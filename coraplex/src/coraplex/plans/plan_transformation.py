@@ -4,12 +4,7 @@ import logging
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    Any,
-    Generic,
-    Type,
-    TypeVar,
-)
+from typing_extensions import Any, Generic, TypeVar
 
 from coraplex.datastructures.enums import InsertionPosition
 from coraplex.exceptions import CannotMatchOnType
@@ -38,7 +33,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
     """
 
     @property
-    def matched_type(self) -> Type[MatchedType]:
+    def matched_type(self) -> type[MatchedType]:
         """
         :return: The type this selects its nodes by.
         """

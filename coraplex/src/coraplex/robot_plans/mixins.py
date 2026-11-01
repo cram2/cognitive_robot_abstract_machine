@@ -3,10 +3,15 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+
 from coraplex.robot_plans.actions.base import Action
 from cramph.node import StatechartNode
 from cramph.world_modification_nodes import MoveBranch
 from cramph.composites import Parallel
+from giskardpy.motion_statechart.goals.gripper import (
+    MoveFingers,
+    MovesGripperToConfiguration,
+)
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
@@ -21,7 +26,6 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
 )
-from typing_extensions import Optional
 
 
 @dataclass(kw_only=True, eq=False)
@@ -275,6 +279,22 @@ class MovesToolCenterPoint(Action, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
+class OperatesGripper(Action, ABC):
+    """
+    An action that brings a gripper into a configuration, such as opening or closing
+    it.
+    """
+
+    gripper_goal_type: type[MovesGripperToConfiguration] = field(
+        default=MoveFingers, init=False
+    )
+    """
+    The kind of node bringing the gripper into the configurations this action asks for,
+    as set by the plan transformations configuring the action.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
 class ReattachesBranches(Action, ABC):
     """
     An action that moves a branch of the kinematic structure under a new parent in the
@@ -347,7 +367,7 @@ class HasApproachesGraspPoses:
         self,
         reference_T_grasp: Pose,
         end_effector: EndEffector,
-        grasp: Optional[GraspCandidate] = None,
+        grasp: GraspCandidate | None = None,
     ) -> GraspPoseSequence:
         """
         :param reference_T_grasp: The grasp frame to reach; for a release, where the
@@ -384,7 +404,7 @@ class HasApproachesGraspPoses:
             (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
         )
 
-    def _approach_distance(self, grasp: Optional[GraspCandidate]) -> float:
+    def _approach_distance(self, grasp: GraspCandidate | None) -> float:
         """
         :param grasp: The grasp on the object, or ``None`` when there is no object.
         :return: The distance in meters from the grasp back to the pre-grasp pose: the

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+# %% Imports
 import os
 from abc import ABC
 from collections import defaultdict
@@ -5,9 +8,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
-from typing import Self, List
+from typing_extensions import Generic, Self
 
-from typing_extensions import Generic
 
 from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.sensors.lidar import Lidar, LidarSource
@@ -25,6 +27,7 @@ from semantic_digital_twin.datastructures.definitions import (
     GripperState,
     TorsoState,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -47,7 +50,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Arm,
     Neck,
     Finger,
-    Camera,
+    RobotCamera,
     AbstractRobot,
     EndEffector,
 )
@@ -65,6 +68,8 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
 
 
 class PR2Topic(StrEnum):
@@ -116,27 +121,36 @@ class PR2Joint(JointName):
 
 
 @dataclass(eq=False)
-class PR2KinectV1(Camera):
+class PR2KinectV1(RobotCamera[FieldOfViewCameraModel]):
+    """
+    Kinect V1 camera attached to its RGB optical frame.
+    """
 
-    def setup_hardware_interfaces(self):
+    def setup_hardware_interfaces(self) -> None:
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
     ) -> Self:
+        """
+        Attach the camera to the Kinect RGB optical frame below the robot root.
+
+        :param robot_root: Root of the robot branch containing the optical frame.
+        :return: Camera configured for the model's optical frame.
+        """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "wide_stereo_optical_frame"
+                robot_root, "head_mount_kinect_rgb_optical_frame"
             ),
-            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(
+                    horizontal_angle=0.99483, vertical_angle=0.75049
+                )
+            ),
             minimal_height=1.27,
             maximal_height=1.60,
             default_camera=True,
@@ -170,11 +184,10 @@ class PR2BaseLidar(Lidar):
 
 @dataclass(eq=False)
 class PR2RightGripperLeftFinger(Finger):
-
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -193,11 +206,10 @@ class PR2RightGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class PR2RightGripperRightFinger(Finger):
-
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -216,11 +228,10 @@ class PR2RightGripperRightFinger(Finger):
 
 @dataclass(eq=False)
 class PR2LeftGripperLeftFinger(Finger):
-
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -239,11 +250,10 @@ class PR2LeftGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class PR2LeftGripperRightFinger(Finger):
-
     def setup_hardware_interfaces(self):
         return
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
@@ -294,8 +304,7 @@ class PR2Gripper(
 class PR2RightGripper(
     PR2Gripper[PR2RightGripperLeftFinger, PR2RightGripperRightFinger]
 ):
-
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         right_gripper_joints = self.active_connections
 
         right_gripper_open = JointState.from_mapping(
@@ -339,8 +348,7 @@ class PR2RightGripper(
 
 @dataclass(eq=False)
 class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFinger]):
-
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         left_gripper_joints = self.active_connections
         left_gripper_open = JointState.from_mapping(
             name=PrefixedName("left_gripper_open", prefix=self.name.name),
@@ -383,7 +391,6 @@ class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFin
 
 @dataclass(eq=False)
 class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
-
     def setup_hardware_interfaces(self):
 
         controlled_joints = [
@@ -396,7 +403,7 @@ class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @property
@@ -467,7 +474,6 @@ class PR2Arm(
 
 @dataclass(eq=False)
 class PR2LeftArm(PR2Arm[PR2LeftGripper]):
-
     def setup_hardware_interfaces(self):
         controlled_joints = [
             PR2Joint.LEFT_SHOULDER_PAN,
@@ -484,7 +490,7 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         left_arm_park = JointState.from_mapping(
             name=PrefixedName("left_park", prefix=self.name.name),
             mapping=dict(
@@ -522,7 +528,6 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
 
 @dataclass(eq=False)
 class PR2RightArm(PR2Arm[PR2RightGripper]):
-
     def setup_hardware_interfaces(self):
         controlled_joints = [
             PR2Joint.RIGHT_SHOULDER_PAN,
@@ -539,7 +544,7 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         right_arm_park = JointState.from_mapping(
             name=PrefixedName("right_park", prefix=self.name.name),
             mapping=dict(
@@ -574,7 +579,6 @@ class PR2Torso(
     HasNeck[PR2Neck],
     ServoedRobotPart,
 ):
-
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -596,7 +600,7 @@ class PR2Torso(
             )
             connection.has_hardware_interface = True
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
         torso_low = JointState.from_mapping(
             name=PrefixedName("torso_low", prefix=self.name.name),
@@ -635,7 +639,6 @@ class PR2Torso(
 
 @dataclass(eq=False)
 class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseLidar]):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -650,7 +653,7 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseL
     def setup_hardware_interfaces(self):
         pass
 
-    def setup_joint_states(self) -> List[JointState]:
+    def setup_joint_states(self) -> list[JointState]:
         return []
 
     @property

@@ -1,7 +1,7 @@
 from cramph.data_types import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing_extensions import Any
 
 import pytest
 
@@ -58,7 +58,7 @@ class GoalQueueMimic:
     Stands in for the action server: hands out one goal and records the outcome.
     """
 
-    goal_json: Optional[str] = None
+    goal_json: str | None = None
     """
     The goal that is waiting to be accepted, or ``None`` if there is none.
     """
@@ -78,27 +78,27 @@ class GoalQueueMimic:
     Whether the current goal should be canceled.
     """
 
-    goal_msg: Optional[Any] = field(init=False, default=None)
+    goal_msg: Any | None = field(init=False, default=None)
     """
     Request of the accepted goal.
     """
 
-    result_message: Optional[Any] = field(init=False, default=None)
+    result_message: Any | None = field(init=False, default=None)
     """
     Result built for the accepted goal.
     """
 
-    outcome: Optional[GoalOutcome] = field(init=False, default=None)
+    outcome: GoalOutcome | None = field(init=False, default=None)
     """
     Whether the goal was marked as succeeded, aborted or canceled.
     """
 
-    sent_results: List[Any] = field(init=False, default_factory=list)
+    sent_results: list[Any] = field(init=False, default_factory=list)
     """
     Every result that was handed back to a client.
     """
 
-    feedback_messages: List[Any] = field(init=False, default_factory=list)
+    feedback_messages: list[Any] = field(init=False, default_factory=list)
     """
     Every feedback message that was published.
     """
@@ -172,18 +172,18 @@ class WorldUpdatesMimic:
     Whether a model change is waiting to be applied.
     """
 
-    drains_until_caught_up: Optional[int] = None
+    drains_until_caught_up: int | None = None
     """
     How many drains it takes until an awaited position counts as applied, or ``None`` if
     it never does.
     """
 
-    awaited_positions: List[StreamPosition] = field(default_factory=list)
+    awaited_positions: list[StreamPosition] = field(default_factory=list)
     """
     Every position this mimic was asked about.
     """
 
-    compiled_while_waiting: List[bool] = field(default_factory=list)
+    compiled_while_waiting: list[bool] = field(default_factory=list)
     """
     Whether a motion statechart was already compiled, per position asked about.
     """
@@ -252,7 +252,7 @@ class RecordingInputSynchronizer(InputSynchronizer):
     The executor whose control cycles are recorded on every apply.
     """
 
-    applied_at_control_cycles: List[float] = field(default_factory=list)
+    applied_at_control_cycles: list[float] = field(default_factory=list)
     """
     The control cycle count at the time of every apply.
     """
@@ -279,7 +279,7 @@ class RecordingCommandPublisher(CommandPublisher):
     Records how often commands were published and when the robot was stopped.
     """
 
-    published_velocities: List[float] = field(default_factory=list)
+    published_velocities: list[float] = field(default_factory=list)
     """
     The commanded velocity of every publish.
     """
@@ -380,7 +380,7 @@ class CycleWatchingGoalCanceler(InputSynchronizer):
     The counter that is watched.
     """
 
-    action_server: Optional[GoalQueueMimic] = None
+    action_server: GoalQueueMimic | None = None
     """
     The action server the cancel request is written to.
     """
@@ -415,7 +415,7 @@ class CycleWatchingClientDisconnector(InputSynchronizer):
     The counter that is watched.
     """
 
-    client_presence: Optional[HeartbeatPresence] = None
+    client_presence: HeartbeatPresence | None = None
     """
     The check that stops reporting the client as present.
     """
@@ -447,7 +447,7 @@ class CycleWatchingLateClientDisconnector(CycleWatchingClientDisconnector):
     goal was accepted.
     """
 
-    client: Optional[MetaData] = None
+    client: MetaData | None = None
     """
     The client that announces itself late.
     """
@@ -478,12 +478,12 @@ class FeedbackCountingSynchronizer(InputSynchronizer):
     inputs.
     """
 
-    action_server: Optional[GoalQueueMimic] = None
+    action_server: GoalQueueMimic | None = None
     """
     The action server whose published feedback is counted.
     """
 
-    published_feedback_per_cycle: List[int] = field(default_factory=list)
+    published_feedback_per_cycle: list[int] = field(default_factory=list)
     """
     Number of feedback messages published before each control cycle.
     """
@@ -518,7 +518,7 @@ class PendingModelChangeInjector(InputSynchronizer):
     process that changes the world model mid-motion.
     """
 
-    world_updates: Optional[WorldUpdatesMimic] = None
+    world_updates: WorldUpdatesMimic | None = None
     """
     The incoming updates the model change is announced on.
     """
@@ -546,7 +546,7 @@ class RecordingPlotter(PostGoalPlotter):
     Records for which goals debug plots were requested.
     """
 
-    plotted_goal_ids: List[int] = field(default_factory=list)
+    plotted_goal_ids: list[int] = field(default_factory=list)
     """
     The goal ids that were plotted.
     """
@@ -598,8 +598,8 @@ def feedback_data(message: Any) -> dict:
 
 def create_goal_json(
     seconds: float = 0.5,
-    required_position: Optional[StreamPosition] = None,
-    client: Optional[MetaData] = None,
+    required_position: StreamPosition | None = None,
+    client: MetaData | None = None,
 ) -> str:
     """
     Build the json of a goal whose motion ends after the given simulated time.

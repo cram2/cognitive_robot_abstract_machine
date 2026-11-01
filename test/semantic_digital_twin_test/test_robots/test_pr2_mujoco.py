@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 
-from typing_extensions import List
 
 import mujoco
 import numpy as np
@@ -24,6 +23,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoFixedConnectionJoints,
     MujocoOmniDriveJoints,
     MujocoSim,
+    SimulatorModelNames,
 )
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
@@ -107,7 +107,7 @@ def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo
         arm.end_effector.thumb.root.parent_connection.raw_dof for arm in pr2.all_arms
     }
 
-    def driven_by(servo_type: type) -> List[str]:
+    def driven_by(servo_type: type) -> list[str]:
         return sorted(
             str(degree_of_freedom.name)
             for actuator in world.actuators
@@ -214,10 +214,19 @@ def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
         if isinstance(connection, FixedConnection)
     )
 
-    assert type(MujocoConnectionJoints.of(pr2.drive, world)) is MujocoOmniDriveJoints
-    assert type(MujocoConnectionJoints.of(revolute, world)) is MujocoConnectionJoint
-    assert type(MujocoConnectionJoints.of(fixed, world)) is (
-        MujocoFixedConnectionJoints
+    element_names = SimulatorModelNames()
+
+    assert (
+        type(MujocoConnectionJoints.of(pr2.drive, world, element_names))
+        is MujocoOmniDriveJoints
+    )
+    assert (
+        type(MujocoConnectionJoints.of(revolute, world, element_names))
+        is MujocoConnectionJoint
+    )
+    assert (
+        type(MujocoConnectionJoints.of(fixed, world, element_names))
+        is MujocoFixedConnectionJoints
     )
 
 

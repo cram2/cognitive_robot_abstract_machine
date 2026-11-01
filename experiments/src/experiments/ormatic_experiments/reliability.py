@@ -11,7 +11,6 @@ import pathlib
 import time
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List
 
 import plotly.graph_objects as go
 import tqdm
@@ -80,9 +79,9 @@ def build_cram_world():
     hsrb_world = _build_hsrb_world()
     apartment = URDFParser.from_file(str(_APARTMENT_URDF)).parse()
     hsrb_world.merge_world(apartment)
-    hsrb_world.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
-    )
+    hsrb_world.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     hsrb = hsrb_world.get_semantic_annotations_by_type(HSRB)[0]
     extensions = [
         RobotAccess(hsrb),
@@ -276,7 +275,7 @@ def reliability_experiment(
 def run_reliability_experiment(
     plan_size: int,
     iterations: int = 10,
-) -> tuple[ORMaticReliabilityAggregateResult, List[ORMaticReliabilityExperimentResult]]:
+) -> tuple[ORMaticReliabilityAggregateResult, list[ORMaticReliabilityExperimentResult]]:
     """
     Run *iterations* reliability experiment cycles for plans of *plan_size* actions and
     aggregate the results.
@@ -325,7 +324,7 @@ def run_reliability_experiment(
 
 
 def plot_reliability(
-    raw_results: List[ORMaticReliabilityExperimentResult],
+    raw_results: list[ORMaticReliabilityExperimentResult],
 ) -> go.Figure:
     """
     Produce a grouped violin plot of plan size vs duration for each timing phase.
@@ -366,7 +365,7 @@ def plot_reliability(
 
 def main():
     aggregate_results = []
-    all_raw: List[ORMaticReliabilityExperimentResult] = []
+    all_raw: list[ORMaticReliabilityExperimentResult] = []
     for plan_size in tqdm.tqdm(
         [
             1,

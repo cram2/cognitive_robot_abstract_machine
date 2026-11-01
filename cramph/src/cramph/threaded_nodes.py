@@ -28,6 +28,10 @@ class ThreadedNode(StatechartNode, ABC):
 
     .. warning:: What :meth:`run` calls is usually not serializable, so such a node only
         works in a locally ticked statechart.
+
+    .. warning:: Nothing stops the thread when this node ends, and a thread still
+        running from an earlier start can overwrite the outcome of a later one, so
+        restart such a node only once :attr:`has_finished` holds.
     """
 
     _thread: threading.Thread | None = field(default=None, init=False, repr=False)

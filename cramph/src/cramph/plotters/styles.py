@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 
+
 from semantic_digital_twin.world_description.geometry import Color
 from cramph.data_types import ObservationStateValues, TransitionKind
 

@@ -21,7 +21,7 @@ from functools import cached_property
 
 import numpy as np
 import trimesh
-from typing_extensions import TYPE_CHECKING, List, Optional, Sequence, Tuple
+from typing_extensions import TYPE_CHECKING, Sequence
 
 from experiments.experiment_definitions import VolumeBound
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
@@ -67,7 +67,7 @@ class ObstacleContainmentChecker:
     axis-aligned box around a hollow or L-shaped obstacle would.
     """
 
-    world_meshes: List[trimesh.Trimesh]
+    world_meshes: list[trimesh.Trimesh]
     """
     One or more watertight meshes covering the obstacle, expressed in the target frame
     (the original mesh if it was already watertight, or its convex-decomposed pieces
@@ -85,7 +85,7 @@ class ObstacleContainmentChecker:
         cls,
         shape: Shape,
         target_frame: KinematicStructureEntity,
-        mesh_decomposer: Optional[MeshDecomposer] = None,
+        mesh_decomposer: MeshDecomposer | None = None,
     ) -> ObstacleContainmentChecker:
         """
         Build a containment checker for *shape*, expressed relative to *target_frame*.
@@ -147,7 +147,7 @@ class MonteCarloFreeSpaceSampler:
     The volume to sample points within.
     """
 
-    obstacle_containment_checkers: List[ObstacleContainmentChecker] = field(
+    obstacle_containment_checkers: list[ObstacleContainmentChecker] = field(
         default_factory=list
     )
     """
@@ -270,7 +270,7 @@ class MonteCarloFreeSpaceSampler:
     @staticmethod
     def wilson_score_interval(
         success_count: int, total: int, confidence_level: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Wilson score confidence interval for the true proportion of successes among
         *total* Bernoulli trials, following :cite:t:`wilson1927probable`.

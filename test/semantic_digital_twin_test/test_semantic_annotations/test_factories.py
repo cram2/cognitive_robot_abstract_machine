@@ -1,6 +1,5 @@
 import unittest
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -1197,11 +1196,11 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
     both.
     """
 
-    door: Optional[Door] = field(
+    door: Door | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
-    typed_door: Optional[DoorWithType] = field(
+    typed_door: DoorWithType | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )

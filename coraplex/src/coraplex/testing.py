@@ -9,7 +9,7 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List
+from typing_extensions import Callable
 
 import numpy as np
 import pytest
@@ -137,10 +137,10 @@ def setup_world() -> World:
             1.5, 2.5, 0, reference_frame=apartment_root
         )
 
-    apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.0345, reference_frame=apartment_world.root
-        )
+    apartment_world.get_body_by_name(
+        "milk.stl"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2.37, 2, 1.0345, reference_frame=apartment_world.root
     )
     apartment_world.get_body_by_name(
         "breakfast_cereal.stl"
@@ -274,7 +274,7 @@ class StandaloneProcess:
     node to look from.
     """
 
-    arguments: List[str] = field(default_factory=list)
+    arguments: list[str] = field(default_factory=list)
     """
     Command-line arguments passed to the script.
     """

@@ -369,7 +369,7 @@ class TestTemplates:
                     [
                         Box(
                             scale=Scale(0.05, 0.01, 0.15),
-                            color=Color(R=0.0, G=0.588, B=0.784),
+                            color=Color.from_rgba(red=0.0, green=0.588, blue=0.784),
                         )
                     ]
                 ),
@@ -389,7 +389,7 @@ class TestTemplates:
                     [
                         Box(
                             scale=Scale(0.1, 0.2, 0.06),
-                            color=Color(R=0.784, G=0.588, B=0.0),
+                            color=Color.from_rgba(red=0.784, green=0.588, blue=0.0),
                         )
                     ]
                 ),

@@ -465,6 +465,9 @@ class StatechartExecutor(Executor, RecompileCallback):
         Compiles `statechart` and ticks it once, so that nodes whose start condition is
         constant true start immediately.
 
+        A run that raises while it starts is finished, see :meth:`finish_run`, before
+        the exception propagates.
+
         :param statechart: The statechart to execute.
         :raises StatechartOfDifferentContextError: If `statechart` was not built in
             :attr:`context`.
@@ -473,8 +476,12 @@ class StatechartExecutor(Executor, RecompileCallback):
         self.tick_count = 0
         self.statechart.compiler.compile()
         self.statechart.compiler.add_recompile_callback(self)
-        self._notify_compiled()
-        self.statechart.tick()
+        try:
+            self._notify_compiled()
+            self.statechart.tick()
+        except BaseException:
+            self.finish_run()
+            raise
 
     def before_recompile(self) -> bool:
         """

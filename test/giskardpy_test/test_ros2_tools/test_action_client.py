@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing_extensions import Any
 
 import pytest
 from json_msgs.action import JsonAction

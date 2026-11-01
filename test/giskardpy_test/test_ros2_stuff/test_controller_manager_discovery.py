@@ -15,7 +15,9 @@ from typing_extensions import Iterator
 
 import pytest
 from rclpy.executors import SingleThreadedExecutor
+from geometry_msgs.msg import TwistStamped
 from rclpy.node import Node
+from rclpy.subscription import Subscription
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
@@ -36,7 +38,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyVelocityInterface,
-    WorldWithDaisyConfig,
+    WorldWithDAiSyConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     TracyVelocityInterface,
@@ -143,9 +145,13 @@ class ControllerManagerMimic:
                 )
             case ControllerType.JOINT_STATE_BROADCASTER:
                 node.create_publisher(JointState, "joint_states", 10)
+            case ControllerType.DIFF_DRIVE:
+                node.create_subscription(
+                    TwistStamped, "~/cmd_vel", self.ignore_command, 10
+                )
         return node
 
-    def ignore_command(self, command: Float64MultiArray) -> None:
+    def ignore_command(self, command: Float64MultiArray | TwistStamped) -> None:
         """
         Accept a command without acting on it.
         """
@@ -171,16 +177,18 @@ class ControllerManagerMimic:
         """
         return self.nodes[1 + self.controllers.index(controller)]
 
+    def command_subscription_of(self, controller: ControllerMimic) -> Subscription:
+        """
+        :return: The subscription ``controller`` receives its commands through.
+        """
+        [subscription] = self.controller_node(controller).subscriptions
+        return subscription
+
     def command_topic_of(self, controller: ControllerMimic) -> str:
         """
         :return: The topic ``controller`` receives its commands on.
         """
-        [subscription] = [
-            subscription
-            for subscription in self.controller_node(controller).subscriptions
-            if subscription.msg_type is Float64MultiArray
-        ]
-        return subscription.topic_name
+        return self.command_subscription_of(controller).topic_name
 
     def joint_state_topic_of(self, controller: ControllerMimic) -> str:
         """
@@ -460,6 +468,31 @@ def test_a_whitelisted_controller_that_is_not_active_raises(serve) -> None:
         giskard.setup()
 
 
+# %% discovering the drive
+
+
+def test_a_diff_drive_controller_is_commanded_on_its_topic_in_its_message_type(
+    serve,
+) -> None:
+    diff_drive = ControllerMimic(
+        name="diff_drive_controller", controller_type=ControllerType.DIFF_DRIVE
+    )
+    manager = ControllerManagerMimic(
+        name="base/controller_manager", controllers=[diff_drive]
+    )
+    start(serve, manager)
+    giskard = closed_loop_pr2(DiscoveringInterface(manager.name))
+
+    giskard.setup()
+
+    [publisher] = giskard.motion_server.control_loop.command_publishers
+    subscription = manager.command_subscription_of(diff_drive)
+    assert (publisher.command_topic, publisher.command_format.message_type()) == (
+        subscription.topic_name,
+        subscription.msg_type,
+    )
+
+
 # %% discovering the joint states
 
 
@@ -669,7 +702,7 @@ def closed_loop_daisy() -> Giskard:
     A Giskard that commands DAiSy through its velocity interface.
     """
     return Giskard(
-        world_config=WorldWithDaisyConfig(urdf=load_xacro(DAiSy.get_ros_file_path())),
+        world_config=WorldWithDAiSyConfig(urdf=load_xacro(DAiSy.get_ros_file_path())),
         robot_interface_config=DAiSyVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),

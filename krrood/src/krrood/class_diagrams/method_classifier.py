@@ -20,7 +20,7 @@ import inspect
 from dataclasses import dataclass
 from functools import lru_cache
 
-from typing_extensions import Any, Callable, Self, Tuple, Type
+from typing_extensions import Any, Callable, Self
 
 from krrood.class_diagrams.exceptions import FactoryMethodDecoratorError
 from krrood.class_diagrams.factory_method_registry import FactoryMethodRegistry
@@ -48,14 +48,14 @@ class FactoryMethodMarker:
     wrapped: classmethod
     """The ``classmethod`` being marked as a factory."""
 
-    def __set_name__(self, owner: Type, name: str) -> None:
+    def __set_name__(self, owner: type, name: str) -> None:
         """
         Register the factory with :class:`FactoryMethodRegistry` once the owner is
         known.
         """
         FactoryMethodRegistry().register(owner, name)
 
-    def __get__(self, instance: Any, owner: Type = None) -> Any:
+    def __get__(self, instance: Any, owner: type = None) -> Any:
         """
         Bind the wrapped classmethod so the factory stays callable on the class and
         instances.
@@ -88,7 +88,7 @@ def _decorated_name(method: Any) -> str:
     return repr(method)
 
 
-def _return_annotation_is_self_or_owner(func: Callable, cls: Type) -> bool:
+def _return_annotation_is_self_or_owner(func: Callable, cls: type) -> bool:
     """
     :param func: The underlying function of a classmethod.
     :param cls: The class on which the method is looked up.
@@ -104,7 +104,7 @@ def _return_annotation_is_self_or_owner(func: Callable, cls: Type) -> bool:
 
 
 @lru_cache(maxsize=None)
-def is_factory_method(cls: Type, name: str) -> bool:
+def is_factory_method(cls: type, name: str) -> bool:
     """
     :param cls: The class to look the method up on.
     :param name: The attribute name to classify.
@@ -118,7 +118,7 @@ def is_factory_method(cls: Type, name: str) -> bool:
     return _return_annotation_is_self_or_owner(attribute.__func__, cls)
 
 
-def factory_method_names(cls: Type) -> Tuple[str, ...]:
+def factory_method_names(cls: type) -> tuple[str, ...]:
     """
     :param cls: The class to inspect.
     :return: The names of all factory classmethods reachable on ``cls`` (including inherited ones).

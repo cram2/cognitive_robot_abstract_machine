@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import json
 import threading
 from datetime import timedelta
 from functools import partial
-from typing_extensions import Callable, List, Tuple, Union, Any
+from typing_extensions import Callable, Any
 
 from action_msgs.msg import GoalStatus
 from rcl_interfaces.srv._get_parameters import (
@@ -39,12 +41,12 @@ def msg_type_as_str(msg_type) -> str:
 
 def wait_for_message(
     msg_type,
-    node: "Node",
+    node: Node,
     topic: str,
     *,
-    qos_profile: Union[QoSProfile, int] = QoSProfile(depth=10),
+    qos_profile: QoSProfile | int = QoSProfile(depth=10),
     time_to_wait=-1,
-) -> Tuple[bool, Any]:
+) -> tuple[bool, Any]:
     event = threading.Event()
     msg_holder = [None]
 
@@ -107,7 +109,7 @@ def search_for_subscriber_of_node_with_type(
     )[0]
 
 
-def search_for_publishers_of_type(topic_type) -> List[str]:
+def search_for_publishers_of_type(topic_type) -> list[str]:
     topics = _search_in_topic_list(
         topic_list=rospy.get_node().get_topic_names_and_types(), topic_type=topic_type
     )
@@ -120,21 +122,21 @@ def search_for_publishers_of_type(topic_type) -> List[str]:
 
 def search_for_unique_publisher_of_type(topic_type) -> str:
     topic_names = search_for_publishers_of_type(topic_type)
-    assert (
-        len(topic_names) == 1
-    ), f"Found too many {msg_type_as_str(topic_type)} topics: {topic_names}."
+    assert len(topic_names) == 1, (
+        f"Found too many {msg_type_as_str(topic_type)} topics: {topic_names}."
+    )
     return topic_names[0]
 
 
 def search_for_unique_subscriber_of_type(topic_type) -> str:
     topic_names = search_for_subscribers_of_type(topic_type)
-    assert (
-        len(topic_names) == 1
-    ), f"Found too many {msg_type_as_str(topic_type)} topics: {topic_names}."
+    assert len(topic_names) == 1, (
+        f"Found too many {msg_type_as_str(topic_type)} topics: {topic_names}."
+    )
     return topic_names[0]
 
 
-def search_for_subscribers_of_type(topic_type) -> List[str]:
+def search_for_subscribers_of_type(topic_type) -> list[str]:
     topics = _search_in_topic_list(
         topic_list=rospy.get_node().get_topic_names_and_types(), topic_type=topic_type
     )
@@ -177,7 +179,7 @@ def call_service(
 
 
 def get_parameters(
-    parameters: List[str], node_name: str = "controller_manager"
+    parameters: list[str], node_name: str = "controller_manager"
 ) -> GetParameters_Response:
     request = GetParameters_Request()
     request.names = parameters
@@ -185,8 +187,8 @@ def get_parameters(
 
 
 def _search_in_topic_list(
-    topic_list: List[Tuple[str, list]], topic_type: str, node_name: str | None = None
-) -> List[str]:
+    topic_list: list[tuple[str, list]], topic_type: str, node_name: str | None = None
+) -> list[str]:
     matches = []
     for topic_name, topic_types in topic_list:
         if topic_types[0] == msg_type_as_str(topic_type):

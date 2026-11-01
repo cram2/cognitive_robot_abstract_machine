@@ -109,9 +109,10 @@ sent. The HSR does it like this:
 - `sync_robot_parts()` reads the joint states and the odometry from the topics the robot
   class declares. A robot without a robot class uses `sync_joint_state_topic()` and
   `sync_odometry_topic()` instead.
-- `add_base_cmd_velocity()` sends the velocity of the drive as a `Twist`.
-- `add_joint_velocity_group_controller()` sends joint velocities to a controller that is
-  not found through a controller manager. The joints have to be listed in the order of
+- `add_drive_velocity_command_topic()` sends the velocity of the drive, as a `Twist` by
+  default.
+- `add_joint_group_velocity_command_topic()` sends joint velocities to a controller that
+  is not found through a controller manager. The joints have to be listed in the order of
   the controller's command layout, because the command is an array without names.
 
 Inputs are applied in the order `setup()` adds them, except the tf frames, which are

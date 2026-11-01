@@ -14,7 +14,11 @@ from coraplex.querying.grasp_closeness import GraspsByCloseness
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.core.pick_up import GraspingAction, HasGraspChoice
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
+from coraplex.robot_plans.mixins import (
+    HasApproachesGraspPoses,
+    MovesToolCenterPoint,
+    OperatesGripper,
+)
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
@@ -36,7 +40,7 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class MovesContainerByItsHandle(
-    MovesToolCenterPoint, SequentialAction, HasGraspChoice, ABC
+    MovesToolCenterPoint, OperatesGripper, SequentialAction, HasGraspChoice, ABC
 ):
     """
     An action that takes hold of a container's handle by :attr:`grasp`, moves the
@@ -126,7 +130,9 @@ class MovesContainerByItsHandle(
                 approach_clearance=self.approach_clearance,
             ),
             self._create_mechanism_goal(),
-            self.create_finger_goal(end_effector, GripperState.OPEN),
+            self.gripper_goal_type.moving_gripper_to(
+                end_effector.default_configuration(GripperState.OPEN)
+            ),
             self.tool_center_point_goal(
                 self.back_off_pose(self.grasp.grasp_pose, end_effector),
                 self.arm,

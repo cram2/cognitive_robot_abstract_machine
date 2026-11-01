@@ -39,8 +39,8 @@ class HSRVelocityInterface(ClosedLoopRobotInterfaceConfig):
         self.sync_robot_parts()
 
         omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
-        self.add_base_cmd_velocity(
-            cmd_vel_topic="/omni_base_controller/cmd_vel", joint=omni_drive
+        self.add_drive_velocity_command_topic(
+            command_topic="/omni_base_controller/cmd_vel", drive=omni_drive
         )
 
         joints_left = [
@@ -52,6 +52,7 @@ class HSRVelocityInterface(ClosedLoopRobotInterfaceConfig):
             HSRBJoint.HEAD_PAN,
             HSRBJoint.HEAD_TILT,
         ]
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/realtime_body_controller_real/command", connections=joints_left
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/realtime_body_controller_real/command",
+            connections=joints_left,
         )

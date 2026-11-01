@@ -4,7 +4,7 @@ import dataclasses
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, assert_never, Union
+from typing_extensions import assert_never, Union
 
 from experiments.shelf_generation_experiments.exceptions import PathError
 from experiments.shelf_generation_experiments.utils import (
@@ -66,7 +66,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
     Identifier used to look up the PLY mesh file for this object in the dataset.
     """
 
-    name: Optional[str] = field(default=None, kw_only=True)
+    name: str | None = field(default=None, kw_only=True)
     """
     Optional explicit name for the spawned body.
 
@@ -74,7 +74,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
     carried on a now-removed ``id`` field.
     """
 
-    annotation: Optional[Body] = field(default=None, compare=False)
+    annotation: Body | None = field(default=None, compare=False)
     """
     The body spawned for this object in the world.
 
@@ -127,12 +127,12 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
     def spawn(
         self,
         world: World,
-        mesh_path: Optional[Path],
-        name: Optional[str] = None,
-        parent: Optional[KinematicStructureEntity] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        x: Optional[float] = None,
-        y: Optional[float] = None,
+        mesh_path: Path | None,
+        name: str | None = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        x: float | None = None,
+        y: float | None = None,
         z: float = 0.0,
     ) -> Body:
         """
@@ -304,7 +304,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
     real shelves instead of assumed from evenly spaced layers.
     """
 
-    slab_top_height: Optional[float] = field(default=None, compare=False)
+    slab_top_height: float | None = field(default=None, compare=False)
     """
     Height of the slab's top face, in the shelf corpus's own frame.
 
@@ -312,7 +312,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
     only recorded or only sampled, never spawned, carries no real slab yet.
     """
 
-    maximum_object_extents: Optional[Scale] = field(default=None, compare=False)
+    maximum_object_extents: Scale | None = field(default=None, compare=False)
     """
     Largest object the layer accepts, as ``(length, width, height)`` on ``(x, y, z)``.
 
@@ -321,7 +321,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
     top.
     """
 
-    annotation: Optional[ShelfLayer] = field(default=None, compare=False)
+    annotation: ShelfLayer | None = field(default=None, compare=False)
     """
     The layer's supporting-surface annotation in the world.
 
@@ -330,7 +330,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
     :attr:`RelationalCircuitExperimentObject2D.annotation`, not here.
     """
 
-    name: Optional[str] = field(default=None, kw_only=True)
+    name: str | None = field(default=None, kw_only=True)
     """
     Optional explicit name for the spawned layer annotation and its body.
     """
@@ -341,9 +341,9 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
         corpus: KinematicStructureEntity,
         shelf_scale: Scale,
         slab_thickness: float,
-        name: Optional[str] = None,
-        parent: Optional[KinematicStructureEntity] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        name: str | None = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
     ) -> ShelfLayer:
         """
         Spawn this layer's slab and reparent it under the shelf ``corpus`` so the whole
@@ -426,19 +426,19 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
     dimensions, layer count and contents are conditioned on.
     """
 
-    source_ids: Optional[list[MeshCandidate]] = field(default=None)
+    source_ids: list[MeshCandidate] | None = field(default=None)
     """
     Pool of candidate meshes used when placing objects on shelf layers.
     """
 
-    annotation: Optional[Cabinet] = field(default=None, compare=False)
+    annotation: Cabinet | None = field(default=None, compare=False)
     """
     The shelf corpus's annotation in the world.
 
     ``None`` until :meth:`spawn` is called, which sets it to the annotation it creates.
     """
 
-    name: Optional[str] = field(default=None, kw_only=True)
+    name: str | None = field(default=None, kw_only=True)
     """
     Optional explicit name for the spawned corpus annotation and its body.
     """
@@ -463,7 +463,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         return shelf_yaw_radians + math.radians(offset_degrees)
 
     @property
-    def world(self) -> Optional[World]:
+    def world(self) -> World | None:
         """
         The world this shelf was spawned into, or ``None`` before :meth:`spawn` is
         called.
@@ -471,7 +471,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         return None if self.annotation is None else self.annotation.root._world
 
     @property
-    def parent(self) -> Optional[KinematicStructureEntity]:
+    def parent(self) -> KinematicStructureEntity | None:
         """
         The frame this shelf's objects' poses are expressed relative to, or ``None``
         before :meth:`spawn` is called.
@@ -483,7 +483,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
         )
 
     @property
-    def corpus(self) -> Optional[Body]:
+    def corpus(self) -> Body | None:
         """
         The shelf corpus's body, so a caller can check objects for collision against its
         walls in addition to each other.
@@ -688,9 +688,9 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
     def _spawn_corpus_and_slabs(
         self,
         world: World,
-        name: Optional[str] = None,
-        parent: Optional[KinematicStructureEntity] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        name: str | None = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
         *,
         slab_thickness: float,
         corpus_wall_thickness: float,
@@ -866,9 +866,9 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
     def spawn(
         self,
         world: World,
-        name: Optional[str] = None,
-        parent: Optional[KinematicStructureEntity] = None,
-        parent_T_self: Optional[HomogeneousTransformationMatrix] = None,
+        name: str | None = None,
+        parent: KinematicStructureEntity | None = None,
+        parent_T_self: HomogeneousTransformationMatrix | None = None,
         slab_thickness: float = 0.02,
         corpus_wall_thickness: float = 0.03,
     ) -> Cabinet:

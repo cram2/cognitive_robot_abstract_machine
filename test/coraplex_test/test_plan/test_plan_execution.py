@@ -3,6 +3,7 @@ Tests for compiling and executing a plan with a
 :class:`~coraplex.plans.executors.PlanExecutor`.
 """
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -14,6 +15,7 @@ from coraplex.exceptions import (
     MotionDidNotFinish,
     PlanNotCompiled,
 )
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.plans.plan_transformation import PlanRewriting
 from coraplex.plans.failures import (
     MotionExceededSimulationTimeLimit,
@@ -27,22 +29,38 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
 )
 from cramph.composites import Sequence
-from cramph.exceptions import StatechartOfDifferentContextError
+from cramph.exceptions import (
+    DuplicateContextExtensionError,
+    StatechartOfDifferentContextError,
+)
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.executor import Pacer, StatechartExecutor
 from cramph.node import CancelStatechart
 from cramph.nodes_for_testing import NodeFailingOnObservingFalse
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
+)
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.world import World
 from ..conftest import physically_simulated_executor
-from ...plan_running import run_plan, simulated_executor, statechart_of
+from ...plan_running import (
+    robot_extensions,
+    run_plan,
+    simulated_executor,
+    statechart_of,
+)
 
 # %% counting the waits between ticks
 
@@ -312,6 +330,52 @@ def test_a_plan_that_violates_collision_avoidance_fails_as_a_plan_failure(
     assert failure.value.violation is violation
 
 
+# %% avoiding collisions in a world with several robots
+
+
+@pytest.fixture
+def tiago_world_with_a_stretch(_tiago_world_setup) -> World:
+    """
+    A world holding a Tiago and, three metres in front of it, a Stretch.
+    """
+    world = deepcopy(_tiago_world_setup)
+    RobotSpecification(
+        Stretch, world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
+    ).spawn(world)
+    return world
+
+
+def test_collision_avoidance_is_compiled_for_the_robot_performing_the_plan(
+    tiago_world_with_a_stretch,
+) -> None:
+    [tiago] = tiago_world_with_a_stretch.get_semantic_annotations_by_type(Tiago)
+    plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
+    executor = simulated_executor(robot_extensions(tiago), collision_avoidance=True)
+
+    executor.compile(statechart_of(executor, plan))
+
+    statechart = plan.statechart
+    [external_collision_avoidance] = statechart.get_nodes_by_type(
+        ExternalCollisionAvoidance
+    )
+    [self_collision_avoidance] = statechart.get_nodes_by_type(SelfCollisionAvoidance)
+    assert external_collision_avoidance.robot is tiago
+    assert self_collision_avoidance.robot is tiago
+
+
+def test_a_plan_avoiding_collisions_succeeds_in_a_world_with_another_robot(
+    tiago_world_with_a_stretch,
+) -> None:
+    [tiago] = tiago_world_with_a_stretch.get_semantic_annotations_by_type(Tiago)
+    plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
+    executor = simulated_executor(robot_extensions(tiago), collision_avoidance=True)
+
+    executor.compile(statechart_of(executor, plan))
+    executor.execute()
+
+    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+
 # %% performing a plan in a physically simulated world
 
 
@@ -409,3 +473,20 @@ def test_the_rewriting_a_plan_was_given_is_left_as_it_was(
     physically_simulated_executor([*extensions, given])
 
     assert given.transformations == [detecting]
+
+
+def test_a_second_executor_on_a_context_leaves_the_rewriting_of_the_first_alone(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    first = simulated_executor(extensions)
+    rewriting = first.context.require_extension(PlanRewriting)
+    transformations = list(rewriting.transformations)
+
+    with pytest.raises(DuplicateContextExtensionError):
+        KinematicallySimulatedPlanExecutor(
+            first.context, plan_adaptations=[DetectBeforeGrasp()]
+        )
+
+    assert first.context.require_extension(PlanRewriting) is rewriting
+    assert rewriting.transformations == transformations

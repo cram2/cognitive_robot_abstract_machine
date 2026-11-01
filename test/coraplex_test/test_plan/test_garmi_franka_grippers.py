@@ -67,7 +67,13 @@ def test_garmi_opens_its_gripper_through_the_franka_driver(garmi_extensions) -> 
     transformation = DriveGarmiGripperStatesWithTheirFrankaDriver()
 
     plan = prepared(
-        Sequence(nodes=[SetGripperAction(gripper=gripper, motion=GripperState.OPEN)]),
+        Sequence(
+            nodes=[
+                SetGripperAction(
+                    configuration=gripper.default_configuration(GripperState.OPEN)
+                )
+            ]
+        ),
         real_garmi_executor(garmi_extensions),
     )
 

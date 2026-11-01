@@ -60,11 +60,11 @@ root_C_slider: PrismaticConnection = ...
 world = World()
 red_box = ShapeCollection([Box(
     scale=Scale(0.1, 0.1, 0.1),
-    color=Color(1.0, 0.0, 0.0),
+    color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
 )])
 green_box = ShapeCollection([Box(
     scale=Scale(0.1, 0.1, 0.1),
-    color=Color(0.0, 1.0, 0.0),
+    color=Color.from_rgba(red=0.0, green=1.0, blue=0.0),
 )])
 root = Body(name=PrefixedName("root"), visual=red_box, collision=red_box)
 slider = Body(name=PrefixedName("slider"), visual=green_box, collision=green_box)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import field
-from typing_extensions import List, Optional
 
 from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner
@@ -47,7 +46,7 @@ class LocalMinimumReached(EndedByOwner, MotionStatechartNode):
     Windows size for joint convergence check.
     """
 
-    degrees_of_freedom: Optional[List[DegreeOfFreedom]] = None
+    degrees_of_freedom: list[DegreeOfFreedom] | None = None
     """
     Degrees of freedom to check for convergence.
 
@@ -71,7 +70,7 @@ class LocalMinimumReached(EndedByOwner, MotionStatechartNode):
     on earlier, unrelated motions, before this one ever started.
     """
 
-    _start_cycle_variable: Optional[FloatVariable] = field(
+    _start_cycle_variable: FloatVariable | None = field(
         init=False, default=None, repr=False
     )
     """

@@ -315,3 +315,17 @@ def test_a_child_a_compiled_composite_node_rejects_does_not_join_the_statechart(
 
     assert statechart.nodes == nodes_before
     assert not rejected.belongs_to_statechart()
+
+
+def test_a_child_a_compiled_composite_node_rejects_does_not_become_its_child(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    first = _node_arriving_at_once("first")
+    statechart.add_node(sequence := Sequence(nodes=[first]))
+    statechart_executor.compile(statechart)
+
+    with pytest.raises(StatechartAlreadyCompiledError):
+        sequence.add_node(_node_arriving_at_once("rejected"))
+
+    assert sequence.nodes == [first]

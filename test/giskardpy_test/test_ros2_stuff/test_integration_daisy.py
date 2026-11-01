@@ -7,7 +7,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDaisyConfig,
+    WorldWithDAiSyConfig,
 )
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
@@ -63,7 +63,7 @@ class DAiSyTester(GiskardTester):
             "package://iai_daisy_description/robots/daisy.urdf.xacro"
         )
         return Giskard(
-            world_config=WorldWithDaisyConfig(urdf=robot_desc),
+            world_config=WorldWithDAiSyConfig(urdf=robot_desc),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
                 debug_mode=True,

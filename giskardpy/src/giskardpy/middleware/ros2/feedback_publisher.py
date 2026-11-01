@@ -145,10 +145,10 @@ class ActionFeedbackPublisher:
         data = self.create_states()
         data[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         if len(statechart.nodes) > self.sent_node_count:
-            data[
-                StatechartPayloadKey.JOINED_NODES
-            ] = statechart.create_structure_copy().nodes_from_to_json(
-                first_node_index=self.sent_node_count
+            data[StatechartPayloadKey.JOINED_NODES] = (
+                statechart.create_structure_copy().nodes_from_to_json(
+                    first_node_index=self.sent_node_count
+                )
             )
             self.sent_node_count = len(statechart.nodes)
         self.send(data)

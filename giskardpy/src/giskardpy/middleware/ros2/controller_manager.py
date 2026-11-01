@@ -9,7 +9,6 @@ from enum import StrEnum
 
 from controller_manager_msgs.srv import ListControllers
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
 from typing_extensions import TYPE_CHECKING
 
 from giskardpy.middleware.ros2.exceptions import (
@@ -145,13 +144,14 @@ class ControllerManager:
             .string_array_value
         )
 
-    def command_topic_of(self, controller_name: str) -> str:
+    def command_topic_of(self, controller_name: str, message_type: type) -> str:
         """
-        :return: The topic a joint group controller receives its commands on.
+        :param message_type: The message type the controller receives its commands in.
+        :return: The topic the controller receives its commands on.
         """
         return search_for_subscriber_of_node_with_type(
             node_name=controller_name,
-            topic_type=Float64MultiArray,
+            topic_type=message_type,
             namespace=self.namespace,
         )
 

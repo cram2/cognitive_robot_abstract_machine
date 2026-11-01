@@ -24,7 +24,7 @@ Run with (the ``experiments`` package must be importable)::
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List
+from typing_extensions import Any
 
 import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
@@ -315,9 +315,7 @@ def _q_total_duration(plan: StatechartNode) -> BehaviourQuery:
         query=eql.set_of(
             min_start := eql.min(n.start_time),
             max_end := eql.max(n.end_time),
-        ).where(
-            n.start_time != None, n.end_time != None
-        ),  # noqa: E711
+        ).where(n.start_time != None, n.end_time != None),  # noqa: E711
     )
 
 
@@ -497,7 +495,7 @@ def run_experiment(
     :param session: An open SQLAlchemy session connected to the persisted plan database.
     :return: A table with one :class:`BehaviourQueryResult` row per query.
     """
-    rows: List[BehaviourQueryResult] = []
+    rows: list[BehaviourQueryResult] = []
     for query in build_queries(plan, world):
         # EQL evaluation
         t0 = time.perf_counter()

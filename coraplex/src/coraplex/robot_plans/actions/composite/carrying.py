@@ -1,21 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING
-
-from cramph.node import StatechartNode
-from coraplex.robot_plans.actions.base import Action, ParallelAction
+from coraplex.plans.plan_transformation import PlanRewriting
+from coraplex.robot_plans.actions.base import ParallelAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
-from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
+from cramph.node import StatechartNode
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.spatial_types.spatial_types import Vector3
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world_description.world_entity import Body
 
 # %% driving with held objects upright
 
@@ -26,9 +19,8 @@ class CarryAction(ParallelAction):
     Drives the robot's base to a pose while every object the robot holds keeps its
     z-axis pointing up and every arm holding nothing is parked.
 
-    An object counts as held when it hangs below a gripper's tool frame, or when a pick-
-    up earlier in the plan takes it and no placing puts it down again before this
-    action.
+    An object counts as held when it hangs below a gripper's tool frame when this action
+    first starts, so the steps of the arms join it then.
     """
 
     navigate: NavigateAction
@@ -42,8 +34,39 @@ class CarryAction(ParallelAction):
     the object counts as upright.
     """
 
+    accepts_children_after_compile: bool = field(init=False, default=True)
+
+    _arm_steps_added: bool = field(default=False, init=False, repr=False)
+    """
+    Whether the steps of the arms joined this action, which happens once.
+    """
+
     def create_steps(self) -> list[StatechartNode]:
-        held_bodies = {arm: self._held_body(arm) for arm in self.robot.all_arms}
+        return [self.navigate]
+
+    def on_start(self) -> None:
+        """
+        Adds the steps of the arms the first time this action starts, rewritten by the
+        plan transformations of :attr:`context`.
+        """
+        super().on_start()
+        if self._arm_steps_added:
+            return
+        self._arm_steps_added = True
+        rewriting = self.context.get_extension(PlanRewriting)
+        with self.statechart.modify():
+            for step in self._create_arm_steps():
+                self.add_node(step)
+                if rewriting is not None:
+                    rewriting.rewrite(step)
+            self.statechart.request_rebuild(self)
+
+    def _create_arm_steps(self) -> list[StatechartNode]:
+        """
+        :return: New steps parking every arm that holds nothing and keeping every object
+            the robot holds upright.
+        """
+        held_bodies = {arm: arm.end_effector.held_body for arm in self.robot.all_arms}
         free_arms = [arm for arm, held_body in held_bodies.items() if held_body is None]
         park_free_arms = [ParkArmsAction(arms=free_arms)] if free_arms else []
         keep_upright = [
@@ -57,33 +80,4 @@ class CarryAction(ParallelAction):
             for held_body in held_bodies.values()
             if held_body is not None
         ]
-        return [self.navigate, *park_free_arms, *keep_upright]
-
-    def _held_body(self, arm: Arm) -> Body | None:
-        """
-        :param arm: The arm to look at.
-        :return: The body `arm` holds, or None if it holds nothing.
-        """
-        held_body = arm.end_effector.held_body
-        if held_body is not None:
-            return held_body
-        pick_up = self._earlier_pick_up_still_holding(arm)
-        if pick_up is None:
-            return None
-        return pick_up.grasp.graspable.root
-
-    def _earlier_pick_up_still_holding(self, arm: Arm) -> PickUpAction | None:
-        """
-        :param arm: The arm to look at.
-        :return: The latest pick-up with `arm` before this action whose object no
-            placing between it and this action puts down, or None if there is none.
-        """
-        put_down = set()
-        for earlier in self.statechart.get_preceding_nodes_by_type(self, Action):
-            if isinstance(earlier, PlaceAction):
-                put_down.add(earlier.object_designator.root)
-            elif isinstance(earlier, PickUpAction) and earlier.arm is arm:
-                if earlier.grasp.graspable.root in put_down:
-                    return None
-                return earlier
-        return None
+        return [*park_free_arms, *keep_upright]

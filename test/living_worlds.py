@@ -14,7 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from krrood.exceptions import DataclassException
-from typing_extensions import Any, List, Tuple
+from typing_extensions import Any
 
 MAXIMUM_LIVING_WORLDS: int = 30
 """
@@ -122,7 +122,7 @@ class LeakedWorldsError(DataclassException, MemoryError):
     How many of them the run allows.
     """
 
-    left_behind: Tuple[WorldsLeftBehind, ...]
+    left_behind: tuple[WorldsLeftBehind, ...]
     """
     The tests whose worlds survived, the test that left the most first.
     """
@@ -163,7 +163,7 @@ class LivingWorlds:
     The type whose instances are recorded.
     """
 
-    creations: List[WorldCreation] = field(default_factory=list)
+    creations: list[WorldCreation] = field(default_factory=list)
     """
     One entry per world created while watching, minus the ones dropped again as their
     worlds were collected.
@@ -225,7 +225,7 @@ class LivingWorlds:
             creation for creation in self.creations if creation.world_is_alive
         ]
 
-    def surviving_worlds(self) -> Tuple[WorldsLeftBehind, ...]:
+    def surviving_worlds(self) -> tuple[WorldsLeftBehind, ...]:
         """
         The tests whose worlds are still in memory, the test that left the most first.
         """
@@ -235,7 +235,7 @@ class LivingWorlds:
             for test, worlds in worlds_per_test.most_common()
         )
 
-    def collect_surviving_worlds(self) -> Tuple[WorldsLeftBehind, ...]:
+    def collect_surviving_worlds(self) -> tuple[WorldsLeftBehind, ...]:
         """
         Collect garbage, drop the worlds that have gone, and read back what survived.
 

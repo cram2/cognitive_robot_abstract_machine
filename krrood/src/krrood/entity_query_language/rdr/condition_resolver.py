@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from typing_extensions import TYPE_CHECKING, Any, List, Optional, Type
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.entity_query_language.rdr.backward_inference import ConclusionSufficientConditionSets
 
@@ -54,7 +54,7 @@ class ResolvedCondition:
 
     expression: SymbolicExpression
     """The EQL condition expression to insert as the new rule's condition."""
-    resolver_type: Type[ConditionResolver]
+    resolver_type: type[ConditionResolver]
     """The concrete resolver class that produced this condition."""
 
 
@@ -76,8 +76,8 @@ class ConditionResolver(ABC):
             corner_case: Any,
             target_knowledge: ConclusionSufficientConditionSets,
             current_knowledge: ConclusionSufficientConditionSets,
-            firing_anchor: Optional[SymbolicExpression] = None,
-    ) -> Optional[ResolvedCondition]:
+            firing_anchor: SymbolicExpression | None = None,
+    ) -> ResolvedCondition | None:
         """Attempt to auto-derive a differentiating condition.
 
         :param case: The new case being fit (classified as ``target_conclusion``).
@@ -110,8 +110,8 @@ class TargetSufficientConditionsBasedResolver(ConditionResolver):
             corner_case: Any,
             target_knowledge: ConclusionSufficientConditionSets,
             current_knowledge: ConclusionSufficientConditionSets,
-            firing_anchor: Optional[SymbolicExpression] = None,
-    ) -> Optional[ResolvedCondition]:
+            firing_anchor: SymbolicExpression | None = None,
+    ) -> ResolvedCondition | None:
         for sufficient_condition_set in target_knowledge.sufficient_condition_sets:
             for guard in sufficient_condition_set.conditions:
                 if guard.holds_for(case_variable, case) and not guard.holds_for(
@@ -136,9 +136,9 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 
     def _active_path(
             self,
-            firing_anchor: Optional[SymbolicExpression],
+            firing_anchor: SymbolicExpression | None,
             current_knowledge: ConclusionSufficientConditionSets,
-    ) -> Optional[SufficientConditionSet]:
+    ) -> SufficientConditionSet | None:
         """:return: The sufficient condition set in which ``firing_anchor`` appears as a
         positive (non-negated) guard, or ``None`` if none does.
 
@@ -167,8 +167,8 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
             corner_case: Any,
             target_knowledge: ConclusionSufficientConditionSets,
             current_knowledge: ConclusionSufficientConditionSets,
-            firing_anchor: Optional[SymbolicExpression] = None,
-    ) -> Optional[ResolvedCondition]:
+            firing_anchor: SymbolicExpression | None = None,
+    ) -> ResolvedCondition | None:
         """Search non-active paths for a guard that holds for ``case`` but not ``corner_case``.
 
         The active path, identified via ``firing_anchor``, is skipped.
@@ -191,7 +191,7 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 class ChainConditionResolver(ConditionResolver):
     """A Chain-of-Responsibility that tries each resolver in order, returning the first match."""
 
-    resolvers: List[ConditionResolver] = field(default_factory=list)
+    resolvers: list[ConditionResolver] = field(default_factory=list)
     """Ordered list of :class:`ConditionResolver` strategies to try, in priority order."""
 
     def resolve(
@@ -203,8 +203,8 @@ class ChainConditionResolver(ConditionResolver):
             corner_case: Any,
             target_knowledge: ConclusionSufficientConditionSets,
             current_knowledge: ConclusionSufficientConditionSets,
-            firing_anchor: Optional[SymbolicExpression] = None,
-    ) -> Optional[ResolvedCondition]:
+            firing_anchor: SymbolicExpression | None = None,
+    ) -> ResolvedCondition | None:
         """Try each resolver in :attr:`resolvers` in order, returning the first non-``None`` result.
 
         :return: The first :class:`ResolvedCondition` produced by a resolver, or ``None``

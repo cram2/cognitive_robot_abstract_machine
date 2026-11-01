@@ -1,3 +1,4 @@
+# %% Imports
 import tracemalloc
 
 import numpy as np
@@ -22,6 +23,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 
+# %% Ray tracing tests
 def test_create_segmentation_mask(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
     rt = RayTracer(world)
@@ -49,7 +51,10 @@ def test_create_segmentation_mask(ray_test_world):
     )
     assert seg.shape == (resolution.width, resolution.height)
 
-    hit, index, body = rt.ray_test(np.array([1, 0, 1]), np.array([-1, 0, 1]))
+    ray_intersections = rt.ray_test(np.array([1, 0, 1]), np.array([-1, 0, 1]))
+    hit = ray_intersections.hit_points
+    index = ray_intersections.ray_indices
+    body = ray_intersections.bodies
     assert hit is not None
     assert index is not None
     assert body is not None
@@ -91,10 +96,13 @@ def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
     camera_pose[:3, 3] = [-2.5, 0.0, 0.0]
 
     resolution = CameraResolution(width=128, height=64)
-    ray_origins, ray_directions, pixels = ray_tracer.create_camera_rays(
+    camera_rays = ray_tracer.create_camera_rays(
         HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
         resolution=resolution,
     )
+    ray_origins = camera_rays.origin_points
+    ray_directions = camera_rays.direction_vectors
+    pixels = camera_rays.pixel_coordinates
 
     assert ray_origins.shape == (resolution.width * resolution.height, 3)
     assert ray_directions.shape == (resolution.width * resolution.height, 3)
@@ -167,14 +175,20 @@ def test_ray_test(ray_test_world):
     rt = RayTracer(world)
     rt.update_scene()
 
-    hit, index, body = rt.ray_test(np.array([1, 0, 0.1]), np.array([-1, 0, 0.1]))
+    ray_intersections = rt.ray_test(np.array([1, 0, 0.1]), np.array([-1, 0, 0.1]))
+    hit = ray_intersections.hit_points
+    index = ray_intersections.ray_indices
+    body = ray_intersections.bodies
     assert hit is not None
     assert index is not None
     assert body is not None
     assert body1 in body
 
     # Test with a ray that does not hit any object
-    hit, index, body = rt.ray_test(np.array([10, 10, 10]), np.array([20, 20, 20]))
+    ray_intersections = rt.ray_test(np.array([10, 10, 10]), np.array([20, 20, 20]))
+    hit = ray_intersections.hit_points
+    index = ray_intersections.ray_indices
+    body = ray_intersections.bodies
     assert not np.any(hit)
     assert not np.any(index)
     assert not np.any(body)
@@ -199,7 +213,10 @@ def test_ray_test_batch(ray_test_world):
     rays = np.array([[1, 1, 0.1], [-1, 1, 0.1]])
     targets = np.array([[1, -1, 0.1], [-1, -1, 0.1]])
 
-    hits, indices, bodies = rt.ray_test(rays, targets)
+    ray_intersections = rt.ray_test(rays, targets)
+    hits = ray_intersections.hit_points
+    indices = ray_intersections.ray_indices
+    bodies = ray_intersections.bodies
     assert hits is not None
     assert indices is not None
     assert bodies is not None
@@ -230,7 +247,10 @@ def test_min_distance(ray_test_world):
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
     targets = np.array([[1, 0, 0.1], [1, 0, 0.1]])
 
-    hits, indices, bodies = rt.ray_test(rays, targets, min_distance=1)
+    ray_intersections = rt.ray_test(rays, targets, min_distance=1)
+    hits = ray_intersections.hit_points
+    indices = ray_intersections.ray_indices
+    bodies = ray_intersections.bodies
 
     assert len(hits) == 1
     assert bodies[0] == body1
@@ -255,11 +275,17 @@ def test_max_distance(ray_test_world):
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
     targets = np.array([[2, 0, 0.1], [2, 0, 0.1]])
 
-    hits, indices, bodies = rt.ray_test(rays, targets)
+    ray_intersections = rt.ray_test(rays, targets)
+    hits = ray_intersections.hit_points
+    indices = ray_intersections.ray_indices
+    bodies = ray_intersections.bodies
 
     assert len(hits) == 2
 
-    hits, indices, bodies = rt.ray_test(rays, targets, max_distance=1)
+    ray_intersections = rt.ray_test(rays, targets, max_distance=1)
+    hits = ray_intersections.hit_points
+    indices = ray_intersections.ray_indices
+    bodies = ray_intersections.bodies
 
     assert len(hits) == 0
 
@@ -330,11 +356,11 @@ def textured_world() -> World:
 def test_a_ray_hits_the_textured_box_it_points_at(textured_world):
     ray_tracer = RayTracer(textured_world)
 
-    _, _, bodies = ray_tracer.ray_test(
+    ray_intersections = ray_tracer.ray_test(
         np.array([2.0, 0.0, 2.0]), np.array([2.0, 0.0, -2.0])
     )
 
-    assert bodies == [textured_world.get_body_by_name("box_1")]
+    assert ray_intersections.bodies == [textured_world.get_body_by_name("box_1")]
 
 
 def test_casting_rays_does_not_decode_the_textures_of_the_world(textured_world):

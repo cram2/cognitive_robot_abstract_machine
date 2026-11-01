@@ -12,7 +12,7 @@ import tomllib
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing_extensions import Any
 
 
 class RepositoryFile(StrEnum):

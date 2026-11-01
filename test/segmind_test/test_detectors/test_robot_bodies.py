@@ -110,7 +110,7 @@ def _box_resting_on(
 
 def _supporters_detected_for(
     world: World, box: Body, exclude_robot: bool = True
-) -> List[Body]:
+) -> list[Body]:
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
@@ -161,7 +161,7 @@ def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
 
 def _contacts_detected_for(
     world: World, box: Body, exclude_robot: bool = True
-) -> List[Body]:
+) -> list[Body]:
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
@@ -246,7 +246,7 @@ def _box_inside(world: World, container: Body) -> Body:
 
 def _containers_detected_for(
     world: World, box: Body, exclude_robot: bool = True
-) -> List[Body]:
+) -> list[Body]:
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )

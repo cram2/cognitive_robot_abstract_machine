@@ -1,4 +1,3 @@
-import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
@@ -7,10 +6,6 @@ from typing_extensions import Callable
 from cramph.node import EndedByOwner
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.node import StatechartNode, NodeArtifacts
-from cramph.threaded_nodes import ThreadedNode
-
-logger = logging.getLogger(__name__)
-
 
 # %% tick count check
 
@@ -157,63 +152,6 @@ class CountTicks(TickCounter):
 
     def _reached_target(self) -> bool:
         return self._counter >= self.ticks
-
-
-# %% threaded predicates
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class ThreadedPredicateMonitor(EndedByOwner, ThreadedNode):
-    """
-    Evaluates an arbitrary boolean predicate in a background thread and exposes the
-    result as the node's observation state.
-
-    The observation is ``UNKNOWN`` until the predicate returned, then ``TRUE`` or
-    ``FALSE`` by what it returned. If the predicate raises, the error is raised out of
-    the tick.
-
-    The predicate is a plain ``Callable[[], bool]`` so this class has no dependency on
-    whatever produces it (e.g. an EQL condition is wrapped in a lambda by the caller).
-    """
-
-    predicate: Callable[[], bool] | None
-    """
-    The predicate to evaluate, passed as a constructor argument.
-    """
-
-    def run(self) -> bool:
-        return bool(self.predicate())
-
-    def on_start(self) -> None:
-        """
-        Start evaluating the predicate, unless there is none.
-        """
-        if self.predicate is None:
-            logger.error(
-                "%s has no predicate; pass one via the `predicate` argument.",
-                self.unique_name,
-            )
-            return
-        super().on_start()
-
-    def on_tick(self) -> ObservationStateValues | None:
-        """
-        :raises BaseException: What the predicate raised, if it raised.
-        """
-        if not self.has_finished:
-            return ObservationStateValues.UNKNOWN
-        if self._error is not None:
-            logger.warning(
-                "%s predicate raised %s.",
-                self.unique_name,
-                self._error,
-            )
-            raise self._error
-        return (
-            ObservationStateValues.TRUE
-            if self._result
-            else ObservationStateValues.FALSE
-        )
 
 
 # %% pulses

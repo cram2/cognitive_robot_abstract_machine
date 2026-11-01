@@ -4,7 +4,11 @@ Tests for the Stretch apartment demo's perception pipeline configuration.
 
 import numpy as np
 
-from robokudo.annotators.image_cluster_extractor import ImageClusterExtractor
+from robokudo.annotators.image_cluster_extractor import (
+    ColorName,
+    ColorRangeBound,
+    ImageClusterExtractor,
+)
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
@@ -69,10 +73,16 @@ def test_pipeline_extracts_objects_by_color_not_depth_clustering(monkeypatch):
         node for node in pipeline.children if isinstance(node, ImageClusterExtractor)
     )
     parameters = cluster_annotator.descriptor.parameters
-    red_hsv_range = parameters.color_name_to_hsv_range["red"]
+    red_color_range = parameters.color_ranges[ColorName.RED]
 
-    assert parameters.hsv_min == red_hsv_range["hsv_min"]
-    assert parameters.hsv_max == red_hsv_range["hsv_max"]
+    assert (
+        parameters.minimum_hue_saturation_value
+        == red_color_range[ColorRangeBound.LOWER]
+    )
+    assert (
+        parameters.maximum_hue_saturation_value
+        == red_color_range[ColorRangeBound.UPPER]
+    )
 
 
 def test_target_shelf_layer_bounds_are_the_midpoints_to_its_neighbours():

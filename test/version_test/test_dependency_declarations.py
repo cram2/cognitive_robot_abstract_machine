@@ -13,7 +13,7 @@ import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing_extensions import Any
 
 import pytest
 from packaging.requirements import Requirement

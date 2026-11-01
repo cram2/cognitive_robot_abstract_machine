@@ -1,5 +1,3 @@
-from typing_extensions import Dict, Optional, Type
-
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Classification,
@@ -41,7 +39,7 @@ class FeatureComparatorFactory:
     A factory for creating feature comparators.
     """
 
-    annotator_comparators: Dict[Type[Annotation], Type[FeatureComparator]] = {
+    annotator_comparators: dict[type[Annotation], type[FeatureComparator]] = {
         BoundingBox3DAnnotation: BboxComparator,
         Classification: ClassificationComparator,
         ColorHistogram: HistogramComparator,
@@ -57,7 +55,7 @@ class FeatureComparatorFactory:
     Mapping of annotation types to feature comparators.
     """
 
-    type_comparators: Dict[Type[RkType], Type[FeatureComparator]] = {
+    type_comparators: dict[type[RkType], type[FeatureComparator]] = {
         Rect: RoiComparator,
         ImageROI: ImageROIComparator,
         Position: TranslationComparator,
@@ -72,8 +70,8 @@ class FeatureComparatorFactory:
 
     @classmethod
     def for_annotation(
-        cls, annotation: Type[Annotation], weight: float, **kwargs
-    ) -> Optional[FeatureComparator]:
+        cls, annotation: type[Annotation], weight: float, **kwargs
+    ) -> FeatureComparator | None:
         """
         Get a feature comparator for the given annotation type and assign it the given
         weight.
@@ -91,8 +89,8 @@ class FeatureComparatorFactory:
 
     @classmethod
     def for_type(
-        cls, rk_type: Type[RkType], weight: float, **kwargs
-    ) -> Optional[FeatureComparator]:
+        cls, rk_type: type[RkType], weight: float, **kwargs
+    ) -> FeatureComparator | None:
         """
         Get a feature comparator for the given robokudo type and assign it the given
         weight.

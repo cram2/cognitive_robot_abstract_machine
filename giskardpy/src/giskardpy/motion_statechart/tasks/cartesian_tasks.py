@@ -70,10 +70,14 @@ class CartesianTask(ConvergingTask, ABC):
     _forward_kinematics_binding: ForwardKinematicsBinding = field(init=False)
     """Binding for the goal pose."""
 
-    GOAL_COLOR: ClassVar[Color] = Color(R=0.0, G=1.0, B=0.0, A=1.0)
+    GOAL_COLOR: ClassVar[Color] = Color.from_rgba(
+        red=0.0, green=1.0, blue=0.0, opacity=1.0
+    )
     """The color of the goal debug expression marker (green)."""
 
-    CURRENT_COLOR: ClassVar[Color] = Color(R=1.0, G=0.0, B=0.0, A=1.0)
+    CURRENT_COLOR: ClassVar[Color] = Color.from_rgba(
+        red=1.0, green=0.0, blue=0.0, opacity=1.0
+    )
     """The color of the current debug expression marker (red)."""
 
     def set_up(self) -> None:

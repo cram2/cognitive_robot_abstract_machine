@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -243,7 +243,7 @@ class HistoryGanttChartPlotter:
         :return: A tuple containing the main axis and the fixed-width final-state axis.
         """
         # Build node label list early so we can size the right margin adaptively
-        node_names: List[str] = []
+        node_names: list[str] = []
         for idx, n in enumerate(ordered_nodes):
             prev_depth = 0 if idx == 0 else ordered_nodes[idx - 1].depth
             node_names.append(self._make_label(n, prev_depth))
@@ -503,7 +503,7 @@ class HistoryGanttChartPlotter:
         else:
             return "│  " * (depth - 1) + "├─ " + node.unique_name
 
-    def _measure_labels_width_in(self, labels: List[str]) -> float:
+    def _measure_labels_width_in(self, labels: list[str]) -> float:
         """
         Measures the maximum width of a list of text labels when rendered in a temporary
         figure. This is useful to determine the required space for labels in a plot.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Self
+from typing_extensions import Self
 
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,

@@ -4,6 +4,7 @@ import pytest
 
 from giskardpy.data_types.exceptions import NoControlledJointsError
 from cramph.executor import NoPacing, RealTimePacer
+from giskardpy.middleware.ros2.exceptions import NoUniqueDriveError
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
@@ -11,13 +12,12 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDaisyConfig,
+    WorldWithDAiSyConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
     WorldWithHSRConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    PR2VelocityMujocoInterface,
     WorldWithPR2Config,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
@@ -62,16 +62,6 @@ def test_the_robot_interface_base_is_a_dataclass():
 
 def test_the_interface_state_bound_after_construction_is_no_constructor_argument():
     assert [field.name for field in fields(RobotInterfaceConfig) if field.init] == []
-
-
-def test_the_mujoco_interface_defaults_name_the_frames_its_localization_uses():
-    interface = PR2VelocityMujocoInterface()
-
-    assert (
-        interface.map_name,
-        interface.localization_joint_name,
-        interface.odom_link_name,
-    ) == ("map", "localization", "odom_combined")
 
 
 # %% the tf frame synchronizer is created on demand
@@ -153,7 +143,7 @@ def test_standalone_controls_the_joints_tracy_declares(init_rospy, tracy_world) 
 
 def test_standalone_controls_the_joints_daisy_declares(init_rospy, daisy_world) -> None:
     giskard = set_up_standalone(
-        WorldWithDaisyConfig(urdf=load_xacro(DAiSy.get_ros_file_path()))
+        WorldWithDAiSyConfig(urdf=load_xacro(DAiSy.get_ros_file_path()))
     )
 
     assert controlled_joint_names(giskard.world_config.world) == (
@@ -251,8 +241,8 @@ class GroupCommandingInterface(ClosedLoopRobotInterfaceConfig):
     """
 
     def setup(self) -> None:
-        self.add_joint_velocity_group_controller(
-            cmd_topic="group_velocity_commands", connections=self.joint_names
+        self.add_joint_group_velocity_command_topic(
+            command_topic="group_velocity_commands", connections=self.joint_names
         )
 
 
@@ -297,6 +287,45 @@ def test_closed_loop_does_not_control_a_drive_nothing_commands(init_rospy) -> No
 
     [drive] = giskard.world_config.world.get_connections_by_type(OmniDrive)
     assert not drive.is_controlled
+
+
+# %% commanding the drive
+
+
+@dataclass
+class DriveCommandingInterface(ClosedLoopRobotInterfaceConfig):
+    """
+    An interface that commands the drive of the robot without naming the drive.
+    """
+
+    def setup(self) -> None:
+        self.add_drive_velocity_command_topic(command_topic="drive_velocity_commands")
+
+
+def test_a_drive_command_without_a_drive_commands_the_only_drive_of_the_world(
+    init_rospy,
+) -> None:
+    giskard = closed_loop_pr2(DriveCommandingInterface())
+
+    giskard.setup()
+
+    [drive] = giskard.world_config.world.get_connections_by_type(OmniDrive)
+    [publisher] = giskard.motion_server.control_loop.command_publishers
+    assert publisher.connection is drive
+
+
+def test_a_drive_command_without_a_drive_in_a_world_without_a_drive_raises(
+    init_rospy,
+) -> None:
+    giskard = Giskard(
+        world_config=WorldWithTracyConfig(urdf=load_xacro(Tracy.get_ros_file_path())),
+        robot_interface_config=DriveCommandingInterface(),
+        server_config=GiskardServerConfig(),
+        qp_controller_config=QPControllerConfig(target_frequency=25),
+    )
+
+    with pytest.raises(NoUniqueDriveError):
+        giskard.setup()
 
 
 # %% reading the robot's own parts from the robot

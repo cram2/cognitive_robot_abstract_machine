@@ -66,9 +66,9 @@ class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
         )
         omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
         self.sync_odometry_topic("/r100_0603/platform/odom/filtered", omni_drive)
-        self.add_base_cmd_velocity(
-            cmd_vel_topic="/r100_0603/joy_teleop/cmd_vel",
-            joint=omni_drive,
+        self.add_drive_velocity_command_topic(
+            command_topic="/r100_0603/joy_teleop/cmd_vel",
+            drive=omni_drive,
             command_format=TwistStampedFormat(),
         )
 
@@ -77,13 +77,13 @@ class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
         # stay available if a joint group needs faster sync.
         self.sync_joint_state_topic("/garmi/joint_states")
 
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/garmi/arms/left_arm_joint_velocity_controller/reference",
             connections=GarmiJoint.left_arm(),
             command_format=MultiDOFCommandFormat(),
         )
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/garmi/arms/right_arm_joint_velocity_controller/reference",
             connections=GarmiJoint.right_arm(),
             command_format=MultiDOFCommandFormat(),
         )

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field, is_dataclass
-from typing import Any
+from typing_extensions import Any
 
 from pytest import MonkeyPatch
 from rclpy.node import Node

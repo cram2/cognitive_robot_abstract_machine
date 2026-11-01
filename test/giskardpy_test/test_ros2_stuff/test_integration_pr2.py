@@ -55,7 +55,6 @@ from .test_client_presence import wait_until
 
 @dataclass
 class PR2Tester(GiskardTester):
-
     better_pose_left = {
         PR2Joint.LEFT_SHOULDER_PAN: 1.9652,
         PR2Joint.LEFT_SHOULDER_LIFT: -0.26499,
@@ -168,7 +167,6 @@ class TestJointGoals:
 
 
 class TestCartGoals:
-
     def test_cart_goal_1eef(self, giskard: PR2Tester):
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=giskard.right_tip

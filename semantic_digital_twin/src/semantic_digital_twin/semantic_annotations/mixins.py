@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import dataclasses
 import math
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing_extensions import TYPE_CHECKING, Generic, Self, TypeVar
 
 import numpy as np
 import trimesh
@@ -29,16 +29,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
-from typing_extensions import (
-    TYPE_CHECKING,
-    Generic,
-    List,
-    Optional,
-    Self,
-    Set,
-    Type,
-    TypeVar,
-)
 
 from semantic_digital_twin.specifications.connections import (
     ActiveConnection1DOFSpecification,
@@ -130,7 +120,7 @@ class IsPerceivable:
     A mixin class for semantic annotations that can be perceived.
     """
 
-    class_label: Optional[str] = field(default=None, kw_only=True)
+    class_label: str | None = field(default=None, kw_only=True)
     """
     The exact class label of the perceived object.
     """
@@ -195,7 +185,7 @@ class HasRootKinematicStructureEntity(
         )
 
     @property
-    def min_max_points(self) -> Tuple[Point3, Point3]:
+    def min_max_points(self) -> tuple[Point3, Point3]:
         min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
         max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
         return min, max
@@ -208,8 +198,8 @@ class HasRootKinematicStructureEntity(
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> KinematicStructureEntitySpecification:
         """
         Build this type's default root entity specification, the geometry only.
@@ -239,9 +229,9 @@ class HasRootKinematicStructureEntity(
         name: str,
         root_specification: KinematicStructureEntitySpecification,
         *,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        annotation_kwargs: Optional[dict] = None,
-        part_specifications: Optional[dict] = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        annotation_kwargs: dict | None = None,
+        part_specifications: dict | None = None,
     ) -> SemanticAnnotationWithRootSpecification[Self]:
         """
         Wrap a root entity specification, typically from
@@ -278,7 +268,7 @@ class HasRootKinematicStructureEntity(
 
     @staticmethod
     def _to_part_bindings(
-        part_specifications: Optional[dict],
+        part_specifications: dict | None,
     ) -> list[PartSpecificationBinding]:
         """
         Convert the keyword-friendly mapping of parts into the bindings the
@@ -328,7 +318,7 @@ class HasRootKinematicStructureEntity(
         return self._world.get_connections_of_branch(self.root)
 
     def _kinematic_structure_entities(
-        self, visited: Set[int]
+        self, visited: set[int]
     ) -> list[KinematicStructureEntity]:
         if id(self) in visited:
             return []
@@ -351,9 +341,9 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
         cls,
         name: str,
         world: World,
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        scale: Optional[Scale] = None,
+        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        scale: Scale | None = None,
     ) -> Self:
         """
         Create a new semantic annotation with a new body in the given world.
@@ -377,8 +367,8 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> BodySpecification:
         """
         Build the default body specification whose geometry matches what
@@ -424,9 +414,9 @@ class HasGraspCandidates(HasRootBody, Mixin):
 
     def grasp_candidates(
         self,
-        model_registry: Optional[ModelRegistry] = None,
+        model_registry: ModelRegistry | None = None,
         require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+    ) -> list[GraspCandidate]:
         """
         The grasps this annotation offers, in no particular order: those of its
         :meth:`grasped_part` when it is grasped at one of its parts; otherwise grasps
@@ -443,7 +433,7 @@ class HasGraspCandidates(HasRootBody, Mixin):
             return self.default_grasp_candidates()
         return self.drawn_grasp_candidates(model_registry, require_lifting)
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: The grasps offered while no model is given: the object at its own
             origin, approached from evenly spaced directions around its z-axis, which
@@ -464,9 +454,9 @@ class HasGraspCandidates(HasRootBody, Mixin):
 
     def drawn_grasp_candidates(
         self,
-        model_registry: Optional[ModelRegistry] = None,
+        model_registry: ModelRegistry | None = None,
         require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+    ) -> list[GraspCandidate]:
         """
         :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
             uniformly from what it allows.
@@ -557,9 +547,9 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
         cls,
         name: str,
         world: World,
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        scale: Optional[Scale] = None,
+        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        scale: Scale | None = None,
     ) -> Self:
         """
         Create a new semantic annotation with a new region in the given world.
@@ -583,8 +573,8 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> RegionSpecification:
         """
         Build the default region specification whose geometry matches what
@@ -680,7 +670,7 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
             setattr(self, match.field.name, part)
 
     @property
-    def parts(self) -> List[HasRootKinematicStructureEntity]:
+    def parts(self) -> list[HasRootKinematicStructureEntity]:
         """
         :return: The structural parts of this annotation, from all of its part-whole
             relationship fields.
@@ -706,7 +696,7 @@ class HasApertures(HasRootBody, PartWholeRelationship, Mixin):
     removes its volume from the annotation's collision and visual geometry.
     """
 
-    apertures: List[Aperture] = field(
+    apertures: list[Aperture] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -781,7 +771,7 @@ class HasDrawers(PartWholeRelationship, Mixin):
     A mixin class for semantic annotations that have drawers.
     """
 
-    drawers: List[Drawer] = field(
+    drawers: list[Drawer] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -798,7 +788,7 @@ class HasShelfLayers(PartWholeRelationship, Mixin):
     A mixin class for semantic annotations that have shelf layers.
     """
 
-    shelf_layers: List[ShelfLayer] = field(
+    shelf_layers: list[ShelfLayer] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -815,7 +805,7 @@ class HasDoors(PartWholeRelationship, Mixin):
     A mixin class for semantic annotations that have doors.
     """
 
-    doors: List[Door] = field(
+    doors: list[Door] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -833,7 +823,7 @@ class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
     when they have one.
     """
 
-    handle: Optional[Handle] = field(
+    handle: Handle | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -947,7 +937,7 @@ class HasRim(HasPinchableWall, PartWholeRelationship, Mixin):
     have one.
     """
 
-    rim: Optional[Rim] = field(
+    rim: Rim | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -964,7 +954,7 @@ class HasRim(HasPinchableWall, PartWholeRelationship, Mixin):
             return super().grasped_part()
         return self.rim
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
         """
@@ -1004,7 +994,7 @@ class HasHandles(HasRootBody, PartWholeRelationship, Mixin):
     A mixin class for semantic annotations that may have more than one handle.
     """
 
-    handles: List[Handle] = field(
+    handles: list[Handle] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -1027,7 +1017,7 @@ class HasLegs(PartWholeRelationship, Mixin):
     A mixin class for semantic annotations that have legs.
     """
 
-    legs: List[Leg] = field(
+    legs: list[Leg] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -1044,7 +1034,7 @@ class HasSink(PartWholeRelationship, Mixin):
     A mixin class for semantic annotations that have a sink.
     """
 
-    sink: Optional[Sink] = field(
+    sink: Sink | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -1062,7 +1052,7 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
     with the table when it is moved.
     """
 
-    objects: List[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
+    objects: list[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
     """
     The occupants currently contained in/on this annotation.
     """
@@ -1075,8 +1065,8 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
         self.objects.append(object)
 
     def get_objects_of_type(
-        self, object_type: Type[SemanticAnnotation]
-    ) -> List[HasRootBody]:
+        self, object_type: type[SemanticAnnotation]
+    ) -> list[HasRootBody]:
         """
         Returns all objects of a given type in the semantic annotation.
 
@@ -1107,7 +1097,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         upward_threshold: float = 0.95,
         clearance_threshold: float = 0.5,
         min_surface_area: float = 0.0225,  # 15cm x 15cm
-    ) -> Optional[Region]:
+    ) -> Region | None:
         """
         Calculate the supporting surface region for the semantic annotation, add it to
         the world, and set it as the supporting surface of self.
@@ -1239,10 +1229,10 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def sample_points_from_surface(
         self,
-        body_to_sample_for: Optional[HasRootBody] = None,
-        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        body_to_sample_for: HasRootBody | None = None,
+        category_of_interest: type[SemanticAnnotation] | None = None,
         amount: int = 100,
-    ) -> List[Point3]:
+    ) -> list[Point3]:
         """
         Samples points from a surface around the semantic annotation.
 
@@ -1298,7 +1288,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def _build_surface_sampler(
         self,
-        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        category_of_interest: type[SemanticAnnotation] | None = None,
         object_bloat: float = 0.1,
     ):
         """
@@ -1352,10 +1342,10 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def _2d_gaussian_sampler_from_2d_sample_space(
         self,
-        objects_of_interest: List[HasRootBody],
+        objects_of_interest: list[HasRootBody],
         variance: float,
         sample_space: Event,
-    ) -> Optional[ProbabilisticCircuit]:
+    ) -> ProbabilisticCircuit | None:
         """
         Create a Gaussian mixture model from a list of points, truncated by an event.
 
@@ -1378,7 +1368,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def _untruncated_2d_gaussian_sampler(
         self,
-        objects_of_interest: List[HasRootBody],
+        objects_of_interest: list[HasRootBody],
         variance: float,
     ) -> ProbabilisticCircuit:
         """
@@ -1428,8 +1418,8 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
     def spawn_bounding_boxes_as_region(
         self,
         boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
-        name: Optional[PrefixedName] = None,
-        color: Optional[Color] = None,
+        name: PrefixedName | None = None,
+        color: Color | None = None,
     ) -> Region:
         """
         Spawn a collection of bounding boxes as a region, connected to this
@@ -1444,7 +1434,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         if name is None:
             name = PrefixedName("region")
         if color is None:
-            color = Color(0.5, 1.0, 0.5, 0.5)
+            color = Color.from_rgba(red=0.5, green=1.0, blue=0.5, opacity=0.5)
 
         shapes = boxes.as_shapes()
         shapes.dye_shapes(color)
@@ -1461,7 +1451,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         tolerance: float = 0.001,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
-        semantic_wall_annotation: Optional[Wall] = None,
+        semantic_wall_annotation: Wall | None = None,
         obstacle_height_clearance: float = 0.01,
     ) -> PlanarGraphOfBoundingBoxes:
         """
@@ -1596,8 +1586,8 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
         *,
         wall_thickness: float = 0.01,
     ) -> BodySpecification:

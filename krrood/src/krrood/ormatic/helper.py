@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from inspect import isclass
 from types import ModuleType
-from typing import List, Type, Dict
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
@@ -17,22 +16,22 @@ class OrmaticInterfaceInformation:
     from an existing ormatic interface.
     """
 
-    classes: List[Type] = field(default_factory=list)
+    classes: list[type] = field(default_factory=list)
     """
     The domain classes mapped in the interface.
     """
 
-    alternative_mappings: List[Type[AlternativeMapping]] = field(default_factory=list)
+    alternative_mappings: list[type[AlternativeMapping]] = field(default_factory=list)
     """
     The alternative mappings used in the interface.
     """
 
-    type_mappings: Dict = field(default_factory=dict)
+    type_mappings: dict = field(default_factory=dict)
     """
     The type mappings used in the interface.
     """
 
-    externally_mapped_classes: Dict[Type, Type] = field(default_factory=dict)
+    externally_mapped_classes: dict[type, type] = field(default_factory=dict)
     """
     Maps every domain class already mapped anywhere in this interface's dependency
     chain to the :class:`DataAccessObject` subclass that maps it, so a dependent

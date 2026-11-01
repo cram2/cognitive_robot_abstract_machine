@@ -27,7 +27,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from random_events.plotting import EventPlotter
 from random_events.product_algebra import Event
-from typing_extensions import List, Sequence
+from typing_extensions import Sequence
 
 from semantic_digital_twin.spatial_types import Point3
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
@@ -306,7 +306,7 @@ class VolumePanel(ABC):
 
     def traces(
         self, scene: NavigationScene, palette: FigurePalette
-    ) -> List[go.BaseTraceType]:
+    ) -> list[go.BaseTraceType]:
         """
         :param scene: The scene to draw.
         :param palette: The colors to draw with.
@@ -487,7 +487,7 @@ class GraphOfConvexSetsVolumeFigure:
         self._style(figure, palette)
         return figure
 
-    def save(self, output_directory: Path) -> List[Path]:
+    def save(self, output_directory: Path) -> list[Path]:
         """
         Render the figure and write it as an interactive page, a vector file and a
         raster file.
@@ -574,7 +574,7 @@ class GraphOfConvexSetsVolumeFigure:
                 }
             )
 
-    def _panel_titles(self, palette: FigurePalette) -> List[dict[str, object]]:
+    def _panel_titles(self, palette: FigurePalette) -> list[dict[str, object]]:
         """
         :param palette: The colors to draw with.
         :return: One annotation per panel, holding its label, its name and the statistic

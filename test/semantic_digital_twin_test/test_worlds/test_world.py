@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import gc
 import os
 import subprocess
@@ -10,7 +12,6 @@ from uuid import UUID, uuid4
 import numpy as np
 import pytest
 from numpy.testing import assert_raises
-from typing_extensions import Optional, Tuple, Type
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import (
@@ -31,6 +32,7 @@ from semantic_digital_twin.exceptions import (
     WorldEntityNotFoundError,
     WorldEntityWithIDBelongsToAnotherWorld,
     AlreadyBelongsToAWorldError,
+    WorldHasNoUniqueRootError,
 )
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
@@ -48,7 +50,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     Pose2D,
     RotationMatrix,
 )
-from semantic_digital_twin.testing import StateChangeCounter, world_setup
+from semantic_digital_twin.testing import StateChangeCounter, world_setup  # noqa: F401
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
@@ -896,7 +898,7 @@ def test_remove_connection(world_setup):
         new_connection = FixedConnection(r1, r2)
         world.add_connection(new_connection)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(WorldHasNoUniqueRootError):
         with world.modify_world():
             # if you remove a connection, the child must be connected some other way or deleted
             world.remove_connection(world.get_connection(r1, r2))
@@ -1482,7 +1484,7 @@ def test_rebind_a_cycle_keeps_its_shape(world_setup):
     @dataclass(eq=False)
     class Link:
         body: Body
-        partner: Optional["Link"] = None
+        partner: Link | None = None
 
     world, l1, l2, bf, r1, r2 = world_setup
     world_copy = deepcopy(world)
@@ -1574,9 +1576,9 @@ def test_set_omni_after_copy(pr2_world_state_reset):
         type(pr2_copy.get_body_by_name("base_footprint").parent_connection) == OmniDrive
     )
 
-    pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(10, 10, 0)
-    )
+    pr2_copy.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(10, 10, 0)
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
@@ -2117,7 +2119,6 @@ def test_memoization_clears_only_last_modification_block():
     b1_C_b2 = FixedConnection(parent=b2, child=b1)
 
     with world.modify_world():
-
         assert world.root == b1
 
         with world.modify_world():
@@ -2304,8 +2305,8 @@ def test_move_branch_resets_free_connection_derivatives():
 
 
 def create_world_with_driven_child(
-    drive_type: Type[WheeledDrive],
-) -> Tuple[World, Body, Body]:
+    drive_type: type[WheeledDrive],
+) -> tuple[World, Body, Body]:
     """
     Builds a world where ``driven_child`` hangs off the root by ``drive_type`` and
     ``new_parent`` sits elsewhere under the root.
@@ -2760,7 +2761,7 @@ def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
 # %% moving a branch keeps both worlds replayable
 
 
-def world_with_branch(branch_length: int) -> Tuple[World, Body]:
+def world_with_branch(branch_length: int) -> tuple[World, Body]:
     """
     Build a world whose root carries one branch of the requested length.
 

@@ -1,7 +1,7 @@
 from __future__ import division
 
 from dataclasses import field, dataclass
-from typing_extensions import Self, Type, Tuple
+from typing_extensions import Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -62,7 +62,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
     If it is None and there is only one drive in the world, it will be used.
     """
 
-    _odom_joints: Tuple[Type[Connection], ...] = field(default=(OmniDrive,), init=False)
+    _odom_joints: tuple[type[Connection], ...] = field(default=(OmniDrive,), init=False)
     """
     The kinds of drive searched for when :attr:`odom_connection` is None.
     """

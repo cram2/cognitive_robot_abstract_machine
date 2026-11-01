@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-from typing_extensions import List
 
 from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
@@ -20,7 +19,7 @@ class StretchVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
 
     @staticmethod
-    def velocity_controlled_joint_names() -> List[StretchJoint]:
+    def velocity_controlled_joint_names() -> list[StretchJoint]:
         """
         The joints driven by the velocity group controller.
 
@@ -49,10 +48,12 @@ class StretchVelocityInterface(ClosedLoopRobotInterfaceConfig):
         self.sync_robot_parts()
 
         diff_drive = self.world.get_connections_by_type(DifferentialDrive)[0]
-        self.add_base_cmd_velocity(cmd_vel_topic="/stretch/cmd_vel", joint=diff_drive)
+        self.add_drive_velocity_command_topic(
+            command_topic="/stretch/cmd_vel", drive=diff_drive
+        )
 
-        self.add_joint_velocity_group_controller(
-            cmd_topic="/joint_velocity_cmd",
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/joint_velocity_cmd",
             connections=self.velocity_controlled_joint_names(),
             minimum_valid_velocity=0.03,
             minimum_velocity_overrides={

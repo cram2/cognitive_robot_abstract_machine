@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -29,7 +28,7 @@ class NaturalLanguageWithTypeDescription(
     Graspable, since a typed description stands for an object a robot may pick up.
     """
 
-    type_description: Optional[str] = field(default=None)
+    type_description: str | None = field(default=None)
     """
     The cleaned description of the type of the object.
     """

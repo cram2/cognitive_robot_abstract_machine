@@ -1,7 +1,6 @@
 from copy import deepcopy
 import operator
 from itertools import islice
-from typing_extensions import Optional
 
 import numpy as np
 from numpy.typing import NDArray
@@ -35,10 +34,10 @@ def test_attachment_exclusion(pr2_apartment_context, rclpy_node):
             -1.5, 1, 0, reference_frame=world.root
         )
     )
-    world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            -1.8, 1, 1, reference_frame=world.root
-        )
+    world.get_body_by_name(
+        "milk.stl"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        -1.8, 1, 1, reference_frame=world.root
     )
 
     test_world = deepcopy(world)
@@ -526,7 +525,7 @@ def _sparsely_rated_map(world) -> RingCostmap:
 
 
 def _stand_off_distances(
-    costmap: Costmap, seed: Optional[int], count: int
+    costmap: Costmap, seed: int | None, count: int
 ) -> NDArray[np.float64]:
     """
     :return: How far the first ``count`` candidates stand from the map's origin.

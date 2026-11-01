@@ -2,9 +2,14 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from coraplex.datastructures.enums import CuttingTechnique, PouringSide
+from coraplex.datastructures.enums import (
+    CuttingTechnique,
+    PouringSide,
+    WipingTechnique,
+)
 from coraplex.exceptions import WipingTargetMissing
 from coraplex.robot_plans.actions.base import ParallelAction
+from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.composite.tool_based import (
     CuttingAction,
     MixingAction,
@@ -16,6 +21,8 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
 )
+from cramph.composites import PausedUntilTrue, Sequence
+from cramph.data_types import LifeCycleValues
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -38,7 +45,12 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.justin import Justin
 
 from .conftest import expand
-from ..plan_running import robot_extensions, simulated_executor, statechart_of
+from ..plan_running import (
+    robot_extensions,
+    run_plan,
+    simulated_executor,
+    statechart_of,
+)
 
 
 def _add_box_body(world, name, size, position):
@@ -373,6 +385,77 @@ def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
     assert final_waypoint_reached.tip_link is tool_body
     assert final_waypoint_reached.goal_point is action._waypoints[-1]
     assert final_waypoint_reached.threshold == action.final_waypoint_success_tolerance
+
+
+def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
+    tool_action_world,
+) -> None:
+    """
+    A spread sweep ends where it starts, so the tool is at its final waypoint before the
+    first stroke; that alone does not finish the wipe.
+    """
+    world, robot, extensions, container, tool_body = tool_action_world
+    held_sponge = _attach_box_to_gripper(
+        world, robot, "held_sponge", (0.05, 0.05, 0.05), 0.0
+    )
+    wiping = WipingAction(
+        arm=robot.right_arm,
+        tool=Sponge(root=held_sponge),
+        technique=WipingTechnique.SPREAD,
+        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.1, reference_frame=world.root),
+    )
+    plan = Sequence(
+        nodes=[
+            NavigateAction(
+                target_location=Pose.from_xyz_rpy(
+                    x=1.85, y=2.2, reference_frame=world.root
+                )
+            ),
+            wiping,
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [tool_path] = [node for node in wiping.nodes if _trajectory_of(node) is not None]
+    assert tool_path.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+
+def test_a_wipe_stalled_close_to_its_final_waypoint_is_done(
+    tool_action_world,
+) -> None:
+    """
+    A wipe whose tool gets stuck within the success tolerance of its final waypoint is
+    accepted once the motion stalled.
+    """
+    world, robot, extensions, container, tool_body = tool_action_world
+    held_sponge = _attach_box_to_gripper(
+        world, robot, "held_sponge", (0.05, 0.05, 0.05), 0.0
+    )
+    # the sponge reaches up to about 1.58 m here, so it gets stuck 5 cm below the patch
+    wiping = WipingAction(
+        arm=robot.right_arm,
+        tool=Sponge(root=held_sponge),
+        technique=WipingTechnique.SPREAD,
+        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.63, reference_frame=world.root),
+    )
+    plan = Sequence(
+        nodes=[
+            NavigateAction(
+                target_location=Pose.from_xyz_rpy(
+                    x=1.85, y=2.2, reference_frame=world.root
+                )
+            ),
+            wiping,
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [final_waypoint_check] = [
+        node for node in wiping.nodes if isinstance(node, PausedUntilTrue)
+    ]
+    assert final_waypoint_check.life_cycle_state == LifeCycleValues.SUCCEEDED
 
 
 # %% keeping the torso upright

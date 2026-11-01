@@ -258,7 +258,9 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             SetGripperAction,
             lambda world: [
                 SetGripperAction(
-                    gripper=_arm(world).end_effector, motion=GripperState.OPEN
+                    configuration=_arm(world).end_effector.default_configuration(
+                        GripperState.OPEN
+                    )
                 )
             ],
         ),

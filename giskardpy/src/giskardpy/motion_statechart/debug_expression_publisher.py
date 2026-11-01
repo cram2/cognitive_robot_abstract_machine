@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from rclpy.node import Node
 
@@ -17,7 +17,6 @@ from semantic_digital_twin.world import World
 from giskardpy.motion_statechart.graph_node import DebugExpression
 
 if TYPE_CHECKING:
-
     from cramph.statechart import Statechart
 
 

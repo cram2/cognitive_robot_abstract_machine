@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+# %% Imports
+
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -12,6 +16,7 @@ from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 import robokudo.defs
+import robokudo.world
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
@@ -155,6 +160,21 @@ def isolate_blackboard() -> Iterator[None]:
     clear_blackboard()
     yield
     clear_blackboard()
+
+
+# %% semantic world isolation
+
+
+@pytest.fixture(autouse=True)
+def isolate_semantic_world() -> Iterator[None]:
+    """
+    Give each RoboKudo test an empty semantic world, tracker, and belief state.
+    """
+    robokudo.world.get_object_belief_states().clear()
+    robokudo.world.init_world_with_entity_tracker()
+    yield
+    robokudo.world.get_object_belief_states().clear()
+    robokudo.world.init_world_with_entity_tracker()
 
 
 # %% annotator visualization output

@@ -5,9 +5,8 @@ Specifications of semantic annotations together with the entities they are roote
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Type
+from typing_extensions import TypeVar, TYPE_CHECKING, Any
 
-from typing_extensions import TypeVar
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
@@ -85,7 +84,7 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         parameter is a construction error rather than a silently ignored field.
     """
 
-    semantic_annotation_type: Type[TSemanticAnnotation]
+    semantic_annotation_type: type[TSemanticAnnotation]
     """
     The type of the semantic annotation that is a subclass of
     HasRootKinematicStructureEntity.

@@ -1,12 +1,10 @@
 import json
 import logging
-import threading
 import time
 from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
-from typing_extensions import Never
 
 import cramph.node as node_module
 import krrood.symbolic_math.symbolic_math as sm
@@ -52,7 +50,6 @@ from cramph.monitors import (
     CountSeconds,
     CountTicks,
     CountSimulationTimeSeconds,
-    ThreadedPredicateMonitor,
 )
 from cramph.statechart import Statechart
 from cramph.nodes_for_testing import (
@@ -675,95 +672,6 @@ def test_thread_payload_monitor_non_blocking_and_caching() -> None:
     time.sleep(mon.delay * 2)
     val1 = mon.compute_observation()
     assert val1 == ObservationStateValues.TRUE
-
-
-def _tick_until(sim, predicate, timeout=2.0) -> None:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        sim.tick()
-        if predicate():
-            return
-        time.sleep(0.005)
-    raise AssertionError("condition not reached within timeout")
-
-
-def test_threaded_predicate_monitor_unknown_then_true() -> None:
-    gate = threading.Event()
-    sim = StatechartExecutor(StatechartContext(world=World()))
-    msc = Statechart(context=sim.context)
-    # predicate blocks on the gate, so we can observe the UNKNOWN phase
-    mon = ThreadedPredicateMonitor(predicate=lambda: gate.wait(2.0), name="cond")
-    msc.add_node(mon)
-    end = EndStatechart.when_true(mon)
-    msc.add_node(end)
-
-    sim.compile(statechart=msc)
-
-    # while the predicate is blocked, the monitor stays UNKNOWN and ticking
-    # never blocks on the (slow) evaluation
-    for _ in range(3):
-        t0 = time.perf_counter()
-        sim.tick()
-        assert time.perf_counter() - t0 < 0.5
-        assert mon.observation_state == ObservationStateValues.UNKNOWN
-        assert not msc.is_ended()
-
-    gate.set()
-    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.TRUE)
-    assert mon.observation_state == ObservationStateValues.TRUE
-    sim.tick()
-    assert msc.is_ended()
-
-
-def test_threaded_predicate_monitor_false() -> None:
-    sim = StatechartExecutor(StatechartContext(world=World()))
-    msc = Statechart(context=sim.context)
-    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
-    msc.add_node(mon)
-    end = EndStatechart.when_true(mon)
-    msc.add_node(end)
-
-    sim.compile(statechart=msc)
-
-    _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
-    assert mon.observation_state == ObservationStateValues.FALSE
-    assert not msc.is_ended()
-
-
-def test_threaded_predicate_monitor_false_triggers_cancel() -> None:
-    sim = StatechartExecutor(StatechartContext(world=World()))
-    msc = Statechart(context=sim.context)
-    mon = ThreadedPredicateMonitor(predicate=lambda: False, name="cond")
-    msc.add_node(mon)
-    cancel = CancelStatechart(exception=CancellingFailure())
-    cancel.start_condition = mon.observes_false
-    msc.add_node(cancel)
-
-    sim.compile(statechart=msc)
-
-    with pytest.raises(CancellingFailure):
-        _tick_until(sim, lambda: False)
-
-
-def test_threaded_predicate_monitor_exception_is_false() -> None:
-    def boom() -> Never:
-        raise RuntimeError("query failed")
-
-    sim = StatechartExecutor(StatechartContext(world=World()))
-    msc = Statechart(context=sim.context)
-    mon = ThreadedPredicateMonitor(predicate=boom, name="cond")
-    msc.add_node(mon)
-    end = EndStatechart.when_true(mon)
-    msc.add_node(end)
-
-    sim.compile(statechart=msc)
-
-    # a raising predicate must not crash the control loop; it reports FALSE
-    try:
-        _tick_until(sim, lambda: mon.observation_state == ObservationStateValues.FALSE)
-    except RuntimeError:
-        pass
-    assert mon.observation_state == ObservationStateValues.UNKNOWN
 
 
 def test_thread_payload_monitor_cleanup_stops_worker() -> None:

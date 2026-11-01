@@ -50,17 +50,17 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
         )
 
     @classmethod
-    def to_json(cls, obj: Any, **kwargs) -> Dict[str, Any]:
+    def to_json(cls, instance: Any, **kwargs) -> dict[str, Any]:
         """
         Serialize a ROS 2 message into a JSON-compatible dictionary.
         """
         return {
-            JSONField.TYPE: get_full_class_name(obj.__class__),
-            "data": convert_ros_message_to_dictionary(obj),
+            JSONField.TYPE: get_full_class_name(instance.__class__),
+            "data": convert_ros_message_to_dictionary(instance),
         }
 
     @classmethod
-    def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs: Any) -> Any:
+    def from_json(cls, data: dict[str, Any], clazz: type, **kwargs: Any) -> Any:
         """
         Deserialize a JSON-compatible dictionary into a ROS 2 message.
         """
@@ -72,7 +72,7 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
         return convert_dictionary_to_ros_message(clazz, data["data"], **valid_kwargs)
 
     @classmethod
-    def matches_generic_type(cls, clazz: Type) -> bool:
+    def matches_generic_type(cls, clazz: type) -> bool:
         """
         Check if the given class is a ROS 2 message class.
         """
@@ -92,20 +92,20 @@ class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
     """
 
     @classmethod
-    def to_json(cls, obj: QoSProfile, **kwargs) -> Dict[str, Any]:
+    def to_json(cls, instance: QoSProfile, **kwargs) -> dict[str, Any]:
         """
         Serialize a QoSProfile into a JSON-compatible dictionary.
         """
         return {
-            JSONField.TYPE: get_full_class_name(obj.__class__),
+            JSONField.TYPE: get_full_class_name(instance.__class__),
             **{
-                field_name: to_json(getattr(obj, field_name), **kwargs)
-                for field_name in obj.__slots__
+                field_name: to_json(getattr(instance, field_name), **kwargs)
+                for field_name in instance.__slots__
             },
         }
 
     @classmethod
-    def from_json(cls, data: Dict[str, Any], clazz: Type[QoSProfile], **kwargs) -> Any:
+    def from_json(cls, data: dict[str, Any], clazz: type[QoSProfile], **kwargs) -> Any:
         """
         Deserialize a JSON-compatible dictionary into a QoSProfile.
         """
@@ -127,17 +127,17 @@ class DurationJSONSerializer(ExternalClassJSONSerializer[Duration]):
     """
 
     @classmethod
-    def to_json(cls, obj: Duration, **kwargs) -> Dict[str, Any]:
+    def to_json(cls, instance: Duration, **kwargs) -> dict[str, Any]:
         """
         Serialize a Duration into a JSON-compatible dictionary.
         """
         return {
-            JSONField.TYPE: get_full_class_name(obj.__class__),
-            "nanoseconds": obj.nanoseconds,
+            JSONField.TYPE: get_full_class_name(instance.__class__),
+            "nanoseconds": instance.nanoseconds,
         }
 
     @classmethod
-    def from_json(cls, data: Dict[str, Any], clazz: Type, **kwargs) -> Any:
+    def from_json(cls, data: dict[str, Any], clazz: type, **kwargs) -> Any:
         """
         Deserialize a JSON-compatible dictionary into a Duration.
         """

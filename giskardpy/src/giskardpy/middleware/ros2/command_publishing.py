@@ -13,13 +13,12 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, Generic, List, Union
+from typing_extensions import Self, TypeVar, Generic, Union
 
 from control_msgs.msg import MultiDOFCommand
 from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64, Float64MultiArray
-from typing_extensions import Self, TypeVar
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.adapters.ros import rospy
@@ -47,7 +46,7 @@ class MinimumVelocity:
     Velocities below this magnitude are increased to it. ``0.0`` disables the minimum.
     """
 
-    def enforce_on_vector(self, velocities: List[float]) -> List[float]:
+    def enforce_on_vector(self, velocities: list[float]) -> list[float]:
         """
         Scale a velocity vector up to :attr:`magnitude`, keeping its direction.
 
@@ -97,14 +96,14 @@ class JointMinimumVelocities:
     Minimum applied to every joint without an override.
     """
 
-    overrides: List[JointMinimumVelocity] = field(default_factory=list)
+    overrides: list[JointMinimumVelocity] = field(default_factory=list)
     """
     Minimums of individual joints, e.g. to exempt hardware without a velocity deadband.
     """
 
     @classmethod
     def from_magnitudes(
-        cls, default: float = 0.0, overrides: Dict[str, float] | None = None
+        cls, default: float = 0.0, overrides: dict[str, float] | None = None
     ) -> Self:
         """
         Build minimum velocities from a default magnitude and per-joint magnitudes.
@@ -134,7 +133,7 @@ class JointMinimumVelocities:
         return self.default
 
     def validate_overrides_apply_to(
-        self, connections: List[ActiveConnection1DOF]
+        self, connections: list[ActiveConnection1DOF]
     ) -> None:
         """
         Make sure every override is used by one of the given connections.
@@ -175,12 +174,12 @@ class StateVelocityReader:
     The world holding the commanded velocities.
     """
 
-    degrees_of_freedom: List[DegreeOfFreedom]
+    degrees_of_freedom: list[DegreeOfFreedom]
     """
     The degrees of freedom to read, in the order the velocities are returned in.
     """
 
-    columns: List[int] = field(init=False, default_factory=list)
+    columns: list[int] = field(init=False, default_factory=list)
     """
     Column of every degree of freedom in the state data.
     """
@@ -190,7 +189,7 @@ class StateVelocityReader:
     Model version the columns were resolved for.
     """
 
-    def velocities(self) -> List[float]:
+    def velocities(self) -> list[float]:
         """
         The current velocity of every degree of freedom.
 
@@ -239,9 +238,9 @@ class JointVelocityCommand:
     @classmethod
     def for_connections(
         cls,
-        connections: List[ActiveConnection1DOF],
+        connections: list[ActiveConnection1DOF],
         minimum_velocities: JointMinimumVelocities,
-    ) -> List[Self]:
+    ) -> list[Self]:
         """
         Resolve the minimum velocity of every connection once.
 
@@ -294,7 +293,7 @@ class GroupCommandFormat(CommandFormat[CommandMessage], ABC):
     """
 
     @abstractmethod
-    def create_message(self, velocities: List[float]) -> CommandMessage:
+    def create_message(self, velocities: list[float]) -> CommandMessage:
         """
         Pack the velocities into a fresh message of :meth:`message_type`.
 
@@ -310,7 +309,7 @@ class Float64MultiArrayFormat(GroupCommandFormat[Float64MultiArray]):
     Commands a controller that consumes :class:`std_msgs.msg.Float64MultiArray`.
     """
 
-    def create_message(self, velocities: List[float]) -> Float64MultiArray:
+    def create_message(self, velocities: list[float]) -> Float64MultiArray:
         message = Float64MultiArray()
         message.data = velocities
         return message
@@ -325,7 +324,7 @@ class MultiDOFCommandFormat(GroupCommandFormat[MultiDOFCommand]):
         joint order.
     """
 
-    def create_message(self, velocities: List[float]) -> MultiDOFCommand:
+    def create_message(self, velocities: list[float]) -> MultiDOFCommand:
         message = MultiDOFCommand()
         message.values = velocities
         return message
@@ -408,7 +407,7 @@ class JointVelocityCommandPublisher(CommandPublisher):
     The world holding the commanded velocities.
     """
 
-    namespaces: List[str]
+    namespaces: list[str]
     """
     Namespaces of the velocity controllers; each offers a ``command`` topic and a
     ``joint`` parameter.
@@ -421,17 +420,17 @@ class JointVelocityCommandPublisher(CommandPublisher):
     Minimum velocities of the commanded joints.
     """
 
-    connections: List[ActiveConnection1DOF] = field(init=False, default_factory=list)
+    connections: list[ActiveConnection1DOF] = field(init=False, default_factory=list)
     """
     The controlled connections, in the same order as ``namespaces``.
     """
 
-    publishers: List[Publisher] = field(init=False, default_factory=list)
+    publishers: list[Publisher] = field(init=False, default_factory=list)
     """
     The command publishers, in the same order as ``namespaces``.
     """
 
-    commands: List[JointVelocityCommand] = field(init=False, default_factory=list)
+    commands: list[JointVelocityCommand] = field(init=False, default_factory=list)
     """
     What to send for every connection.
     """
@@ -499,7 +498,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     Topic the velocity array is published on.
     """
 
-    connections: List[ActiveConnection1DOF]
+    connections: list[ActiveConnection1DOF]
     """
     The controlled connections, in the order expected by the controller.
     """
@@ -516,7 +515,7 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
     Message format the controller on ``command_topic`` consumes.
     """
 
-    commands: List[JointVelocityCommand] = field(init=False, default_factory=list)
+    commands: list[JointVelocityCommand] = field(init=False, default_factory=list)
     """
     What to send for every connection.
     """
@@ -631,7 +630,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
             f"Created publisher for {self.command_topic}."
         )
 
-    def translation_degrees_of_freedom(self) -> List[DegreeOfFreedom]:
+    def translation_degrees_of_freedom(self) -> list[DegreeOfFreedom]:
         """
         The degrees of freedom the drive can translate along.
 

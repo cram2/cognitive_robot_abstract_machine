@@ -20,7 +20,7 @@ The module is used for:
 from __future__ import annotations
 
 from py_trees.common import Status
-from typing_extensions import Callable, Dict, Optional, Tuple
+from typing_extensions import Callable
 
 from robokudo.annotators.core import BaseAnnotator
 
@@ -45,13 +45,13 @@ class FilterAnnotator(BaseAnnotator):
             """Parameter container for filter configuration."""
 
             def __init__(self) -> None:
-                self.func: Optional[Callable] = None
+                self.func: Callable | None = None
                 """Filter function to apply"""
 
-                self.func_args: Optional[Tuple] = None
+                self.func_args: tuple | None = None
                 """Positional arguments for filter function"""
 
-                self.func_kwargs: Optional[Dict] = None
+                self.func_kwargs: dict | None = None
                 """Keyword arguments for filter function"""
 
         # overwrite the parameters explicitly to enable auto-completion

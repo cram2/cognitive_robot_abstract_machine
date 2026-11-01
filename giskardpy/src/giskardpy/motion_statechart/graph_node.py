@@ -5,12 +5,7 @@ from dataclasses import field, dataclass
 from functools import cached_property
 
 import numpy as np
-from typing_extensions import (
-    TYPE_CHECKING,
-    Self,
-    Optional,
-    List,
-)
+from typing_extensions import TYPE_CHECKING, Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
@@ -68,7 +63,9 @@ class DebugExpression:
     The tracked expression; spatial types are additionally rendered as RViz markers.
     """
 
-    color: Color = field(default_factory=lambda: Color(1, 0, 0, 1))
+    color: Color = field(
+        default_factory=lambda: Color.from_rgba(red=1, green=0, blue=0, opacity=1)
+    )
     """
     The color used when this expression is rendered in visualization tools.
     """
@@ -200,9 +197,9 @@ def velocity_convergence_expression(
     joint_convergence_threshold: float,
     minimum_threshold: float,
     maximum_threshold: float,
-    degrees_of_freedom: Optional[List[DegreeOfFreedom]] = None,
+    degrees_of_freedom: list[DegreeOfFreedom] | None = None,
     minimum_time: float = 1.0,
-    reference_cycle_variable: Optional[FloatVariable] = None,
+    reference_cycle_variable: FloatVariable | None = None,
 ) -> Scalar:
     """
     Builds a trinary expression that is true once every given degree of freedom's

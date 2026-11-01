@@ -6,7 +6,7 @@ from rclpy.node import MsgType, Node
 from rclpy.publisher import Publisher
 from rclpy.qos import QoSProfile
 from rclpy.subscription import Subscription
-from typing_extensions import Generic, Type
+from typing_extensions import Generic
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.ormatic.utils import classproperty
@@ -154,7 +154,7 @@ class PublishOnStart(TopicPublisherNode[MsgType]):
     Message to publish.
     """
 
-    msg_type: Type[MsgType] = field(init=False)
+    msg_type: type[MsgType] = field(init=False)
     """
     Init=False, because we can figure out the type from the msg parameter.
     """

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable
+from typing_extensions import Callable
 
 import numpy as np
 
@@ -336,8 +336,7 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
             start_idx : start_idx + self._contact_normal_offset
         ] = group_a_P_point_on_a[:3]
         self.float_variable_data.data[
-            start_idx
-            + self._contact_normal_offset : start_idx
+            start_idx + self._contact_normal_offset : start_idx
             + self._contact_distance_offset
         ] = root_V_contact_normal[:3]
         self.float_variable_data.data[start_idx + self._contact_distance_offset] = (

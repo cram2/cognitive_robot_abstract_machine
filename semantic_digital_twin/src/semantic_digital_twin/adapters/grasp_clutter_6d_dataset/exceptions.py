@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Tuple
 
 from krrood.exceptions import DataclassException
 
@@ -148,7 +147,7 @@ class GraspClutter6DSceneNotFoundError(DataclassException, LookupError):
     scenes_directory: Path
     """The extracted scenes root that was searched."""
 
-    candidates: Tuple[Path, ...] = field(default_factory=tuple)
+    candidates: tuple[Path, ...] = field(default_factory=tuple)
     """Every folder that matched, if more than one did."""
 
     def error_message(self) -> str:

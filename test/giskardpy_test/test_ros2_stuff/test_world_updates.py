@@ -1,7 +1,7 @@
 import json
 import time
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing_extensions import Any
 
 import pytest
 
@@ -73,7 +73,7 @@ class BufferingSynchronizerMimic:
     The answer this mimic gives about every position it is asked about.
     """
 
-    asked_about_positions: List[StreamPosition] = field(default_factory=list)
+    asked_about_positions: list[StreamPosition] = field(default_factory=list)
     """
     Every position this mimic was asked about.
     """
@@ -331,7 +331,7 @@ class GoalQueueStub:
     Id of the running goal.
     """
 
-    feedback_messages: List[Any] = field(default_factory=list)
+    feedback_messages: list[Any] = field(default_factory=list)
     """
     Every feedback message that was published.
     """
@@ -603,7 +603,6 @@ def local_control_loop(init_rospy) -> ControlLoop:
 
 
 class TestModelChangesOfTheMotionItself:
-
     def test_commands_keep_being_published_while_the_motion_is_built_again(
         self, local_control_loop: ControlLoop
     ) -> None:

@@ -361,18 +361,24 @@ class ShapeSortingBoard:
     The board, as read off its mesh.
     """
 
-    color: Color = field(default_factory=lambda: Color(1.0, 0.32, 0.0))
+    color: Color = field(
+        default_factory=lambda: Color.from_rgba(red=1.0, green=0.32, blue=0.0)
+    )
     """
     Colour the board is drawn in, the orange measured off the real board (hue 19).
     """
 
-    drawer_color: Color = field(default_factory=lambda: Color(0.85, 0.27, 0.0))
+    drawer_color: Color = field(
+        default_factory=lambda: Color.from_rgba(red=0.85, green=0.27, blue=0.0)
+    )
     """
     Colour the drawer fronts are drawn in, a shade darker than the board so they read
     apart.
     """
 
-    handle_color: Color = field(default_factory=lambda: Color(0.5, 0.5, 0.5))
+    handle_color: Color = field(
+        default_factory=lambda: Color.from_rgba(red=0.5, green=0.5, blue=0.5)
+    )
     """
     Colour the drawer handles are drawn in.
     """

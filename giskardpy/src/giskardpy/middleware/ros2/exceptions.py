@@ -5,13 +5,13 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Type
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
 from semantic_digital_twin.adapters.ros.messages import MetaData
+from semantic_digital_twin.world_description.connections import WheeledDrive
 
 
 @dataclass
@@ -25,7 +25,7 @@ class UnknownMinimumVelocityJointError(SetupException):
     The joint the override was written for.
     """
 
-    commanded_joint_names: List[str]
+    commanded_joint_names: list[str]
     """
     The joints the publisher actually commands.
     """
@@ -113,6 +113,28 @@ class ControllersNotActiveError(SetupException):
 
 
 @dataclass
+class NoUniqueDriveError(SetupException):
+    """
+    Raised when Giskard is told to command the drive of a world without being told which
+    drive, and the world does not hold exactly one.
+    """
+
+    drives: list[WheeledDrive]
+    """
+    The drives the world holds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Expected exactly one drive to command, but the world holds "
+            f"{[str(drive.name) for drive in self.drives]}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name the drive to command."
+
+
+@dataclass
 class ExecutionException(GiskardException):
     """
     Base class for errors that occur while executing a trajectory.
@@ -189,7 +211,7 @@ class NoWatchedClientError(GiskardException):
     Raised when a presence check is asked about a client while it watches none.
     """
 
-    check_type: Type
+    check_type: type
     """
     The check that was asked.
     """

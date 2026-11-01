@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, Hashable, List, Set, TYPE_CHECKING, Type
+from typing_extensions import Any, Hashable, TYPE_CHECKING
 
 import random_events.variable
 from krrood.entity_query_language.core.variable import Variable
@@ -80,7 +80,7 @@ class EmptyVariableDomain(InputError):
 
 @dataclass
 class InvalidEllipsis(InputError):
-    type_: Type
+    type_: type
 
     def error_message(self) -> str:
         return f"Ellipsis is not allowed for type {self.type_}. Ellipsis are only allowed for the leaf objects (random events compatible types, see `random_events.variable.Variable.compatible_types`)."
@@ -184,7 +184,7 @@ class MultipleEffectVariablesNotSupported(ProbabilisticModelException):
     that best explains the effect becomes the primary cause.
     """
 
-    variables: List[random_events.variable.Variable]
+    variables: list[random_events.variable.Variable]
     """
     The declared effect variables.
     """
@@ -218,7 +218,7 @@ class JointQueryAcrossClassesNotSupported(ProbabilisticModelException):
     referencing zero, or more than one, classes' models yet.
     """
 
-    owner_classes: Set[Type]
+    owner_classes: set[type]
     """
     The distinct owner classes found among the query's referenced attributes -- empty
     when it referenced none at all.
@@ -288,7 +288,7 @@ class AmbiguousVariableName(ProbabilisticModelException):
     The variable of the model.
     """
 
-    attribute_matches: List[AttributeMatch]
+    attribute_matches: list[AttributeMatch]
     """
     The attributes of the match that have the name of the variable.
     """
@@ -322,7 +322,7 @@ class DomainElementsIndistinguishableInSamples(ProbabilisticModelException):
     The symbolic variable.
     """
 
-    elements: List[Hashable]
+    elements: list[Hashable]
     """
     The elements of the domain whose hashes become the same value in a sample.
     """

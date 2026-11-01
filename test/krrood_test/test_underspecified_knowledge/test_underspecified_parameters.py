@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Any
+from typing_extensions import Any
 
 import pytest
 
@@ -132,7 +132,7 @@ def test_iterable_of_primitives_produces_indexed_variables():
 
     @dataclass
     class FloatMeasurements:
-        readings: List[Any]
+        readings: list[Any]
 
     prob_q = a(FloatMeasurements)(readings=[1.0, 2.0, 3.0])
     parameters = UnderspecifiedParameters(prob_q)

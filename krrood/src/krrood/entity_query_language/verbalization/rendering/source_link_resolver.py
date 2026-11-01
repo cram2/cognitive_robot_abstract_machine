@@ -5,7 +5,7 @@ import inspect
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing_extensions import Optional, Protocol
+from typing_extensions import Protocol
 
 from krrood.entity_query_language.verbalization.fragments.source_reference import (
     SourceReference,
@@ -20,7 +20,7 @@ class SourceLinkResolver(Protocol):
     attribute cannot be located.
     """
 
-    def resolve(self, reference: SourceReference) -> Optional[str]:
+    def resolve(self, reference: SourceReference) -> str | None:
         """
         Resolve *reference* to a URL string.
 
@@ -40,7 +40,7 @@ class AutoAPIResolver:
     """Root URL of the generated docs site, e.g. ``"https://myproject.readthedocs.io/en/latest"``
     or ``"http://localhost:63342/project/doc/_build/html"``."""
 
-    html_root: Optional[Path] = None
+    html_root: Path | None = None
     """
     Optional local path to the Sphinx HTML output directory.
 
@@ -48,7 +48,7 @@ class AutoAPIResolver:
     warning if it does not.
     """
 
-    def resolve(self, reference: SourceReference) -> Optional[str]:
+    def resolve(self, reference: SourceReference) -> str | None:
         """
         Resolve *reference* to a Sphinx AutoAPI page URL.
 
@@ -131,7 +131,7 @@ class AutoAPIResolver:
 
         pkg_file = Path(inspect.getfile(pkg)).resolve()
 
-        package_root: Optional[Path] = None
+        package_root: Path | None = None
         for parent in pkg_file.parents:
             if (parent / "pyproject.toml").exists():
                 package_root = parent
@@ -148,7 +148,7 @@ class AutoAPIResolver:
                 f"Build the docs first: sphinx-build doc doc/_build/html"
             )
 
-        git_root: Optional[Path] = None
+        git_root: Path | None = None
         for parent in [package_root, *package_root.parents]:
             if (parent / ".git").exists():
                 git_root = parent

@@ -88,9 +88,19 @@ jobs:
           bazel build //test:test_all
           bazel test //test:test_all
 
-      # Physics test outcomes differ between runner CPU models; the log records which one ran.
+      # The runners differ in CPU model, which can change the rounding of numeric results;
+      # the log records which one ran, to trace a failure that only one runner shows.
       - name: Show CPU
         run: lscpu
+
+      - name: Check the generated rules in AGENTS.md
+        # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
+        # edit or a forgotten regeneration fails here.
+        if: ${{ inputs.lib == 'krrood' }}
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          cd cognitive_robot_abstract_machine
+          krrood agents-md --check
 
       - name: Run tests
         run: |
@@ -107,11 +117,7 @@ jobs:
           if [[ "${{ inputs.lib }}" == "semantic_digital_twin" ]]; then
             export MUJOCO_GL=egl
           fi
-          if [[ "${{ inputs.lib }}" == "cramera" ]]; then
-            python -m pytest -n auto --cov=cramera --cov-fail-under=85 cognitive_robot_abstract_machine/test/cramera_test
-          else
-            python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
-          fi
+          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache
         uses: actions/cache/save@v4

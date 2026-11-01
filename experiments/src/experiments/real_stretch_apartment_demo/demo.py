@@ -171,7 +171,11 @@ class StretchApartmentDemonstration(RobotDemonstration):
         plan = Sequence(
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
-                SetGripperAction(gripper=arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(
+                    configuration=arm.end_effector.default_configuration(
+                        GripperState.CLOSE
+                    )
+                ),
                 NavigateAction(
                     target_location=Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
@@ -216,7 +220,11 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     ),
                 ),
                 ParkArmsAction(arms=robot.all_arms),
-                SetGripperAction(gripper=arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(
+                    configuration=arm.end_effector.default_configuration(
+                        GripperState.CLOSE
+                    )
+                ),
                 NavigateAction(
                     target_location=Pose.from_xyz_rpy(
                         1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
@@ -260,7 +268,11 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 ParkArmsAction(arms=robot.all_arms),
-                SetGripperAction(gripper=arm.end_effector, motion=GripperState.CLOSE),
+                SetGripperAction(
+                    configuration=arm.end_effector.default_configuration(
+                        GripperState.CLOSE
+                    )
+                ),
             ]
         )
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import (
@@ -147,7 +147,7 @@ class ConstraintCollection:
         equality_bound: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         reference_velocity: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
@@ -198,7 +198,7 @@ class ConstraintCollection:
         upper_error: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
-        name: Optional[str] = None,
+        name: str | None = None,
         linear_weight: sm.ScalarData = 0,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -251,7 +251,7 @@ class ConstraintCollection:
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         velocity_limit: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
@@ -290,7 +290,7 @@ class ConstraintCollection:
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         velocity_limit: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:

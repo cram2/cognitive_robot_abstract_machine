@@ -40,7 +40,6 @@ from semantic_digital_twin.adapters.ros import rospy
 
 
 class SvgGrahpicsView(QGraphicsView):
-
     def __init__(self, *args):
         QGraphicsView.__init__(self, *args)
         self.mutex = QMutex()  # Mutex for synchronizing access to the widget

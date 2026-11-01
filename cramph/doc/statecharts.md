@@ -637,7 +637,6 @@ cramph ships these nodes besides the templates:
 | `CountNodeResets`            | True once `node` was reset `target` times                        |
 | `Pulse`                      | True for its first `length` ticks, then False                    |
 | `Print`                      | True every tick, printing `message`                              |
-| `ThreadedPredicateMonitor`   | Unknown until `predicate` returned in a thread of its own, then what it returned |
 | `FunctionCall`               | True once `function` returned in a thread of its own, False if it raised one of `failure_types`, and ends on its own |
 | `MoveBranch`                 | True once it moved `body` under `new_parent`, after which every node is built again |
 

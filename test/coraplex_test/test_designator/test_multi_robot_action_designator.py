@@ -156,6 +156,7 @@ from ...plan_running import (
     statechart_of,
 )
 from cramph.context import ContextExtension
+from krrood.entity_query_language.factories import a
 
 # %% standing a robot next to something
 
@@ -382,7 +383,10 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
     end_effector = left_or_only_arm(view).end_effector
 
     for state in (GripperState.OPEN, GripperState.CLOSE):
-        run_plan(SetGripperAction(gripper=end_effector, motion=state), extensions)
+        run_plan(
+            SetGripperAction(configuration=end_effector.default_configuration(state)),
+            extensions,
+        )
 
         if isinstance(end_effector, HasTwoFingers):
             assert end_effector.fingertips.separation == pytest.approx(
@@ -895,7 +899,8 @@ def test_gcs_navigation_plans_on_the_floor_the_robot_stands_on(
     ).bounding_box()
     assert floor_box.min_x <= float(base_pose.x) <= floor_box.max_x
     assert floor_box.min_y <= float(base_pose.y) <= floor_box.max_y
-    assert floor_box.max_z == pytest.approx(float(base_pose.z))
+    # Mesh files store positions as 32-bit floats.
+    assert floor_box.max_z == pytest.approx(float(base_pose.z), abs=1e-6)
 
     waypoints = action._waypoints()
     assert [waypoint.reference_frame for waypoint in waypoints] == [floor.root] * len(
@@ -1237,7 +1242,9 @@ def test_set_gripper_drives_the_gripper_it_names(multiple_robot_apartment_contex
     """
     _, robot, extensions = multiple_robot_apartment_context
     end_effector = left_or_only_arm(robot).end_effector
-    action = SetGripperAction(gripper=end_effector, motion=GripperState.OPEN)
+    action = SetGripperAction(
+        configuration=end_effector.default_configuration(GripperState.OPEN)
+    )
 
     expand(action, extensions)
 
@@ -1310,6 +1317,26 @@ def test_look_at_points_the_default_camera(multiple_robot_apartment_context):
 
     [pointing] = nodes_of_type(action, Pointing)
     assert pointing.tip_link == robot.get_default_camera().root
+
+
+def test_look_at_points_along_the_optical_viewing_direction(
+    multiple_robot_apartment_context,
+):
+    """
+    Looking somewhere aims the camera's optical viewing direction, expressed in the
+    camera's optical root.
+    """
+    _, robot, extensions = multiple_robot_apartment_context
+    camera = robot.get_default_camera()
+    action = LookAtAction(target=Pose())
+
+    expand(action, extensions)
+
+    [pointing] = nodes_of_type(action, Pointing)
+    assert np.array_equal(
+        pointing.pointing_axis.to_np(), camera.viewing_direction.to_np()
+    )
+    assert pointing.pointing_axis.reference_frame is camera.root
 
 
 def test_following_a_path_runs_one_goal_per_waypoint(
@@ -1833,7 +1860,7 @@ def test_a_robot_holding_nothing_drives_with_its_arms_parked(
     _, robot, extensions = multiple_robot_apartment_context
     carry = CarryAction(navigate=drive_ahead(robot))
 
-    expand(carry, extensions)
+    run_plan(carry, extensions)
 
     navigate, park_arms = carry.nodes
     assert navigate is carry.navigate
@@ -1848,7 +1875,7 @@ def test_only_the_arms_holding_nothing_are_parked(
     cup_held_tilted(robot)
     carry = CarryAction(navigate=drive_ahead(robot))
 
-    expand(carry, extensions)
+    run_plan(carry, extensions)
 
     parked_arms = [
         arm
@@ -1860,28 +1887,44 @@ def test_only_the_arms_holding_nothing_are_parked(
     assert parked_arms == [arm for arm in robot.all_arms if arm is not holding_arm]
 
 
-def test_a_cup_put_down_earlier_in_the_plan_is_not_carried(
+def test_a_carry_holds_only_its_drive_until_it_starts(
     multiple_robot_apartment_context,
 ) -> None:
     _, robot, extensions = multiple_robot_apartment_context
-    cup = cup_in_reach(robot, "cup")
+    cup_held_tilted(robot)
     carry = CarryAction(navigate=drive_ahead(robot))
 
-    expand(
+    expand(carry, extensions)
+
+    assert carry.nodes == [carry.navigate]
+
+
+def test_a_cup_picked_up_by_a_statement_ends_upright(
+    multiple_robot_apartment_context,
+) -> None:
+    """
+    The pick-up is grounded only when it starts, after the carry joined the plan.
+    """
+    _, robot, extensions = multiple_robot_apartment_context
+    cup = cup_in_reach(robot, "tilted_cup", roll=0.3)
+    arm = left_or_only_arm(robot)
+    carry = CarryAction(navigate=drive_ahead(robot))
+
+    run_plan(
         Sequence(
             nodes=[
-                PickUpAction.from_above(cup, left_or_only_arm(robot)),
-                PlaceAction(
-                    object_designator=cup,
-                    target_location=Pose.from_xyz_rpy(y=0.1, reference_frame=cup.root),
-                ),
+                a(PickUpAction)(grasp=PickUpAction.from_above(cup, arm).grasp, arm=arm),
                 carry,
             ]
         ),
-        extensions,
+        [*extensions, PlanRewriting(transformations=[ParkArmsBeforeFirstAction()])],
     )
 
-    assert [type(node) for node in carry.nodes] == [NavigateAction, ParkArmsAction]
+    # The cup is held with the orientation error the gripper reached its grasp with.
+    assert (
+        tilt_from_upright(cup.root)
+        <= carry.upright_threshold + PickUpAction.orientation_threshold
+    )
 
 
 def test_a_placing_carries_its_object_to_where_it_stands(

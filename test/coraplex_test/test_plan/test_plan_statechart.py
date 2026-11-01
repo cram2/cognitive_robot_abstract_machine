@@ -549,7 +549,9 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     sent = Statechart(context=simulated_executor(extensions).context)
     sent.add_node(
         action := SetGripperAction(
-            gripper=robot.left_arm.end_effector, motion=GripperState.OPEN
+            configuration=robot.left_arm.end_effector.default_configuration(
+                GripperState.OPEN
+            )
         )
     )
 

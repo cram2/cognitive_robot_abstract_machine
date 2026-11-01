@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field, InitVar
-from typing import Optional
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -24,12 +23,12 @@ class MainWindow(QMainWindow):
     Main Window of the Probabilistic Model GUI.
     """
 
-    model: Optional[ProbabilisticModel] = None
+    model: ProbabilisticModel | None = None
     """
     The initial probabilistic model (optional).
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
@@ -69,7 +68,7 @@ class MainWindow(QMainWindow):
     The action group for toolbar navigation.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.setWindowTitle("Probabilistic Model GUI")
         self.resize(1000, 700)

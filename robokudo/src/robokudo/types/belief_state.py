@@ -6,7 +6,7 @@ from collections import deque
 
 from robokudo.types.scene import ObjectHypothesis
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Deque, Optional, Self
+from typing_extensions import TYPE_CHECKING, Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
@@ -23,14 +23,14 @@ class ObjectBeliefState:
     max_num_hypotheses: int = 1
     """The maximum number of object hypotheses to keep in the belief state."""
 
-    hypotheses: Deque[ObjectHypothesis] = field(init=False)
+    hypotheses: deque[ObjectHypothesis] = field(init=False)
     """The hypotheses associated with the belief state."""
 
     def __post_init__(self):
         self.hypotheses = deque(maxlen=self.max_num_hypotheses)
 
     @classmethod
-    def create_with_new_body(cls, name: Optional[PrefixedName] = None) -> Self:
+    def create_with_new_body(cls, name: PrefixedName | None = None) -> Self:
         """Create a new ObjectBeliefState with a new Body.
 
         :param name: Name of the body.
@@ -46,14 +46,14 @@ class ObjectBeliefState:
         return self.body.id
 
     @property
-    def latest_hypothesis(self) -> Optional[ObjectHypothesis]:
+    def latest_hypothesis(self) -> ObjectHypothesis | None:
         """The latest hypothesis added to the belief state."""
         if len(self.hypotheses) == 0:
             return None
         return self.hypotheses[len(self.hypotheses) - 1]
 
     @property
-    def latest_pose(self) -> Optional[PoseAnnotation]:
+    def latest_pose(self) -> PoseAnnotation | None:
         """The newest pose annotation of the latest hypothesis."""
         hypothesis = self.latest_hypothesis
         if hypothesis is not None:
@@ -63,7 +63,7 @@ class ObjectBeliefState:
         return None
 
     @property
-    def latest_bbox_3d(self) -> Optional[BoundingBox3DAnnotation]:
+    def latest_bbox_3d(self) -> BoundingBox3DAnnotation | None:
         """The newest 3D bounding box annotation of the latest hypothesis."""
         hypothesis = self.latest_hypothesis
         if hypothesis is not None:

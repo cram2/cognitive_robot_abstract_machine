@@ -36,7 +36,7 @@ artifacts.debug_expressions.append(
     DebugExpression(
         name=f"{self.name}/current_normal",
         expression=root_V_tip_normal,
-        color=Color(1, 0, 0, 1),
+        color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
     )
 )
 ```

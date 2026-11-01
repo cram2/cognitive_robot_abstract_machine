@@ -80,19 +80,25 @@ with world.modify_world():
     box1 = Body(
         name=PrefixedName("Box1"),
         collision=ShapeCollection(shapes=[Box(scale=box_scale)]),
-        visual=ShapeCollection(shapes=[Box(scale=box_scale, color=Color(1, 0, 0))]),
+        visual=ShapeCollection(
+            shapes=[Box(scale=box_scale, color=Color.from_rgba(red=1, green=0, blue=0))]
+        ),
     )
 
     box2 = Body(
         name=PrefixedName("Box2"),
         collision=ShapeCollection(shapes=[Box(scale=box_scale)]),
-        visual=ShapeCollection(shapes=[Box(scale=box_scale, color=Color(0, 1, 0))]),
+        visual=ShapeCollection(
+            shapes=[Box(scale=box_scale, color=Color.from_rgba(red=0, green=1, blue=0))]
+        ),
     )
 
     box3 = Body(
         name=PrefixedName("Box3"),
         collision=ShapeCollection(shapes=[Box(scale=box_scale)]),
-        visual=ShapeCollection(shapes=[Box(scale=box_scale, color=Color(0, 0, 1))]),
+        visual=ShapeCollection(
+            shapes=[Box(scale=box_scale, color=Color.from_rgba(red=0, green=0, blue=1))]
+        ),
     )
 
     world.add_kinematic_structure_entity(box1)

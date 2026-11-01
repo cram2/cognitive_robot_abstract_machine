@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING, Any, List, Type
+from typing_extensions import TYPE_CHECKING, Any
 
 from probabilistic_model.exceptions import ProbabilisticModelException
 
@@ -32,7 +32,7 @@ class ClassCircuitGroundingFailedError(ProbabilisticModelException):
     no nodes at all.
     """
 
-    class_: Type
+    class_: type
     """The domain class whose class circuit failed to ground."""
 
     def error_message(self) -> str:
@@ -55,7 +55,7 @@ class MixedCircuitTypesError(ProbabilisticModelException):
     type than the class circuit, which grounding cannot combine.
     """
 
-    class_: Type
+    class_: type
     """
     The domain class whose relational circuit was fitted.
     """
@@ -65,12 +65,12 @@ class MixedCircuitTypesError(ProbabilisticModelException):
     Field name of the exchangeable relation.
     """
 
-    class_circuit_type: Type
+    class_circuit_type: type
     """
     The type of the class circuit.
     """
 
-    part_circuit_type: Type
+    part_circuit_type: type
     """
     The type of the class circuit of the template.
     """
@@ -96,12 +96,12 @@ class UnknownExchangeablePartsError(ProbabilisticModelException):
     the class.
     """
 
-    class_: Type
+    class_: type
     """
     The domain class whose relational circuit is fitted.
     """
 
-    parts: List[str]
+    parts: list[str]
     """
     The field names that name no exchangeable part of the class.
     """
@@ -167,7 +167,7 @@ class PartCircuitGroundingFailedError(ProbabilisticModelException):
     Raised when grounding one exchangeable part leaves its circuit with no nodes at all.
     """
 
-    class_: Type
+    class_: type
     """The domain class of the exchangeable part that failed to ground."""
 
     def error_message(self) -> str:
@@ -212,7 +212,7 @@ class UndeterminedLatentsNotModeledError(ProbabilisticModelException):
     aggregation statistics, so they cannot be sampled and integrated out.
     """
 
-    undetermined_latents: List[Variable]
+    undetermined_latents: list[Variable]
     """
     The undetermined latent variables that the conditioned circuit fails to model.
     """
@@ -244,7 +244,7 @@ class UndeterminedLatentsNotPartitionedError(ProbabilisticModelException):
     represents.
     """
 
-    undetermined_latents: List[Variable]
+    undetermined_latents: list[Variable]
     """
     The undetermined latent variables whose marginal support is not a genuine, disjoint
     partition.
@@ -276,7 +276,7 @@ class VariableNotFoundError(ProbabilisticModelException):
     The access path that failed to resolve.
     """
 
-    available_variables: List[Variable]
+    available_variables: list[Variable]
     """
     The variables the grounded circuit actually has, for diagnosis.
     """
@@ -306,7 +306,7 @@ class AmbiguousVariablePathError(ProbabilisticModelException):
     The access path that matched more than one variable.
     """
 
-    matches: List[Variable]
+    matches: list[Variable]
     """
     The variables that matched.
     """
@@ -326,7 +326,7 @@ class NoCommonSuperclassError(ProbabilisticModelException):
     ``object``.
     """
 
-    classes: List[Type]
+    classes: list[type]
     """
     The classes of the instances.
     """
@@ -348,12 +348,12 @@ class InstanceNotOfClassError(ProbabilisticModelException):
     class.
     """
 
-    class_: Type
+    class_: type
     """
     The class the circuit is fitted for.
     """
 
-    instance_class: Type
+    instance_class: type
     """
     The class of the instance.
     """

@@ -177,7 +177,13 @@ def test_external_collision_avoidance_battle():
         strong = Body(
             name=PrefixedName("strong"),
             collision=ShapeCollection(
-                [Cylinder(width=0.1, height=0.1, color=Color(R=1, G=0, B=0, A=1))]
+                [
+                    Cylinder(
+                        width=0.1,
+                        height=0.1,
+                        color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
+                    )
+                ]
             ),
         )
         strong_robot_world.add_body(strong)
@@ -188,7 +194,13 @@ def test_external_collision_avoidance_battle():
         weak = Body(
             name=PrefixedName("weak"),
             collision=ShapeCollection(
-                [Cylinder(width=0.1, height=0.1, color=Color(R=0, G=0, B=1, A=1))]
+                [
+                    Cylinder(
+                        width=0.1,
+                        height=0.1,
+                        color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
+                    )
+                ]
             ),
         )
         weak_robot_world.add_body(weak)

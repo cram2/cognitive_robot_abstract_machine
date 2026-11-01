@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import trimesh
 
@@ -48,7 +47,7 @@ class MeshMeasurements:
     :func:`~experiments.shelf_generation_experiments.utils.build_source_id_to_path`.
     """
 
-    _bounds_by_source_id: dict[str, Optional[VolumetricBoundingBox]] = field(
+    _bounds_by_source_id: dict[str, VolumetricBoundingBox | None] = field(
         default_factory=dict
     )
     """
@@ -98,7 +97,7 @@ class MeshMeasurements:
             is_mesh_corrected=True,
         )
 
-    def bounds(self, source_id: str) -> Optional[VolumetricBoundingBox]:
+    def bounds(self, source_id: str) -> VolumetricBoundingBox | None:
         """
         The measurements of *source_id*'s mesh, loading it on first request.
 
@@ -109,7 +108,7 @@ class MeshMeasurements:
             self._bounds_by_source_id[source_id] = self._measure(source_id)
         return self._bounds_by_source_id[source_id]
 
-    def _measure(self, source_id: str) -> Optional[VolumetricBoundingBox]:
+    def _measure(self, source_id: str) -> VolumetricBoundingBox | None:
         """
         Load *source_id*'s mesh and measure its bounding box.
 
@@ -122,8 +121,8 @@ class MeshMeasurements:
 
     @staticmethod
     def _load_mesh_bounds(
-        source_id: str, scene_directory: Optional[Path]
-    ) -> Optional[VolumetricBoundingBox]:
+        source_id: str, scene_directory: Path | None
+    ) -> VolumetricBoundingBox | None:
         """
         Load and measure *source_id*'s mesh from *scene_directory*.
 

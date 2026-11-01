@@ -6,7 +6,6 @@ from math import ceil
 
 import numpy as np
 import pytest
-from typing_extensions import List
 
 from cramph.node import EndedByOwner
 from cramph.data_types import ObservationStateValues
@@ -81,7 +80,7 @@ def unreachable_arm_goal(world: World) -> CartesianPosition:
 def tick_until_end_recording(
     executor: StatechartExecutor,
     motion_statechart: Statechart,
-    nodes: List[MotionStatechartNode],
+    nodes: list[MotionStatechartNode],
     maximum_cycles: int = 2000,
 ) -> dict[MotionStatechartNode, list[float]]:
     """
@@ -121,7 +120,7 @@ class NodeWithDeclaredDependencies(EndedByOwner, MotionStatechartNode):
     """
 
     @property
-    def prerequisite_nodes(self) -> List[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
         return self.dependencies
 
     def build_artifacts(self) -> NodeArtifacts:
@@ -133,7 +132,6 @@ class NodeWithDeclaredDependencies(EndedByOwner, MotionStatechartNode):
 
 
 class TestStallDetection:
-
     def test_stall_cancels_the_motion(self, pr2_world_state_reset: World):
         """
         An arm that has extended as far as it can stops closing on its goal, so the
@@ -641,8 +639,8 @@ class ScriptedErrorRun:
         )
 
     def observations_while_the_error_is(
-        self, errors: List[float]
-    ) -> List[ObservationStateValues]:
+        self, errors: list[float]
+    ) -> list[ObservationStateValues]:
         """
         :param errors: The first task's error on each control cycle, the bot being
             short of its goal.
@@ -670,7 +668,6 @@ class ScriptedErrorRun:
 
 
 class TestConvergenceRule:
-
     @pytest.mark.parametrize(
         "fall_factor, observed",
         [(0.8, ObservationStateValues.TRUE), (1.2, ObservationStateValues.FALSE)],
@@ -726,6 +723,27 @@ class TestConvergenceRule:
             ObservationStateValues.FALSE
         ]
 
+    def test_a_task_cycling_through_its_goal_makes_no_progress(
+        self, cylinder_bot_world: World
+    ) -> None:
+        """
+        A task that falls into its goal, is pushed back out and falls in again, over and
+        over, gets no closer than it already was, so it cannot hide that another task is
+        stuck.
+        """
+        run = ScriptedErrorRun(cylinder_bot_world, goal_xs=[GOAL_X, 0.0])
+        threshold_of_the_cycling_task = run.tasks[1].threshold
+        cycle = [
+            3 * threshold_of_the_cycling_task,
+            2 * threshold_of_the_cycling_task,
+            threshold_of_the_cycling_task / 2,
+        ]
+
+        run.observations_while_the_bot_is_at(cycle)
+        later_cycles = run.observations_while_the_bot_is_at(cycle + cycle)
+
+        assert later_cycles == [ObservationStateValues.TRUE] * len(later_cycles)
+
     def test_several_tasks_are_stalled_only_while_none_of_them_approaches(
         self, cylinder_bot_world: World
     ) -> None:
@@ -766,7 +784,6 @@ class TestConvergenceRule:
 
 
 class TestTimeDerivative:
-
     def test_expression_without_joints_has_no_rate(self):
         """
         An error that does not depend on any joint cannot change through robot motion.
@@ -795,7 +812,6 @@ class TestTimeDerivative:
 
 
 class TestErrorDrivesObservation:
-
     def test_error_is_the_distance_to_the_goal(self, cylinder_bot_world: World):
         """
         CartesianPosition reports the distance between tip and goal as its error.
@@ -909,7 +925,6 @@ def trajectory_task_at_its_goal(world: World) -> CartesianPositionTrajectory:
 
 
 class TestTaskAtItsGoal:
-
     @pytest.mark.parametrize(
         "task_at_its_goal", [position_task_at_its_goal, trajectory_task_at_its_goal]
     )
@@ -948,7 +963,6 @@ class TestTaskAtItsGoal:
 
 
 class TestNothingToConverge:
-
     def test_a_node_that_never_converges_stalls_after_the_timeout(
         self, cylinder_bot_world: World
     ):
@@ -993,14 +1007,13 @@ class TestNothingToConverge:
 
 
 class TestNodeDependencies:
-
     def test_a_dependency_is_built_first_even_when_added_later(
         self, cylinder_bot_world: World
     ):
         """
         Build order follows declared dependencies, not the order nodes were added.
         """
-        built_after: List[str] = []
+        built_after: list[str] = []
         dependency = NodeWithDeclaredDependencies(
             name="dependency", built_after=built_after
         )
@@ -1071,7 +1084,6 @@ class TestNodeDependencies:
 
 
 class TestTrajectoryProgress:
-
     def test_a_trajectory_being_followed_is_progressing(
         self, cylinder_bot_world: World
     ):

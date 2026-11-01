@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import ClassVar, Dict, List, Type
+from typing_extensions import ClassVar
 
 import numpy as np
 
@@ -132,7 +132,7 @@ class BenchmarkRobot(GiskardTester):
     Frequency the controller is discretized for, in hertz.
     """
 
-    default_joint_state: ClassVar[Dict[str, float]] = {
+    default_joint_state: ClassVar[dict[str, float]] = {
         PR2Joint.RIGHT_ELBOW_FLEX: -0.15,
         PR2Joint.RIGHT_FOREARM_ROLL: 0,
         PR2Joint.RIGHT_SHOULDER_LIFT: 0,
@@ -157,7 +157,7 @@ class BenchmarkRobot(GiskardTester):
     The neutral configuration the arms start from.
     """
 
-    better_pose: ClassVar[Dict[str, float]] = {
+    better_pose: ClassVar[dict[str, float]] = {
         PR2Joint.RIGHT_SHOULDER_PAN: -1.7125,
         PR2Joint.RIGHT_SHOULDER_LIFT: -0.25672,
         PR2Joint.RIGHT_UPPER_ARM_ROLL: -1.46335,
@@ -182,7 +182,7 @@ class BenchmarkRobot(GiskardTester):
     The configuration with the arms tucked in, used when the robot has to drive around.
     """
 
-    pocky_pose: ClassVar[Dict[str, float]] = {
+    pocky_pose: ClassVar[dict[str, float]] = {
         PR2Joint.RIGHT_ELBOW_FLEX: -1.29610152504,
         PR2Joint.RIGHT_FOREARM_ROLL: -0.0301682323805,
         PR2Joint.RIGHT_SHOULDER_LIFT: 1.20324921318,
@@ -245,7 +245,7 @@ class BenchmarkRobot(GiskardTester):
         """
         return self.api.world.get_kinematic_structure_entity_by_name(name)
 
-    def teleport_to_configuration(self, joint_state: Dict[str, float]) -> None:
+    def teleport_to_configuration(self, joint_state: dict[str, float]) -> None:
         """
         Teleport the robot into the given configuration and reset its odometry.
 
@@ -323,7 +323,7 @@ class BenchmarkScenario(ABC):
         """
 
     @abstractmethod
-    def seed_joint_state(self, robot: BenchmarkRobot) -> Dict[str, float]:
+    def seed_joint_state(self, robot: BenchmarkRobot) -> dict[str, float]:
         """
         The configuration the robot is teleported into before the motion starts.
 
@@ -361,7 +361,7 @@ class CartesianGoalScenario(BenchmarkScenario):
     def name(cls) -> BenchmarkScenarioName:
         return BenchmarkScenarioName.CARTESIAN_GOAL_ONE_END_EFFECTOR
 
-    def seed_joint_state(self, robot: BenchmarkRobot) -> Dict[str, float]:
+    def seed_joint_state(self, robot: BenchmarkRobot) -> dict[str, float]:
         return robot.default_joint_state
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
@@ -390,7 +390,7 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
     def name(cls) -> BenchmarkScenarioName:
         return BenchmarkScenarioName.AVOID_COLLISION_GO_AROUND_CORNER
 
-    def seed_joint_state(self, robot: BenchmarkRobot) -> Dict[str, float]:
+    def seed_joint_state(self, robot: BenchmarkRobot) -> dict[str, float]:
         return robot.pocky_pose
 
     def prepare(self, robot: BenchmarkRobot) -> None:
@@ -447,7 +447,7 @@ class ApartmentDrivingScenario(BenchmarkScenario):
     def name(cls) -> BenchmarkScenarioName:
         return BenchmarkScenarioName.DRIVE_INTO_APARTMENT
 
-    def seed_joint_state(self, robot: BenchmarkRobot) -> Dict[str, float]:
+    def seed_joint_state(self, robot: BenchmarkRobot) -> dict[str, float]:
         return robot.better_pose
 
     def prepare(self, robot: BenchmarkRobot) -> None:
@@ -486,7 +486,7 @@ class KitchenPointingScenario(BenchmarkScenario):
     def name(cls) -> BenchmarkScenarioName:
         return BenchmarkScenarioName.POINTING_KITCHEN
 
-    def seed_joint_state(self, robot: BenchmarkRobot) -> Dict[str, float]:
+    def seed_joint_state(self, robot: BenchmarkRobot) -> dict[str, float]:
         return robot.better_pose
 
     def prepare(self, robot: BenchmarkRobot) -> None:
@@ -569,10 +569,10 @@ class LongSequenceScenario(BenchmarkScenario):
     def name(cls) -> BenchmarkScenarioName:
         return BenchmarkScenarioName.LONG_SEQUENCE
 
-    def seed_joint_state(self, robot: BenchmarkRobot) -> Dict[str, float]:
+    def seed_joint_state(self, robot: BenchmarkRobot) -> dict[str, float]:
         return robot.better_pose
 
-    waypoint_offsets: ClassVar[List[float]] = [-0.15, 0.15, -0.2, 0.2, -0.1, 0.1]
+    waypoint_offsets: ClassVar[list[float]] = [-0.15, 0.15, -0.2, 0.2, -0.1, 0.1]
     """
     How far along x each waypoint moves the gripper, relative to the one before.
     """
@@ -668,7 +668,7 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
         return step
 
 
-BENCHMARK_SCENARIOS: Dict[str, Type[BenchmarkScenario]] = {
+BENCHMARK_SCENARIOS: dict[str, type[BenchmarkScenario]] = {
     scenario.name: scenario
     for scenario in (
         CartesianGoalScenario,

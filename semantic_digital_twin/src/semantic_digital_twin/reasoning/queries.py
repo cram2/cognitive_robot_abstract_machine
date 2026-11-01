@@ -6,7 +6,6 @@ from krrood.inheritance_path_length import (
 
 from krrood.entity_query_language.factories import not_, set_of, type_
 import math
-from typing import List, Optional
 from krrood.entity_query_language.factories import (
     variable_from,
     entity,
@@ -90,7 +89,7 @@ def goal_surface_of_object(
     object_of_interest: SemanticAnnotation,
     supporting_surfaces: list[HasSupportingSurface],
     threshold: int = 1,
-) -> Optional[HasSupportingSurface]:
+) -> HasSupportingSurface | None:
     """
     Finds the most similar object to a given semantic annotation among a list of tables
     based on the inheritance path length. If the similarity does not meet the provided
@@ -164,7 +163,7 @@ def filter_annotations_by_color(
     return entity(semantic_annotation).where(semantic_annotation.root == matching_body)
 
 
-def annotation_class_by_label(label: str) -> Optional[type]:
+def annotation_class_by_label(label: str) -> type | None:
     """
     Finds the class whose name is contained within the given label.
 
@@ -192,8 +191,8 @@ def annotation_class_by_label(label: str) -> Optional[type]:
 
 
 def sort_annotations_by_volume(
-    annotations: List[HasRootBody], order: Optional[bool] = True
-) -> List[HasRootBody]:
+    annotations: list[HasRootBody], order: bool | None = True
+) -> list[HasRootBody]:
     """
     Sorts a list of SemanticAnnotations by volume in descending order (largest to
     smallest). Volume is calculated by multiplying the scale dimensions (x * y * z) of

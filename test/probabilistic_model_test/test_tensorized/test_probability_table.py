@@ -9,7 +9,6 @@ import dataclasses
 
 import numpy as np
 import pytest
-from typing_extensions import Type
 
 from krrood.adapters import json_serializer
 from krrood.adapters.json_field import JSONField
@@ -41,7 +40,7 @@ def probabilities() -> np.ndarray:
     params=[DenseProbabilityTable, SparseProbabilityTable],
     ids=lambda table_type: table_type.__name__,
 )
-def table_type(request) -> Type[ProbabilityTable]:
+def table_type(request) -> type[ProbabilityTable]:
     """
     Every way to store a probability table.
     """
@@ -49,7 +48,7 @@ def table_type(request) -> Type[ProbabilityTable]:
 
 
 def table_of(
-    table_type: Type[ProbabilityTable], probabilities: np.ndarray
+    table_type: type[ProbabilityTable], probabilities: np.ndarray
 ) -> ProbabilityTable:
     """
     :param table_type: The way to store the table.

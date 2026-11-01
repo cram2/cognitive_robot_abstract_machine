@@ -21,7 +21,6 @@ import numpy as np
 import trimesh
 from numpy.typing import NDArray
 from scipy.spatial import cKDTree
-from typing_extensions import Optional
 
 from semantic_digital_twin.part_finding.locating import (
     LocatedPart,
@@ -144,7 +143,7 @@ class KnownPartBoxDetector(PartBoxDetector):
     @staticmethod
     def _box_around(
         view_faces: NDArray[np.int64], faces: NDArray[np.int64]
-    ) -> Optional[list[int]]:
+    ) -> list[int] | None:
         """
         :param view_faces: For each pixel of a view, the face it shows.
         :param faces: The faces of a part.

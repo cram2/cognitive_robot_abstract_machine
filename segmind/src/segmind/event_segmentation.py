@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
-from typing_extensions import List, Optional, Self, Sequence, Type
+from typing_extensions import Self, Sequence
 
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import MotionDetector
@@ -39,9 +39,9 @@ class Segmind:
     what it wants detected, and keeps the rest to its plan.
 
     A tick holds the world's lock, so it never reads the world while another thread is
-    in the middle of changing it. Ticks begin :attr:`tick_period` apart, so the share
-    of the run spent watching falls as ticks get cheaper, and every tick is followed by
-    a pause at least as long as the tick, so a plan changing the world keeps going while
+    in the middle of changing it. Ticks begin :attr:`tick_period` apart, so the share of
+    the run spent watching falls as ticks get cheaper, and every tick is followed by a
+    pause at least as long as the tick, so a plan changing the world keeps going while
     it is watched.
     """
 
@@ -50,7 +50,7 @@ class Segmind:
     The world the run takes place in.
     """
 
-    detectors: List[AbstractDetector]
+    detectors: list[AbstractDetector]
     """
     The detectors ticked.
     """
@@ -78,7 +78,7 @@ class Segmind:
     Set when the detectors are to stop being ticked.
     """
 
-    thread: Optional[threading.Thread] = field(init=False, default=None)
+    thread: threading.Thread | None = field(init=False, default=None)
     """
     The thread the detectors are ticked on, once started.
     """
@@ -97,7 +97,7 @@ class Segmind:
         cls,
         world: World,
         bodies: Sequence[Body],
-        detector_types: Sequence[Type[AbstractDetector]] = (),
+        detector_types: Sequence[type[AbstractDetector]] = (),
     ) -> Self:
         """
         SegMind detecting what happens to ``bodies``.
@@ -114,7 +114,7 @@ class Segmind:
             if detector_types
             else DetectorSelection.of_every_kind()
         )
-        detectors: List[AbstractDetector] = [
+        detectors: list[AbstractDetector] = [
             detector
             for detector_type in selection.detector_types
             for detector in detector_type.create_for_run(
@@ -127,8 +127,8 @@ class Segmind:
     def create_for_semantic_annotation_types(
         cls,
         world: World,
-        semantic_annotation_types: Sequence[Type[SemanticAnnotation]],
-        detector_types: Sequence[Type[AbstractDetector]] = (),
+        semantic_annotation_types: Sequence[type[SemanticAnnotation]],
+        detector_types: Sequence[type[AbstractDetector]] = (),
     ) -> Self:
         """
         SegMind watching the bodies of every semantic annotation of the types a run
@@ -154,7 +154,7 @@ class Segmind:
         return cls.create_for_bodies(world, list(dict.fromkeys(bodies)), detector_types)
 
     @property
-    def watched_bodies(self) -> List[Body]:
+    def watched_bodies(self) -> list[Body]:
         """
         The bodies the detectors watch, each named once, in the order they are ticked.
         """
@@ -167,7 +167,7 @@ class Segmind:
         )
 
     @property
-    def detector_names(self) -> List[str]:
+    def detector_names(self) -> list[str]:
         """
         The kinds of detector ticked, each named once, in the order they are ticked.
         """

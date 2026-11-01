@@ -18,20 +18,14 @@ from cramph.node import (
     StatechartNode,
     expanded_child_field,
 )
-from giskardpy.motion_statechart.goals.gripper import (
-    MoveFingers,
-    MoveFingersToJointState,
-    MoveGripper,
-)
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_if_cases
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
-from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase, HasTwoFingers
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -167,39 +161,6 @@ class Action(CompositeNode, ABC):
         """
         return []
 
-    @staticmethod
-    def create_finger_goal(
-        end_effector: EndEffector,
-        state: GripperState,
-        finger_velocity: float | None = None,
-        stall_minimum_time: float | None = None,
-        tolerate_stall: bool = False,
-    ) -> MoveFingers:
-        """
-        :param end_effector: The end effector whose fingers move.
-        :param state: The state to bring the fingers into.
-        :param finger_velocity: See :attr:`~giskardpy.motion_statechart.goals.gripper.MoveFingers.finger_velocity`.
-        :param stall_minimum_time: See :attr:`~giskardpy.motion_statechart.goals.gripper.MoveFingers.stall_minimum_time`.
-        :param tolerate_stall: See :attr:`~giskardpy.motion_statechart.goals.gripper.MoveFingers.tolerate_stall`.
-        :return: A new goal bringing the fingers of `end_effector` into `state`: to the
-            width its fingertips stand apart in that state for a two-finger gripper, to
-            the joint state of that state for any other hand.
-        """
-        if isinstance(end_effector, HasTwoFingers):
-            return MoveGripper(
-                gripper=end_effector,
-                width=end_effector.separation_in(state),
-                finger_velocity=finger_velocity,
-                stall_minimum_time=stall_minimum_time,
-                tolerate_stall=tolerate_stall,
-            )
-        return MoveFingersToJointState(
-            goal_state=end_effector.get_joint_state_by_type(state),
-            finger_velocity=finger_velocity,
-            stall_minimum_time=stall_minimum_time,
-            tolerate_stall=tolerate_stall,
-        )
-
     def on_start(self) -> None:
         super().on_start()
         if self.temporary_collision_rules:
@@ -214,6 +175,14 @@ class Action(CompositeNode, ABC):
     def on_reset(self) -> None:
         self._take_temporary_collision_rules_out_of_force()
         super().on_reset()
+
+    def cleanup(self) -> None:
+        """
+        Takes :attr:`temporary_collision_rules` out of force, so a run that stopped
+        while this action ran leaves none of them behind.
+        """
+        self._take_temporary_collision_rules_out_of_force()
+        super().cleanup()
 
     def _take_temporary_collision_rules_out_of_force(self) -> None:
         """

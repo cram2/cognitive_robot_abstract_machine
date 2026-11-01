@@ -94,10 +94,10 @@ class TrialProbe:
     """
 
     def __init__(self):
-        self.calls: List[TrialCall] = []
+        self.calls: list[TrialCall] = []
 
 
-_registered_probes: Dict[UUID, TrialProbe] = {}
+_registered_probes: dict[UUID, TrialProbe] = {}
 """
 :class:`TrialProbe` instances, keyed by the id a :class:`RecordingAction` carries as
 :attr:`~RecordingAction.probe_key`.

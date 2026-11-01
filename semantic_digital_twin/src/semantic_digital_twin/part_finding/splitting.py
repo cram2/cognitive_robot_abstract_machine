@@ -13,7 +13,7 @@ import numpy as np
 import trimesh
 from numpy.typing import NDArray
 from trimesh.visual.texture import TextureVisuals
-from typing_extensions import TYPE_CHECKING, Callable, Optional, Type, TypeVar
+from typing_extensions import TYPE_CHECKING, Callable, TypeVar
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import CollisionDiffersFromVisualError
@@ -56,7 +56,7 @@ class MeshSplit:
     @classmethod
     def from_mesh(
         cls, mesh: trimesh.Trimesh, belongs_to_part_mask: NDArray[np.bool_]
-    ) -> Optional[MeshSplit]:
+    ) -> MeshSplit | None:
         """
         :param mesh: The mesh to split.
         :param belongs_to_part_mask: For each face of ``mesh``, whether it belongs to
@@ -103,7 +103,7 @@ class PartFinder(ABC):
     """
 
     @abstractmethod
-    def split(self, mesh: trimesh.Trimesh) -> Optional[MeshSplit]:
+    def split(self, mesh: trimesh.Trimesh) -> MeshSplit | None:
         """
         :param mesh: The object's mesh, in its root body's frame.
         :return: ``mesh`` split into the part and the rest; ``None`` if the mesh has
@@ -128,7 +128,7 @@ class PartSplitter:
     only split with a :attr:`decomposer`; otherwise split before decomposing.
     """
 
-    part_type: Type[HasRootBody]
+    part_type: type[HasRootBody]
     """
     The type of annotation the part is given, which also names the part's body.
     """
@@ -138,13 +138,13 @@ class PartSplitter:
     Finds the part in a body's shape.
     """
 
-    decomposer: Optional[MeshDecomposer] = None
+    decomposer: MeshDecomposer | None = None
     """
     Gives the part and the rest new collision shapes from their visual shapes, for
     bodies whose collision shapes differ from their visual shapes.
     """
 
-    def part_of(self, whole: PartWholeRelationship) -> Optional[HasRootBody]:
+    def part_of(self, whole: PartWholeRelationship) -> HasRootBody | None:
         """
         The part of one annotation, split off its shape the first time it is asked for.
 
@@ -161,7 +161,7 @@ class PartSplitter:
 
     def split(
         self, whole: PartWholeRelationship, field_name: str = ""
-    ) -> Optional[HasRootBody]:
+    ) -> HasRootBody | None:
         """
         Split the part off the shape of one annotation's root body and add it to the
         annotation, unless the relationship field holds a single part and is set
@@ -188,7 +188,7 @@ class PartSplitter:
             whole.add(part, field_name=relationship.name)
         return part
 
-    def split_body(self, body: Body) -> Optional[Body]:
+    def split_body(self, body: Body) -> Body | None:
         """
         Split the part off the shape of a body, without annotating either of them.
 
@@ -202,7 +202,7 @@ class PartSplitter:
         with body._world.modify_world():
             return cut.apply()
 
-    def _cut(self, body: Body) -> Optional[CutBody]:
+    def _cut(self, body: Body) -> CutBody | None:
         """
         :param body: The body whose shape is split.
         :return: The part's body and the rest of the shape, not yet in the world;
@@ -333,18 +333,68 @@ class ColoredShape:
         :return: The shapes as one mesh in the body's frame, each face colored as its
             shape looks there.
         """
-        meshes = []
+        # Built from the arrays of the shapes' meshes, because trimesh converts the
+        # colours of every copy of a mesh with per-vertex colours.
+        vertices, faces, face_colors = [], [], []
+        vertex_count = 0
         for shape in self.shapes:
-            mesh = shape.mesh.copy()
-            if isinstance(mesh.visual, TextureVisuals):
-                mesh.visual = mesh.visual.to_color()
-            if mesh.visual.kind is None:
-                mesh.visual.face_colors = trimesh.visual.color.to_rgba(
-                    shape.color.to_rgba()
-                )
-            mesh.apply_transform(shape.origin.to_np())
-            meshes.append(mesh)
-        return trimesh.util.concatenate(meshes)
+            vertices.append(
+                trimesh.transform_points(shape.mesh.vertices, shape.origin.to_np())
+            )
+            faces.append(shape.mesh.faces + vertex_count)
+            face_colors.append(self._face_colors(shape))
+            vertex_count += len(shape.mesh.vertices)
+        return trimesh.Trimesh(
+            vertices=np.concatenate(vertices),
+            faces=np.concatenate(faces),
+            face_colors=np.concatenate(face_colors),
+            process=False,
+        )
+
+    @staticmethod
+    def _face_colors(shape: Shape) -> NDArray[np.uint8]:
+        """
+        :param shape: One of :attr:`shapes`.
+        :return: The RGBA colour of each face of the shape's mesh, as the shape looks.
+        """
+        visual = shape.mesh.visual
+        if isinstance(visual, TextureVisuals):
+            # The colours trimesh bakes a texture into belong to no mesh, so they
+            # cannot tell the colour of a face themselves.
+            return trimesh.visual.color.vertex_to_face_color(
+                visual.to_color().vertex_colors, shape.mesh.faces
+            )
+        if visual.kind is None:
+            return np.tile(
+                trimesh.visual.color.to_rgba(shape.color.to_rgba()),
+                (len(shape.mesh.faces), 1),
+            )
+        return np.asarray(visual.face_colors)
+
+    # Cutting reads the arrays of :attr:`mesh` once as plain numpy arrays: trimesh would
+    # otherwise hash the whole of :attr:`mesh` again for every piece, to check that its
+    # caches are still valid.
+
+    @cached_property
+    def faces(self) -> NDArray[np.int64]:
+        """
+        :return: The vertex indices of each face of :attr:`mesh`.
+        """
+        return self.mesh.faces.view(np.ndarray)
+
+    @cached_property
+    def vertices(self) -> NDArray[np.float64]:
+        """
+        :return: The positions of the vertices of :attr:`mesh`.
+        """
+        return self.mesh.vertices.view(np.ndarray)
+
+    @cached_property
+    def face_colors(self) -> NDArray[np.uint8]:
+        """
+        :return: The RGBA colour of each face of :attr:`mesh`.
+        """
+        return np.asarray(self.mesh.visual.face_colors).view(np.ndarray)
 
     def piece(self, faces: NDArray[np.int64], body: Body) -> ShapeCollection:
         """
@@ -355,9 +405,14 @@ class ColoredShape:
             the surface finish and simulator properties that all of :attr:`shapes`
             share.
         """
-        mesh = self.mesh.submesh([faces], append=True)
+        piece_vertices, piece_faces = np.unique(self.faces[faces], return_inverse=True)
+        mesh = trimesh.Trimesh(
+            vertices=self.vertices[piece_vertices],
+            faces=piece_faces.reshape(-1, 3),
+            process=False,
+        )
         mesh.visual = trimesh.visual.ColorVisuals(
-            mesh, face_colors=self.mesh.visual.face_colors[faces]
+            mesh, face_colors=self.face_colors[faces]
         )
         shape = Mesh.from_trimesh(
             mesh=mesh,
@@ -369,7 +424,7 @@ class ColoredShape:
         )
         return ShapeCollection([shape], reference_frame=body)
 
-    def shared(self, attribute: Callable[[Shape], T]) -> Optional[T]:
+    def shared(self, attribute: Callable[[Shape], T]) -> T | None:
         """
         :param attribute: Reads an attribute of a shape.
         :return: The attribute's value, if all :attr:`shapes` have the same; otherwise

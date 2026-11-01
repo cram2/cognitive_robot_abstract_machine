@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing_extensions import Any
 
 import geometry_msgs.msg as geometry_msgs
 import numpy as np
@@ -42,7 +42,6 @@ class TransformStampedToSemDTConverter(
         geometry_msgs.TransformStamped, HomogeneousTransformationMatrix
     ]
 ):
-
     @classmethod
     def convert(cls, data: InputType, world: World) -> OutputType:
         result = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -69,7 +68,6 @@ class TransformStampedToSemDTConverter(
 class PoseStampedToSemDTConverter(
     Ros2ToSemDTConverter[geometry_msgs.PoseStamped, Pose]
 ):
-
     @classmethod
     def convert(cls, data: geometry_msgs.PoseStamped, world: World) -> Pose:
         result = Pose.from_xyz_quaternion(
@@ -90,7 +88,6 @@ class PoseStampedToSemDTConverter(
 
 @dataclass
 class PoseToSemDTConverter(Ros2ToSemDTConverter[geometry_msgs.Pose, Pose]):
-
     @classmethod
     def convert(cls, data: geometry_msgs.Pose, world: World) -> Pose:
         result = Pose.from_xyz_quaternion(
@@ -109,7 +106,6 @@ class PoseToSemDTConverter(Ros2ToSemDTConverter[geometry_msgs.Pose, Pose]):
 class PointStampedToSemDTConverter(
     Ros2ToSemDTConverter[geometry_msgs.PointStamped, Point3]
 ):
-
     @classmethod
     def convert(cls, data: OutputType, world: World) -> InputType:
         result = Point3(
@@ -128,7 +124,6 @@ class PointStampedToSemDTConverter(
 class Vector3StampedToSemDTConverter(
     Ros2ToSemDTConverter[geometry_msgs.Vector3Stamped, Vector3]
 ):
-
     @classmethod
     def convert(cls, data: geometry_msgs.Vector3Stamped, world: World) -> Vector3:
         result = Vector3(
@@ -147,7 +142,6 @@ class Vector3StampedToSemDTConverter(
 class QuaternionToSemDTConverter(
     Ros2ToSemDTConverter[geometry_msgs.QuaternionStamped, Quaternion]
 ):
-
     @classmethod
     def convert(cls, data: geometry_msgs.QuaternionStamped, world: World) -> Quaternion:
         result = Quaternion(
@@ -165,15 +159,13 @@ class QuaternionToSemDTConverter(
 
 @dataclass
 class ColorToSemDTConverter(Ros2ToSemDTConverter[ColorRGBA, Color]):
-
     @classmethod
     def convert(cls, data: OutputType, world: World) -> InputType:
-        return Color(data.r, data.g, data.b, data.a)
+        return Color.from_rgba(red=data.r, green=data.g, blue=data.b, opacity=data.a)
 
 
 @dataclass
 class CubeMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Box]):
-
     @classmethod
     def can_convert(cls, data: Any) -> bool:
         return super().can_convert(data) and data.type == Marker.CUBE
@@ -193,7 +185,6 @@ class CubeMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Box]):
 
 @dataclass
 class CylinderMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Cylinder]):
-
     @classmethod
     def can_convert(cls, data: Any) -> bool:
         return super().can_convert(data) and data.type == Marker.CYLINDER
@@ -214,7 +205,6 @@ class CylinderMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Cylinder]):
 
 @dataclass
 class SphereMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Sphere]):
-
     @classmethod
     def can_convert(cls, data: Any) -> bool:
         return super().can_convert(data) and data.type == Marker.SPHERE
@@ -234,7 +224,6 @@ class SphereMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Sphere]):
 
 @dataclass
 class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Mesh]):
-
     @classmethod
     def can_convert(cls, data: Any) -> bool:
         return super().can_convert(data) and data.type == Marker.MESH_RESOURCE
@@ -265,7 +254,6 @@ class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Mesh]):
 
 @dataclass
 class LaserScanToSemDTConverter(Ros2ToSemDTConverter[LaserScan, LidarReading]):
-
     @classmethod
     def convert(cls, data: LaserScan, world: World) -> LidarReading:
         root = world.get_kinematic_structure_entity_by_name(data.header.frame_id)

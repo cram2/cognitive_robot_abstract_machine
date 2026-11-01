@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from krrood.ontomatic.property_descriptor.property_descriptor import (
@@ -27,7 +27,7 @@ class HasInverseProperty(ABC):
 
     @classmethod
     @abstractmethod
-    def get_inverse(cls) -> Type[PropertyDescriptor]:
+    def get_inverse(cls) -> type[PropertyDescriptor]:
         """
         The inverse of the property.
         """

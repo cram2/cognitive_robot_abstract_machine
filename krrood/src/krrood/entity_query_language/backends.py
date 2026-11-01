@@ -4,12 +4,11 @@ import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from types import NoneType
-from typing import Iterable, TypeVar
+from typing_extensions import ClassVar, Iterable, Iterator, TypeVar
 
 import random_events.variable
 from random_events.product_algebra import Event
 from sqlalchemy.orm import sessionmaker
-from typing_extensions import ClassVar, Dict, Iterator, List, Optional
 
 from krrood import logger
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
@@ -84,7 +83,7 @@ class QueryBackend(ABC):
     Query backends are objects that answer queries by different means.
     """
 
-    opening_directive: ClassVar[Optional[Directive]] = None
+    opening_directive: ClassVar[Directive | None] = None
     """
     The opening verb a verbalization uses when this backend evaluates the expression
     (``None`` keeps the query-type default).
@@ -138,7 +137,7 @@ class SelectiveBackend(QueryBackend, ABC):
     These can take any query as input.
     """
 
-    opening_directive: ClassVar[Optional[Directive]] = Directive.FIND
+    opening_directive: ClassVar[Directive | None] = Directive.FIND
     """
     Selecting from existing data reads as *"Find …"*.
     """
@@ -162,7 +161,7 @@ class GenerativeBackend(QueryBackend, ABC):
     {py:class}`~krrood.entity_query_language.query.match.Match` is the only way to do so.
     """
 
-    opening_directive: ClassVar[Optional[Directive]] = Directive.GENERATE
+    opening_directive: ClassVar[Directive | None] = Directive.GENERATE
     """
     Generating new elements reads as *"Generate …"*.
     """
@@ -218,7 +217,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
         self._warn_or_raise_on_unresolved_cause_(expression)
-        enumerated_variables: Dict[uuid.UUID, Selectable] = {}
+        enumerated_variables: dict[uuid.UUID, Selectable] = {}
         for attribute_match in expression._matches_with_variables_:
             self._check_attribute_match_is_suitable_for_generation(attribute_match)
             enumerated_variables[attribute_match.assigned_variable._id_] = (
@@ -281,7 +280,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
 
     @staticmethod
     def _enumerate_bindings(
-        enumerated_variables: Dict[uuid.UUID, Selectable],
+        enumerated_variables: dict[uuid.UUID, Selectable],
     ) -> Iterator[Bindings]:
         """
         :param enumerated_variables: The variable whose values each pattern variable
@@ -331,7 +330,7 @@ class ProbabilisticBackend(GenerativeBackend):
         yield from super().evaluate(expression)
 
     @staticmethod
-    def _bare_average_selection(expression: Evaluable) -> Optional[Average]:
+    def _bare_average_selection(expression: Evaluable) -> Average | None:
         """
         :param expression: The expression being evaluated.
         :return: The :class:`~krrood.entity_query_language.operators.aggregators.Average`
@@ -529,9 +528,9 @@ class ProbabilisticBackend(GenerativeBackend):
     def _resolve_primary_intervention(
         cls,
         model: CausalCircuit,
-        cause_variables: List[random_events.variable.Variable],
+        cause_variables: list[random_events.variable.Variable],
         effect_variable: random_events.variable.Variable,
-        effect_truncation_event: Optional[Event],
+        effect_truncation_event: Event | None,
         expression: Match[T],
         confounder_variables: Iterable[random_events.variable.Variable] = (),
     ) -> ScoredIntervention:
@@ -574,11 +573,11 @@ class ProbabilisticBackend(GenerativeBackend):
     def _score_all_interventions(
         cls,
         model: CausalCircuit,
-        cause_variables: List[random_events.variable.Variable],
+        cause_variables: list[random_events.variable.Variable],
         effect_variable: random_events.variable.Variable,
-        effect_truncation_event: Optional[Event],
+        effect_truncation_event: Event | None,
         confounder_variables: Iterable[random_events.variable.Variable] = (),
-    ) -> List[ScoredIntervention]:
+    ) -> list[ScoredIntervention]:
         """
         Score every candidate cause variable independently for the region whose
         intervention best explains the effect.
@@ -620,7 +619,7 @@ class ProbabilisticBackend(GenerativeBackend):
         )
         return scored_interventions
 
-    def rank_causes(self, expression: Match[T]) -> List[ScoredIntervention]:
+    def rank_causes(self, expression: Match[T]) -> list[ScoredIntervention]:
         """
         Rank every ``cause`` candidate in *expression* by how well its intervention
         explains the declared effect.
@@ -669,9 +668,9 @@ class ProbabilisticBackend(GenerativeBackend):
         model: CausalCircuit,
         cause_variable: random_events.variable.Variable,
         effect_variable: random_events.variable.Variable,
-        effect_truncation_event: Optional[Event],
+        effect_truncation_event: Event | None,
         confounder_variables: Iterable[random_events.variable.Variable] = (),
-    ) -> Optional[ScoredIntervention]:
+    ) -> ScoredIntervention | None:
         """
         Compute ``cause_variable``'s best-region search result and score it by how
         *reliably* that region produces the effect: ``P(effect | do(cause_variable in

@@ -1,8 +1,10 @@
 import copy
 import os
+from dataclasses import dataclass, field
 
 import giskardpy_bullet_bindings as pb
 import pytest
+import trimesh
 from importlib.resources import files
 from pathlib import Path
 
@@ -12,9 +14,12 @@ from semantic_digital_twin.collision_checking.pybullet_collision_detector import
     BulletCollisionDetector,
     clear_cache,
     convert_to_decomposed_obj_and_save_in_tmp,
+    convert_to_obj_and_save_in_tmp,
     create_shape_from_geometry,
+    trimesh_quantized_hash,
 )
 from semantic_digital_twin.utils import create_cache_dir
+from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd import (
     BulletVHACDMeshDecomposer,
 )
@@ -22,7 +27,12 @@ from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDec
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import world_setup_simple
-from semantic_digital_twin.world_description.geometry import Mesh
+from semantic_digital_twin.world_description.geometry import (
+    Mesh,
+    MeshFileFormat,
+    Scale,
+    Shape,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -168,6 +178,7 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     """
     Two independent ``BulletCollisionDetector`` instances built from worlds with
     identical geometry may end up sharing the same cached ``bullet.CollisionShape``.
+
     Moving a body's pose in one world must not affect collision results in the other.
     """
     world_a, box_a, cylinder_a, sphere_a, mesh_a, compound_a = world_setup_simple
@@ -193,3 +204,122 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     )
 
     assert collision_b_after.distance == pytest.approx(baseline_distance_b)
+
+
+# %% reading the cache while a mesh is decomposed
+
+
+@dataclass
+class DecomposerWatchingTheCache(MeshDecomposer):
+    """
+    A decomposer that notes, whenever it decomposes, whether the decomposition's cache
+    file can already be read, and splits every mesh into two boxes.
+    """
+
+    cache_file: Path = field(kw_only=True)
+    """
+    The file the finished decomposition is cached in.
+    """
+
+    cache_file_existed: list[bool] = field(default_factory=list)
+    """
+    Whether :attr:`cache_file` existed, at each decomposition.
+    """
+
+    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
+        return [Mesh.box(extents=(1, 1, 1)), Mesh.box(extents=(2, 1, 1))]
+
+    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+        self.cache_file_existed.append(self.cache_file.exists())
+        trimesh.Scene([part.mesh for part in self.apply_to_mesh(mesh)]).export(
+            output_path, file_type="obj"
+        )
+        return output_path
+
+
+def test_a_decomposition_appears_in_the_cache_only_once_it_is_finished(
+    clean_cache, cache_dir, non_convex_mesh
+):
+    """
+    A process that finds a mesh's cache file reads it as the finished decomposition, so
+    the file must not exist while the mesh is still being decomposed.
+    """
+    decomposer = DecomposerWatchingTheCache(
+        cache_file=cache_dir / f"{trimesh_quantized_hash(non_convex_mesh.mesh)}.obj"
+    )
+
+    cached = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=decomposer, cache_dir=cache_dir
+    )
+
+    assert decomposer.cache_file_existed == [False]
+    assert cached == str(decomposer.cache_file)
+    assert sum(1 for line in open(cached) if line.startswith("o ")) == len(
+        decomposer.apply_to_mesh(non_convex_mesh)
+    )
+
+
+# %% mesh files Bullet cannot read
+
+
+def bounds_of(shape: pb.CollisionShape) -> list[list[float]]:
+    """
+    :return: The lower and upper corner of the shape's axis-aligned bounding box.
+    """
+    return [
+        corner.to_np()[:3].tolist()
+        for corner in shape.get_aabb(pb.Transform.identity())
+    ]
+
+
+def test_mesh_in_a_file_bullet_cannot_read_collides_like_the_same_mesh_in_obj(
+    monkeypatch,
+):
+    monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
+    box = trimesh.creation.box(extents=(1.0, 2.0, 3.0))
+    meshes = [
+        Mesh.from_trimesh(mesh=box, scale=Scale(2.0, 1.0, 1.0), file_type=file_format)
+        for file_format in (MeshFileFormat.GLB, MeshFileFormat.OBJ)
+    ]
+
+    glb_shape, obj_shape = [
+        create_shape_from_geometry(geometry=mesh) for mesh in meshes
+    ]
+
+    assert bounds_of(glb_shape) == bounds_of(obj_shape)
+
+
+def test_a_cached_copy_of_a_mesh_is_not_taken_for_its_decomposition(
+    clean_cache, cache_dir, non_convex_mesh
+):
+    decomposer = DecomposerWatchingTheCache(
+        cache_file=cache_dir / f"{trimesh_quantized_hash(non_convex_mesh.mesh)}.obj"
+    )
+    convert_to_obj_and_save_in_tmp(mesh=non_convex_mesh, cache_dir=cache_dir)
+
+    decomposition = convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=decomposer, cache_dir=cache_dir
+    )
+
+    assert sum(1 for line in open(decomposition) if line.startswith("o ")) == len(
+        decomposer.apply_to_mesh(non_convex_mesh)
+    )
+
+
+def test_a_cached_decomposition_is_not_taken_for_a_copy_of_the_mesh(
+    clean_cache, cache_dir, non_convex_mesh
+):
+    decomposer = DecomposerWatchingTheCache(
+        cache_file=cache_dir / f"{trimesh_quantized_hash(non_convex_mesh.mesh)}.obj"
+    )
+    convert_to_decomposed_obj_and_save_in_tmp(
+        non_convex_mesh, mesh_decomposer=decomposer, cache_dir=cache_dir
+    )
+
+    copy = trimesh.load(
+        convert_to_obj_and_save_in_tmp(mesh=non_convex_mesh, cache_dir=cache_dir),
+        force="mesh",
+        process=False,
+    )
+
+    assert len(copy.faces) == len(non_convex_mesh.unscaled_mesh.faces)

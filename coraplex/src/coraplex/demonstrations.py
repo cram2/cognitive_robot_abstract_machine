@@ -20,7 +20,6 @@ from functools import partial
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import Type
 
 from coraplex.plans.executors import (
     KinematicallySimulatedPlanExecutor,
@@ -157,7 +156,7 @@ class RobotDemonstration(ABC):
     in the physics of :meth:`build_simulation`.
     """
 
-    used_robot: Type[AbstractRobot]
+    used_robot: type[AbstractRobot]
     """
     The robot this demonstration uses.
     """

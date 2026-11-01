@@ -1,7 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from threading import Thread
-from typing import Any, Dict, List, Optional, Type, Union
+from typing_extensions import Any
 
 import numpy as np
 import pytest
@@ -48,13 +48,13 @@ class RecordingPublisher:
     cannot rewrite what was already recorded.
     """
 
-    published_messages: List[Any] = field(default_factory=list)
+    published_messages: list[Any] = field(default_factory=list)
     """
     Copies of all published messages, oldest first.
     """
 
     @property
-    def published_message(self) -> Optional[Any]:
+    def published_message(self) -> Any | None:
         """
         The most recently published message, or ``None`` if nothing was published.
         """
@@ -138,17 +138,17 @@ class ConnectionSpec:
     Scaling between the world state value and the value of the connection.
     """
 
-    connection_type: Type[ActiveConnection1DOF] = RevoluteConnection
+    connection_type: type[ActiveConnection1DOF] = RevoluteConnection
     """
     The concrete connection class to instantiate.
     """
 
 
-def add_joints(world: World, parent: Body, specs: List[ConnectionSpec]) -> None:
+def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     """
     Append a chain of connections to a body and apply their commanded velocities.
     """
-    connections: List[ActiveConnection1DOF] = []
+    connections: list[ActiveConnection1DOF] = []
     with world.modify_world():
         for index, spec in enumerate(specs):
             child = Body(name=PrefixedName(f"body_{index}"))
@@ -167,7 +167,7 @@ def add_joints(world: World, parent: Body, specs: List[ConnectionSpec]) -> None:
         connection.velocity = spec.velocity
 
 
-def build_world_with_joints(specs: List[ConnectionSpec]) -> World:
+def build_world_with_joints(specs: list[ConnectionSpec]) -> World:
     """
     Build a world holding a chain of connections with their commanded velocities.
     """
@@ -206,9 +206,9 @@ def remove_joint(world: World, connection: ActiveConnection1DOF) -> None:
 
 
 def build_group_publisher(
-    specs: List[ConnectionSpec],
+    specs: list[ConnectionSpec],
     minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    minimum_velocity_overrides: dict[str, float] | None = None,
     command_format: GroupCommandFormat | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
@@ -225,9 +225,9 @@ def build_group_publisher(
 
 def group_publisher_for(
     world: World,
-    specs: List[ConnectionSpec],
+    specs: list[ConnectionSpec],
     minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    minimum_velocity_overrides: dict[str, float] | None = None,
     command_format: GroupCommandFormat | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
@@ -264,7 +264,7 @@ def stop_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
     return recorder.published_message
 
 
-def publish_group(controller: JointGroupVelocityCommandPublisher) -> List[float]:
+def publish_group(controller: JointGroupVelocityCommandPublisher) -> list[float]:
     """
     Replace the publisher with a recorder, publish once, and return the data.
     """
@@ -284,7 +284,7 @@ def publish_drive(publisher: DriveVelocityCommandPublisher) -> RecordingPublishe
 def add_drive(
     world: World,
     parent: Body,
-    drive_type: Union[Type[OmniDrive], Type[DifferentialDrive]],
+    drive_type: type[OmniDrive] | type[DifferentialDrive],
 ) -> None:
     """
     Append a drive to a body.
@@ -300,7 +300,7 @@ def add_drive(
 
 
 def build_drive_world(
-    drive_type: Union[Type[OmniDrive], Type[DifferentialDrive]],
+    drive_type: type[OmniDrive] | type[DifferentialDrive],
 ) -> World:
     """
     Build a world whose only connection is a drive.
@@ -607,7 +607,7 @@ def test_overrides_of_commanded_joints_are_accepted(init_rospy):
 
 @pytest.fixture()
 def joint_parameter_nodes(init_rospy):
-    nodes: List[ParameterServingNode] = []
+    nodes: list[ParameterServingNode] = []
 
     def _serve(controller_name: str, joint_name: str) -> None:
         nodes.append(
@@ -623,9 +623,9 @@ def joint_parameter_nodes(init_rospy):
 
 def build_joint_publisher(
     world: World,
-    namespaces: List[str],
+    namespaces: list[str],
     minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    minimum_velocity_overrides: dict[str, float] | None = None,
 ) -> JointVelocityCommandPublisher:
     """
     Build a publisher that commands one joint per namespace.
@@ -639,7 +639,7 @@ def build_joint_publisher(
     )
 
 
-def publish_per_joint(publisher: JointVelocityCommandPublisher) -> List[float]:
+def publish_per_joint(publisher: JointVelocityCommandPublisher) -> list[float]:
     """
     Replace all publishers with recorders, publish once, and return the values.
     """

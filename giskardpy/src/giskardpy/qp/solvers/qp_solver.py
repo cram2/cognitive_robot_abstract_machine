@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Type
+from typing_extensions import TypeVar, Generic, get_args
 
 import numpy as np
-from typing_extensions import TypeVar, Generic, get_args
 
 from giskardpy.qp.qp_data import QPDataExplicit, QPDataTwoSidedInequality
 
@@ -15,7 +14,7 @@ T = TypeVar("T", QPDataExplicit, QPDataTwoSidedInequality)
 class QPSolver(Generic[T]):
 
     @classmethod
-    def qp_data_type(cls) -> Type[T]:
+    def qp_data_type(cls) -> type[T]:
         """
         The :class:`QPData` subtype this solver consumes.
         """

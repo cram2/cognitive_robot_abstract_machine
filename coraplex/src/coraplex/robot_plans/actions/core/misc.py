@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Type
 
 from krrood.ormatic.utils import classproperty
 from coraplex.datastructures.enums import (
@@ -53,7 +52,7 @@ class DetectAction(SequentialAction):
     The state of the detection, e.g Start Stop for continues perception.
     """
 
-    object_sem_annotation: Type[SemanticAnnotation] = None
+    object_sem_annotation: type[SemanticAnnotation] = None
     """
     The type of the object that should be detected, only considered if technique is
     equal to Type.

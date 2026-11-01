@@ -1,7 +1,6 @@
 import json
 from dataclasses import dataclass, field
 from time import time, sleep
-from typing import Optional
 
 from rclpy.node import Node
 from rclpy.service import Service
@@ -34,7 +33,7 @@ class FetchWorldServer(HasROS2Node):
     The name of the service.
     """
 
-    service: Optional[Service] = field(default=None, init=False)
+    service: Service | None = field(default=None, init=False)
     """
     The ROS service object.
     """

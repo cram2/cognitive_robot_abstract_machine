@@ -330,6 +330,24 @@ class ExtensionSettingTheTickDuration(ExecutorExtension):
         context.set_tick_duration(self.tick_duration)
 
 
+@dataclass(eq=False, repr=False, kw_only=True)
+class NodeFailingToStart(ConstTrueNode):
+    """
+    A node whose start callback raises, recording whether it was cleaned up.
+    """
+
+    cleaned_up: bool = field(default=False, init=False)
+    """
+    Whether :meth:`cleanup` ran.
+    """
+
+    def on_start(self) -> None:
+        raise NodeAssertionError(reason="the node failed to start")
+
+    def cleanup(self) -> None:
+        self.cleaned_up = True
+
+
 def _statechart_ending_after_one_node(executor: StatechartExecutor) -> Statechart:
     """
     :return: A statechart in the context of `executor` that ends once its only node
@@ -438,6 +456,39 @@ def test_nodes_are_built_with_the_context_extensions_of_every_executor_extension
 
     assert first.counting_context.builds == 1
     assert records[-1].stage == ExecutorStage.AFTER_RUN
+
+
+def test_a_compile_whose_first_tick_raises_tells_the_extensions_the_run_stopped(
+    statechart_context: StatechartContext,
+) -> None:
+    records: list[StageRecord] = []
+    executor = StatechartExecutor(
+        context=statechart_context,
+        extensions=[ExtensionRecordingCompileAndRun(records)],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(NodeFailingToStart())
+
+    with pytest.raises(NodeAssertionError):
+        executor.compile(statechart)
+
+    assert [record.stage for record in records] == [
+        ExecutorStage.EXTEND_CONTEXT,
+        ExecutorStage.AFTER_COMPILE,
+        ExecutorStage.AFTER_RUN,
+    ]
+
+
+def test_a_compile_whose_first_tick_raises_cleans_up_the_nodes(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_node(node := NodeFailingToStart())
+
+    with pytest.raises(NodeAssertionError):
+        statechart_executor.compile(statechart)
+
+    assert node.cleaned_up
 
 
 def test_an_extension_can_decide_the_tick_duration_a_pacer_paces(

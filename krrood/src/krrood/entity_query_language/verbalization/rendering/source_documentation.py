@@ -4,7 +4,7 @@ import ast
 import inspect
 import textwrap
 
-from typing_extensions import Dict, Optional, Any
+from typing_extensions import Any
 
 from krrood.entity_query_language.verbalization.fragments.source_reference import (
     SourceReference,
@@ -12,7 +12,7 @@ from krrood.entity_query_language.verbalization.fragments.source_reference impor
 from krrood.patterns.caching import weak_key_cache
 
 
-def first_docstring_line(documented_object: Any) -> Optional[str]:
+def first_docstring_line(documented_object: Any) -> str | None:
     """:return: The first non-empty line of *documented_object*'s docstring, or ``None``."""
     if documented_object is None:
         return None
@@ -26,14 +26,14 @@ def first_docstring_line(documented_object: Any) -> Optional[str]:
     return None
 
 
-def _annotated_target_name(node: ast.AST) -> Optional[str]:
+def _annotated_target_name(node: ast.AST) -> str | None:
     """:return: The target name when *node* is an annotated assignment with a simple name target."""
     if not isinstance(node, ast.AnnAssign) or not isinstance(node.target, ast.Name):
         return None
     return node.target.id
 
 
-def _string_expression_first_line(node: ast.AST) -> Optional[str]:
+def _string_expression_first_line(node: ast.AST) -> str | None:
     """:return: The first stripped line when *node* is a bare string expression (a PEP 257
     attribute docstring), else ``None``."""
     if (
@@ -50,7 +50,7 @@ def _string_expression_first_line(node: ast.AST) -> Optional[str]:
 
 
 @weak_key_cache
-def _attribute_docstrings(cls: type) -> Dict[str, str]:
+def _attribute_docstrings(cls: type) -> dict[str, str]:
     """
     :param cls: The class whose own body to scan.
     :return: A mapping of field name to its first PEP 257 attribute docstring line, or an empty
@@ -65,7 +65,7 @@ def _attribute_docstrings(cls: type) -> Dict[str, str]:
     except (SyntaxError, IndexError):
         return {}
     body = getattr(class_definition, "body", [])
-    docstrings: Dict[str, str] = {}
+    docstrings: dict[str, str] = {}
     for current, following in zip(body, body[1:]):
         name = _annotated_target_name(current)
         if name is None:
@@ -77,7 +77,7 @@ def _attribute_docstrings(cls: type) -> Dict[str, str]:
     return docstrings
 
 
-def docstring_for_source_ref(source_reference: SourceReference) -> Optional[str]:
+def docstring_for_source_ref(source_reference: SourceReference) -> str | None:
     """
     Attribute documentation follows the project convention of a bare string expression
     immediately below the field definition (a PEP 257 attribute docstring).

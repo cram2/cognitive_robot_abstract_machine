@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -37,7 +36,7 @@ is allowed to span.
 """
 
 
-def _logged(events: List[DetectionEvent]) -> SegmindContext:
+def _logged(events: list[DetectionEvent]) -> SegmindContext:
     """
     :return: A context whose logger holds ``events``.
     """
@@ -57,7 +56,7 @@ def _translation_of(body: Body, at: datetime) -> TranslationEvent:
     )
 
 
-def _pick_ups_concluded_from(segmind_context: SegmindContext) -> List[DetectionEvent]:
+def _pick_ups_concluded_from(segmind_context: SegmindContext) -> list[DetectionEvent]:
     return [
         event
         for event in PickUpDetector().update_context_and_events(segmind_context, [])
@@ -130,7 +129,7 @@ def test_one_loss_of_support_is_the_pick_up_of_one_translation(milk_in_the_apart
 
 def _pick_ups_concluded_beside_a_grasp_detector(
     segmind_context: SegmindContext,
-) -> List[DetectionEvent]:
+) -> list[DetectionEvent]:
     """
     What a pick-up detector makes of ``segmind_context`` while a grasp detector runs in
     the same statechart.

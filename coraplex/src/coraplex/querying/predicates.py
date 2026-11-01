@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from typing_extensions import Callable, List
+from typing_extensions import Callable
 
 from krrood.entity_query_language.predicate import Predicate, RenderedFields
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -26,7 +26,7 @@ class GripperOccupancy:
     """
 
     def check_manipulator_occupancy(
-        self, condition: Callable[List[Body], bool]
+        self, condition: Callable[list[Body], bool]
     ) -> bool:
         """
         Checks the occupancy of the gripper against a condition.

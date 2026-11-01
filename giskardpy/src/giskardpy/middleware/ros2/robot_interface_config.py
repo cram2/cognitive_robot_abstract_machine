@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Union
+from typing_extensions import TYPE_CHECKING
 
 from nav_msgs.msg import Odometry
 
@@ -14,6 +14,7 @@ from giskardpy.middleware.ros2.command_publishing import (
     DriveCommandFormat,
     GroupCommandFormat,
     TwistFormat,
+    TwistStampedFormat,
     JointGroupVelocityCommandPublisher,
     JointMinimumVelocities,
     JointVelocityCommandPublisher,
@@ -24,6 +25,7 @@ from giskardpy.middleware.ros2.controller_manager import (
     ControllerManager,
     ControllerType,
 )
+from giskardpy.middleware.ros2.exceptions import NoUniqueDriveError
 from semantic_digital_twin.adapters.ros.input_synchronization import (
     PendingJointStateSynchronizer,
     OdometrySynchronizer,
@@ -43,6 +45,7 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     DifferentialDrive,
     OmniDrive,
+    WheeledDrive,
 )
 
 if TYPE_CHECKING:
@@ -168,7 +171,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
     def sync_odometry_topic(
         self,
         odometry_topic: str | None = None,
-        joint: Union[OmniDrive, DifferentialDrive] = None,
+        joint: OmniDrive | DifferentialDrive = None,
         sync_in_control_loop: bool = True,
     ):
         """
@@ -245,20 +248,20 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     # %% commanding the robot
 
-    def add_base_cmd_velocity(
+    def add_drive_velocity_command_topic(
         self,
-        cmd_vel_topic: str | None = None,
-        joint: Union[OmniDrive, DifferentialDrive] = None,
+        command_topic: str | None = None,
+        drive: WheeledDrive | None = None,
         minimum_linear_velocity: float = 0.0,
         minimum_angular_velocity: float = 0.0,
         command_format: DriveCommandFormat | None = None,
-    ):
+    ) -> None:
         """
-        Tell Giskard how it can control an odom joint of the robot.
+        Tell Giskard to send the velocity of a drive to a topic.
 
-        :param cmd_vel_topic: a topic of the message type of `command_format`
-        :param joint: omni or diff drive joint. Doesn't need to be specified if there is
-            only one.
+        :param command_topic: The topic the velocity is sent to, the only topic of the
+            message type of ``command_format`` if ``None``.
+        :param drive: The drive to command, the only drive of the world if ``None``.
         :param minimum_linear_velocity: magnitude that smaller linear velocities are
             raised to so the hardware moves, without changing the driving direction.
             ``0.0`` disables raising.
@@ -266,17 +269,24 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             are raised to. ``0.0`` disables raising.
         :param command_format: message format the drive controller consumes; defaults to
             :class:`~giskardpy.middleware.ros2.command_publishing.TwistFormat`.
+        :raises NoUniqueDriveError: If ``drive`` is ``None`` and the world does not hold
+            exactly one drive.
         """
+        if drive is None:
+            drives = self.world.get_connections_by_type(WheeledDrive)
+            if len(drives) != 1:
+                raise NoUniqueDriveError(drives=drives)
+            [drive] = drives
         command_format = command_format or TwistFormat()
-        if cmd_vel_topic is None:
-            cmd_vel_topic = search_for_unique_subscriber_of_type(
+        if command_topic is None:
+            command_topic = search_for_unique_subscriber_of_type(
                 command_format.message_type()
             )
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
                 world=self.world,
-                command_topic=cmd_vel_topic,
-                connection=joint,
+                command_topic=command_topic,
+                connection=drive,
                 minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
                 minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
                 command_format=command_format,
@@ -285,9 +295,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
 
     def add_joint_velocity_controller(
         self,
-        namespaces: List[str],
+        namespaces: list[str],
         minimum_valid_velocity: float = 0.0,
-        minimum_velocity_overrides: Dict[str, float] | None = None,
+        minimum_velocity_overrides: dict[str, float] | None = None,
     ):
         """
         Tell Giskard how it can send velocities to joints.
@@ -309,17 +319,21 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             )
         )
 
-    def add_joint_velocity_group_controller(
+    def add_joint_group_velocity_command_topic(
         self,
-        cmd_topic: str,
-        connections: List[str],
+        command_topic: str,
+        connections: list[str],
         minimum_valid_velocity: float = 0.0,
-        minimum_velocity_overrides: Dict[str, float] | None = None,
+        minimum_velocity_overrides: dict[str, float] | None = None,
         command_format: GroupCommandFormat | None = None,
-    ):
+    ) -> None:
         """
-        Tell Giskard how it can send velocities for a group of connections.
+        Tell Giskard to send the velocities of a group of joints, all in one message, to
+        a topic.
 
+        :param command_topic: The topic the velocities are sent to.
+        :param connections: The names of the joints, in the order the message lists their
+            velocities.
         :param minimum_valid_velocity: magnitude that smaller joint velocities are
             raised to so the hardware moves. ``0.0`` disables raising.
         :param minimum_velocity_overrides: minimum magnitude per joint name, overriding
@@ -327,14 +341,14 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param command_format: message format the controller consumes; defaults to
             :class:`~giskardpy.middleware.ros2.command_publishing.Float64MultiArrayFormat`.
         """
-        controlled_connections: List[ActiveConnection1DOF] = [
+        controlled_connections: list[ActiveConnection1DOF] = [
             self.world.get_connection_by_name(connection_name)
             for connection_name in connections
         ]
         self.control_loop.command_publishers.append(
             JointGroupVelocityCommandPublisher(
                 world=self.world,
-                command_topic=cmd_topic,
+                command_topic=command_topic,
                 connections=controlled_connections,
                 minimum_velocities=JointMinimumVelocities.from_magnitudes(
                     minimum_valid_velocity, minimum_velocity_overrides
@@ -366,9 +380,19 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                         controller_manager.joint_state_topic_of(controller.name)
                     )
                 case ControllerType.JOINT_GROUP_VELOCITY:
-                    self.add_joint_velocity_group_controller(
-                        cmd_topic=controller_manager.command_topic_of(controller.name),
+                    command_format = Float64MultiArrayFormat()
+                    self.add_joint_group_velocity_command_topic(
+                        command_topic=controller_manager.command_topic_of(
+                            controller.name, command_format.message_type()
+                        ),
                         connections=controller_manager.joints_of(controller.name),
+                        command_format=command_format,
                     )
                 case ControllerType.DIFF_DRIVE:
-                    self.add_base_cmd_velocity(controller.name)
+                    command_format = TwistStampedFormat()
+                    self.add_drive_velocity_command_topic(
+                        command_topic=controller_manager.command_topic_of(
+                            controller.name, command_format.message_type()
+                        ),
+                        command_format=command_format,
+                    )

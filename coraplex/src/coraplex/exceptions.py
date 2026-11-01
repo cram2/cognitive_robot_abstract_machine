@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 from coraplex.plans.failures import PlanFailure
@@ -52,12 +52,12 @@ class CannotMatchOnType(DataclassException):
     a designator, leaving no rule by which it could select the nodes it rewrites.
     """
 
-    transformation: Type
+    transformation: type
     """
     The transformation class that carries the binding.
     """
 
-    matched_type: Type
+    matched_type: type
     """
     The type it is bound to.
     """
@@ -262,7 +262,7 @@ class PerceptionExceptionWithSemanticAnnotation(PerceptionException, ABC):
     For PerceptionExceptions that name the annotation the perception was about.
     """
 
-    semantic_annotation: Type[SemanticAnnotation]
+    semantic_annotation: type[SemanticAnnotation]
     """
     The annotation the perception was about.
     """

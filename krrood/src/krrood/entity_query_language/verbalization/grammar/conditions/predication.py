@@ -19,7 +19,7 @@ from abc import abstractmethod
 from dataclasses import replace
 from itertools import islice
 
-from typing_extensions import TYPE_CHECKING, List, Optional, Set
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.expression_structure import is_temporal
@@ -207,7 +207,7 @@ class AbsenceTransform(GenericComparator):
         return render_absence(comparator, context)
 
 
-def _lone_coindexed_fold(comparator: Comparator) -> Optional[CoindexedFold]:
+def _lone_coindexed_fold(comparator: Comparator) -> CoindexedFold | None:
     """:return: the single-terminal :class:`CoindexedFold` for a co-indexed comparison
     (``p.begin.month == p.end.month``), or ``None`` when *comparator* is not co-indexed — the
     one-terminal case of the conjunct-list fold, so a lone such comparison reuses the same form.
@@ -368,7 +368,7 @@ class RelationalIdentityTransform(GenericComparator):
     @staticmethod
     def _relational_identity(
         comparator: Comparator,
-    ) -> Optional[tuple]:
+    ) -> tuple | None:
         """:return: ``(relational_hop, subject_variable)`` when one operand is a relational attribute
         chain and the other a (non-literal) variable, in either order; else ``None``."""
         for hop, other in (
@@ -393,7 +393,7 @@ def comparator_operator(
     services: MicroplanningServices,
     *,
     negated: bool = False,
-    compact: Optional[bool] = None,
+    compact: bool | None = None,
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     copula: bool = True,
 ) -> VerbalizationFragment:
@@ -476,7 +476,7 @@ def _is_negatable_head(fragment: VerbalizationFragment) -> bool:
     )
 
 
-def negate_clause(fragment: VerbalizationFragment) -> Optional[VerbalizationFragment]:
+def negate_clause(fragment: VerbalizationFragment) -> VerbalizationFragment | None:
     """
     :param fragment: A predicate clause built from the typed clause vocabulary.
     :return: *fragment* with its head verb or copula marked ``negated`` (so the morphology pass
@@ -599,7 +599,7 @@ def render_absence(
     )
 
 
-def _relation_target(attribute: Attribute) -> List[VerbalizationFragment]:
+def _relation_target(attribute: Attribute) -> list[VerbalizationFragment]:
     """:return: The object of a passive absence — *"any <Type>"* using the attribute's declared
     related type (*"any Robot"*), or the bare *"anything"* when that type is not a nameable class
     (a primitive, a typing generic, or unknown).
@@ -617,7 +617,7 @@ def _relation_target(attribute: Attribute) -> List[VerbalizationFragment]:
     return [Quantifiers.ANYTHING.as_fragment()]
 
 
-def _boolean_constraint(right: SymbolicExpression) -> Optional[Set[bool]]:
+def _boolean_constraint(right: SymbolicExpression) -> set[bool] | None:
     """:return: The set of boolean values *right* constrains a boolean attribute to — ``{True}`` /
     ``{False}`` for a boolean literal or singleton domain, ``{True, False}`` for an open domain — or
     ``None`` when *right* is not a boolean literal / bounded boolean-domain variable.

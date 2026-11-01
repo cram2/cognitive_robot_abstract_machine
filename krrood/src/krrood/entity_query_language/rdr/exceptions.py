@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List, Type
 
 from krrood.exceptions import DataclassException
 
@@ -23,7 +22,7 @@ class AmbiguousBranchSemanticsError(DataclassException):
     selector: object
     """The conclusion selector node being dispatched when the collision occurred."""
 
-    candidates: List[Type]
+    candidates: list[type]
     """
     The equally-specific branch-semantics classes that collided.
     """

@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Event
-from typing import Callable
+from typing_extensions import Callable
 
 import pytest
 import rclpy
@@ -362,8 +362,10 @@ class TestHeartbeatWhileNodeIsBusy:
             assert wait_until(busy.started.is_set)
 
             assert wait_until(
-                lambda: sender.publish(heartbeat_of(client))
-                or client in presence.last_heartbeat
+                lambda: (
+                    sender.publish(heartbeat_of(client))
+                    or client in presence.last_heartbeat
+                )
             )
         finally:
             busy.release()
@@ -416,8 +418,10 @@ class TestHeartbeatWithoutItsNodeBeingSpun:
         )
         try:
             assert wait_until(
-                lambda: sender.publish(heartbeat_of(client))
-                or client in presence.last_heartbeat
+                lambda: (
+                    sender.publish(heartbeat_of(client))
+                    or client in presence.last_heartbeat
+                )
             )
         finally:
             presence.stop()

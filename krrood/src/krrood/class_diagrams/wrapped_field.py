@@ -12,19 +12,19 @@ from datetime import datetime
 from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
-from typing import Generic, Any
-
 from typing_extensions import (
     get_origin,
     get_args,
     ClassVar,
-    List,
     Type,
     TYPE_CHECKING,
     Optional,
     TypeVar,
     Union,
+    Generic,
+    Any,
 )
+
 
 from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
 from krrood.class_diagrams.utils import (
@@ -69,18 +69,18 @@ class WrappedField:
     The dataclass field object that is wrapped.
     """
 
-    public_name: Optional[str] = None
+    public_name: str | None = None
     """
     If the field is a relationship managed field, this is public name of the
     relationship that manages the field.
     """
 
-    property_descriptor: Optional[PropertyDescriptor] = None
+    property_descriptor: PropertyDescriptor | None = None
     """
     The property descriptor instance that manages the field.
     """
 
-    container_types: ClassVar[List[Type]] = [list, set, tuple, type, Sequence]
+    container_types: ClassVar[list[type]] = [list, set, tuple, type, Sequence]
     """
     A list of container types that are supported by the parser.
     """
@@ -143,7 +143,7 @@ class WrappedField:
                 namespace[cls.name] = cls.clazz
         return namespace
 
-    def _find_class_by_name(self, class_name: str) -> Type:
+    def _find_class_by_name(self, class_name: str) -> type:
         """
         Find a class by name in the class diagram or sys.modules.
         """
@@ -165,7 +165,7 @@ class WrappedField:
         return get_origin(self.resolved_type) in self.container_types
 
     @cached_property
-    def container_type(self) -> Optional[Type]:
+    def container_type(self) -> type | None:
         if not self.is_container:
             return None
         return get_origin(self.resolved_type)
@@ -259,7 +259,7 @@ class WrappedField:
         )
 
     @cached_property
-    def type_endpoint(self) -> Type:
+    def type_endpoint(self) -> type:
         """
         The concrete type this field ultimately points to, ready to be used directly.
 
@@ -273,7 +273,7 @@ class WrappedField:
         return endpoint
 
     @cached_property
-    def _unresolved_type_endpoint(self) -> Type:
+    def _unresolved_type_endpoint(self) -> type:
         """
         The type this field points to before a bounded ``TypeVar`` is reduced to its
         bound: the contained type for containers and optionals, the lowest common
@@ -389,7 +389,7 @@ class WrappedField:
 
 
 @lru_cache(maxsize=None)
-def manually_search_for_class_name(target_class_name: str) -> Type:
+def manually_search_for_class_name(target_class_name: str) -> type:
     """
     Searches for a class with the specified name in the current module's `globals()`
     dictionary and all loaded modules present in `sys.modules`. This function attempts
@@ -417,7 +417,7 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
     return resolved_class
 
 
-def search_class_in_globals(target_class_name: str) -> List[Type]:
+def search_class_in_globals(target_class_name: str) -> list[type]:
     """
     Searches for a class with the given name in the current module's globals.
 
@@ -431,7 +431,7 @@ def search_class_in_globals(target_class_name: str) -> List[Type]:
     ]
 
 
-def search_class_in_sys_modules(target_class_name: str) -> List[Type]:
+def search_class_in_sys_modules(target_class_name: str) -> list[type]:
     """
     Searches for a class with the given name in all loaded modules (via sys.modules).
     """

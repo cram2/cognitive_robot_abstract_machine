@@ -13,21 +13,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from inspect import isclass
-from typing import Self
+from typing_extensions import TYPE_CHECKING, Generic, Iterable, Any, get_args, Self
 
-from typing_extensions import (
-    TYPE_CHECKING,
-    Generic,
-    Iterable,
-    Any,
-    Type,
-    Optional,
-    Set,
-    Tuple,
-    Dict,
-    List,
-    get_args,
-)
 
 from random_events.variable import (
     Continuous,
@@ -72,7 +59,7 @@ if TYPE_CHECKING:
     )
 
 
-def attribute_names_for_completion(type_: Any) -> Set[str]:
+def attribute_names_for_completion(type_: Any) -> set[str]:
     """
     Collect the non-dunder attribute and annotation names of a type, for interactive
     completion on expressions that stand for a value of that type.
@@ -81,7 +68,7 @@ def attribute_names_for_completion(type_: Any) -> Set[str]:
         a class yields no names.
     :return: The collected names.
     """
-    names: Set[str] = set()
+    names: set[str] = set()
     if not isinstance(type_, type):
         return names
     names.update(
@@ -107,7 +94,7 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
     written once, here.
     """
 
-    _type_: Optional[Type[T]]
+    _type_: type[T] | None
     """
     The type of the value this stands for, whose attributes and operations are offered.
     """
@@ -161,7 +148,7 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
             raise AttributeError(name)
         return self._symbolic_expression_._get_mapped_variable_(Attribute, name)
 
-    def __dir__(self) -> List[str]:
+    def __dir__(self) -> list[str]:
         """
         Surface the value type's attributes for interactive completion.
 
@@ -301,7 +288,7 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
     former alone and reports one of these as :attr:`_symbolic_expression_`.
     """
 
-    _known_mapped_variables_: Dict[MappedVariableCacheItem, MappedVariable] = field(
+    _known_mapped_variables_: dict[MappedVariableCacheItem, MappedVariable] = field(
         init=False, default_factory=dict
     )
     """
@@ -317,7 +304,7 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         return self
 
     def _get_mapped_variable_(
-        self, type_: Type[MappedVariable], *args, **kwargs
+        self, type_: type[MappedVariable], *args, **kwargs
     ) -> MappedVariable:
         """
         Retrieves or creates a MappedVariable instance based on the provided arguments.
@@ -335,7 +322,7 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
             self._known_mapped_variables_[cache_item] = instance
             return instance
 
-    def _get_mapped_variable_key_(self, type_: Type[MappedVariable], *args, **kwargs):
+    def _get_mapped_variable_key_(self, type_: type[MappedVariable], *args, **kwargs):
         """
         Generates a hashable key for the given type and arguments.
 
@@ -361,7 +348,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     The child expression to apply the mapping to.
     """
 
-    _rerooted_chains_: Dict[uuid.UUID, MappedVariable] = field(
+    _rerooted_chains_: dict[uuid.UUID, MappedVariable] = field(
         init=False, default_factory=dict
     )
     """
@@ -406,7 +393,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     @abstractmethod
     def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
+        self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
         """
         Apply the mapping to a value from the child variable.
@@ -456,7 +443,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         return self._rerooted_chains_[root._id_]
 
     @property
-    def _access_path_(self) -> List[Self]:
+    def _access_path_(self) -> list[Self]:
         """
         :return: The access path of the variable as a list of operations.
         """
@@ -629,7 +616,7 @@ class Attribute(SingleValueMapping[T]):
     """
 
     @cached_property
-    def _owner_class_(self) -> Optional[Type]:
+    def _owner_class_(self) -> type | None:
         """
         The class that owns this attribute.
         """
@@ -642,7 +629,7 @@ class Attribute(SingleValueMapping[T]):
         self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
 
     def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
+        self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
         if hasattr(value, self._attribute_name_):
             yield getattr(value, self._attribute_name_)
@@ -735,7 +722,7 @@ class IndexByValue(Index[T], SingleValueMapping[T]):
     """
 
     def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
+        self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
         try:
             yield value[self._key_]
@@ -760,7 +747,7 @@ class IndexByExpression(Index[T]):
     """
 
     def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
+        self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
         try:
             if isinstance(value, UnificationDict) and self._key_ in value:
@@ -781,18 +768,18 @@ class Call(SingleValueMapping[T]):
     A variable created through a function call operation on its child variable.
     """
 
-    _args_: Tuple[Any, ...] = field(default_factory=tuple)
+    _args_: tuple[Any, ...] = field(default_factory=tuple)
     """
     The arguments to call the method with.
     """
 
-    _kwargs_: Dict[str, Any] = field(default_factory=dict)
+    _kwargs_: dict[str, Any] = field(default_factory=dict)
     """
     The keyword arguments to call the method with.
     """
 
     def _apply_mapping_(
-        self, value: Any, sources: Optional[OperationResult] = None
+        self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
         if len(self._args_) > 0 or len(self._kwargs_) > 0:
             yield value(*self._args_, **self._kwargs_)
@@ -853,7 +840,7 @@ class FlatVariable(MappedVariable[T]):
     """
 
     def _apply_mapping_(
-        self, value: Iterable[T], sources: Optional[OperationResult] = None
+        self, value: Iterable[T], sources: OperationResult | None = None
     ) -> Iterable[T]:
         yield from value
 
@@ -877,7 +864,7 @@ class MappedVariableCacheItem:
     for the dictionary  that stores the mapped variable instances.
     """
 
-    type: Type[MappedVariable]
+    type: type[MappedVariable]
     """
     The mapping type to create, e.g., Attribute, Index, etc.
     """
@@ -888,12 +875,12 @@ class MappedVariableCacheItem:
     applied).
     """
 
-    args: Tuple[Any, ...] = field(default_factory=tuple)
+    args: tuple[Any, ...] = field(default_factory=tuple)
     """
     Positional arguments to pass to the mapping constructor.
     """
 
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     """
     Keyword arguments to pass to the mapping constructor.
     """

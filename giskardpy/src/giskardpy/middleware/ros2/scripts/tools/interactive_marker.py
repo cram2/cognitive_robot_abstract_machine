@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from threading import Thread
-from typing import Dict, List
 
 import rclpy
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
@@ -104,7 +103,7 @@ class InteractiveMarkerNode:
     Timeout in seconds for motion execution.
     """
 
-    chains: List[RootTipPair] | None = None
+    chains: list[RootTipPair] | None = None
     """
     The kinematic chains to create a marker for.
 
@@ -116,7 +115,7 @@ class InteractiveMarkerNode:
     Sends the motions to Giskard.
     """
 
-    markers: Dict[str, KinematicChainMarker] = field(init=False)
+    markers: dict[str, KinematicChainMarker] = field(init=False)
     """
     Dictionary mapping marker names to KinematicChainMarker instances.
     """
@@ -151,7 +150,7 @@ class InteractiveMarkerNode:
         self._initialize_markers()
         self._setup_marker_server()
 
-    def _read_chains_from_parameters(self) -> List[RootTipPair]:
+    def _read_chains_from_parameters(self) -> list[RootTipPair]:
         """
         Pair up the chains declared by the ``root_links`` and ``tip_links`` node
         parameters.
@@ -173,7 +172,7 @@ class InteractiveMarkerNode:
         )
 
     @classmethod
-    def start_in_background_thread(cls, chains: List[RootTipPair]) -> Thread:
+    def start_in_background_thread(cls, chains: list[RootTipPair]) -> Thread:
         """
         Start an interactive marker node for the given kinematic chains in a daemon
         thread.

@@ -5,7 +5,7 @@ Specifications of robots placed into a world.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Type, cast
+from typing_extensions import TYPE_CHECKING, cast
 from uuid import uuid4
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -37,7 +37,7 @@ class RobotSpecification:
     a mobile base.
     """
 
-    semantic_annotation_type: Type[AbstractRobot]
+    semantic_annotation_type: type[AbstractRobot]
     """
     The robot to merge into the world.
     """
@@ -138,7 +138,7 @@ class RobotSpecification:
         return robot
 
     def _drive_velocity_limits(
-        self, connection_type: Type[Connection]
+        self, connection_type: type[Connection]
     ) -> dict[str, float]:
         """
         Collect the velocity limits to create the drive connection with.

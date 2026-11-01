@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
@@ -12,7 +12,8 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 
 if TYPE_CHECKING:
     from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot
+    from semantic_digital_twin.datastructures.definitions import GripperState
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
     from semantic_digital_twin.world_description.world_entity import (
         KinematicStructureEntity,
     )
@@ -100,7 +101,7 @@ class UnexpectedWorldEntityCountError(NodeInitializationError):
     The number of matching entities that were found in the world.
     """
 
-    entity_type: Type | str | tuple[Type, ...]
+    entity_type: type | str | tuple[type, ...]
     """
     The type of entity that was searched for.
     """
@@ -227,6 +228,90 @@ class InvalidConstraintExpressionShapeError(MotionStatechartError):
 
 
 @dataclass
+class UnknownGriplinkActionError(MotionStatechartError):
+    """
+    Raised when a griplink action server task is built for a griplink action it does not
+    build goals for.
+    """
+
+    message_type: type
+    """
+    The griplink action the task was built with.
+    """
+
+    def error_message(self) -> str:
+        return f'Cannot build a goal for the griplink action "{self.message_type.__name__}".'
+
+    def suggest_correction(self) -> str:
+        return "Build the task with Grip, Release, Flexgrip or Flexrelease."
+
+
+@dataclass
+class NoGriplinkEndpoint(MotionStatechartError):
+    """
+    Raised when a gripper state has no griplink action server endpoint to command it on.
+    """
+
+    end_effector: EndEffector
+    """
+    The gripper whose state is to be commanded.
+    """
+
+    state_type: GripperState
+    """
+    The gripper state no griplink endpoint serves.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The gripper '{self.end_effector.name}' has no griplink endpoint to "
+            f"command the state {self.state_type.name}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Command a gripper state the gripper declares an endpoint for, or add an "
+            "endpoint for this gripper and state."
+        )
+
+
+@dataclass
+class GriplinkParameterOutOfRangeError(MotionStatechartError):
+    """
+    Raised when a griplink parameter lies outside the interval the gripper accepts.
+    """
+
+    parameter_name: str
+    """
+    The name of the offending parameter.
+    """
+
+    value: float
+    """
+    The value the parameter was given.
+    """
+
+    lower_bound: float
+    """
+    The smallest value the gripper accepts.
+    """
+
+    upper_bound: float
+    """
+    The largest value the gripper accepts.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Griplink parameter {self.parameter_name} is {self.value}, outside the "
+            f"valid interval [{self.lower_bound}..{self.upper_bound}]."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Choose a {self.parameter_name} within the valid interval."
+
+
+@dataclass
 class ActionClientTypeMismatchError(MotionStatechartError):
     """
     Raised when an action topic is requested with a different message type than the one
@@ -238,12 +323,12 @@ class ActionClientTypeMismatchError(MotionStatechartError):
     The action topic that was requested with two different message types.
     """
 
-    existing_message_type: Type
+    existing_message_type: type
     """
     The message type the cached action client for this topic was created with.
     """
 
-    requested_message_type: Type
+    requested_message_type: type
     """
     The message type that was requested for this topic instead.
     """

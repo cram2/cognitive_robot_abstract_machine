@@ -2,7 +2,7 @@ import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing_extensions import Any, Generic, Optional, TypeVar
+from typing_extensions import Any, Generic, TypeVar
 
 from krrood.adapters.json_serializer import from_json
 from krrood.entity_query_language.backends import ProbabilisticBackend
@@ -181,7 +181,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
     Training environment for MoveToReach actions in an empty world using the PR2.
     """
 
-    model_path: Optional[Path] = None
+    model_path: Path | None = None
     """
     Path to a model file that should be used for the action.
 

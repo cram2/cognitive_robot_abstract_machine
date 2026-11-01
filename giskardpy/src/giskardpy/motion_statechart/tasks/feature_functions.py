@@ -75,7 +75,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
                 DebugExpression(
                     name="root_P_controlled_feature",
                     expression=self.root_P_controlled_feature,
-                    color=Color(1, 0, 0, 1),
+                    color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
                 )
             )
         elif isinstance(self.controlled_feature, Vector3):
@@ -87,7 +87,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
                 DebugExpression(
                     name="root_V_controlled_feature",
                     expression=self.root_V_controlled_feature,
-                    color=Color(1, 0, 0, 1),
+                    color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
                 )
             )
 
@@ -97,7 +97,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
                 DebugExpression(
                     name="root_P_reference_feature",
                     expression=self.root_P_reference_feature,
-                    color=Color(0, 1, 0, 1),
+                    color=Color.from_rgba(red=0, green=1, blue=0, opacity=1),
                 )
             )
         elif isinstance(self.reference_feature, Vector3):
@@ -109,7 +109,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
                 DebugExpression(
                     name="root_V_reference_feature",
                     expression=self.root_V_reference_feature,
-                    color=Color(0, 1, 0, 1),
+                    color=Color.from_rgba(red=0, green=1, blue=0, opacity=1),
                 )
             )
 

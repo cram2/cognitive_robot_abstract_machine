@@ -212,6 +212,7 @@ class ControlStructureNode(CompositeNode, ABC):
         Puts every node in :attr:`nodes` below this goal in its statechart and wires
         them.
         """
+        self._check_accepts_children()
         for node in list(self.nodes):
             self._check_can_be_a_child(node)
             self._place_child_in_statechart(node)
@@ -274,6 +275,8 @@ class ControlStructureNode(CompositeNode, ABC):
         :param position: The index among the children `node` takes.
         :param node: The node to insert, or a statement of it.
         :raises NodeAlreadyAChildError: If `node` is a child of this goal already.
+        :raises StatechartAlreadyCompiledError: If this goal accepts no children any
+            more, see :meth:`_check_accepts_children`.
         """
         node = self._as_node(node)
         self._check_is_not_a_child(node)
@@ -281,6 +284,7 @@ class ControlStructureNode(CompositeNode, ABC):
             self.nodes.insert(position, node)
             return
         self._check_can_be_a_child(node)
+        self._check_accepts_children()
         self.nodes.insert(position, node)
         self._place_child_in_statechart(node)
         self._wire_children()

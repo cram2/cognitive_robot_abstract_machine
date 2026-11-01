@@ -5,17 +5,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import combinations
 from itertools import product
-from typing import Dict, Any
+from typing_extensions import TYPE_CHECKING, Self, Callable, ClassVar, Any
 
 import numpy as np
 from lxml import etree
-from typing_extensions import (
-    List,
-    TYPE_CHECKING,
-    Self,
-    Callable,
-    ClassVar,
-)
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -134,11 +127,11 @@ class AvoidCollisionBetweenGroups(AvoidCollisionRule):
     Adds collision checks between all pairs of bodies in the given groups to the collision matrix.
     """
 
-    body_group_a: List[Body] = field(default_factory=list)
+    body_group_a: list[Body] = field(default_factory=list)
     """
     List of bodies that should not collide with bodies in `body_group_b`.
     """
-    body_group_b: List[Body] = field(default_factory=list)
+    body_group_b: list[Body] = field(default_factory=list)
     """
     List of bodies that should not collide with bodies in `body_group_a`.
     """
@@ -214,7 +207,7 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
             for body_a, body_b in product(robot_bodies, external_bodies)
         }
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "robot": to_json(self.robot.id, **kwargs),
@@ -231,7 +224,7 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         robot = tracker.get(from_json(data["robot"], **kwargs))
         body_subset_ids = from_json(data["body_subset"], **kwargs)
@@ -296,11 +289,11 @@ class AllowCollisionBetweenGroups(AllowCollisionRule):
     Allows collision checks between two groups of bodies.
     """
 
-    body_group_a: List[Body] = field(default_factory=list)
+    body_group_a: list[Body] = field(default_factory=list)
     """
     The first group of bodies.
     """
-    body_group_b: List[Body] = field(default_factory=list)
+    body_group_b: list[Body] = field(default_factory=list)
     """
     The second group of bodies.
     """
@@ -828,7 +821,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             )
         return self
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "allowed_body_ids": to_json(
@@ -838,7 +831,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         allowed_body_ids = from_json(data["allowed_body_ids"], **kwargs)
         allowed_bodies = {tracker.get(_id) for _id in allowed_body_ids}

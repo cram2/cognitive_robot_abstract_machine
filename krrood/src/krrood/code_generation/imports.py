@@ -7,7 +7,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from importlib.util import resolve_name
-from typing import Callable, Dict, Iterable, List, Optional, Set, Type
+from typing_extensions import Callable, Iterable
 
 from krrood.code_generation.enums import PythonBuiltinParameterNames
 from krrood.code_generation.exceptions import FunctionMissingAnnotationsError
@@ -97,10 +97,10 @@ def validate_annotations(function: Callable) -> None:
 
 
 def get_type_names_per_module_from_types(
-    type_objects: Iterable[Type],
-    excluded_names: Optional[List[str]] = None,
-    excluded_modules: Optional[List[str]] = None,
-) -> Dict[str, List[str]]:
+    type_objects: Iterable[type],
+    excluded_names: list[str] | None = None,
+    excluded_modules: list[str] | None = None,
+) -> dict[str, list[str]]:
     """Get a dictionary of type names grouped by module.
 
     :param type_objects: A list of type objects to format.
@@ -110,7 +110,7 @@ def get_type_names_per_module_from_types(
     """
     excluded_modules = [] if excluded_modules is None else excluded_modules
     excluded_names = [] if excluded_names is None else excluded_names
-    module_to_types: Dict[str, List[str]] = defaultdict(list)
+    module_to_types: dict[str, list[str]] = defaultdict(list)
     for type_object in type_objects:
         try:
             if isinstance(type_object, type) or is_typing_type(type_object):
@@ -145,12 +145,12 @@ def get_type_names_per_module_from_types(
 
 
 def get_imports_from_types(
-    type_objects: Iterable[Type],
-    target_file_path: Optional[str] = None,
-    package_name: Optional[str] = None,
-    excluded_names: Optional[List[str]] = None,
-    excluded_modules: Optional[List[str]] = None,
-) -> List[str]:
+    type_objects: Iterable[type],
+    target_file_path: str | None = None,
+    package_name: str | None = None,
+    excluded_names: list[str] | None = None,
+    excluded_modules: list[str] | None = None,
+) -> list[str]:
     """Format import lines from type objects.
 
     :param type_objects: A list of type objects to format.
@@ -164,10 +164,10 @@ def get_imports_from_types(
         type_objects, excluded_names, excluded_modules
     )
 
-    lines: List[str] = []
-    stem_imports: List[str] = []
+    lines: list[str] = []
+    stem_imports: list[str] = []
     for module, names in module_to_types.items():
-        filtered_names: Set[str] = set()
+        filtered_names: set[str] = set()
         for name in set(names):
             if "." in name:
                 stem = ".".join(name.split(".")[1:])

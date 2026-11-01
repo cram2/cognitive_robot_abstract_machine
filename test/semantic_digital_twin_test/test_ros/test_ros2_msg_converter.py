@@ -268,7 +268,7 @@ def test_convert_mesh_shape(cylinder_bot_world):
     )
     mesh = Mesh(
         filename=stl_file,
-        color=Color(0.0, 0.0, 0.0, 0.0),
+        color=Color.from_rgba(red=0.0, green=0.0, blue=0.0, opacity=0.0),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 2, 3, reference_frame=cylinder_bot_world.get_body_by_name("map")
         ),

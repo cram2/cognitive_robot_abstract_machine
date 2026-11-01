@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from tqdm import tqdm
-from typing_extensions import List, Optional, Sequence, Tuple
+from typing_extensions import Sequence
 
 from cognitive_robot_abstract_machine import orm_generation
 from cognitive_robot_abstract_machine.exceptions import (
@@ -42,7 +42,7 @@ SOURCE_FILE_PATTERN = "*.py"
 What a module of a package is named like.
 """
 
-MAPPING_ENGINE_SOURCE_FOLDERS: Tuple[Path, ...] = (
+MAPPING_ENGINE_SOURCE_FOLDERS: tuple[Path, ...] = (
     Path("krrood") / "src" / "krrood",
     Path("cognitive_robot_abstract_machine"),
 )
@@ -87,7 +87,7 @@ class BuildProgress:
     How many of them are built.
     """
 
-    bar: Optional[tqdm] = field(default=None, init=False)
+    bar: tqdm | None = field(default=None, init=False)
     """
     The bar, absent while the generators have the terminal to themselves.
     """
@@ -169,7 +169,7 @@ class OrmInterface:
     Root of the checkout the package lives in.
     """
 
-    dependencies: Tuple[str, ...] = ()
+    dependencies: tuple[str, ...] = ()
     """
     Names of the packages whose ORM model this interface builds on.
     """
@@ -203,7 +203,7 @@ class OrmInterface:
         return self.repository_root / self.package_name / "src" / self.package_name
 
     @property
-    def mapping_engine_sources(self) -> List[Path]:
+    def mapping_engine_sources(self) -> list[Path]:
         """
         The folders of the library that maps this package's classes and of the module
         that runs its generator.
@@ -213,7 +213,7 @@ class OrmInterface:
         ]
 
     @property
-    def inputs(self) -> List[Path]:
+    def inputs(self) -> list[Path]:
         """
         The files this package contributes to a build: its generator, the modules of its
         source folder, and those of the mapping engine.
@@ -274,12 +274,12 @@ class GenerationOutput:
     What the classes and interfaces the run finishes are reported to.
     """
 
-    package_name: Optional[str] = field(default=None, init=False)
+    package_name: str | None = field(default=None, init=False)
     """
     The package whose generator is running, absent until the run names one.
     """
 
-    written: List[str] = field(default_factory=list, init=False)
+    written: list[str] = field(default_factory=list, init=False)
     """
     The lines carrying no report, kept for a failure to quote.
     """
@@ -369,7 +369,7 @@ class WorkspaceOrmInterfaces:
             self.run_reporting_to(progress)
 
     @property
-    def command(self) -> List[str]:
+    def command(self) -> list[str]:
         """
         The command that runs every generator in one interpreter.
 

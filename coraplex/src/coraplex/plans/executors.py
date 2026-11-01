@@ -13,7 +13,7 @@ from coraplex.exceptions import (
     MotionDidNotFinish,
     PlanNotCompiled,
 )
-from coraplex.plans.context_extensions import StatementGrounding
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from coraplex.plans.failures import (
     CandidateLimitReached,
     EmptyUnderspecified,
@@ -73,6 +73,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecu
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import logic_or
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 
 if TYPE_CHECKING:
     from semantic_digital_twin.adapters.multi_sim import MujocoSim
@@ -94,7 +95,8 @@ class PlanExecutor(Executor, ABC):
     :class:`~coraplex.plans.plan_transformation.PlanRewriting` with default values are
     added unless one is there; the executor replaces the latter with one offering every
     node to :attr:`universal_adaptations` and :attr:`plan_adaptations` first. A context
-    serves one executor. :meth:`compile` adds what a plan runs with: the collision avoidance if asked for, one
+    serves one executor. :meth:`compile` adds what a plan runs with: the collision
+    avoidance of the robot of :attr:`context` if asked for, one
     :class:`~giskardpy.motion_statechart.graph_node.EndMotion` once every plan node
     succeeded or one of them ended without succeeding, and the stall detection.
     Underspecified actions are grounded while it runs, see
@@ -169,21 +171,22 @@ class PlanExecutor(Executor, ABC):
         if self.debug and self.ros_node is None:
             raise DebuggingWithoutRosNode()
         self.supplied_context_extensions = list(self.context.extensions.values())
-        rewriting = self.context.get_extension(PlanRewriting)
-        if rewriting is not None:
-            self.context.extensions[type(rewriting)] = (
-                rewriting.copy_with_preceding_transformations(self.adaptations)
-            )
         trial = ActionTrial(
             executor=self, trial_executor_type=KinematicallySimulatedPlanExecutor
         )
         self.child_chooser = UnderspecifiedChildChooser(trial=trial)
         self.parallel_child_chooser = UnderspecifiedParallelChildChooser(trial=trial)
+        # Raises for a context another executor runs on before anything of it changed.
         self.context.add_extension(
             ChildChooserAccess(
                 choosers=[self.child_chooser, self.parallel_child_chooser]
             )
         )
+        rewriting = self.context.get_extension(PlanRewriting)
+        if rewriting is not None:
+            self.context.extensions[type(rewriting)] = (
+                rewriting.copy_with_preceding_transformations(self.adaptations)
+            )
         super().__post_init__()
 
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -223,8 +226,9 @@ class PlanExecutor(Executor, ABC):
         # a transformation may have put a plan node below a node holding it
         self.plan_nodes = list(statechart.top_level_nodes)
         if self.collision_avoidance:
-            statechart.add_node(ExternalCollisionAvoidance())
-            statechart.add_node(SelfCollisionAvoidance())
+            robot = self.context.require_extension(RobotAccess).robot
+            statechart.add_node(ExternalCollisionAvoidance(robot=robot))
+            statechart.add_node(SelfCollisionAvoidance(robot=robot))
         self._add_end_of_plan(statechart)
         self._add_stall_detection(statechart)
 
@@ -516,18 +520,41 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     """
 
     plan_adaptations: list[PlanTransformation] = field(
-        default_factory=lambda: [
-            # A servo grips only with the position error it is left with, so fingers
-            # sent no further than the object's surface touch it without holding it.
-            CloseFingersToObjectWidth(squeeze=0.005),
-            LetContactCarryTheBodies(),
-        ],
+        default_factory=lambda: [LetContactCarryTheBodies()],
         kw_only=True,
     )
+    """
+    The plan transformations adapting every plan to being performed in physics. Unless
+    one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
+    is put first that squeezes by the
+    :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.squeeze` of the
+    robot's two-finger grippers.
+    """
 
     def __post_init__(self) -> None:
         self.pacer = SteppedSimulationPacer(self.simulation)
+        if not any(
+            isinstance(adaptation, CloseFingersToObjectWidth)
+            for adaptation in self.plan_adaptations
+        ):
+            self.plan_adaptations = [
+                CloseFingersToObjectWidth(squeeze=self._squeeze_of_the_grippers()),
+                *self.plan_adaptations,
+            ]
         super().__post_init__()
+
+    def _squeeze_of_the_grippers(self) -> float:
+        """
+        :return: The squeeze the two-finger grippers of the robot in :attr:`context`
+            name, or the default one where it has none.
+        """
+        robot = self.context.require_extension(RobotAccess).robot
+        [squeeze] = {
+            arm.end_effector.squeeze
+            for arm in robot.all_arms
+            if isinstance(arm.end_effector, HasTwoFingers)
+        } or {HasTwoFingers.squeeze}
+        return squeeze
 
     def create_qp_controller_config(self) -> QPControllerConfig:
         return QPControllerConfig.create_with_physical_simulation_defaults()

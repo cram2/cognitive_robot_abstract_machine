@@ -4,7 +4,6 @@ import logging
 import os
 from dataclasses import field, dataclass
 from pathlib import Path
-from typing_extensions import Optional
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
@@ -82,7 +81,7 @@ class EpisodeSceneLoader:
     Names of the models that are fixed to the root of the world.
     """
 
-    def spawn_scene(self, models_dir, file_resolver: Optional[FileUriResolver] = None):
+    def spawn_scene(self, models_dir, file_resolver: FileUriResolver | None = None):
         """
         Spawns the scene from the given directory.
 
@@ -95,7 +94,7 @@ class EpisodeSceneLoader:
         for file in directory.glob("*.stl"):
             self._load_stl(file)
 
-    def _load_urdf(self, file: Path, file_resolver: Optional[FileUriResolver] = None):
+    def _load_urdf(self, file: Path, file_resolver: FileUriResolver | None = None):
         """
         Loads an URDF file into the simulation world.
 

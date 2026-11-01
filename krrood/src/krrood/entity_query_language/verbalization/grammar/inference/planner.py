@@ -5,7 +5,6 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from typing_extensions import Dict, FrozenSet, List, Optional, Tuple, Union
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
@@ -51,12 +50,12 @@ class AntecedentInformation:
     Descriptor for one antecedent variable in the IF clause.
     """
 
-    root: Union[Variable, Entity]
+    root: Variable | Entity
     """
     The underlying Variable/Entity (unwrapped from any ResultQuantifier).
     """
 
-    variable: Optional[Variable]
+    variable: Variable | None
     """
     The antecedent's restriction subject — the variable its conditions attach
     to (``root`` for a Variable root, the selected variable for an Entity
@@ -73,7 +72,7 @@ class AntecedentInformation:
     Whether this antecedent is a group key, aggregated, or neither.
     """
 
-    conditions: List[SymbolicExpression] = field(default_factory=list)
+    conditions: list[SymbolicExpression] = field(default_factory=list)
     """
     The raw WHERE conditions attributable to this antecedent; their surface
     form/slot is the condition-form registry's concern at render time, not the
@@ -114,12 +113,12 @@ class RuleStructure:
     Complete decomposition of an inference-rule Entity query (the plan).
     """
 
-    primary_antecedents: List[AntecedentInformation]
+    primary_antecedents: list[AntecedentInformation]
     """
     Antecedents with at least one condition — items in the IF block.
     """
 
-    secondary_antecedents: List[AntecedentInformation]
+    secondary_antecedents: list[AntecedentInformation]
     """
     Antecedents with no conditions — only registered for coreference.
     """
@@ -129,17 +128,17 @@ class RuleStructure:
     Python type name of the inferred variable (e.g. ``"Drawer"``).
     """
 
-    consequent_bindings: List[ConsequentBinding]
+    consequent_bindings: list[ConsequentBinding]
     """
     Ordered field bindings for the THEN clause.
     """
 
-    unmatched_conditions: List[SymbolicExpression]
+    unmatched_conditions: list[SymbolicExpression]
     """
     Outer WHERE conditions not attributable to any antecedent.
     """
 
-    group_key_ids: FrozenSet[uuid.UUID]
+    group_key_ids: frozenset[uuid.UUID]
     """
     ``_id_`` values of the GROUP BY key variables.
     """
@@ -226,7 +225,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         inferred = self._inferred
         return getattr(inferred._type_, "__name__", str(inferred._type_))
 
-    def _group_key_ids(self) -> FrozenSet[uuid.UUID]:
+    def _group_key_ids(self) -> frozenset[uuid.UUID]:
         """:return: The ``_id_`` set of the GROUP BY key variables — empty when the query is
         ungrouped.
 
@@ -245,7 +244,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
     @staticmethod
     def _aggregation_status(
-        node_id: uuid.UUID, group_key_ids: FrozenSet[uuid.UUID]
+        node_id: uuid.UUID, group_key_ids: frozenset[uuid.UUID]
     ) -> AggregationStatus:
         """:return: GROUP_KEY if a group key, else AGGREGATED when grouping is present, else NONE.
 
@@ -263,8 +262,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
     # %% consequent (THEN bindings)
 
     def _plan_consequent(
-        self, group_key_ids: FrozenSet[uuid.UUID]
-    ) -> List[ConsequentBinding]:
+        self, group_key_ids: frozenset[uuid.UUID]
+    ) -> list[ConsequentBinding]:
         """:return: One :class:`ConsequentBinding` per THEN-clause field, in construction order.
 
         >>> connection = variable(FixedConnection, [])
@@ -286,8 +285,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
     # %% antecedents (IF roots + their conditions)
 
     def _plan_antecedents(
-        self, group_key_ids: FrozenSet[uuid.UUID]
-    ) -> Tuple[List[AntecedentInformation], List[SymbolicExpression]]:
+        self, group_key_ids: frozenset[uuid.UUID]
+    ) -> tuple[list[AntecedentInformation], list[SymbolicExpression]]:
         """Discover antecedent roots, then attribute outer-WHERE conditions to them.
 
         :return: The antecedents (their ``conditions`` mutated in place) and the conditions that
@@ -307,8 +306,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         return antecedents, unmatched
 
     def _discover_antecedents(
-        self, group_key_ids: FrozenSet[uuid.UUID]
-    ) -> List[AntecedentInformation]:
+        self, group_key_ids: frozenset[uuid.UUID]
+    ) -> list[AntecedentInformation]:
         """:return: One :class:`AntecedentInformation` per distinct root reached from the consequent
         bindings (the IF-clause subjects).
 
@@ -320,7 +319,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         >>> [antecedent.type_name for antecedent in planner._discover_antecedents(frozenset())]
         ['FixedConnection']
         """
-        antecedents_by_root_id: Dict[uuid.UUID, AntecedentInformation] = {}
+        antecedents_by_root_id: dict[uuid.UUID, AntecedentInformation] = {}
         for child in self._inferred._child_variables_.values():
             root = self._find_root(child)
             if root is None or root._id_ in antecedents_by_root_id:
@@ -336,7 +335,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         return list(antecedents_by_root_id.values())
 
     @staticmethod
-    def _root_variable(root: Union[Variable, Entity]) -> Optional[Variable]:
+    def _root_variable(root: Variable | Entity) -> Variable | None:
         """:return: The restriction subject of an antecedent root — the selected variable for an
         Entity root, the root itself for a Variable root.
 
@@ -350,7 +349,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             return selected if isinstance(selected, Variable) else None
         return root if isinstance(root, Variable) else None
 
-    def _outer_conditions(self) -> List[SymbolicExpression]:
+    def _outer_conditions(self) -> list[SymbolicExpression]:
         """:return: The flattened outer-WHERE conditions of the query — empty when it has no
         ``.where(...)``.
 
@@ -365,9 +364,9 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
     def _attribute_conditions(
         self,
-        antecedents: List[AntecedentInformation],
-        extra_conditions: List[SymbolicExpression],
-    ) -> List[SymbolicExpression]:
+        antecedents: list[AntecedentInformation],
+        extra_conditions: list[SymbolicExpression],
+    ) -> list[SymbolicExpression]:
         """Distribute outer-WHERE conditions to owning antecedents (in place).
 
         :return: The conditions that matched no antecedent.
@@ -383,7 +382,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             self._antecedent_variable_id(antecedent): antecedent
             for antecedent in antecedents
         }
-        unmatched: List[SymbolicExpression] = []
+        unmatched: list[SymbolicExpression] = []
         for condition in extra_conditions:
             owner_id = self._condition_left_owner_id(condition)
             if owner_id is not None and owner_id in id_to_antecedent:
@@ -394,7 +393,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
     def _antecedent_variable_id(
         self, antecedent: AntecedentInformation
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """:return: The stable ``_id_`` of the underlying variable for an antecedent."""
         root = antecedent.root
         if isinstance(root, Entity):
@@ -405,7 +404,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
     def _condition_left_owner_id(
         self, condition: SymbolicExpression
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """:return: The ``_id_`` of the root variable on the left-hand side of an equality condition, else
         ``None``.
 
@@ -421,9 +420,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         current = unwrap_result_quantifiers(chain_root(condition.left))
         return current._id_
 
-    def _find_root(
-        self, expression: SymbolicExpression
-    ) -> Optional[Union[Variable, Entity]]:
+    def _find_root(self, expression: SymbolicExpression) -> Variable | Entity | None:
         """:return: The :class:`Variable`/:class:`Entity` at the root of *expression*'s chain, else
         ``None``.
 
@@ -438,8 +435,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         return None
 
     def _extract_root_info(
-        self, root: Union[Variable, Entity]
-    ) -> Tuple[str, List[SymbolicExpression]]:
+        self, root: Variable | Entity
+    ) -> tuple[str, list[SymbolicExpression]]:
         """:return: ``(type_name, own_conditions)`` for a root variable or entity.
 
         >>> planner = InferencePlanner(entity(variable(Robot, [])))
@@ -451,7 +448,7 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
             root.build()
             selected = root.selected_variable
             type_name = FallbackNouns.ENTITY.name_of(selected)
-            conditions: List[SymbolicExpression] = []
+            conditions: list[SymbolicExpression] = []
             if root._where_expression_ is not None:
                 conditions = flatten_operands(root._where_expression_.condition, AND)
             return type_name, conditions

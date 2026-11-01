@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 import cv2
 import open3d as o3d
-from typing_extensions import TYPE_CHECKING, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.types.core import Type
 from robokudo.types.tf import Pose
@@ -93,11 +93,11 @@ class Rect(Type):
         left, top, right, bottom = int(x1), int(y1), int(x2), int(y2)
         return cls(pos=Point2D(x=left, y=top), width=right - left, height=bottom - top)
 
-    def get_corner_points(self) -> Tuple[int, int, int, int]:
+    def get_corner_points(self) -> tuple[int, int, int, int]:
         """Get the rectangle as a tuple of (x1, y1, x2, y2)."""
         return self.pos.x, self.pos.y, self.pos.x + self.width, self.pos.y + self.height
 
-    def as_tuple(self) -> Tuple[int, int, int, int]:
+    def as_tuple(self) -> tuple[int, int, int, int]:
         """Get the rectangle as a tuple of (x, y, w, h)."""
         return self.pos.x, self.pos.y, self.width, self.height
 

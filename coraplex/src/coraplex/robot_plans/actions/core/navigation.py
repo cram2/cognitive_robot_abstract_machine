@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional
 
 from coraplex.exceptions import NoFloorBelowRobot, NotOnASingleLevelException
 from cramph.node import StatechartNode
@@ -99,7 +98,7 @@ class LookAtAction(ParallelAction):
     Position at which the robot should look, given as 6D pose.
     """
 
-    camera: Optional[Camera] = None
+    camera: Camera | None = None
     """
     Camera that should be looking at the target.
     """
@@ -110,7 +109,7 @@ class LookAtAction(ParallelAction):
             root_link=self.robot.get_torso().root,
             tip_link=camera.root,
             goal_point=self._world_P_target(),
-            pointing_axis=camera.forward_facing_axis,
+            pointing_axis=camera.viewing_direction,
         )
         return [pointing, *self.keep_base_still()]
 

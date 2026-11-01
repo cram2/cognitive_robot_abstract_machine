@@ -3,11 +3,11 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import cached_property
 
 import numpy as np
 from scipy.spatial.transform import Rotation
-from typing_extensions import List, Optional, Tuple, Union
 
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -48,9 +48,10 @@ from coraplex.robot_plans.actions.base import (
     TryAllAction,
 )
 from coraplex.robot_plans.mixins import MovesToolCenterPoint
-from cramph.composites import Parallel
+from cramph.composites import Parallel, PausedUntilTrue
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PositionReached
+from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
@@ -129,13 +130,13 @@ class ToolMotionAction(
 
     @property
     @abstractmethod
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         """
         :return: The target the tool is aligned with during the motion.
         """
 
     @cached_property
-    def _waypoints(self) -> List[Point3]:
+    def _waypoints(self) -> list[Point3]:
         """
         :return: The sampled waypoints of the tool path in the world frame.
         """
@@ -150,7 +151,7 @@ class ToolMotionAction(
         return waypoints
 
     @property
-    def _alignment_pairs(self) -> List[AlignmentPair]:
+    def _alignment_pairs(self) -> list[AlignmentPair]:
         """
         :return: The normal pairs that keep the tool aligned with its target during
             the motion, or an empty list if there is no alignment target.
@@ -234,7 +235,7 @@ class MixingAction(ToolMotionAction, ParallelAction):
         return self.container.global_pose.homogeneous_matrix
 
     @property
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         return self.container
 
 
@@ -254,14 +255,14 @@ class CuttingAction(ToolMotionAction, ParallelAction):
     The cutting technique to use.
     """
 
-    slice_thickness: Optional[float] = None
+    slice_thickness: float | None = None
     """
     Target slice thickness in meters, controlling the spacing between cut anchors.
 
     Derived from ``number_of_cuts_on_local_x_axis`` and the object size if None.
     """
 
-    number_of_cuts_on_local_x_axis: Optional[int] = None
+    number_of_cuts_on_local_x_axis: int | None = None
     """
     Number of cut passes along the object's local X axis.
 
@@ -287,7 +288,7 @@ class CuttingAction(ToolMotionAction, ParallelAction):
         return self.object_to_cut.global_pose.homogeneous_matrix
 
     @property
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         return self.object_to_cut
 
 
@@ -297,14 +298,14 @@ class WipingAction(ToolMotionAction, TryAllAction):
     Wipe a surface or a patch around a target pose with a tool.
     """
 
-    surface: Optional[Body] = None
+    surface: Body | None = None
     """
     The surface body to wipe.
 
     If None, ``target_pose`` is used instead.
     """
 
-    target_pose: Optional[Pose] = None
+    target_pose: Pose | None = None
     """
     Center pose of the wiping patch.
 
@@ -328,8 +329,17 @@ class WipingAction(ToolMotionAction, TryAllAction):
 
     final_waypoint_success_tolerance: float = 0.08
     """
-    Accept an unfinished motion as successful if the tool ends up within this distance
-    in meters of the final waypoint.
+    Accept a stalled motion as successful if the tool ended up within this distance in
+    meters of the final waypoint.
+    """
+
+    stall_timeout: timedelta = timedelta(seconds=2)
+    """
+    How long the tool may make no progress along its path before the wipe is checked for
+    having reached the final waypoint.
+
+    .. note:: Has to be shorter than the stall timeout of the executor, which otherwise
+        aborts the plan first.
     """
 
     def __post_init__(self):
@@ -377,7 +387,7 @@ class WipingAction(ToolMotionAction, TryAllAction):
         return self.target_pose.homogeneous_matrix
 
     @property
-    def _alignment_target(self) -> Optional[Union[Body, Pose]]:
+    def _alignment_target(self) -> Body | Pose | None:
         if self.surface is not None:
             return self.surface
         return self.target_pose
@@ -385,17 +395,22 @@ class WipingAction(ToolMotionAction, TryAllAction):
     def create_steps(self) -> list[StatechartNode]:
         """
         :return: The goal moving the tool along the sampled waypoints, and as an
-            alternative to it, the tool having reached the final waypoint, since the
-            last stretch of a wipe often stalls against the surface.
+            alternative to it, the tool having reached the final waypoint once that
+            motion stalled, since the last stretch of a wipe often stalls against the
+            surface.
         """
+        tool_path = Parallel(nodes=self._tool_path_steps())
         return [
-            Parallel(nodes=self._tool_path_steps()),
-            PositionReached(
-                name=f"{self.name}/final waypoint reached",
-                root_link=self.world.root,
-                tip_link=self.tool.root,
-                goal_point=self._waypoints[-1],
-                threshold=self.final_waypoint_success_tolerance,
+            tool_path,
+            PausedUntilTrue(
+                monitor=Stalled(monitored_node=tool_path, timeout=self.stall_timeout),
+                monitored_node=PositionReached(
+                    name=f"{self.name}/final waypoint reached",
+                    root_link=self.world.root,
+                    tip_link=self.tool.root,
+                    goal_point=self._waypoints[-1],
+                    threshold=self.final_waypoint_success_tolerance,
+                ),
             ),
         ]
 
@@ -427,7 +442,7 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
     Tilt angle in radians applied to the source container while pouring.
     """
 
-    pour_side: Optional[PouringSide] = None
+    pour_side: PouringSide | None = None
     """
     Robot-relative side of the target container to pour from.
 
@@ -487,7 +502,7 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
 
     def _approach_direction(
         self, target_pose: Pose, robot_pose: Pose
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         :return: The XY unit vector from the robot toward the target container,
             snapped to the target's nearest local axis so the pour never aims at a
@@ -516,7 +531,7 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
             return approach_x, approach_y
         return float(best[0]) / snapped_norm, float(best[1]) / snapped_norm
 
-    def _pour_poses(self) -> Tuple[Pose, Pose]:
+    def _pour_poses(self) -> tuple[Pose, Pose]:
         """
         :return: The pre-pour pose next to the target container's rim and the tilted
             pouring pose.

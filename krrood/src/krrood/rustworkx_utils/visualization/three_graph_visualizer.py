@@ -5,7 +5,7 @@ import threading
 import webbrowser
 from dataclasses import dataclass
 
-from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
+from typing_extensions import Any, ClassVar, Dict, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
@@ -46,7 +46,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
         content delivery network, so viewing the page needs internet access.
     """
 
-    required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
+    required_modules: ClassVar[tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
 
     layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
@@ -62,7 +62,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
     )
     """The 3d-force-graph layout options for each :class:`GraphLayout`."""
 
-    def node_extra_data(self, node_index: int) -> Dict[str, Any]:
+    def node_extra_data(self, node_index: int) -> dict[str, Any]:
         """
         :param node_index: The rustworkx index of the node.
         :return: Extra fields merged into the node's JSON payload, letting subclasses attach data
@@ -70,7 +70,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
         """
         return {}
 
-    def graph_nodes(self) -> List[ThreeNode]:
+    def graph_nodes(self) -> list[ThreeNode]:
         """
         :return: The 3d-force-graph nodes for the current graph.
         """
@@ -86,7 +86,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             nodes.append(node)
         return nodes
 
-    def _fixed_position_fields(self, node_index: int) -> Dict[str, float]:
+    def _fixed_position_fields(self, node_index: int) -> dict[str, float]:
         """
         :param node_index: The rustworkx index of the node.
         :return: ``fx``/``fy``/(``fz``) fields pinning the node at :meth:`node_position`'s result,
@@ -104,7 +104,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             fields["fz"] = float(position[2])
         return fields
 
-    def graph_links(self) -> List[ThreeLink]:
+    def graph_links(self) -> list[ThreeLink]:
         """
         :return: The 3d-force-graph links for the current graph.
         """

@@ -5,7 +5,6 @@ from time import sleep
 import pytest
 from rclpy.duration import Duration
 from rclpy.time import Time
-from typing_extensions import List, Set, Tuple
 from visualization_msgs.msg import MarkerArray, Marker
 
 from .test_tf_publisher import publisher_ignoring_existing_frames
@@ -173,7 +172,7 @@ def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_w
     region = Region(
         name=PrefixedName("region"),
         area=ShapeCollection(
-            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color(A=1.0))]
+            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(opacity=1.0))]
         ),
     )
     connection = FixedConnection(parent=cylinder_bot_world.root, child=region)
@@ -248,7 +247,7 @@ def test_trimesh(rclpy_node):
 # %% marker frames
 
 
-def world_with_visible_bodies(*names: str) -> Tuple[World, List[Body]]:
+def world_with_visible_bodies(*names: str) -> tuple[World, list[Body]]:
     """
     Build a world whose root carries one body with a visual shape per given name.
     """
@@ -268,7 +267,7 @@ def world_with_visible_bodies(*names: str) -> Tuple[World, List[Body]]:
     return world, bodies
 
 
-def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
+def published_child_frames(tf_publisher: TFPublisher) -> set[str]:
     """
     The tf frames the publisher broadcasts a transform for, on every state change or
     once per model change.
@@ -281,7 +280,7 @@ def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
     }
 
 
-def marker_frames(viz: VizMarkerPublisher) -> Set[str]:
+def marker_frames(viz: VizMarkerPublisher) -> set[str]:
     """
     The tf frames the markers are positioned in.
     """
@@ -297,6 +296,22 @@ def test_markers_are_stamped_with_the_frame_names_the_tf_publisher_publishes(
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
     assert marker_frames(viz) == published_child_frames(tf_publisher)
+
+
+def test_markers_of_equally_named_bodies_do_not_replace_each_other(rclpy_node):
+    """
+    RViz identifies a marker by its namespace and id, so a marker sharing both with
+    another one replaces it.
+    """
+    world, bodies = world_with_visible_bodies("milk", "milk")
+
+    viz = VizMarkerPublisher(_world=world, node=rclpy_node)
+
+    assert sorted((marker.ns, marker.id) for marker in viz.markers.markers) == sorted(
+        (viz.tf_publisher.tf_model_callback.frame_names.assign(body), shape_index)
+        for body in bodies
+        for shape_index, _ in enumerate(body.visual.shapes)
+    )
 
 
 def test_the_tf_publisher_of_the_world_is_adopted(rclpy_node):

@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import List
 
 import json
 
@@ -274,14 +273,14 @@ class Giskard:
             10,
         )
 
-    def create_post_goal_plotters(self) -> List[PostGoalPlotter]:
+    def create_post_goal_plotters(self) -> list[PostGoalPlotter]:
         """
         Create the debug plotters that are configured and let them record what they
         need.
         """
         if not self.server_config.debug_mode:
             return []
-        plotters: List[PostGoalPlotter] = []
+        plotters: list[PostGoalPlotter] = []
         if self.server_config.plot_trajectory:
             plotters.append(GoalTrajectoryPlotter(executor=self.executor))
         if self.server_config.plot_gantt_chart:
@@ -297,9 +296,9 @@ class Giskard:
             semantic_digital_twin_database_uri = os.environ.get(
                 "SEMANTIC_DIGITAL_TWIN_DATABASE_URI"
             )
-            assert (
-                semantic_digital_twin_database_uri is not None
-            ), "Please set the SEMANTIC_DIGITAL_TWIN_DATABASE_URI environment variable."
+            assert semantic_digital_twin_database_uri is not None, (
+                "Please set the SEMANTIC_DIGITAL_TWIN_DATABASE_URI environment variable."
+            )
 
             engine = create_engine(semantic_digital_twin_database_uri)
             session = sessionmaker(bind=engine)()
@@ -375,7 +374,7 @@ class Giskard:
         return self.robots[0]
 
     @property
-    def robots(self) -> List[AbstractRobot]:
+    def robots(self) -> list[AbstractRobot]:
         return self.world_config.world.get_semantic_annotations_by_type(AbstractRobot)
 
     def _controlled_joints_sanity_check(self):

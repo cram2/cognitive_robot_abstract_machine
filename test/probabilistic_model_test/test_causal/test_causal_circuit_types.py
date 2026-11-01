@@ -19,7 +19,6 @@ import pytest
 from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Symbolic, Variable
-from typing_extensions import Dict, List
 
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -71,7 +70,7 @@ class CausalQuery:
     The circuit, built as a graph of units.
     """
 
-    causes: List[Variable]
+    causes: list[Variable]
     """
     The cause Variables to register.
     """
@@ -81,12 +80,12 @@ class CausalQuery:
     The effect Variable to register.
     """
 
-    adjustment: List[Variable] = field(default_factory=list)
+    adjustment: list[Variable] = field(default_factory=list)
     """
     The Variables to adjust for.
     """
 
-    observations: Dict[Variable, float] = field(default_factory=dict)
+    observations: dict[Variable, float] = field(default_factory=dict)
     """
     An observed value per cause Variable, for the failure diagnosis.
 
@@ -219,7 +218,7 @@ def as_layers(query: CausalQuery) -> CausalCircuit[LayeredProbabilisticCircuit]:
     )
 
 
-def events_over(variables: List[Variable], number_of_events: int) -> List[Event]:
+def events_over(variables: list[Variable], number_of_events: int) -> list[Event]:
     """
     Events that restrict every variable to a random part of its domain: a sub-interval
     of a continuous one, a random subset of the values of a symbolic one.
@@ -249,8 +248,8 @@ def events_over(variables: List[Variable], number_of_events: int) -> List[Event]
 
 
 def probabilities_of(
-    circuit: ProbabilisticCircuitRepresentation, events: List[Event]
-) -> List[float]:
+    circuit: ProbabilisticCircuitRepresentation, events: list[Event]
+) -> list[float]:
     """
     :param circuit: The circuit to query.
     :param events: The events to query it with.
@@ -286,7 +285,7 @@ def described(violation: SupportDeterminismViolation) -> str:
             return type(violation).__name__
 
 
-def violations_of(causal_circuit: CausalCircuit) -> List[str]:
+def violations_of(causal_circuit: CausalCircuit) -> list[str]:
     """
     :param causal_circuit: A causal circuit whose check is expected to fail.
     :return: Every violation as both circuit types describe it, unlike the node a

@@ -30,6 +30,7 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.exceptions import (
     CompositeNodeWithoutChildrenError,
     NodesMissingContextExtensionsError,
+    TickLimitReachedError,
 )
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart, StatechartNode
@@ -619,6 +620,29 @@ def test_a_reset_action_takes_its_collision_allowances_out(simple_pr2_context) -
     executor.tick()
 
     assert action.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert not _in_force(statechart, action)
+
+
+def test_an_aborted_run_takes_the_collision_allowances_of_a_running_action_out(
+    simple_pr2_context,
+) -> None:
+    """
+    A run that raises while an action runs ends it neither by ending nor by resetting it.
+    """
+    _, robot, extensions = simple_pr2_context
+    end_effector = robot.left_arm.end_effector
+    action = ActionLettingAGripperTouch(
+        steps=[_away("step")], end_effector=end_effector
+    )
+    statechart = _expanded(action, extensions)
+    statechart.add_node(EndStatechart.when_true(action))
+    executor = StatechartExecutor(context=statechart.context)
+    executor.compile(statechart)
+
+    with pytest.raises(TickLimitReachedError):
+        executor.tick_until_end(timeout=2)
+
+    assert action.life_cycle_state == LifeCycleValues.RUNNING
     assert not _in_force(statechart, action)
 
 

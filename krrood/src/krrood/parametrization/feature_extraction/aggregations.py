@@ -6,7 +6,7 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
-from typing_extensions import Callable, Optional, Type, Any, ClassVar, TypeVar
+from typing_extensions import Callable, Any, ClassVar, TypeVar
 
 from krrood.entity_query_language.core.mapped_variable import Attribute, MappedVariable
 from krrood.entity_query_language.core.variable import Variable as SymbolicVariable
@@ -49,7 +49,7 @@ class _AggregationStatisticDescriptor:
     The wrapped statistic method.
     """
 
-    def __set_name__(self, owner: Type[AggregationStatistic], name: str) -> None:
+    def __set_name__(self, owner: type[AggregationStatistic], name: str) -> None:
         if "aggregation_registry" not in owner.__dict__:
             owner.aggregation_registry = defaultdict(list)
         owner.aggregation_registry[self.field_name].append(self.func)
@@ -88,7 +88,7 @@ def aggregation_statistic(
 
 
 @lru_cache(maxsize=None)
-def get_aggregation_class(owner: Type) -> Optional[Type[AggregationStatistic]]:
+def get_aggregation_class(owner: type) -> type[AggregationStatistic] | None:
     """
     Returns the most specific :class:`AggregationStatistic` subclass for ``owner``.
 
@@ -138,7 +138,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         ``Base`` without losing type safety in the concrete subclasses.
     """
 
-    field_name: Optional[str] = None
+    field_name: str | None = None
     """
     The exchangeable-part field this instance is scoped to.
 

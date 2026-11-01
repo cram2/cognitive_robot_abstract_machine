@@ -2,12 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    List,
-    Tuple,
-    TYPE_CHECKING,
-    Any,
-)
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.exceptions import DataclassException
 
@@ -66,8 +61,8 @@ class WrongDimensionsError(SymbolicMathError):
     Represents an error for mismatched dimensions.
     """
 
-    expected_dimensions: Tuple[int, int] | str
-    actual_dimensions: Tuple[int, int]
+    expected_dimensions: tuple[int, int] | str
+    actual_dimensions: tuple[int, int]
 
     def error_message(self) -> str:
         return f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
@@ -82,7 +77,7 @@ class NotScalerError(WrongDimensionsError):
     Exception raised for errors when a non-scalar input is provided.
     """
 
-    expected_dimensions: Tuple[int, int] = field(default=(1, 1), init=False)
+    expected_dimensions: tuple[int, int] = field(default=(1, 1), init=False)
 
 
 @dataclass
@@ -92,8 +87,8 @@ class NotSquareMatrixError(WrongDimensionsError):
     is not.
     """
 
-    expected_dimensions: Tuple[int, int] = field(default="square", init=False)
-    actual_dimensions: Tuple[int, int]
+    expected_dimensions: tuple[int, int] = field(default="square", init=False)
+    actual_dimensions: tuple[int, int]
 
 
 @dataclass
@@ -103,7 +98,7 @@ class NotColumnVectorError(WrongDimensionsError):
     """
 
     expected_dimensions: str = field(default="(n, 1)", init=False)
-    actual_dimensions: Tuple[int, int]
+    actual_dimensions: tuple[int, int]
 
 
 @dataclass
@@ -112,7 +107,7 @@ class HasFreeVariablesError(SymbolicMathError):
     Raised when an operation can't be performed on an expression with free variables.
     """
 
-    variables: List[FloatVariable]
+    variables: list[FloatVariable]
 
     def error_message(self) -> str:
         return f"Operation can't be performed on expression with free variables: {self.variables}."
@@ -191,7 +186,7 @@ class DuplicateVariablesError(SymbolicMathError):
     variables.
     """
 
-    variables: List[FloatVariable]
+    variables: list[FloatVariable]
 
     def error_message(self) -> str:
         return f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."

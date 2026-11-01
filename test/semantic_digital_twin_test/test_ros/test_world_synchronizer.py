@@ -98,7 +98,7 @@ from semantic_digital_twin.adapters.ros.messages import (
 from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
 
-def create_dummy_world(w: Optional[World] = None) -> World:
+def create_dummy_world(w: World | None = None) -> World:
     def deterministic_uuid(seed: str) -> uuid.UUID:
         h = hashlib.sha1(seed.encode()).hexdigest()[:32]
         return uuid.UUID(h)
@@ -152,7 +152,7 @@ def create_dummy_world(w: Optional[World] = None) -> World:
 
 def wait_for_sync_kse_and_return_ids(
     w1: World, w2: World, timeout: float = 5.0, interval: float = 0.05
-) -> Tuple[Set[uuid.UUID], Set[uuid.UUID]]:
+) -> tuple[set[uuid.UUID], set[uuid.UUID]]:
     """
     Waits until the sets of kinematic structure entity IDs in both worlds are identical,
     or until the timeout is reached.
@@ -383,7 +383,7 @@ class PublisherWithAppearingSubscribers:
     appear.
     """
 
-    subscriber_counts: List[int]
+    subscriber_counts: list[int]
     """
     What each look at the topic reports, the last entry from then on.
     """
@@ -400,7 +400,7 @@ class PublisherWithAppearingSubscribers:
 
 
 def connect_with_appearing_subscribers(
-    synchronizer: WorldSynchronizer, subscriber_counts: List[int]
+    synchronizer: WorldSynchronizer, subscriber_counts: list[int]
 ) -> timedelta:
     """
     Let a synchronizer connect against subscribers that appear as given.
@@ -440,9 +440,9 @@ def test_a_synchronizer_waits_until_no_further_subscriber_appears(rclpy_node):
             synchronizer, subscriber_counts=[1, 2]
         )
 
-        assert (
-            spent_connecting >= synchronizer.discovery_settle_time
-        ), "the synchronizer stopped waiting while subscribers were still appearing"
+        assert spent_connecting >= synchronizer.discovery_settle_time, (
+            "the synchronizer stopped waiting while subscribers were still appearing"
+        )
     finally:
         synchronizer.close()
 
@@ -598,7 +598,7 @@ def test_model_synchronization_merge_full_world_stress_test(rclpy_node):
             time.sleep(interval)
 
         raise RuntimeError(
-            f"World synchronization timed out after {i+1} attempts. bodylen: {len(body_hash_1)} vs {len(body_hash_2)}"
+            f"World synchronization timed out after {i + 1} attempts. bodylen: {len(body_hash_1)} vs {len(body_hash_2)}"
         )
 
     w1 = World(name="w1")
@@ -613,7 +613,6 @@ def test_model_synchronization_merge_full_world_stress_test(rclpy_node):
         _world=w2,
     )
     for i in range(10):
-
         pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
 
         w1.merge_world(pr2_world)
@@ -628,12 +627,14 @@ def test_model_synchronization_merge_full_world_stress_test(rclpy_node):
 
     w1_connection_hashes = [hash(c) for c in w1.connections]
     w2_connection_hashes = [hash(c) for c in w2.connections]
-    assert (
-        w1_connection_hashes == w2_connection_hashes
-    ), f"w1: {[c.name for c in w1.connections]}, w2: {[c.name for c in w2.connections]}, If this feels flaky, contact @LucaKro"
+    assert w1_connection_hashes == w2_connection_hashes, (
+        f"w1: {[c.name for c in w1.connections]}, w2: {[c.name for c in w2.connections]}, If this feels flaky, contact @LucaKro"
+    )
     assert [d.id for d in w1.degrees_of_freedom] == [
         d.id for d in w2.degrees_of_freedom
-    ], f"w1: {[d.name for d in w1.degrees_of_freedom]}, w2: {[d.name for d in w2.degrees_of_freedom]}, If this feels flaky, contact @LucaKro"
+    ], (
+        f"w1: {[d.name for d in w1.degrees_of_freedom]}, w2: {[d.name for d in w2.degrees_of_freedom]}, If this feels flaky, contact @LucaKro"
+    )
 
     synchronizer_1.close()
     synchronizer_2.close()
@@ -730,7 +731,6 @@ def test_ChangeDifHasHardwareInterface(rclpy_node):
     )
 
     try:
-
         with w1.modify_world():
             body1 = Body(name=PrefixedName("b1"))
             body2 = Body(name=PrefixedName("b2"))
@@ -872,7 +872,9 @@ def test_semantic_annotation_change_parameter_during_same_modification_block(
     time.sleep(1)
     assert [hash(sa) for sa in w1.semantic_annotations] == [
         hash(sa) for sa in w2.semantic_annotations
-    ], f"w1: {[sa.name for sa in w1.semantic_annotations]}, w2: {[sa.name for sa in w2.semantic_annotations]}"
+    ], (
+        f"w1: {[sa.name for sa in w1.semantic_annotations]}, w2: {[sa.name for sa in w2.semantic_annotations]}"
+    )
 
 
 def test_synchronize_6dof(rclpy_node):
@@ -977,7 +979,9 @@ def test_attribute_updates(rclpy_node):
     time.sleep(1)
     assert [hash(sa) for sa in world1.semantic_annotations] == [
         hash(sa) for sa in world2.semantic_annotations
-    ], f"{[sa.name for sa in world1.semantic_annotations]} vs {[sa.name for sa in world2.semantic_annotations]}"
+    ], (
+        f"{[sa.name for sa in world1.semantic_annotations]} vs {[sa.name for sa in world2.semantic_annotations]}"
+    )
 
     with world1.modify_world():
         fridge.add(door)
@@ -985,14 +989,16 @@ def test_attribute_updates(rclpy_node):
     time.sleep(1)
     assert [hash(sa) for sa in world1.semantic_annotations] == [
         hash(sa) for sa in world2.semantic_annotations
-    ], f"{[sa.name for sa in world1.semantic_annotations]} vs {[sa.name for sa in world2.semantic_annotations]}"
+    ], (
+        f"{[sa.name for sa in world1.semantic_annotations]} vs {[sa.name for sa in world2.semantic_annotations]}"
+    )
 
 
 @dataclass(eq=False)
 class TestAnnotation(SemanticAnnotation):
     value: str = "default"
-    entity: Optional[Body] = None
-    entities: List[Body] = field(default_factory=list, hash=False)
+    entity: Body | None = None
+    entities: list[Body] = field(default_factory=list, hash=False)
 
     @synchronized_attribute_modification
     def update_value(self, new_value: str):
@@ -1801,12 +1807,12 @@ def test_stop_without_close_leaves_ros_resources_alive(rclpy_node):
 
     world_synchronizer.stop()
 
-    assert (
-        world_synchronizer.subscriber is not None
-    ), "subscriber must remain alive after stop() — only close() destroys ROS resources"
-    assert (
-        world_synchronizer.publisher is not None
-    ), "publisher must remain alive after stop() — only close() destroys ROS resources"
+    assert world_synchronizer.subscriber is not None, (
+        "subscriber must remain alive after stop() — only close() destroys ROS resources"
+    )
+    assert world_synchronizer.publisher is not None, (
+        "publisher must remain alive after stop() — only close() destroys ROS resources"
+    )
 
     world_synchronizer.close()
 
@@ -1877,9 +1883,9 @@ def test_apply_missed_messages_interleaved_model_and_state(rclpy_node):
 
     time.sleep(0.2)
 
-    assert (
-        len(world_synchronizer_2.missed_messages) == 3
-    ), "expected at least a model message and a state message to be buffered"
+    assert len(world_synchronizer_2.missed_messages) == 3, (
+        "expected at least a model message and a state message to be buffered"
+    )
     assert len(world_2.kinematic_structure_entities) == 0
 
     world_synchronizer_2.resume()
@@ -2081,9 +2087,9 @@ def test_state_publish_does_not_hold_world_lock(rclpy_node):
     ms.close()
 
     assert state_publish_lock_free, "no state update was published"
-    assert all(
-        state_publish_lock_free
-    ), "State update was published while _world_lock was held."
+    assert all(state_publish_lock_free), (
+        "State update was published while _world_lock was held."
+    )
 
 
 def test_state_change_during_a_modification_is_published_after_its_model_change(
@@ -2099,7 +2105,7 @@ def test_state_change_during_a_modification_is_published_after_its_model_change(
         node=rclpy_node, _world=world, topic_name=f"/publication_order_{uuid4().hex}"
     )
 
-    published_updates: List[WorldUpdate] = []
+    published_updates: list[WorldUpdate] = []
     original_publish = synchronizer.publish
 
     def slowly_publishing_model_updates(update: WorldUpdate):
@@ -2266,9 +2272,9 @@ def test_apply_missed_messages_is_atomic_against_concurrent_modify(rclpy_node):
         w1.add_body(toctou_body)
         w1.add_connection(FixedConnection(parent=w1.root, child=toctou_body))
 
-    assert wait_for_condition(
-        lambda: len(ms2.missed_messages) >= 1, timeout=3.0
-    ), "paused receiver never buffered the model change"
+    assert wait_for_condition(lambda: len(ms2.missed_messages) >= 1, timeout=3.0), (
+        "paused receiver never buffered the model change"
+    )
     ms2.resume()
 
     lock_held_during_apply = {}
@@ -2423,7 +2429,7 @@ class WorldUpdateSender:
         )
 
     def announce_state_change(
-        self, receiver: WorldSynchronizer, positions: Dict[uuid.UUID, float]
+        self, receiver: WorldSynchronizer, positions: dict[uuid.UUID, float]
     ) -> None:
         """
         Hand over the positions of the given degrees of freedom.
@@ -2484,7 +2490,7 @@ class DelayedApplyWorldSynchronizer(WorldSynchronizer):
 
 def create_connected_worlds(
     rclpy_node: Node, name: str
-) -> Tuple[World, World, WorldSynchronizer, WorldSynchronizer]:
+) -> tuple[World, World, WorldSynchronizer, WorldSynchronizer]:
     """
     Build a publishing world and a receiving world that share one prismatic connection.
 
@@ -2572,8 +2578,10 @@ def test_deferring_incoming_updates_keeps_outgoing_publishing_alive(rclpy_node):
 
         publish_position(world_1, 1.25)
         assert wait_for_condition(
-            lambda: world_2.get_connections_by_type(PrismaticConnection)[0].position
-            == pytest.approx(1.25, abs=1e-9)
+            lambda: (
+                world_2.get_connections_by_type(PrismaticConnection)[0].position
+                == pytest.approx(1.25, abs=1e-9)
+            )
         ), "the state change of the deferring synchronizer was not published"
     finally:
         synchronizer_1.close()
@@ -3128,9 +3136,9 @@ def test_a_split_part_and_its_rollback_reach_a_synchronized_world(rclpy_node):
         sender.rollback_modification_blocks()
 
         assert wait_for_condition(lambda: len(receiver.bodies) == 1)
-        assert wait_for_condition(
-            lambda: received_faces("collision") == whole_faces
-        ), "the receiver kept the cut shape after the rollback"
+        assert wait_for_condition(lambda: received_faces("collision") == whole_faces), (
+            "the receiver kept the cut shape after the rollback"
+        )
         assert received_faces("visual") == whole_faces
     finally:
         sender_synchronizer.close()

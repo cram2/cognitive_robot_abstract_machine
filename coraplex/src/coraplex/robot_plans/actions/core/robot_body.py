@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 
-from typing_extensions import Optional, Any, List
+from typing_extensions import Any
 
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -23,6 +23,7 @@ from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpeni
 from coraplex.robot_plans.mixins import (
     HasMaxJointVelocity,
     MovesToolCenterPoint,
+    OperatesGripper,
 )
 from cramph.composites import Sequence
 from cramph.node import StatechartNode
@@ -38,8 +39,10 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from giskardpy.motion_statechart.goals.gripper import MoveGripper
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
-    GripperState,
     StaticJointState,
+)
+from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+    GripperConfiguration,
 )
 
 
@@ -60,23 +63,18 @@ class MoveTorsoAction(SequentialAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SetGripperAction(GoalAction):
+class SetGripperAction(OperatesGripper, GoalAction):
     """
-    Set the gripper state of the robot.
-    """
-
-    gripper: EndEffector
-    """
-    The gripper that should be set.
+    Moves a gripper to the given configuration.
     """
 
-    motion: GripperState
+    configuration: GripperConfiguration
     """
-    The motion that should be set on the gripper.
+    The configuration the gripper is to reach.
     """
 
     def create_goal(self) -> StatechartNode:
-        return self.create_finger_goal(self.gripper, self.motion)
+        return self.gripper_goal_type.moving_gripper_to(self.configuration)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -139,7 +137,7 @@ class ParkArmsAction(ParallelAction, HasMaxJointVelocity):
     Park the arms of the robot.
     """
 
-    arms: List[Arm]
+    arms: list[Arm]
     """
     The arms that should be parked.
     """
@@ -219,7 +217,7 @@ class FollowToolCenterPointPathAction(MovesToolCenterPoint, ParallelAction):
 
     def validate(
         self,
-        result: Optional[Any] = None,
+        result: Any | None = None,
         max_wait_time: timedelta = timedelta(seconds=2),
     ):
         pass

@@ -3,7 +3,6 @@ from __future__ import annotations
 import operator
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional, Tuple
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.expression_structure import walk_chain
@@ -61,13 +60,13 @@ class AttributeGroup:
     or a sub-object chain (``pose.position``) for a nested match's attributes.
     """
 
-    assignments: List[AttributeAssignment]
+    assignments: list[AttributeAssignment]
     """
     The attribute assignments on *object*, in construction order.
     """
 
     @property
-    def concrete(self) -> List[AttributeAssignment]:
+    def concrete(self) -> list[AttributeAssignment]:
         """:return: The assignments with a concrete value (the *"given that …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
@@ -78,7 +77,7 @@ class AttributeGroup:
         return [a for a in self.assignments if not a.is_predicted]
 
     @property
-    def predicted(self) -> List[AttributeAssignment]:
+    def predicted(self) -> list[AttributeAssignment]:
         """:return: The Ellipsis assignments (the *"predict …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
@@ -107,18 +106,18 @@ class MatchPlan:
     The variable the match constructs/selects.
     """
 
-    groups: List[AttributeGroup]
+    groups: list[AttributeGroup]
     """
     Single-hop construction equalities, grouped by their object.
     """
 
-    other_conditions: List[SymbolicExpression]
+    other_conditions: list[SymbolicExpression]
     """
     Construction conditions that don't group (multi-hop chains, type filters); rendered
     as individual *"given that"* points.
     """
 
-    where_conditions: List[SymbolicExpression]
+    where_conditions: list[SymbolicExpression]
     """
     The conditions added via ``.where(...)``.
 
@@ -171,7 +170,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
     @staticmethod
     def _as_assignment(
         condition: SymbolicExpression,
-    ) -> Optional[Tuple[SymbolicExpression, AttributeAssignment]]:
+    ) -> tuple[SymbolicExpression, AttributeAssignment] | None:
         """
         :param condition: A construction-pattern condition.
         :return: ``(object, assignment)`` when *condition* is an attribute equality

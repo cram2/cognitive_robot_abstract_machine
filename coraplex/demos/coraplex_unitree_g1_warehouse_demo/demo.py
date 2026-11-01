@@ -106,7 +106,7 @@ def build_world() -> World:
             BodySpecification.box(
                 "parcel",
                 PARCEL_SCALE,
-                color=Color(0.85, 0.45, 0.1),
+                color=Color.from_rgba(red=0.85, green=0.45, blue=0.1),
                 parent_T_self=PICK_POSE.homogeneous_matrix,
             )
         ],

@@ -7,7 +7,6 @@ from pathlib import Path
 import imageio.v2 as imageio
 import mujoco
 import numpy as np
-from typing_extensions import List, Optional
 
 from semantic_digital_twin.adapters.multi_sim import (
     MujocoCamera,
@@ -47,7 +46,7 @@ class RecordedVideo:
     The raw result of a :class:`MujocoVideoRecorder` session, before encoding.
     """
 
-    frames: List[np.ndarray]
+    frames: list[np.ndarray]
     """The captured RGB frames, in playback order."""
 
     frames_per_second: int
@@ -56,7 +55,7 @@ class RecordedVideo:
     """
 
     @property
-    def frame_timestamps(self) -> List[float]:
+    def frame_timestamps(self) -> list[float]:
         """
         Each frame's position, in seconds, on the *encoded video's own timeline*
         (``index / frames_per_second``) - not a real-world or simulated-world clock. Whatever
@@ -145,7 +144,7 @@ class MujocoVideoRecorder:
     The pixel resolution of the captured frames.
     """
 
-    camera: Optional[MujocoCamera] = None
+    camera: MujocoCamera | None = None
     """
     An existing camera, already attached to :attr:`world`, to record from.
 
@@ -153,12 +152,12 @@ class MujocoVideoRecorder:
     automatically on construction, and this field is replaced with it.
     """
 
-    _multi_sim: Optional[MujocoSim] = field(init=False, default=None, repr=False)
+    _multi_sim: MujocoSim | None = field(init=False, default=None, repr=False)
     """
     The live MuJoCo mirror of :attr:`world`, present only while recording.
     """
 
-    _frame_capture_callback: Optional[_FrameCaptureCallback] = field(
+    _frame_capture_callback: _FrameCaptureCallback | None = field(
         init=False, default=None, repr=False
     )
     """
@@ -170,12 +169,12 @@ class MujocoVideoRecorder:
     Number of world state changes observed since :meth:`start`.
     """
 
-    _frames: List[np.ndarray] = field(init=False, default_factory=list, repr=False)
+    _frames: list[np.ndarray] = field(init=False, default_factory=list, repr=False)
     """
     Frames captured since the last :meth:`start`.
     """
 
-    _auto_attached_camera: Optional[MujocoCamera] = field(
+    _auto_attached_camera: MujocoCamera | None = field(
         init=False, default=None, repr=False
     )
     """
