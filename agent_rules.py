@@ -79,6 +79,24 @@ class KrroodIsolationRules(Section):
     )
 
 
+# %% krrood optional modules
+
+
+class KrroodOptionalModulesRules(Section):
+    """
+    The rules on the libraries `krrood` installs only with one of its extras.
+    """
+
+    IMPORT_OPTIONAL_MODULES_WHERE_USED = (
+        "`krrood` imports a library that only one of its extras installs inside the "
+        "method that needs it, right after that library's "
+        "`krrood.optional_modules.OptionalModule` member's `ensure_installed()`, "
+        "which raises `OptionalModuleNotInstalled` naming the extra. This is the "
+        "one exception to importing at the top of the module; a type-only import "
+        "of such a library goes under `TYPE_CHECKING`"
+    )
+
+
 # %% domain specific conventions
 
 

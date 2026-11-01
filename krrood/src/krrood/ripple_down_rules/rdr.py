@@ -13,18 +13,18 @@ from types import NoneType, ModuleType
 from krrood.ripple_down_rules import logger
 from krrood.ripple_down_rules.exceptions import RDRLoadError
 
-try:
-    from matplotlib import pyplot as plt
-
-    Figure = plt.Figure
-except ImportError as e:
-    logger.debug(f"{e}: matplotlib is not installed")
-    matplotlib = None
-    Figure = None
-    plt = None
-
 from sqlalchemy.orm import DeclarativeBase as SQLTable
-from typing_extensions import List, Optional, Dict, Union, Any, Self, Callable, Set
+from typing_extensions import (
+    TYPE_CHECKING,
+    List,
+    Optional,
+    Dict,
+    Union,
+    Any,
+    Self,
+    Callable,
+    Set,
+)
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
@@ -71,11 +71,15 @@ from krrood.ripple_down_rules.utils import (
     copy_case,
 )
 from krrood.code_generation.imports import get_imports_from_types
+from krrood.optional_modules import OptionalModule
 from krrood.code_generation.source_extraction_utils import extract_function_source
 from krrood.utils import (
     get_import_path_from_path,
     get_scope_from_imports,
 )
+
+if TYPE_CHECKING:
+    from matplotlib.figure import Figure
 
 
 class RippleDownRules(ABC):
@@ -346,13 +350,14 @@ class RippleDownRules(ABC):
         :param n_iter: The number of iterations to fit the classifier for.
         :param animate_tree: Whether to draw the tree while fitting the classifier.
         :param kwargs_for_fit_case: The keyword arguments to pass to the fit_case method.
+        :raises OptionalModuleNotInstalled: If the tree is animated and matplotlib is not
+            installed.
         """
         targets = []
         if animate_tree:
-            if plt is None:
-                raise ImportError(
-                    "matplotlib is not installed, cannot animate the tree."
-                )
+            OptionalModule.MATPLOTLIB.ensure_installed()
+            from matplotlib import pyplot as plt
+
             plt.ion()
         i = 0
         stop_iterating = False
@@ -576,7 +581,12 @@ class RippleDownRules(ABC):
     def update_figures(self):
         """
         Update the figures of the classifier.
+
+        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
         """
+        OptionalModule.MATPLOTLIB.ensure_installed()
+        from matplotlib import pyplot as plt
+
         if isinstance(self, GeneralRDR):
             for i, (rdr_name, rdr) in enumerate(self.start_rules_dict.items()):
                 if not rdr.fig:
@@ -929,7 +939,6 @@ class MultiClassTreeBuilder(TreeBuilder):
 
 
 class RDRWithCodeWriter(RippleDownRules, ABC):
-
     @classmethod
     def read_rule_tree_from_python(
         cls, model_path: str, python_file_path: str | None = None

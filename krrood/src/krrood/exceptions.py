@@ -4,7 +4,10 @@ import ast
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import Any, Protocol
+from typing_extensions import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from krrood.optional_modules import OptionalModule
 
 
 @dataclass
@@ -334,3 +337,21 @@ class SourceDataNotProvided(InputError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class OptionalModuleNotInstalled(DataclassException, ModuleNotFoundError):
+    """
+    Raised when a feature needs an optional module that is not installed.
+    """
+
+    module: OptionalModule
+    """
+    The optional module the feature needs.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.module} is not installed, but this feature needs it."
+
+    def suggest_correction(self) -> str:
+        return f"Install it with: pip install krrood[{self.module.extra}]"

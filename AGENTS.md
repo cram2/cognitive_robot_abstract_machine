@@ -186,6 +186,10 @@
 - When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
 - Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
 
+# Krrood optional modules
+<!-- from KrroodOptionalModulesRules in agent_rules.py -->
+- `krrood` imports a library that only one of its extras installs inside the method that needs it, right after that library's `krrood.optional_modules.OptionalModule` member's `ensure_installed()`, which raises `OptionalModuleNotInstalled` naming the extra. This is the one exception to importing at the top of the module; a type-only import of such a library goes under `TYPE_CHECKING`
+
 # Pull request labels
 <!-- from PullRequestLabelsRules in agent_rules.py -->
 - Label every pull request you open with its kinds of change. Where you cannot set a label, because the repository lacks it or the pull request is opened through a link, name the labels to the user instead
