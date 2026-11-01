@@ -33,8 +33,6 @@ dependencies = [
     "opencv-python>=4.11.0.86",
     "matplotlib>=3.0",
     "setuptools",
-    "pooch",
-    "filelock",
     "krrood",
     "semantic_digital_twin",
     "krrood_spatial_math[casadi]",
