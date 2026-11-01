@@ -3,8 +3,16 @@ from enum import StrEnum
 import numpy as np
 import pytest
 
-from coraplex.robot_plans.actions.core.container import CloseAction, OpenAction
+from coraplex.robot_plans.actions.core.container import (
+    CloseAction,
+    CloseHeldContainerAction,
+    OpenAction,
+    OpenHeldContainerAction,
+)
 from cramph.node import StatechartNode
+from giskardpy.motion_statechart.goals.grasped_mechanism import (
+    ArticulateGraspedMechanism,
+)
 from giskardpy.motion_statechart.goals.gripper import MoveGripper
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import GripperState
@@ -15,6 +23,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
     RotationMatrix,
     Vector3,
 )
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from .conftest import left_or_only_arm
 from ..plan_running import simulated_executor, statechart_of
 
@@ -157,3 +166,51 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
     assert back_off.to_np()[2, 3] - tool_goal.to_np()[2, 3] == pytest.approx(
         drawer_top - grasp_height + action.release_clearance, abs=1e-3
     )
+
+
+# %% moving a container whose handle is held
+
+
+def test_opening_a_held_handle_drives_the_mechanism_to_its_upper_limit(pr2_at_drawer):
+    """
+    An open whose gripper already holds the handle only moves the container, with the
+    gripper that holds it, as far as its mechanism goes, and keeps holding the handle.
+    """
+    world, robot, extensions, handle = pr2_at_drawer
+    arm = left_or_only_arm(robot)
+    action = OpenHeldContainerAction(arm=arm, handle=handle)
+    statechart_of(simulated_executor(extensions), action)
+
+    [opening] = [
+        node
+        for node in goals_of(action)
+        if isinstance(node, ArticulateGraspedMechanism)
+    ]
+    mechanism = handle.root.get_first_parent_connection_of_type(ActiveConnection1DOF)
+    assert opening.tip_link is arm.end_effector.tool_frame
+    assert opening.environment_link is handle.root
+    assert opening.goal_joint_state == mechanism.dof.limits.upper.position
+    assert not [node for node in goals_of(action) if isinstance(node, MoveGripper)]
+
+
+def test_closing_a_held_handle_drives_the_mechanism_to_the_closed_position(
+    pr2_at_drawer,
+):
+    """
+    A close whose gripper already holds the handle drives the mechanism to the position
+    it is given, and keeps holding the handle.
+    """
+    world, robot, extensions, handle = pr2_at_drawer
+    arm = left_or_only_arm(robot)
+    action = CloseHeldContainerAction(arm=arm, handle=handle, closed_joint_position=0.02)
+    statechart_of(simulated_executor(extensions), action)
+
+    [closing] = [
+        node
+        for node in goals_of(action)
+        if isinstance(node, ArticulateGraspedMechanism)
+    ]
+    assert closing.tip_link is arm.end_effector.tool_frame
+    assert closing.environment_link is handle.root
+    assert closing.goal_joint_state == 0.02
+    assert not [node for node in goals_of(action) if isinstance(node, MoveGripper)]

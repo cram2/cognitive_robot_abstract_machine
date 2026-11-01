@@ -17,7 +17,9 @@ from coraplex.robot_plans.actions.base import (
 )
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.pick_up import (
+    FixateObjectAction,
     GraspingAction,
+    GripperContactAction,
     PickUpAction,
     ReachAction,
 )
@@ -722,6 +724,46 @@ def test_opening_lets_the_gripper_on_the_handle_touch(pr2_apartment_context) -> 
     [rule] = action.temporary_collision_rules
     assert rule.end_effector is robot.right_arm.end_effector
     assert nodes_of_type(action, UpdateTemporaryCollisionRules) == []
+
+
+def test_a_gripper_contact_lets_its_gripper_touch_while_its_steps_run(
+    simple_pr2_context,
+) -> None:
+    _, robot, extensions = simple_pr2_context
+    end_effector = robot.left_arm.end_effector
+    step = _away("step")
+    action = GripperContactAction(end_effector=end_effector, steps=[step])
+    statechart = _expanded(action, extensions)
+    statechart.add_node(EndStatechart.when_true(action))
+    executor = StatechartExecutor(context=statechart.context)
+    executor.compile(statechart)
+    for _ in range(3):
+        executor.tick()
+
+    assert action.nodes == [step]
+    [rule] = action.temporary_collision_rules
+    assert rule.end_effector is end_effector
+    assert _in_force(statechart, action)
+
+
+def test_fixating_an_object_keeps_the_gripper_where_it_is(simple_pr2_context) -> None:
+    """
+    The gripper is held at the pose its tool frame has when the action starts, so
+    whatever it holds stays where it is.
+    """
+    world, robot, extensions = simple_pr2_context
+    tool_frame = robot.left_arm.end_effector.tool_frame
+    action = FixateObjectAction(arm=robot.left_arm)
+
+    _expanded(action, extensions)
+
+    [holding] = action.nodes
+    assert type(holding) is CartesianPose
+    assert holding.root_link is world.root
+    assert holding.tip_link is tool_frame
+    assert holding.goal_pose.reference_frame is tool_frame
+    [rule] = action.temporary_collision_rules
+    assert rule.end_effector is robot.left_arm.end_effector
 
 
 def test_an_action_lets_nothing_touch_unless_it_says_so(simple_pr2_context) -> None:

@@ -39,7 +39,12 @@ from coraplex.robot_plans.actions.composite.transporting import (
     PickAndPlaceAction,
     TransportAction,
 )
-from coraplex.robot_plans.actions.core.container import CloseAction, OpenAction
+from coraplex.robot_plans.actions.core.container import (
+    CloseAction,
+    CloseHeldContainerAction,
+    OpenAction,
+    OpenHeldContainerAction,
+)
 from coraplex.robot_plans.actions.core.misc import DetectAction, MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
     ElevatorNavigation,
@@ -49,7 +54,9 @@ from coraplex.robot_plans.actions.core.navigation import (
     PathPlanningNavigateAction,
 )
 from coraplex.robot_plans.actions.core.pick_up import (
+    FixateObjectAction,
     GraspingAction,
+    GripperContactAction,
     PickUpAction,
     ReachAction,
 )
@@ -379,6 +386,30 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             CloseAction,
             lambda world: [
                 CloseAction(grasp=_handle(world).grasp_candidates()[0], arm=_arm(world))
+            ],
+        ),
+        ActionRoundTripCase(
+            OpenHeldContainerAction,
+            lambda world: [
+                OpenHeldContainerAction(arm=_arm(world), handle=_handle(world))
+            ],
+        ),
+        ActionRoundTripCase(
+            CloseHeldContainerAction,
+            lambda world: [
+                CloseHeldContainerAction(arm=_arm(world), handle=_handle(world))
+            ],
+        ),
+        ActionRoundTripCase(
+            FixateObjectAction, lambda world: [FixateObjectAction(arm=_arm(world))]
+        ),
+        ActionRoundTripCase(
+            GripperContactAction,
+            lambda world: [
+                GripperContactAction(
+                    end_effector=_arm(world).end_effector,
+                    steps=[_navigate(world)],
+                )
             ],
         ),
         ActionRoundTripCase(
