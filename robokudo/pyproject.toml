@@ -37,6 +37,7 @@ dependencies = [
     "filelock",
     "krrood",
     "semantic_digital_twin",
+    "krrood_spatial_math[casadi]",
     "transformers",
     "faiss-cpu",
     "ultralytics"
@@ -56,6 +57,7 @@ version = {attr = "robokudo._version.__version__"}
 [dependency-groups]
 workspace = [
     "krrood",
+    "krrood_spatial_math",
     "semantic_digital_twin",
 ]
 
