@@ -456,7 +456,8 @@ def get_scope_from_imports(
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
 
-    An absolute import whose top-level package is not installed contributes no names.
+    An absolute import in an ``if TYPE_CHECKING:`` block whose top-level package is not
+    installed contributes no names.
 
     :param file_path: The path to the Python file to extract imports from.
     :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
@@ -480,16 +481,23 @@ def get_scope_from_imports(
     )
 
     scope: dict[str, Any] = {}
+    imports_that_never_run = set(type_checking_imports(parsed_tree))
 
     for node in module_level_imports(parsed_tree):
         if isinstance(node, ast.Import):
-            _handle_import_node(node, scope, package_name)
+            _handle_import_node(
+                node=node,
+                scope=scope,
+                package_name=package_name,
+                skips_uninstalled_package=node in imports_that_never_run,
+            )
         elif isinstance(node, ast.ImportFrom):
             package_name = _handle_import_from_node(
                 node=node,
                 scope=scope,
                 file_path=file_path,
                 package_name=package_name,
+                skips_uninstalled_package=node in imports_that_never_run,
             )
 
     return scope
@@ -513,6 +521,28 @@ def module_level_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]
             child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
         ):
             yield from module_level_imports(child)
+
+
+def type_checking_imports(node: ast.AST) -> Iterator[ast.Import | ast.ImportFrom]:
+    """
+    Yield the module-level import statements that only run while type checking.
+
+    :param node: The node whose statements are searched.
+    :return: The module-level import statements inside ``if TYPE_CHECKING:`` blocks,
+        whether the condition names ``TYPE_CHECKING`` directly or as a module attribute.
+    """
+    for child in ast.iter_child_nodes(node):
+        if (
+            isinstance(child, ast.If)
+            and ast.unparse(child.test).rpartition(".")[2] == "TYPE_CHECKING"
+        ):
+            yield from module_level_imports(
+                ast.Module(body=child.body, type_ignores=[])
+            )
+        elif not isinstance(
+            child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+        ):
+            yield from type_checking_imports(child)
 
 
 def get_and_import_module(
@@ -611,7 +641,10 @@ def _resolve_relative_import(
 
 
 def _handle_import_node(
-    node: ast.Import, scope: dict[str, Any], package_name: str | None
+    node: ast.Import,
+    scope: dict[str, Any],
+    package_name: str | None,
+    skips_uninstalled_package: bool,
 ) -> None:
     """
     Process a standard import node and update the provided scope mapping.
@@ -619,9 +652,11 @@ def _handle_import_node(
     :param node: The import node to process.
     :param scope: The scope mapping to update.
     :param package_name: The package name to use for relative imports.
+    :param skips_uninstalled_package: Whether a module whose top-level package is not
+        installed contributes no name instead of raising.
     """
     for alias in node.names:
-        if not is_top_level_package_installed(alias.name):
+        if skips_uninstalled_package and not is_top_level_package_installed(alias.name):
             continue
         asname = alias.asname or alias.name
         scope[asname] = get_and_import_module(alias.name, package_name)
@@ -671,13 +706,13 @@ def _handle_import_from_node(
     scope: dict[str, Any],
     file_path: str | None,
     package_name: str | None,
+    skips_uninstalled_package: bool,
 ) -> str | None:
     """
     Process a from-import node and update the provided scope mapping.
 
-    A statement whose top-level package is not installed contributes no names. A
-    statement whose module cannot be imported, because it is missing or only partially
-    initialized in a circular import, is skipped likewise, just as a
+    A statement whose module cannot be imported, because it is missing or only partially
+    initialized in a circular import, contributes no names and is skipped, just as a
     name missing from an imported module is: the scope is built for
     best-effort name resolution, so one statement that cannot be bound must not cost
     the caller every other name in the file.
@@ -692,11 +727,14 @@ def _handle_import_from_node(
     :param scope: The scope mapping to update.
     :param file_path: The path to the file containing the import statement.
     :param package_name: The package name to use for relative imports.
+    :param skips_uninstalled_package: Whether an absolute import whose top-level package
+        is not installed is skipped before any import is attempted.
     :return: the (possibly) updated package_name to mimic original behavior.
     """
     module_name = node.module
     if (
-        node.level == 0
+        skips_uninstalled_package
+        and node.level == 0
         and module_name is not None
         and not is_top_level_package_installed(module_name)
     ):
