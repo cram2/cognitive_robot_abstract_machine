@@ -41,7 +41,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Neck,
     Torso,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     RotationMatrix,

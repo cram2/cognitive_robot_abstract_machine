@@ -25,7 +25,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.io.storage import Storage, StorageDocumentField
 import robokudo.utils.tree_execution
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline

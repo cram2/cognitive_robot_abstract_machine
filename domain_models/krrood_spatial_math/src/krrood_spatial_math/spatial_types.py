@@ -19,6 +19,7 @@ from krrood.symbolic_math.symbolic_math import Matrix, to_sx
 from krrood_spatial_math.cartesian_frame_3d import (
     CartesianFrame3D,
     CartesianFrame3DReference,
+    ValueInCartesianFrame3D,
 )
 from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
@@ -63,7 +64,7 @@ class SpatialFrameKey(StrEnum):
 
 
 @dataclass(eq=False, repr=False)
-class SpatialType(ABC):
+class SpatialType(ValueInCartesianFrame3D, ABC):
     """
     Provides functionality to associate a reference frame with an object.
 
@@ -1512,7 +1513,7 @@ class OrthogonalProjection:
                     actual_frame=point.reference_frame,
                     context="the projected Point3",
                 )
-            point = self.plane_frame.express(point)
+            point = self.plane_frame.express_in_own_frame(point)
         return Point2(point.x, point.y, reference_frame=self.plane_frame)
 
     def unproject(self, point: Point2, height: sm.ScalarData = 0) -> Point3:
@@ -2375,7 +2376,6 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
-
     def __init__(
         self,
         position: Point3 | None = None,
@@ -2746,7 +2746,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         frame = plane_frame if plane_frame is not None else pose.reference_frame
         if frame is not pose.reference_frame:
-            pose = frame.express(pose)
+            pose = frame.express_in_own_frame(pose)
         _, _, yaw = pose.rotation_matrix.rpy
         return cls.from_xy_yaw(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
 

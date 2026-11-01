@@ -8,7 +8,7 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 
 # %% driving with held objects upright
 

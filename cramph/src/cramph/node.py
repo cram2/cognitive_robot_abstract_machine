@@ -2096,10 +2096,10 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
     def _has_untracked(self, key: str) -> bool:
         return self._find_node_of_statechart(key) is not None
 
-    def _get_untracked(self, key: str) -> StatechartNode:
+    def _get_untracked(self, key: str, name: Any = None) -> StatechartNode:
         node = self._find_node_of_statechart(key)
         if node is None:
-            raise UntrackedObjectError(key=key)
+            raise UntrackedObjectError(key=key, name=name)
         return node
 
     def _find_node_of_statechart(self, node_id: str) -> StatechartNode | None:

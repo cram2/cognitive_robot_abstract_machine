@@ -80,8 +80,9 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 
     def suggest_correction(self) -> str:
         return (
-            "transform it into the expected frame first, e.g. via "
-            "world.transform(value, target_frame), or construct it with the expected frame."
+            "express it in the expected frame first, with "
+            "expected_frame.express_in_own_frame(value), or construct it with the "
+            "expected frame."
         )
 
 
@@ -109,6 +110,6 @@ class MissingCartesianFrame3DResolver(SpatialTypesError):
 
     def suggest_correction(self) -> str:
         return (
-            "pass the keyword arguments of a CartesianFrame3DResolver that knows the "
-            "frame, e.g. **resolver.create_kwargs(), to from_json."
+            "pass a CartesianFrame3DResolver that knows the frame among the keyword "
+            "arguments of from_json."
         )

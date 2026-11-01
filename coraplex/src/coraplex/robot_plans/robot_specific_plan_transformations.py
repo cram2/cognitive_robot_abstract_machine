@@ -37,7 +37,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
+from krrood_spatial_math.spatial_types import Pose, Vector3
 from semantic_digital_twin.world_description.connections import DifferentialDrive
 
 # %% keeping the torso upright while using a tool

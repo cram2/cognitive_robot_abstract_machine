@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from krrood_spatial_math.cartesian_frame_3d import ValueT
+from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3DT
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
@@ -29,7 +29,9 @@ class MountedFrame(NamedFrame):
             self.mount_T_self.reference_frame, self
         )
 
-    def express(self, value: ValueT) -> ValueT:
+    def express_in_own_frame(
+        self, value: ValueInCartesianFrame3DT
+    ) -> ValueInCartesianFrame3DT:
         if value.reference_frame is self:
             return value
         if value.reference_frame is not self.mount_T_self.reference_frame:

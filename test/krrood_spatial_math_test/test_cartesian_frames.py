@@ -26,7 +26,9 @@ def test_a_three_dimensional_cartesian_frame_is_identified_and_named(trait):
 
 
 def test_a_three_dimensional_cartesian_frame_declares_expressing_values_in_it():
-    assert CartesianFrame3D.__abstractmethods__ == {CartesianFrame3D.express.__name__}
+    assert CartesianFrame3D.__abstractmethods__ == {
+        CartesianFrame3D.express_in_own_frame.__name__
+    }
 
 
 # %% referring to a frame in a serialized value

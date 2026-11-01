@@ -21,16 +21,13 @@ from semantic_digital_twin.pipeline.pipeline import (
     CenterLocalGeometryAndPreserveWorldPose,
     BodyFactoryReplace,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 
 class PipelineTestCase(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -129,11 +126,12 @@ class PipelineTestCase(unittest.TestCase):
         procthor_replace_pipeline = Pipeline(
             [
                 BodyFactoryReplace(
-                    body_condition=lambda b: bool(
-                        dresser_pattern.fullmatch(b.name.name)
-                    )
-                    and not (
-                        "drawer" in b.name.name.lower() or "door" in b.name.name.lower()
+                    body_condition=lambda b: (
+                        bool(dresser_pattern.fullmatch(b.name.name))
+                        and not (
+                            "drawer" in b.name.name.lower()
+                            or "door" in b.name.name.lower()
+                        )
                     ),
                     annotation_creator=dresser_from_body_in_world,
                 )

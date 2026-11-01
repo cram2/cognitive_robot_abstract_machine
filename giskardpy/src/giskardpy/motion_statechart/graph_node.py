@@ -20,7 +20,7 @@ from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     Scalar,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
     Quaternion,

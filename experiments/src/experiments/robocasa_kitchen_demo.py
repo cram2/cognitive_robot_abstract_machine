@@ -55,9 +55,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
     CounterTop,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from coraplex.plans.context_extensions import RobotAccess

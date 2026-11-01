@@ -10,7 +10,7 @@ import pytest
 
 from semantic_digital_twin.robots.robot_parts import RobotCamera
 from semantic_digital_twin.robots.tiago import TiagoMujocoBody, TiagoMujocoCamera
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     Body,

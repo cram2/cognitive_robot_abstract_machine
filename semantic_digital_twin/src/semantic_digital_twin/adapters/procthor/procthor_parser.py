@@ -34,7 +34,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bathroom,
     LivingRoom,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
@@ -563,7 +563,6 @@ class ProcthorObject:
             return None
 
         with body_world.modify_world():
-
             for child in self.object_dict.get("children", {}):
                 child_object = ProcthorObject(child, self.session)
                 world_T_child = child_object.world_T_obj
@@ -770,9 +769,9 @@ class ProcTHORParser:
                 found_walls.append(wall)
                 used_wall_ids.add(wall_id)
 
-            assert (
-                len(found_walls) == 2
-            ), f"Door {door['id']} should have two walls, but found {len(found_walls)}."
+            assert len(found_walls) == 2, (
+                f"Door {door['id']} should have two walls, but found {len(found_walls)}."
+            )
 
             procthor_walls.append(
                 ProcthorWall(door_dicts=[door], wall_dicts=found_walls)

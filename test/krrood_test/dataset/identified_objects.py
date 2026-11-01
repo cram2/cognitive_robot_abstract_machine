@@ -14,7 +14,7 @@ from krrood.patterns.identifier_and_name import HasID, HasName
 
 
 @dataclass
-class Landmark(HasID, HasName):
+class Landmark(HasID, HasName[str]):
     """
     A named object that documents refer to instead of containing it.
     """

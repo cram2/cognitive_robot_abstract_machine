@@ -12,11 +12,7 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood_spatial_math.exceptions import (
-    InsufficientVectorsError,
-    ReferenceFrameMismatchError,
-    SpatialTypesError,
-)
+from krrood_spatial_math.exceptions import SpatialTypesError
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -44,10 +40,7 @@ if TYPE_CHECKING:
         WorldEntityWithID,
         KinematicStructureEntity,
     )
-    from semantic_digital_twin.spatial_types.spatial_types import (
-        SpatialType,
-    )
-    from semantic_digital_twin.spatial_types import Vector3, Point
+    from krrood_spatial_math.spatial_types import SpatialType, Vector3, Point
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
         DegreeOfFreedom,

@@ -4,8 +4,11 @@ import json
 
 import pytest
 
+from uuid import uuid4
+
+from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import to_json
-from krrood.patterns.identifier_and_name import HasID, HasName
+from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
 from krrood.patterns.mixin import Mixin
 
@@ -31,6 +34,10 @@ def test_an_identifier_and_a_name_are_interfaces(trait):
 
 def test_an_identifier_does_not_require_a_name():
     assert not issubclass(HasID, HasName)
+
+
+def test_a_named_object_binds_the_kind_of_its_name():
+    assert Landmark.get_type_of_generic_parameter(NameT) is str
 
 
 # %% writing and resolving references
@@ -73,3 +80,10 @@ def test_a_written_reference_resolves_to_the_object_it_names(lighthouse):
     )
 
     assert resolved is lighthouse
+
+
+def test_an_object_missing_from_the_document_is_reported_with_its_name():
+    with pytest.raises(UntrackedObjectError) as raised:
+        LandmarkTracker().get(uuid4(), name="lighthouse")
+
+    assert raised.value.name == "lighthouse"

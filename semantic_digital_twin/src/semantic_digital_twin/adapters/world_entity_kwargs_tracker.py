@@ -68,15 +68,6 @@ class WorldEntityWithIDKwargsTracker(
         tracker._world = world
         return tracker
 
-    def get(self, key: UUID, name: PrefixedName | None = None) -> WorldEntityWithID:
-        """
-        :param name: The name the reference to the entity went by, which says which
-            entity was meant when it cannot be found.
-        """
-        if key in self.tracked_objects:
-            return self.tracked_objects[key]
-        return self._get_untracked(key, name)
-
     def _has_untracked(self, key: UUID) -> bool:
         if self._world is None:
             return False
@@ -86,8 +77,6 @@ class WorldEntityWithIDKwargsTracker(
         self, key: UUID, name: PrefixedName | None = None
     ) -> WorldEntityWithID:
         """
-        :param name: The name the reference to the entity went by, which says which
-            entity was meant when it cannot be found.
         :raises MissingWorldError: If the tracker has no world to look the entity up in.
         :raises WorldEntityWithIDNotInKwargs: If the world holds no entity with the id.
         """

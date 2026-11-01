@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
 from krrood_spatial_math.exceptions import (
     MissingCartesianFrame3DResolver,
     ReferenceFrameMismatchError,
@@ -33,6 +34,14 @@ def shelf_frame(table_frame) -> MountedFrame:
             x=1, z=2, reference_frame=table_frame
         ),
     )
+
+
+# %% values given in a frame
+
+
+@pytest.mark.parametrize("spatial_type", [Point3, Pose, RotationMatrix])
+def test_a_spatial_type_is_a_value_given_in_a_cartesian_frame(spatial_type):
+    assert issubclass(spatial_type, ValueInCartesianFrame3D)
 
 
 # %% combining values expressed in frames

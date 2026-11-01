@@ -10,9 +10,7 @@ from fbxloader import Object3D, Mesh as FBXMesh, Scene
 
 from semantic_digital_twin.adapters.mesh import MeshParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -136,9 +134,9 @@ class FBXParser(MeshParser):
         Transform vertices from FBX coordinate system to Semantic Digital Twin
         coordinate system.
         """
-        assert (
-            fbx_vertices.ndim == 2 and fbx_vertices.shape[1] == 3
-        ), "vertices must be (N,3)"
+        assert fbx_vertices.ndim == 2 and fbx_vertices.shape[1] == 3, (
+            "vertices must be (N,3)"
+        )
         assert semantic_digital_twin_T_fbx.shape == (
             4,
             4,
