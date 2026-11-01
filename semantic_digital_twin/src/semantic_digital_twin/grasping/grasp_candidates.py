@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing_extensions import TYPE_CHECKING
 
-from semantic_digital_twin.exceptions import (
+from semantic_digital_twin.exceptions import ObjectHasNoWidthWithoutCollision
+from krrood_spatial_math.exceptions import (
     MissingReferenceFrameError,
-    ObjectHasNoWidthWithoutCollision,
+    ReferenceFrameMismatchError,
 )
-from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import Pose
 
 if TYPE_CHECKING:

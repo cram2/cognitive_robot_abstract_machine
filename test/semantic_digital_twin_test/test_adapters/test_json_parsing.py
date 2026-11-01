@@ -25,7 +25,7 @@ from krrood_spatial_math.spatial_types import (
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,

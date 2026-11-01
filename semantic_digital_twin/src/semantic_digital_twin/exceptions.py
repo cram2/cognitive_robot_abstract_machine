@@ -12,7 +12,6 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood_spatial_math.exceptions import SpatialTypesError
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -40,7 +39,7 @@ if TYPE_CHECKING:
         WorldEntityWithID,
         KinematicStructureEntity,
     )
-    from krrood_spatial_math.spatial_types import SpatialType, Vector3, Point
+    from krrood_spatial_math.spatial_types import Vector3, Point
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
         DegreeOfFreedom,
@@ -1554,25 +1553,6 @@ class DuplicateRobotAssignmentsError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
-
-
-@dataclass
-class MissingReferenceFrameError(SpatialTypesError):
-    """
-    Represents an error that occurs when a spatial type lacks a reference frame, even
-    though its required for the current operation.
-    """
-
-    spatial_type: SpatialType
-    """
-    Spatial type that lacks a reference frame.
-    """
-
-    def error_message(self) -> str:
-        return f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one."
-
-    def suggest_correction(self) -> str:
-        return "construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
 
 
 @dataclass

@@ -96,7 +96,7 @@ from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (

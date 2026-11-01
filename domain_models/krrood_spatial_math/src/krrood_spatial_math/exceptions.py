@@ -8,7 +8,7 @@ from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
     from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
-    from krrood_spatial_math.spatial_types import Vector3
+    from krrood_spatial_math.spatial_types import SpatialType, Vector3
 
 # %% spatial types
 
@@ -84,6 +84,25 @@ class ReferenceFrameMismatchError(SpatialTypesError):
             "expected_frame.express_in_own_frame(value), or construct it with the "
             "expected frame."
         )
+
+
+@dataclass
+class MissingReferenceFrameError(SpatialTypesError):
+    """
+    Represents an error that occurs when a spatial type lacks a reference frame, even
+    though it is required for the current operation.
+    """
+
+    spatial_type: SpatialType
+    """
+    Spatial type that lacks a reference frame.
+    """
+
+    def error_message(self) -> str:
+        return f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one."
+
+    def suggest_correction(self) -> str:
+        return "construct it with an explicit reference frame."
 
 
 # %% serialized Cartesian frames

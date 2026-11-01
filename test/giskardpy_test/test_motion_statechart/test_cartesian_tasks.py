@@ -48,7 +48,7 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (

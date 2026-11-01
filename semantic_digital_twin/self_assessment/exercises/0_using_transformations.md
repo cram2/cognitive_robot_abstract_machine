@@ -176,5 +176,5 @@ rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ## Final Notes
 
-This is just a very basic introduction to transformations. To learn more about transformations, please refer to the [Wikipedia Article about transformations](https://en.wikipedia.org/wiki/Transformation_matrix), as well as our [TransformationMatrix API](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#krrood_spatial_math.spatial_types.TransformationMatrix) for further details.
+This is just a very basic introduction to transformations. To learn more about transformations, please refer to the [Wikipedia Article about transformations](https://en.wikipedia.org/wiki/Transformation_matrix), as well as our [TransformationMatrix API](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/domain_models/krrood_spatial_math/src/krrood_spatial_math/spatial_types.py) for further details.
 

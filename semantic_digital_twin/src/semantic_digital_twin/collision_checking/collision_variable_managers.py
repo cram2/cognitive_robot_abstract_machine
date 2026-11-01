@@ -19,7 +19,6 @@ from semantic_digital_twin.collision_checking.collision_groups import (
     CollisionGroupCombination,
 )
 from krrood_spatial_math.spatial_types import Vector3, Point3
-from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% avoided contacts

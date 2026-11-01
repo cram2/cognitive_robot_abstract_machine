@@ -576,6 +576,24 @@ class HomogeneousTransformationMatrix(
         inv[:3, 3] = (-inv[:3, :3]).dot(self[:3, 3])
         return inv
 
+    @staticmethod
+    def invert_numeric_matrix(f1_T_f2: np.ndarray) -> np.ndarray:
+        """
+        Invert a numeric rigid homogeneous transformation without building a symbolic
+        expression.
+
+        :param f1_T_f2: A 4x4 rigid homogeneous transformation from frame f2 to f1.
+        :return: f2_T_f1, a new 4x4 array of the same dtype.
+        """
+        R = f1_T_f2[:3, :3]
+        t = f1_T_f2[:3, 3]
+        Rt = R.T
+        f2_T_f1 = np.empty((4, 4), dtype=f1_T_f2.dtype)
+        f2_T_f1[:3, :3] = Rt
+        f2_T_f1[:3, 3] = -Rt @ t
+        f2_T_f1[3] = [0, 0, 0, 1]
+        return f2_T_f1
+
     @property
     def position(self) -> Point3:
         """

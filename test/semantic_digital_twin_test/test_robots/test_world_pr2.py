@@ -35,7 +35,7 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (

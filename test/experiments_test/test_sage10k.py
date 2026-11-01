@@ -15,7 +15,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (

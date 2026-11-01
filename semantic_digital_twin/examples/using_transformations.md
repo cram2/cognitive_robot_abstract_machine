@@ -159,5 +159,5 @@ rt.scene.show("jupyter")
 
 ## Where to go next
 - Style guide on transformations and naming: https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/style_guide.html
-- API docs for `HomogeneousTransformationMatrix`: https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#krrood_spatial_math.spatial_types.HomogeneousTransformationMatrix
+- API docs for `HomogeneousTransformationMatrix`: https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/domain_models/krrood_spatial_math/src/krrood_spatial_math/spatial_types.py
 - Now try the exercise: [](using-transformations-exercise)

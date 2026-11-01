@@ -639,7 +639,7 @@ class Connection6DoF(Connection):
 
         :param transformation: The desired parent-to-child origin. Must carry a
             reference frame (:meth:`World.transform` raises
-            :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
+            :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
             otherwise); does not need to already be expressed in the parent frame. Other
             spatial types (e.g. ``Pose``) must be converted with their own
             ``homogeneous_matrix`` before being assigned here.
