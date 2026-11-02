@@ -20,7 +20,7 @@ from robokudo.types.annotation import (
 from robokudo.types.camera import CameraObservation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo import world as rk_world
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView

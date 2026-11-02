@@ -15,7 +15,7 @@ from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import OmniDrive
 
 

@@ -16,12 +16,7 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
     MotionNodeArtifacts,
 )
-from semantic_digital_twin.spatial_types import (
-    AxisAngle,
-    Point3,
-    Vector3,
-    RotationMatrix,
-)
+from krrood_spatial_math.spatial_types import AxisAngle, Point3, Vector3, RotationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 

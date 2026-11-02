@@ -63,7 +63,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Fridge,
     Drawer,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -613,7 +613,7 @@ def test_model_synchronization_merge_full_world_stress_test(rclpy_node):
         _world=w2,
     )
     for i in range(10):
-        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).parse()
+        pr2_world = URDFParser.from_file(PR2.get_ros_file_path()).create_world()
 
         w1.merge_world(pr2_world)
         sleep(1)

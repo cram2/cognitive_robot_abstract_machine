@@ -312,7 +312,7 @@ class RobotDemonstration(ABC):
 
         :return: A world holding the scene and no robot.
         """
-        scene = self.scene_specification().to_domain_object()
+        scene = self.scene_specification().create_world()
         self.populate_scene(scene)
         return scene
 

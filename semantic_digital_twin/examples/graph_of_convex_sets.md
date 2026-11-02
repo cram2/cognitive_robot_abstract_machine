@@ -39,7 +39,7 @@ from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection, BoundingBoxCollection
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 box_world = World()
@@ -90,7 +90,7 @@ graph_of_bounding_boxes.draw()
 Let's use graph theory to find a path!
 
 ```{code-cell} ipython3
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 start = Point3(-0.75, 0, 0.15, reference_frame=box_world.root)
 goal = Point3(0.75, 0, 0.15, reference_frame=box_world.root)
@@ -110,7 +110,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 apartment = os.path.realpath(os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "kitchen.urdf"))
 
 apartment_parser = URDFParser.from_file(apartment)
-world = apartment_parser.parse()
+world = apartment_parser.create_world()
 
 search_space = BoundingBoxCollection([VolumetricBoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,

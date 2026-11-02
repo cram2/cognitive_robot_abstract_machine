@@ -21,7 +21,7 @@ from robokudo.utils.o3d_helper import (
     create_line_for_visualization,
     create_sphere_from_translation,
 )
-from semantic_digital_twin.spatial_types import Point2
+from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
@@ -112,9 +112,9 @@ class TestUtilsO3DHelper(object):
         assert np.all(
             target_bounding_box.center[:2] == adjusted_bounding_box.center[:2]
         ), "x and y were not adjusted correctly"
-        assert (
-            adjusted_bounding_box.center[2] == expected_z
-        ), "z was not adjusted correctly"
+        assert adjusted_bounding_box.center[2] == expected_z, (
+            "z was not adjusted correctly"
+        )
 
     def test_position_bounding_box_relative_to_target_rotation(self):
         input_bounding_box = open3d.geometry.OrientedBoundingBox(

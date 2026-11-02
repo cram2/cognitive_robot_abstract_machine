@@ -11,10 +11,8 @@ from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import (
-    SpatialTypesError,
-)
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.exceptions import SpatialTypesError
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     RotationMatrix,
     Quaternion,
@@ -22,8 +20,8 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point2, Pose2D
-from semantic_digital_twin.spatial_types.spatial_types import Pose, SpatialType
+from krrood_spatial_math.spatial_types import Pose, Point2, Pose2D
+from krrood_spatial_math.spatial_types import Pose, SpatialType
 from semantic_digital_twin.world_description.world_entity import Body
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
@@ -571,9 +569,9 @@ class TestRotationMatrix:
         for r in operations_to_test:
             rotation_part = r[:3, :3]
             det = rotation_part.det()
-            assert np.allclose(
-                det, 1.0, atol=1e-10
-            ), f"Determinant {det} != 1.0 for operation"
+            assert np.allclose(det, 1.0, atol=1e-10), (
+                f"Determinant {det} != 1.0 for operation"
+            )
 
     def test_deepcopy_of_default_constructed_matrix(self):
         """
@@ -2134,7 +2132,6 @@ class TestTransformationMatrix:
 
 
 class TestQuaternion:
-
     def test_from_iterable_copies_a_symbolic_math_type_input(self):
         """
         `from_iterable` must not alias a SymbolicMathType input's casadi_sx: the result
