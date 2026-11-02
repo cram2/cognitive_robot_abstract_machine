@@ -4,8 +4,9 @@ import logging
 import os
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
-from typing_extensions import ClassVar
+from enum import StrEnum
 
+from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -63,6 +64,29 @@ from semantic_digital_twin.world_description.world_entity import Body
 logger = logging.getLogger(__name__)
 
 
+class SdfJointType(StrEnum):
+    """
+    The SDF joint types this parser builds a connection for.
+    """
+
+    REVOLUTE = "revolute"
+    CONTINUOUS = "continuous"
+    PRISMATIC = "prismatic"
+    FIXED = "fixed"
+
+    @property
+    def connection_specification_type(self) -> type[ConnectionSpecification]:
+        """
+        :return: The specification of the connection this joint type becomes.
+        """
+        return {
+            SdfJointType.REVOLUTE: RevoluteConnectionSpecification,
+            SdfJointType.CONTINUOUS: RevoluteConnectionSpecification,
+            SdfJointType.PRISMATIC: PrismaticConnectionSpecification,
+            SdfJointType.FIXED: FixedConnectionSpecification,
+        }[self]
+
+
 @dataclass
 class GazeboParser(WorldModelParser):
     """
@@ -77,40 +101,6 @@ class GazeboParser(WorldModelParser):
 
     .. note:: A model declared ``static`` is attached rigidly, but joints inside it stay
         movable.
-    """
-
-    connection_specification_types: ClassVar[
-        dict[str, type[ConnectionSpecification]]
-    ] = {
-        "revolute": RevoluteConnectionSpecification,
-        "continuous": RevoluteConnectionSpecification,
-        "prismatic": PrismaticConnectionSpecification,
-        "fixed": FixedConnectionSpecification,
-    }
-    """
-    Maps a joint's declared type to the specification of the connection it becomes.
-    """
-
-    world_link_name: ClassVar[str] = "world"
-    """
-    The reserved link name that refers to the simulation world rather than a model link.
-    """
-
-    truthy_values: ClassVar[tuple[str, ...]] = ("1", "true")
-    """
-    The texts that SDF accepts for a boolean element that is set.
-    """
-
-    interpreted_elements: ClassVar[tuple[str, ...]] = (
-        "model",
-        "include",
-        "link",
-        "joint",
-        "pose",
-        "static",
-    )
-    """
-    The child elements of a world or model that carry into the parsed world.
     """
 
     sdf: str
@@ -136,6 +126,29 @@ class GazeboParser(WorldModelParser):
 
     def __post_init__(self):
         self.root_element = ElementTree.fromstring(self.sdf)
+
+    @classproperty
+    def world_link_name(cls) -> str:
+        """
+        :return: The reserved link name that refers to the simulation world rather than
+            a model link.
+        """
+        return "world"
+
+    @classproperty
+    def truthy_values(cls) -> tuple[str, ...]:
+        """
+        :return: The texts that SDF accepts for a boolean element that is set.
+        """
+        return "1", "true"
+
+    @classproperty
+    def interpreted_elements(cls) -> tuple[str, ...]:
+        """
+        :return: The child elements of a world or model that carry into the parsed
+            world.
+        """
+        return "model", "include", "link", "joint", "pose", "static"
 
     # %% construction
 
@@ -719,14 +732,15 @@ class GazeboParser(WorldModelParser):
         :raises UnsupportedJointType: If the joint type has no connection counterpart.
         """
         joint_name = element.get("name")
-        joint_type = element.get("type")
-        specification_type = self.connection_specification_types.get(joint_type)
-        if specification_type is None:
+        declared_type = element.get("type")
+        if declared_type not in SdfJointType:
             raise UnsupportedJointType(
                 joint_name=joint_name,
-                joint_type=joint_type,
-                supported_types=list(self.connection_specification_types),
+                joint_type=declared_type,
+                supported_types=list(SdfJointType),
             )
+        joint_type = SdfJointType(declared_type)
+        specification_type = joint_type.connection_specification_type
 
         parent_name = element.findtext("parent").strip()
         child_name = element.findtext("child").strip()
@@ -796,7 +810,7 @@ class GazeboParser(WorldModelParser):
         )
 
     def parse_limits(
-        self, element: ElementTree.Element, joint_type: str, joint_name: str
+        self, element: ElementTree.Element, joint_type: SdfJointType, joint_name: str
     ) -> DegreeOfFreedomLimits:
         """
         Parses the limits of a ``joint`` element.
@@ -814,7 +828,7 @@ class GazeboParser(WorldModelParser):
 
         lower_position = None
         upper_position = None
-        if joint_type != "continuous":
+        if joint_type != SdfJointType.CONTINUOUS:
             lower_position = self.parse_optional_float(limit_element, "lower")
             upper_position = self.parse_optional_float(limit_element, "upper")
 

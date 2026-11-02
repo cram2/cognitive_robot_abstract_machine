@@ -11,6 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 
+from semantic_digital_twin.adapters.procthor.exceptions import (
+    ProcthorDoorWallNotFound,
+    UnpairedProcthorWalls,
+)
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
@@ -721,13 +725,11 @@ class ProcTHORParser(WorldSource):
         :param walls: List of walls without doors
 
         :return: List of ProcthorWall instances, each representing a pair of walls with the same polygon.
-        :raises AssertionError: If the number of walls is not even, as we assume that walls are always paired.
+        :raises UnpairedProcthorWalls: If the number of walls is not even.
         """
 
-        assert len(walls) % 2 == 0, (
-            f"Expected an even number of walls, but found {len(walls)}. "
-            f"We assumed that this is never the case, this case may need to be handled now."
-        )
+        if len(walls) % 2 != 0:
+            raise UnpairedProcthorWalls(wall_count=len(walls))
 
         def _polygon_key(poly):
             return frozenset((p["x"], p["y"], p["z"]) for p in poly)
@@ -754,7 +756,7 @@ class ProcTHORParser(WorldSource):
         :param doors: List of door dictionaries
 
         :returns: Tuple containing a list of ProcthorWall instances and a set of used wall IDs.
-        :raises AssertionError: If a door does not have exactly two walls associated with it.
+        :raises ProcthorDoorWallNotFound: If a door refers to a wall that is not given.
         """
         walls_by_id = {wall["id"]: wall for wall in walls}
         used_wall_ids = set()
@@ -764,13 +766,10 @@ class ProcTHORParser(WorldSource):
             wall_ids = [door.get("wall0"), door.get("wall1")]
             found_walls = []
             for wall_id in wall_ids:
-                wall = walls_by_id[wall_id]
-                found_walls.append(wall)
+                if wall_id not in walls_by_id:
+                    raise ProcthorDoorWallNotFound(door_id=door["id"], wall_id=wall_id)
+                found_walls.append(walls_by_id[wall_id])
                 used_wall_ids.add(wall_id)
-
-            assert len(found_walls) == 2, (
-                f"Door {door['id']} should have two walls, but found {len(found_walls)}."
-            )
 
             procthor_walls.append(
                 ProcthorWall(door_dicts=[door], wall_dicts=found_walls)

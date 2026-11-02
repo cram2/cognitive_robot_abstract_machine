@@ -53,23 +53,22 @@ class WorldModelParser(WorldSource, ABC):
     Whether a body that the description gives no collision geometry collides with its
     visual geometry instead.
 
-    Cosmetic parts such as covers are often drawn but never described for contact, and
-    some scenes keep their collision geometry in a file that is not loaded; either way
-    the drawn geometry is the best stand-in for the real shape. A body that already has
-    collision geometry is left alone, and each format decides what counts as having
-    none.
+    A body that already has collision geometry is left alone, and each format decides
+    what counts as having none.
     """
 
     @classmethod
     @abstractmethod
-    def from_file(cls, file_path: str, prefix: str | None = None) -> Self:
+    def from_file(
+        cls, file_path: str, prefix: str | None = None, *args, **kwargs
+    ) -> Self:
         """
         Create a parser for the world described by a file.
 
-        Subclasses may accept further optional parameters for the aspects their format
-        supports.
-
-        :param file_path: The path of the file to parse.
+        :param file_path: The path or resource URI (such as ``package://``) of the file
+            to parse.
         :param prefix: The prefix for every name used in the parsed world.
+        :param args: Further parameters for the aspects the format supports.
+        :param kwargs: Further keyword parameters for the aspects the format supports.
         :return: The parser for the described world.
         """

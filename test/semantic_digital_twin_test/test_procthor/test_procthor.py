@@ -4,11 +4,16 @@ import unittest
 from dataclasses import asdict
 
 import numpy as np
+import pytest
 from importlib.resources import files
 from pathlib import Path
 from sqlalchemy.orm import Session
 
 from krrood.ormatic.utils import create_engine
+from semantic_digital_twin.adapters.procthor.exceptions import (
+    ProcthorDoorWallNotFound,
+    UnpairedProcthorWalls,
+)
 from semantic_digital_twin.adapters.procthor.procthor_parser import (
     ProcTHORParser,
     ProcthorRoom,
@@ -382,6 +387,21 @@ class ProcTHORTestCase(unittest.TestCase):
 
         resolved_string = resolver.resolve("whitebread_a_slice_8_mesh")
         self.assertEqual(Bread, resolved_string)
+
+
+def test_odd_number_of_walls_without_door_is_rejected():
+    with pytest.raises(UnpairedProcthorWalls) as error:
+        ProcTHORParser._build_procthor_wall_from_polygon([{"id": "wall|0"}])
+    assert error.value.wall_count == 1
+
+
+def test_door_referring_to_missing_wall_is_rejected():
+    door = {"id": "door|0", "wall0": "wall|0", "wall1": "wall|1"}
+    with pytest.raises(ProcthorDoorWallNotFound) as error:
+        ProcTHORParser._build_procthor_wall_from_door(
+            walls=[{"id": "wall|0"}], doors=[door]
+        )
+    assert error.value.wall_id == door["wall1"]
 
 
 if __name__ == "__main__":
