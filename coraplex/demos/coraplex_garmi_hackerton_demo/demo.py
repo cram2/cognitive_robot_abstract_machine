@@ -32,10 +32,6 @@ from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor, PlanExecutor
 from coraplex.querying.grasp_closeness import GraspsByCloseness
-from coraplex.robot_plans.actions.core.container import (
-    CloseHeldContainerAction,
-    OpenHeldContainerAction,
-)
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import (
     FixateObjectAction,
@@ -57,6 +53,9 @@ from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.goals.grasped_mechanism import (
+    ArticulateGraspedMechanism,
 )
 from giskardpy.motion_statechart.monitors.feature_monitors import DistanceMonitor
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
@@ -442,8 +441,11 @@ class GarmiHackathonDemonstration(RobotDemonstration):
                         nodes=[
                             Sequence(
                                 nodes=[
-                                    OpenHeldContainerAction(
-                                        arm=left_arm, handle=drawer.handle
+                                    ArticulateGraspedMechanism(
+                                        tip_link=left_hand.tool_frame,
+                                        environment_link=drawer.handle.root,
+                                        goal_joint_state=drawer_mechanism.dof.limits.upper.position,
+                                        holding_end_effector=left_hand,
                                     ),
                                     SetGripperAction(
                                         configuration=left_hand.default_configuration(
@@ -479,8 +481,11 @@ class GarmiHackathonDemonstration(RobotDemonstration):
                     Parallel(
                         nodes=[
                             ParkArmsAction(arms=[right_arm]),
-                            CloseHeldContainerAction(
-                                arm=left_arm, handle=drawer.handle
+                            ArticulateGraspedMechanism(
+                                tip_link=left_hand.tool_frame,
+                                environment_link=drawer.handle.root,
+                                goal_joint_state=drawer_mechanism.dof.limits.lower.position,
+                                holding_end_effector=left_hand,
                             ),
                             UpdateTemporaryCollisionRules.for_end_effector(left_hand),
                         ]
@@ -563,7 +568,9 @@ class GarmiHackathonDemonstration(RobotDemonstration):
             Parallel(
                 nodes=[
                     a(GraspingAction)(
-                        grasp=self._grasps_by_closeness(handle_grasp.graspable, left_arm),
+                        grasp=self._grasps_by_closeness(
+                            handle_grasp.graspable, left_arm
+                        ),
                         arm=left_arm,
                     ),
                     Sequence(
@@ -618,7 +625,9 @@ class GarmiHackathonDemonstration(RobotDemonstration):
         """
         # A place leaves the milk under the world; under the drawer it moves along when
         # the drawer closes.
-        hang_off_the_drawer = MoveBranch(branch_root=milk.root, new_parent=storage_drawer)
+        hang_off_the_drawer = MoveBranch(
+            branch_root=milk.root, new_parent=storage_drawer
+        )
         if self.grasp_selection is GraspSelection.BY_CLOSENESS:
             # Grounded once it starts, when the milk is in hand, since a place reads the
             # grasp off the gripper holding it.
