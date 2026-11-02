@@ -14,8 +14,8 @@ The module provides:
 
 from py_trees.composites import Sequence
 
-from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.behaviours.action_server_checks import ActionServerPresentAndDone
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.behaviours.clear_errors import ClearErrors
 
 

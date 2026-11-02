@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set, Tuple, Type, TYPE_CHECKING
+from typing_extensions import Any, TYPE_CHECKING
 
 import rustworkx
 
@@ -22,12 +22,12 @@ class ConversionOrderConstraint(ABC):
     One reason why an alternative mapping type is converted before another.
     """
 
-    earlier: Type[AlternativeMapping]
+    earlier: type[AlternativeMapping]
     """
     The mapping type that is converted first.
     """
 
-    later: Type[AlternativeMapping]
+    later: type[AlternativeMapping]
     """
     The mapping type that is converted after it.
     """
@@ -102,7 +102,7 @@ class ConversionOrder:
     :func:`AlternativeMapping.required_pre_build_classes`.
     """
 
-    references: Dict[AlternativeMapping, List[Tuple[Any, MappedVariable]]]
+    references: dict[AlternativeMapping, list[tuple[Any, MappedVariable]]]
     """
     Every occurrence of an alternative mapping instance inside another object, keyed by
     the mapping instance being referenced.
@@ -122,7 +122,7 @@ class ConversionOrder:
         for held, holder in self._held_and_holder_types():
             self._order_held_before_holder(held, holder, index_of_type)
 
-    def _held_and_holder_types(self) -> Set[Tuple[Type, Type]]:
+    def _held_and_holder_types(self) -> set[tuple[type, type]]:
         """
         The distinct pairs of the type of a held mapping and the type holding it.
 
@@ -140,9 +140,9 @@ class ConversionOrder:
 
     def _order_held_before_holder(
         self,
-        held: Type[AlternativeMapping],
-        holder: Type,
-        index_of_type: Dict[Type, int],
+        held: type[AlternativeMapping],
+        holder: type,
+        index_of_type: dict[type, int],
     ):
         """
         Add the order holding asks for, unless what is declared already asks for the
@@ -168,7 +168,7 @@ class ConversionOrder:
             return
         self.graph.add_edge(held_index, holder_index, HoldingOrder(held, holder))
 
-    def sort_types(self) -> List[Type[AlternativeMapping]]:
+    def sort_types(self) -> list[type[AlternativeMapping]]:
         """
         Put the mapping types of the conversion in the order they are converted in.
 

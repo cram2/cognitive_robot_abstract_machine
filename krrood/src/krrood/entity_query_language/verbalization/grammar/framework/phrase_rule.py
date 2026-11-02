@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Optional, Sequence
+from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Sequence
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
@@ -10,7 +10,7 @@ from krrood.entity_query_language.verbalization.fragments.base import (
 from krrood.entity_query_language.verbalization.fragments.features import (
     GrammaticalNumber,
 )
-from krrood.entity_query_language.verbalization.exceptions import AmbiguousRuleError
+from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 
 if TYPE_CHECKING:
@@ -66,7 +66,7 @@ class RuleContext:
     for cross-cutting state directly.
     """
 
-    recurse: Callable[["FoldNode", "RenderOptions"], VerbalizationFragment]
+    recurse: Callable[[FoldNode, RenderOptions], VerbalizationFragment]
     """The fold continuation — given a sub-expression and its render options, returns its fragment.
     Rules do not call this directly; they call :meth:`child`."""
 
@@ -201,7 +201,7 @@ def _is_guarded(rule: PhraseRule) -> bool:
 
 def select(
     node: FoldNode, rules: Sequence[PhraseRule], context: RuleContext
-) -> Optional[PhraseRule]:
+) -> PhraseRule | None:
     """
     Specificity key, highest wins: ``(construct MRO depth, guarded over unguarded, rule-class MRO
     depth)``.
@@ -211,7 +211,7 @@ def select(
     refinement of a top-level entity). This only models *subsumption* — a guard that implies
     another's. Rules whose guards merely *overlap* (neither implies the other) have no is-a
     relationship to express; their guards must be mutually exclusive, since an equal-specificity
-    tie is a collision raised as :class:`~krrood.entity_query_language.verbalization.exceptions.AmbiguousRuleError`.
+    tie is a collision raised as :class:`~krrood.patterns.exceptions.AmbiguousRuleError`.
 
     :param node: The EQL expression being dispatched.
     :param rules: The grammar.

@@ -96,13 +96,13 @@ lowest branching-atom counts to 1 at the highest.
 ## Why not ground this analytically instead?
 
 `GroundingMode.EXACT` grounds by enumerating the fitted circuit's own exact partition
-over the cause variable instead of Monte Carlo sampling, but only when that partition
-is already disjoint on its own; otherwise it logs a warning and falls back to
-`GroundingMode.SAMPLED`. That precondition does not hold for branching-atom count on
-this dataset: it is not, today, a split the induced tree makes on its own. `EXACT`
-grounding is not reachable yet for this experiment. `SAMPLED` grounding is not a
-fallback chosen over a working alternative; it is the mode that runs to completion
-here.
+over the cause variable instead of Monte Carlo sampling, but only when the distinct
+regions of that partition are pairwise disjoint; otherwise it raises
+`UndeterminedLatentsNotPartitionedError`. Leaves that the tree only separates by other
+variables count as one region. That precondition holds for branching-atom count on this
+dataset: the fitted tree has 118 leaves, with 18 distinct, disjoint branching-atom-count
+values. The results below were computed with `SAMPLED` and have not been rerun with
+`EXACT`.
 
 ## Results
 

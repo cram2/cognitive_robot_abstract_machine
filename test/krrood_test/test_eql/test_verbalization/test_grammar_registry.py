@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 import pytest
 
 from krrood.entity_query_language.verbalization import grammar as grammar_package
-from krrood.entity_query_language.verbalization.exceptions import AmbiguousRuleError
+from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
     PhraseRule,
     select,

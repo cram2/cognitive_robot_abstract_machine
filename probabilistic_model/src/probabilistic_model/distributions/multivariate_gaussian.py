@@ -11,17 +11,9 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Continuous, Variable
 from scipy.stats import multivariate_normal, norm
 from scipy.stats._multivariate import multivariate_normal_frozen
-from typing_extensions import (
-    Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Self,
-    Tuple,
-)
+from typing_extensions import Any, Iterable, Iterator, Self
 
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.truncated_multivariate_gaussian import (
     TruncatedMultivariateGaussianDistribution,
 )
@@ -37,6 +29,7 @@ from probabilistic_model.probabilistic_model import (
     OrderType,
     ProbabilisticModel,
 )
+from probabilistic_model.query_results import LogConditioning, LogMode, LogTruncation
 
 # %% the covariance matrix
 
@@ -119,7 +112,7 @@ class Covariance:
         row, column = max(first, second), min(first, second)
         return float(self.lower_triangle[row * (row + 1) // 2 + column])
 
-    def marginal(self, indices: List[int]) -> Self:
+    def marginal(self, indices: list[int]) -> Self:
         """
         :param indices: The rows and columns to keep, in the order to keep them in.
         :return: The covariance of only those.
@@ -142,7 +135,7 @@ class Covariance:
 
 
 @dataclass
-class MultivariateGaussianDistribution(ProbabilisticModel):
+class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
     """
     A multivariate Gaussian distribution over continuous random variables.
 
@@ -151,7 +144,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
     answers its own through :mod:`scipy.stats.norm`.
     """
 
-    variables: Tuple[Continuous, ...]
+    variables: tuple[Continuous, ...]
     """
     The variables of the distribution.
     """
@@ -263,7 +256,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
 
     def _bounds_of_boxes(
         self, event: SimpleEvent
-    ) -> Iterator[Tuple[npt.NDArray, npt.NDArray]]:
+    ) -> Iterator[tuple[npt.NDArray, npt.NDArray]]:
         """
         :param event: The event to split into boxes.
         :return: The lower and the upper bounds of each box the event makes, laid out
@@ -278,7 +271,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
                 np.array([interval.upper for interval in box]),
             )
 
-    def log_mode(self) -> Tuple[Event, float]:
+    def log_mode(self) -> LogMode:
         """
         A Gaussian is most dense exactly at its mean.
 
@@ -290,11 +283,11 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
                 for variable, value in zip(self.variables, self.mean)
             }
         ).as_composite_set()
-        return mode, float(self.log_likelihood(self.mean.reshape(1, -1))[0])
+        return LogMode(mode, float(self.log_likelihood(self.mean.reshape(1, -1))[0]))
 
     # %% reading fewer variables
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal(self, variables: Iterable[Variable]) -> Self | None:
         """
         :param variables: The variables to keep. They are kept in this distribution's
             own order, whatever order they are asked for in, and those it is not over
@@ -310,7 +303,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
             return None
         return self._marginal_over_variable_indices(indices)
 
-    def _marginal_over_variable_indices(self, indices: List[int]) -> Self:
+    def _marginal_over_variable_indices(self, indices: list[int]) -> Self:
         """
         :param indices: The indices of the variables to keep, in this distribution's own
             order.
@@ -324,9 +317,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
 
     # %% fixing variables at a value
 
-    def log_conditional(
-        self, point: Dict[Variable, Any]
-    ) -> Tuple[Optional[ProbabilisticModel], float]:
+    def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         """
         Fix some of the variables at the values given and answer with the distribution
         over the rest, which stays Gaussian.
@@ -355,7 +346,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
             )[0]
         )
 
-        return (
+        return LogConditioning(
             self._conditional_over_variable_indices(
                 free_indices, fixed_indices, fixed_at
             ),
@@ -364,8 +355,8 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
 
     def _conditional_over_variable_indices(
         self,
-        free_indices: List[int],
-        fixed_indices: List[int],
+        free_indices: list[int],
+        fixed_indices: list[int],
         fixed_at: npt.NDArray,
     ) -> Self:
         """
@@ -420,7 +411,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[ProbabilisticModel], float]:
+    ) -> LogTruncation[TruncatedMultivariateGaussianDistribution]:
         """
         Confine this Gaussian to a box.
 
@@ -443,8 +434,8 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
         [box] = event.simple_sets
         probability = self.probability_of_simple_event(box)
         if probability == 0.0:
-            return None, -np.inf
-        return (
+            return LogTruncation.impossible()
+        return LogTruncation(
             TruncatedMultivariateGaussianDistribution(untruncated=self, box=box),
             math.log(probability),
         )
@@ -473,7 +464,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
 
     # %% translation and scaling
 
-    def apply_translation(self, translation: Dict[Variable, float]):
+    def apply_translation(self, translation: dict[Variable, float]):
         """
         Move the mean, leaving the covariance as it is.
 
@@ -483,7 +474,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
         for index, variable in enumerate(self.variables):
             self.mean[index] += translation.get(variable, 0.0)
 
-    def apply_scaling(self, scaling: Dict[Variable, float]):
+    def apply_scaling(self, scaling: dict[Variable, float]):
         """
         Scale the variables, which scales the mean once and the covariance once per
         variable it relates.
@@ -503,27 +494,3 @@ class MultivariateGaussianDistribution(ProbabilisticModel):
         return self.scipy_distribution.rvs(size=amount).reshape(
             amount, len(self.variables)
         )
-
-    def __copy__(self) -> Self:
-        return type(self)(
-            variables=self.variables,
-            mean=self.mean.copy(),
-            covariance=Covariance(lower_triangle=self.covariance.lower_triangle.copy()),
-        )
-
-    def __deepcopy__(self, memo=None) -> Self:
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
-        result = type(self)(
-            variables=tuple(
-                variable.__class__(name=variable.name, domain=variable.domain)
-                for variable in self.variables
-            ),
-            mean=self.mean.copy(),
-            covariance=Covariance(lower_triangle=self.covariance.lower_triangle.copy()),
-        )
-        memo[id_self] = result
-        return result

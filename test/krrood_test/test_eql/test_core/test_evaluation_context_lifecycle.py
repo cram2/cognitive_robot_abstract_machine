@@ -153,6 +153,26 @@ def test_evaluation_started_while_another_is_suspended_gets_its_own_context():
     assert other_context is not suspended_context
 
 
+def test_evaluation_runs_in_the_context_set_before_it_starts():
+    """
+    A query evaluated while a context is current that no evaluation is running in
+    evaluates within that context.
+    """
+    captured_contexts = []
+
+    @symbolic_function
+    def capture_context(value):
+        captured_contexts.append(get_evaluation_context())
+        return True
+
+    evaluation_context = EvaluationContext()
+    subject = variable(int, [1])
+    with evaluation_context.as_current():
+        an(entity(subject).where(capture_context(subject))).tolist()
+
+    assert captured_contexts == [evaluation_context]
+
+
 def test_closing_suspended_results_keeps_their_context_current_for_the_cleanup():
     """
     Closing results part way runs their cleanup with the context they were produced in

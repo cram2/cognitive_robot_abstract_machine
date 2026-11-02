@@ -1,3 +1,7 @@
+import pytest
+
+from cramph.exceptions import MissingExecutorExtensionError
+from giskardpy.motion_control import WorldStateTrajectoryRecording
 from giskardpy.middleware.ros2.post_goal_plotters import (
     GoalGanttChartPlotter,
     GoalTrajectoryPlotter,
@@ -13,7 +17,8 @@ def test_creating_a_trajectory_plotter_does_not_record_yet():
 
     GoalTrajectoryPlotter(executor=executor)
 
-    assert executor.trajectory_plotter is None
+    with pytest.raises(MissingExecutorExtensionError):
+        executor.require_extension(WorldStateTrajectoryRecording)
 
 
 def test_start_recording_hands_the_trajectory_plotter_to_the_executor():
@@ -22,7 +27,10 @@ def test_start_recording_hands_the_trajectory_plotter_to_the_executor():
 
     plotter.start_recording()
 
-    assert executor.trajectory_plotter is plotter.trajectory_plotter
+    assert (
+        executor.require_extension(WorldStateTrajectoryRecording).plotter
+        is plotter.trajectory_plotter
+    )
 
 
 def test_a_plotter_without_own_recording_leaves_the_executor_alone():
@@ -30,4 +38,5 @@ def test_a_plotter_without_own_recording_leaves_the_executor_alone():
 
     GoalGanttChartPlotter(executor=executor).start_recording()
 
-    assert executor.trajectory_plotter is None
+    with pytest.raises(MissingExecutorExtensionError):
+        executor.require_extension(WorldStateTrajectoryRecording)

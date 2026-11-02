@@ -16,6 +16,7 @@ authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 dependencies = [
   "coraplex",
   "giskardpy",
+  "cramph",
   "semantic_digital_twin",
   "krrood",
   "random-events",
@@ -24,7 +25,6 @@ dependencies = [
   "physics_simulators",
   "experiments",
   "segmind",
-  "cramera",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -43,7 +43,7 @@ dev = [
     "treon",
     "bokeh",
     "mypy>=1.8",
-    "docformatter",
+    "krrood[development-tools]",
 ]
 
 doc = [
@@ -85,6 +85,7 @@ exclude-dependencies = [
 members = [
   "coraplex",
   "giskardpy",
+  "cramph",
   "semantic_digital_twin",
   "krrood",
   "random_events",
@@ -92,13 +93,13 @@ members = [
   "physics_simulators",
   "robokudo",
   "experiments",
-  "segmind",
-  "cramera"
+  "segmind"
 ]
 
 [tool.uv.sources]
 coraplex       = { workspace = true }
 giskardpy             = { workspace = true }
+cramph                = { workspace = true }
 semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
 probabilistic_model   = { workspace = true }
@@ -107,7 +108,6 @@ robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
-cramera                = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -115,6 +115,7 @@ package-mode = false
 [tool.poetry.dependencies]
 coraplex = { path = "coraplex", develop = true }
 giskardpy = { path = "giskardpy", develop = true }
+cramph = { path = "cramph", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
 random_events = { path = "random_events", develop = true }
@@ -123,7 +124,6 @@ robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
-cramera = { path = "cramera", develop = true }
 
 [tool.setuptools]
 packages = ["cognitive_robot_abstract_machine"]
@@ -131,9 +131,3 @@ package-dir = {"" = "."}
 
 [tool.setuptools.dynamic]
 version = {attr = "cognitive_robot_abstract_machine._version.__version__"}
-
-[tool.docformatter]
-make-summary-multi-line = true
-pre-summary-newline = true
-close-quotes-on-newline = true
-black = true

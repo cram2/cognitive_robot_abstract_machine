@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import timedelta
 
-from typing_extensions import TYPE_CHECKING, Iterable, List, Optional
+from typing_extensions import TYPE_CHECKING, Iterable
 
 from semantic_digital_twin.mixin import UniqueSimulatorProperty
 
@@ -41,7 +41,7 @@ class ContactFriction:
     Friction around both axes of the tangent plane.
     """
 
-    def to_list(self) -> List[float]:
+    def to_list(self) -> list[float]:
         """
         :return: The coefficients as sliding, torsional and rolling.
         """
@@ -66,7 +66,7 @@ class ContactStiffness:
     Damping of that resolution; ``1`` is critically damped.
     """
 
-    def to_list(self) -> List[float]:
+    def to_list(self) -> list[float]:
         """
         :return: The pair as time constant, in seconds, and damping ratio.
         """
@@ -105,7 +105,7 @@ class ContactImpedance:
     How sharply the rise bends around the midpoint.
     """
 
-    def to_list(self) -> List[float]:
+    def to_list(self) -> list[float]:
         """
         :return: The quintuple as minimum, maximum, width, midpoint and power.
         """
@@ -127,7 +127,7 @@ class ContactParameters(UniqueSimulatorProperty):
     Sliding, torsional and rolling friction.
     """
 
-    stiffness: Optional[ContactStiffness] = None
+    stiffness: ContactStiffness | None = None
     """
     How stiff and how damped the contacts are.
 
@@ -136,7 +136,7 @@ class ContactParameters(UniqueSimulatorProperty):
     :meth:`create_for_surface`) never resets a stiffness declared elsewhere.
     """
 
-    impedance: Optional[ContactImpedance] = None
+    impedance: ContactImpedance | None = None
     """
     How hard the contacts push back as they are penetrated.
 

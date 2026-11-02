@@ -37,6 +37,7 @@ exist, but about the *model itself*. Three constructs answer that kind of questi
 |---|---|---|
 | "On average, how fast do robots move?" | {py:func}`~krrood.entity_query_language.factories.average` | a number |
 | "What fraction of robots run dangerously hot?" | {py:func}`~krrood.entity_query_language.factories.probability_of` | a number |
+| "Of the robots running hot, how many are critically hot?" | {py:func}`~krrood.entity_query_language.factories.probability_of` with `evidence` | a number |
 | "Given today's charge level, what does the rest look like?" | {py:func}`~krrood.entity_query_language.factories.distribution_of` | a distribution |
 
 Without live telemetry on hand -- only the fitted model -- all three questions below
@@ -123,6 +124,31 @@ count, only the model (as with `backend` above). The counting answer is only eve
 good as the fleet it's counting; the model-based one is exact regardless of fleet
 size, because there never was a fleet to begin with.
 
+## "Of the robots running hot, how many are critically hot?"
+
+Anything above 0.75 counts as critically hot. The question is not about the whole
+fleet but only about the robots already running hot -- the probability of one
+condition *given* another. `probability_of` takes that second condition as
+`evidence`:
+
+```python
+x = variable(Robot)
+print(probability_of(x.temperature > 0.75, evidence=x.temperature > 0.5).first(backend=backend))
+# 0.5
+```
+
+Counting works the same way, only now the robots that satisfy the evidence are the
+ones counted in the denominator:
+
+```python
+print(probability_of(y.temperature > 0.75, evidence=y.temperature > 0.5).first())
+# 0.5 -- 1 of the 2 hot robots above is critically hot
+```
+
+Evidence that nothing satisfies -- zero probability under the model, or no matching
+robot in the fleet -- leaves the answer undefined and raises
+{py:class}`~krrood.entity_query_language.exceptions.EvidenceHasZeroProbability`.
+
 ## "Given today's charge level, what does the rest look like?"
 
 Every robot left the dock at a 1.5 charge level today, and anything moving slower than
@@ -137,7 +163,7 @@ instead of generating robots, it hands back the distribution itself.
 
 ```python
 match = a(Robot)(temperature=..., speed=..., charge=1.5)
-match.where(match.variable.speed > 0.2)
+match.where(match.speed > 0.2)
 
 result = distribution_of(match).first(backend=backend)
 print(sorted(v.name for v in result.variables))
@@ -164,7 +190,7 @@ print(result.probability(temperature_range))
 To narrow down to temperature specifically:
 
 ```python
-narrowed = distribution_of(match, marginalize_for=(match.variable.temperature,)).first(backend=backend)
+narrowed = distribution_of(match, marginalize_for=(match.temperature,)).first(backend=backend)
 print({v.name for v in narrowed.variables})
 # {'Robot.temperature'}
 ```
@@ -176,7 +202,8 @@ print({v.name for v in narrowed.variables})
   only a fitted model.
 - **`probability_of(condition)`** -- counts a real fleet's matching robots when one is
   on hand, or reads the exact answer straight off the model when there's only a fitted
-  model. Accepts any condition a `.where(...)` clause does.
+  model. Accepts any condition a `.where(...)` clause does, and optional `evidence`
+  to condition on.
 - **`distribution_of(match, marginalize_for=...)`** -- the same match that would
   normally *generate* robots, answered with the shape of the distribution instead of
   samples from it. Optional `marginalize_for` narrows which readings the answer
@@ -202,4 +229,5 @@ answered from a model instead of only ever a table.
 - {py:meth}`~krrood.parametrization.parameterizer.UnderspecifiedParameters.resolve_conditioned_and_truncated_model`
 - {py:class}`~krrood.parametrization.parameterizer.ModelQueryParameters`
 - {py:class}`~krrood.entity_query_language.exceptions.BackendCannotEvaluateProbabilisticQuery`
+- {py:class}`~krrood.entity_query_language.exceptions.EvidenceHasZeroProbability`
 - {py:class}`~krrood.parametrization.exceptions.JointQueryAcrossClassesNotSupported`

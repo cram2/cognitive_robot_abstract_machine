@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Callable, Dict, Optional
+from typing_extensions import Any, Callable
 
 
 @dataclass(frozen=True)
@@ -40,10 +40,19 @@ class QueryCache:
     fresh one.
     """
 
-    results: Dict[QueryCacheKey, Any] = field(default_factory=dict)
+    results: dict[QueryCacheKey, Any] = field(default_factory=dict)
     """
     The result of every query evaluated so far, per layer.
     """
+
+    def result_of(self, query: Callable, layer: Any) -> Any:
+        """
+        :param query: A memoized query of a layer type, such as
+            :meth:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer.ProductLayer.marginal`.
+        :param layer: A layer the query was evaluated for in this pass.
+        :return: What the query returned for the layer.
+        """
+        return self.results[QueryCacheKey(query.__wrapped__, id(layer))]
 
 
 def memoized(method: Callable) -> Callable:
@@ -55,7 +64,7 @@ def memoized(method: Callable) -> Callable:
     """
 
     @functools.wraps(method)
-    def wrapper(self, *args, cache: Optional[QueryCache] = None, **kwargs):
+    def wrapper(self, *args, cache: QueryCache | None = None, **kwargs):
         if cache is None:
             cache = QueryCache()
         key = QueryCacheKey(method, id(self))

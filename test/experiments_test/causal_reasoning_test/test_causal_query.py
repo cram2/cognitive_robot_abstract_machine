@@ -130,7 +130,7 @@ def test_every_distinct_branching_atom_count_is_reported(
     """
     expected_counts = sorted(
         {
-            MutagenesisMoleculeAggregations(instance=molecule).branching_atom_count()
+            MutagenesisMoleculeAggregations(role_taker=molecule).branching_atom_count()
             for molecule in mutagenesis_molecules
         }
     )

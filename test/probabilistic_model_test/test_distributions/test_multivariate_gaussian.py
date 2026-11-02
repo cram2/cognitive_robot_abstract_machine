@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 import math
 
 import numpy as np
@@ -15,10 +16,13 @@ from probabilistic_model.distributions.multivariate_gaussian import (
     MultivariateGaussianDistribution,
 )
 from probabilistic_model.distributions.truncated_multivariate_gaussian import (
+    MomentIntegration,
     TruncatedMultivariateGaussianDistribution,
 )
 from probabilistic_model.exceptions import (
     EventIsNotABoxError,
+    InvalidMomentOrderError,
+    NoClosedFormError,
     ProbabilisticCircuitRequiredError,
     ShapeMismatchError,
     VariableNotInDistributionError,
@@ -362,9 +366,9 @@ class TestPrecision:
 
 class TestMode:
     def test_the_mode_is_the_mean(self, independent, horizontal, vertical):
-        mode, likelihood = independent.mode()
-        assert mode.contains(np.array([1.0, -2.0]))
-        assert likelihood == pytest.approx(
+        mode = independent.mode()
+        assert mode.event.contains(np.array([1.0, -2.0]))
+        assert mode.likelihood == pytest.approx(
             independent.likelihood(np.array([[1.0, -2.0]]))[0]
         )
 
@@ -382,7 +386,7 @@ class TestConditioningOnAValue:
         conditioning formula.
         """
         given = 0.8
-        conditioned, _ = correlated.conditional({vertical: given})
+        conditioned = correlated.conditional({vertical: given}).distribution
         somewhere = 0.3
 
         joint = correlated.likelihood(np.array([[somewhere, given]]))[0]
@@ -394,14 +398,14 @@ class TestConditioningOnAValue:
     def test_conditioning_leaves_only_the_free_variables(
         self, correlated, horizontal, vertical
     ):
-        conditioned, _ = correlated.conditional({vertical: 0.0})
+        conditioned = correlated.conditional({vertical: 0.0}).distribution
         assert conditioned.variables == (horizontal,)
 
     def test_the_probability_returned_is_the_marginal_density_of_the_value(
         self, correlated, vertical
     ):
         given = 0.8
-        _, probability = correlated.conditional({vertical: given})
+        probability = correlated.conditional({vertical: given}).likelihood
         assert probability == pytest.approx(
             correlated.marginal([vertical]).likelihood(np.array([[given]]))[0]
         )
@@ -409,7 +413,7 @@ class TestConditioningOnAValue:
     def test_conditioning_an_uncorrelated_variable_leaves_it_alone(
         self, independent, horizontal, vertical
     ):
-        conditioned, _ = independent.conditional({vertical: 100.0})
+        conditioned = independent.conditional({vertical: 100.0}).distribution
         assert mean_of(conditioned, horizontal) == pytest.approx(
             mean_of(independent, horizontal)
         )
@@ -420,7 +424,7 @@ class TestConditioningOnAValue:
     def test_conditioning_always_narrows_a_correlated_variable(
         self, correlated, horizontal, vertical
     ):
-        conditioned, _ = correlated.conditional({vertical: 0.0})
+        conditioned = correlated.conditional({vertical: 0.0}).distribution
         assert variance_of(conditioned, horizontal) < variance_of(
             correlated, horizontal
         )
@@ -444,7 +448,7 @@ class TestConditioningOnAValue:
                 )
             ),
         )
-        conditioned, _ = distribution.conditional({given: 1.0})
+        conditioned = distribution.conditional({given: 1.0}).distribution
         assert conditioned.covariance_between(
             first, second
         ) == conditioned.covariance_between(second, first)
@@ -687,7 +691,7 @@ class TestSampling:
 
 class TestCopying:
     def test_a_copy_moves_without_moving_the_original(self, independent, horizontal):
-        copied = copy.copy(independent)
+        copied = copy.deepcopy(independent)
         copied.apply_translation({horizontal: 10.0})
         assert mean_of(independent, horizontal) == 1.0
         assert mean_of(copied, horizontal) == 11.0
@@ -710,9 +714,9 @@ class TestCopying:
     def test_a_deep_copy_of_a_truncated_distribution_keeps_its_box(
         self, correlated, horizontal, vertical
     ):
-        truncated, _ = correlated.truncated(
+        truncated = correlated.truncated(
             box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        )
+        ).distribution
         copied = copy.deepcopy(truncated)
         assert copied.box == truncated.box
         assert copied.normalizing_constant == truncated.normalizing_constant
@@ -736,7 +740,7 @@ def mode_point_of(truncated: TruncatedMultivariateGaussianDistribution) -> np.nd
     :return: The one point the mode is, read back in the distribution's own order, so a
         mode an optimiser lands next to can be compared to the value it should be.
     """
-    mode, _ = truncated.log_mode()
+    mode = truncated.log_mode().event
     box = mode.simple_sets[0]
     return np.array(
         [box[variable].simple_sets[0].lower for variable in truncated.variables]
@@ -752,9 +756,11 @@ class TestTruncation:
         answer with one of its own kind.
         """
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, probability = correlated.truncated(box)
-        assert isinstance(truncated, TruncatedMultivariateGaussianDistribution)
-        assert probability == pytest.approx(correlated.probability(box))
+        truncation = correlated.truncated(box)
+        assert isinstance(
+            truncation.distribution, TruncatedMultivariateGaussianDistribution
+        )
+        assert truncation.probability == pytest.approx(correlated.probability(box))
 
     def test_an_event_of_more_than_one_box_is_not_this_class_to_answer(
         self, correlated, horizontal, vertical
@@ -777,25 +783,25 @@ class TestTruncation:
         nothing = SimpleEvent.from_data(
             {horizontal: singleton(0.0), vertical: singleton(0.0)}
         ).as_composite_set()
-        truncated, probability = correlated.truncated(nothing)
-        assert truncated is None
-        assert probability == 0.0
+        truncation = correlated.truncated(nothing)
+        assert truncation.distribution is None
+        assert truncation.probability == 0.0
 
     def test_the_truncated_density_is_the_original_scaled_up_to_one(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, probability = correlated.truncated(box)
+        truncation = correlated.truncated(box)
         inside = np.array([[0.5, 0.5]])
-        assert truncated.likelihood(inside)[0] == pytest.approx(
-            correlated.likelihood(inside)[0] / probability
+        assert truncation.distribution.likelihood(inside)[0] == pytest.approx(
+            correlated.likelihood(inside)[0] / truncation.probability
         )
 
     def test_nothing_outside_the_event_can_happen(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         assert truncated.likelihood(np.array([[5.0, 5.0]]))[0] == 0.0
 
     def test_an_excluded_end_of_the_box_cannot_happen(
@@ -804,7 +810,7 @@ class TestTruncation:
         box = SimpleEvent.from_data(
             {horizontal: open_closed(0.0, 1.0), vertical: closed(0.0, 1.0)}
         ).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         likelihoods = truncated.likelihood(np.array([[0.0, 0.5], [1.0, 0.5]]))
         assert likelihoods[0] == 0.0
         assert likelihoods[1] > 0.0
@@ -824,7 +830,7 @@ class TestTruncation:
         box = SimpleEvent.from_data(
             {horizontal: closed(5.0, 6.0), vertical: closed(0.0, 1.0)}
         ).as_composite_set()
-        truncated, _ = distribution.truncated(box)
+        truncated = distribution.truncated(box).distribution
         assert truncated.box_contains(np.array([0.5, 5.5]))
         assert not truncated.box_contains(np.array([5.5, 0.5]))
 
@@ -832,7 +838,7 @@ class TestTruncation:
         self, independent, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 2.0).as_composite_set()
-        truncated, _ = independent.truncated(box)
+        truncated = independent.truncated(box).distribution
         point = np.array([[1.0, 0.5]])
         expected = 1.0
         for index, variable in enumerate(independent.variables):
@@ -853,7 +859,7 @@ class TestTruncation:
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         values = truncated.cumulative_distribution_function(
             np.array([[-1.0, 0.5], [2.0, 3.0]])
         )
@@ -864,15 +870,15 @@ class TestTruncation:
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         assert truncated.probability(truncated.support) == pytest.approx(1.0)
 
     def test_the_mode_is_the_mean_when_the_mean_survived_the_truncation(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, -1.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        mode, _ = truncated.mode()
+        truncated = correlated.truncated(box).distribution
+        mode = truncated.mode().event
         assert mode.contains(np.array([0.0, 0.0]))
 
     def test_the_mode_of_variables_that_do_not_co_vary_is_the_mean_pulled_into_the_box(
@@ -885,7 +891,7 @@ class TestTruncation:
         box = SimpleEvent.from_data(
             {horizontal: closed(3.0, 4.0), vertical: closed(-2.0, 0.0)}
         ).as_composite_set()
-        truncated, _ = independent.truncated(box)
+        truncated = independent.truncated(box).distribution
         assert mode_point_of(truncated) == pytest.approx(
             [3.0, mean_of(independent, vertical)]
         )
@@ -898,8 +904,8 @@ class TestTruncation:
         the mean still has exactly one most likely point: its own corner nearest to it.
         """
         box = box_over(horizontal, vertical, 3.0, 4.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        _, log_density = truncated.log_mode()
+        truncated = correlated.truncated(box).distribution
+        log_density = truncated.log_mode().log_likelihood
         assert mode_point_of(truncated) == pytest.approx([3.0, 3.0])
         assert log_density == pytest.approx(
             truncated.log_likelihood(np.array([[3.0, 3.0]]))[0]
@@ -920,15 +926,15 @@ class TestTruncation:
         box = SimpleEvent.from_data(
             {horizontal: closed(1.0, 2.0), vertical: closed(-5.0, 5.0)}
         ).as_composite_set()
-        truncated, _ = strongly_correlated.truncated(box)
+        truncated = strongly_correlated.truncated(box).distribution
         assert mode_point_of(truncated) == pytest.approx([1.0, 0.9])
 
     def test_no_point_of_the_box_is_more_likely_than_the_mode(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 3.0, 4.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        _, log_density = truncated.log_mode()
+        truncated = correlated.truncated(box).distribution
+        log_density = truncated.log_mode().log_likelihood
         grid = np.linspace(3.0, 4.0, 11)
         elsewhere = np.array([[first, second] for first in grid for second in grid])
         assert max(truncated.log_likelihood(elsewhere)) <= log_density
@@ -944,18 +950,18 @@ class TestTruncation:
         box = SimpleEvent.from_data(
             {horizontal: open_closed(3.0, 4.0), vertical: open_closed(3.0, 4.0)}
         ).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        _, log_density = truncated.log_mode()
+        truncated = correlated.truncated(box).distribution
+        log_density = truncated.log_mode().log_likelihood
         assert log_density > -np.inf
         assert truncated.log_likelihood(np.array([[3.0, 3.0]]))[0] == -np.inf
 
     def test_truncating_again_narrows_the_event(self, correlated, horizontal, vertical):
         box = box_over(horizontal, vertical, 0.0, 2.0).as_composite_set()
         smaller = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        narrowed, probability = truncated.truncated(smaller)
-        assert narrowed.likelihood(np.array([[1.5, 1.5]]))[0] == 0.0
-        assert probability == pytest.approx(
+        truncated = correlated.truncated(box).distribution
+        truncation = truncated.truncated(smaller)
+        assert truncation.distribution.likelihood(np.array([[1.5, 1.5]]))[0] == 0.0
+        assert truncation.probability == pytest.approx(
             correlated.probability(smaller) / correlated.probability(box)
         )
 
@@ -963,19 +969,19 @@ class TestTruncation:
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         truncated.burn_in_period_length = 7
         smaller = box_over(horizontal, vertical, 0.0, 0.5).as_composite_set()
-        further, _ = truncated.truncated(smaller)
+        further = truncated.truncated(smaller).distribution
         assert further.burn_in_period_length == truncated.burn_in_period_length
 
     def test_the_burn_in_period_length_carries_over_to_a_conditional(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         truncated.burn_in_period_length = 7
-        conditional, _ = truncated.log_conditional({horizontal: 0.5})
+        conditional = truncated.log_conditional({horizontal: 0.5}).distribution
         assert conditional.burn_in_period_length == truncated.burn_in_period_length
 
     def test_every_sample_falls_inside_the_event(
@@ -983,7 +989,7 @@ class TestTruncation:
     ):
         np.random.seed(69)
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         samples = truncated.sample(200)
         assert samples.shape == (200, 2)
         assert all(truncated.support.contains(sample) for sample in samples)
@@ -1007,7 +1013,7 @@ class TestTruncation:
         confined = SimpleEvent.from_data(
             {horizontal: closed(1.0, np.inf), vertical: closed(-np.inf, np.inf)}
         ).as_composite_set()
-        truncated, _ = correlated.truncated(confined)
+        truncated = correlated.truncated(confined).distribution
         samples = truncated.sample(5000)
         assert samples[:, 1].mean() == pytest.approx(
             rho * norm.pdf(1.0) / norm.sf(1.0), abs=0.05
@@ -1022,7 +1028,7 @@ class TestTruncation:
         """
         np.random.seed(69)
         unlikely = box_over(horizontal, vertical, 8.0, 9.0).as_composite_set()
-        truncated, _ = correlated.truncated(unlikely)
+        truncated = correlated.truncated(unlikely).distribution
         samples = truncated.sample(50)
         assert samples.shape == (50, 2)
         assert all(truncated.support.contains(sample) for sample in samples)
@@ -1034,13 +1040,33 @@ class TestTruncation:
         unlikely = SimpleEvent.from_data(
             {horizontal: closed(20.0, 21.0), vertical: closed(20.0, 21.0)}
         ).as_composite_set()
-        truncated, _ = independent.truncated(unlikely)
+        truncated = independent.truncated(unlikely).distribution
         samples = truncated.sample(50)
         assert samples.shape == (50, 2)
         assert all(truncated.support.contains(sample) for sample in samples)
 
 
 # %% fixing a variable of a distribution that has already been confined
+
+
+class TestNormalizingConstant:
+    def test_the_probability_of_the_box_is_computed_once(
+        self, correlated, horizontal, vertical, monkeypatch
+    ):
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        calls = []
+        probability_of_simple_event = type(correlated).probability_of_simple_event
+
+        def counted(distribution, event):
+            calls.append(event)
+            return probability_of_simple_event(distribution, event)
+
+        monkeypatch.setattr(type(correlated), "probability_of_simple_event", counted)
+        points = np.array([[0.5, 0.5], [0.2, 0.7]])
+        first_answer = truncated.log_likelihood(points)
+        np.testing.assert_array_equal(truncated.log_likelihood(points), first_answer)
+        assert len(calls) <= 1
 
 
 class TestConditioningATruncatedDistribution:
@@ -1052,8 +1078,8 @@ class TestConditioningATruncatedDistribution:
         itself confined to what the box still allows the rest.
         """
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        conditional, _ = truncated.conditional({vertical: 0.5})
+        truncated = correlated.truncated(box).distribution
+        conditional = truncated.conditional({vertical: 0.5}).distribution
         assert isinstance(conditional, TruncatedMultivariateGaussianDistribution)
         assert conditional.variables == (horizontal,)
         assert conditional.likelihood(np.array([[1.5]]))[0] == 0.0
@@ -1063,14 +1089,14 @@ class TestConditioningATruncatedDistribution:
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        conditional, _ = truncated.conditional({vertical: 0.5})
+        truncated = correlated.truncated(box).distribution
+        conditional = truncated.conditional({vertical: 0.5}).distribution
 
-        untruncated_conditional, _ = correlated.conditional({vertical: 0.5})
+        untruncated_conditional = correlated.conditional({vertical: 0.5}).distribution
         interval = SimpleEvent.from_data(
             {horizontal: closed(0.0, 1.0)}
         ).as_composite_set()
-        expected, _ = untruncated_conditional.truncated(interval)
+        expected = untruncated_conditional.truncated(interval).distribution
         inside = np.array([[0.25]])
         assert conditional.likelihood(inside)[0] == pytest.approx(
             expected.likelihood(inside)[0]
@@ -1084,25 +1110,240 @@ class TestConditioningATruncatedDistribution:
         which is what the number answered alongside the conditional has to be.
         """
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        conditional, log_density = truncated.log_conditional({vertical: 0.5})
+        truncated = correlated.truncated(box).distribution
+        conditioning = truncated.log_conditional({vertical: 0.5})
         assert truncated.likelihood(np.array([[0.25, 0.5]]))[0] == pytest.approx(
-            math.exp(log_density) * conditional.likelihood(np.array([[0.25]]))[0]
+            math.exp(conditioning.log_likelihood)
+            * conditioning.distribution.likelihood(np.array([[0.25]]))[0]
         )
 
     def test_a_value_the_box_rules_out_leaves_nothing(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
-        conditional, log_density = truncated.log_conditional({vertical: 5.0})
-        assert conditional is None
-        assert log_density == -np.inf
+        truncated = correlated.truncated(box).distribution
+        conditioning = truncated.log_conditional({vertical: 5.0})
+        assert conditioning.distribution is None
+        assert conditioning.log_likelihood == -np.inf
 
     def test_fixing_every_variable_needs_a_circuit(
         self, correlated, horizontal, vertical
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
-        truncated, _ = correlated.truncated(box)
+        truncated = correlated.truncated(box).distribution
         with pytest.raises(ProbabilisticCircuitRequiredError):
             truncated.log_conditional({horizontal: 0.25, vertical: 0.5})
+
+
+# %% marginals and moments of a truncated distribution
+
+
+class TestMarginalOfATruncatedDistribution:
+    def test_a_marginal_over_some_of_its_variables_has_no_closed_form(
+        self, correlated, horizontal, vertical
+    ):
+        """
+        Integrating a variable out of a correlated Gaussian confined to a box does not
+        leave a Gaussian confined to a box.
+        """
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        with pytest.raises(NoClosedFormError):
+            truncated.marginal([horizontal])
+
+    def test_a_marginal_over_all_of_its_variables_is_the_distribution_itself(
+        self, correlated, horizontal, vertical
+    ):
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        marginal = truncated.marginal([vertical, horizontal])
+        assert isinstance(marginal, TruncatedMultivariateGaussianDistribution)
+        assert marginal.variables == truncated.variables
+        points = np.array([[0.5, 0.5], [0.2, 0.7]])
+        np.testing.assert_array_equal(
+            marginal.log_likelihood(points), truncated.log_likelihood(points)
+        )
+
+    def test_a_marginal_over_none_of_its_variables_is_nothing(
+        self, correlated, horizontal, vertical
+    ):
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        assert truncated.marginal([Continuous("absent")]) is None
+
+
+class TestMomentsOfATruncatedDistribution:
+    def test_variables_that_do_not_co_vary_have_the_moments_of_their_truncated_normal(
+        self, independent, horizontal, vertical
+    ):
+        box = SimpleEvent.from_data(
+            {horizontal: closed(0.0, 3.0), vertical: closed(-4.0, 1.0)}
+        ).as_composite_set()
+        truncated = independent.truncated(box).distribution
+        for variable, mean, deviation, lower, upper in (
+            (horizontal, 1.0, 2.0, 0.0, 3.0),
+            (vertical, -2.0, 3.0, -4.0, 1.0),
+        ):
+            expected = truncnorm(
+                (lower - mean) / deviation,
+                (upper - mean) / deviation,
+                loc=mean,
+                scale=deviation,
+            )
+            assert mean_of(truncated, variable) == pytest.approx(expected.mean())
+            assert variance_of(truncated, variable) == pytest.approx(expected.var())
+
+    def test_a_bound_on_one_variable_moves_the_mean_of_a_correlated_one(
+        self, correlated, horizontal, vertical
+    ):
+        """
+        The mean of the unbounded variable follows the bounded one by their correlation,
+        which is 0.6 here, and the mean of a standard normal above 1 is known.
+        """
+        box = SimpleEvent.from_data(
+            {vertical: closed(1.0, math.inf)}
+        ).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        mean_above_one = norm.pdf(1.0) / norm.sf(1.0)
+        assert mean_of(truncated, vertical) == pytest.approx(mean_above_one)
+        assert mean_of(truncated, horizontal) == pytest.approx(0.6 * mean_above_one)
+
+    def test_correlated_variables_have_the_moments_of_the_density_over_the_box(
+        self, correlated, horizontal, vertical
+    ):
+        box = SimpleEvent.from_data(
+            {horizontal: closed(-1.0, 0.5), vertical: closed(0.2, 2.0)}
+        ).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+
+        # the density summed over the midpoints of a fine grid of the box
+        resolution = 1200
+        horizontal_values = -1.0 + 1.5 * (np.arange(resolution) + 0.5) / resolution
+        vertical_values = 0.2 + 1.8 * (np.arange(resolution) + 0.5) / resolution
+        grid = np.stack(
+            np.meshgrid(horizontal_values, vertical_values, indexing="ij"), axis=-1
+        )
+        density = correlated.scipy_distribution.pdf(grid)
+        density /= density.sum()
+        for variable, values in (
+            (horizontal, grid[..., 0]),
+            (vertical, grid[..., 1]),
+        ):
+            mean = float((density * values).sum())
+            variance = float((density * values**2).sum()) - mean**2
+            assert mean_of(truncated, variable) == pytest.approx(mean, abs=1e-6)
+            assert variance_of(truncated, variable) == pytest.approx(variance, abs=1e-6)
+
+    def test_three_correlated_variables_have_the_moments_of_their_samples(self):
+        variables = tuple(Continuous(name) for name in ("first", "second", "third"))
+        covariance = np.array([[1.0, 0.5, 0.3], [0.5, 1.0, 0.4], [0.3, 0.4, 1.0]])
+        gaussian = MultivariateGaussianDistribution(
+            variables=variables,
+            mean=np.array([0.2, -0.1, 0.4]),
+            covariance=Covariance.from_matrix(covariance),
+        )
+        box = SimpleEvent.from_data(
+            {variable: closed(-0.5, 1.5) for variable in variables}
+        ).as_composite_set()
+        truncated = gaussian.truncated(box).distribution
+
+        samples = np.random.default_rng(69).multivariate_normal(
+            gaussian.mean, covariance, size=2_000_000
+        )
+        inside = samples[np.all((samples >= -0.5) & (samples <= 1.5), axis=1)]
+        for index, variable in enumerate(variables):
+            assert mean_of(truncated, variable) == pytest.approx(
+                inside[:, index].mean(), abs=5e-3
+            )
+            assert variance_of(truncated, variable) == pytest.approx(
+                inside[:, index].var(), abs=5e-3
+            )
+
+    def test_a_second_moment_about_a_center_follows_from_the_mean_and_variance(
+        self, correlated, horizontal, vertical
+    ):
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        center = 0.3
+        moment = truncated.moment(
+            VariableMap({horizontal: 2}), VariableMap({horizontal: center})
+        )[horizontal]
+        assert moment == pytest.approx(
+            variance_of(truncated, horizontal)
+            + (mean_of(truncated, horizontal) - center) ** 2
+        )
+
+    def test_a_higher_moment_matches_the_truncated_normal(
+        self, independent, horizontal, vertical
+    ):
+        box = SimpleEvent.from_data(
+            {horizontal: closed(0.0, 3.0), vertical: closed(-4.0, 1.0)}
+        ).as_composite_set()
+        truncated = independent.truncated(box).distribution
+        expected = truncnorm((0.0 - 1.0) / 2.0, (3.0 - 1.0) / 2.0, loc=1.0, scale=2.0)
+        moment = truncated.moment(
+            VariableMap({horizontal: 3}), VariableMap({horizontal: 0.0})
+        )[horizontal]
+        assert moment == pytest.approx(expected.moment(3))
+
+    @pytest.mark.parametrize("order", [-1, 1.5])
+    def test_an_order_that_is_negative_or_not_a_whole_number_is_rejected(
+        self, correlated, horizontal, vertical, order
+    ):
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        with pytest.raises(InvalidMomentOrderError):
+            truncated.moment(
+                VariableMap({horizontal: order}), VariableMap({horizontal: 0.0})
+            )
+
+    def test_a_coarser_integration_answers_less_exactly(
+        self, correlated, horizontal, vertical
+    ):
+        box = SimpleEvent.from_data(
+            {vertical: closed(1.0, math.inf)}
+        ).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        coarse = dataclasses.replace(
+            truncated, moment_integration=MomentIntegration(panels=1, nodes_per_panel=2)
+        )
+        exact = 0.6 * norm.pdf(1.0) / norm.sf(1.0)
+        assert abs(mean_of(coarse, horizontal) - exact) > abs(
+            mean_of(truncated, horizontal) - exact
+        )
+
+    def test_the_way_to_integrate_survives_what_the_distribution_becomes(
+        self, correlated, horizontal, vertical
+    ):
+        box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
+        truncated = correlated.truncated(box).distribution
+        moment_integration = MomentIntegration(
+            deviations_integrated_over=6.0, panels=8, nodes_per_panel=12
+        )
+        configured = dataclasses.replace(
+            truncated, moment_integration=moment_integration
+        )
+        further = configured.truncated(
+            box_over(horizontal, vertical, 0.2, 0.8).as_composite_set()
+        ).distribution
+        conditioned = configured.log_conditional({horizontal: 0.5}).distribution
+        for descendant in (
+            further,
+            conditioned,
+            copy.copy(configured),
+            copy.deepcopy(configured),
+        ):
+            assert descendant.moment_integration == moment_integration
+
+
+class TestMomentIntegration:
+    def test_the_points_integrate_a_polynomial_exactly(self):
+        points = MomentIntegration(panels=2, nodes_per_panel=3).points_between(0.0, 2.0)
+        assert len(points.values) == 6
+        assert np.sum(points.weights) == pytest.approx(2.0)
+        assert np.sum(points.weights * points.values**3) == pytest.approx(4.0)
+
+    def test_the_settings_cannot_be_changed_after_creation(self):
+        moment_integration = MomentIntegration()
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            moment_integration.panels = 1

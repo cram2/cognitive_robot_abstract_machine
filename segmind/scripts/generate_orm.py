@@ -22,7 +22,14 @@ from krrood.ormatic.custom_types import NumpyType
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
 
-ignored_classes = {SubclassJSONSerializer}
+from segmind.event_segmentation import Segmind
+from segmind.exceptions import NoSemanticAnnotationToWatch
+
+ignored_classes = {
+    SubclassJSONSerializer,
+    Segmind,
+    NoSemanticAnnotationToWatch,
+}
 
 dependencies = []
 

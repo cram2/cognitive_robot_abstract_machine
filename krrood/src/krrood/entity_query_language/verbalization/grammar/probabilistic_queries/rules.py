@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List
 
 from krrood.entity_query_language.operators.probabilistic_queries import (
     Distribution,
@@ -70,7 +69,7 @@ class DistributionRule(PhraseRule):
     >>> match = a(Robot)(name="R2", battery=...)
     >>> verbalize_expression(distribution_of(match))
     "The distribution over a Robot given that its name is 'R2'"
-    >>> verbalize_expression(distribution_of(match, marginalize_for=(match.variable.battery,)))
+    >>> verbalize_expression(distribution_of(match, marginalize_for=(match.battery,)))
     "The distribution over the battery of a Robot given that its name is 'R2'"
     """
 
@@ -104,7 +103,7 @@ class DistributionRule(PhraseRule):
             parts=[Directive.DISTRIBUTION_OVER.as_fragment(), subject]
         )
 
-        items: List[VerbalizationFragment] = []
+        items: list[VerbalizationFragment] = []
         given = assembler._given_that_block(plan)
         if given is not None:
             items.append(given)
@@ -112,15 +111,19 @@ class DistributionRule(PhraseRule):
         if where is not None:
             items.append(where)
 
-        return BlockFragment(header=header, items=items, source=node.match.expression)
+        return BlockFragment(
+            header=header, items=items, source=node.match._get_expression_()
+        )
 
 
 @dataclass
 class ProbabilityRule(PhraseRule):
     """
-    Realise ``probability_of(condition)`` as *"the probability that <condition>"* --
-    the condition is recursed through the ordinary comparator/logical-operator grammar
-    via ``context.child``, so it reads exactly as it would inside a ``where`` clause.
+    Realise ``probability_of(condition)`` as *"the probability that <condition>"*, and
+    ``probability_of(condition, evidence=evidence)`` as *"the probability that
+    <condition> given that <evidence>"* -- both are recursed through the ordinary
+    comparator/logical-operator grammar via ``context.child``, so they read exactly as
+    they would inside a ``where`` clause.
 
     >>> from krrood.entity_query_language.factories import probability_of, variable
     >>> robot = variable(Robot, [])
@@ -131,9 +134,10 @@ class ProbabilityRule(PhraseRule):
     construct = Probability
 
     def build(self, node: Probability, context: RuleContext) -> VerbalizationFragment:
-        return PhraseFragment(
-            parts=[
-                Keywords.THE_PROBABILITY_THAT.as_fragment(),
-                context.child(node.condition),
-            ]
-        )
+        parts = [
+            Keywords.THE_PROBABILITY_THAT.as_fragment(),
+            context.child(node.condition),
+        ]
+        if node.evidence is not None:
+            parts += [Keywords.GIVEN_THAT.as_fragment(), context.child(node.evidence)]
+        return PhraseFragment(parts=parts)

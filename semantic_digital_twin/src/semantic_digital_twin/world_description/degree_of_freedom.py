@@ -4,7 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from typing_extensions import Any, ClassVar, Dict, Generic, Self, TypeVar
+from typing_extensions import Any, ClassVar, Generic, Self, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -57,7 +57,7 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
     def resolve(self) -> float:
         return self.dof._world.state[self.dof.id][self.derivative]
 
-    def _value_to_json(self, **kwargs) -> Dict[str, Any]:
+    def _value_to_json(self, **kwargs) -> dict[str, Any]:
         result = {}
         WorldEntityReference(DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM).write(
             result, self.dof
@@ -65,7 +65,7 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         dof = WorldEntityReference(
             DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
         ).resolve(data, **kwargs)
@@ -130,6 +130,33 @@ class DegreeOfFreedomLimits(Generic[T]):
     def __post_init__(self):
         self.lower = self.lower or DerivativeMap()
         self.upper = self.upper or DerivativeMap()
+
+    @classmethod
+    def from_position_range_and_speed(
+        cls,
+        lower_position: T | None = None,
+        upper_position: T | None = None,
+        maximum_speed: T | None = None,
+    ) -> Self:
+        """
+        Create limits that keep the position between the two bounds and the velocity within
+        the maximum speed in either direction.
+
+        :param lower_position: The lowest position allowed, or ``None`` for no lower
+            bound.
+        :param upper_position: The highest position allowed, or ``None`` for no upper
+            bound.
+        :param maximum_speed: The largest absolute velocity allowed, which bounds the
+            velocity in both directions, or ``None`` for no velocity bound.
+        :return: The limits with every other derivative left unbounded.
+        """
+        return cls(
+            lower=DerivativeMap(
+                position=lower_position,
+                velocity=None if maximum_speed is None else -maximum_speed,
+            ),
+            upper=DerivativeMap(position=upper_position, velocity=maximum_speed),
+        )
 
     def __deepcopy__(self, memo):
         return DegreeOfFreedomLimits(

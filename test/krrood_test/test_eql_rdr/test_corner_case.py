@@ -4,8 +4,8 @@ Self-contained tests for corner-case provenance
 
 Uses plain dataclasses for the recorded cases and raw core-EQL ``Variable`` instances
 (any ``SymbolicExpression`` will do -- only ``._id_`` is used) as stand-ins for rule
-condition nodes, so this test module -- and the corner-case provenance slice it covers --
-stays testable independently of the rest of the RDR engine.
+condition nodes, so this test module -- and the corner-case provenance slice it covers
+-- stays testable independently of the rest of the RDR engine.
 """
 
 from __future__ import annotations
@@ -31,14 +31,18 @@ class Species(Enum):
 
 @dataclass(unsafe_hash=True)
 class Owner:
-    """Inner dataclass of a nested dataclass, used to exercise recursive (de)serialization."""
+    """
+    Inner dataclass of a nested dataclass, used to exercise recursive (de)serialization.
+    """
 
     name: str
 
 
 @dataclass
 class Animal:
-    """Flat-plus-nested dataclass used as the recorded corner case."""
+    """
+    Flat-plus-nested dataclass used as the recorded corner case.
+    """
 
     name: str
     species: Species
@@ -48,7 +52,9 @@ class Animal:
 
 @dataclass
 class Unserializable:
-    """A dataclass with a field type AsdictCaseSerializer does not support."""
+    """
+    A dataclass with a field type AsdictCaseSerializer does not support.
+    """
 
     tags: list
 
@@ -67,7 +73,7 @@ def test_to_source_emits_eval_able_constructor_source_for_a_nested_dataclass():
 
     rebuilt = eval(
         case_source.source,
-        {t.__name__: t for t in (Animal, Species, Owner)},
+        {case_type.__name__: case_type for case_type in (Animal, Species, Owner)},
     )
     assert rebuilt == _rex()
     assert case_source.referenced_types == {Animal, Species, Owner}

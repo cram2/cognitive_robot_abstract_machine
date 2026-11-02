@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 
-from typing_extensions import Dict, List, Tuple
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
@@ -89,7 +88,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
 
     def _bindings(
         self, plan: InstantiatedPlan, instantiated_type: type
-    ) -> Tuple[List[VerbalizationFragment], Dict[uuid.UUID, VerbalizationFragment]]:
+    ) -> tuple[list[VerbalizationFragment], dict[uuid.UUID, VerbalizationFragment]]:
         """:return: Every binding fragment and the field-reference overrides.
 
         Its contribution is the *"where"* clause body: it builds each *"the container of the Drawer is
@@ -101,8 +100,8 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         >>> verbalize_expression(inference(Drawer)(container=connection.parent, handle=connection.child))
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
-        binding_fragments: List[VerbalizationFragment] = []
-        overrides: Dict[uuid.UUID, VerbalizationFragment] = {}
+        binding_fragments: list[VerbalizationFragment] = []
+        overrides: dict[uuid.UUID, VerbalizationFragment] = {}
         for binding in plan.bindings:
             field_reference = self._field_reference(
                 binding.field_name, plan.type_name, instantiated_type
@@ -168,8 +167,8 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         self,
         node: InstantiatedVariable,
         type_name: str,
-        binding_fragments: List[VerbalizationFragment],
-        constraint_fragments: List[VerbalizationFragment],
+        binding_fragments: list[VerbalizationFragment],
+        constraint_fragments: list[VerbalizationFragment],
     ) -> VerbalizationFragment:
         """:return: *"a <type>, where <bindings>, such that <constraints>"* — the referring noun
         phrase with its appositive clauses as droppable modifiers.
@@ -183,7 +182,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         >>> verbalize_expression(inference(Drawer)(container=connection.parent, handle=connection.child))
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
-        modifiers: List[VerbalizationFragment] = []
+        modifiers: list[VerbalizationFragment] = []
         if binding_fragments:
             # Bindings and constraints are independent clauses → a two-clause pair keeps its comma.
             joined = oxford_comma(

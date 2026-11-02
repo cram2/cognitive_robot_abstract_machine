@@ -9,18 +9,7 @@ import numpy as np
 import numpy.typing as npt
 from trimesh import Trimesh
 from trimesh.util import concatenate
-from typing_extensions import (
-    Dict,
-    Any,
-    Self,
-    Optional,
-    List,
-    Iterable,
-    Iterator,
-    Generic,
-    Type,
-    TypeVar,
-)
+from typing_extensions import Any, Self, Iterable, Iterator, Generic, TypeVar
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
@@ -60,18 +49,18 @@ class ShapeCollection(SubclassJSONSerializer):
     A collection of shapes.
     """
 
-    shapes: List[Shape] = field(default_factory=list)
+    shapes: list[Shape] = field(default_factory=list)
     """
     The shapes contained in this collection.
     """
 
-    reference_frame: Optional[KinematicStructureEntity] = None
+    reference_frame: KinematicStructureEntity | None = None
     """
     Backreference to the kinematic structure entity this collection belongs to.
     """
 
     @property
-    def world(self) -> Optional[World]:
+    def world(self) -> World | None:
         """
         The world this collection belongs to.
         """
@@ -209,15 +198,25 @@ class ShapeCollection(SubclassJSONSerializer):
             HomogeneousTransformationMatrix(reference_frame=reference_frame)
         )
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "shapes": [to_json(shape, **kwargs) for shape in self.shapes],
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return cls(shapes=[from_json(d, **kwargs) for d in data["shapes"]])
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        """
+        The collection belongs to the frame all its shapes are expressed in, which is the
+        entity it was written from, such as a body whose shapes are replaced.
+        """
+        shapes = [from_json(d, **kwargs) for d in data["shapes"]]
+        frames = {
+            id(shape.origin.reference_frame): shape.origin.reference_frame
+            for shape in shapes
+        }
+        reference_frame = next(iter(frames.values())) if len(frames) == 1 else None
+        return cls(shapes=shapes, reference_frame=reference_frame)
 
     def center_of_mass_in_world(self) -> Point3:
         """
@@ -270,7 +269,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     first, but Python cannot derive one type parameter from another, so both are spelled.
     """
 
-    shapes: List[BoxT] = field(default_factory=list)
+    shapes: list[BoxT] = field(default_factory=list)
 
     def __post_init__(self):
         if not self.reference_frame:
@@ -284,7 +283,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         return iter(self.bounding_boxes)
 
     @property
-    def bounding_boxes(self) -> List[BoxT]:
+    def bounding_boxes(self) -> list[BoxT]:
         return self.shapes
 
     @property
@@ -342,7 +341,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     @classmethod
     def from_simple_event(
         cls,
-        box_type: Type[BoxT],
+        box_type: type[BoxT],
         reference_frame: KinematicStructureEntity,
         simple_event: SimpleEvent,
         keep_surface: bool = False,
@@ -388,7 +387,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     @classmethod
     def from_event(
         cls,
-        box_type: Type[BoxT],
+        box_type: type[BoxT],
         reference_frame: KinematicStructureEntity,
         event: Event,
     ) -> Self:

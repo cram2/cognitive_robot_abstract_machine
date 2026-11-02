@@ -4,7 +4,6 @@ from uuid import UUID
 
 import matplotlib
 import numpy as np
-from typing_extensions import List, Dict
 
 from giskardpy.utils.utils import create_path
 
@@ -33,7 +32,7 @@ class WorldStateTrajectoryPlotter:
     The trajectory of the robot's world state.
     """
 
-    derivatives_to_plot: List[Derivatives] = field(
+    derivatives_to_plot: list[Derivatives] = field(
         default_factory=lambda: [
             Derivatives.position,
             Derivatives.velocity,
@@ -65,7 +64,7 @@ class WorldStateTrajectoryPlotter:
     Width of a second in cm.
     """
 
-    y_label: Dict[Derivatives, str] = field(
+    y_label: dict[Derivatives, str] = field(
         default_factory=lambda: {
             Derivatives.position: "rad or m",
             Derivatives.velocity: "rad/s or m/s",
@@ -94,7 +93,7 @@ class WorldStateTrajectoryPlotter:
     For positions this suppresses lines that are always equal to the initial value.
     """
 
-    color_map: Dict[UUID, str] | None = None
+    color_map: dict[UUID, str] | None = None
     """
     A color map to use for plotting the trajectory.
 
@@ -191,7 +190,7 @@ class WorldStateTrajectoryPlotter:
             step = max(1, int(np.ceil(duration / max_ticks)))
         return np.arange(0.0, duration + 1e-9, step)
 
-    def _sort_degrees_of_freedom(self, traj: WorldStateTrajectory) -> List[UUID]:
+    def _sort_degrees_of_freedom(self, traj: WorldStateTrajectory) -> list[UUID]:
         """
         Return DOF ids ordered based on self.sort_degrees_of_freedom.
 
@@ -218,8 +217,8 @@ class WorldStateTrajectoryPlotter:
         return not np.all(series == float(series[0]))
 
     def _create_styles_for_degrees_of_freedom(
-        self, dof_ids: List[UUID]
-    ) -> Dict[UUID, dict]:
+        self, dof_ids: list[UUID]
+    ) -> dict[UUID, dict]:
         """
         Assign styles to DOFs, respecting an optional color_map of matplotlib format
         strings.
@@ -227,7 +226,7 @@ class WorldStateTrajectoryPlotter:
         :param dof_ids: DOF ids for which to create styles.
         :return: Dict mapping DOF ids to matplotlib style dicts.
         """
-        styles: Dict[UUID, dict] = {}
+        styles: dict[UUID, dict] = {}
         if self.color_map is not None:
             for d in dof_ids:
                 s = self.color_map.get(d)
@@ -313,8 +312,8 @@ class WorldStateTrajectoryPlotter:
     def _plot_derivatives(
         self,
         axes: list[plt.Axes],
-        styles: Dict[UUID, dict],
-        dof_ids: List[UUID],
+        styles: dict[UUID, dict],
+        dof_ids: list[UUID],
         traj: WorldStateTrajectory,
         t: np.ndarray,
     ):

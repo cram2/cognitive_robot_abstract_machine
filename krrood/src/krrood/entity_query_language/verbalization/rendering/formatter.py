@@ -6,7 +6,7 @@ import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing_extensions import ClassVar, Optional
+from typing_extensions import ClassVar
 
 from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
 
@@ -18,7 +18,7 @@ _log = logging.getLogger(__name__)
 #: Hex colour string (or ``None`` for no colour) for each semantic role, matching the
 #: query-graph palette.  Colour is a *formatter* concern — the fragment tree carries only the
 #: role tag.
-ROLE_COLORS: dict[SemanticRole, Optional[str]] = {
+ROLE_COLORS: dict[SemanticRole, str | None] = {
     SemanticRole.KEYWORD: "#eded18",  # ConclusionSelector yellow
     SemanticRole.VARIABLE: "cornflowerblue",
     SemanticRole.AGGREGATION: "#F54927",  # Aggregator red-orange
@@ -125,7 +125,7 @@ class Formatter(ABC):
         """
         ...
 
-    def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
+    def wrap_link(self, text: str, url: str, tooltip: str | None = None) -> str:
         """
         Wrap already-rendered *text* with a hyperlink to *url*.
 
@@ -190,7 +190,7 @@ class ANSIFormatter(Formatter):
         r, g, b = self._hex_to_rgb(color)
         return f"\033[38;2;{r};{g};{b}m{text}{self._RESET}"
 
-    def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
+    def wrap_link(self, text: str, url: str, tooltip: str | None = None) -> str:
         if not self._hyperlinks_enabled:
             return text
         # OSC 8 format: ESC ] 8 ; ; URL ST  text  ESC ] 8 ; ; ST
@@ -231,7 +231,7 @@ class HTMLFormatter(Formatter):
             return text
         return f'<span style="color:{color}">{text}</span>'
 
-    def wrap_link(self, text: str, url: str, tooltip: Optional[str] = None) -> str:
+    def wrap_link(self, text: str, url: str, tooltip: str | None = None) -> str:
         tooltip_attribute = (
             f' {_TOOLTIP_ATTR}="{html.escape(tooltip, quote=True)}"' if tooltip else ""
         )

@@ -307,7 +307,7 @@ def test_inference_chain_reachable_from_pipeline():
     for r1 in q1._evaluate_():
         for r2 in b._evaluate_(r1):
             assert r2.previous_operation_result is r1
-            # r1 must have a non-trivial previous chain (InstantiatedVariable → child vars)
+            # The inferred result must have a non-trivial previous chain (InstantiatedVariable → child variables)
             assert r1.previous_operation_result is not None
 
 

@@ -1,6 +1,13 @@
 # Motion Statecharts
 
-Motion Statecharts are a core concept in Giskard for composing complex robot motions. They provide a structured way to manage the transition between different motion goals and monitors, making it easier to build robust and reactive robot behaviors.
+Motion Statecharts are a core concept in Giskard for composing complex robot motions. A
+motion statechart is a plain `Statechart` from
+[cramph](https://cram2.github.io/cognitive_robot_abstract_machine/cramph/statecharts.html)
+whose nodes can add constraints to the motion problem. Life cycles, transition conditions,
+ticking, the composite templates (`Sequence`, `Parallel`, `TryInOrder`, `TryAll`,
+`RepeatUntil`, …), generic monitors and plotting are documented in
+[cramph](https://cram2.github.io/cognitive_robot_abstract_machine/cramph). This page covers
+what giskardpy adds on top.
 
 ## The Problem
 
@@ -10,43 +17,98 @@ Traditional robot motion planning often involves a sequence of fixed waypoints o
 - **Error Handling**: What happens if a collision is detected mid-motion? Or if the gripper fails to close? Handling these contingencies in a flat script often leads to "spaghetti code."
 - **Reactivity**: Modern robots need to respond to their environment. A simple trajectory doesn't easily allow for behavior like "move until a certain force is felt" or "stop if a human enters the workspace."
 
-## How Motion Statecharts Solve It
+A Motion Statechart solves them by composing a motion out of statechart nodes. Giskard ticks
+the statechart once per control cycle, before the QP controller computes the next command.
 
-Motion Statecharts address these issues by using a state machine-based approach to motion composition. 
+## Node types
 
-### Key Concepts
+- **Task**: A specific, single-purpose segment of the overall motion. Tasks add constraints to
+  the motion problem and observe whether those constraints are currently satisfied. For
+  example, a Cartesian position task observes whether the distance to its target is below a
+  threshold. Only running tasks influence the motion.
+- **Monitor**: A node that observes a condition of the world without adding constraints to the
+  motion, for example `PoseReached`, `JointPositionReached` or `Stalled`. A monitor is a
+  `MotionStatechartNode` that also says how it succeeds, usually by inheriting `EndedByOwner`
+  (see [Who ends a task](#who-ends-a-task)); a class that inherits only
+  `MotionStatechartNode` cannot be constructed.
+- **Goal**: A composite node that combines tasks and monitors into a reusable motion, for
+  example a Cartesian goal or opening a door.
+- **EndMotion**: An `EndStatechart` that additionally waits for the robot to come to rest (see
+  [Ending the motion](#ending-the-motion)).
 
-A Motion Statechart comprises multiple **nodes**, which may be one of the following
-types:
-- **Task**: A specific, single-purpose segment of the overall motion. These nodes add constraints to the motion problem and monitor their progress. For example, a Cartesian position task will monitor if the distance to the target is below a threshold.
-- **Monitor**: Nodes that observe certain conditions or events without controlling motion. For example, monitoring the distance between the robot’s gripper and a goal point without actively controlling the motion.
-- **Termination Node**: Nodes that signal the end of motion execution upon reaching a specific observation state. For example, a node that terminates the motion when a specific condition is met, such as reaching the final destination. There are two termination nodes, **EndMotion** and **CancelMotion**.
-- **Goal**: Nodes that encapsulate reusable, parameterized designs for Motion Statechart patterns. For example, a combination of monitors and motion tasks to open a door can be encapsulated into a template for
-reuse in different contexts.
+## Who ends a task
 
+A task that is ended stops being enforced, and the robot can then be pulled out of the pose
+that task had just reached, for example by another task that is still running. That is why
+every `Task` is `EndedByOwner`: it never ends itself on reaching its goal, and
+whoever runs it writes its success and interrupt conditions. Monitors such as `PoseReached` and
+`JointPositionReached` do the same. Nodes whose ending undoes nothing, such as `SetOdometry` and
+`SetSeedConfiguration`, are `SucceedsOnObservingTrue`. The ordering templates run those as
+they are and end every `EndedByOwner` node once it observes True, see
+[Who ends a node](https://cram2.github.io/cognitive_robot_abstract_machine/cramph/statecharts.html#who-ends-a-node).
 
-Every node has two inner state machines:
-- An observation FSM is used to represent whether an observed condition is currently True, False, or "?". For tasks, this state represents the constraint satisfaction status. An explicit "?" state is required for situations in which the state is unknown, for example when the node has never been active.
-- A life cycle FSM is used to determine whether the node is active.
-  - Possible states are :
-    - Not Started: The initial state.
-    - Running: The only active state. The Nodes can updates their observation state and Tasks will cause motions.
-    - Paused: Indicates a temporary inactivity
-    - Stopped: Indicates that the node purpose is done
-  - Every node has life cycle transitions that based on observation state of itself or other nodes. Since "?" is a possible observation state, the transitions use three-values logic:
-    - start: When True, Transition from Not Started -> Running
-    - pause: When True, Transition from Running -> Pause, when not True, transition from Pause -> Running
-    - end: When True, transition from Running or Paused -> Stopped
-    - reset: When True, transition from any State to Not Started.
-    - When multiple transitions are possible, the following priority is used: reset > end > pause > start
+## Ending the motion
 
-### Benefits
+The motion ends once an `EndMotion` node is running and observes True. `EndMotion` observes
+True once every active degree of freedom with a velocity limit has come to rest and more than
+one second of trajectory time has passed since the start of the whole motion, not since the
+`EndMotion` started. In a world without active degrees of freedom it observes True as soon as
+it runs. `EndMotion` offers the same factory methods as `EndStatechart`, such as
+`EndMotion.when_true(node)`, and must be added at the top level of the statechart. A
+`CancelStatechart` node ends the motion by raising its exception at the end of the control
+cycle it starts in.
 
+## Example
 
-- **Modularity**: Individual motions and checks are self-contained nodes that can be reused across different tasks.
-- **Clarity**: The statechart structure provides a clear visual and logical representation of the robot's behavior.
-- **Robustness**: Error handling and environment reactivity are built directly into the motion's structure through monitors and transitions.
+A plan that moves to a joint goal and then ends once the robot has come to rest. A statechart
+is built in the context of the executor that runs it, see
+[Running a motion statechart](#running-a-motion-statechart):
+
+```python
+from cramph.composites import Sequence
+from giskardpy.motion_statechart.graph_node import EndMotion
+from cramph.statechart import Statechart
+from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
+
+# goal_state is a JointState of the robot's joints
+motion_statechart = Statechart(context=executor.context)
+plan = Sequence(nodes=[JointPositionList(goal_state=goal_state)])
+motion_statechart.add_node(plan)
+motion_statechart.add_node(EndMotion.when_true(plan))
+```
+
+## Running a motion statechart
+
+giskardpy does not have its own statechart or executor. Motion control is an extension of
+cramph's `StatechartExecutor`, so the same statechart can also hold nodes of other modules,
+and their executor extensions can run alongside it. The executor is created first, because
+the statechart is built in its context:
+
+```python
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from giskardpy.motion_control import MotionControl
+
+executor = StatechartExecutor(
+    context=StatechartContext(world=world),
+    extensions=[MotionControl()],
+)
+# ... build motion_statechart = Statechart(context=executor.context) as above
+executor.compile(motion_statechart)
+executor.tick_until_end()
+```
+
+`MotionControl` gives the nodes a `MotionControlContext` with the QP controller configuration
+and the collision variable managers, sets the tick duration to the control time step, and
+applies the commands of the QP controller after every tick. Further extensions add what a
+run needs on top: `WorldStateTrajectoryRecording` and `DebugExpressionRecording` record the
+motion, `RosNodeAccess` gives nodes a ROS2 node, and `DebugExpressionPublishing` shows debug
+expressions in RViz. Extensions are called in the order they are listed, so list the
+recordings after `MotionControl`.
+
+## Benefits
+
 - **Constraint-Based**: The constraints of all currently active tasks influence the motion, ensuring the robot satisfies all requirements simultaneously (e.g., "reach for the cup while keeping the arm away from the table").
-
+- **Robustness**: Collisions, stalls and failed grasps are handled by monitors and templates in the structure of the motion rather than in the script that runs it.
 
 For practical examples of how to use Motion Statecharts, see the [Basic Motion](examples/basic_motion.md) and [Cartesian Goals](examples/cartesian_goals.md) tutorials.

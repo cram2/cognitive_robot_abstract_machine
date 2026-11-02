@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, Field
+
+import pytest
 from types import NoneType
 
+from sortedcontainers import SortedSet
 from typing_extensions import List, Type, TypeVar
 
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -207,3 +210,75 @@ def test_common_base_class():
     )
 
     assert common_base_class([KRROODCup, KRROODBowl, NoneType]) is None
+
+
+# %% WrappedField.holds_collection
+
+
+@dataclass
+class FieldsOfEveryValueShape:
+    """
+    Fields typed as single values and as collections, each optionally wrapped in a
+    union.
+    """
+
+    single_value: float
+    """
+    A single value.
+    """
+
+    optional_single_value: float | None
+    """
+    A single value that may be missing.
+    """
+
+    class_reference: Type[KRROODPosition]
+    """
+    A single class, which is not a collection although its annotation has an origin.
+    """
+
+    collection: List[str]
+    """
+    A collection of values.
+    """
+
+    optional_collection: list[str] | None
+    """
+    A collection of values that may be missing.
+    """
+
+    mapping: dict[str, int]
+    """
+    A mapping, which is a collection of key-value pairs.
+    """
+
+    frozen_collection: frozenset[str]
+    """
+    An immutable collection of values.
+    """
+
+    sorted_collection: SortedSet[str]
+    """
+    A sorted collection of values, whose class is not a subclass of :class:`set`.
+    """
+
+
+@pytest.mark.parametrize(
+    "field_name, holds_collection",
+    [
+        ("single_value", False),
+        ("optional_single_value", False),
+        ("class_reference", False),
+        ("collection", True),
+        ("optional_collection", True),
+        ("mapping", True),
+        ("frozen_collection", True),
+        ("sorted_collection", True),
+    ],
+)
+def test_holds_collection(field_name: str, holds_collection: bool):
+    wrapped_class = WrappedClass(clazz=FieldsOfEveryValueShape)
+    wrapped_field = WrappedField(
+        wrapped_class, get_field_by_name(FieldsOfEveryValueShape, field_name)
+    )
+    assert wrapped_field.holds_collection is holds_collection

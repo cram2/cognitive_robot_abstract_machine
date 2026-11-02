@@ -17,11 +17,11 @@ The pipeline implements the following functionality:
     processing flows using nested pipelines and conditional execution.
 """
 
-from robokudo.annotators.outputs import ClearAnnotatorOutputs
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.analysis_engine import AnalysisEngineInterface
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
 from py_trees.behaviours import SuccessEveryN, TickCounter
 from py_trees.common import Status

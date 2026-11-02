@@ -19,17 +19,20 @@ The module uses:
    Can analyze either ObjectHypothesis or CloudAnnotation data.
 """
 
+# %% imports
+
 from __future__ import annotations
 
 from timeit import default_timer
 
-import open3d as o3d
+import open3d
 from py_trees.common import Status
-from typing_extensions import List, Type
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.types import annotation, scene
+
+# %% position estimation
 
 
 class ClusterPositionAnnotator(BaseAnnotator):
@@ -40,7 +43,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
 
     * Calculates 3D positions from point clouds
     * Supports multiple analysis scopes
-    * Computes centroids and covariance
+    * Computes centroids
     * Creates position annotations
     * Generates visualization markers
 
@@ -59,7 +62,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
             """
 
             def __init__(self) -> None:
-                self.analysis_scope: Type = scene.ObjectHypothesis
+                self.analysis_scope: type = scene.ObjectHypothesis
                 """
                 Type of data to perform position estimation on(e.g. ObjectHypothesis or
                 CloudAnnotation)
@@ -85,23 +88,14 @@ class ClusterPositionAnnotator(BaseAnnotator):
 
     def update(self) -> Status:
         """
-        Process object hypotheses and estimate positions.
+        Annotate and visualize centroids of nonempty object point clouds.
 
-        The method:
-
-        * Loads point cloud from CAS
-        * For each object hypothesis:
-          * Gets appropriate point cloud data
-          * Computes centroid and covariance
-          * Creates position annotation
-          * Creates visualization marker
-
-        :return: SUCCESS after processing
+        :return: SUCCESS after processing.
         """
         start_timer = default_timer()
 
         cloud = self.get_cas().get(CASViews.CLOUD)
-        centroids_to_visualize: List[List[float]] = []
+        centroids_to_visualize: list[open3d.geometry.TriangleMesh] = []
 
         object_hypotheses = self.get_cas().filter_annotations_by_type(
             scene.ObjectHypothesis
@@ -112,40 +106,45 @@ class ClusterPositionAnnotator(BaseAnnotator):
                 continue
 
             if self.descriptor.parameters.analysis_scope == annotation.CloudAnnotation:
-                o_clouds: List[annotation.CloudAnnotation] = CAS.filter_by_type(
-                    annotation.CloudAnnotation,
-                    object_hypothesis.annotations,
+                cloud_annotations: list[annotation.CloudAnnotation] = (
+                    CAS.filter_by_type(
+                        annotation.CloudAnnotation,
+                        object_hypothesis.annotations,
+                    )
                 )
-                if len(o_clouds) == 0:
+                if len(cloud_annotations) == 0:
                     self.rk_logger.warning(
                         "CloudAnnotation mode, but no CloudAnnotation found on object"
                     )
                     continue
 
-                cluster_cloud = o_clouds[0].points
+                cluster_cloud = cloud_annotations[0].points
             else:
                 cluster_cloud = object_hypothesis.points
-            centroid, covariance = cluster_cloud.compute_mean_and_covariance()
+            if not cluster_cloud.has_points():
+                continue
+
+            centroid = cluster_cloud.get_center()
 
             position = self.position_annotation_from_centroid(centroid)
             object_hypothesis.annotations.append(position)
 
-            self.add_centroid_to_vis(centroid, centroids_to_visualize)
+            self.add_centroid_to_visualization(centroid, centroids_to_visualize)
 
         # Visualization
-        vis_geometries = [
+        visualization_geometries = [
             {"name": "Cloud", "geometry": cloud},
         ]
-        vis_geometries.extend(centroids_to_visualize)
+        visualization_geometries.extend(centroids_to_visualize)
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        self.get_annotator_output_struct().set_geometries(visualization_geometries)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return Status.SUCCESS
 
     def position_annotation_from_centroid(
-        self, centroid: List[float]
+        self, centroid: list[float]
     ) -> annotation.PositionAnnotation:
         """
         Create position annotation from centroid.
@@ -158,8 +157,10 @@ class ClusterPositionAnnotator(BaseAnnotator):
         position.translation = centroid
         return position
 
-    def add_centroid_to_vis(
-        self, centroid: List[float], centroids_to_visualize: List[List[float]]
+    def add_centroid_to_visualization(
+        self,
+        centroid: list[float],
+        centroids_to_visualize: list[open3d.geometry.TriangleMesh],
     ) -> None:
         """
         Add centroid visualization marker.
@@ -169,7 +170,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
         :param centroid: 3D centroid coordinates
         :param centroids_to_visualize: List to append visualization marker to
         """
-        centroid_sphere = o3d.geometry.TriangleMesh.create_sphere(
+        centroid_sphere = open3d.geometry.TriangleMesh.create_sphere(
             radius=self.descriptor.parameters.visualizer_point_radius
         )  # in meters
         centroid_sphere.paint_uniform_color([255, 0, 0])

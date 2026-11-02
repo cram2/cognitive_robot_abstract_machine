@@ -7,19 +7,7 @@ from enum import Enum, StrEnum
 
 import casadi as ca
 import numpy as np
-from typing_extensions import (
-    Any,
-    TYPE_CHECKING,
-    overload,
-    Optional,
-    Dict,
-    Self,
-    List,
-    Union,
-    Tuple,
-    Callable,
-    TypeVar,
-)
+from typing_extensions import Any, TYPE_CHECKING, overload, Self, Callable, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -94,9 +82,7 @@ class SpatialType(ABC):
     Implement Symbolic Math protocol.
     """
 
-    reference_frame: Optional[KinematicStructureEntity] = field(
-        kw_only=True, default=None
-    )
+    reference_frame: KinematicStructureEntity | None = field(kw_only=True, default=None)
     """
     The reference frame associated with the object.
 
@@ -116,7 +102,7 @@ class SpatialType(ABC):
         """
         return target_frame_T_reference_frame @ self
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         """
         The json of a spatial type: the frames it is expressed in, and its value, as
         numbers if it is constant and as the expression computing it otherwise.
@@ -131,7 +117,7 @@ class SpatialType(ABC):
             )
         return result
 
-    def _frames_to_json(self, data: Dict[str, Any]) -> None:
+    def _frames_to_json(self, data: dict[str, Any]) -> None:
         """
         Put references to the frames this value is expressed in into its json.
 
@@ -143,13 +129,13 @@ class SpatialType(ABC):
             )
 
     @abstractmethod
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         """
         :return: The json entries holding the numbers of this constant value.
         """
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         if sm.SymbolicMathJSONKey.EXPRESSION not in data:
             return cls._from_constant_json(data, **kwargs)
         result = sm.ExpressionGraph.from_json(
@@ -158,7 +144,7 @@ class SpatialType(ABC):
         result._frames_from_json(data, **kwargs)
         return result
 
-    def _frames_from_json(self, data: Dict[str, Any], **kwargs) -> None:
+    def _frames_from_json(self, data: dict[str, Any], **kwargs) -> None:
         """
         Set the frames this value is expressed in from references in its json.
 
@@ -171,7 +157,7 @@ class SpatialType(ABC):
 
     @classmethod
     @abstractmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
         :param data: The json of a constant value, as :meth:`_constant_to_json` wrote it.
         :param kwargs: The kwargs of the ``_from_json`` that is reading it.
@@ -180,8 +166,8 @@ class SpatialType(ABC):
 
     @classmethod
     def _parse_optional_frame_from_json(
-        cls, data: Dict[str, Any], frame: SpatialFrameKey, **kwargs
-    ) -> Optional[KinematicStructureEntity]:
+        cls, data: dict[str, Any], frame: SpatialFrameKey, **kwargs
+    ) -> KinematicStructureEntity | None:
         """
         Resolve a kinematic structure entity a serialized spatial type refers to.
 
@@ -198,8 +184,8 @@ class SpatialType(ABC):
 
     @staticmethod
     def _ensure_consistent_frame(
-        spatial_objects: List[Optional[SpatialType]],
-    ) -> Optional[KinematicStructureEntity]:
+        spatial_objects: list[SpatialType | None],
+    ) -> KinematicStructureEntity | None:
         """
         Ensures that all provided spatial objects have a consistent reference frame.
 
@@ -279,16 +265,16 @@ class HomogeneousTransformationMatrix(
     and create transformations from various inputs such as Euler angles or quaternions.
     """
 
-    child_frame: Optional[KinematicStructureEntity] = field(kw_only=True, default=None)
+    child_frame: KinematicStructureEntity | None = field(kw_only=True, default=None)
     """
     child_frame of this transformation matrix.
     """
 
     def __init__(
         self,
-        data: Optional[sm.MatrixData] = None,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        child_frame: Optional[KinematicStructureEntity] = None,
+        data: sm.MatrixData | None = None,
+        reference_frame: KinematicStructureEntity | None = None,
+        child_frame: KinematicStructureEntity | None = None,
     ):
         """
         :param data: A 4x4 matrix of some form that represents the rotation matrix.
@@ -312,7 +298,7 @@ class HomogeneousTransformationMatrix(
         self[3, :] = _ConstantMatrixParts.HOMOGENEOUS_BOTTOM_ROW
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -353,30 +339,30 @@ class HomogeneousTransformationMatrix(
         transformation_matrix.append([0, 0, 0, 1])
         return cls(transformation_matrix)
 
-    def _frames_to_json(self, data: Dict[str, Any]) -> None:
+    def _frames_to_json(self, data: dict[str, Any]) -> None:
         super()._frames_to_json(data)
         if self.child_frame is not None:
             WorldEntityReference(SpatialFrameKey.CHILD).write(data, self.child_frame)
 
-    def _frames_from_json(self, data: Dict[str, Any], **kwargs) -> None:
+    def _frames_from_json(self, data: dict[str, Any], **kwargs) -> None:
         super()._frames_from_json(data, **kwargs)
         self.child_frame = self._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.CHILD, **kwargs
         )
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
-            "position": self.to_position().to_np().tolist(),
-            "rotation": self.to_quaternion().to_np().tolist(),
+            "position": self.position.to_np().tolist(),
+            "rotation": self.quaternion.to_np().tolist(),
         }
 
     @classmethod
     def from_point_rotation_matrix(
         cls,
-        point: Optional[Point3] = None,
-        rotation_matrix: Optional[RotationMatrix] = None,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        child_frame: Optional[KinematicStructureEntity] = None,
+        point: Point3 | None = None,
+        rotation_matrix: RotationMatrix | None = None,
+        reference_frame: KinematicStructureEntity | None = None,
+        child_frame: KinematicStructureEntity | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Constructs a TransformationMatrix object from a given point, a rotation matrix,
@@ -419,8 +405,8 @@ class HomogeneousTransformationMatrix(
         roll: sm.ScalarData = 0,
         pitch: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        child_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
+        child_frame: KinematicStructureEntity | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Creates a TransformationMatrix object from position (x, y, z) and Euler angles
@@ -454,8 +440,8 @@ class HomogeneousTransformationMatrix(
         quat_y: sm.ScalarData = 0,
         quat_z: sm.ScalarData = 0,
         quat_w: sm.ScalarData = 1,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        child_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
+        child_frame: KinematicStructureEntity | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Creates a `TransformationMatrix` instance from the provided position coordinates
@@ -491,8 +477,8 @@ class HomogeneousTransformationMatrix(
         z: sm.ScalarData = 0,
         axis: Vector3 | sm.NumericalVector = None,
         angle: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        child_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
+        child_frame: KinematicStructureEntity | None = None,
     ) -> Self:
         """
         Creates an instance of the class from x, y, z coordinates, axis and angle.
@@ -513,7 +499,11 @@ class HomogeneousTransformationMatrix(
         """
         if axis is None:
             axis = Vector3(0, 0, 1)
-        rotation_matrix = RotationMatrix.from_axis_angle(axis=axis, angle=angle)
+        elif not isinstance(axis, Vector3):
+            axis = Vector3.from_iterable(axis)
+        rotation_matrix = RotationMatrix.from_axis_angle(
+            AxisAngle(axis=axis, angle=angle)
+        )
         point = Point3(x=x, y=y, z=z)
         return cls.from_point_rotation_matrix(
             point=point,
@@ -562,7 +552,7 @@ class HomogeneousTransformationMatrix(
             transformation multiplies.
         """
         if isinstance(other, Quaternion):
-            result = self.to_quaternion().multiply(other)
+            result = self.quaternion.multiply(other)
             result.reference_frame = self.reference_frame
             return result
         if isinstance(
@@ -588,15 +578,33 @@ class HomogeneousTransformationMatrix(
         inv[:3, 3] = (-inv[:3, :3]).dot(self[:3, 3])
         return inv
 
-    def to_position(self) -> Point3:
-        result = Point3.from_iterable(
-            self[:4, 3:], reference_frame=self.reference_frame
-        )
+    @property
+    def position(self) -> Point3:
+        """
+        :return: The translation this transformation is composed of.
+        """
+        result = Point3.from_casadi_sx(self.casadi_sx[:4, 3])
+        result.reference_frame = self.reference_frame
         return result
 
-    def to_translation_matrix(self) -> HomogeneousTransformationMatrix:
+    @property
+    def quaternion(self) -> Quaternion:
         """
-        :return: sets the rotation part of a frame to identity
+        :return: The rotation this transformation is composed of.
+        """
+        return self.rotation_matrix.quaternion
+
+    @property
+    def axis_angle(self) -> AxisAngle:
+        """
+        :return: The rotation this transformation is composed of.
+        """
+        return self.rotation_matrix.axis_angle
+
+    @property
+    def translation_matrix(self) -> HomogeneousTransformationMatrix:
+        """
+        :return: This transformation with its rotation replaced by the identity.
         """
         r = HomogeneousTransformationMatrix()
         r[0, 3] = self[0, 3]
@@ -606,13 +614,18 @@ class HomogeneousTransformationMatrix(
             data=r, reference_frame=self.reference_frame, child_frame=None
         )
 
-    def to_rotation_matrix(self) -> RotationMatrix:
+    @property
+    def rotation_matrix(self) -> RotationMatrix:
+        """
+        :return: The rotation this transformation is composed of.
+        """
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
-    def to_quaternion(self) -> Quaternion:
-        return self.to_rotation_matrix().to_quaternion()
-
-    def to_pose(self) -> Pose:
+    @property
+    def pose(self) -> Pose:
+        """
+        :return: The pose this transformation moves its reference frame to.
+        """
         result = Pose.from_casadi_sx(casadi_sx=copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
         return result
@@ -640,8 +653,8 @@ class HomogeneousTransformationMatrix(
         if self.is_constant():
             return hash(
                 (
-                    *self.to_position().to_np().tolist(),
-                    *self.to_quaternion().to_np().tolist(),
+                    *self.position.to_np().tolist(),
+                    *self.quaternion.to_np().tolist(),
                     self.reference_frame,
                 )
             )
@@ -663,8 +676,8 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
-        data: Optional[sm.MatrixData] = None,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        data: sm.MatrixData | None = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ):
         """
         :param data: A 4x4 matrix of some form that represents the rotation matrix.
@@ -688,34 +701,32 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self[3, :] = _ConstantMatrixParts.HOMOGENEOUS_BOTTOM_ROW
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
         return Quaternion.from_iterable(
             data["quaternion"],
             reference_frame=reference_frame,
-        ).to_rotation_matrix()
+        ).rotation_matrix
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
-            "quaternion": self.to_quaternion().to_np().tolist(),
+            "quaternion": self.quaternion.to_np().tolist(),
         }
 
     @classmethod
-    def from_axis_angle(
-        cls,
-        axis: Union[Vector3, sm.NumericalVector],
-        angle: sm.ScalarData,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ) -> RotationMatrix:
+    def from_axis_angle(cls, axis_angle: AxisAngle) -> RotationMatrix:
         """
         Conversion of unit axis and angle to 4x4 rotation matrix according to:
         https://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToMatrix/index.htm
+
+        :param axis_angle: The rotation to convert.
+        :return: The rotation matrix, expressed in the frame of the axis angle.
         """
         # use casadi to prevent a bunch of sm.SymbolicMathType.__init__.py calls
-        axis = sm.to_sx(axis)
-        angle = sm.to_sx(angle)
+        axis = axis_angle.casadi_sx[:3]
+        angle = axis_angle.casadi_sx[3]
         ct = ca.cos(angle)
         st = ca.sin(angle)
         vt = 1 - ct
@@ -734,7 +745,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         s[2, 0] = -m_st[1] + m_vt_0_ax[1]
         s[2, 1] = m_st[0] + m_vt_1_2
         s[2, 2] = ct__m_vt__axis[2]
-        return cls(s, reference_frame=reference_frame)
+        return cls(s, reference_frame=axis_angle.reference_frame)
 
     @classmethod
     def _from_constant_quaternion(cls, quaternion: Quaternion) -> RotationMatrix:
@@ -840,7 +851,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             rotation multiplies.
         """
         if isinstance(other, Quaternion):
-            result = self.to_quaternion().multiply(other)
+            result = self.quaternion.multiply(other)
             result.reference_frame = self.reference_frame
             return result
         if isinstance(
@@ -857,33 +868,34 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     ) -> GenericRotatableSpatialType:
         return self.dot(other)
 
-    def to_axis_angle(self) -> Tuple[Vector3, sm.Scalar]:
-        return self.to_quaternion().to_axis_angle()
-
-    def to_angle(self, hint: Optional[Callable] = None) -> sm.Scalar:
+    @property
+    def axis_angle(self) -> AxisAngle:
         """
-        :param hint: A function whose sign of the result will be used to determine if angle should be positive or
-                        negative
-        :return:
+        :return: The rotation this matrix describes.
         """
-        axis, angle = self.to_axis_angle()
-        if hint is not None:
-            return sm.normalize_angle(
-                sm.if_greater_zero(hint(axis), if_result=angle, else_result=-angle)
-            )
-        else:
-            return angle
+        return self.quaternion.axis_angle
 
-    def to_generic_matrix(self) -> sm.Matrix:
+    @property
+    def angle(self) -> sm.Scalar:
+        """
+        :return: The angle of the rotation around its axis in radians, in [0, 2 pi].
+        """
+        return self.axis_angle.angle
+
+    @property
+    def generic_matrix(self) -> sm.Matrix:
+        """
+        :return: This rotation matrix as a matrix without spatial semantics.
+        """
         return sm.Matrix.from_casadi_sx(copy(self.casadi_sx))
 
     @classmethod
     def from_vectors(
         cls,
-        x: Optional[Vector3] = None,
-        y: Optional[Vector3] = None,
-        z: Optional[Vector3] = None,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        x: Vector3 | None = None,
+        y: Vector3 | None = None,
+        z: Vector3 | None = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> RotationMatrix:
         """
         Create a rotation matrix from 2 or 3 orthogonal vectors.
@@ -922,7 +934,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_x_axis(
         cls,
         x_vector: Vector3,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> RotationMatrix:
         """
         Create a rotation matrix from the direction its x-axis points along.
@@ -954,10 +966,10 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     @classmethod
     def from_rpy(
         cls,
-        roll: Optional[sm.ScalarData] = None,
-        pitch: Optional[sm.ScalarData] = None,
-        yaw: Optional[sm.ScalarData] = None,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        roll: sm.ScalarData | None = None,
+        pitch: sm.ScalarData | None = None,
+        yaw: sm.ScalarData | None = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> RotationMatrix:
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -967,29 +979,30 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         roll = 0 if roll is None else roll
         pitch = 0 if pitch is None else pitch
         yaw = 0 if yaw is None else yaw
-        roll = sm.to_sx(roll)
-        pitch = sm.to_sx(pitch)
-        yaw = sm.to_sx(yaw)
-
+        # Every sine and cosine is built once, and through ca.SX.unary, because casadi's
+        # overloaded functions spend most of their time choosing the overload.
+        sin_roll, cos_roll, sin_pitch, cos_pitch, sin_yaw, cos_yaw = (
+            sm.Scalar.from_casadi_sx(ca.SX.unary(operation, sm.to_sx(angle)))
+            for angle in (roll, pitch, yaw)
+            for operation in (ca.OP_SIN, ca.OP_COS)
+        )
+        rotation = [
+            [
+                cos_yaw * cos_pitch,
+                (cos_yaw * sin_pitch * sin_roll) - (sin_yaw * cos_roll),
+                (sin_yaw * sin_roll) + (cos_yaw * sin_pitch * cos_roll),
+            ],
+            [
+                sin_yaw * cos_pitch,
+                (cos_yaw * cos_roll) + (sin_yaw * sin_pitch * sin_roll),
+                (sin_yaw * sin_pitch * cos_roll) - (cos_yaw * sin_roll),
+            ],
+            [-sin_pitch, cos_pitch * sin_roll, cos_pitch * cos_roll],
+        ]
         s = ca.SX.eye(4)
-
-        s[0, 0] = ca.cos(yaw) * ca.cos(pitch)
-        s[0, 1] = (ca.cos(yaw) * ca.sin(pitch) * ca.sin(roll)) - (
-            ca.sin(yaw) * ca.cos(roll)
-        )
-        s[0, 2] = (ca.sin(yaw) * ca.sin(roll)) + (
-            ca.cos(yaw) * ca.sin(pitch) * ca.cos(roll)
-        )
-        s[1, 0] = ca.sin(yaw) * ca.cos(pitch)
-        s[1, 1] = (ca.cos(yaw) * ca.cos(roll)) + (
-            ca.sin(yaw) * ca.sin(pitch) * ca.sin(roll)
-        )
-        s[1, 2] = (ca.sin(yaw) * ca.sin(pitch) * ca.cos(roll)) - (
-            ca.cos(yaw) * ca.sin(roll)
-        )
-        s[2, 0] = -ca.sin(pitch)
-        s[2, 1] = ca.cos(pitch) * ca.sin(roll)
-        s[2, 2] = ca.cos(pitch) * ca.cos(roll)
+        for row_index, row in enumerate(rotation):
+            for column_index, entry in enumerate(row):
+                s[row_index, column_index] = entry.casadi_sx
         result = cls(reference_frame=reference_frame)
         result.casadi_sx = s
         return result
@@ -997,7 +1010,8 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def inverse(self) -> RotationMatrix:
         return self.T
 
-    def to_rpy(self) -> Tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
+    @property
+    def rpy(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
         """
         :return: roll, pitch, yaw
         """
@@ -1016,7 +1030,11 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         az = sm.if_greater_zero(if0, sm.atan2(self[j, i], self[i, i]), sm.Scalar(0))
         return ax, ay, az
 
-    def to_quaternion(self) -> Quaternion:
+    @property
+    def quaternion(self) -> Quaternion:
+        """
+        :return: The rotation this matrix describes.
+        """
         return Quaternion.from_rotation_matrix(self)
 
     def normalize(self) -> None:
@@ -1044,7 +1062,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The angular error between the two rotation matrices as an expression.
         """
         r_distance = self.dot(other.inverse())
-        return r_distance.to_angle()
+        return r_distance.angle
 
 
 class Point(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
@@ -1056,6 +1074,11 @@ class Point(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
     point has (e.g. path plotting) can accept either without a ``Union``. Only
     :class:`Point3` has a ``z``: a 2D point has no height of its own, so :class:`Point2`
     does not carry the attribute at all.
+
+    .. warning::
+        Reading :attr:`x` and :attr:`y` of a :class:`Point3` through this interface
+        ignores its height but is not a projection. Code that needs the 2D point a
+        :class:`Point3` corresponds to uses :meth:`OrthogonalProjection.project`.
     """
 
     @property
@@ -1093,7 +1116,7 @@ class Point3(Point):
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ):
         """
 
@@ -1121,7 +1144,7 @@ class Point3(Point):
     def from_iterable(
         cls,
         data: sm.VectorData,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Point3:
         """
         Creates an instance of Point3 from provided iterable data.
@@ -1143,12 +1166,12 @@ class Point3(Point):
         """
         if isinstance(data, SpatialType) and reference_frame is None:
             reference_frame = data.reference_frame
-        result = cls(reference_frame=reference_frame)
-        result.casadi_sx = copy(sm.to_sx(data))
+        result = cls.from_casadi_sx(copy(sm.to_sx(data)))
+        result.reference_frame = reference_frame
         return result
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -1159,7 +1182,7 @@ class Point3(Point):
 
     @classmethod
     def create_with_variables(
-        cls, name: str, resolver: Callable[[], List[float] | np.ndarray] | None = None
+        cls, name: str, resolver: Callable[[], list[float] | np.ndarray] | None = None
     ) -> Self:
         """
         Creates a Vector3 object with float variables in all relevant entries.
@@ -1183,7 +1206,7 @@ class Point3(Point):
             z.resolve = lambda: resolver()[2]
         return result
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
             "data": self.to_np().tolist(),
         }
@@ -1201,7 +1224,9 @@ class Point3(Point):
 
     def __add__(self, other: Vector3) -> Point3:
         if isinstance(other, Vector3):
-            result = Point3.from_iterable(self.casadi_sx.__add__(other.casadi_sx))
+            result = Point3.from_casadi_sx(
+                ca.SX.binary(ca.OP_ADD, self.casadi_sx, other.casadi_sx)
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
@@ -1215,22 +1240,26 @@ class Point3(Point):
 
     def __sub__(self, other):
         if isinstance(other, Point3):
-            result = Vector3.from_iterable(self.casadi_sx.__sub__(other.casadi_sx))
+            result = Vector3.from_casadi_sx(
+                ca.SX.binary(ca.OP_SUB, self.casadi_sx, other.casadi_sx)
+            )
         elif isinstance(other, Vector3):
-            result = Point3.from_iterable(self.casadi_sx.__sub__(other.casadi_sx))
+            result = Point3.from_casadi_sx(
+                ca.SX.binary(ca.OP_SUB, self.casadi_sx, other.casadi_sx)
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
         return result
 
     def __neg__(self) -> Point3:
-        result = Point3.from_iterable(self.casadi_sx.__neg__())
+        result = Point3.from_casadi_sx(ca.SX.unary(ca.OP_NEG, self.casadi_sx))
         result.reference_frame = self.reference_frame
         return result
 
     def project_to_plane(
         self, frame_V_plane_vector1: Vector3, frame_V_plane_vector2: Vector3
-    ) -> Tuple[Point3, sm.Scalar]:
+    ) -> tuple[Point3, sm.Scalar]:
         """
         Projects a point onto a plane defined by two vectors.
 
@@ -1244,7 +1273,7 @@ class Point3(Point):
         """
         normal = frame_V_plane_vector1.cross(frame_V_plane_vector2)
         normal.scale(1)
-        frame_V_current = self.to_vector3()
+        frame_V_current = self.vector3
         d = normal @ frame_V_current
         v: Vector3 = normal * d
         projection = self - v
@@ -1252,7 +1281,7 @@ class Point3(Point):
 
     def project_to_line(
         self, line_point: Point3, line_direction: Vector3
-    ) -> Tuple[Point3, sm.Scalar]:
+    ) -> tuple[Point3, sm.Scalar]:
         """
         :param line_point: a point that the line intersects, must have the same reference frame as self
         :param line_direction: the direction of the line, must have the same reference frame as self
@@ -1270,7 +1299,7 @@ class Point3(Point):
 
     def distance_to_line_segment(
         self, line_start: Point3, line_end: Point3
-    ) -> Tuple[sm.Scalar, Point3]:
+    ) -> tuple[sm.Scalar, Point3]:
         """
         All parameters must have the same reference frame as self.
 
@@ -1293,16 +1322,31 @@ class Point3(Point):
         frame_P_nearest = frame_P_line_start + frame_V_offset
         return dist, frame_P_nearest
 
-    def to_vector3(self) -> Vector3:
+    def midpoint(self, other: Point3) -> Point3:
+        """
+        :param other: The point to meet halfway.
+        :return: The point midway between this one and ``other``.
+        """
+        return self + (other - self) / 2
+
+    @property
+    def vector3(self) -> Vector3:
+        """
+        :return: The vector from the origin of the reference frame to this point.
+        """
         result = Vector3.from_casadi_sx(copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
         return result
 
-    def to_generic_vector(self) -> sm.Vector:
+    @property
+    def generic_vector(self) -> sm.Vector:
+        """
+        :return: The coordinates of this point as a vector without spatial semantics.
+        """
         return sm.Vector.from_casadi_sx(copy(self.casadi_sx[:3]))
 
     def euclidean_distance(self, other: Self) -> sm.Scalar:
-        return self.to_generic_vector().euclidean_distance(other.to_generic_vector())
+        return self.generic_vector.euclidean_distance(other.generic_vector)
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -1311,16 +1355,17 @@ class Point2(Point):
     Represents a 2D point with reference frame handling.
 
     Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous augmentation --
-    the same convention :class:`Pose2D` uses. The point always lies on its reference
-    frame's own x-y plane (z=0 relative to that frame); :meth:`to_point3` converts to
-    the equivalent 3D :class:`Point3` whenever a 3D calculation is required.
+    the same convention :class:`Pose2D` uses. The point lies on its reference frame's
+    own x-y plane and has no height; it relates to 3D space only through an
+    :class:`OrthogonalProjection` onto that plane, which :meth:`from_point3`,
+    :meth:`from_pose` and :meth:`to_point3` apply.
     """
 
     def __init__(
         self,
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ):
         """
         :param x: X-coordinate of the point. Defaults to 0.
@@ -1338,59 +1383,61 @@ class Point2(Point):
             )
 
     @classmethod
+    def from_point3(
+        cls,
+        point: Point3,
+        plane_frame: KinematicStructureEntity | None = None,
+    ) -> Point2:
+        """
+        The :meth:`OrthogonalProjection.project` of ``point`` onto the x-y plane of
+        ``plane_frame``.
+
+        :param point: The point to project.
+        :param plane_frame: The frame whose x-y plane to project onto. Defaults to
+            ``point``'s reference frame.
+        :return: The point on the plane directly below or above ``point``.
+        """
+        frame = plane_frame if plane_frame is not None else point.reference_frame
+        return OrthogonalProjection(frame).project(point)
+
+    @classmethod
     def from_pose(
         cls,
         pose: Pose,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        plane_frame: KinematicStructureEntity | None = None,
     ) -> Point2:
         """
-        Extract a Point2 from a 3D Pose by dropping z, roll, pitch and yaw.
+        The :meth:`from_point3` of ``pose``'s position.
 
-        :param pose: The pose to extract the point from.
-        :param reference_frame: The reference frame. Defaults to ``pose``'s.
-        :return: The Point2 instance.
+        :param pose: The pose whose position to project.
+        :param plane_frame: The frame whose x-y plane to project onto. Defaults to
+            ``pose``'s reference frame.
+        :return: The point on the plane directly below or above ``pose``.
         """
-        frame = reference_frame if reference_frame is not None else pose.reference_frame
-        return cls(x=pose.x, y=pose.y, reference_frame=frame)
+        return cls.from_point3(pose.position, plane_frame)
+
+    def to_point3(self, height: sm.ScalarData = 0) -> Point3:
+        """
+        The :meth:`OrthogonalProjection.unproject` of this point into its own reference
+        frame.
+
+        :param height: The z-coordinate the point is placed at.
+        :return: The 3D point at ``height`` above this point.
+        """
+        return OrthogonalProjection(self.reference_frame).unproject(self, height)
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
         x, y = data["data"][:2]
         return cls(x=x, y=y, reference_frame=reference_frame)
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
             "data": self.to_np().tolist(),
         }
-
-    def to_point3(self, z: sm.ScalarData = 0) -> Point3:
-        """
-        Convert to a 3D :class:`Point3`.
-
-        :param z: The z-coordinate the resulting point should have. Defaults to 0.
-        """
-        return Point3(self.x, self.y, z, reference_frame=self.reference_frame)
-
-    @classmethod
-    def from_point3(
-        cls,
-        point: Point3,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ) -> Point2:
-        """
-        Extract a Point2 from a 3D :class:`Point3` by dropping z.
-
-        :param point: The point to extract from.
-        :param reference_frame: The reference frame. Defaults to ``point``'s.
-        :return: The Point2 instance.
-        """
-        frame = (
-            reference_frame if reference_frame is not None else point.reference_frame
-        )
-        return cls(x=point.x, y=point.y, reference_frame=frame)
 
     def transform(
         self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
@@ -1399,10 +1446,10 @@ class Point2(Point):
         This point re-expressed in ``target_frame_T_reference_frame``'s reference frame.
 
         .. warning::
-            A Point2 carries no z, so it is transformed as the point at z=0 and the
-            result is projected back onto the target frame's x-y plane. Transforming
-            into a frame tilted against this one therefore loses the height the rotation
-            produced.
+            Between frames whose x-y planes are not parallel this is not a change of
+            coordinates but a projection: the point is placed at height 0 through an
+            :class:`OrthogonalProjection`, moved, and projected onto the target plane.
+            The height the rotation produced is lost.
 
         :param target_frame_T_reference_frame: The transformation from this point's
             reference frame to the frame it should be expressed in.
@@ -1414,6 +1461,93 @@ class Point2(Point):
         if self.is_constant():
             return hash((*self.to_np().tolist(), self.reference_frame))
         return super().__hash__()
+
+
+@dataclass(eq=False)
+class Line3:
+    """
+    An infinite straight line in 3D space.
+    """
+
+    point: Point3
+    """
+    A point the line passes through.
+    """
+
+    direction: Vector3
+    """
+    The direction the line runs in, in the same reference frame as :attr:`point`.
+    """
+
+
+@dataclass(frozen=True)
+class OrthogonalProjection:
+    """
+    The orthogonal projection of 3D space onto the x-y plane of one frame, together
+    with its right inverse.
+
+    :meth:`unproject` at any height is a right inverse of :meth:`project`: for every
+    :class:`Point2` ``p`` on the plane, ``project(unproject(p, h)) == p``. The reverse,
+    ``unproject(project(q), h) == q``, holds only for a :class:`Point3` ``q`` whose
+    z-coordinate in :attr:`plane_frame` is ``h``.
+    """
+
+    plane_frame: KinematicStructureEntity | None
+    """
+    The frame whose x-y plane points are projected onto.
+
+    ``None`` is the plane of points that have no reference frame. Their coordinates
+    are taken as they are, so such a projection only relates points without a
+    reference frame to each other.
+    """
+
+    def project(self, point: Point3) -> Point2:
+        """
+        :param point: A point in :attr:`plane_frame` or in any frame of its world.
+        :return: The point on the plane directly below or above ``point``.
+        :raises ReferenceFrameMismatchError: If exactly one of ``point`` and this
+            projection has no reference frame.
+        """
+        if point.reference_frame is not self.plane_frame:
+            if point.reference_frame is None or self.plane_frame is None:
+                raise ReferenceFrameMismatchError(
+                    expected_frame=self.plane_frame,
+                    actual_frame=point.reference_frame,
+                    context="the projected Point3",
+                )
+            point = self.plane_frame._world.transform(point, self.plane_frame)
+        return Point2(point.x, point.y, reference_frame=self.plane_frame)
+
+    def unproject(self, point: Point2, height: sm.ScalarData = 0) -> Point3:
+        """
+        The inverse of :meth:`project` at ``height``: the 3D point at ``height`` above
+        ``point``.
+
+        :param point: A point on the x-y plane of :attr:`plane_frame`.
+        :param height: The z-coordinate the point is placed at.
+        :return: The 3D point at ``height`` above ``point``, in :attr:`plane_frame`.
+        :raises ReferenceFrameMismatchError: If ``point`` lies on another frame's plane.
+        """
+        if point.reference_frame is not self.plane_frame:
+            raise ReferenceFrameMismatchError(
+                expected_frame=self.plane_frame,
+                actual_frame=point.reference_frame,
+                context="the unprojected Point2",
+            )
+        return Point3(point.x, point.y, height, reference_frame=self.plane_frame)
+
+    def projection_line(self, point: Point2) -> Line3:
+        """
+        The vertical line through ``point`` along which :meth:`project` maps every point
+        onto ``point``.
+
+        :param point: A point on the x-y plane of :attr:`plane_frame`.
+        :return: The line of every 3D point that projects onto ``point``.
+        """
+        return Line3(
+            point=self.unproject(point),
+            direction=Vector3.Z(reference_frame=self.plane_frame),
+        )
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -1439,8 +1573,8 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-        visualisation_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
+        visualisation_frame: KinematicStructureEntity | None = None,
     ):
         """
 
@@ -1468,7 +1602,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self._casadi_sx[3] = 0
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -1477,7 +1611,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
             "data": self.to_np().tolist(),
         }
@@ -1486,7 +1620,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_iterable(
         cls,
         data: sm.VectorData,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Vector3:
         """
         Creates an instance of Vector3 from provided iterable data.
@@ -1512,39 +1646,38 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             visualisation_frame = data.visualisation_frame
         else:
             visualisation_frame = None
-        result = cls(
-            reference_frame=reference_frame, visualisation_frame=visualisation_frame
-        )
-        result.casadi_sx = copy(sm.to_sx(data))
+        result = cls.from_casadi_sx(copy(sm.to_sx(data)))
+        result.reference_frame = reference_frame
+        result.visualisation_frame = visualisation_frame
         return result
 
     @classmethod
-    def X(cls, reference_frame: Optional[KinematicStructureEntity] = None) -> Vector3:
+    def X(cls, reference_frame: KinematicStructureEntity | None = None) -> Vector3:
         return cls(x=1, y=0, z=0, reference_frame=reference_frame)
 
     @classmethod
-    def Y(cls, reference_frame: Optional[KinematicStructureEntity] = None) -> Vector3:
+    def Y(cls, reference_frame: KinematicStructureEntity | None = None) -> Vector3:
         return cls(x=0, y=1, z=0, reference_frame=reference_frame)
 
     @classmethod
-    def Z(cls, reference_frame: Optional[KinematicStructureEntity] = None) -> Vector3:
+    def Z(cls, reference_frame: KinematicStructureEntity | None = None) -> Vector3:
         return cls(x=0, y=0, z=1, reference_frame=reference_frame)
 
     @classmethod
     def NEGATIVE_X(
-        cls, reference_frame: Optional[KinematicStructureEntity] = None
+        cls, reference_frame: KinematicStructureEntity | None = None
     ) -> Vector3:
         return cls(x=-1, y=0, z=0, reference_frame=reference_frame)
 
     @classmethod
     def NEGATIVE_Y(
-        cls, reference_frame: Optional[KinematicStructureEntity] = None
+        cls, reference_frame: KinematicStructureEntity | None = None
     ) -> Vector3:
         return cls(x=0, y=-1, z=0, reference_frame=reference_frame)
 
     @classmethod
     def NEGATIVE_Z(
-        cls, reference_frame: Optional[KinematicStructureEntity] = None
+        cls, reference_frame: KinematicStructureEntity | None = None
     ) -> Vector3:
         return cls(x=0, y=0, z=-1, reference_frame=reference_frame)
 
@@ -1554,7 +1687,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Vector3:
         v = cls(x=x, y=y, z=z, reference_frame=reference_frame)
         v.scale(1, unsafe=True)
@@ -1562,7 +1695,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     @classmethod
     def create_with_variables(
-        cls, name: str, resolver: Callable[[], List[float] | np.ndarray] | None = None
+        cls, name: str, resolver: Callable[[], list[float] | np.ndarray] | None = None
     ) -> Self:
         """
         Creates a Vector3 object with float variables in all relevant entries.
@@ -1612,7 +1745,9 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __add__(self, other: Vector3) -> Vector3:
         if isinstance(other, Vector3):
-            result = Vector3.from_iterable(self.casadi_sx.__add__(other.casadi_sx))
+            result = Vector3.from_casadi_sx(
+                ca.SX.binary(ca.OP_ADD, self.casadi_sx, other.casadi_sx)
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
@@ -1620,7 +1755,9 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __sub__(self, other: Vector3) -> Vector3:
         if isinstance(other, Vector3):
-            result = Vector3.from_iterable(self.casadi_sx.__sub__(other.casadi_sx))
+            result = Vector3.from_casadi_sx(
+                ca.SX.binary(ca.OP_SUB, self.casadi_sx, other.casadi_sx)
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
@@ -1628,7 +1765,9 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __mul__(self, other: sm.ScalarData) -> Vector3:
         if isinstance(other, sm.ScalarData):
-            result = Vector3.from_iterable(self.casadi_sx.__mul__(sm.to_sx(other)))
+            result = Vector3.from_casadi_sx(
+                ca.SX.binary(ca.OP_MUL, self.casadi_sx, sm.to_sx(other))
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
@@ -1636,7 +1775,9 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __rmul__(self, other: float) -> Vector3:
         if isinstance(other, (int, float)):
-            result = Vector3.from_iterable(self.casadi_sx.__mul__(other))
+            result = Vector3.from_casadi_sx(
+                ca.SX.binary(ca.OP_MUL, self.casadi_sx, sm.to_sx(other))
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
@@ -1644,7 +1785,9 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __truediv__(self, other: sm.ScalarData) -> Vector3:
         if isinstance(other, sm.ScalarData):
-            result = Vector3.from_iterable(self.casadi_sx.__truediv__(sm.to_sx(other)))
+            result = Vector3.from_casadi_sx(
+                ca.SX.binary(ca.OP_DIV, self.casadi_sx, sm.to_sx(other))
+            )
         else:
             return NotImplemented
         result.reference_frame = self.reference_frame
@@ -1653,7 +1796,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def safe_division(
         self,
         other: sm.ScalarData,
-        if_nan: Optional[Vector3] = None,
+        if_nan: Vector3 | None = None,
     ) -> sm.GenericSymbolicType:
         """
         A version of division where no sub-expression is ever NaN.
@@ -1673,13 +1816,15 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
     def __neg__(self) -> Vector3:
-        result = Vector3.from_iterable(self.casadi_sx.__neg__())
+        result = Vector3.from_casadi_sx(ca.SX.unary(ca.OP_NEG, self.casadi_sx))
         result.reference_frame = self.reference_frame
         return result
 
     def dot(self, other: Vector3) -> sm.Scalar:
         if isinstance(other, Vector3):
-            return sm.Scalar(ca.mtimes(sm.to_sx(self[:3]).T, sm.to_sx(other[:3])))
+            return sm.Scalar.from_casadi_sx(
+                ca.mtimes(self.casadi_sx[:3].T, other.casadi_sx[:3])
+            )
         raise UnsupportedOperationError("dot", self, other)
 
     def __matmul__(self, other: Vector3) -> sm.Scalar:
@@ -1692,7 +1837,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return result
 
     def norm(self) -> sm.Scalar:
-        return sm.Scalar(ca.norm_2(sm.to_sx(self[:3])))
+        return sm.Scalar.from_casadi_sx(ca.norm_2(self.casadi_sx[:3]))
 
     def scale(self, a: sm.ScalarData, unsafe: bool = False):
         if unsafe:
@@ -1775,7 +1920,11 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             + other * (sm.sin(t * angle2) / sm.sin(angle2)),
         )
 
-    def to_point3(self) -> Point3:
+    @property
+    def point3(self) -> Point3:
+        """
+        :return: The point this vector reaches from the origin of the reference frame.
+        """
         result = Point3.from_casadi_sx(copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
         return result
@@ -1800,7 +1949,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
         w: sm.ScalarData = 1,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ):
         """
 
@@ -1827,7 +1976,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return Quaternion.from_iterable(self.casadi_sx.__neg__())
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -1836,7 +1985,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
             "data": self.to_np().tolist(),
         }
@@ -1845,7 +1994,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_iterable(
         cls,
         data: sm.VectorData,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Quaternion:
         """
         Creates an instance of Quaternion from provided iterable data.
@@ -1908,33 +2057,22 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self[3] = value
 
     @classmethod
-    def from_axis_angle(
-        cls,
-        axis: Vector3,
-        angle: sm.ScalarData,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ) -> Quaternion:
+    def from_axis_angle(cls, axis_angle: AxisAngle) -> Quaternion:
         """
         Creates a quaternion from an axis-angle representation.
 
-        This method uses the axis of rotation and the rotation angle (in radians) to
-        construct a quaternion representation of the rotation. Optionally, a reference
-        frame can be specified to which the resulting quaternion is associated.
-
-        :param axis: A 3D vector representing the axis of rotation.
-        :param angle: The rotation angle in radians.
-        :param reference_frame: An optional reference frame entity associated with the
-            quaternion, if applicable.
+        :param axis_angle: The rotation to convert.
         :return: A quaternion representing the rotation defined by the given axis and
-            angle.
+            angle, expressed in the frame of the axis angle.
         """
-        half_angle = angle / 2
+        axis = axis_angle.axis
+        half_angle = axis_angle.angle / 2
         return cls(
             x=axis[0] * sm.sin(half_angle),
             y=axis[1] * sm.sin(half_angle),
             z=axis[2] * sm.sin(half_angle),
             w=sm.cos(half_angle),
-            reference_frame=reference_frame,
+            reference_frame=axis_angle.reference_frame,
         )
 
     @classmethod
@@ -1943,7 +2081,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         roll: sm.ScalarData,
         pitch: sm.ScalarData,
         yaw: sm.ScalarData,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Quaternion:
         """
         Creates a Quaternion instance from specified roll, pitch, and yaw angles.
@@ -1988,7 +2126,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     @classmethod
     def from_rotation_matrix(
-        cls, r: Union[RotationMatrix, HomogeneousTransformationMatrix]
+        cls, r: RotationMatrix | HomogeneousTransformationMatrix
     ) -> Quaternion:
         """
         Creates a Quaternion object initialized from a given rotation matrix.
@@ -2005,7 +2143,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: A new instance of `Quaternion` corresponding to the given rotation
             matrix `r`.
         """
-        q = rotation_matrix_to_quaternion(r.to_generic_matrix())
+        q = rotation_matrix_to_quaternion(r.generic_matrix)
         return cls.from_iterable(q, reference_frame=r.reference_frame)
 
     def conjugate(self) -> Quaternion:
@@ -2047,35 +2185,39 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         if self._casadi_sx.is_constant():
             self._normalize_numerically()
             return
-        norm_ = self.to_generic_vector().norm()
+        norm_ = self.generic_vector.norm()
         self.x /= norm_
         self.y /= norm_
         self.z /= norm_
         self.w /= norm_
 
-    def to_axis_angle(self) -> Tuple[Vector3, sm.Scalar]:
-        self.normalize()
-        w2 = sm.sqrt(1 - self.w**2)
-        m = sm.if_eq_zero(w2, sm.Scalar(1), w2)  # avoid /0
-        angle = sm.if_eq_zero(
-            w2, sm.Scalar(0), sm.Scalar(2 * sm.acos(sm.limit(self.w, -1, 1)))
-        )
-        x = sm.if_eq_zero(w2, sm.Scalar(0), self.x / m)
-        y = sm.if_eq_zero(w2, sm.Scalar(0), self.y / m)
-        z = sm.if_eq_zero(w2, sm.Scalar(1), self.z / m)
-        return (
-            Vector3(x=x, y=y, z=z, reference_frame=self.reference_frame),
-            angle,
-        )
+    @property
+    def axis_angle(self) -> AxisAngle:
+        """
+        :return: The rotation this quaternion describes.
+        """
+        return AxisAngle.from_quaternion(self)
 
-    def to_generic_vector(self) -> sm.Vector:
+    @property
+    def generic_vector(self) -> sm.Vector:
+        """
+        :return: This quaternion as a vector without spatial semantics.
+        """
         return sm.Vector.from_casadi_sx(copy(self.casadi_sx))
 
-    def to_rotation_matrix(self) -> RotationMatrix:
+    @property
+    def rotation_matrix(self) -> RotationMatrix:
+        """
+        :return: The rotation this quaternion describes.
+        """
         return RotationMatrix.from_quaternion(self)
 
-    def to_rpy(self) -> Tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
-        return self.to_rotation_matrix().to_rpy()
+    @property
+    def rpy(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
+        """
+        :return: roll, pitch, yaw
+        """
+        return self.rotation_matrix.rpy
 
     def dot(self, other: Quaternion) -> sm.Scalar:
         if isinstance(other, Quaternion):
@@ -2126,10 +2268,10 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         ratio_b = sm.sin(t * half_theta).safe_division(sin_half_theta)
 
         mid_quaternion = Quaternion.from_iterable(
-            self.to_generic_vector() * 0.5 + other.to_generic_vector() * 0.5
+            self.generic_vector * 0.5 + other.generic_vector * 0.5
         )
         slerped_quaternion = Quaternion.from_iterable(
-            self.to_generic_vector() * ratio_a + other.to_generic_vector() * ratio_b
+            self.generic_vector * ratio_a + other.generic_vector * ratio_b
         )
 
         return sm.if_greater_eq_zero(
@@ -2138,13 +2280,116 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
 
 @dataclass(eq=False, init=False, repr=False)
+class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    A rotation by an angle around a unit axis.
+    """
+
+    def __init__(
+        self,
+        axis: Vector3 | None = None,
+        angle: sm.ScalarData = 0,
+        reference_frame: KinematicStructureEntity | None = None,
+    ):
+        """
+        :param axis: The unit axis to rotate around. Defaults to the z-axis.
+        :param angle: The angle to rotate by, in radians.
+        :param reference_frame: The frame the axis is expressed in.
+        """
+        if axis is None:
+            axis = Vector3.Z()
+        self.casadi_sx = sm.to_sx([axis.x, axis.y, axis.z, angle])
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (4, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(4, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            axis=Vector3(*data["axis"]),
+            angle=data["angle"],
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            "axis": self.axis.to_np()[:3].tolist(),
+            "angle": float(self.angle),
+        }
+
+    @classmethod
+    def from_quaternion(cls, quaternion: Quaternion) -> AxisAngle:
+        """
+        The identity rotation has no axis of its own and is read as a rotation by zero
+        around the z-axis.
+
+        :param quaternion: The rotation to describe, normalized in place.
+        :return: The rotation the quaternion describes, with an angle in [0, 2 pi].
+        """
+        quaternion.normalize()
+        sine_of_half_angle = sm.sqrt(1 - quaternion.w**2)
+        divisor = sm.if_eq_zero(sine_of_half_angle, sm.Scalar(1), sine_of_half_angle)
+        angle = sm.if_eq_zero(
+            sine_of_half_angle,
+            sm.Scalar(0),
+            sm.Scalar(2 * sm.acos(sm.limit(quaternion.w, -1, 1))),
+        )
+        x = sm.if_eq_zero(sine_of_half_angle, sm.Scalar(0), quaternion.x / divisor)
+        y = sm.if_eq_zero(sine_of_half_angle, sm.Scalar(0), quaternion.y / divisor)
+        z = sm.if_eq_zero(sine_of_half_angle, sm.Scalar(1), quaternion.z / divisor)
+        return cls(
+            axis=Vector3(x=x, y=y, z=z),
+            angle=angle,
+            reference_frame=quaternion.reference_frame,
+        )
+
+    @property
+    def axis(self) -> Vector3:
+        """
+        :return: The unit axis this rotation turns around.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def angle(self) -> sm.Scalar:
+        """
+        :return: The angle this rotation turns by, in radians.
+        """
+        return self[3]
+
+    @property
+    def quaternion(self) -> Quaternion:
+        """
+        :return: The rotation this axis angle describes.
+        """
+        return Quaternion.from_axis_angle(self)
+
+    @property
+    def rotation_matrix(self) -> RotationMatrix:
+        """
+        :return: The rotation this axis angle describes.
+        """
+        return RotationMatrix.from_axis_angle(self)
+
+
+@dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
-        position: Optional[Point3] = None,
-        orientation: Optional[Quaternion] = None,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        position: Point3 | None = None,
+        orientation: Quaternion | None = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ):
         """
         Initialize a 3D point with orientation and a reference frame in a kinematic
@@ -2164,7 +2409,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             orientation = Quaternion()
         transformation_matrix = (
             HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=position, rotation_matrix=orientation.to_rotation_matrix()
+                point=position, rotation_matrix=orientation.rotation_matrix
             )
         )
         self._casadi_sx = transformation_matrix._casadi_sx
@@ -2179,7 +2424,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self[3, :] = _ConstantMatrixParts.HOMOGENEOUS_BOTTOM_ROW
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -2189,10 +2434,10 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
-            "position": self.to_position().to_np().tolist(),
-            "rotation": self.to_quaternion().to_np().tolist(),
+            "position": self.position.to_np().tolist(),
+            "rotation": self.quaternion.to_np().tolist(),
         }
 
     @classmethod
@@ -2204,7 +2449,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         roll: sm.ScalarData = 0,
         pitch: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Self:
         """
         Creates a Pose object from position (x, y, z) and Euler angles (roll, pitch,
@@ -2235,7 +2480,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         quat_y: sm.ScalarData = 0,
         quat_z: sm.ScalarData = 0,
         quat_w: sm.ScalarData = 1,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Self:
         """
         Creates a `Pose` instance from the provided position coordinates and quaternion
@@ -2266,7 +2511,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         z: sm.ScalarData = 0,
         axis: Vector3 | sm.NumericalVector = None,
         angle: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Self:
         """
         Creates an instance of the class from x, y, z coordinates, axis and angle.
@@ -2286,7 +2531,9 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         if axis is None:
             axis = Vector3(0, 0, 1)
-        rotation_matrix = Quaternion.from_axis_angle(axis=axis, angle=angle)
+        elif not isinstance(axis, Vector3):
+            axis = Vector3.from_iterable(axis)
+        rotation_matrix = Quaternion.from_axis_angle(AxisAngle(axis=axis, angle=angle))
         point = Point3(x=x, y=y, z=z)
         return cls(
             position=point,
@@ -2308,15 +2555,15 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     @property
     def roll(self) -> sm.Scalar:
-        return self.to_rotation_matrix().to_rpy()[0]
+        return self.rotation_matrix.rpy[0]
 
     @property
     def pitch(self) -> sm.Scalar:
-        return self.to_rotation_matrix().to_rpy()[1]
+        return self.rotation_matrix.rpy[1]
 
     @property
     def yaw(self) -> sm.Scalar:
-        return self.to_rotation_matrix().to_rpy()[2]
+        return self.rotation_matrix.rpy[2]
 
     @y.setter
     def y(self, value: sm.ScalarData):
@@ -2332,25 +2579,37 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     @property
     def position(self) -> Point3:
-        return self.to_position()
+        result = Point3.from_casadi_sx(self.casadi_sx[:4, 3])
+        result.reference_frame = self.reference_frame
+        return result
 
     @property
     def orientation(self) -> Quaternion:
-        return self.to_quaternion()
+        return self.quaternion
 
-    def to_position(self) -> Point3:
-        result = Point3.from_iterable(
-            self[:4, 3:], reference_frame=self.reference_frame
-        )
-        return result
+    @property
+    def quaternion(self) -> Quaternion:
+        return self.rotation_matrix.quaternion
 
-    def to_rotation_matrix(self) -> RotationMatrix:
+    @property
+    def axis_angle(self) -> AxisAngle:
+        """
+        :return: The orientation of this pose.
+        """
+        return self.quaternion.axis_angle
+
+    @property
+    def rotation_matrix(self) -> RotationMatrix:
+        """
+        :return: The orientation of this pose.
+        """
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
-    def to_quaternion(self) -> Quaternion:
-        return self.to_rotation_matrix().to_quaternion()
-
-    def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+    @property
+    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+        """
+        :return: The transformation that moves the reference frame to this pose.
+        """
         return HomogeneousTransformationMatrix(
             data=self, reference_frame=self.reference_frame
         )
@@ -2359,8 +2618,8 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         if self.is_constant():
             return hash(
                 (
-                    *self.to_position().to_np().tolist(),
-                    *self.to_quaternion().to_np().tolist(),
+                    *self.position.to_np().tolist(),
+                    *self.quaternion.to_np().tolist(),
                     self.reference_frame,
                 )
             )
@@ -2372,21 +2631,29 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
     Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
 
-    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``. Behaves similarly to
-    :class:`Pose`, but lives in the 2D plane (z=0, roll=0, pitch=0). Whenever 3D
-    calculations are required, use :meth:`to_pose` to obtain the equivalent 3D
-    :class:`Pose`.
+    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``. It lies on its reference
+    frame's x-y plane and has no height or tilt of its own, so it carries no ``z``,
+    ``roll`` or ``pitch``. Whenever 3D calculations are required, use :attr:`pose` to
+    obtain the equivalent 3D :class:`Pose`.
     """
 
     def __init__(
         self,
-        x: sm.ScalarData = 0,
-        y: sm.ScalarData = 0,
+        position: Point2 | None = None,
         yaw: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
-    ):
-        self.casadi_sx = sm.to_sx([x, y, yaw])
-        self.reference_frame = reference_frame
+        reference_frame: KinematicStructureEntity | None = None,
+    ) -> None:
+        """
+        :param position: Where the pose is. Defaults to the origin.
+        :param yaw: Which way the pose faces. Defaults to 0.
+        :param reference_frame: The reference frame. Defaults to *position*'s.
+        """
+        if position is None:
+            position = Point2()
+        self.casadi_sx = sm.to_sx([position.x, position.y, yaw])
+        self.reference_frame = (
+            reference_frame if reference_frame is not None else position.reference_frame
+        )
         super().__post_init__()
 
     def _verify_type(self):
@@ -2395,9 +2662,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
                 expected_dimensions=(3, 1), actual_dimensions=self.shape
             )
 
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
+    # %% Properties
 
     @property
     def x(self) -> sm.Scalar:
@@ -2423,23 +2688,10 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def yaw(self, value: sm.ScalarData):
         self[2] = value
 
-    @property
-    def z(self) -> float:
-        return 0
+    # %% Conversion to 3D
 
     @property
-    def roll(self) -> float:
-        return 0
-
-    @property
-    def pitch(self) -> float:
-        return 0
-
-    # ------------------------------------------------------------------
-    # Conversion to 3D
-    # ------------------------------------------------------------------
-
-    def to_pose(self) -> Pose:
+    def pose(self) -> Pose:
         """
         Convert to a 3D :class:`Pose` with z=0, roll=0, pitch=0.
         """
@@ -2453,9 +2705,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference_frame=self.reference_frame,
         )
 
-    # ------------------------------------------------------------------
-    # Pose-like interface (delegates to to_pose())
-    # ------------------------------------------------------------------
+    # %% Pose-like interface (delegates to pose)
 
     @property
     def position(self) -> Point2:
@@ -2466,36 +2716,48 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     @property
     def orientation(self) -> Quaternion:
-        return self.to_pose().to_quaternion()
+        return self.quaternion
 
-    def to_position(self) -> Point3:
-        return self.to_pose().to_position()
+    @property
+    def quaternion(self) -> Quaternion:
+        return self.pose.quaternion
 
-    def to_quaternion(self) -> Quaternion:
-        return self.to_pose().to_quaternion()
+    @property
+    def rotation_matrix(self) -> RotationMatrix:
+        """
+        :return: The rotation around the z-axis by the yaw of this pose.
+        """
+        return self.pose.rotation_matrix
 
-    def to_rotation_matrix(self) -> RotationMatrix:
-        return self.to_pose().to_rotation_matrix()
+    @property
+    def homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
+        """
+        :return: The transformation that moves the reference frame to this pose.
+        """
+        return self.pose.homogeneous_matrix
 
-    def to_homogeneous_matrix(self) -> HomogeneousTransformationMatrix:
-        return self.to_pose().to_homogeneous_matrix()
-
-    # ------------------------------------------------------------------
-    # Factory methods
-    # ------------------------------------------------------------------
+    # %% Factory methods
 
     @classmethod
     def from_pose(
         cls,
         pose: Pose,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        plane_frame: KinematicStructureEntity | None = None,
     ) -> Pose2D:
         """
         Extract a Pose2D from a 3D Pose by dropping z, roll, pitch.
+
+        :param pose: The pose to extract from.
+        :param plane_frame: The frame whose x-y plane to express the result on.
+            Defaults to ``pose``'s reference frame; any other frame must belong to the
+            same world as ``pose``'s.
+        :return: The Pose2D on the x-y plane of ``plane_frame``.
         """
-        _, _, yaw = pose.to_rotation_matrix().to_rpy()
-        frame = reference_frame if reference_frame is not None else pose.reference_frame
-        return cls(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
+        frame = plane_frame if plane_frame is not None else pose.reference_frame
+        if frame is not pose.reference_frame:
+            pose = frame._world.transform(pose, frame)
+        _, _, yaw = pose.rotation_matrix.rpy
+        return cls.from_xy_yaw(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
 
     def transform(
         self, target_frame_T_reference_frame: HomogeneousTransformationMatrix
@@ -2513,45 +2775,37 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference frame to the frame it should be expressed in.
         :return: The pose in the transformation's reference frame.
         """
-        return Pose2D.from_pose(target_frame_T_reference_frame @ self.to_pose())
+        return Pose2D.from_pose(target_frame_T_reference_frame @ self.pose)
 
     @classmethod
-    def from_position_and_yaw(
+    def from_xy_yaw(
         cls,
-        position: Point2,
+        x: sm.ScalarData = 0,
+        y: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: Optional[KinematicStructureEntity] = None,
+        reference_frame: KinematicStructureEntity | None = None,
     ) -> Pose2D:
         """
-        Compose a Pose2D from a position and a bearing.
+        Create a Pose2D from its coordinates and bearing.
 
-        :param position: Where the pose is.
-        :param yaw: Which way the pose faces. Defaults to 0.
-        :param reference_frame: The reference frame. Defaults to ``position``'s.
+        :param x: The x-coordinate of the position.
+        :param y: The y-coordinate of the position.
+        :param yaw: The rotation around the z-axis.
+        :param reference_frame: The reference frame.
         :return: The Pose2D instance.
         """
-        frame = (
-            reference_frame if reference_frame is not None else position.reference_frame
-        )
-        return cls(x=position.x, y=position.y, yaw=yaw, reference_frame=frame)
+        return cls(position=Point2(x=x, y=y), yaw=yaw, reference_frame=reference_frame)
 
-    # ------------------------------------------------------------------
-    # JSON serialization
-    # ------------------------------------------------------------------
+    # %% JSON serialization
 
     @classmethod
-    def _from_constant_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
-        return cls(
-            x=data["data"][0],
-            y=data["data"][1],
-            yaw=data["data"][2],
-            reference_frame=reference_frame,
-        )
+        return cls.from_xy_yaw(*data["data"], reference_frame=reference_frame)
 
-    def _constant_to_json(self) -> Dict[str, Any]:
+    def _constant_to_json(self) -> dict[str, Any]:
         return {
             "data": self.to_np().tolist(),
         }

@@ -1,7 +1,7 @@
 # ===================== Possible World Configurations ========================
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Callable
+from typing_extensions import Callable
 
 from .base_config import (
     WorldConf,
@@ -76,19 +76,19 @@ class Drawer3(DrawerConf):
 @dataclass
 class Cabinet2(CabinetConf):
     container: ContainerConf = field(default=Container2)
-    drawers: List[DrawerConf] = field(default_factory=lambda: [Drawer1(), Drawer2()])
+    drawers: list[DrawerConf] = field(default_factory=lambda: [Drawer1(), Drawer2()])
 
 
 @dataclass
 class Cabinet1(CabinetConf):
     container: ContainerConf = field(default=Container2)
-    drawers: List[DrawerConf] = field(default_factory=lambda: [Drawer3()])
+    drawers: list[DrawerConf] = field(default_factory=lambda: [Drawer3()])
 
 
 @dataclass
 class Cabinet3(CabinetConf):
     container: ContainerConf = field(default=Container4)
-    drawers: List[DrawerConf] = field(default_factory=lambda: [Drawer3()])
+    drawers: list[DrawerConf] = field(default_factory=lambda: [Drawer3()])
 
 
 def bodies():
@@ -97,8 +97,8 @@ def bodies():
 
 @dataclass
 class HandlesAndContainersWorld(WorldConf):
-    bodies: List[BodyConf] = field(default_factory=bodies, init=False)
-    connections: List[ConnectionConf] = field(
+    bodies: list[BodyConf] = field(default_factory=bodies, init=False)
+    connections: list[ConnectionConf] = field(
         default_factory=lambda: [
             FixedConnectionConf(parent=Container1(), child=Container2()),
             FixedConnectionConf(parent=Container3(), child=Handle3()),
@@ -108,7 +108,7 @@ class HandlesAndContainersWorld(WorldConf):
         ],
         init=False,
     )
-    views: List[ViewConf] = field(
+    views: list[ViewConf] = field(
         default_factory=lambda: [Drawer1(), Drawer2(), Cabinet1(), Cabinet2()],
         init=False,
     )
@@ -117,7 +117,7 @@ class HandlesAndContainersWorld(WorldConf):
 
 @dataclass
 class InferredCabinetsWorld(WorldConf):
-    bodies: List[BodyConf] = field(
+    bodies: list[BodyConf] = field(
         default_factory=lambda: [
             Handle1(),
             Handle2(),
@@ -129,7 +129,7 @@ class InferredCabinetsWorld(WorldConf):
         ],
         init=False,
     )
-    connections: List[ConnectionConf] = field(
+    connections: list[ConnectionConf] = field(
         default_factory=lambda: [
             FixedConnectionConf(parent=Container1(), child=Container2()),
             FixedConnectionConf(parent=Container3(), child=Handle3()),
@@ -140,7 +140,7 @@ class InferredCabinetsWorld(WorldConf):
         ],
         init=False,
     )
-    views: List[ViewConf] = field(
+    views: list[ViewConf] = field(
         default_factory=lambda: [Drawer1(), Drawer2()],
         init=False,
     )

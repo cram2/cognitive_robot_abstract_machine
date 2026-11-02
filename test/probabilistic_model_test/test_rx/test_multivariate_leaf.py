@@ -142,19 +142,19 @@ class TestConditioningTheLeaf:
         circuit = ProbabilisticCircuit()
         leaf(correlated, circuit)
         point = {first: -9.5, second: 10.5}
-        conditional, log_density = circuit.log_conditional(point)
-        assert log_density == pytest.approx(
+        conditioning = circuit.log_conditional(point)
+        assert conditioning.log_likelihood == pytest.approx(
             correlated.log_likelihood(np.array([[point[second], point[first]]]))[0]
         )
         assert {
             unit.distribution.variable: unit.distribution.location
-            for unit in conditional.leaves
+            for unit in conditioning.distribution.leaves
         } == point
 
     def test_fixing_every_variable_of_the_leaf_leaves_a_dirac_on_each(
         self, circuit, first, second, other
     ):
-        conditional, _ = circuit.log_conditional({first: -9.5, second: 10.5})
+        conditional = circuit.log_conditional({first: -9.5, second: 10.5}).distribution
         dirac_variables = {
             unit.distribution.variable
             for unit in conditional.leaves
@@ -166,7 +166,7 @@ class TestConditioningTheLeaf:
     def test_fixing_every_variable_keeps_the_rest_of_the_circuit(
         self, circuit, independent_of_it, first, second, other
     ):
-        conditional, _ = circuit.log_conditional({first: -9.5, second: 10.5})
+        conditional = circuit.log_conditional({first: -9.5, second: 10.5}).distribution
         marginal = conditional.marginal([other])
         points = np.array([[2.0], [3.5]])
         assert marginal.log_likelihood(points) == pytest.approx(
@@ -177,37 +177,115 @@ class TestConditioningTheLeaf:
         self, circuit, correlated, first, second
     ):
         point = {first: -9.5, second: 10.5}
-        conditional, log_density = copy.deepcopy(circuit).log_conditional_in_place(
+        conditioning = copy.deepcopy(circuit).log_conditional_in_place(
             point, preserve_structure=True
         )
-        assert log_density == pytest.approx(
+        assert conditioning.log_likelihood == pytest.approx(
             correlated.log_likelihood(np.array([[point[second], point[first]]]))[0]
         )
         assert not any(
-            isinstance(unit, MultivariateLeaf) for unit in conditional.leaves
+            isinstance(unit, MultivariateLeaf)
+            for unit in conditioning.distribution.leaves
         )
 
     def test_fixing_some_variables_of_the_leaf_leaves_the_gaussian_conditional(
         self, circuit, correlated, first, second
     ):
-        conditional, log_density = circuit.log_conditional({first: -9.5})
-        expected, expected_log_density = correlated.log_conditional({first: -9.5})
-        assert log_density == pytest.approx(expected_log_density)
-        remaining = conditional.marginal([second])
+        conditioning = circuit.log_conditional({first: -9.5})
+        expected = correlated.log_conditional({first: -9.5})
+        assert conditioning.log_likelihood == pytest.approx(expected.log_likelihood)
+        remaining = conditioning.distribution.marginal([second])
         points = np.array([[9.0], [10.0]])
         assert remaining.log_likelihood(points) == pytest.approx(
-            expected.log_likelihood(points)
+            expected.distribution.log_likelihood(points)
         )
 
     def test_fixing_only_other_variables_leaves_the_leaf_alone(
         self, circuit, correlated, first, second, other
     ):
-        conditional, _ = circuit.log_conditional({other: 3.0})
+        conditional = circuit.log_conditional({other: 3.0}).distribution
         remaining = conditional.marginal([first, second])
         points = np.array([[-10.0, 10.0]])
         assert remaining.log_likelihood(points) == pytest.approx(
             correlated.log_likelihood(np.array([[10.0, -10.0]]))
         )
+
+
+class TestConditioningATruncatedLeaf:
+    """
+    A truncated Gaussian has no marginal, so conditioning must not ask a leaf it keeps
+    whole for one.
+    """
+
+    @pytest.fixture
+    def truncated_circuit(
+        self, correlated, independent_of_it, first, second
+    ) -> ProbabilisticCircuit:
+        box = SimpleEvent.from_data(
+            {first: closed(-11.0, -9.0), second: closed(9.0, 11.0)}
+        ).as_composite_set()
+        truncated = correlated.log_truncated(box).distribution
+        circuit = ProbabilisticCircuit()
+        product = ProductUnit(probabilistic_circuit=circuit)
+        product.add_subcircuit(leaf(truncated, circuit))
+        product.add_subcircuit(leaf(independent_of_it, circuit))
+        return circuit
+
+    def test_fixing_only_other_variables_keeps_the_truncated_leaf(
+        self, truncated_circuit, independent_of_it, first, second, other
+    ):
+        [truncated] = [
+            unit.distribution
+            for unit in truncated_circuit.leaves
+            if isinstance(unit, MultivariateLeaf)
+        ]
+        conditioning = truncated_circuit.log_conditional({other: 3.0})
+        assert conditioning.log_likelihood == pytest.approx(
+            independent_of_it.log_likelihood(np.array([[3.0]]))[0]
+        )
+        points = np.array([[-10.0, 10.0], [-9.5, 9.2]])
+        assert conditioning.distribution.marginal([first, second]).log_likelihood(
+            points
+        ) == pytest.approx(truncated.log_likelihood(points[:, ::-1]))
+
+    def test_fixing_a_variable_of_the_truncated_leaf(
+        self, truncated_circuit, first, second, other
+    ):
+        [truncated] = [
+            unit.distribution
+            for unit in truncated_circuit.leaves
+            if isinstance(unit, MultivariateLeaf)
+        ]
+        expected = truncated.log_conditional({first: -10.0})
+        conditioning = truncated_circuit.log_conditional({first: -10.0})
+        assert conditioning.log_likelihood == pytest.approx(expected.log_likelihood)
+        points = np.array([[9.5], [10.5]])
+        assert conditioning.distribution.marginal([second]).log_likelihood(
+            points
+        ) == pytest.approx(expected.distribution.log_likelihood(points))
+
+
+# %% moments of the leaf
+
+
+class TestMomentsOfTheLeaf:
+    def test_the_moment_of_every_variable(self, circuit, first, second, other):
+        order = {first: 1, second: 1, other: 1}
+        center = {first: 0.0, second: 0.0, other: 0.0}
+        assert dict(circuit.moment(order, center)) == pytest.approx(
+            {first: -10.0, second: 10.0, other: 3.0}
+        )
+
+    def test_the_moment_of_some_variables_of_the_leaf(self, circuit, first, other):
+        moment = circuit.moment({first: 1}, {first: 0.0})
+        assert moment[first] == pytest.approx(-10.0)
+
+    def test_the_moment_of_a_variable_of_the_leaf_and_one_outside_of_it(
+        self, circuit, second, other
+    ):
+        moment = circuit.moment({second: 2, other: 1}, {second: 10.0, other: 0.0})
+        assert moment[second] == pytest.approx(1.0)
+        assert moment[other] == pytest.approx(3.0)
 
 
 # %% confining the leaf to an event
@@ -224,12 +302,14 @@ class TestTruncatingTheLeaf:
                 other: closed(-np.inf, np.inf),
             }
         ).as_composite_set()
-        truncated, log_probability = circuit.log_truncated(event)
-        assert log_probability == pytest.approx(
+        truncation = circuit.log_truncated(event)
+        assert truncation.log_probability == pytest.approx(
             np.log(correlated.probability(event.marginal([first, second])))
         )
-        assert truncated.probability(truncated.support) == pytest.approx(1.0)
-        assert truncated.probability(
+        assert truncation.distribution.probability(
+            truncation.distribution.support
+        ) == pytest.approx(1.0)
+        assert truncation.distribution.probability(
             SimpleEvent.from_data(
                 {
                     first: closed(-9.9, -9.1),
@@ -249,11 +329,13 @@ class TestTruncatingTheLeaf:
                 other: closed(-np.inf, np.inf),
             }
         ).as_composite_set()
-        truncated, log_probability = circuit.log_truncated(event)
-        assert log_probability == pytest.approx(
+        truncation = circuit.log_truncated(event)
+        assert truncation.log_probability == pytest.approx(
             np.log(correlated.probability(event.marginal([first, second])))
         )
-        assert truncated.probability(truncated.support) == pytest.approx(1.0)
+        assert truncation.distribution.probability(
+            truncation.distribution.support
+        ) == pytest.approx(1.0)
 
 
 # %% dropping and moving the leaf's variables

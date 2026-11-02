@@ -32,6 +32,8 @@ from .dataset import (
     alternative_mappings_construction_order,
     clashing_field_names,
     classes_with_generic,
+    identity_hashed_values_created_on_access,
+    single_value_classes,
 )
 from .dataset.example_classes import (
     KRROODPhysicalObject,
@@ -85,6 +87,8 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(alternative_mappings_construction_order))
     all_classes |= set(classes_of_module(clashing_field_names))
     all_classes |= set(classes_of_module(classes_with_generic))
+    all_classes |= set(classes_of_module(single_value_classes))
+    all_classes |= set(classes_of_module(identity_hashed_values_created_on_access))
     all_classes |= {Symbol, Role}
 
     # remove classes that don't need persistence

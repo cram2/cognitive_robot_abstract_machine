@@ -70,26 +70,19 @@ The grounded designator is carried out. If it fails (e.g., object moved, pose bl
 
 ## The kinds of designators
 
-- Action designators ({class}`~coraplex.robot_plans.actions.base.ActionDescription`)
+- Action designators ({class}`~coraplex.robot_plans.actions.base.Action`)
 
   - Express a task at the highest level of “do this,” such as grasping or opening something.
-  - Internally, they can combine several motions, actions, locations, and sub‑steps.
-  - They check basic conditions before and after, to ensure the task makes sense and succeeds.
-
-- Motion designators ({class}`~coraplex.robot_plans.motions.base.BaseMotion`)
-
-  - Represent concrete robot movements (move joints, move a tool center point, open/close a gripper, etc.).
-  - They are the last step before the motion is turned into a giskard motion state chart and executed.
+  - Internally, they can combine several giskard goals, actions, locations, and sub‑steps.
 
 - Location designators ({class}`~coraplex.locations.base.Location`)
 
   - Propose good places and orientations for doing something (e.g., where to stand to see or reach an object, where to place an item).
   - They balance feasibility (reachability, visibility, collision‑free) and preference (shorter, safer, semantically meaningful).
 
-Objects the robot acts on are not a separate designator class. They are referenced directly as `Body` instances of
-the semantic digital twin world, usually obtained from the world model (for example via `world.get_body_by_name(...)`)
-or by querying the belief state with the Entity Query Language. Action designators that operate on an object take such a
-`Body` as their `object_designator` argument.
+An action designator that takes hold of an object takes one of the grasps that annotation offers 
+(`annotation.grasp_candidates()`) as its `grasp` argument, and the grasp names the object it is on; 
+one that releases an object it already holds, such as placing, takes the annotation itself as its `object_designator` argument.
 
 ## How designators fit into a plan
 
@@ -111,7 +104,7 @@ not be constrained to one robot but work across a wide variety of robot platform
 - Clarity: Describe “what” you want; let the system compute the “how.”
 - Flexibility: The same task description adapts across scenes and robots.
 - Robustness: Multiple candidates and late decisions improve success under uncertainty.
-- Composability: High‑level tasks are built by nesting actions, locations, and motions.
+- Composability: High‑level tasks are built by nesting actions, locations, and giskard goals.
 
 ## Typical usage patterns
 

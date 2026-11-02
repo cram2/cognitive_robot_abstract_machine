@@ -23,7 +23,6 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
 
 from experiments.control_loop_experiments.scenarios import (
     BENCHMARK_SCENARIOS,
@@ -102,7 +101,7 @@ class ControlLoopBenchmarkResult(ExperimentResult):
 
     @classmethod
     def from_profiles(
-        cls, plotter_mode: PlotterMode, profiles: List[CallTreeProfile]
+        cls, plotter_mode: PlotterMode, profiles: list[CallTreeProfile]
     ) -> ControlLoopBenchmarkResult:
         """
         Aggregate the repetitions of one configuration into a single row.
@@ -215,7 +214,7 @@ class PhaseBreakdownResult(ExperimentResult):
     @classmethod
     def _rows_for(
         cls, profile: CallTreeProfile, path: PhasePath
-    ) -> List[PhaseBreakdownResult]:
+    ) -> list[PhaseBreakdownResult]:
         """
         The row of the phase at the given path, followed by everything it called.
         """
@@ -256,12 +255,12 @@ class BenchmarkMultiRun:
     Runs every requested configuration in a subprocess and collects the results.
     """
 
-    scenario_names: List[str]
+    scenario_names: list[str]
     """
     The motions that are measured.
     """
 
-    plotter_modes: List[PlotterMode]
+    plotter_modes: list[PlotterMode]
     """
     The plotter modes every motion is measured under.
     """
@@ -276,7 +275,7 @@ class BenchmarkMultiRun:
     Frequency the controller is discretized for, in hertz.
     """
 
-    results: List[ControlLoopBenchmarkResult] = field(default_factory=list)
+    results: list[ControlLoopBenchmarkResult] = field(default_factory=list)
     """
     The configurations measured so far.
     """
@@ -444,7 +443,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--target-frequency",
         type=float,
-        default=20.0,
+        default=ScenarioRunner.target_frequency,
         help="frequency the controller is discretized for, in hertz",
     )
     parser.add_argument(

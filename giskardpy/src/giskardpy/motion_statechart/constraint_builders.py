@@ -3,13 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import Optional
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.data_types import DefaultWeights
+from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from semantic_digital_twin.spatial_types import Point3, Vector3, RotationMatrix
+from semantic_digital_twin.spatial_types import (
+    AxisAngle,
+    Point3,
+    Quaternion,
+    Vector3,
+    RotationMatrix,
+)
 
 
 @dataclass
@@ -26,7 +31,7 @@ class GeometricConstraintBuilder:
     """
 
     @staticmethod
-    def _indexed_constraint_name(name: Optional[str], index: int) -> Optional[str]:
+    def _indexed_constraint_name(name: str | None, index: int) -> str | None:
         """
         Builds a per-axis constraint name, or None so the collection assigns an index-
         based name.
@@ -41,7 +46,7 @@ class GeometricConstraintBuilder:
         frame_P_goal: Point3,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds three constraints to move frame_P_current to frame_P_goal.
@@ -68,7 +73,7 @@ class GeometricConstraintBuilder:
         expression_goal: sm.ScalarData,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         A wrapper around add_constraint.
@@ -95,7 +100,7 @@ class GeometricConstraintBuilder:
         frame_V_goal: Vector3,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds constraints to align frame_V_current with frame_V_goal.
@@ -131,7 +136,7 @@ class GeometricConstraintBuilder:
         frame_R_goal: RotationMatrix,
         reference_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds constraints to move frame_R_current to frame_R_goal.
@@ -142,25 +147,71 @@ class GeometricConstraintBuilder:
         :param frame_R_goal: goal rotation as rotation matrix
         :param reference_velocity: value used for normalization rad/s
         """
-        # avoid singularity
-        # the sign determines in which direction the robot moves when in singularity.
-        # -0.0001 preserves the old behavior from before this goal was refactored
-        hack = RotationMatrix.from_axis_angle(Vector3.Z(), -0.0001)
-        frame_R_current = frame_R_current.dot(hack)
-        q_actual = frame_R_current.to_quaternion()
-        q_goal = frame_R_goal.to_quaternion()
-        q_goal = sm.if_less(q_goal.dot(q_actual), 0, -q_goal, q_goal)
-        q_error = q_actual.diff(q_goal)
+        quaternion_error = self._quaternion_error(frame_R_current, frame_R_goal)
 
         # w is redundant
         for i in range(3):
             self.collection.add_equality_constraint(
-                task_expression=q_error[i],
-                equality_bound=-q_error[i],
+                task_expression=quaternion_error[i],
+                equality_bound=-quaternion_error[i],
                 quadratic_weight=quadratic_weight,
                 reference_velocity=reference_velocity,
                 name=self._indexed_constraint_name(name, i),
             )
+
+    def add_yaw_goal_constraint(
+        self,
+        frame_R_current: RotationMatrix,
+        frame_R_goal: RotationMatrix,
+        reference_velocity: sm.ScalarData,
+        quadratic_weight: sm.ScalarData,
+        name: str | None = None,
+    ) -> None:
+        """
+        Adds one constraint turning frame_R_current about the z-axis of the frame until
+        it faces the way frame_R_goal does, for a rotation that can only turn about that
+        axis.
+
+        Make sure that both are expressed relative to the same frame.
+        :param frame_R_current: current rotation, turned only about the z-axis of the
+            frame. It should depend on active dofs.
+        :param frame_R_goal: goal rotation, of which only the yaw is reached
+        :param reference_velocity: value used for normalization rad/s
+        """
+        frame_R_goal_yaw = RotationMatrix.from_rpy(
+            yaw=frame_R_goal.rpy[2], reference_frame=frame_R_goal.reference_frame
+        )
+        quaternion_error = self._quaternion_error(frame_R_current, frame_R_goal_yaw)
+        self.collection.add_equality_constraint(
+            task_expression=quaternion_error.z,
+            equality_bound=-quaternion_error.z,
+            quadratic_weight=quadratic_weight,
+            reference_velocity=reference_velocity,
+            name=name,
+        )
+
+    @staticmethod
+    def _quaternion_error(
+        frame_R_current: RotationMatrix, frame_R_goal: RotationMatrix
+    ) -> Quaternion:
+        """
+        :return: The rotation from frame_R_current to frame_R_goal, the shorter way
+            round.
+        """
+        # avoid singularity
+        # the sign determines in which direction the robot moves when in singularity.
+        # -0.0001 preserves the old behavior from before this goal was refactored
+        hack = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), -0.0001))
+        frame_R_current = frame_R_current.dot(hack)
+        current_quaternion = frame_R_current.quaternion
+        goal_quaternion = frame_R_goal.quaternion
+        goal_quaternion = sm.if_less(
+            goal_quaternion.dot(current_quaternion),
+            0,
+            -goal_quaternion,
+            goal_quaternion,
+        )
+        return current_quaternion.diff(goal_quaternion)
 
     def add_translational_velocity_limit(
         self,
@@ -168,7 +219,7 @@ class GeometricConstraintBuilder:
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         max_violation: sm.ScalarData = np.inf,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Adds constraints to limit the translational velocity of frame_P_current.
@@ -199,7 +250,7 @@ class GeometricConstraintBuilder:
         max_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         max_violation: sm.ScalarData = LargeNumber,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> None:
         """
         Add velocity constraints to limit the velocity of frame_R_current.
@@ -209,8 +260,8 @@ class GeometricConstraintBuilder:
             should depend on active dofs.
         :param max_velocity: rad/s
         """
-        root_Q_tipCurrent = frame_R_current.to_quaternion()
-        angle_error = root_Q_tipCurrent.to_axis_angle()[1]
+        root_Q_tipCurrent = frame_R_current.quaternion
+        angle_error = root_Q_tipCurrent.axis_angle.angle
         self.collection.add_velocity_constraint(
             upper_velocity_limit=max_velocity,
             lower_velocity_limit=-max_velocity,

@@ -2,7 +2,11 @@ import pytest
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
 
-from krrood.entity_query_language.backends import EntityQueryLanguageBackend, ProbabilisticBackend
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageBackend,
+    ProbabilisticBackend,
+)
+from krrood.entity_query_language.exceptions import EvidenceHasZeroProbability
 from krrood.entity_query_language.factories import and_, probability_of, variable
 from krrood.parametrization.exceptions import JointQueryAcrossClassesNotSupported
 from krrood.parametrization.model_registries import DictRegistry
@@ -87,3 +91,63 @@ def test_probability_of_true_rejected_natively_too():
     """
     with pytest.raises(JointQueryAcrossClassesNotSupported):
         probability_of(True).first()
+
+
+# %% conditional probability given evidence
+
+
+def test_probability_given_evidence_matches_direct_computation():
+    circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
+    x = variable(Coin)
+
+    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    result = probability_of(x.a < 0.5, evidence=x.a < 0.8).first(backend=backend)
+
+    query_and_evidence = SimpleEvent.from_data({var_a: closed(0, 0.5)})
+    evidence = SimpleEvent.from_data({var_a: closed(0, 0.8)})
+    expected = circuit.probability(
+        query_and_evidence.as_composite_set()
+    ) / circuit.probability(evidence.as_composite_set())
+    assert result == pytest.approx(expected)
+
+
+def test_probability_given_evidence_evaluates_natively_by_counting_evidence_rows():
+    x = variable(Coin, domain=_COIN_DOMAIN)
+    result = probability_of(x.b < 1, evidence=x.a < 0.5).first()
+
+    # 4 coins have a < 0.5, 2 of them also have b < 1
+    assert result == pytest.approx(2 / 4)
+
+
+def test_probability_given_impossible_evidence_raises():
+    circuit, var_a, var_b, var_c = build_three_independent_variables_circuit()
+    x = variable(Coin)
+
+    backend = ProbabilisticBackend(model_registry=DictRegistry({Coin: circuit}))
+    with pytest.raises(EvidenceHasZeroProbability):
+        probability_of(x.a < 0.5, evidence=x.a > 2).first(backend=backend)
+
+
+def test_probability_given_evidence_no_row_satisfies_raises_natively():
+    x = variable(Coin, domain=_COIN_DOMAIN)
+
+    with pytest.raises(EvidenceHasZeroProbability):
+        probability_of(x.a < 0.5, evidence=x.a > 2).first()
+
+
+def test_probability_given_evidence_on_other_class_rejected():
+    x = variable(Coin)
+    y = variable(OtherClass)
+
+    with pytest.raises(JointQueryAcrossClassesNotSupported):
+        probability_of(x.a < 0.5, evidence=y.d < 0.5).first(
+            backend=ProbabilisticBackend(model_registry=DictRegistry({}))
+        )
+
+
+def test_probability_takes_evidence_as_second_positional_argument():
+    x = variable(Coin, domain=_COIN_DOMAIN)
+
+    result = probability_of(x.b < 1, x.a < 0.5).first()
+
+    assert result == probability_of(x.b < 1, evidence=x.a < 0.5).first()

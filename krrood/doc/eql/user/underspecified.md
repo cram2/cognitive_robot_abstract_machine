@@ -44,9 +44,9 @@ query = a(KRROODPosition)(x=..., y=..., z=...)
 ```
 
 The returned object is a {py:class}`~krrood.entity_query_language.query.match.Match` and supports
-`.where()` and nesting patterns. Its subject variable is available immediately as
-`query.variable`, so you can reference it in `.where()` conditions without a separate
-`.resolve()` call. Use `the(MyClass)` instead of `an(MyClass)` when exactly one solution is
+`.where()` and nesting patterns. It reads like an instance of the matched class, so
+`query.x` is that attribute symbolically and can be referenced in `.where()` conditions
+without a separate `.resolve()` call. Use `the(MyClass)` instead of `an(MyClass)` when exactly one solution is
 expected.
 
 ---
@@ -96,7 +96,7 @@ operation — you know the exact value of the field and you want the rest of the
 to be consistent with it.
 
 ```{note}
-This is fundamentally different from a `.where(query.variable.x == 0.5)` filter (see below).
+This is fundamentally different from a `.where(query.x == 0.5)` filter (see below).
 A kwargs literal conditions the *model* first; a `.where` condition filters the *samples*
 after the model has already been conditioned.
 ```
@@ -144,7 +144,7 @@ query = a(KRROODPose)(
     position=a(KRROODPosition)(x=..., y=..., z=...),
     orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),  # ← kwargs: condition the model
 )
-query.where(query.variable.position.x > 0.5)   # ← .where(): truncate the conditioned distribution
+query.where(query.position.x > 0.5)   # ← .where(): truncate the conditioned distribution
 ```
 
 Here `orientation` is fixed via kwargs (Bayesian conditioning), while `x > 0.5` is a
@@ -214,7 +214,7 @@ query = a(Pose)(
     position=a(Position)(x=..., y=..., z=...),
     orientation=Orientation(x=0.0, y=0.0, z=0.0, w=1.0),
 )
-query.where(query.variable.position.x > 0.5)
+query.where(query.position.x > 0.5)
 
 poses = list(query.evaluate(backend=ProbabilisticBackend(number_of_samples=10)))
 assert all(p.position.x > 0.5 for p in poses)

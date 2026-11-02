@@ -4,19 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field, fields
 from functools import cached_property, lru_cache
 
-from typing_extensions import (
-    ClassVar,
-    Set,
-    Type,
-    Optional,
-    Any,
-    Iterable,
-    Dict,
-    Union,
-    Tuple,
-    List,
-    DefaultDict,
-)
+from typing_extensions import ClassVar, Any, Iterable, Dict, List
 
 from krrood.ontomatic.property_descriptor.monitored_container import (
     MonitoredContainer,
@@ -39,7 +27,7 @@ from krrood.symbol_graph.symbol_graph import (
 from krrood.entity_query_language.utils import make_set
 from krrood.patterns.caching import memoize
 
-SymbolType = Type[Symbol]
+SymbolType = type[Symbol]
 """
 Type alias for symbol types.
 """
@@ -105,18 +93,18 @@ class PropertyDescriptor(Symbol):
     The wrapped field instance that this descriptor instance manages.
     """
     domain_range_map: ClassVar[
-        DefaultDict[Type[PropertyDescriptor], DomainRangeMap]
+        defaultdict[type[PropertyDescriptor], DomainRangeMap]
     ] = defaultdict(dict)
     """
     A mapping from descriptor class to the mapping from domain types to range types for that descriptor class.
     """
-    all_domains: ClassVar[Dict[Type[PropertyDescriptor], Set[SymbolType]]] = (
+    all_domains: ClassVar[dict[type[PropertyDescriptor], set[SymbolType]]] = (
         defaultdict(set)
     )
     """
     A set of all domain types for this descriptor class.
     """
-    all_ranges: ClassVar[Dict[Type[PropertyDescriptor], Set[SymbolType]]] = defaultdict(
+    all_ranges: ClassVar[dict[type[PropertyDescriptor], set[SymbolType]]] = defaultdict(
         set
     )
     """
@@ -215,7 +203,7 @@ class PropertyDescriptor(Symbol):
 
     @staticmethod
     def _bind_owner_if_container_type(
-        value: Union[Iterable[Symbol], Symbol], owner: Optional[Any] = None
+        value: Iterable[Symbol] | Symbol, owner: Any | None = None
     ):
         """
         Bind the owner instance to the monitored container if the value is a MonitoredContainer type.
@@ -230,8 +218,8 @@ class PropertyDescriptor(Symbol):
             value._bind_owner(owner)
 
     def _ensure_monitored_type(
-        self, value: Union[Iterable[Symbol], Symbol], obj: Optional[Any] = None
-    ) -> Union[MonitoredContainer[Symbol], Symbol]:
+        self, value: Iterable[Symbol] | Symbol, obj: Any | None = None
+    ) -> MonitoredContainer[Symbol] | Symbol:
         """
         Ensure that the value is a monitored container type or is not iterable.
 
@@ -297,8 +285,8 @@ class PropertyDescriptor(Symbol):
     @memoize
     def get_association_of_source_type(
         cls,
-        domain_type: Union[Type[Symbol], WrappedClass],
-    ) -> Optional[Union[Association, AssociationThroughRoleTaker]]:
+        domain_type: type[Symbol] | WrappedClass,
+    ) -> Association | AssociationThroughRoleTaker | None:
         """
         Get the association that has as a source the given domain type and as a field type this descriptor class.
 
@@ -321,8 +309,8 @@ class PropertyDescriptor(Symbol):
     @memoize
     def get_superproperties_associations(
         cls,
-        domain_type: Union[SymbolType, WrappedClass],
-    ) -> Tuple[Association, ...]:
+        domain_type: SymbolType | WrappedClass,
+    ) -> tuple[Association, ...]:
         """
         :param domain_type: The domain type that has the required association(s).
         :return: The associations that have the given domain type as a source and have a descriptor type that

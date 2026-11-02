@@ -104,14 +104,14 @@ print(world.regions)
 We can now see that if we move the table, we also move the region.
 
 ```{code-cell} ipython3
-print(table_surface.global_pose.to_position().to_np()[:3])
+print(table_surface.global_pose.position.to_np()[:3])
 
 with world.modify_world():
     root_to_leg.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=2.0, reference_frame=table_leg
     )
 
-print(table_surface.global_pose.to_position().to_np()[:3])
+print(table_surface.global_pose.position.to_np()[:3])
 ```
 
 Note that Regions are a relatively new concept that may change in the future.

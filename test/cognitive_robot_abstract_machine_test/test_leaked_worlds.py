@@ -11,20 +11,16 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
 
 from ..living_worlds import (
     BEFORE_THE_FIRST_TEST,
     MAXIMUM_LIVING_WORLDS,
-    LeakedWorldsAcrossWorkersError,
     LeakedWorldsError,
     LivingWorlds,
     UnwatchableWorldTypeError,
-    WorkerTally,
     WorldsLeftBehind,
-    WorldTallyLedger,
 )
 from .dataset.leakable_object import LeakableObject, ObjectMakingItsOwnInstances
 
@@ -202,192 +198,6 @@ def test_the_reported_limit_is_the_enforced_one(
     assert leak.value.limit == MAXIMUM_LIVING_WORLDS
     assert leak.value.worlds_in_memory == len(leaked)
     assert str(MAXIMUM_LIVING_WORLDS) in str(leak.value)
-
-
-# %% a worker's tally round-trips through the ledger
-
-
-@pytest.fixture()
-def ledger(tmp_path: Path) -> WorldTallyLedger:
-    """
-    A ledger backed by a fresh directory, standing in for the one every process of a
-    real run would share.
-    """
-    return WorldTallyLedger(directory=tmp_path / "living_worlds_tally")
-
-
-def test_a_tally_written_to_json_reads_back_equal(
-    stand_in_test_names: StandInTestNames,
-):
-    tally = WorkerTally(
-        worker="gw0",
-        left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 3),),
-    )
-
-    assert WorkerTally.from_json(tally.to_json()) == tally
-
-
-def test_a_tally_recorded_by_the_ledger_is_read_back(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    tally = WorkerTally(
-        worker="gw0",
-        left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 3),),
-    )
-
-    ledger.record(tally)
-
-    assert ledger.read_all() == (tally,)
-
-
-def test_the_ledger_reads_back_every_worker_that_recorded_a_tally(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    first = WorkerTally(
-        worker="gw0",
-        left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 3),),
-    )
-    second = WorkerTally(
-        worker="gw1",
-        left_behind=(WorldsLeftBehind(stand_in_test_names.tidy_test, 5),),
-    )
-
-    ledger.record(first)
-    ledger.record(second)
-
-    assert ledger.read_all() == (first, second)
-
-
-def test_an_empty_ledger_reads_back_nothing(ledger: WorldTallyLedger):
-    assert ledger.read_all() == ()
-
-
-def test_clearing_the_ledger_removes_a_previously_recorded_tally(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    ledger.record(
-        WorkerTally(
-            worker="gw0",
-            left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 3),),
-        )
-    )
-
-    ledger.clear()
-
-    assert ledger.read_all() == ()
-
-
-def test_clearing_a_ledger_that_was_never_written_to_does_not_raise(
-    ledger: WorldTallyLedger,
-):
-    ledger.clear()
-
-    assert ledger.read_all() == ()
-
-
-# %% the ledger enforces a limit on every worker's tally combined
-
-
-def test_a_combined_total_within_the_limit_passes(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    ledger.record(
-        WorkerTally(
-            worker="gw0",
-            left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 2),),
-        )
-    )
-    ledger.record(
-        WorkerTally(
-            worker="gw1",
-            left_behind=(WorldsLeftBehind(stand_in_test_names.tidy_test, 2),),
-        )
-    )
-
-    ledger.enforce_combined_limit(limit=4)
-
-
-def test_a_combined_total_over_the_limit_raises(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    ledger.record(
-        WorkerTally(
-            worker="gw0",
-            left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 2),),
-        )
-    )
-    ledger.record(
-        WorkerTally(
-            worker="gw1",
-            left_behind=(WorldsLeftBehind(stand_in_test_names.tidy_test, 3),),
-        )
-    )
-
-    with pytest.raises(LeakedWorldsAcrossWorkersError) as leak:
-        ledger.enforce_combined_limit(limit=4)
-
-    assert leak.value.worlds_in_memory == 5
-    assert leak.value.limit == 4
-
-
-def test_the_combined_error_names_the_worker_that_held_the_most_first(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    few = WorkerTally(
-        worker="gw0",
-        left_behind=(WorldsLeftBehind(stand_in_test_names.leaking_test, 2),),
-    )
-    many = WorkerTally(
-        worker="gw1",
-        left_behind=(WorldsLeftBehind(stand_in_test_names.tidy_test, 6),),
-    )
-    ledger.record(few)
-    ledger.record(many)
-
-    with pytest.raises(LeakedWorldsAcrossWorkersError) as leak:
-        ledger.enforce_combined_limit(limit=2)
-
-    ranked_worker_lines = str(leak.value).splitlines()[2:4]
-    assert ranked_worker_lines == [
-        f"  {many.worker}: {many.worlds_in_memory}",
-        f"  {few.worker}: {few.worlds_in_memory}",
-    ]
-
-
-def test_an_empty_ledger_enforces_nothing(ledger: WorldTallyLedger):
-    ledger.enforce_combined_limit(limit=2)
-
-
-def test_the_default_combined_limit_is_the_same_budget_the_per_module_check_uses(
-    ledger: WorldTallyLedger, stand_in_test_names: StandInTestNames
-):
-    """
-    The combined limit is a total across every process, not each process's own share
-    of it multiplied by how many processes there are - two processes that would each
-    individually pass the per-module check can still combine to more than the run's
-    one shared budget.
-    """
-    ledger.record(
-        WorkerTally(
-            worker="gw0",
-            left_behind=(
-                WorldsLeftBehind(
-                    stand_in_test_names.leaking_test, MAXIMUM_LIVING_WORLDS
-                ),
-            ),
-        )
-    )
-    ledger.record(
-        WorkerTally(
-            worker="gw1",
-            left_behind=(WorldsLeftBehind(stand_in_test_names.tidy_test, 1),),
-        )
-    )
-
-    with pytest.raises(LeakedWorldsAcrossWorkersError) as leak:
-        ledger.enforce_combined_limit()
-
-    assert leak.value.limit == MAXIMUM_LIVING_WORLDS
 
 
 # %% the watched type goes on creating its objects

@@ -125,9 +125,9 @@ product_unit = ProductUnit(probabilistic_circuit=default_circuit)
 product_unit.add_subcircuit(leaf(GaussianDistribution(variable=x, location=0, scale=1), default_circuit))
 product_unit.add_subcircuit(leaf(GaussianDistribution(variable=y, location=0, scale=1), default_circuit))
 
-cpd_xy.conditional_probability_distributions[hash(ObjectPosition.LEFT)] = default_circuit.truncated(SimpleEvent.from_data({x: closed(-np.inf, -0.5)}).as_composite_set())[0]
-cpd_xy.conditional_probability_distributions[hash(ObjectPosition.RIGHT)] = default_circuit.truncated(SimpleEvent.from_data({x: open(0.5, np.inf)}).as_composite_set())[0]
-cpd_xy.conditional_probability_distributions[hash(ObjectPosition.CENTER)] = default_circuit.truncated(SimpleEvent.from_data({x: open_closed(-0.5, 0.5)}).as_composite_set())[0]
+cpd_xy.conditional_probability_distributions[hash(ObjectPosition.LEFT)] = default_circuit.truncated(SimpleEvent.from_data({x: closed(-np.inf, -0.5)}).as_composite_set()).distribution
+cpd_xy.conditional_probability_distributions[hash(ObjectPosition.RIGHT)] = default_circuit.truncated(SimpleEvent.from_data({x: open(0.5, np.inf)}).as_composite_set()).distribution
+cpd_xy.conditional_probability_distributions[hash(ObjectPosition.CENTER)] = default_circuit.truncated(SimpleEvent.from_data({x: open_closed(-0.5, 0.5)}).as_composite_set()).distribution
 
 bn.add_edge(cpd_object_position, cpd_xy)
 

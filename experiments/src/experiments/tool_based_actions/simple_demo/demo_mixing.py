@@ -19,10 +19,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import sequential
 from coraplex.robot_plans.actions.composite.tool_based import MixingAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import (
@@ -30,7 +26,13 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.testing import attach_tool, setup_world, start_visualization
+from coraplex.testing import attach_tool, setup_world, selected_visualizations
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.demonstrations import RobotDemonstrationRosSession
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.statechart import Statechart
+from cramph.composites import Sequence
 
 
 def main() -> None:
@@ -47,37 +49,43 @@ def main() -> None:
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )
-    start_visualization(world)
-
     pr2 = PR2.from_world(world)
-    context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
-    whisk_body = attach_tool(
-        world, pr2, Arms.RIGHT, parse_object("whisk.stl"), MIX_MOUNT
-    )
+    whisk_body = attach_tool(world, pr2.right_arm, parse_object("whisk.stl"), MIX_MOUNT)
     bowl_body = world.get_body_by_name("bowl.stl")
 
     whisk = Whisk(root=whisk_body)
     with world.modify_world():
         world.add_semantic_annotations([Bowl(root=bowl_body), whisk])
 
-    context.evaluate_conditions = False
-
-    plan = sequential(
-        [
-            SetGripperAction(Arms.RIGHT, GripperState.CLOSE),
-            ParkArmsAction(Arms.BOTH),
-            MoveTorsoAction(TorsoState.HIGH),
-            NavigateAction(
-                Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
+    plan = Sequence(
+        nodes=[
+            SetGripperAction(
+                configuration=pr2.right_arm.end_effector.default_configuration(
+                    GripperState.CLOSE
+                )
             ),
-            MixingAction(container=bowl_body, arm=Arms.RIGHT, tool=whisk),
-        ],
-        context=context,
-    ).plan
+            ParkArmsAction(arms=pr2.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
+            NavigateAction(
+                target_location=Pose.from_xyz_rpy(
+                    *BASE_POSITION_XYZ, reference_frame=world.root
+                )
+            ),
+            MixingAction(container=bowl_body, arm=pr2.right_arm, tool=whisk),
+        ]
+    )
 
-    with simulated_robot:
-        plan.perform()
+    with RobotDemonstrationRosSession.start("mixing_demo") as ros_session:
+        executor = KinematicallySimulatedPlanExecutor(
+            StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+            ros_node=ros_session.node,
+            extensions=selected_visualizations(ros_session.node),
+        )
+        statechart = Statechart(context=executor.context)
+        statechart.add_node(plan)
+        executor.compile(statechart)
+        executor.execute()
 
 
 if __name__ == "__main__":

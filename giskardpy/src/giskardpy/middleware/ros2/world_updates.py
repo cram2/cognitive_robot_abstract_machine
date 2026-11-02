@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import sleep
-from typing import Any, Dict, Optional
+from typing_extensions import Any
 
 from krrood.adapters.json_serializer import from_json
 from semantic_digital_twin.adapters.ros.messages import StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
+    PublicationProgress,
     WorldSynchronizer,
 )
 
 from giskardpy.middleware.ros2.exceptions import GiskardWorldUpdateNotReceivedError
+from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayloadKey
 
 # %% the world of Giskard
 
@@ -80,6 +82,46 @@ class IncomingWorldUpdates:
         return self.world_synchronizer.has_applied(position)
 
 
+@dataclass
+class OutgoingWorldUpdates:
+    """
+    The changes of Giskard's world that the running goal published to other processes.
+
+    A client reading its world while or after Giskard runs its goal first has to catch
+    up with them.
+    """
+
+    world_synchronizer: PublicationProgress
+    """
+    Publishes the changes of Giskard's world.
+    """
+
+    _published_sequence_number_before_goal: int = field(init=False, default=0)
+    """
+    How far Giskard's world had published when the running goal was accepted.
+    """
+
+    def start_goal(self) -> None:
+        """
+        Count only what is published from now on as a change of the running goal.
+        """
+        self._published_sequence_number_before_goal = (
+            self.world_synchronizer.published_sequence_number
+        )
+
+    def published_position_of_goal(self) -> StreamPosition | None:
+        """
+        The position Giskard's world published up to while the goal was running, or
+        ``None`` if the goal published nothing.
+        """
+        if (
+            self.world_synchronizer.published_sequence_number
+            == self._published_sequence_number_before_goal
+        ):
+            return None
+        return self.world_synchronizer.latest_published_position
+
+
 # %% the world of a client
 
 
@@ -107,7 +149,7 @@ class ClientWorldUpdates:
     Seconds between two looks at what the world caught up with.
     """
 
-    def required_position(self) -> Optional[StreamPosition]:
+    def required_position(self) -> StreamPosition | None:
         """
         The position a goal built on this world requires, or ``None`` if this world
         never published a change.
@@ -116,22 +158,39 @@ class ClientWorldUpdates:
             return None
         return self.world_synchronizer.latest_published_position
 
-    def wait_for_the_changes_of_a_goal(self, result: Dict[str, Any]) -> None:
+    def wait_for_the_changes_of_a_goal(self, result: dict[str, Any]) -> None:
         """
         Wait until the changes Giskard made while executing a goal reached this world.
 
+        :param result: The result of the goal.
         :raises GiskardWorldUpdateNotReceivedError: If they do not arrive within
             ``timeout``.
         """
-        published_position = result.get("published_position")
-        if published_position is None:
-            return
-        position = from_json(published_position)
-        deadline = time.monotonic() + self.timeout
-        while not self.world_synchronizer.has_applied(position):
-            if time.monotonic() >= deadline:
-                raise GiskardWorldUpdateNotReceivedError(
-                    awaited_sequence_number=position.sequence_number,
-                    timeout=self.timeout,
-                )
+        waiting_since = time.monotonic()
+        while not self.has_applied_the_changes_reported_in(result, waiting_since):
             sleep(self.poll_interval)
+
+    def has_applied_the_changes_reported_in(
+        self, report: dict[str, Any], waiting_since: float
+    ) -> bool:
+        """
+        :param report: A feedback or the result of a goal.
+        :param waiting_since: The :func:`time.monotonic` time this world started waiting
+            for the changes.
+        :return: Whether the changes Giskard reports to have published while executing
+            the goal reached this world.
+        :raises GiskardWorldUpdateNotReceivedError: If they did not, and ``timeout``
+            passed since `waiting_since`.
+        """
+        published_position = report.get(MotionStatechartPayloadKey.PUBLISHED_POSITION)
+        if published_position is None:
+            return True
+        position = from_json(published_position)
+        if self.world_synchronizer.has_applied(position):
+            return True
+        if time.monotonic() - waiting_since >= self.timeout:
+            raise GiskardWorldUpdateNotReceivedError(
+                awaited_sequence_number=position.sequence_number,
+                timeout=self.timeout,
+            )
+        return False

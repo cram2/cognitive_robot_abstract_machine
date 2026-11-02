@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar, List, Mapping, Optional, Type, Iterable
 
-from krrood.entity_query_language.predicate import Symbol, Predicate
+from krrood.entity_query_language.predicate import Symbol, Predicate, Triple
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
 )
@@ -165,13 +165,41 @@ class ContainsType(Predicate):
         )
 
 
+@dataclass(eq=False)
+class TripleDeclaringItsObjectFirst(Triple[Handle, Drawer]):
+    """
+    A relation whose field holding its object comes before the field holding its
+    subject: a handle opens a drawer.
+    """
+
+    drawer: Drawer
+    """
+    The drawer the handle opens.
+    """
+
+    handle: Handle
+    """
+    The handle that opens the drawer.
+    """
+
+    @property
+    def subject(self) -> Handle:
+        return self.handle
+
+    @property
+    def object(self) -> Drawer:
+        return self.drawer
+
+    def __call__(self) -> bool:
+        return self.drawer.handle is self.handle
+
+
 @dataclass(unsafe_hash=True)
 class GraspConfig(WorldEntity):
     """
-    Simulates GraspDescription from coraplex with fields like rotate_gripper.
+    A value object an action reaches through a relationship rather than owning directly.
 
-    Used to test set_of() with transitive attributes like
-    MoveToReachDAO.grasp_description.rotate_gripper.
+    Used to test set_of() with attributes that are transitive rather than direct.
     """
 
     rotate_gripper: float = field(default=0.0)
@@ -182,7 +210,7 @@ class GraspConfig(WorldEntity):
 @dataclass(unsafe_hash=True)
 class MoveAction(WorldEntity):
     """
-    Simulates MoveToReachDAO from coraplex with direct fields and a relationship.
+    An action with direct fields alongside a relationship to a nested value object.
 
     Used to test set_of() with both direct and transitive attributes.
     """

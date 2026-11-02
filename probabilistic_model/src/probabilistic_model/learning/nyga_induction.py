@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import collections
 from dataclasses import dataclass, field
-from typing import Optional, List, Deque, Tuple, Dict, Any
+from typing_extensions import Self, Dict, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -10,7 +10,6 @@ import random_events
 from random_events.interval import closed, closed_open, reals, SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Continuous
-from typing_extensions import Self
 
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
@@ -242,7 +241,7 @@ class InductionStep:
             + sum_of_log_weights
         )
 
-    def compute_best_split(self) -> Tuple[float, Optional[int]]:
+    def compute_best_split(self) -> tuple[float, int | None]:
         """
         Compute the best split of the data.
 
@@ -334,7 +333,7 @@ class InductionStep:
             > self.min_likelihood_improvement
         )
 
-    def induce(self) -> List[Self]:
+    def induce(self) -> list[Self]:
         """
         Perform one induction step.
 
@@ -419,7 +418,7 @@ class NygaInduction:
     The probabilistic circuit to mount the distribution into.
     """
 
-    root_unit: Optional[SumUnit] = field(init=False, default=None, compare=False)
+    root_unit: SumUnit | None = field(init=False, default=None, compare=False)
     """
     Direct reference to the circuit's root SumUnit, set once in :meth:`fit`. Leaves are
     attached through this instead of ``probabilistic_circuit.root`` to avoid that
@@ -428,7 +427,7 @@ class NygaInduction:
     """
 
     def fit(
-        self, data: np.ndarray, weights: Optional[np.ndarray] = None
+        self, data: np.ndarray, weights: np.ndarray | None = None
     ) -> ProbabilisticCircuit:
         """
         Fit the distribution to the data.
@@ -491,7 +490,7 @@ class NygaInduction:
         )
 
         # initialize the queue
-        induction_steps: Deque[InductionStep] = collections.deque(
+        induction_steps: collections.deque[InductionStep] = collections.deque(
             [initial_induction_step]
         )
 

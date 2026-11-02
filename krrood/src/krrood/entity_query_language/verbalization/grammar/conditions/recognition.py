@@ -4,7 +4,6 @@ import dataclasses
 import operator
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional
 
 from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -34,7 +33,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 from krrood.entity_query_language.verbalization.vocabulary.english import Operators
 
 
-def attribute_names(left: SymbolicExpression) -> List[str]:
+def attribute_names(left: SymbolicExpression) -> list[str]:
     """
     :param left: A ``MappedVariable`` chain (or any expression).
     :return: The attribute names along the chain, outermost (last-accessed) first (``[]`` if none).
@@ -44,7 +43,7 @@ def attribute_names(left: SymbolicExpression) -> List[str]:
     >>> attribute_names(variable(Robot, []))
     []
     """
-    names: List[str] = []
+    names: list[str] = []
     current = left
     while isinstance(current, MappedVariable):
         if isinstance(current, Attribute):
@@ -54,8 +53,8 @@ def attribute_names(left: SymbolicExpression) -> List[str]:
 
 
 def single_hop_attribute(
-    expression: SymbolicExpression, subject_variable: Optional[Variable]
-) -> Optional[Attribute]:
+    expression: SymbolicExpression, subject_variable: Variable | None
+) -> Attribute | None:
     """
     :param expression: Candidate expression.
     :param subject_variable: The variable the attribute must be on.
@@ -176,8 +175,8 @@ def is_boolean_attribute_chain(expression: SymbolicExpression) -> bool:
 
 
 def fold_shared_subject_comparisons(
-    operands: List[SymbolicExpression],
-) -> Optional[SharedSubjectComparisons]:
+    operands: list[SymbolicExpression],
+) -> SharedSubjectComparisons | None:
     """
     :param operands: The flattened operands of a coordination (e.g. an ``OR``'s disjuncts).
     :return: a :class:`SharedSubjectComparisons` when *every* operand is a plain value comparison on
@@ -222,8 +221,8 @@ def fold_shared_subject_comparisons(
 
 
 def fold_shared_subject_conjunction(
-    operands: List[SymbolicExpression],
-) -> Optional[SharedSubjectConjunction]:
+    operands: list[SymbolicExpression],
+) -> SharedSubjectConjunction | None:
     """
     :param operands: The flattened operands of an ``AND``.
     :return: a :class:`SharedSubjectConjunction` when *every* operand is a plain value comparison on
@@ -282,8 +281,8 @@ class SuperlativeFold:
 
 
 def superlative_aggregation(
-    comparator: SymbolicExpression, subject: Optional[Variable]
-) -> Optional[SuperlativeFold]:
+    comparator: SymbolicExpression, subject: Variable | None
+) -> SuperlativeFold | None:
     """Recognise a superlative restriction on *subject*.  The guard is strict so it never fires
     on a self-join, a constrained sub-query, a different chain, or a non-extreme aggregation.
 

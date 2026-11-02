@@ -13,8 +13,10 @@ The types support both 2D and 3D representations where applicable.
 """
 
 from dataclasses import dataclass, field
+from enum import StrEnum, auto
 
-from typing_extensions import Any, List
+import open3d as o3d
+from typing_extensions import Any
 
 from robokudo.types.core import Annotation
 from robokudo.types.cv import Points3D, ImageROI
@@ -95,33 +97,75 @@ class ActivityAnnotation(Annotation):
 
 
 @dataclass
+class BodyKeypoint:
+    """
+    The position of one body part, such as the nose or the left knee, in an image.
+    """
+
+    x: float
+    """
+    Horizontal position in color image pixels.
+    """
+
+    y: float
+    """
+    Vertical position in color image pixels.
+    """
+
+    confidence: float
+    """
+    Confidence of the detector that the body part is at this position.
+    """
+
+
+@dataclass
+class BodyKeypointCloud:
+    """
+    The depth measurements around a body keypoint.
+    """
+
+    keypoint: BodyKeypoint
+    """
+    The body keypoint the cloud is built around.
+    """
+
+    points: o3d.geometry.PointCloud
+    """
+    The colored points measured around the keypoint, empty if none were built for it.
+    """
+
+
+class KeypointKind(StrEnum):
+    """
+    What each keypoint of a :class:`KeypointAnnotation` is given as.
+    """
+
+    IMAGE_POSITION = auto()
+    """
+    Each keypoint is a :class:`BodyKeypoint`, its position in the color image.
+    """
+
+    POINT_CLOUD = auto()
+    """
+    Each keypoint is a :class:`BodyKeypointCloud`, the depth measurements around it.
+    """
+
+
+@dataclass
 class KeypointAnnotation(Annotation):
-    """Human body keypoint detection result.
-
-    Represents detected keypoints like:
-    * Joint positions
-    * Body part locations
-    * Facial landmarks
-
-    Supports both 2D and 3D keypoint types.
+    """
+    The body keypoints of one human, indexed by
+    :class:`~robokudo.annotators.human_and_pose.PoseKeypoint`.
     """
 
-    KP_TYPE_2D: str = "2D"
+    keypoints: list[BodyKeypoint] | list[BodyKeypointCloud] = field(
+        default_factory=list
+    )
     """
-    Identifier for 2D keypoint sets
-    """
-
-    KP_TYPE_3D: str = "3D"
-    """
-    Identifier for 3D keypoint sets
+    The keypoints, given as :attr:`kind` says.
     """
 
-    keypoints: List = field(default_factory=list)
+    kind: KeypointKind = field(kw_only=True)
     """
-    List of detected keypoints
-    """
-
-    type: str = None  # type of keypoints: e.g. 3D or 2D
-    """
-    Type of keypoints (2D or 3D)
+    What each of the :attr:`keypoints` is given as.
     """

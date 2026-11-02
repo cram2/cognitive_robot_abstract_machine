@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Callable, Self
+from typing_extensions import Generic, TypeVar, Callable, Self
 
-from typing_extensions import Generic, TypeVar, List, Optional
 
 T = TypeVar("T")
 
@@ -37,13 +36,13 @@ class DerivativeMap(Generic[T]):
     derivatives. Each derivative order can hold a value of type T or None.
     """
 
-    position: Optional[T] = None
-    velocity: Optional[T] = None
-    acceleration: Optional[T] = None
-    jerk: Optional[T] = None
+    position: T | None = None
+    velocity: T | None = None
+    acceleration: T | None = None
+    jerk: T | None = None
 
     @property
-    def data(self) -> List[Optional[T]]:
+    def data(self) -> list[T | None]:
         """
         :return: A list of all derivative values.
         """
@@ -52,7 +51,7 @@ class DerivativeMap(Generic[T]):
     def __hash__(self):
         return hash(tuple(self.data))
 
-    def _broadcast_callable(self, operand: Callable[[Optional[T]], T]) -> Self:
+    def _broadcast_callable(self, operand: Callable[[T | None], T]) -> Self:
         """
         Apply a callable to each derivative value and return a new instance with the
         resulting values.

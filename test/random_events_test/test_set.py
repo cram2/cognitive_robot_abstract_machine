@@ -118,6 +118,13 @@ class SetTestCase(unittest.TestCase):
         s = Set.from_simple_sets(a, b)
         self.assertEqual(s.hash_map, {hash(a): "a", hash(b): "b", hash("c"): "c"})
 
+    def test_one_element_is_a_singleton(self):
+        a = SetElement.from_data("a", str_set)
+        b = SetElement.from_data("b", str_set)
+        self.assertTrue(Set.from_simple_sets(a).is_singleton())
+        self.assertFalse(Set.from_simple_sets(a, b).is_singleton())
+        self.assertFalse(Set.from_simple_sets().is_singleton())
+
 
 class SetTypeTestCase(unittest.TestCase):
     def test_int(self):

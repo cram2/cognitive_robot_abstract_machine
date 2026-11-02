@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# %% Imports
 import numpy as np
 import py_trees
 import pytest
@@ -16,9 +17,17 @@ from robokudo.types.annotation import (
     PoseAnnotation,
     StampedPoseAnnotation,
 )
+from robokudo.types.camera import CameraObservation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo import world as rk_world
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+
+# %% Camera behavior
 
 
 def _make_hypothesis(
@@ -71,9 +80,10 @@ def _set_camera_to_world_transform(
     pos_z: float = 0.0,
 ) -> None:
     sem_world = rk_world.world_instance()
-    world_body = sem_world.get_body_by_name(cas.world_frame)
-    camera_body = sem_world.get_body_by_name(cas.camera_frame)
-    cas.camera_to_world_transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    observation = cas.require_camera_observation()
+    world_body = sem_world.get_body_by_name("map")
+    camera_body = observation.camera.root
+    world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=pos_x,
         pos_y=pos_y,
         pos_z=pos_z,
@@ -84,6 +94,7 @@ def _set_camera_to_world_transform(
         reference_frame=world_body,
         child_frame=camera_body,
     )
+    cas.camera_observation = observation.with_world_T_camera(world_T_camera)
 
 
 def _stamped_world_poses(
@@ -109,8 +120,21 @@ def semdt_cas() -> CAS:
     rk_world.setup_world_for_camera_frame(world_frame="map", camera_frame="camera")
 
     cas = CAS()
-    cas.world_frame = "map"
-    cas.camera_frame = "camera"
+    camera_body = rk_world.world_instance().get_body_by_name("camera")
+    camera_model = PinholeCameraModel.from_field_of_view(
+        resolution=CameraResolution(width=640, height=480),
+        field_of_view=FieldOfView(),
+    )
+    cas.camera_observation = CameraObservation(
+        camera=Camera(
+            name=PrefixedName(name="camera"),
+            root=camera_body,
+            camera_model=camera_model,
+        ),
+        effective_camera_model=camera_model,
+        world_T_camera=None,
+        timestamp_nanoseconds=123,
+    )
     _set_camera_to_world_transform(cas)
 
     yield cas

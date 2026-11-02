@@ -9,7 +9,7 @@ This module provides utilities to:
 
 from __future__ import annotations
 
-from typing_extensions import Iterable, Optional, Tuple, Union
+from typing_extensions import Iterable
 
 import numpy as np
 import open3d as o3d
@@ -35,11 +35,11 @@ def _box_obb_from_shape(
     world_T_box = world_T_region @ box_origin
 
     # Build OBB from center, rotation, scale
-    center_np = world_T_box.to_position().to_np()
+    center_np = world_T_box.position.to_np()
     if center_np.shape[0] == 4:
         center_np = center_np[:3]
     center = center_np.reshape(3, 1).astype(float)
-    R = world_T_box.to_rotation_matrix().to_np().astype(float)
+    R = world_T_box.rotation_matrix.to_np().astype(float)
     if R.shape == (4, 4):
         R = R[:3, :3]
     extent = (
@@ -52,7 +52,7 @@ def _box_obb_from_shape(
 
 
 def region_obb(
-    region: Region, world: Optional[World] = None
+    region: Region, world: World | None = None
 ) -> o3d.geometry.OrientedBoundingBox:
     """
     Return an OBB for the region in world coordinates.
@@ -86,15 +86,15 @@ def region_obb(
 def region_obb_in_camera_coordinates(
     world: World,
     region: Region,
-    world_T_camera: Union[np.ndarray, HomogeneousTransformationMatrix],
+    world_T_camera: np.ndarray | HomogeneousTransformationMatrix,
 ) -> o3d.geometry.OrientedBoundingBox:
     """
     Transform region OBB to camera frame using world_to_camera matrix.
     """
     obb = region_obb(region, world=world)
     if isinstance(world_T_camera, HomogeneousTransformationMatrix):
-        R = world_T_camera.to_rotation_matrix().to_np()
-        t = world_T_camera.to_position().to_np()
+        R = world_T_camera.rotation_matrix.to_np()
+        t = world_T_camera.position.to_np()
     else:
         R = world_T_camera[:3, :3]
         t = world_T_camera[:3, 3]
@@ -109,16 +109,16 @@ def region_pose_annotation(region: Region) -> robokudo.types.annotation.PoseAnno
     """
     pose = robokudo.types.annotation.PoseAnnotation()
     T = region.global_pose
-    pose.translation = T.to_position().to_np().tolist()
-    pose.rotation = T.to_quaternion().to_np().tolist()
+    pose.translation = T.position.to_np().tolist()
+    pose.rotation = T.quaternion.to_np().tolist()
     return pose
 
 
 def region_marker_array(
     regions: Iterable[Region],
-    highlighted: Optional[Iterable[str]] = None,
-    highlight_color: Tuple[float, float, float] = (0.0, 1.0, 0.0),
-    default_color: Tuple[float, float, float] = (0.0, 0.0, 0.7),
+    highlighted: Iterable[str] | None = None,
+    highlight_color: tuple[float, float, float] = (0.0, 1.0, 0.0),
+    default_color: tuple[float, float, float] = (0.0, 0.0, 0.7),
 ):
     """
     Optional helper for visualization markers.

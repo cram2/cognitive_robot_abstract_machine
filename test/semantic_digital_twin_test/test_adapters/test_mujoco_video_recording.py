@@ -41,7 +41,7 @@ requires_mujoco_ci = pytest.mark.skipif(
 def test_overview_camera_pose_applies_distance_floor_for_a_degenerate_box():
     point_bounds = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
 
-    position = MujocoCamera.overview_pose(point_bounds).to_position().to_np()[:3]
+    position = MujocoCamera.overview_pose(point_bounds).position.to_np()[:3]
 
     assert np.linalg.norm(position - np.array([1.0, 1.0, 1.0])) == pytest.approx(1.5)
 
@@ -50,8 +50,8 @@ def test_overview_camera_pose_scales_with_the_bounding_diagonal():
     small_bounds = np.array([[-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]])
     large_bounds = np.array([[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]])
 
-    small_position = MujocoCamera.overview_pose(small_bounds).to_position().to_np()[:3]
-    large_position = MujocoCamera.overview_pose(large_bounds).to_position().to_np()[:3]
+    small_position = MujocoCamera.overview_pose(small_bounds).position.to_np()[:3]
+    large_position = MujocoCamera.overview_pose(large_bounds).position.to_np()[:3]
 
     small_distance = np.linalg.norm(small_position)
     large_distance = np.linalg.norm(large_position)
@@ -62,11 +62,11 @@ def test_overview_camera_pose_looks_at_the_bounding_box_center():
     bounds = np.array([[-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]])
 
     pose = MujocoCamera.overview_pose(bounds)
-    position = pose.to_position().to_np()[:3]
+    position = pose.position.to_np()[:3]
 
     from scipy.spatial.transform import Rotation
 
-    rotation_matrix = Rotation.from_quat(pose.to_quaternion().to_np()).as_matrix()
+    rotation_matrix = Rotation.from_quat(pose.quaternion.to_np()).as_matrix()
     view_direction = rotation_matrix @ np.array([0.0, 0.0, -1.0])
     expected_direction = -position / np.linalg.norm(position)
     assert np.allclose(view_direction, expected_direction, atol=1e-6)

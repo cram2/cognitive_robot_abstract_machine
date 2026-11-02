@@ -16,6 +16,7 @@ Available Modules:
 
 * action_server_base - Base class for ROS action servers
 * action_server_checks - Action server state monitoring
+* clear_annotator_outputs - Annotator output reset
 * clear_errors - Error state management
 * goal_canceled - Goal cancellation detection
 * run_until - Timed execution control

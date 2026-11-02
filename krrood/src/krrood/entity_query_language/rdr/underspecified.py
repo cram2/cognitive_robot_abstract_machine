@@ -25,69 +25,58 @@ from typing_extensions import (
     Iterator,
     List,
     Type,
-    get_args,
-    get_origin,
 )
 
-from krrood.class_diagrams.utils import get_type_hints_of_object, is_union_annotation
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import entity
 from krrood.entity_query_language.query.match import AttributeMatch, Match
 from krrood.entity_query_language.rdr.exceptions import (
     MultipleInferenceTargets,
     NoInferenceTarget,
+    UndeclaredInferenceTarget,
     UnsupportedInferenceTarget,
 )
-
-#: Generic origins whose instances are unbounded iterables we cannot conclude as one value.
-_UNBOUNDED_ITERABLE_ORIGINS = (list, set, frozenset, tuple, dict)
-
-
-def is_ellipsis_target(attribute_match: AttributeMatch) -> bool:
-    """:return: Whether ``attribute_match`` assigns ``...`` (i.e. is an inference target)."""
-    return getattr(attribute_match.assigned_variable, "_value_", None) is ...
-
-
-def _is_unbounded_iterable(annotation: Any) -> bool:
-    """:return: Whether ``annotation`` denotes a collection type (``Optional`` unwrapped)."""
-    if is_union_annotation(annotation):
-        return any(
-            _is_unbounded_iterable(arg)
-            for arg in get_args(annotation)
-            if arg is not type(None)
-        )
-    return get_origin(annotation) in _UNBOUNDED_ITERABLE_ORIGINS
+from krrood.symbol_graph.helpers import get_wrapped_field
 
 
 @dataclass
-class RDRMatchParser:
-    """Reads an underspecified :class:`Match` for RDR-based attribute inference."""
+class RippleDownRulesMatchParser:
+    """
+    Reads an underspecified :class:`Match` for RDR-based attribute inference.
+    """
 
     match: Match
+    """
+    The underspecified query whose ``...`` attributes are inferred.
+    """
 
     def __post_init__(self) -> None:
-        # Callers hand in a freshly built, unresolved template (e.g. an(Animal)(species=...));
-        # every property below reads match.type/.variable/.matches_with_variables, which only
-        # exist once resolved. Match.resolve() is idempotent, so this is safe if already resolved.
+        # The properties below read attributes that exist only on a resolved match.
         self.match.resolve()
 
     @property
     def case_type(self) -> Type:
-        """The type whose instances are being completed (e.g. ``Animal``)."""
-        return self.match.type
+        """
+        The type whose instances are being completed (e.g. ``Animal``).
+        """
+        return self.match._type_
 
     @property
     def variable(self) -> Variable:
-        """The EQL variable the query ranges over."""
-        return self.match.variable
+        """
+        The EQL variable the query ranges over.
+        """
+        return self.match._variable_
 
     @cached_property
     def inference_targets(self) -> List[AttributeMatch]:
-        """The ``...`` attribute leaves to infer (each validated as single-valued)."""
+        """
+        The ``...`` attribute leaves to infer (each validated as single-valued).
+        """
         targets = [
             attribute_match
-            for attribute_match in self.match.matches_with_variables
-            if is_ellipsis_target(attribute_match)
+            for attribute_match in self.match._matches_with_variables_
+            if attribute_match.is_assigned_to_ellipsis
         ]
         for target in targets:
             self._guard_single_valued(target)
@@ -104,7 +93,9 @@ class RDRMatchParser:
 
     @property
     def target_attribute_name(self) -> str:
-        """The name of the single attribute this query asks to infer."""
+        """
+        The name of the single attribute this query asks to infer.
+        """
         return self.single_target().attribute_name
 
     def filtered_cases(self) -> Iterator[Any]:
@@ -119,17 +110,25 @@ class RDRMatchParser:
         return query.evaluate()
 
     def _concrete_conditions(self) -> List[Any]:
-        """Fresh comparator nodes for the concrete attribute constraints (``...`` dropped)."""
+        """
+        Fresh comparator nodes for the concrete attribute constraints (``...`` dropped).
+        """
         conditions: List[Any] = []
-        for leaf in self.match.matches_with_variables:
-            if is_ellipsis_target(leaf):
+        for leaf in self.match._matches_with_variables_:
+            if leaf.is_assigned_to_ellipsis:
                 continue
             attribute = getattr(self.variable, leaf.attribute_name)
             conditions.append(attribute == leaf.assigned_variable._value_)
         return conditions
 
     def _guard_single_valued(self, target: AttributeMatch) -> None:
-        name = target.attribute_name
-        annotation = get_type_hints_of_object(self.case_type).get(name)
-        if annotation is not None and _is_unbounded_iterable(annotation):
-            raise UnsupportedInferenceTarget(self.case_type, name)
+        """
+        :raises UndeclaredInferenceTarget: If ``target`` is not a declared field of the
+            case type.
+        :raises UnsupportedInferenceTarget: If ``target``'s field holds a collection.
+        """
+        wrapped_field = get_wrapped_field(self.case_type, target.attribute_name)
+        if wrapped_field is None:
+            raise UndeclaredInferenceTarget(self.case_type, target.attribute_name)
+        if wrapped_field.holds_collection:
+            raise UnsupportedInferenceTarget(self.case_type, target.attribute_name)

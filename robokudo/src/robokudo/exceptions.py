@@ -22,18 +22,23 @@ class RoboKudoError(DataclassException, ABC):
 @dataclass
 class ColorToDepthRatioMissing(RoboKudoError, RuntimeError):
     """
-    Raised when COLOR2DEPTH_RATIO is required but missing.
+    Raised when an operation needs the color-to-depth ratio, but the CAS holds none.
     """
 
     operation: str = "continue"
+    """
+    The operation that needs the color-to-depth ratio.
+    """
 
     def error_message(self) -> str:
-        return f"COLOR2DEPTH_RATIO is missing from the CAS. Can't {self.operation}."
+        return (
+            f"The color-to-depth ratio is missing from the CAS. Can't {self.operation}."
+        )
 
     def suggest_correction(self) -> str:
         return (
-            "make sure the camera driver or reader stores COLOR2DEPTH_RATIO in the CAS "
-            "before this operation."
+            "make sure the camera driver or reader stores the color-to-depth ratio in "
+            "the CAS before this operation."
         )
 
 
@@ -51,6 +56,86 @@ class UnknownMode(RoboKudoError, ValueError):
 
     def suggest_correction(self) -> str:
         return "use one of the modes supported by this component."
+
+
+# %% ROS frame identifiers
+
+
+@dataclass
+class InvalidROSFrameId(RoboKudoError, ValueError):
+    """
+    Raised when a ROS frame identifier is empty after normalization.
+    """
+
+    frame_id: str
+    """
+    Supplied ROS frame identifier.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid ROS frame identifier: {self.frame_id!r}."
+
+    def suggest_correction(self) -> str:
+        return "provide a nonempty ROS frame identifier containing more than leading slashes."
+
+
+# %% Camera observations
+
+
+@dataclass
+class InvalidCameraObservation(RoboKudoError, TypeError):
+    """
+    Raised when camera metadata contains incompatible values.
+    """
+
+    reason: str
+    """
+    Reason the persisted observation is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid camera observation: {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "use compatible camera, pose-frame, and projection-model data."
+
+
+@dataclass
+class CameraObservationMissing(RoboKudoError):
+    """
+    Raised when processing requires camera metadata for the current frame.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing frame metadata.
+        """
+        return "The CAS contains no camera observation."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide frame metadata.
+        """
+        return "run a camera interface before camera-dependent annotators."
+
+
+@dataclass
+class CameraPoseMissing(RoboKudoError):
+    """
+    Raised when camera metadata has no sampled world pose.
+    """
+
+    def error_message(self) -> str:
+        """
+        Describe the missing sampled pose.
+        """
+        return "The camera observation contains no camera pose in the world frame."
+
+    def suggest_correction(self) -> str:
+        """
+        Describe how to provide the sampled pose.
+        """
+        return "configure camera TF or a static camera transform."
 
 
 @dataclass
@@ -266,19 +351,6 @@ class CVBridgeUnsupportedTargetEncoding(RoboKudoError, ValueError):
 
 
 @dataclass
-class StoredCameraTransformFrameMetadataMissing(RoboKudoError):
-    """
-    Raised when stored camera transform frame metadata is missing.
-    """
-
-    def error_message(self) -> str:
-        return "Stored CAMERA_TO_WORLD_TRANSFORM is missing frame-name metadata."
-
-    def suggest_correction(self) -> str:
-        return "Recreate the recording with the current storage format."
-
-
-@dataclass
 class AnalysisPreconditionError(RoboKudoError, ABC):
     """
     Base class for unmet analysis preconditions.
@@ -365,6 +437,19 @@ class PlaneModelMissing(AnalysisPreconditionError):
         return (
             "run a plane annotator before this algorithm or provide a plane annotation."
         )
+
+
+@dataclass
+class PointCloudCameraModelMissing(AnalysisPreconditionError):
+    """
+    Raised when the CAS lacks the projection model for its point cloud.
+    """
+
+    def error_message(self) -> str:
+        return "The CAS contains no point cloud camera model."
+
+    def suggest_correction(self) -> str:
+        return "provide the camera model used to create the point cloud."
 
 
 @dataclass
@@ -464,3 +549,103 @@ class WorldDescriptorBootstrapError(WorldDescriptorError, RuntimeError):
             "inspect the original chained exception for the underlying world model "
             "operation that failed."
         )
+
+
+# %% Analysis data contracts
+
+
+@dataclass
+class ObjectGeometryMissing(WorldDescriptorError, ValueError):
+    """
+    A world object declares no supported geometry.
+    """
+
+    object_name: str
+    """
+    Name of the object without geometry.
+    """
+
+    def error_message(self) -> str:
+        return f"Object {self.object_name!r} requires mesh, box or cylinder dimensions."
+
+    def suggest_correction(self) -> str:
+        return "Configure a mesh path, box dimensions or cylinder dimensions."
+
+
+@dataclass
+class RegionParentMissing(WorldDescriptorError, ValueError):
+    """
+    A world region references a missing parent body.
+    """
+
+    region_name: str
+    """
+    Name of the region being attached.
+    """
+
+    parent_name: str
+    """
+    Requested parent body name.
+    """
+
+    def error_message(self) -> str:
+        return f"Region {self.region_name!r} references missing parent {self.parent_name!r}."
+
+    def suggest_correction(self) -> str:
+        return "Add the parent body or select an existing parent name."
+
+
+# %% Bounding box projection
+@dataclass
+class BoundingBoxDepthMissing(RoboKudoError, ValueError):
+    """
+    A bounding box has a corner on the camera plane.
+    """
+
+    def error_message(self) -> str:
+        return "A bounding box corner has zero optical depth and cannot be projected."
+
+    def suggest_correction(self) -> str:
+        return "Provide a bounding box whose corners have nonzero optical depth."
+
+
+@dataclass
+class DetectionModelNotConfigured(RoboKudoError, ValueError):
+    """
+    Raised when an annotator is given no model to load.
+    """
+
+    annotator_name: str
+    """
+    Name of the annotator that has no model configured.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotator_name} has neither a pretrained model nor weights inside "
+            f"a ROS package configured."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "set 'pretrained_model', or set both 'ros_package_name' and "
+            "'weights_path' in the annotator's parameters."
+        )
+
+
+@dataclass
+class ParentPipelineMissing(RoboKudoError, RuntimeError):
+    """
+    Raised when a behaviour that operates on its pipeline is not part of one.
+    """
+
+    behaviour_name: str
+    """
+    Name of the behaviour without a parent pipeline.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.behaviour_name} is not part of a Pipeline."
+
+    def suggest_correction(self) -> str:
+        return "add the behaviour as a descendant of a Pipeline."

@@ -1,268 +1,268 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import List, Dict, Set
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from segmind.datastructures.events import (
     DetectionEvent,
     SupportEvent,
     LossOfSupportEvent,
     ContainmentEvent,
-    LossOfContainmentEvent, ContactEvent, InsertionEvent,
+    LossOfContainmentEvent,
+    ContactEvent,
+    InsertionEvent,
 )
 
-from semantic_digital_twin.reasoning.predicates import is_supported_by, InsideOf
+from semantic_digital_twin.reasoning.predicates import SupportedBy, InsideOf
 from semantic_digital_twin.world_description.world_entity import Body
 
-from segmind.detectors.base import AbstractDetector, SegmindContext
+from segmind.detectors.atomic_event_detectors_nodes import ContactDetector
+from segmind.detectors.base import (
+    AbstractDetector,
+    EventCombiningDetector,
+    IndexedBodyPairs,
+    SegmindContext,
+)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class SupportDetector(AbstractDetector):
     """
-    Class for detecting and updating newly established support relationships.
+    Detects supports being established and being lost.
 
-    This class provides functionality to detect and update support relationships
-    between physical bodies. It evaluates the given objects and generates events
-    for newly established support connections. This can be useful in simulations
-    or physics-based environments to monitor and handle dynamic interactions
-    between objects.
+    A support is one body resting on another. The detector reports a
+    :class:`SupportEvent` when a body starts resting on something and a
+    :class:`LossOfSupportEvent` when it stops resting on something it rested on.
     """
 
     def update_context_and_events(
-        self, context:MotionStatechartContext, segmind_context:SegmindContext, objects_to_check: List[Body]
-    ) -> List[DetectionEvent]:
+        self,
+        segmind_context: SegmindContext,
+        objects_to_check: list[Body],
+    ) -> list[DetectionEvent]:
         """
-        Detects newly established support relationships.
+        Detects newly established and newly lost support relationships.
 
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param objects_to_check: Bodies that should be evaluated for new supports.
-        :return: List of SupportEvent objects representing newly detected supports.
+        A held object is carried rather than resting, so what it brushes on the way does
+        not become something it rests on. What already holds it up is left alone, so
+        taking hold of something that still stands on a surface does not take that
+        surface away from it.
+
+        :param segmind_context: The shared SegmindContext containing the information
+            required to track events.
+        :param objects_to_check: Bodies that should be evaluated for supports.
+        :return: The supports established, then the supports lost.
         """
+        supports_now = self.get_relation(
+            objects_to_check,
+            SupportedBy,
+            candidates=self.bodies_outside_end_effectors(self.context.world),
+        )
+        latest_supports = segmind_context.latest_support
+        not_held = {
+            body: supporters
+            for body, supporters in supports_now.items()
+            if not segmind_context.latest_grasps.get(body)
+        }
+        new_supports = self.remember_new_relations(latest_supports, not_held)
+        lost_supports = self.forget_lost_relations(
+            latest_supports, supports_now, objects_to_check
+        )
+        return [
+            SupportEvent(tracked_object=body, with_object=supporter)
+            for body, supporters in new_supports.items()
+            for supporter in supporters
+        ] + [
+            LossOfSupportEvent(tracked_object=body, with_object=supporter)
+            for body, supporters in lost_supports.items()
+            for supporter in supporters
+        ]
 
-        events = []
-        latest_support = segmind_context.latest_support
-        new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
-        for body, support in new_support_pairs.items():
-            new_supports = (
-                support
-                if body not in latest_support
-                else support - latest_support[body]
-            )
-            if new_supports:
-                latest_support.setdefault(body, set()).update(new_supports)
-                events.extend(
-                    [
-                        SupportEvent(tracked_object=body, with_object=s)
-                        for s in new_supports
-                    ]
-                )
 
-        return events
-
-
-@dataclass(eq=False, repr=False)
-class LossOfSupportDetector(AbstractDetector):
+@dataclass(eq=False, repr=False, kw_only=True)
+class ContainmentDetector(AbstractDetector):
     """
-    Detects and manages the loss of support relationships among objects.
+    Detects containments between bodies being established and being lost.
 
-    This class is a specialized support detector that identifies when previously
-    registered support relationships are no longer present. It processes a given
-    set of objects to detect and update the context with events signifying the loss
-    of such support relationships. This functionality is particularly useful in
-    simulation or analysis scenarios where maintaining updated context for object
-    interactions is essential.
-    """
-
-    def update_context_and_events(
-        self,context:MotionStatechartContext, segmind_context:SegmindContext , objects_to_check: List[Body]
-    ) -> List[DetectionEvent]:
-        """
-        Detects when previously existing support relationships are lost.
-
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param objects_to_check: Bodies that should be evaluated for lost supports.
-        :return: List of LossOfSupportEvent objects representing removed supports.
-        """
-
-        events = []
-        latest_support = segmind_context.latest_support
-        new_support_pairs = self.get_relation(context, objects_to_check, is_supported_by)
-
-        for body, support in list(latest_support.items()):
-            loss_supports = support - new_support_pairs.get(body, set())
-
-            if not loss_supports:
-                continue
-
-            segmind_context.latest_support[body] -= loss_supports
-            if not segmind_context.latest_support[body]:
-                segmind_context.latest_support.pop(body)
-
-            events.extend(
-                LossOfSupportEvent(tracked_object=body, with_object=s)
-                for s in loss_supports
-            )
-
-        return events
-
-
-@dataclass(eq=False, repr=False)
-class BaseContainmentDetector(AbstractDetector):
-    """
-    Abstract base class for contaiment-based detectors.
-
-    Provides shared functionality for detecting containment between
-    bodies and generating events when containment relationships change.
+    The detector reports a :class:`ContainmentEvent` when a body ends up inside
+    something and a :class:`LossOfContainmentEvent` when it leaves something it was
+    inside. Containment is only looked for once a body comes to rest on something new,
+    as read from a :class:`SupportDetector`.
     """
 
     containment_threshold: float = 0.9
     """
-    The threshold for the containment ratio between two bodies to be considered containment.
+    The threshold for the containment ratio between two bodies to be considered
+    containment.
     """
 
-    def get_containment_pairs(
-        self,context:MotionStatechartContext, tracked_objects: List[Body]
-    ) -> Dict[Body, Set[Body]]:
+    _supports_seen: IndexedBodyPairs = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    What each tracked body rested on at the previous tick.
+    """
+
+    @classmethod
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
+        return (SupportDetector,)
+
+    def bodies_come_to_rest(
+        self, segmind_context: SegmindContext, tracked_objects: list[Body]
+    ) -> list[Body]:
         """
-        Computes support relationships.
+        The tracked objects resting on something they did not rest on when their
+        supports were last remembered (see :meth:`remember_supports`).
+
+        :param segmind_context: The shared SegmindContext holding what each body rests
+            on.
+        :param tracked_objects: Bodies that should be checked.
+        """
+        return [
+            tracked_object
+            for tracked_object in tracked_objects
+            if segmind_context.latest_support.get(tracked_object, set())
+            - self._supports_seen.get(tracked_object, set())
+        ]
+
+    def remember_supports(
+        self, segmind_context: SegmindContext, tracked_objects: list[Body]
+    ) -> None:
+        """
+        Remember what each tracked object rests on now, for :meth:`bodies_come_to_rest`
+        to compare against at the next tick.
+
+        :param segmind_context: The shared SegmindContext holding what each body rests
+            on.
+        :param tracked_objects: Bodies whose supports are remembered.
+        """
+        for tracked_object in tracked_objects:
+            self._supports_seen[tracked_object] = set(
+                segmind_context.latest_support.get(tracked_object, set())
+            )
+
+    def containers_still_holding(
+        self, tracked_object: Body, containers: set[Body]
+    ) -> set[Body]:
+        """
+        :param tracked_object: The body found inside ``containers``.
+        :param containers: What ``tracked_object`` was found inside.
+        :return: Those of ``containers`` it is still inside.
+        """
+        return {
+            container
+            for container in containers
+            if InsideOf(tracked_object, container).compute_containment_ratio()
+            > self.containment_threshold
+        }
+
+    def get_containment_pairs(
+        self, tracked_objects: list[Body]
+    ) -> dict[Body, set[Body]]:
+        """
+        Computes containment relationships.
+
+        A tracked object is never checked against the bodies :meth:`bodies_left_out`
+        names.
 
         :param tracked_objects: Bodies that should be checked.
-        :return: Mapping of body → supporting bodies.
+        :return: Mapping of body → containing bodies.
         """
-        containment_pairs: Dict[Body, Set[Body]] = {}
-        bodies_with_collision = context.world.bodies_with_collision
+        containment_pairs: dict[Body, set[Body]] = {}
+        if not tracked_objects:
+            return containment_pairs
+        left_out = self.bodies_left_out(self.context.world)
+        candidates = [
+            body
+            for body in self.bodies_outside_end_effectors(self.context.world)
+            if body not in left_out
+        ]
 
-        for obj in tracked_objects:
+        for tracked_object in tracked_objects:
             containers = {
-                body for body in bodies_with_collision
-                if obj is not body
-                   and InsideOf(obj, body).compute_containment_ratio() > self.containment_threshold
+                body
+                for body in candidates
+                if tracked_object is not body
+                and InsideOf(tracked_object, body).compute_containment_ratio()
+                > self.containment_threshold
             }
             if containers:
-                containment_pairs[obj] = containers
+                containment_pairs[tracked_object] = containers
 
         return containment_pairs
 
-@dataclass(eq=False, repr=False)
-class ContainmentDetector(BaseContainmentDetector):
-    """
-    Handles detection of containment events between objects.
-
-    This class performs the task of identifying and updating containment relations between
-    given objects. It determines when a new containment relationship is established and
-    generates corresponding containment events. The purpose of this class is to provide
-    event-driven responses based on the spatial interactions of objects.
-    """
-
     def update_context_and_events(
-        self, context:MotionStatechartContext, segmind_context:SegmindContext, objects_to_check: List[Body]
-    ) -> List[DetectionEvent]:
+        self,
+        segmind_context: SegmindContext,
+        objects_to_check: list[Body],
+    ) -> list[DetectionEvent]:
         """
-        Updates the tracking context with new containment relationships and generates
-        containment events for identified changes. The function processes a list of
-        objects, compares the current containment status against the latest tracked
-        data, and generates events for any newly identified containment relationships.
+        Detects newly established and newly lost containments and updates the stored
+        containment state.
 
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
+        :param segmind_context: The shared SegmindContext containing the information
+            required to track events.
         :param objects_to_check: List of Body objects to check for containment changes.
-        :return: List of ContainmentEvent objects representing newly established containments.
+        :return: The containments established, then the containments lost.
         """
-        new_containment_pairs = self.get_containment_pairs(context, objects_to_check)
-        latest_containment = segmind_context.latest_containments
-        events = []
-
-        for obj, containment_list in new_containment_pairs.items():
-            new_containments = containment_list - latest_containment.get(obj, set())
-
-            if not new_containments:
-                continue
-
-            latest_containment.setdefault(obj, set()).update(new_containments)
-            events.extend(
-                ContainmentEvent(tracked_object=obj, with_object=c)
-                for c in new_containments
+        latest_containments = segmind_context.latest_containments
+        come_to_rest = self.bodies_come_to_rest(segmind_context, objects_to_check)
+        self.remember_supports(segmind_context, objects_to_check)
+        containments_now = self.get_containment_pairs(come_to_rest)
+        inside_something = [
+            body
+            for body in objects_to_check
+            if body not in come_to_rest and latest_containments.get(body)
+        ]
+        for body in inside_something:
+            containments_now[body] = self.containers_still_holding(
+                body, latest_containments[body]
             )
-
-        return events
-
-
-@dataclass(eq=False, repr=False)
-class LossOfContainmentDetector(BaseContainmentDetector):
-    """
-    Detects and processes loss of containment events.
-
-    The LossOfContainmentDetector class is responsible for identifying instances where an
-    object loses containment with another object. It updates the current containment context
-    and generates a list of events representing these loss of containment occurrences. This
-    class extends BaseContainmentDetector and utilizes its utilities for containment
-    verification and context management.
-
-    """
-    def update_context_and_events(
-        self, context:MotionStatechartContext, segmind_context:SegmindContext, objects_to_check: List[Body]
-    ) -> List[DetectionEvent]:
-        """
-        Updates the context with the latest containment pairs and generates events for
-        any lost containments.
-
-        This method checks the current state of containment pairs against the previously
-        stored state in the context. If any containments have been lost, it removes
-        them from the context and generates corresponding events.
-
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param objects_to_check: List of Body objects to check for containment loss.
-        :return: List of LossOfContainmentEvent objects representing the loss of containment.
-        """
-        new_containment_pairs = self.get_containment_pairs(context, objects_to_check)
-        latest_containment = segmind_context.latest_containments
-        events = []
-        for obj, containment_list in list(latest_containment.items()):
-            lost_containments = (
-                containment_list.copy()
-                if obj not in new_containment_pairs
-                else containment_list - new_containment_pairs[obj]
-            )
-            if lost_containments:
-                latest_containment[obj] -= lost_containments
-                if not latest_containment[obj]:
-                    latest_containment.pop(obj)
-                events.extend(
-                    [
-                        LossOfContainmentEvent(tracked_object=obj, with_object=c)
-                        for c in lost_containments
-                    ]
-                )
-
-        return events
+        checked = come_to_rest + inside_something
+        new_containments = self.remember_new_relations(
+            latest_containments, containments_now
+        )
+        lost_containments = self.forget_lost_relations(
+            latest_containments, containments_now, checked
+        )
+        return [
+            ContainmentEvent(tracked_object=body, with_object=container)
+            for body, containers in new_containments.items()
+            for container in containers
+        ] + [
+            LossOfContainmentEvent(tracked_object=body, with_object=container)
+            for body, containers in lost_containments.items()
+            for container in containers
+        ]
 
 
-
-@dataclass(eq=False, repr=False)
-class InsertionDetector(AbstractDetector):
+@dataclass(eq=False, repr=False, kw_only=True)
+class InsertionDetector(EventCombiningDetector):
     """
     Detects insertion events based on object interaction context.
 
     The InsertionDetector class is used to analyze the interaction between tracked
-    objects and identify insertion events. It tracks specific events such as
-    contacts and containment, and generates an InsertionEvent when specific
-    conditions are met. The class leverages a context that holds relevant
-    event logs and tracked objects.
+    objects and identify insertion events. It tracks specific events such as contacts
+    and containment, and generates an InsertionEvent when specific conditions are met.
+    The class leverages a context that holds relevant event logs and tracked objects.
     """
+
+    @classmethod
+    def get_required_detector_types(cls) -> tuple[type[AbstractDetector], ...]:
+        return (ContactDetector, ContainmentDetector)
 
     shift_threshold: timedelta = timedelta(seconds=15.0)
     """
-    The threshold for the time difference between two events to be considered an insertion.
+    The threshold for the time difference between two events to be considered an
+    insertion.
     """
 
-    def update_context_and_events(self, context:MotionStatechartContext, segmind_context:SegmindContext, tracked_objs: List[Body]) -> List[DetectionEvent]:
+    def update_context_and_events(
+        self,
+        segmind_context: SegmindContext,
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         """
         Updates context and processes tracked objects to generate a list of events.
 
@@ -272,26 +272,43 @@ class InsertionDetector(AbstractDetector):
         pairs that have already been processed and ensures exclusivity during event
         generation.
 
-        :param context: The current motion statechart context.
-        :param segmind_context: The shared SegmindContext containing the information required to track events.
-        :param tracked_objs: List of Body objects to analyze for insertion events.
-        :return List of InsertionEvent objects representing detected insertions.
+        :param segmind_context: The shared SegmindContext containing the information
+            required to track events.
+        :param tracked_objects: List of Body objects to analyze for insertion events.
+            :return List of InsertionEvent objects representing detected insertions.
         """
         events = []
-        contact_events = [i for i in segmind_context.logger.get_events() if isinstance(i, ContactEvent)]
-        contact_events_with_holes = [i for i in contact_events if i.with_object in segmind_context.holes]
-        containment_event = [i for i in segmind_context.logger.get_events() if isinstance(i, ContainmentEvent)]
+        contact_events = [
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, ContactEvent)
+        ]
+        contact_events_with_holes = [
+            contact_event
+            for contact_event in contact_events
+            if contact_event.with_object in segmind_context.holes
+        ]
+        containment_events = [
+            event
+            for event in segmind_context.logger.get_events()
+            if isinstance(event, ContainmentEvent)
+        ]
 
-        by_object = defaultdict(list)
-        for i in contact_events_with_holes:
-            by_object[i.tracked_object].append(i)
+        contacts_by_object = defaultdict(list)
+        for contact_event in contact_events_with_holes:
+            contacts_by_object[contact_event.tracked_object].append(contact_event)
 
-        for j in containment_event:
-            for i in by_object.get(j.tracked_object, []):
-                if abs(i.timestamp - j.timestamp) >= self.shift_threshold:
+        for containment_event in containment_events:
+            for contact_event in contacts_by_object.get(
+                containment_event.tracked_object, []
+            ):
+                if (
+                    abs(contact_event.timestamp - containment_event.timestamp)
+                    >= self.shift_threshold
+                ):
                     continue
 
-                key = (i.tracked_object.id, i.with_object.id)
+                key = (contact_event.tracked_object.id, contact_event.with_object.id)
                 if key in segmind_context.insertion_pairs:
                     continue
 
@@ -299,9 +316,9 @@ class InsertionDetector(AbstractDetector):
 
                 events.append(
                     InsertionEvent(
-                        tracked_object=i.tracked_object,
-                        with_object=i.with_object,
-                        inserted_into_objects=[j.with_object],
+                        tracked_object=contact_event.tracked_object,
+                        with_object=contact_event.with_object,
+                        inserted_into_objects=[containment_event.with_object],
                     )
                 )
                 break

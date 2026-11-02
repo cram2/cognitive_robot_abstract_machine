@@ -35,6 +35,26 @@ Things to note:
   symlink-install installations are recommended if you want to develop extra RoboKudo ROS2 packages and want to change
   code (e.g. Analysis Engines, World Descriptors) without rebuilding.
 
+### Optional requirements
+
+Annotators built on large machine learning libraries need extra packages that a plain `robokudo` install leaves out,
+so users who do not need them are spared the download. They are bundled in the `dev` extra:
+
+| Package       | Annotators that need it                                                                                                |
+|---------------|------------------------------------------------------------------------------------------------------------------------|
+| `torch`       | `CLIPAnnotator` (`robokudo.annotators.clip_annotator`), `YoloAnnotator`, `HumanAndPoseAnnotator`                       |
+| `ultralytics` | `YoloAnnotator` (`robokudo.annotators.yolo_annotator`), `HumanAndPoseAnnotator` (`robokudo.annotators.human_and_pose`) |
+
+Install them together with RoboKudo:
+
+```bash
+# From the root of the CRAM workspace
+uv pip install -e "./robokudo[dev]"
+
+# Or for a standalone RoboKudo installation
+pip install "robokudo[dev]"
+```
+
 ### PyCharm setup
 
 - Install PyCharm

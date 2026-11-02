@@ -25,23 +25,32 @@ from krrood.code_generation.object_to_source import value_to_source
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.rdr.exceptions import CaseNotSerializableError
 
-#: The scalar types :class:`AsdictCaseSerializer` emits directly. The single source of
-#: truth for both the ``isinstance`` check in :meth:`AsdictCaseSerializer._emit_value`
-#: and the types listed in :class:`~krrood.entity_query_language.rdr.exceptions.CaseNotSerializableError`.
 SUPPORTED_SCALAR_TYPES: Tuple[Type, ...] = (bool, int, float, str, enum.Enum)
+"""
+The scalar types :class:`AsdictCaseSerializer` emits directly.
+
+The single source of truth for both the ``isinstance`` check in :meth:`AsdictCaseSerializer._emit_value`
+and the types listed in :class:`~krrood.entity_query_language.rdr.exceptions.CaseNotSerializableError`.
+"""
 
 # %% CaseSource
 
 
 @dataclass
 class CaseSource:
-    """The eval-able Python constructor source for a case, plus its type dependencies."""
+    """
+    The eval-able Python constructor source for a case, plus its type dependencies.
+    """
 
     source: str
-    """Eval-able Python constructor expression, e.g. ``Animal(name='Rex')``."""
+    """
+    Eval-able Python constructor expression, e.g. ``Animal(name='Rex')``.
+    """
 
     referenced_types: Set[Type]
-    """Every type referenced in :attr:`source` that must be imported for it to evaluate."""
+    """
+    Every type referenced in :attr:`source` that must be imported for it to evaluate.
+    """
 
 
 # %% CaseSerializer ABC
@@ -49,25 +58,28 @@ class CaseSource:
 
 @dataclass
 class CaseSerializer(ABC):
-    """Abstract base for pluggable corner-case serialization strategies.
+    """
+    Abstract base for pluggable corner-case serialization strategies.
 
-    Implementations convert a case instance to Python constructor source (for the
-    saved ``.py`` file) and reconstruct it on load. The default implementation is
+    Implementations convert a case instance to Python constructor source (for the saved
+    ``.py`` file) and reconstruct it on load. The default implementation is
     :class:`AsdictCaseSerializer`.
     """
 
     @abstractmethod
     def to_source(self, case: Any) -> CaseSource:
-        """Return the constructor source and referenced types for ``case``.
+        """
+        Return the constructor source and referenced types for ``case``.
 
         :param case: A dataclass instance to serialize.
-        :return: The Python constructor expression (eval-able) and the set of types
-            that must be imported for the expression to evaluate.
+        :return: The Python constructor expression (eval-able) and the set of types that
+            must be imported for the expression to evaluate.
         """
 
     @abstractmethod
     def from_data(self, data: Any, case_type: Type) -> Any:
-        """Reconstruct a case instance from ``data``.
+        """
+        Reconstruct a case instance from ``data``.
 
         This method is part of the extension contract for :class:`CaseSerializer`
         implementations. The default save/load path (``rdr_to_python`` / ``load_rdr``)
@@ -86,7 +98,8 @@ class CaseSerializer(ABC):
 
 @dataclass
 class AsdictCaseSerializer(CaseSerializer):
-    """Serialize dataclass case instances via ``dataclasses.asdict`` + constructor source.
+    """
+    Serialize dataclass case instances via ``dataclasses.asdict`` + constructor source.
 
     :class:`AsdictCaseSerializer` supports:
 
@@ -106,36 +119,45 @@ class AsdictCaseSerializer(CaseSerializer):
     """
 
     def to_source(self, case: Any) -> CaseSource:
-        """Emit ``CaseType(field=value, ...)`` constructor source for ``case``.
+        """
+        Emit ``CaseType(field=value, ...)`` constructor source for ``case``.
 
         :param case: A dataclass instance to serialize.
         :raises CaseNotSerializableError: When a field value cannot be emitted.
         """
         if not dataclasses.is_dataclass(case) or isinstance(case, type):
             raise CaseNotSerializableError(case, SUPPORTED_SCALAR_TYPES)
-        referenced: Set[Type] = {type(case)}
+        referenced_types: Set[Type] = {type(case)}
         field_parts = []
-        for f in dataclasses.fields(case):
-            value = getattr(case, f.name)
+        for case_field in dataclasses.fields(case):
+            value = getattr(case, case_field.name)
             value_source = self._emit_value(value)
-            referenced.update(value_source.referenced_types)
-            field_parts.append(f"{f.name}={value_source.source}")
+            referenced_types.update(value_source.referenced_types)
+            field_parts.append(f"{case_field.name}={value_source.source}")
         source = f"{type(case).__name__}({', '.join(field_parts)})"
-        return CaseSource(source, referenced)
+        return CaseSource(source, referenced_types)
 
     def _emit_value(self, value: Any) -> CaseSource:
-        """Emit a single field value as source, recursing into nested dataclasses."""
+        """
+        Emit a single field value as source, recursing into nested dataclasses.
+
+        :param value: The value of one field of a case.
+        :return: The value's constructor source and the types it references.
+        :raises CaseNotSerializableError: When ``value`` is neither ``None``, a
+            supported scalar, nor a dataclass instance.
+        """
         if dataclasses.is_dataclass(value) and not isinstance(value, type):
             return self.to_source(value)
         if value is None or isinstance(value, SUPPORTED_SCALAR_TYPES):
-            ref_types: Set[Type] = set()
+            referenced_types: Set[Type] = set()
             if isinstance(value, enum.Enum):
-                ref_types.add(type(value))
-            return CaseSource(value_to_source(value), ref_types)
+                referenced_types.add(type(value))
+            return CaseSource(value_to_source(value), referenced_types)
         raise CaseNotSerializableError(value, SUPPORTED_SCALAR_TYPES)
 
     def from_data(self, data: Any, case_type: Type) -> Any:
-        """Reconstruct a case instance from a ``dataclasses.asdict``-style dict.
+        """
+        Reconstruct a case instance from a ``dataclasses.asdict``-style dict.
 
         :param data: A plain dict as produced by ``dataclasses.asdict``.
         :param case_type: The dataclass type to reconstruct.
@@ -143,16 +165,18 @@ class AsdictCaseSerializer(CaseSerializer):
         """
         if not dataclasses.is_dataclass(case_type):
             return data
-        hints = get_type_hints_of_object(case_type)
-        kwargs = {}
-        for f in dataclasses.fields(case_type):
-            val = data[f.name]
-            field_type = hints.get(f.name, type(val))
-            if isinstance(val, dict) and dataclasses.is_dataclass(field_type):
-                kwargs[f.name] = self.from_data(val, field_type)
+        type_hints = get_type_hints_of_object(case_type)
+        constructor_arguments = {}
+        for case_field in dataclasses.fields(case_type):
+            value = data[case_field.name]
+            field_type = type_hints.get(case_field.name, type(value))
+            if isinstance(value, dict) and dataclasses.is_dataclass(field_type):
+                constructor_arguments[case_field.name] = self.from_data(
+                    value, field_type
+                )
             else:
-                kwargs[f.name] = val
-        return case_type(**kwargs)
+                constructor_arguments[case_field.name] = value
+        return case_type(**constructor_arguments)
 
 
 # %% CornerCaseStore
@@ -160,15 +184,25 @@ class AsdictCaseSerializer(CaseSerializer):
 
 @dataclass
 class CornerCaseStore:
-    """Maps each rule's condition-node id to the case instance that triggered it."""
+    """
+    Maps each rule's condition-node id to the case instance that triggered it.
+    """
 
     cases: Dict[UUID, Any] = field(default_factory=dict)
-    """Live in-memory mapping from condition-node ``_id_`` to corner case instance."""
+    """
+    Live in-memory mapping from condition-node ``_id_`` to corner case instance.
+    """
+
     serializer: CaseSerializer = field(default_factory=AsdictCaseSerializer)
-    """Pluggable serialization strategy. Default: :class:`AsdictCaseSerializer`."""
+    """
+    Pluggable serialization strategy.
+
+    Default: :class:`AsdictCaseSerializer`.
+    """
 
     def record(self, node: SymbolicExpression, case: Any) -> None:
-        """Record ``case`` as the corner case for the rule whose condition is ``node``.
+        """
+        Record ``case`` as the corner case for the rule whose condition is ``node``.
 
         :param node: The condition node of the newly created rule.
         :param case: The concrete case instance that triggered the rule's creation.
@@ -176,7 +210,8 @@ class CornerCaseStore:
         self.cases[node._id_] = case
 
     def get(self, node_id: Optional[UUID]) -> Optional[Any]:
-        """Return the corner case recorded for ``node_id``, or ``None`` if absent.
+        """
+        Return the corner case recorded for ``node_id``, or ``None`` if absent.
 
         :param node_id: The ``_id_`` of a rule's condition node, or ``None``.
         :return: The recorded corner case, or ``None``.
@@ -189,7 +224,8 @@ class CornerCaseStore:
         self,
         ordered_nodes: List[SymbolicExpression],
     ) -> Dict[int, CaseSource]:
-        """Emit constructor source for every node that has a recorded corner case.
+        """
+        Emit constructor source for every node that has a recorded corner case.
 
         Delegates to ``self.serializer.to_source`` for each recorded case.
 
@@ -199,10 +235,10 @@ class CornerCaseStore:
             recorded corner case; nodes without one are absent.
         """
         result: Dict[int, CaseSource] = {}
-        for i, node in enumerate(ordered_nodes):
+        for index, node in enumerate(ordered_nodes):
             case = self.cases.get(node._id_)
             if case is not None:
-                result[i] = self.serializer.to_source(case)
+                result[index] = self.serializer.to_source(case)
         return result
 
     @classmethod
@@ -211,7 +247,8 @@ class CornerCaseStore:
         ordered_nodes: List[SymbolicExpression],
         cases_by_index: Dict[int, Any],
     ) -> CornerCaseStore:
-        """Rebuild a store from a positional index map loaded from a saved file.
+        """
+        Rebuild a store from a positional index map loaded from a saved file.
 
         :param ordered_nodes: Rule condition nodes in the same emission order used at
             save time (from
@@ -222,7 +259,7 @@ class CornerCaseStore:
         :return: A new :class:`CornerCaseStore` keyed by node ``_id_``.
         """
         store = cls()
-        for i, node in enumerate(ordered_nodes):
-            if i in cases_by_index:
-                store.cases[node._id_] = cases_by_index[i]
+        for index, node in enumerate(ordered_nodes):
+            if index in cases_by_index:
+                store.cases[node._id_] = cases_by_index[index]
         return store

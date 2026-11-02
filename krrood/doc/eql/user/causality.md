@@ -99,7 +99,7 @@ for season_value, ice_cream_range, drowning_value, weight in branches:
 
 causal_circuit = CausalCircuit.from_probabilistic_circuit(
     circuit,
-    MarginalDeterminismTreeNode.from_causal_graph([ice_cream_sales], [drowning_incidents]),
+    MarginalDeterminismTreeNode.from_variable_order([ice_cream_sales]),
     [ice_cream_sales],
     [drowning_incidents],
 )
@@ -108,7 +108,8 @@ high_ice_cream = SimpleEvent.from_data({ice_cream_sales: closed(9, 10).simple_se
 high_drowning = SimpleEvent.from_data({drowning_incidents: Set.from_iterable([DrowningLevel.HIGH])}).as_composite_set()
 
 # Conditioning: observe high ice cream sales, ask about drowning incidents.
-conditioned, _ = circuit.truncated(high_ice_cream.fill_missing_variables_pure(circuit.variables))
+conditioned = circuit.truncated(high_ice_cream.fill_missing_variables_pure(circuit.variables)).distribution
+
 conditioned.probability(high_drowning.fill_missing_variables_pure(conditioned.variables))
 # 0.7 -- conditioning picks up the confound: high sales lean warm, which leans toward
 # high drowning incidents.
@@ -162,7 +163,7 @@ backend = ProbabilisticBackend(
     model_registry=DictRegistry({SummerStatistics: circuit}), number_of_samples=1000
 )
 high_ice_cream = a(SummerStatistics)(season=..., ice_cream_sales=..., drowning_incidents=...)
-high_ice_cream.where(high_ice_cream.variable.ice_cream_sales >= 9.0)
+high_ice_cream.where(high_ice_cream.ice_cream_sales >= 9.0)
 results = high_ice_cream.tolist(backend=backend)
 sum(r.drowning_incidents == DrowningLevel.HIGH for r in results) / len(results)
 # approximately 0.7 -- matches the direct computation above, up to sampling noise: this
@@ -199,13 +200,13 @@ backend = ProbabilisticBackend(
 
 # Without confounder: the search can't separate the confound from the effect.
 naive = a(SummerStatistics)(season=..., ice_cream_sales=cause, drowning_incidents=...)
-naive.causes_effect(naive.variable.drowning_incidents == DrowningLevel.HIGH)
+naive.causes_effect(naive.drowning_incidents == DrowningLevel.HIGH)
 backend.rank_causes(naive)[0].effect_probability_given_region
 # 0.7 -- spurious, the same number plain conditioning on ice_cream_sales gave above.
 
 # With confounder: season is summed back out, recovering the causal truth.
 adjusted = a(SummerStatistics)(season=confounder, ice_cream_sales=cause, drowning_incidents=...)
-adjusted.causes_effect(adjusted.variable.drowning_incidents == DrowningLevel.HIGH)
+adjusted.causes_effect(adjusted.drowning_incidents == DrowningLevel.HIGH)
 backend.rank_causes(adjusted)[0].effect_probability_given_region
 # 0.5 -- back to the unconfounded baseline, correctly showing ice_cream_sales has no
 # real effect on drowning_incidents once season is accounted for.
@@ -232,7 +233,7 @@ from krrood.entity_query_language.factories import a, cause
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 pick = a(Pick)(arm=cause, outcome=...)
-pick.causes_effect(pick.variable.outcome == Status.SUCCESS)
+pick.causes_effect(pick.outcome == Status.SUCCESS)
 verbalize_expression(pick)
 # 'Generate a Pick and predict its arm and outcome values where its arm causes
 #  its outcome to be SUCCESS'
@@ -299,6 +300,42 @@ If the registry resolves anything other than a `CausalCircuit` for a query conta
 is no fallback to plain conditioning. Confounder adjustment is configured on however
 the registered `CausalCircuit` itself was built, not from the query.
 
+#### The circuit type a causal query is answered in
+
+A causal query is answered in whichever circuit type its circuit is stored as, and gives
+the same answers either way. With
+{py:class}`~krrood.parametrization.model_registries.RelationalCircuitRegistry`, that is the
+type the relational circuit was fitted in, so fitting with `LayeredLearning` makes every
+causal query run over layered circuits:
+
+Here `SceneRoom` stands for the class the relational circuit models and `rooms` for its
+training instances:
+
+```python
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.learning_method import LayeredLearning
+from probabilistic_model.probabilistic_circuit.relational.part_learning_methods import (
+    PartLearningMethods,
+)
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
+    RelationalProbabilisticCircuit,
+)
+
+model = RelationalProbabilisticCircuit(
+    SceneRoom,
+    learning_method=LayeredLearning(JointProbabilityTree()),
+    part_learning_methods=PartLearningMethods(LayeredLearning(JointProbabilityTree())),
+).fit(rooms)
+
+backend = ProbabilisticBackend(model_registry=RelationalCircuitRegistry(model))
+```
+
+Nothing changes on the query side: `cause`, `causes_effect()`, `confounder` and
+`rank_causes` read the same, and the circuit a ranked candidate carries is of that same
+type. A layered circuit evaluates a query for all nodes of a layer at once, which makes the
+support-determinism check a grounded circuit has to pass markedly cheaper on a large
+grounding.
+
 #### Ranking every candidate
 
 `evaluate()` only ever narrows to the single best-scoring `cause` candidate. When more
@@ -310,7 +347,7 @@ returns every candidate's score instead:
 
 ```python
 match = a(Pick)(arm=cause, grip=cause, outcome=...)
-match.causes_effect(match.variable.outcome == Status.SUCCESS)
+match.causes_effect(match.outcome == Status.SUCCESS)
 
 ranking = backend.rank_causes(match)
 for scored in ranking:
@@ -348,7 +385,9 @@ backend.
 - {py:meth}`~krrood.entity_query_language.query.match.Match.causes_effect`
 - {py:class}`~krrood.entity_query_language.operators.causal.CausesEffect`
 - {py:class}`~krrood.parametrization.model_registries.CausalCircuitRegistry`
+- {py:class}`~krrood.parametrization.model_registries.RelationalCircuitRegistry`
 - {py:class}`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`
+- {py:class}`~probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation.ProbabilisticCircuitRepresentation`
 - {py:class}`~krrood.parametrization.exceptions.DoRequiresCausalCircuitModel`
 - {py:class}`~krrood.parametrization.exceptions.MultipleEffectVariablesNotSupported`
 - {py:class}`~krrood.entity_query_language.exceptions.NoCausesEffectConditionForCause`

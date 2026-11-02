@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib
 import pkgutil
 
-from typing_extensions import List
 
 from krrood.entity_query_language.verbalization import grammar as grammar_package
 from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule import (
@@ -34,4 +33,4 @@ _load_rule_modules()
 # ``select`` decides specificity — and a new rule is registered simply by defining its class in one
 # of the construct ``rules`` modules. Uses the same ``concrete_subclasses`` primitive the
 # ``SpecificityRule`` families use to discover their alternatives.
-RULES: List[PhraseRule] = [rule_cls() for rule_cls in concrete_subclasses(PhraseRule)]
+RULES: list[PhraseRule] = [rule_cls() for rule_cls in concrete_subclasses(PhraseRule)]

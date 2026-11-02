@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing_extensions import ClassVar, Dict, Type, Any, List
+from typing_extensions import ClassVar, Any
 
 
 class SingletonMeta(type):
@@ -9,12 +9,12 @@ class SingletonMeta(type):
     A metaclass for creating singleton classes.
     """
 
-    _instances: ClassVar[Dict[Type, Any]] = {}
+    _instances: ClassVar[dict[type, Any]] = {}
     """
     The available instances of the singleton classes.
     """
 
-    _is_being_created: ClassVar[List[Type]] = []
+    _is_being_created: ClassVar[list[type]] = []
     """
     A list of classes that are currently being created.
     """

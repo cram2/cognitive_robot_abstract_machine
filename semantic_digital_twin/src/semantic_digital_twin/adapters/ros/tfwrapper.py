@@ -3,9 +3,8 @@ from __future__ import annotations
 import io
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, List, TYPE_CHECKING, TypeVar
+from typing_extensions import TYPE_CHECKING, TypeVar
 
-import rclpy
 from geometry_msgs.msg import (
     PoseStamped,
     Vector3Stamped,
@@ -18,6 +17,8 @@ from rclpy.time import Time
 from tf2_py import InvalidArgumentException
 from tf2_ros import Buffer, TransformListener
 
+from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
+
 if TYPE_CHECKING:
     from networkx import MultiDiGraph
 
@@ -29,17 +30,12 @@ TransformableMsg = TypeVar(
 
 
 @dataclass
-class TFWrapper:
+class TFWrapper(HasROS2Node):
     """
     A wrapper for ROS2's very beautiful tf library.
     """
 
-    node: rclpy.node.Node = None
-    """
-    The ROS2 node that this TFWrapper is associated with.
-    """
-
-    tf_buffer_size: Optional[Duration] = None
+    tf_buffer_size: Duration | None = None
     """
     The size of the tf buffer.
 
@@ -64,7 +60,13 @@ class TFWrapper:
         except Exception as e:
             logger.warning(str(e))
 
-    def get_tf_roots(self) -> List[str]:
+    def stop(self) -> None:
+        """
+        Stop listening to tf, so :attr:`tf_buffer` receives no further transforms.
+        """
+        self.tf_listener.unregister()
+
+    def get_tf_roots(self) -> list[str]:
         """
         Returns a list of all tf roots in the tf tree.
         """
@@ -93,7 +95,7 @@ class TFWrapper:
         assert len(tf_roots) > 0, "There is no tf tree."
         return tf_roots.pop()
 
-    def get_full_frame_names(self, frame_name: str) -> List[str]:
+    def get_full_frame_names(self, frame_name: str) -> list[str]:
         """
         Search for namespaced frames that include frame_name.
 
@@ -115,7 +117,7 @@ class TFWrapper:
             )
         return ret
 
-    def get_tf_frames(self) -> List[str]:
+    def get_tf_frames(self) -> list[str]:
         """
         Get all frames in the tf buffer.
 
@@ -141,7 +143,7 @@ class TFWrapper:
         self,
         target_frame: str,
         source_frame: str,
-        time: Optional[Time] = None,
+        time: Time | None = None,
         timeout: float = 5.0,
     ) -> TransformStamped:
         """
@@ -266,7 +268,7 @@ class TFWrapper:
         return new_pose
 
     def lookup_pose(
-        self, target_frame: str, source_frame: str, time: Optional[Time] = None
+        self, target_frame: str, source_frame: str, time: Time | None = None
     ) -> PoseStamped:
         """
         Look up a pose between two frames.
@@ -284,7 +286,7 @@ class TFWrapper:
         return self.transform_pose(target_frame, p)
 
     def lookup_point(
-        self, target_frame: str, source_frame: str, time: Optional[Time] = None
+        self, target_frame: str, source_frame: str, time: Time | None = None
     ) -> PointStamped:
         """
         Look up a point between two frames.

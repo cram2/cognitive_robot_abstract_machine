@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import ast
 
-from typing_extensions import Dict, List, Set
 
 from cognitive_robot_abstract_machine.orm_interfaces import (
     OrmInterface,
@@ -30,7 +29,7 @@ Base class through which a package tells ORMatic how to map a class it does not 
 # %% reading the sources
 
 
-def imported_modules(node: ast.AST) -> List[str]:
+def imported_modules(node: ast.AST) -> list[str]:
     """
     The modules an import statement reads from.
 
@@ -44,7 +43,7 @@ def imported_modules(node: ast.AST) -> List[str]:
     return []
 
 
-def imported_orm_packages(interface: OrmInterface) -> Set[str]:
+def imported_orm_packages(interface: OrmInterface) -> set[str]:
     """
     Names of the other packages whose ORM modules a generator imports.
 
@@ -78,7 +77,7 @@ def base_class_name(base: ast.expr) -> str:
     return ast.unparse(base)
 
 
-def base_class_names_by_class_name(interface: OrmInterface) -> Dict[str, Set[str]]:
+def base_class_names_by_class_name(interface: OrmInterface) -> dict[str, set[str]]:
     """
     The base classes of every class a package's own sources define.
 
@@ -99,7 +98,7 @@ def base_class_names_by_class_name(interface: OrmInterface) -> Dict[str, Set[str
     return bases_by_class_name
 
 
-def alternative_mapping_class_names(interface: OrmInterface) -> Set[str]:
+def alternative_mapping_class_names(interface: OrmInterface) -> set[str]:
     """
     Names of the classes a package defines as ORMatic alternative mappings.
 
@@ -130,7 +129,7 @@ def alternative_mapping_class_names(interface: OrmInterface) -> Set[str]:
     return known_mapping_names - {ALTERNATIVE_MAPPING}
 
 
-def dependency_closure(interface: OrmInterface) -> Set[str]:
+def dependency_closure(interface: OrmInterface) -> set[str]:
     """
     Names of the packages an interface builds on, directly or through another one.
 
@@ -168,7 +167,7 @@ def test_every_interface_follows_the_ones_it_builds_on():
     A generator reads the ORM model of the packages it depends on, so those are built
     first.
     """
-    built: Set[str] = set()
+    built: set[str] = set()
     for interface in WORKSPACE_ORM_INTERFACES.interfaces:
         assert set(interface.dependencies) <= built
         built.add(interface.package_name)

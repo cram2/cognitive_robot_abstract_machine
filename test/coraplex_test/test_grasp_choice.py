@@ -1,0 +1,88 @@
+"""
+How a pick-up settles on the grasp it takes.
+"""
+
+import numpy as np
+
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
+from cramph.composites import Sequence
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.spatial_types.spatial_types import Pose
+
+from .conftest import expand
+
+# %% helpers
+
+
+def _reach_of(pick_up: PickUpAction) -> ReachAction:
+    """
+    :return: The reach the expanded pick-up performs.
+    """
+    [reach] = pick_up.statechart.get_nodes_by_type(ReachAction)
+    return reach
+
+
+# %% the grasp a pick-up takes
+
+
+def test_pick_up_takes_the_grasp_it_is_given(pr2_apartment_context):
+    """
+    A caller that settled on a grasp -- together with the pose the robot stands at, say
+    -- has the pick-up take that one instead of ranking the object's grasps again.
+    """
+    world, view, extensions = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    given = GraspCandidate(
+        milk, Pose.from_xyz_rpy(yaw=np.pi / 3, reference_frame=milk.root)
+    )
+
+    pick_up = PickUpAction(grasp=given, arm=view.left_arm)
+    expand(Sequence(nodes=[pick_up]), extensions)
+
+    assert pick_up.grasp is given
+
+
+def test_pick_up_reaches_for_the_grasp_it_settled_on(pr2_apartment_context):
+    """
+    The grasp the pick-up chose is the one its plan reaches for, so a caller's choice
+    reaches the motions rather than stopping at the action.
+    """
+    world, view, extensions = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    given = GraspCandidate(
+        milk, Pose.from_xyz_rpy(yaw=np.pi / 3, reference_frame=milk.root)
+    )
+
+    pick_up = PickUpAction(grasp=given, arm=view.left_arm)
+    expand(Sequence(nodes=[pick_up]), extensions)
+
+    assert _reach_of(pick_up).grasp is given
+
+
+def test_pick_up_keeps_its_grasp_even_when_it_cannot_be_reached(pr2_apartment_context):
+    """
+    The action takes the grasp it was given and no other.
+
+    Quietly swapping in one that works would perform a different action than the one
+    described.
+    """
+    world, view, extensions = pr2_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    arm = view.left_arm
+    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        10, 10, 0
+    )
+    world.notify_state_change()
+    out_of_reach = np.linalg.norm(
+        milk.root.global_pose.position.to_np()[:2]
+        - view.root.global_pose.position.to_np()[:2]
+    )
+    assert out_of_reach > float(arm.approximate_length())
+    grasp = milk.grasp_candidates()[0]
+
+    pick_up = PickUpAction(grasp=grasp, arm=arm)
+    expand(Sequence(nodes=[pick_up]), extensions)
+
+    assert _reach_of(pick_up).grasp is grasp

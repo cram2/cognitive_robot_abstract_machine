@@ -1,12 +1,8 @@
 import numpy as np
+import pytest
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
-)
-from giskardpy.motion_statechart.goals.templates import Parallel, Sequence
+from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
 )
@@ -14,28 +10,26 @@ from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
     SetOdometry,
 )
-from giskardpy.motion_statechart.motion_statechart import (
-    MotionStatechart,
+from cramph.statechart import (
+    Statechart,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
     JointState,
     JointVelocityLimit,
 )
-from giskardpy.motion_statechart.nodes_for_testing.nodes_for_testing import (
-    ConstTrueNode,
-)
+from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import (
-    trinary_logic_and,
     shortest_angular_distance,
+    logic_and,
 )
+from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -48,11 +42,19 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
+from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.pr2 import PR2Joint
+from giskardpy.motion_control import MotionControl
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
 
 
 def test_set_seed_configuration(pr2_world_state_reset):
-    msc = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
     goal = 0.1
 
     connection: ActiveConnection1DOF = pr2_world_state_reset.get_connection_by_name(
@@ -63,15 +65,14 @@ def test_set_seed_configuration(pr2_world_state_reset):
         seed_configuration=JointState.from_mapping({connection: goal})
     )
     end = EndMotion()
-    msc.add_node(node1)
-    msc.add_node(end)
-    node1.end_condition = node1.observation_variable
-    end.start_condition = node1.observation_variable
+    statechart.add_node(node1)
+    statechart.add_node(end)
+    node1.success_condition = node1.observes_true
+    end.start_condition = node1.observes_true
 
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
+    executor.compile(statechart=statechart)
 
-    kin_sim.tick_until_end()
+    executor.tick_until_end()
     assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
     assert end.observation_state == ObservationStateValues.TRUE
     assert end.life_cycle_state == LifeCycleValues.RUNNING
@@ -80,7 +81,11 @@ def test_set_seed_configuration(pr2_world_state_reset):
 
 
 def test_set_seed_odometry(pr2_world_state_reset):
-    msc = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
 
     goal = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1,
@@ -99,15 +104,14 @@ def test_set_seed_odometry(pr2_world_state_reset):
         base_pose=goal,
     )
     end = EndMotion()
-    msc.add_node(node1)
-    msc.add_node(end)
-    node1.end_condition = node1.observation_variable
-    end.start_condition = node1.observation_variable
+    statechart.add_node(node1)
+    statechart.add_node(end)
+    node1.success_condition = node1.observes_true
+    end.start_condition = node1.observes_true
 
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
+    executor.compile(statechart=statechart)
 
-    kin_sim.tick_until_end()
+    executor.tick_until_end()
     assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
     assert end.observation_state == ObservationStateValues.TRUE
     assert end.life_cycle_state == LifeCycleValues.RUNNING
@@ -126,13 +130,10 @@ def test_joint_goal(tmp_path):
         root = Body(name=PrefixedName("root"))
         tip = Body(name=PrefixedName("tip"))
         tip2 = Body(name=PrefixedName("tip2"))
-        ul = DerivativeMap()
-        ul.velocity = 1
-        ll = DerivativeMap()
-        ll.velocity = -1
+        limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1)
         dof = DegreeOfFreedom(
             name=PrefixedName("dof", "a"),
-            limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
+            limits=limits,
         )
         world.add_degree_of_freedom(dof)
         root_C_tip = RevoluteConnection(
@@ -142,7 +143,7 @@ def test_joint_goal(tmp_path):
 
         dof = DegreeOfFreedom(
             name=PrefixedName("dof", "b"),
-            limits=DegreeOfFreedomLimits(lower=ll, upper=ul),
+            limits=limits,
         )
         world.add_degree_of_freedom(dof)
         root_C_tip2 = RevoluteConnection(
@@ -150,54 +151,56 @@ def test_joint_goal(tmp_path):
         )
         world.add_connection(root_C_tip2)
 
-    msc = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[
+            MotionControl(
+                qp_controller_config=QPControllerConfig(
+                    target_frequency=20,
+                    prediction_horizon=7,
+                )
+            )
+        ],
+    )
+    statechart = Statechart(context=executor.context)
 
     task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 1}))
     always_true = ConstTrueNode()
-    msc.add_node(always_true)
-    msc.add_node(task1)
+    statechart.add_node(always_true)
+    statechart.add_node(task1)
     end = EndMotion()
-    msc.add_node(end)
+    statechart.add_node(end)
 
-    task1.start_condition = always_true.observation_variable
-    end.start_condition = trinary_logic_and(
-        task1.observation_variable, always_true.observation_variable
-    )
+    task1.start_condition = always_true.observes_true
+    end.start_condition = logic_and(task1.observes_true, always_true.observes_true)
 
-    kin_sim = Executor(
-        MotionStatechartContext(
-            world=world,
-            qp_controller_config=QPControllerConfig(
-                target_frequency=20,
-                prediction_horizon=7,
-            ),
-        )
-    )
-    kin_sim.compile(motion_statechart=msc)
+    executor.compile(statechart=statechart)
 
     assert task1.observation_state == ObservationStateValues.UNKNOWN
     assert end.observation_state == ObservationStateValues.UNKNOWN
     assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
     assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    msc.draw(str(tmp_path / "muh.pdf"))
-    kin_sim.tick_until_end()
-    msc.draw(str(tmp_path / "muh.pdf"))
+    statechart.draw(str(tmp_path / "muh.pdf"))
+    executor.tick_until_end()
+    statechart.draw(str(tmp_path / "muh.pdf"))
     # +1 compared to the tick count without a moving dof: EndMotion now waits for the
     # dof's velocity to settle below its convergence threshold before observing True.
-    assert len(msc.history) == 7
+    assert len(statechart.state_history) == 7
     assert (
-        msc.history.get_observation_history_of_node(task1)[-1]
+        statechart.state_history.get_observation_history_of_node(task1)[-1]
         == ObservationStateValues.TRUE
     )
     assert (
-        msc.history.get_observation_history_of_node(end)[-1]
+        statechart.state_history.get_observation_history_of_node(end)[-1]
         == ObservationStateValues.TRUE
     )
     assert (
-        msc.history.get_life_cycle_history_of_node(task1)[-1] == LifeCycleValues.RUNNING
+        statechart.state_history.get_life_cycle_history_of_node(task1)[-1]
+        == LifeCycleValues.RUNNING
     )
     assert (
-        msc.history.get_life_cycle_history_of_node(end)[-1] == LifeCycleValues.RUNNING
+        statechart.state_history.get_life_cycle_history_of_node(end)[-1]
+        == LifeCycleValues.RUNNING
     )
 
 
@@ -208,7 +211,11 @@ def test_continuous_joint(pr2_world_state_reset):
     l_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
         PR2Joint.LEFT_WRIST_ROLL
     )
-    msc = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping(
             {
@@ -217,18 +224,13 @@ def test_continuous_joint(pr2_world_state_reset):
             },
         ),
     )
-    msc.add_node(joint_goal)
+    statechart.add_node(joint_goal)
     end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    statechart.add_node(end)
+    end.start_condition = joint_goal.observes_true
 
-    kin_sim = Executor(
-        MotionStatechartContext(
-            world=pr2_world_state_reset,
-        )
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+    executor.compile(statechart=statechart)
+    executor.tick_until_end()
     assert np.isclose(
         shortest_angular_distance(r_wrist_roll_joint.position, -np.pi),
         0,
@@ -244,7 +246,11 @@ def test_continuous_joint(pr2_world_state_reset):
 def test_revolute_joint(pr2_world_state_reset):
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     head_tilt_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_TILT)
-    msc = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping(
             {
@@ -253,18 +259,13 @@ def test_revolute_joint(pr2_world_state_reset):
             },
         ),
     )
-    msc.add_node(joint_goal)
+    statechart.add_node(joint_goal)
     end = EndMotion()
-    msc.add_node(end)
-    end.start_condition = joint_goal.observation_variable
+    statechart.add_node(end)
+    end.start_condition = joint_goal.observes_true
 
-    kin_sim = Executor(
-        MotionStatechartContext(
-            world=pr2_world_state_reset,
-        )
-    )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+    executor.compile(statechart=statechart)
+    executor.tick_until_end()
     assert np.isclose(head_pan_joint.position, 0.042, atol=1e-3)
     assert np.isclose(head_tilt_joint.position, -0.37, atol=1e-2)
 
@@ -279,8 +280,12 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     max_velocity = 0.05
 
-    msc = MotionStatechart()
-    msc.add_nodes(
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_nodes(
         [
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
@@ -289,17 +294,16 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
         ]
     )
 
-    kin_sim = Executor(MotionStatechartContext(world=pr2_world_state_reset))
-    kin_sim.compile(motion_statechart=msc)
+    executor.compile(statechart=statechart)
 
     for i in range(400):
-        kin_sim.tick()
+        executor.tick()
         observed_velocity = abs(head_pan_joint.raw_dof.variables.velocity.resolve())
         assert observed_velocity <= max_velocity + 1e-3, (
             f"head_pan_joint's velocity {observed_velocity} exceeded the "
             f"{max_velocity} rad/s cap on tick {i}"
         )
-        if msc.observation_state[joint_goal] == ObservationStateValues.TRUE:
+        if statechart.observation_state[joint_goal] == ObservationStateValues.TRUE:
             break
     else:
         raise TimeoutError(
@@ -310,10 +314,14 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
 
 
 def test_joint_sequence(pr2_world_state_reset):
-    msc = MotionStatechart()
-    msc.add_node(
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(
         sequence := Sequence(
-            [
+            nodes=[
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
                         {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
@@ -327,12 +335,33 @@ def test_joint_sequence(pr2_world_state_reset):
             ]
         )
     )
-    msc.add_node(EndMotion.when_true(sequence))
+    statechart.add_node(EndMotion.when_true(sequence))
 
-    kin_sim = Executor(
-        MotionStatechartContext(
-            world=pr2_world_state_reset,
-        )
+    executor.compile(statechart=statechart)
+    executor.tick_until_end()
+
+
+# %% static joint states
+
+
+@pytest.mark.parametrize("arm_index", [0, 1], ids=["left", "right"])
+def test_daisy_arm_reaches_its_park_state(
+    daisy_world_copy: World, default_daisy_pose: dict[str, float], arm_index: int
+) -> None:
+    JointState.from_str_dict(default_daisy_pose, daisy_world_copy).apply_to(
+        daisy_world_copy
     )
-    kin_sim.compile(motion_statechart=msc)
-    kin_sim.tick_until_end()
+    robot = daisy_world_copy.get_semantic_annotations_by_type(DAiSy)[0]
+    park_state = robot.arms[arm_index].get_joint_state_by_type(StaticJointState.PARK)
+    executor = StatechartExecutor(
+        context=StatechartContext(world=daisy_world_copy),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(joint_goal := JointPositionList(goal_state=park_state))
+    statechart.add_node(EndMotion.when_true(joint_goal))
+
+    executor.compile(statechart=statechart)
+    executor.tick_until_end()
+
+    assert park_state.is_achieved()

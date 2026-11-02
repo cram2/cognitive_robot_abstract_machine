@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from typing_extensions import Tuple, ClassVar
+from typing_extensions import ClassVar
 
 from robokudo.descriptors.camera_configs.components import (
     RGBDComponent,
@@ -9,6 +9,7 @@ from robokudo.descriptors.camera_configs.components import (
     WorldDescriptorComponent,
 )
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.types.cv import ColorToDepthRatio
 
 
 @dataclass(slots=True)
@@ -52,7 +53,9 @@ class KinectCameraConfig(
     Overwrite RGBDComponent.
     """
 
-    color2depth_ratio: Tuple[float, float] = (0.5, 0.5)
+    color_to_depth_ratio: ColorToDepthRatio = field(
+        default_factory=lambda: ColorToDepthRatio(horizontal=0.5, vertical=0.5)
+    )
     """
     Overwrite RGBDComponent.
     """

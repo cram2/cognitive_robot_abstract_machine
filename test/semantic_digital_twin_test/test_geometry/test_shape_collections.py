@@ -35,7 +35,7 @@ def test_post_init_transformation():
     )
     shape_collection.transform_all_shapes_to_own_frame()
     assert shape.origin.reference_frame == b1
-    assert shape.origin.to_position().x == 2.0
+    assert shape.origin.position.x == 2.0
 
     shape = Sphere(
         radius=1,
@@ -46,4 +46,4 @@ def test_post_init_transformation():
     shape_collection.append(shape)
     shape_collection.transform_all_shapes_to_own_frame()
     assert shape.origin.reference_frame == b1
-    assert shape.origin.to_position().x == 2.0
+    assert shape.origin.position.x == 2.0

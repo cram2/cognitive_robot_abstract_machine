@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from visualization_msgs.msg import Marker, MarkerArray
 
+from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.adapters.ros.visualization.exceptions import (
     WorldNotResolvableError,
 )
@@ -43,17 +44,12 @@ class MarkerIdentity:
 
 
 @dataclass(eq=False)
-class SpatialTypePublisher(StateChangeCallback):
+class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     """
     Publishes spatial types as RViz markers and keeps them updated as the robot moves.
 
     Registered spatial types are re-evaluated against the live world state and
     republished on every joint-state update, so symbolic expressions track motion.
-    """
-
-    node: Node = field(kw_only=True)
-    """
-    The ROS2 node used to create the marker publisher.
     """
 
     topic_name: str = "/semworld/viz_marker"

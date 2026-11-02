@@ -1,26 +1,66 @@
 from __future__ import annotations
 
-from time import sleep
 from dataclasses import dataclass, field
-from typing import Dict, List
+from threading import Thread
 
 import rclpy
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
 from rclpy import Parameter
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
 from visualization_msgs.msg import InteractiveMarkerFeedback
 
+from cramph.monitors import CountSeconds
+from cramph.statechart import Statechart
+from giskardpy.data_types.exceptions import UnpairedKinematicChainParametersError
+from semantic_digital_twin.adapters.ros import rospy
+from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.monitors.payload_monitors import CountSeconds
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from giskardpy.middleware.ros2.python_interface import GiskardWrapper
-from giskardpy.middleware.ros2 import rospy
-from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
+
+# %% kinematic chain endpoints
+
+
+@dataclass(frozen=True)
+class RootTipPair:
+    """
+    The two links that delimit a kinematic chain a marker controls.
+    """
+
+    root_link: str
+    """
+    Name of the link the chain starts at.
+    """
+
+    tip_link: str
+    """
+    Name of the link the chain ends at.
+    """
+
+    @classmethod
+    def pair_up(cls, root_links: list[str], tip_links: list[str]) -> list[RootTipPair]:
+        """
+        Pair each root link with the tip link at the same index.
+
+        :param root_links: Names of the links the chains start at.
+        :param tip_links: Names of the links the chains end at.
+        :raises UnpairedChainEndpointParametersError: If the two lists differ in length.
+        :return: The endpoints of every chain.
+        """
+        if len(root_links) != len(tip_links):
+            raise UnpairedKinematicChainParametersError(
+                root_links=root_links, tip_links=tip_links
+            )
+        return [
+            cls(root_link=root_link, tip_link=tip_link)
+            for root_link, tip_link in zip(root_links, tip_links)
+        ]
+
+
+# %% the marker node
 
 
 @dataclass
@@ -32,10 +72,9 @@ class InteractiveMarkerNode:
     users to manipulate them via RViz. When a marker is moved, it generates motion
     goals that are sent to Giskard for execution.
 
-    Node parameters for launching the node:
-
-    - root_links: List of root link names for kinematic chains
-    - tip_links: List of tip link names corresponding to root_links
+    The chains to control may be supplied directly as a constructor argument. When
+    omitted, they are read from the ``root_links`` and ``tip_links`` ROS 2 node
+    parameters, which allows configuration via a launch file.
 
     Example Node for .launch.py:
 
@@ -63,42 +102,63 @@ class InteractiveMarkerNode:
     """
     Timeout in seconds for motion execution.
     """
-    giskard: GiskardWrapper = field(init=False)
+
+    chains: list[RootTipPair] | None = None
     """
-    Wrapper for Giskard motion planner.
+    The kinematic chains to create a marker for.
+
+    When ``None``, read from the ``root_links`` and ``tip_links`` ROS 2 parameters.
     """
-    markers: Dict[str, KinematicChainMarker] = field(init=False)
+
+    giskard: GiskardClientExecutor = field(init=False)
+    """
+    Sends the motions to Giskard.
+    """
+
+    markers: dict[str, KinematicChainMarker] = field(init=False)
     """
     Dictionary mapping marker names to KinematicChainMarker instances.
     """
+
     server: InteractiveMarkerServer | None = field(init=False)
     """
     Interactive marker server for RViz.
     """
-    root_links: List[str] = field(init=False)
-    """
-    List of root link names from parameters.
-    """
-    tip_links: List[str] = field(init=False)
-    """
-    List of tip link names from parameters.
-    """
 
     def __post_init__(self) -> None:
         """
-        Sets up the Giskard wrapper, reads parameters, creates kinematic chain markers,
-        and initializes the interactive marker server. Retries up to world_entity_retry_attempts
-        times if world entities are not found initially.
+        Sets up the Giskard client, resolves the chains to control, creates markers, and
+        initializes the interactive marker server.
 
-        :raises WorldEntityNotFoundError: If kinematic structure entities cannot be found
-            after all retry attempts.
+        When no chains were passed to the constructor, they are paired up from the
+        ``root_links`` and ``tip_links`` ROS 2 node parameters.
+
+        :raises UnpairedChainEndpointParametersError: If the two node parameters differ
+            in length.
+        :raises WorldEntityNotFoundError: If kinematic structure entities cannot be
+            found.
         """
-        self.giskard = GiskardWrapper(
+        self.giskard = GiskardClientExecutor(
             node_handle=rospy.get_node(), giskard_node_name="giskard"
         )
         self.markers = {}
         self.server = None
 
+        if self.chains is None:
+            self.chains = self._read_chains_from_parameters()
+
+        self._initialize_markers()
+        self._setup_marker_server()
+
+    def _read_chains_from_parameters(self) -> list[RootTipPair]:
+        """
+        Pair up the chains declared by the ``root_links`` and ``tip_links`` node
+        parameters.
+
+        :raises UnpairedChainEndpointParametersError: If the two parameters differ in
+            length.
+        :return: The endpoints of every declared chain.
+        """
         self.giskard.node_handle.declare_parameters(
             namespace="",
             parameters=[
@@ -106,11 +166,27 @@ class InteractiveMarkerNode:
                 ("tip_links", Parameter.Type.STRING_ARRAY),
             ],
         )
-        self.root_links = self.giskard.node_handle.get_parameter("root_links").value
-        self.tip_links = self.giskard.node_handle.get_parameter("tip_links").value
+        return RootTipPair.pair_up(
+            self.giskard.node_handle.get_parameter("root_links").value,
+            self.giskard.node_handle.get_parameter("tip_links").value,
+        )
 
-        self._initialize_markers()
-        self._setup_marker_server()
+    @classmethod
+    def start_in_background_thread(cls, chains: list[RootTipPair]) -> Thread:
+        """
+        Start an interactive marker node for the given kinematic chains in a daemon
+        thread.
+
+        :param chains: The kinematic chains to create a marker for.
+        :return: The started daemon thread running the node.
+        """
+        thread = Thread(
+            target=lambda: cls(chains=chains),
+            daemon=True,
+            name="interactive_marker",
+        )
+        thread.start()
+        return thread
 
     def _initialize_markers(self) -> None:
         """
@@ -118,20 +194,24 @@ class InteractiveMarkerNode:
 
         :raises WorldEntityNotFoundError: If entities cannot be found after all retries.
         """
-        for root, tip in zip(self.root_links, self.tip_links):
-            root_body = self.giskard.world.get_kinematic_structure_entity_by_name(root)
-            tip_body = self.giskard.world.get_kinematic_structure_entity_by_name(tip)
-            kinematic_chain = KinematicChainMarker(root, tip, root_body, tip_body)
+        for chain in self.chains:
+            root_body = self.giskard.world.get_kinematic_structure_entity_by_name(
+                chain.root_link
+            )
+            tip_body = self.giskard.world.get_kinematic_structure_entity_by_name(
+                chain.tip_link
+            )
+            kinematic_chain = KinematicChainMarker(
+                chain.root_link, chain.tip_link, root_body, tip_body
+            )
             self.markers[kinematic_chain.name] = kinematic_chain
-
-        return
 
     def _setup_marker_server(self) -> None:
         """
         Set up the interactive marker server and register all markers.
 
-        Creates the server, configures each marker with controls,
-        and registers feedback callbacks.
+        Creates the server, configures each marker with controls, and registers feedback
+        callbacks.
         """
         self.server = InteractiveMarkerServer(rospy.get_node(), "cartesian_goals")
 
@@ -147,10 +227,11 @@ class InteractiveMarkerNode:
         Process feedback from interactive markers when user interactions occur.
 
         When a marker is released (MOUSE_UP event), this method extracts the new pose,
-        creates a motion goal with a timeout, and sends it to Giskard for execution.
-        The marker is then reset to its default pose.
+        creates a motion goal with a timeout, and sends it to Giskard for execution. The
+        marker is then reset to its default pose.
 
-        :param feedback: The interactive marker feedback containing pose and event information.
+        :param feedback: The interactive marker feedback containing pose and event
+            information.
         """
         if feedback.event_type != InteractiveMarkerFeedback.MOUSE_UP:
             return
@@ -172,7 +253,7 @@ class InteractiveMarkerNode:
             reference_frame=kinematic_chain_marker.tip_body,
         )
 
-        motion_statechart = MotionStatechart()
+        motion_statechart = Statechart(context=self.giskard.context)
         motion_statechart.add_nodes(
             [
                 goal_transformation := CartesianPose(
@@ -186,11 +267,11 @@ class InteractiveMarkerNode:
         motion_statechart.add_node(
             EndMotion.when_any_true([goal_transformation, motion_timeout])
         )
-        self.giskard.execute_async(motion_statechart)
+        self.giskard.compile(motion_statechart)
+        self.giskard.execute_async()
 
         # Reset marker pose
         kinematic_chain_marker.reset_pose()
-
         # Update marker in server
         self.server.insert(kinematic_chain_marker.interactive_marker_message)
         self.server.applyChanges()
@@ -210,38 +291,47 @@ class KinematicChainMarker:
     """
     Name of the root link in the kinematic chain.
     """
+
     tip_link: str
     """
     Name of the tip/end-effector link in the kinematic chain.
     """
+
     root_body: KinematicStructureEntity
     """
     Kinematic structure entity representing the root body.
     """
+
     tip_body: KinematicStructureEntity
     """
     Kinematic structure entity representing the tip body.
     """
+
     marker_scale: float = 0.25
     """
     Scale of the interactive marker in meters.
     """
+
     marker_box_size: float = 0.175
     """
     Size of the marker box along each axis in meters.
     """
+
     marker_color_value: float = 0.5
     """
     RGB color value for the marker box (0.0 to 1.0).
     """
+
     marker_color_alpha: float = 0.5
     """
     Alpha transparency value for the marker box (0.0 to 1.0).
     """
+
     name: str = field(init=False)
     """
     Formatted name combining root and tip links.
     """
+
     interactive_marker_message: InteractiveMarker = field(init=False)
     """
     ROS InteractiveMarker message object.
@@ -258,8 +348,8 @@ class KinematicChainMarker:
         """
         Configure and create the interactive marker with all controls.
 
-        Sets up marker frame, appearance (cube visualization), and movement and
-        rotation controls for all axes.
+        Sets up marker frame, appearance (cube visualization), and movement and rotation
+        controls for all axes.
         """
         self._setup_marker_properties()
         self._add_box_control()
@@ -293,7 +383,6 @@ class KinematicChainMarker:
         box_control.always_visible = True
         box_control.markers.append(box_marker)
         box_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
-
         self.interactive_marker_message.controls.append(box_control)
 
     def _add_movement_controls(self) -> None:
@@ -352,7 +441,8 @@ class KinematicChainMarker:
         Add a single interactive marker control for translation or rotation.
 
         :param name: Identifier for the control (e.g., "move_x", "rotate_z")
-        :param interaction_mode: InteractiveMarkerControl mode (MOVE_AXIS or ROTATE_AXIS)
+        :param interaction_mode: InteractiveMarkerControl mode (MOVE_AXIS or
+            ROTATE_AXIS)
         :param x: X component of the control orientation quaternion
         :param y: Y component of the control orientation quaternion
         :param z: Z component of the control orientation quaternion
@@ -386,8 +476,8 @@ def main(args: None = None) -> None:
     """
     Main entry point for the interactive marker ROS 2 node.
 
-    Initializes the ROS 2 node, creates the InteractiveMarkerNode instance,
-    logs a startup message, and keeps the node running until shutdown is requested.
+    Initializes the ROS 2 node, creates the InteractiveMarkerNode instance, logs a
+    startup message, and keeps the node running until shutdown is requested.
 
     :param args: Optional command-line arguments (currently unused)
     """

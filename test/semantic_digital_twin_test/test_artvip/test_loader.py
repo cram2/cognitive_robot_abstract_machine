@@ -94,7 +94,7 @@ def test_every_body_has_mesh_geometry(door_object):
 
 
 def test_hinged_door_is_reachable_as_an_active_connection_from_its_body(door_object):
-    # giskardpy's Open/Close goals (motion_statechart/goals/open_close.py) drive any
+    # giskardpy's ArticulateGraspedMechanism goal (motion_statechart/goals/grasped_mechanism.py) drives any
     # mechanism whose grasped part "hangs below an ActiveConnection1DOF" by calling
     # exactly this lookup on the grasped Body - this is the actual shape a manipulation
     # plan would query, not just that the World happens to contain a RevoluteConnection

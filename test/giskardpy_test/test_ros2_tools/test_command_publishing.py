@@ -1,19 +1,28 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 from threading import Thread
-from typing import Any, Dict, List, Optional, Type, Union
+from typing_extensions import Any
 
 import numpy as np
 import pytest
+from control_msgs.msg import MultiDOFCommand
+from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
+from std_msgs.msg import Float64MultiArray
 
 from giskardpy.middleware.ros2.command_publishing import (
     DriveVelocityCommandPublisher,
+    Float64MultiArrayFormat,
+    GroupCommandFormat,
     JointGroupVelocityCommandPublisher,
     JointVelocityCommandPublisher,
     JointMinimumVelocities,
     MinimumVelocity,
+    MultiDOFCommandFormat,
+    DriveCommandFormat,
+    TwistFormat,
+    TwistStampedFormat,
 )
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -39,13 +48,13 @@ class RecordingPublisher:
     cannot rewrite what was already recorded.
     """
 
-    published_messages: List[Any] = field(default_factory=list)
+    published_messages: list[Any] = field(default_factory=list)
     """
     Copies of all published messages, oldest first.
     """
 
     @property
-    def published_message(self) -> Optional[Any]:
+    def published_message(self) -> Any | None:
         """
         The most recently published message, or ``None`` if nothing was published.
         """
@@ -129,17 +138,17 @@ class ConnectionSpec:
     Scaling between the world state value and the value of the connection.
     """
 
-    connection_type: Type[ActiveConnection1DOF] = RevoluteConnection
+    connection_type: type[ActiveConnection1DOF] = RevoluteConnection
     """
     The concrete connection class to instantiate.
     """
 
 
-def add_joints(world: World, parent: Body, specs: List[ConnectionSpec]) -> None:
+def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     """
     Append a chain of connections to a body and apply their commanded velocities.
     """
-    connections: List[ActiveConnection1DOF] = []
+    connections: list[ActiveConnection1DOF] = []
     with world.modify_world():
         for index, spec in enumerate(specs):
             child = Body(name=PrefixedName(f"body_{index}"))
@@ -158,7 +167,7 @@ def add_joints(world: World, parent: Body, specs: List[ConnectionSpec]) -> None:
         connection.velocity = spec.velocity
 
 
-def build_world_with_joints(specs: List[ConnectionSpec]) -> World:
+def build_world_with_joints(specs: list[ConnectionSpec]) -> World:
     """
     Build a world holding a chain of connections with their commanded velocities.
     """
@@ -197,9 +206,10 @@ def remove_joint(world: World, connection: ActiveConnection1DOF) -> None:
 
 
 def build_group_publisher(
-    specs: List[ConnectionSpec],
+    specs: list[ConnectionSpec],
     minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    minimum_velocity_overrides: dict[str, float] | None = None,
+    command_format: GroupCommandFormat | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over a chain of freshly created connections.
@@ -209,14 +219,16 @@ def build_group_publisher(
         specs,
         minimum_valid_velocity,
         minimum_velocity_overrides,
+        command_format,
     )
 
 
 def group_publisher_for(
     world: World,
-    specs: List[ConnectionSpec],
+    specs: list[ConnectionSpec],
     minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    minimum_velocity_overrides: dict[str, float] | None = None,
+    command_format: GroupCommandFormat | None = None,
 ) -> JointGroupVelocityCommandPublisher:
     """
     Build a group publisher over connections that already exist in a world.
@@ -228,17 +240,35 @@ def group_publisher_for(
         minimum_velocities=JointMinimumVelocities.from_magnitudes(
             minimum_valid_velocity, minimum_velocity_overrides
         ),
+        command_format=command_format or Float64MultiArrayFormat(),
     )
 
 
-def publish_group(controller: JointGroupVelocityCommandPublisher) -> List[float]:
+def publish_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
     """
-    Replace the publisher with a recorder, publish once, and return the data.
+    Replace the publisher with a recorder, publish once, and return the message.
     """
     recorder = RecordingPublisher()
     controller.command_publisher = recorder
     controller.publish()
-    return list(recorder.published_message.data)
+    return recorder.published_message
+
+
+def stop_group_message(controller: JointGroupVelocityCommandPublisher) -> Any:
+    """
+    Replace the publisher with a recorder, stop the publisher, and return the message.
+    """
+    recorder = RecordingPublisher()
+    controller.command_publisher = recorder
+    controller.stop()
+    return recorder.published_message
+
+
+def publish_group(controller: JointGroupVelocityCommandPublisher) -> list[float]:
+    """
+    Replace the publisher with a recorder, publish once, and return the data.
+    """
+    return list(publish_group_message(controller).data)
 
 
 def publish_drive(publisher: DriveVelocityCommandPublisher) -> RecordingPublisher:
@@ -254,7 +284,7 @@ def publish_drive(publisher: DriveVelocityCommandPublisher) -> RecordingPublishe
 def add_drive(
     world: World,
     parent: Body,
-    drive_type: Union[Type[OmniDrive], Type[DifferentialDrive]],
+    drive_type: type[OmniDrive] | type[DifferentialDrive],
 ) -> None:
     """
     Append a drive to a body.
@@ -270,7 +300,7 @@ def add_drive(
 
 
 def build_drive_world(
-    drive_type: Union[Type[OmniDrive], Type[DifferentialDrive]],
+    drive_type: type[OmniDrive] | type[DifferentialDrive],
 ) -> World:
     """
     Build a world whose only connection is a drive.
@@ -463,6 +493,73 @@ def test_group_publisher_publishes_the_velocities_of_the_current_cycle(init_rosp
     assert recorded[1] == pytest.approx([0.4])
 
 
+# %% group command message formats
+
+
+def test_default_format_publishes_a_float64_multi_array(init_rospy):
+    controller = build_group_publisher([ConnectionSpec(name="joint_a", velocity=0.1)])
+
+    message = publish_group_message(controller)
+
+    assert isinstance(message, Float64MultiArray)
+    assert list(message.data) == pytest.approx([0.1])
+
+
+def test_multi_dof_format_publishes_the_velocities_as_values(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
+
+    message = publish_group_message(controller)
+
+    assert isinstance(message, MultiDOFCommand)
+    assert list(message.values) == pytest.approx([0.1, 0.2])
+
+
+def test_multi_dof_format_leaves_the_degree_of_freedom_names_empty(init_rospy):
+    specs = [ConnectionSpec(name="joint_a", velocity=0.1)]
+    controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
+
+    assert list(publish_group_message(controller).dof_names) == []
+
+
+def test_minimum_velocity_is_raised_in_every_message_format(init_rospy):
+    specs = [ConnectionSpec(name="slow_positive", velocity=0.01)]
+    controller = build_group_publisher(
+        specs, minimum_valid_velocity=0.03, command_format=MultiDOFCommandFormat()
+    )
+
+    assert list(publish_group_message(controller).values) == pytest.approx([0.03])
+
+
+def test_stopping_publishes_zero_velocities_in_the_default_format(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_group_publisher(specs)
+
+    message = stop_group_message(controller)
+
+    assert isinstance(message, Float64MultiArray)
+    assert list(message.data) == pytest.approx([0.0, 0.0])
+
+
+def test_stopping_publishes_zero_velocities_in_the_configured_format(init_rospy):
+    specs = [
+        ConnectionSpec(name="joint_a", velocity=0.1),
+        ConnectionSpec(name="joint_b", velocity=0.2),
+    ]
+    controller = build_group_publisher(specs, command_format=MultiDOFCommandFormat())
+
+    message = stop_group_message(controller)
+
+    assert isinstance(message, MultiDOFCommand)
+    assert list(message.values) == pytest.approx([0.0, 0.0])
+
+
 # %% minimum velocity overrides that apply to nothing
 
 
@@ -510,7 +607,7 @@ def test_overrides_of_commanded_joints_are_accepted(init_rospy):
 
 @pytest.fixture()
 def joint_parameter_nodes(init_rospy):
-    nodes: List[ParameterServingNode] = []
+    nodes: list[ParameterServingNode] = []
 
     def _serve(controller_name: str, joint_name: str) -> None:
         nodes.append(
@@ -526,9 +623,9 @@ def joint_parameter_nodes(init_rospy):
 
 def build_joint_publisher(
     world: World,
-    namespaces: List[str],
+    namespaces: list[str],
     minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: Optional[Dict[str, float]] = None,
+    minimum_velocity_overrides: dict[str, float] | None = None,
 ) -> JointVelocityCommandPublisher:
     """
     Build a publisher that commands one joint per namespace.
@@ -542,7 +639,7 @@ def build_joint_publisher(
     )
 
 
-def publish_per_joint(publisher: JointVelocityCommandPublisher) -> List[float]:
+def publish_per_joint(publisher: JointVelocityCommandPublisher) -> list[float]:
     """
     Replace all publishers with recorders, publish once, and return the values.
     """
@@ -612,6 +709,7 @@ def build_drive_publisher(
     world: World,
     minimum_linear_velocity: float = 0.0,
     minimum_angular_velocity: float = 0.0,
+    command_format: DriveCommandFormat | None = None,
 ) -> DriveVelocityCommandPublisher:
     """
     Build a drive publisher for the only drive of the world.
@@ -622,6 +720,7 @@ def build_drive_publisher(
         connection=world.get_connection_by_name("brumbrum"),
         minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
         minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
+        command_format=command_format or TwistFormat(),
     )
 
 
@@ -677,6 +776,54 @@ def test_drive_without_minimums_publishes_unchanged_velocities(init_rospy):
 
     assert command.linear.x == pytest.approx(0.001)
     assert command.angular.z == pytest.approx(0.002)
+
+
+# %% drive command message formats
+
+
+def test_default_drive_format_publishes_a_twist(init_rospy):
+    world = build_drive_world(OmniDrive)
+    drive = world.get_connection_by_name("brumbrum")
+    world.state[drive.x_velocity.id].velocity = 0.3
+
+    command = publish_drive(build_drive_publisher(world)).published_message
+
+    assert isinstance(command, Twist)
+    assert command.linear.x == pytest.approx(0.3)
+
+
+def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
+    init_rospy,
+):
+    world = build_drive_world(OmniDrive)
+    drive = world.get_connection_by_name("brumbrum")
+    world.state[drive.x_velocity.id].velocity = 0.3
+    world.state[drive.yaw.id].velocity = 0.4
+    publisher = build_drive_publisher(world, command_format=TwistStampedFormat())
+
+    command = publish_drive(publisher).published_message
+
+    assert isinstance(command, TwistStamped)
+    assert command.header.frame_id == drive.child.name.name
+    assert command.twist.linear.x == pytest.approx(0.3)
+    assert command.twist.angular.z == pytest.approx(0.4)
+
+
+def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(init_rospy):
+    world = build_drive_world(OmniDrive)
+    drive = world.get_connection_by_name("brumbrum")
+    world.state[drive.x_velocity.id].velocity = 0.3
+    publisher = build_drive_publisher(world, command_format=TwistStampedFormat())
+    recorder = RecordingPublisher()
+    publisher.velocity_publisher = recorder
+
+    publisher.stop()
+
+    assert isinstance(recorder.published_message, TwistStamped)
+    assert recorder.published_message.twist == Twist()
+
+
+# %% drive publisher and model changes
 
 
 def test_drive_publisher_follows_its_dofs_through_a_model_change(init_rospy):

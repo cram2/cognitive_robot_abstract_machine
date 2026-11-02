@@ -21,10 +21,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.spatial_types.spatial_types import Pose
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, CuttingTechnique
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import sequential
+from coraplex.datastructures.enums import CuttingTechnique
 from coraplex.robot_plans.actions.composite.tool_based import CuttingAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import (
@@ -32,7 +29,13 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.testing import attach_tool, setup_world, start_visualization
+from coraplex.testing import attach_tool, setup_world, selected_visualizations
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.demonstrations import RobotDemonstrationRosSession
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.statechart import Statechart
+from cramph.composites import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +54,11 @@ def main() -> None:
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )
-    start_visualization(world)
     logger.debug("World root: %s", world.root)
     pr2 = PR2.from_world(world)
-    context = Context(world=world, robot=pr2, _debug=False, ros_node=None)
 
     knife_body = attach_tool(
-        world, pr2, Arms.RIGHT, parse_object("big-knife.stl"), CUT_MOUNT
+        world, pr2.right_arm, parse_object("big-knife.stl"), CUT_MOUNT
     )
     bread_body = world.get_body_by_name("bread.stl")
 
@@ -65,30 +66,41 @@ def main() -> None:
     with world.modify_world():
         world.add_semantic_annotations([Bread(root=bread_body), knife])
 
-    context.evaluate_conditions = False
-
-    plan = sequential(
-        [
-            SetGripperAction(Arms.RIGHT, GripperState.CLOSE),
-            ParkArmsAction(Arms.BOTH),
-            MoveTorsoAction(TorsoState.HIGH),
+    plan = Sequence(
+        nodes=[
+            SetGripperAction(
+                configuration=pr2.right_arm.end_effector.default_configuration(
+                    GripperState.CLOSE
+                )
+            ),
+            ParkArmsAction(arms=pr2.all_arms),
+            MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                Pose.from_xyz_rpy(*BASE_POSITION_XYZ, reference_frame=world.root)
+                target_location=Pose.from_xyz_rpy(
+                    *BASE_POSITION_XYZ, reference_frame=world.root
+                )
             ),
             CuttingAction(
                 object_to_cut=bread_body,
-                arm=Arms.RIGHT,
+                arm=pr2.right_arm,
                 tool=knife,
                 technique=CuttingTechnique.SLICE,
                 number_of_cuts_on_local_x_axis=3,
                 slice_thickness=0.03,
             ),
-        ],
-        context=context,
-    ).plan
+        ]
+    )
 
-    with simulated_robot:
-        plan.perform()
+    with RobotDemonstrationRosSession.start("cutting_demo") as ros_session:
+        executor = KinematicallySimulatedPlanExecutor(
+            StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+            ros_node=ros_session.node,
+            extensions=selected_visualizations(ros_session.node),
+        )
+        statechart = Statechart(context=executor.context)
+        statechart.add_node(plan)
+        executor.compile(statechart)
+        executor.execute()
 
 
 if __name__ == "__main__":

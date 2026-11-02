@@ -1,7 +1,7 @@
 # ===================== Possible World Configurations ========================
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Callable
+from typing_extensions import Callable
 
 from .base_config import (
     WorldConf,
@@ -44,8 +44,8 @@ def bodies():
 
 @dataclass
 class HandlesAndContainersWorld(WorldConf):
-    bodies: List[BodyConf] = field(default_factory=bodies, init=False)
-    connections: List[Connection] = field(
+    bodies: list[BodyConf] = field(default_factory=bodies, init=False)
+    connections: list[Connection] = field(
         default_factory=lambda: [
             FixedConnectionConf(parent=Container1(), child=Handle1()),
             PrismaticConnectionConf(parent=Container2(), child=Container1()),

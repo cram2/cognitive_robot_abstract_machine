@@ -1,214 +1,176 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
-from copy import deepcopy
 from dataclasses import dataclass
-from typing import Optional, Any
 
 import numpy as np
 import trimesh.boolean
 from trimesh.collision import CollisionManager
-from typing_extensions import List, TYPE_CHECKING, Iterable, Type
+from typing_extensions import TYPE_CHECKING, Iterable, Any
 
 from krrood.entity_query_language.predicate import (
     Predicate,
+    RenderedFields,
     Symbol,
+    SymbolicFunction,
     symbolic_function,
+    Triple,
+)
+from krrood.entity_query_language.utils import camel_case_to_words
+from krrood.entity_query_language.verbalization.fragments.base import (
+    VerbalizationFragment,
 )
 from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Adjective,
     clause,
+    Copula,
     Noun,
     Verb,
 )
 from krrood.inheritance_path_length import inheritance_path_length
-from random_events.interval import Interval
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
-from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.spatial_types import Vector3, Point3, math
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
 )
-from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
     KinematicStructureEntity,
+    TBody,
+    TRegion,
 )
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.robots.robot_parts import (
-        Camera,
-    )
 
 
-@symbolic_function
-def stable(obj: Body) -> bool:
+@dataclass(eq=False)
+class InContactWith(Triple[TBody, TBody]):
     """
-    Checks if an object is stable in the world.
+    Whether two bodies are touching, by how close their collision geometry comes.
 
-    Stable meaning that its position will not change after simulating physics in the
-    World. This will be done by simulating the world for 10 seconds and comparing the
-    previous coordinates with the coordinates after the simulation.
-
-    :param obj: The object which should be checked
-    :return: True if the given object is stable in the world False else
+    Touching is a judgement about a distance rather than a distance, so the distance is
+    what :meth:`compute_distance` answers and :attr:`maximum_distance` is where the
+    judgement is stated.
     """
-    raise NotImplementedError("Needs multiverse")
 
-
-@symbolic_function
-def contact(
-    body1: Body,
-    body2: Body,
-    threshold: float = 0.001,
-) -> bool:
+    body1: TBody
     """
-    Checks if two objects are in contact or not.
-
-    :param body1: The first object
-    :param body2: The second object
-    :param threshold: The threshold for contact detection
-    :return: True if the two objects are in contact False else
+    The first body.
     """
-    tcd = body1._world.collision_manager.collision_detector
-    result = tcd.check_collision_between_bodies(body1, body2)
 
-    if result is None:
-        return False
-    return result.distance < threshold
-
-
-@symbolic_function
-def get_visible_bodies(camera: Camera) -> List[KinematicStructureEntity]:
+    body2: TBody
     """
-    Get all bodies and regions that are visible from the given camera using a
-    segmentation mask.
-
-    :param camera: The camera for which the visible objects should be returned
-    :return: A list of bodies/regions that are visible from the camera
+    The other body.
     """
-    rt = RayTracer(camera._world)
-    rt.update_scene()
 
-    seg = rt.create_segmentation_mask(
-        camera.root_T_forward_view,
-        resolution=CameraResolution(width=256, height=256),
-        min_distance=0.2,
-        field_of_view=camera.field_of_view,
-    )
-    indices = np.unique(seg)
-    indices = indices[indices > -1]
-    bodies = [camera._world.kinematic_structure[i] for i in indices]
-
-    return bodies
-
-
-@symbolic_function
-def visible(camera: Camera, obj: KinematicStructureEntity) -> bool:
+    maximum_distance: float = 0.001
     """
-    Checks if a body/region is visible by the given camera.
+    How close the two have to come before they count as touching, in metres.
     """
-    return obj in get_visible_bodies(camera)
 
+    @property
+    def subject(self) -> TBody:
+        return self.body1
 
-@symbolic_function
-def occluding_bodies(camera: Camera, body: Body) -> List[Body]:
-    """
-    Determines the bodies that occlude a given body in the scene as seen from a
-    specified camera.
+    @property
+    def object(self) -> TBody:
+        return self.body2
 
-    This function uses a ray-tracing approach to check occlusion. Every body that hides
-    anything from the target body is an occluding body.
+    def __call__(self) -> bool:
+        distance = self.compute_distance()
+        return distance is not None and distance < self.maximum_distance
 
-    :param camera: The camera for which the occluding bodies should be returned
-    :param body: The body for which the occluding bodies should be returned
-    :return: A list of bodies that are occluding the given body.
-    """
-    camera_pose = camera.root_T_forward_view
-
-    # create a world only containing the target body
-    world_without_occlusion = deepcopy(body._world)
-    root = Body(name=PrefixedName("root"))
-    with world_without_occlusion.modify_world():
-        world_without_occlusion.clear()
-        world_without_occlusion.add_body(root)
-        copied_body = Body.from_json(body.to_json())
-        root_T_body = body.global_transform
-        root_T_body.reference_frame = root
-        root_to_copied_body = FixedConnection(
-            parent=root,
-            child=copied_body,
-            parent_T_connection_expression=root_T_body,
+    def compute_distance(self) -> float | None:
+        """
+        :return: How far apart the two bodies' collision geometry is, or ``None`` when
+            the collision detector reports no result for the pair at all.
+        """
+        detector = self.body1._world.collision_manager.collision_detector
+        result = detector.check_collision_between_bodies(
+            self.body1, self.body2, distance=self.maximum_distance
         )
-        world_without_occlusion.add_connection(root_to_copied_body)
+        if result is None:
+            return None
+        return result.distance
 
-    # get segmentation mask without occlusion
-    ray_tracer_without_occlusion = RayTracer(world_without_occlusion)
-    ray_tracer_without_occlusion.update_scene()
-    segmentation_mask_without_occlusion = (
-        ray_tracer_without_occlusion.create_segmentation_mask(
-            camera_pose,
-            resolution=CameraResolution(width=256, height=256),
-            min_distance=0.1,
-            field_of_view=camera.field_of_view,
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the body is in contact with the other body"*.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["body1"]),
+            Copula(),
+            Prepositions.IN,
+            Noun.bare("contact"),
+            Prepositions.WITH,
+            Noun(fields["body2"]),
         )
-    )
-
-    # get segmentation mask with occlusion
-    ray_tracer_with_occlusion = RayTracer(camera._world)
-    ray_tracer_with_occlusion.update_scene()
-    segmentation_mask_with_occlusion = (
-        ray_tracer_with_occlusion.create_segmentation_mask(
-            camera_pose,
-            resolution=CameraResolution(width=256, height=256),
-            min_distance=0.1,
-            field_of_view=camera.field_of_view,
-        )
-    )
-
-    # pixels where the target body is visible when nothing else is in the scene
-    target_pixels = segmentation_mask_without_occlusion == copied_body.index
-
-    # whatever covers those pixels in the real scene (except the target itself)
-    # is occluding the target
-    indices = np.unique(segmentation_mask_with_occlusion[target_pixels])
-    indices = indices[(indices > -1) & (indices != body.index)]
-    bodies = [camera._world.kinematic_structure[i] for i in indices]
-    return bodies
 
 
-@symbolic_function
-def reachable(pose: HomogeneousTransformationMatrix, root: Body, tip: Body) -> bool:
+@dataclass(eq=False)
+class Reachable(Predicate):
     """
-    Checks if a end_effector can reach a given position.
-
-    This is determined by inverse kinematics.
-
-    :param pose: The pose to reach
-    :param root: The root of the kinematic chain.
-    :param tip: The threshold between the end effector and the position.
-    :return: True if the end effector is closer than the threshold to the target
-        position, False in every other case
+    Whether a kinematic chain can put its tip at a pose, answered by inverse kinematics.
     """
-    try:
-        root._world.compute_inverse_kinematics(
-            root=root, tip=tip, target=pose, max_iterations=1000
+
+    pose: HomogeneousTransformationMatrix
+    """
+    The pose to reach.
+    """
+
+    root: Body
+    """
+    The root of the kinematic chain.
+    """
+
+    tip: Body
+    """
+    The end of the kinematic chain that has to arrive at the pose.
+    """
+
+    maximum_iterations: int = 1000
+    """
+    How long the solver may search before the pose counts as out of reach.
+    """
+
+    def __call__(self) -> bool:
+        try:
+            self.root._world.compute_inverse_kinematics(
+                root=self.root,
+                tip=self.tip,
+                target=self.pose,
+                max_iterations=self.maximum_iterations,
+            )
+        except (MaxIterationsException, UnreachableException):
+            return False
+        return True
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the pose is reachable by the tip"*.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["pose"]),
+            Copula(),
+            Adjective("reachable"),
+            Prepositions.BY,
+            Noun(fields["tip"]),
         )
-    except MaxIterationsException as e:
-        return False
-    except UnreachableException as e:
-        return False
-    return True
 
 
 @symbolic_function
@@ -231,8 +193,8 @@ def compute_euclidean_planar_distance(
     :return: The Euclidean distance between the two bodies in the 2D plane after
         ignoring the specified dimension.
     """
-    body1_position = body1.global_pose.to_position()
-    body2_position = body2.global_pose.to_position()
+    body1_position = body1.global_pose.position
+    body2_position = body2.global_pose.position
 
     if np.allclose(ignore_dimension, Vector3.X()):
         body1_position.x = 0.0
@@ -247,110 +209,222 @@ def compute_euclidean_planar_distance(
     return body1_position.euclidean_distance(body2_position)
 
 
-@symbolic_function
-def is_supported_by(
-    supported_body: Body, supporting_body: Body, max_intersection_height: float = 0.1
-) -> bool:
+@dataclass(eq=False)
+class SupportedBy(Triple[TBody, TBody]):
     """
-    Checks if one object is supporting another object.
+    Whether one body rests on another.
 
-    :param supported_body: Object that is supported
-    :param supporting_body: Object that potentially supports the first object
-    :param max_intersection_height: Maximum height of the intersection between the two
-        objects. If the intersection is higher than this value, the check returns False
-        due to unhandled clipping.
-    :return: True if the second object is supported by the first object, False otherwise
+    An object rests on what touches it and pushes it up, which is read off how the two
+    meet rather than from where their middles lie: a container carries its own middle
+    above what stands on its floor, a wall's bounding box reaches far past the wall, and
+    what touches an object only from the side does not hold it up. Up is the world's up.
     """
-    if Below(
-        supported_body.center_of_mass,
-        supporting_body.center_of_mass,
-        supported_body.global_transform,
-    )():
+
+    supported: TBody
+    """
+    The body that may be resting.
+    """
+
+    supporting: TBody
+    """
+    The body that may be holding it up.
+    """
+
+    maximum_intersection_height: float = 0.1
+    """
+    How deep, in metres, the two may sink into each other.
+
+    Sunk deeper, they are a clipping the simulation did not resolve, and the reading is
+    refused.
+    """
+
+    contact_tolerance: float = 0.005
+    """
+    How far apart, in metres, the two may be and still count as touching, and so how far
+    above the supporting body the supported body may stand and still rest on it.
+
+    A body is set down by a motion that stops where it can rather than
+    exactly on the surface, so a support read from overlapping volume
+    alone would hold for almost no placement at all. Measured on a robot
+    stacking boxes, a placement missed the surface it was aimed at by
+    1.9 mm; the default leaves room for that while staying far below the
+    centimetres by which a body that is genuinely in the air clears a
+    surface.
+    """
+
+    maximum_slope: float = np.radians(30.0)
+    """
+    How steeply, in radians, the supporting body may slope where the two meet and still
+    hold the supported body up.
+    """
+
+    @property
+    def subject(self) -> TBody:
+        return self.supported
+
+    @property
+    def object(self) -> TBody:
+        return self.supporting
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the supported body is supported by the supporting body"*.
+
+        :attr:`maximum_intersection_height` is a tolerance of the reading rather than
+        part of the claim, so it is left unspoken.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["supported"]),
+            Copula(),
+            Adjective("supported"),
+            Prepositions.BY,
+            Noun(fields["supporting"]),
+        )
+
+    def __call__(self) -> bool:
+        if self.supported is self.supporting:
+            return False
+
+        collision_detector = self.supported._world.collision_manager.collision_detector
+        touch = collision_detector.check_collision_between_bodies(
+            self.supported, self.supporting, distance=self.contact_tolerance
+        )
+        if touch is None or touch.distance >= self.contact_tolerance:
+            return False
+
+        if touch.body_a is not self.supported:
+            touch = touch.reverse()
+        root_V_push = touch.root_V_contact_normal_from_b_to_a[:3]
+        if root_V_push[2] < np.cos(self.maximum_slope) * np.linalg.norm(root_V_push):
+            return False
+
+        return -touch.distance < self.maximum_intersection_height
+
+
+@dataclass(eq=False)
+class Supports(Predicate):
+    """
+    Whether anything in the world rests on a body.
+    """
+
+    supporting_body: Body
+    """
+    The body that may be holding something up.
+    """
+
+    maximum_intersection_height: float = 0.1
+    """
+    How far two bodies may overlap vertically, in metres, before the reading is refused
+    as unhandled clipping.
+    """
+
+    def __call__(self) -> bool:
+        for candidate in self.supporting_body._world.bodies_with_collision:
+            if candidate is self.supporting_body:
+                continue
+            if SupportedBy(
+                candidate, self.supporting_body, self.maximum_intersection_height
+            )():
+                return True
         return False
-    bounding_box_supported_body = (
-        supported_body.collision.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=supported_body)
-        ).event
-    )
-    bounding_box_supporting_body = (
-        supporting_body.collision.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=supported_body)
-        ).event
-    )
 
-    intersection = (
-        bounding_box_supported_body & bounding_box_supporting_body
-    ).bounding_box()
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the body is supporting a body"*, naming what is held up, which the
+        class name leaves implicit.
 
-    if intersection.is_empty():
-        return False
-
-    z_intersection: Interval = intersection[SpatialVariables.z.value]
-    size = sum([si.upper - si.lower for si in z_intersection.simple_sets])
-    return size < max_intersection_height
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["supporting_body"]),
+            Copula(),
+            Adjective("supporting"),
+            Noun("body"),
+        )
 
 
-@symbolic_function
-def is_supporting(supporting_body: Body, max_intersection_height: float = 0.1) -> bool:
+@dataclass(eq=False)
+class InsideRegion(Triple[TBody, TRegion]):
     """
-    Determine if any body in the world is supported by a given supporting body.
+    Whether a body lies in a region, by what fraction of its collision volume falls
+    inside the region's area.
 
-    This function iterates over all bodies in the provided world and checks if any of
-    them are supported by the specified supporting body. The support determination is
-    performed using the helper function `is_supported_by`. Bodies for which the
-    computation fails are skipped.
-
-    :param supporting_body: The body that is being checked to determine if it is
-        supporting other bodies in the world.
-    :param max_intersection_height: The maximum allowable intersection height for a body
-        to be considered supported. Defaults to 0.1.
-    :return: True if any body in the world is supported by the supporting_body, False
-        otherwise.
+    How much counts as inside is a judgement rather than a measurement, so the fraction
+    is what :meth:`compute_contained_fraction` answers and
+    :attr:`minimum_contained_fraction` is where the judgement is stated.
     """
-    for candidate in supporting_body._world.bodies_with_collision:
-        if candidate is supporting_body:
-            continue
-        if is_supported_by(candidate, supporting_body, max_intersection_height):
-            return True
 
-    return False
-
-
-@symbolic_function
-def is_body_in_region(body: Body, region: Region) -> float:
+    body: TBody
     """
-    Check if the body is in the region by computing the fraction of the body's collision
-    volume that lies inside the region's area volume.
-
-    Implementation detail: both the body and region meshes are defined in their
-    respective local frames; we must transform them into a common (world) frame
-    using their global poses before computing the boolean intersection.
-
-    :param body: The body for which the check should be done.
-    :param region: The region to check if the body is in.
-    :return: The percentage (0.0..1.0) of the body's volume that lies in the region.
+    The body that may be in the region.
     """
-    # Retrieve meshes in local frames
-    body_mesh_local = body.collision.combined_mesh
-    region_mesh_local = region.area.combined_mesh
 
-    # Transform copies of the meshes into the world frame
-    body_mesh = body_mesh_local.copy().apply_transform(body.global_transform.to_np())
-    region_mesh = region_mesh_local.copy().apply_transform(
-        region.global_transform.to_np()
-    )
-    intersection = trimesh.boolean.intersection([body_mesh, region_mesh])
+    region: TRegion
+    """
+    The region it may be in.
+    """
 
-    # no body volume -> zero fraction
-    body_volume = body_mesh.volume
-    if body_volume <= 1e-12:
-        return 0.0
+    minimum_contained_fraction: float = 0.5
+    """
+    How much of the body has to lie inside the region before it counts as being in it.
+    """
 
-    return intersection.volume / body_volume
+    @property
+    def subject(self) -> TBody:
+        return self.body
+
+    @property
+    def object(self) -> TRegion:
+        return self.region
+
+    def __call__(self) -> bool:
+        return self.compute_contained_fraction() >= self.minimum_contained_fraction
+
+    def compute_contained_fraction(self) -> float:
+        """
+        :return: The fraction (0.0..1.0) of the body's volume lying in the region.
+        """
+        # Retrieve meshes in local frames
+        local_body_mesh = self.body.collision.combined_mesh
+        local_region_mesh = self.region.area.combined_mesh
+
+        # Transform copies of the meshes into the world frame
+        body_mesh = local_body_mesh.copy().apply_transform(
+            self.body.global_transform.to_np()
+        )
+        region_mesh = local_region_mesh.copy().apply_transform(
+            self.region.global_transform.to_np()
+        )
+        intersection = trimesh.boolean.intersection([body_mesh, region_mesh])
+
+        # no body volume -> zero fraction
+        body_volume = body_mesh.volume
+        if body_volume <= 1e-12:
+            return 0.0
+
+        return intersection.volume / body_volume
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the body is inside the region"*.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["body"]),
+            Copula(),
+            Prepositions.INSIDE,
+            Noun(fields["region"]),
+        )
 
 
-@dataclass
-class KinematicStructureEntitySpatialRelation(Symbol, ABC):
+@dataclass(eq=False)
+class KinematicStructureEntitySpatialRelation(Predicate, ABC):
     """
     Base class for spatial relations between two KinematicStructureEntity instances.
 
@@ -369,8 +443,8 @@ class KinematicStructureEntitySpatialRelation(Symbol, ABC):
     """
 
 
-@dataclass
-class PointSpatialRelation(Symbol, ABC):
+@dataclass(eq=False)
+class PointSpatialRelation(Predicate, ABC):
     """
     Check if the point is spatially related to the other point.
     """
@@ -386,19 +460,41 @@ class PointSpatialRelation(Symbol, ABC):
     """
 
 
-@dataclass
+@dataclass(eq=False)
 class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
+    """
+    A spatial relation between two points, read from somewhere in particular.
+
+    Which way is left, above or in front depends on where it is being seen from, so the
+    relation carries that spot as an operand of its own.
+    """
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the point is left of the other point, seen from the point of view"*,
+        with the direction taken from the relation's own name.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        direction = camel_case_to_words(cls.__name__).lower()
+        return clause(
+            Noun(fields["point"]),
+            Copula(),
+            Adjective(direction),
+            Noun(fields["other"]),
+            Prepositions.FROM,
+            Noun(fields["point_of_view"]),
+        )
 
     point_of_view: HomogeneousTransformationMatrix
     """
     The reference spot from where to look at the bodies.
     """
-
     eps: float = 1e-12
     """
     A small value to avoid division by zero.
     """
-
     spatial_relation_result: bool = False
 
     def _signed_distance_along_direction(self, index: int) -> float:
@@ -423,12 +519,12 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
             reference_frame=self.point_of_view.reference_frame,
         )
 
-        s_body = front_norm.dot(self.point.to_vector3())
-        s_other = front_norm.dot(self.other.to_vector3())
+        s_body = front_norm.dot(self.point.vector3)
+        s_other = front_norm.dot(self.other.vector3)
         return (s_body - s_other).compile()()
 
 
-@dataclass
+@dataclass(eq=False)
 class LeftOf(ViewDependentSpatialRelation):
     """
     The "left" direction is taken as the -Y axis of the given point of
@@ -440,7 +536,7 @@ class LeftOf(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass
+@dataclass(eq=False)
 class RightOf(ViewDependentSpatialRelation):
     """
     The "right" direction is taken as the +Y axis of the given point of
@@ -452,7 +548,7 @@ class RightOf(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass
+@dataclass(eq=False)
 class Above(ViewDependentSpatialRelation):
     """
     The "above" direction is taken as the +Z axis of the given point of
@@ -464,7 +560,7 @@ class Above(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass
+@dataclass(eq=False)
 class Below(ViewDependentSpatialRelation):
     """
     The "below" direction is taken as the -Z axis of the given point of
@@ -476,7 +572,7 @@ class Below(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass
+@dataclass(eq=False)
 class Behind(ViewDependentSpatialRelation):
     """
     The "behind" direction is defined as the -X axis of the given point of semantic
@@ -488,7 +584,7 @@ class Behind(ViewDependentSpatialRelation):
         return self.spatial_relation_result
 
 
-@dataclass
+@dataclass(eq=False)
 class InFrontOf(ViewDependentSpatialRelation):
     """
     The "in front of" direction is defined as the +X axis of the given point of semantic
@@ -500,58 +596,79 @@ class InFrontOf(ViewDependentSpatialRelation):
         return self.result
 
 
-@dataclass
+@dataclass(eq=False)
 class InsideOf(KinematicStructureEntitySpatialRelation):
     """
-    The "inside of" relation is defined as the fraction of the volume of self.body
-    that lies within the bounding box of self.other.
+    Whether one thing lies inside another, by what fraction of its volume falls within
+    the other's bounding box.
 
-    Readily, `InsideOf(a,b) = 1.` means that `a` is completely inside `b`.
+    How much counts as inside is a judgement rather than a measurement, so the fraction
+    is what :meth:`compute_containment_ratio` answers and
+    :attr:`minimum_containment_ratio` is where the judgement is stated.
+    """
+
+    minimum_containment_ratio: float = 0.5
+    """
+    How much of the body has to lie inside the other before it counts as being in it.
+
+    Half by default: a thing more than half swallowed is in, and one less than half
+    swallowed is merely overlapping. Callers that want the fraction itself rather than a
+    verdict read :meth:`compute_containment_ratio`.
     """
 
     containment_ratio: float = 0.0
+    """
+    What the last call measured, kept so a caller can read it off the relation it just
+    evaluated.
+    """
 
-    def __call__(self) -> float:
+    def __call__(self) -> bool:
         self.containment_ratio = self.compute_containment_ratio()
-        return self.containment_ratio
+        return self.containment_ratio >= self.minimum_containment_ratio
 
     def compute_containment_ratio(self) -> float:
         """
-        Compute the containment ratio of self.body inside self.other.
+        :return: The fraction of the vertices of :attr:`body` that lie within the
+            world-aligned bounding box of :attr:`other`, or 0 when either has no mesh or
+            that box encloses no volume.
         """
-        if self.other.combined_mesh is None:
-            return 0.0
-
-        # Get meshes in their local (body) frames
-        mesh_a_local = self.body.combined_mesh
-        mesh_b_local = self.other.combined_mesh
-
-        # Check if either mesh is empty
+        body_mesh = self.body.combined_mesh
+        other_mesh = self.other.combined_mesh
         if (
-            mesh_a_local is None
-            or mesh_a_local.is_empty
-            or mesh_b_local is None
-            or mesh_b_local.is_empty
+            body_mesh is None
+            or body_mesh.is_empty
+            or other_mesh is None
+            or other_mesh.is_empty
         ):
             return 0.0
 
-        # Transform meshes from body frame to world frame
-        mesh_a = mesh_a_local.copy()
-        mesh_a.apply_transform(self.body.global_transform.to_np())
-
-        mesh_b = mesh_b_local.copy()
-        mesh_b.apply_transform(self.other.global_transform.to_np())
-
-        # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
-        mesh_b_bbox = mesh_b.bounding_box
-
-        if not mesh_b_bbox.is_watertight:
+        other_vertices = trimesh.transform_points(
+            other_mesh.vertices, self.other.global_transform.to_np()
+        )
+        lower = other_vertices.min(axis=0)
+        upper = other_vertices.max(axis=0)
+        if np.any(upper <= lower):
             return 0.0
 
-        inside = mesh_b_bbox.contains(mesh_a.vertices)
-        if len(inside) == 0:
-            return 0.0
-        return sum(inside) / len(inside)
+        body_vertices = trimesh.transform_points(
+            body_mesh.vertices, self.body.global_transform.to_np()
+        )
+        inside = np.all((body_vertices >= lower) & (body_vertices <= upper), axis=1)
+        return float(inside.mean())
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the body is inside the other"*.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(
+            Noun(fields["body"]),
+            Copula(),
+            Prepositions.INSIDE,
+            Noun(fields["other"]),
+        )
 
 
 @dataclass
@@ -565,7 +682,7 @@ class ContainsType(Predicate):
     Iterable to check for objects of the given type.
     """
 
-    obj_type: Type
+    obj_type: type
     """
     Object type to check for.
     """
@@ -584,55 +701,76 @@ class ContainsType(Predicate):
         )
 
 
-@symbolic_function
-def is_place_occupied(
-    box: VolumetricBoundingBox,
-    pose: Pose,
-    world: World,
-    allowed_bodies: List[Body] = None,
-) -> bool:
+@dataclass(eq=False)
+class PlaceIsOccupied(Predicate):
     """
-    Checks if the given region (as a box at its pose) intersects with any collidable
-    object in the world, excluding `allowed_bodies`.
+    Whether anything already stands in a stretch of the world.
 
-    The region is converted to a box mesh at the region pose and tested against each
-    body's world-aligned collision mesh using trimesh's collision manager.
-
-    :param box: The region (axis-aligned box in its own local frame with pose in
-        `region.origin`).
-    :param world: The world providing bodies with enabled collisions.
-    :param allowed_bodies: Bodies to ignore during the check.
-    :return: True if any collision is found, False otherwise.
+    The stretch is a box at a pose, tested against every collidable body's own collision
+    mesh.
     """
-    allowed_bodies = set(allowed_bodies or [])
 
-    # Build a mesh for the region box at its current pose
-    region_box_shape = box.as_shape()  # returns a Box centered at the region
-    region_mesh = region_box_shape.mesh.copy()
-    region_mesh.apply_transform(world.transform(pose, world.root).to_np())
+    box: VolumetricBoundingBox
+    """
+    The stretch of space asked about, in its own local frame.
+    """
 
-    # Prepare collision manager with the region mesh
-    cm = CollisionManager()
-    cm.add_object("region", region_mesh)
+    pose: Pose
+    """
+    Where that box stands.
+    """
 
-    # Iterate over collidable bodies and test collision
-    for body in world.bodies_with_collision:
-        if body in allowed_bodies:
-            continue
+    world: World
+    """
+    The world whose collidable bodies are tested against it.
+    """
 
-        mesh_local = getattr(body.collision, "combined_mesh", None)
-        if mesh_local is None or getattr(mesh_local, "is_empty", False):
-            continue
+    allowed_bodies: list[Body] | None = None
+    """
+    Bodies that may stand there without the place counting as occupied.
+    """
 
-        # Transform body mesh into world frame
-        body_mesh = mesh_local.copy()
-        body_mesh.apply_transform(body.global_pose.to_np())
+    def __call__(self) -> bool:
+        ignored = set(self.allowed_bodies or [])
 
-        # Early exit on first collision
-        if cm.in_collision_single(body_mesh):
-            return True
+        # Build a mesh for the region box at its current pose
+        region_box_shape = self.box.as_shape()  # returns a Box centered at the region
+        region_mesh = region_box_shape.mesh.copy()
+        region_mesh.apply_transform(
+            self.world.transform(self.pose, self.world.root).to_np()
+        )
 
-    return False
+        # Prepare collision manager with the region mesh
+        cm = CollisionManager()
+        cm.add_object("region", region_mesh)
+
+        # Iterate over collidable bodies and test collision
+        for body in self.world.bodies_with_collision:
+            if body in ignored:
+                continue
+
+            mesh_local = getattr(body.collision, "combined_mesh", None)
+            if mesh_local is None or getattr(mesh_local, "is_empty", False):
+                continue
+
+            # Transform body mesh into world frame
+            body_mesh = mesh_local.copy()
+            body_mesh.apply_transform(body.global_pose.to_np())
+
+            # Early exit on first collision
+            if cm.in_collision_single(body_mesh):
+                return True
+
+        return False
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+        """
+        Reads as *"the place is occupied"*.
+
+        :param fields: The rendered fragment for each field, keyed by field name.
+        """
+        return clause(Noun(fields["box"]), Copula(), Adjective("occupied"))
 
 
 @symbolic_function

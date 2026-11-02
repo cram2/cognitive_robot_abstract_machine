@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing_extensions import Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.operators.aggregators import Aggregator
-from krrood.entity_query_language.verbalization.grammar.framework.specificity import (
-    SpecificityRule,
-)
+from krrood.patterns.specificity_ranking import SpecificityRule
 from krrood.entity_query_language.query.aggregation_structure import (
     aggregation_source_root,
 )
@@ -44,7 +41,7 @@ class RestrictionSubjectRule(SpecificityRule):
     @abstractmethod
     def subject(
         cls, expression: SymbolicExpression, selected_variable: SymbolicExpression
-    ) -> Optional[Variable]:
+    ) -> Variable | None:
         """
         :param expression: The query whose restriction subject to resolve.
         :param selected_variable: The query's selected variable.
@@ -78,7 +75,7 @@ class SelectedVariableSubjectRule(RestrictionSubjectRule):
     @classmethod
     def subject(
         cls, expression: SymbolicExpression, selected_variable: SymbolicExpression
-    ) -> Optional[Variable]:
+    ) -> Variable | None:
         """The plain selection is its own restriction subject.
 
         >>> robot = variable(Robot, [])
@@ -121,7 +118,7 @@ class AggregationSourceSubjectRule(RestrictionSubjectRule):
     @classmethod
     def subject(
         cls, expression: SymbolicExpression, selected_variable: SymbolicExpression
-    ) -> Optional[Variable]:
+    ) -> Variable | None:
         """The aggregated source variable is the restriction subject.
 
         >>> employee = variable(Employee, [])
@@ -134,7 +131,7 @@ class AggregationSourceSubjectRule(RestrictionSubjectRule):
 
 def restriction_subject(
     expression: SymbolicExpression, selected_variable: SymbolicExpression
-) -> Optional[Variable]:
+) -> Variable | None:
     """
     :param expression: The query whose restriction subject to resolve.
     :param selected_variable: The query's selected variable.

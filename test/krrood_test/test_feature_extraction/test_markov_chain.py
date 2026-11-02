@@ -12,7 +12,7 @@ from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.relational.markov_chain import (
     MarkovChainDistributionTemplate,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -41,7 +41,7 @@ def type_variable() -> Symbolic:
 @pytest.fixture
 def dirac_hidden_state_template(type_variable):
     """
-    A ``RelationalProbabilisticCircuit(SceneObject)`` whose class circuit is a
+    A ``RelationalProbabilisticCircuit`` of ``SceneObject`` whose class circuit is a
     2-state hidden Markov emission model built by hand: one state always emits
     ``CHAIR``, the other always emits ``TABLE``. The dirac emissions make the
     "type" observed at each grounded position reveal the hidden state exactly,
@@ -57,7 +57,7 @@ def dirac_hidden_state_template(type_variable):
     root.add_subcircuit(
         leaf(make_dirac(type_variable, SceneObjectType.TABLE), circuit), np.log(0.5)
     )
-    template_distribution = RelationalProbabilisticCircuit(SceneObject)
+    template_distribution = RelationalProbabilisticCircuit()
     template_distribution.class_probabilistic_circuit = circuit
     return template_distribution
 
@@ -143,7 +143,7 @@ def _scene_object_parts(count: int) -> list:
         objects=[a(SceneObject)(type=...) for _ in range(count)],
     )
     room_query.resolve()
-    return room_query.kwargs["objects"]
+    return room_query._kwargs_["objects"]
 
 
 # %% __post_init__ validation
@@ -183,7 +183,7 @@ def test_ground_single_part_uses_starting_distribution(
     grounded = markov_chain_template.ground([part])
     assert grounded.is_valid()
     [type_variable_at_position] = [
-        v for v in grounded.variables if v.name == f"{part.variable}.type"
+        v for v in grounded.variables if v.name == f"{part._variable_}.type"
     ]
     for state, type_value in enumerate(type_by_state):
         probability = grounded.probability(
@@ -200,7 +200,10 @@ def test_ground_three_parts_is_valid(markov_chain_template):
 
 
 def test_ground_three_parts_matches_forward_algorithm(
-    markov_chain_template, starting_probabilities, transition_probabilities, type_by_state
+    markov_chain_template,
+    starting_probabilities,
+    transition_probabilities,
+    type_by_state,
 ):
     """
     With dirac emissions, the observed "type" sequence reveals the hidden state sequence
@@ -214,7 +217,7 @@ def test_ground_three_parts_matches_forward_algorithm(
     parts = _scene_object_parts(3)
     grounded = markov_chain_template.ground(parts)
     type_variables_by_position = [
-        next(v for v in grounded.variables if v.name == f"{part.variable}.type")
+        next(v for v in grounded.variables if v.name == f"{part._variable_}.type")
         for part in parts
     ]
 
@@ -238,7 +241,10 @@ def test_ground_three_parts_matches_forward_algorithm(
 
 
 def test_ground_position_probability_matches_forward_marginal(
-    markov_chain_template, starting_probabilities, transition_probabilities, type_by_state
+    markov_chain_template,
+    starting_probabilities,
+    transition_probabilities,
+    type_by_state,
 ):
     """
     Each position's "type" probability, with the other positions left.
@@ -252,7 +258,7 @@ def test_ground_position_probability_matches_forward_marginal(
     forward_marginal = starting_probabilities
     for part in parts:
         type_variable_at_position = next(
-            v for v in grounded.variables if v.name == f"{part.variable}.type"
+            v for v in grounded.variables if v.name == f"{part._variable_}.type"
         )
         for state, type_value in enumerate(type_by_state):
             probability = grounded.probability(

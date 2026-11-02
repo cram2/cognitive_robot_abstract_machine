@@ -32,7 +32,11 @@ from typing import Optional
 
 from semantic_digital_twin.semantic_annotations.mixins import HasHandle, HasRootBody
 from semantic_digital_twin.semantic_annotations.part_whole import IsPartWholeRelationship
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Dresser, Handle, Slider
+from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
+)
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Dresser, Handle
+from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
@@ -46,21 +50,19 @@ Your goal:
 - Create a world with a root body and store it in a variable named `world`
 - Inside one `with world.modify_world():` block, use `create_with_new_body_in_world` to create
   a `Dresser` named `dresser` (scale `Scale(0.31, 0.31, 0.21)`), a `Drawer` named `drawer`
-  (scale `Scale(0.3, 0.3, 0.2)`), a `Handle` named `drawer_handle`, and a `Slider` named
-  `drawer_slider` with `Slider.parent_connection_specification(axis=Vector3.X())`
-- Wire them together with `add`: the handle and the slider onto the drawer, the drawer onto the dresser
-- Store the annotations in variables named `dresser`, `drawer`, `handle`, and `slider`
+  (scale `Scale(0.3, 0.3, 0.2)`) that slides on
+  `PrismaticConnectionSpecification(axis=Vector3.X())`, and a `Handle` named `drawer_handle`
+- Wire them together with `add`: the handle onto the drawer, the drawer onto the dresser
+- Store the annotations in variables named `dresser`, `drawer`, and `handle`
 
 ```{code-cell} ipython3
 :tags: [exercise]
-# TODO: create the four annotations and wire them together with add
+# TODO: create the three annotations and wire them together with add
 # world = World.create_with_root_body()
 # with world.modify_world():
 #     dresser = Dresser.create_with_new_body_in_world(name="dresser", scale=Scale(0.31, 0.31, 0.21), world=world)
-#     drawer = ...
+#     drawer = ...  # pass parent_connection_specification=PrismaticConnectionSpecification(axis=Vector3.X())
 #     handle = ...
-#     slider = ...  # pass parent_connection_specification=Slider.parent_connection_specification(axis=Vector3.X())
-#     drawer.add(...)
 #     drawer.add(...)
 #     dresser.add(...)
 ```
@@ -73,21 +75,18 @@ with world.modify_world():
         name="dresser", scale=Scale(0.31, 0.31, 0.21), world=world
     )
     drawer = Drawer.create_with_new_body_in_world(
-        name="drawer", scale=Scale(0.3, 0.3, 0.2), world=world
+        name="drawer",
+        scale=Scale(0.3, 0.3, 0.2),
+        world=world,
+        parent_connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
     )
-    slider = Slider.create_with_new_body_in_world(
-        name="drawer_slider",
-        world=world,
-        parent_connection_specification=Slider.parent_connection_specification(axis=Vector3.X()),
-    )
-    # One method, routed by type: handle -> drawer.handle, slider -> drawer.mechanical_joint
+    # One method, routed by type: handle -> drawer.handle
     drawer.add(handle)
-    drawer.add(slider)
     # drawer -> dresser.drawers (a list field, so it is appended)
     dresser.add(drawer)
 ```
@@ -95,7 +94,8 @@ with world.modify_world():
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 if drawer.handle is not handle: raise ExerciseVerificationFailed("The handle should be routed to drawer.handle.")
-if drawer.mechanical_joint is not slider: raise ExerciseVerificationFailed("The slider should be routed to drawer.mechanical_joint.")
+if not isinstance(drawer.movable_joint, PrismaticConnection): raise ExerciseVerificationFailed("The drawer should slide on a prismatic connection.")
+if drawer.movable_joint.parent is not dresser.root: raise ExerciseVerificationFailed("The drawer should keep sliding once it is part of the dresser.")
 if drawer not in dresser.drawers: raise ExerciseVerificationFailed("The drawer should be appended to dresser.drawers.")
 if handle.root.parent_connection.parent is not drawer.root: raise ExerciseVerificationFailed("The handle should be a kinematic child of the drawer.")
 ```

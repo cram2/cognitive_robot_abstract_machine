@@ -5,7 +5,7 @@ Conditional EQL operator constructs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing_extensions import Any, List
 
 from krrood.entity_query_language.core.base_expressions import (
     Selectable,
@@ -38,7 +38,7 @@ class CaseWhen(Selectable):
     The value returned if the condition is true.
     """
 
-    else_value: Optional[SymbolicExpression] = None
+    else_value: SymbolicExpression | None = None
     """
     The value returned if the condition is false.
 
@@ -61,19 +61,20 @@ class CaseWhen(Selectable):
 
     def _replace_child_field_(self, old: Any, new: Any) -> None:
         """
-        Replace a child expression node during EQL tree manipulation.
+        Replace every operand that holds *old* with *new*.
         """
-        if self.condition is old:
-            self.condition = new
-        elif self.then_value is old:
-            self.then_value = new
-        elif self.else_value is old:
-            self.else_value = new
-        else:
+        operands = (self.condition, self.then_value, self.else_value)
+        if all(operand is None or operand._id_ != old._id_ for operand in operands):
             raise ValueError(
                 f"Child {old} not found in CaseWhen — "
                 f"expected one of: condition, then_value, else_value"
             )
+        if self.condition._id_ == old._id_:
+            self.condition = new
+        if self.then_value._id_ == old._id_:
+            self.then_value = new
+        if self.else_value is not None and self.else_value._id_ == old._id_:
+            self.else_value = new
 
     def _name_(self) -> str:
         """

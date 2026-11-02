@@ -22,7 +22,7 @@ The module is primarily used for:
 from py_trees.composites import Parallel as OriginalParallel
 from py_trees.behaviour import Behaviour
 from py_trees.common import Status
-from typing_extensions import List, Union, Any, Iterator
+from typing_extensions import Any, Iterator
 
 
 class ParallelPolicy(object):
@@ -89,7 +89,7 @@ class ParallelPolicy(object):
         successful children are skipped until all specified succeed or one fails.
         """
 
-        def __init__(self, children: List[Behaviour], synchronise: bool = True) -> None:
+        def __init__(self, children: list[Behaviour], synchronise: bool = True) -> None:
             """
             Initialize SuccessOnSelected policy.
 
@@ -114,7 +114,7 @@ class Parallel(OriginalParallel):
        Children are ticked in sequence but may run concurrently.
     """
 
-    def tick(self) -> Iterator[Union[OriginalParallel, Any]]:
+    def tick(self) -> Iterator[OriginalParallel | Any]:
         """
         Tick all children according to policy.
 

@@ -239,7 +239,7 @@ def test_constrain_to_free_space_adds_a_where_condition(table_world: World):
 
     query = a(Point3)(x=..., y=..., z=..., reference_frame=None)
 
-    condition = graph_of_convex_sets.constrain_to_free_space(query.expression)
+    condition = graph_of_convex_sets.constrain_to_free_space(query._get_expression_())
 
     assert condition is not None
     assert condition._children_
@@ -421,11 +421,11 @@ def test_from_world_with_rotated_box():
     for bounding_box in graph_of_convex_sets.graph.nodes():
         bounding_box_T_world: Pose = world.transform(
             bounding_box.as_shape().origin, world.root
-        ).to_pose()
+        ).pose
 
         assert bounding_box_T_world.roll == 0
         assert bounding_box_T_world.pitch == 0
-        assert allclose(bounding_box_T_world.yaw, rotated_box_body_pose.to_pose().yaw)
+        assert allclose(bounding_box_T_world.yaw, rotated_box_body_pose.pose.yaw)
 
 
 def test_path_from_to_prefers_shorter_distance_over_fewer_hops():
@@ -525,7 +525,7 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
 
     It now runs a single-source Dijkstra search instead.
     """
-    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).parse()
+    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).create_world()
     search_space = BoundingBoxCollection(
         [
             VolumetricBoundingBox(

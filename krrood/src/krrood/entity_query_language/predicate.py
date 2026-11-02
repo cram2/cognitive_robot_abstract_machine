@@ -24,6 +24,9 @@ from typing_extensions import (
     TYPE_CHECKING,
     Dict,
     Union,
+    Generic,
+    TypeVar,
+    Self,
 )
 
 if TYPE_CHECKING:
@@ -38,6 +41,7 @@ from krrood.entity_query_language.core.variable import (
     Literal,
 )
 from krrood.entity_query_language.core.base_expressions import (
+    Operand,
     Selectable,
     SymbolicExpression,
 )
@@ -47,12 +51,13 @@ from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
 def symbolic_function(
     function: Callable[..., T],
-) -> Union[Callable[..., Variable[T]], T]:
+) -> Callable[..., Variable[T]] | T:
     """
     Function decorator that constructs a symbolic expression representing the function
     call when inside a symbolic_rule context.
@@ -66,9 +71,9 @@ def symbolic_function(
     """
 
     @wraps(function)
-    def wrapper(*args, **kwargs) -> Optional[Any]:
+    def wrapper(*args, **kwargs) -> Any | None:
         all_kwargs = merge_args_and_kwargs(function, args, kwargs)
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=function,
                 _kwargs_=all_kwargs,
@@ -79,7 +84,7 @@ def symbolic_function(
 
 
 def symbolic_callable_to_function(
-    symbolic_callable: Type[SymbolicCallable],
+    symbolic_callable: type[SymbolicCallable],
 ) -> Callable[..., Any]:
     """:return: a function that calls *symbolic_callable* -- the class-form counterpart of the
     :func:`symbolic_function` decorator.
@@ -138,12 +143,12 @@ class RenderedFields(Mapping):
     — without the author choosing between them.
     """
 
-    fragments: "Mapping[str, VerbalizationFragment]"
+    fragments: Mapping[str, VerbalizationFragment]
     """
     The rendered fragment for each field, keyed by field name.
     """
 
-    raw: "Mapping[str, SymbolicExpression]"
+    raw: Mapping[str, SymbolicExpression]
     """
     The raw child expression for each field, keyed by field name.
     """
@@ -225,7 +230,7 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
         all_kwargs = merge_args_and_kwargs(
             cls.__init__, args, kwargs, ignore_first=True
         )
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=cls,
                 _kwargs_=all_kwargs,
@@ -272,7 +277,7 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
         """
 
     @classmethod
-    def _example_operand_values_(cls) -> Dict[str, Any]:
+    def _example_operand_values_(cls) -> dict[str, Any]:
         """
         A literal example value for each field that is never bound to a symbolic operand
         in real usage -- only ever a literal (e.g. ``HasType.types_``, since
@@ -332,29 +337,77 @@ class SymbolicFunction(SymbolicCallable, ABC):
         """
 
 
+SubjectType = TypeVar("SubjectType")
+"""
+The type of what a :class:`Triple` relates to its object.
+"""
+
+ObjectType = TypeVar("ObjectType")
+"""
+The type of what a :class:`Triple` relates its subject to.
+"""
+
+
 @dataclass(eq=False)
-class Triple(Predicate):
+class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
     """
     A Triple is a type predicate that represents a relation between two entities.
 
     To know if your predicate is a Triple or not ask yourself can I say
     "subject" "predicate_name" "object" and it makes sense? if so then
     yes. Check the verbalization function below as a reference.
+
+    A Triple binds the types it relates as its parameters, e.g. ``Triple[Body, Body]``.
     """
 
     @property
     @abstractmethod
-    def subject(self) -> Any:
+    def subject(self) -> SubjectType:
         """
         The subject of the predicate.
         """
 
     @property
     @abstractmethod
-    def object(self) -> Any:
+    def object(self) -> ObjectType:
         """
         The object of the predicate.
         """
+
+    @classmethod
+    def from_subject_object(cls, subject: SubjectType, object_: ObjectType) -> Self:
+        """
+        Build this relation between a subject and an object, whatever order its fields
+        are declared in.
+
+        :param subject: What the relation relates to the object.
+        :param object_: What the relation relates the subject to.
+        :return: The relation, symbolic when either of them is.
+        """
+        return cls(
+            **{
+                cls.subject_field_name(): subject,
+                cls.object_field_name(): object_,
+            }
+        )
+
+    @classmethod
+    def subject_field_name(cls) -> str:
+        """
+        :return: The name of the field :attr:`subject` reads.
+        """
+        return get_accessed_attribute_name_in_return_statement_of_property(
+            cls.subject, cls
+        )
+
+    @classmethod
+    def object_field_name(cls) -> str:
+        """
+        :return: The name of the field :attr:`object` reads.
+        """
+        return get_accessed_attribute_name_in_return_statement_of_property(
+            cls.object, cls
+        )
 
     @classmethod
     def _verbalization_fragment_(
@@ -378,23 +431,17 @@ class Triple(Predicate):
         )
 
         words = camel_case_to_words(cls.__name__).split()
-        subject_name = get_accessed_attribute_name_in_return_statement_of_property(
-            cls.subject, cls
-        )
-        object_name = get_accessed_attribute_name_in_return_statement_of_property(
-            cls.object, cls
-        )
         particles = [WordFragment(text=word) for word in words[1:]]
         return clause(
-            Noun(fields[subject_name]),
+            Noun(fields[cls.subject_field_name()]),
             Verb(morphology.verb_lemma(words[0])),
             *particles,
-            Noun(fields[object_name]),
+            Noun(fields[cls.object_field_name()]),
         )
 
 
 @dataclass(eq=False)
-class HasType(Triple):
+class HasType(Triple[Any, Type]):
     """
     Represents a predicate to check if a given variable is an instance of a specified
     type.
@@ -409,7 +456,7 @@ class HasType(Triple):
     The variable whose type is being checked.
     """
 
-    types_: Type
+    types_: type
     """
     The type or tuple of types against which the `variable` is validated.
     """
@@ -453,7 +500,7 @@ class HasType(Triple):
         )
 
     @classmethod
-    def _example_operand_values_(cls) -> Dict[str, Any]:
+    def _example_operand_values_(cls) -> dict[str, Any]:
         return {"types_": int}
 
 
@@ -469,13 +516,13 @@ class HasTypes(HasType):
     comparison explicitly disabled.
     """
 
-    types_: Tuple[Type, ...]
+    types_: tuple[type, ...]
     """
     A tuple containing Type objects that are associated with this instance.
     """
 
     @classmethod
-    def _example_operand_values_(cls) -> Dict[str, Any]:
+    def _example_operand_values_(cls) -> dict[str, Any]:
         return {"types_": (int, str)}
 
 
@@ -512,12 +559,13 @@ call).
 """
 
 
-def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
+def _any_argument_is_an_operand(arguments: dict[str, Any]) -> bool:
     """
-    :param bindings: A kwarg like dict mapping strings to objects
-    :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
+    :param arguments: The arguments of a call, by parameter name.
+    :return: Whether any of *arguments* stands for an expression, such as a variable or
+        a match, so that the call has to be built as an expression instead of computed.
     """
-    return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())
+    return any(isinstance(argument, Operand) for argument in arguments.values())
 
 
 @dataclass(eq=False)

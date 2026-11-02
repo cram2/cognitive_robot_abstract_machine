@@ -20,17 +20,9 @@ The module is used for:
 
 from __future__ import annotations
 
-import logging
 
 import numpy as np
-from py_trees.behaviour import Behaviour
-from py_trees.blackboard import Blackboard
-from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Any, Dict, List
-
-import robokudo.pipeline
-from robokudo.defs import PACKAGE_NAME
-from robokudo.utils.tree import find_parent_of_type
+from typing_extensions import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -51,7 +43,7 @@ class AnnotatorOutputStruct:
         self.image: npt.NDArray[np.uint8] = np.zeros((640, 480, 3), dtype="uint8")
         """Image output data"""
 
-        self.geometries: List[Dict[str, o3d.geometry.Geometry3D]] = []
+        self.geometries: list[dict[str, o3d.geometry.Geometry3D]] = []
         """Open3D Geometries data. Will be passed to o3d.visualization.O3DVisualizer.add_geometry."""
 
         self.render_next_time = True
@@ -65,7 +57,7 @@ class AnnotatorOutputStruct:
         self.image = img
         self.render_next_time = True
 
-    def set_geometries(self, geometries: List[Dict[str, Any]]) -> None:
+    def set_geometries(self, geometries: list[dict[str, Any]]) -> None:
         """Set the geometries in this AnnotatorOutputStruct and instruct the GUI to render it next time.
 
         :param geometries: This parameter holds the geometries to be drawn. It should behave like o3d.visualization.draw,
@@ -88,7 +80,7 @@ class AnnotatorOutputs:
     def __init__(self) -> None:
         """Initialize an empty outputs container."""
 
-        self.outputs: Dict[str, AnnotatorOutputStruct] = {}
+        self.outputs: dict[str, AnnotatorOutputStruct] = {}
         """Dictionary mapping annotator names to their outputs"""
 
         self.redraw = True
@@ -117,35 +109,5 @@ class AnnotatorOutputPerPipelineMap:
     def __init__(self) -> None:
         """Initialize an empty pipeline map."""
 
-        self.map: Dict[str, AnnotatorOutputs] = {}
+        self.map: dict[str, AnnotatorOutputs] = {}
         """Dictionary mapping pipeline names to their annotator outputs"""
-
-
-class ClearAnnotatorOutputs(Behaviour):
-    """Put directly in the corresponding RK Pipeline"""
-
-    def __init__(self, name: str = "ClearAnnotatorOutputs") -> None:
-        super().__init__(name)
-        self.rk_logger = logging.getLogger(PACKAGE_NAME)
-
-    def update(self) -> Status:
-        self.rk_logger.debug("%s.update()" % (self.__class__.__name__))
-        blackboard = Blackboard()
-        annotator_output_pipeline_map_buffer = blackboard.get(
-            "annotator_output_pipeline_map_buffer"
-        )
-        assert isinstance(
-            annotator_output_pipeline_map_buffer,
-            AnnotatorOutputPerPipelineMap,
-        )
-
-        pipeline = find_parent_of_type(self, robokudo.pipeline.Pipeline)
-        if pipeline is None:
-            self.feedback_message = "No parent pipeline found!"
-            return Status.FAILURE
-
-        annotator_outputs = annotator_output_pipeline_map_buffer.map[pipeline.name]
-        assert isinstance(annotator_outputs, AnnotatorOutputs)
-        annotator_outputs.clear_outputs()
-
-        return Status.SUCCESS

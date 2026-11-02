@@ -48,7 +48,7 @@ def _build_pick_causal_circuit() -> CausalCircuit:
     )
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([arm], [success]),
+        MarginalDeterminismTreeNode.from_variable_order([arm]),
         [arm],
         [success],
     )
@@ -59,7 +59,7 @@ def test_registry_resolves_the_circuit_registered_for_the_queried_class():
     registry = CausalCircuitRegistry({Pick: pick_circuit})
 
     match = a(Pick)(arm=cause, success=...)
-    match.causes_effect(match.variable.success == 0.5)
+    match.causes_effect(match.success == 0.5)
     parameters = UnderspecifiedParameters(match)
 
     assert registry.get_model(parameters) is pick_circuit
@@ -71,5 +71,5 @@ def test_registry_distinguishes_between_multiple_registered_classes():
     registry = CausalCircuitRegistry({Pick: pick_circuit, Place: place_circuit})
 
     pick_match = a(Pick)(arm=cause, success=...)
-    pick_match.causes_effect(pick_match.variable.success == 0.5)
+    pick_match.causes_effect(pick_match.success == 0.5)
     assert registry.get_model(UnderspecifiedParameters(pick_match)) is pick_circuit

@@ -18,19 +18,17 @@ from __future__ import annotations
 import logging
 import timeit
 
+from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
-from typing_extensions import TYPE_CHECKING, Any, List, Optional
+from typing_extensions import Any
 
 import robokudo.annotators.core
 import robokudo.annotators.outputs
 import robokudo.cas as cas
 import robokudo.defs as defs
 import robokudo.utils.tree
-
-if TYPE_CHECKING:
-    from py_trees.behaviour import Behaviour
 
 
 class Pipeline(Sequence):
@@ -45,7 +43,7 @@ class Pipeline(Sequence):
     def __init__(
         self,
         name: str = "Sequence",
-        children: Optional[List[Behaviour]] = None,
+        children: list[Behaviour] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -98,10 +96,6 @@ class Pipeline(Sequence):
         annotator_output_pipeline_map_buffer = blackboard.get(
             "annotator_output_pipeline_map_buffer"
         )
-        assert isinstance(
-            annotator_output_pipeline_map_buffer,
-            robokudo.annotators.outputs.AnnotatorOutputPerPipelineMap,
-        )
         if self.name not in annotator_output_pipeline_map_buffer.map:
             annotator_output_pipeline_map_buffer.map[self.name] = (
                 robokudo.annotators.outputs.AnnotatorOutputs()
@@ -121,7 +115,7 @@ class Pipeline(Sequence):
         """
         return self.cas
 
-    def get_annotators(self) -> List[robokudo.annotators.core.BaseAnnotator]:
+    def get_annotators(self) -> list[robokudo.annotators.core.BaseAnnotator]:
         """
         Get all annotators in this pipeline.
 
@@ -136,7 +130,7 @@ class Pipeline(Sequence):
             if isinstance(child, robokudo.annotators.core.BaseAnnotator)
         ]
 
-    def pipeline_children(self) -> List[Behaviour]:
+    def pipeline_children(self) -> list[Behaviour]:
         """
         Get all children of this pipeline.
 

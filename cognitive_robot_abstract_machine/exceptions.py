@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from krrood.exceptions import DataclassException
-from typing_extensions import Tuple
 
 
 @dataclass
@@ -78,7 +77,7 @@ class MissingORMBuildChoiceError(DataclassException, ValueError):
     The option that was left without a choice.
     """
 
-    choices: Tuple[str, ...]
+    choices: tuple[str, ...]
     """
     The choices it accepts.
     """
@@ -108,7 +107,7 @@ class UnknownORMBuildChoiceError(DataclassException, ValueError):
     What it said, which names no time to build at.
     """
 
-    choices: Tuple[str, ...]
+    choices: tuple[str, ...]
     """
     The choices it accepts.
     """

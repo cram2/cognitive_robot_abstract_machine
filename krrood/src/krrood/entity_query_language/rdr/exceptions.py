@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, List, Tuple, Type
+from typing_extensions import Any, Tuple, Type
 
 from krrood.exceptions import DataclassException
 
@@ -26,7 +26,7 @@ class AmbiguousBranchSemanticsError(DataclassException):
     selector: object
     """The conclusion selector node being dispatched when the collision occurred."""
 
-    candidates: List[Type]
+    candidates: list[type]
     """
     The equally-specific branch-semantics classes that collided.
     """
@@ -47,10 +47,14 @@ class AmbiguousBranchSemanticsError(DataclassException):
 
 @dataclass
 class NoInferenceTarget(DataclassException):
-    """Raised when an underspecified ``Match`` has no ``...`` attribute to infer."""
+    """
+    Raised when an underspecified ``Match`` has no ``...`` attribute to infer.
+    """
 
     case_type: type
-    """The type whose instances were queried."""
+    """
+    The type whose instances were queried.
+    """
 
     def error_message(self) -> str:
         return f"{self.case_type.__name__} has no underspecified (`...`) attribute to infer."
@@ -61,10 +65,14 @@ class NoInferenceTarget(DataclassException):
 
 @dataclass
 class MultipleInferenceTargets(DataclassException):
-    """Raised when a single-class RDR is handed more than one ``...`` attribute."""
+    """
+    Raised when a single-class RDR is handed more than one ``...`` attribute.
+    """
 
     attribute_names: list[str]
-    """The names of the attributes that were all marked with ``...``."""
+    """
+    The names of the attributes that were all marked with ``...``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -87,10 +95,14 @@ class UnsupportedInferenceTarget(DataclassException):
     """
 
     case_type: type
-    """The type whose instances were queried."""
+    """
+    The type whose instances were queried.
+    """
 
     attribute_name: str
-    """The name of the unbounded-iterable attribute that was marked with ``...``."""
+    """
+    The name of the unbounded-iterable attribute that was marked with ``...``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -102,23 +114,61 @@ class UnsupportedInferenceTarget(DataclassException):
         return "This will be supported by a future MultiClassRDR."
 
 
+@dataclass
+class UndeclaredInferenceTarget(DataclassException):
+    """
+    Raised when an ``...`` attribute is not a declared field of the case type, so the
+    shape of the value to infer is unknown.
+    """
+
+    case_type: type
+    """
+    The type whose instances were queried.
+    """
+
+    attribute_name: str
+    """
+    The name of the attribute that was marked with ``...``.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.case_type.__name__}.{self.attribute_name} is not a declared field of "
+            f"{self.case_type.__name__}, so the value to infer cannot be checked."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Make {self.case_type.__name__} a dataclass that declares "
+            f"{self.attribute_name} as a field."
+        )
+
+
 # %% corner-case serialization
 
 
 @dataclass
 class CaseNotSerializableError(DataclassException):
-    """Raised when a :class:`~krrood.entity_query_language.rdr.corner_case.CaseSerializer`
-    cannot emit constructor source for a value."""
+    """
+    Raised when a :class:`~krrood.entity_query_language.rdr.corner_case.CaseSerializer`
+    cannot emit constructor source for a value.
+    """
 
     value: Any
-    """The field value that could not be serialized."""
+    """
+    The field value that could not be serialized.
+    """
 
     supported_types: Tuple[Type, ...]
-    """The scalar types the serializer does support (``None`` and nested dataclasses are
-    always supported in addition to these, so are not part of this list)."""
+    """
+    The scalar types the serializer does support (``None`` and nested dataclasses are
+    always supported in addition to these, so are not part of this list).
+    """
 
     def error_message(self) -> str:
-        type_names = ", ".join(t.__name__ for t in self.supported_types)
+        type_names = ", ".join(
+            supported_type.__name__ for supported_type in self.supported_types
+        )
         return (
             f"Cannot serialize value of type {type(self.value).__name__!r} to Python "
             f"constructor source. Only None, {type_names} members, and nested "

@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field, InitVar
-from typing import List, Optional
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -30,19 +29,19 @@ class QueryWidget(QWidget):
     The model controller.
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
 
-    query_widgets: List[VariableConstraintWidget] = field(
+    query_widgets: list[VariableConstraintWidget] = field(
         default_factory=list, init=False, repr=False, compare=False
     )
     """
     The list of variable constraint widgets for the query.
     """
 
-    evidence_widgets: List[VariableConstraintWidget] = field(
+    evidence_widgets: list[VariableConstraintWidget] = field(
         default_factory=list, init=False, repr=False, compare=False
     )
     """
@@ -59,7 +58,7 @@ class QueryWidget(QWidget):
     The label to display the calculation result.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.init_ui()
 
@@ -98,7 +97,7 @@ class QueryWidget(QWidget):
         main_layout.addLayout(result_layout)
 
     def create_section(
-        self, title: str, widgets_list: List[VariableConstraintWidget]
+        self, title: str, widgets_list: list[VariableConstraintWidget]
     ) -> QWidget:
         section = QWidget()
         layout = QVBoxLayout(section)
@@ -133,7 +132,7 @@ class QueryWidget(QWidget):
         return section
 
     def add_variable_row(
-        self, widgets_list: List[VariableConstraintWidget], container: QWidget
+        self, widgets_list: list[VariableConstraintWidget], container: QWidget
     ):
         if not self.controller.model:
             return
@@ -158,14 +157,14 @@ class QueryWidget(QWidget):
         self,
         row_widget: QWidget,
         var_widget: VariableConstraintWidget,
-        widgets_list: List[VariableConstraintWidget],
+        widgets_list: list[VariableConstraintWidget],
     ):
         widgets_list.remove(var_widget)
         row_widget.deleteLater()
         self.update_variable_options(widgets_list)
         self.on_calculate()
 
-    def update_variable_options(self, widgets_list: List[VariableConstraintWidget]):
+    def update_variable_options(self, widgets_list: list[VariableConstraintWidget]):
         """
         Updates the available variables in all widgets of the list.
         """
@@ -192,7 +191,7 @@ class QueryWidget(QWidget):
         prob = self.controller.calculate_probability(query_event, evidence_event)
         self.result_label.setText(f"P(Q | E) = {prob:.5f}")
 
-    def build_event(self, widgets_list: List[VariableConstraintWidget]) -> Event:
+    def build_event(self, widgets_list: list[VariableConstraintWidget]) -> Event:
         simple_event = SimpleEvent.from_data()
         for widget in widgets_list:
             constraint = widget.get_constraint()

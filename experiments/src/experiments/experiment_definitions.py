@@ -11,7 +11,7 @@ from typing_extensions import Any
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.exceptions import DataclassException
-from semantic_digital_twin.world_description.geometry import Bounds
+from krrood.bounds import Bounds
 
 
 from krrood.class_diagrams.attribute_introspector import (

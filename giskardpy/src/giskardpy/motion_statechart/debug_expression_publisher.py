@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from rclpy.node import Node
 
@@ -12,11 +12,12 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher imp
     SpatialTypePublisher,
 )
 from semantic_digital_twin.spatial_types.spatial_types import SpatialType, Vector3
+from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from semantic_digital_twin.world import World
+from giskardpy.motion_statechart.graph_node import DebugExpression
 
 if TYPE_CHECKING:
-    from giskardpy.motion_statechart.graph_node import DebugExpression
-    from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+    from cramph.statechart import Statechart
 
 
 @dataclass
@@ -41,13 +42,13 @@ class DebugExpressionPublisher:
     The underlying publisher that renders and republishes the debug expressions.
     """
 
-    def attach(self, motion_statechart: MotionStatechart) -> None:
+    def attach(self, statechart: Statechart) -> None:
         """
         Register the spatial debug expressions of every node for live visualization.
         """
         requests = [
             self._to_request(debug_expression)
-            for debug_expression in motion_statechart.collect_debug_expressions()
+            for debug_expression in DebugExpression.collect_from(statechart)
             if isinstance(debug_expression.expression, SpatialType)
         ]
         if self._publisher is None:
@@ -92,3 +93,33 @@ class DebugExpressionPublisher:
         if self._publisher is not None:
             self._publisher.clear()
             self._publisher.stop()
+
+
+@dataclass
+class DebugExpressionPublishing(TickingExecutorExtension):
+    """
+    Visualizes the debug expressions of every compiled statechart as RViz markers.
+
+    .. warning::
+        You should only use this while debugging and preferably only in simulation,
+        because it slows down the control loop.
+    """
+
+    ros_node: Node
+    """
+    The ROS2 node used to create the marker publisher.
+    """
+
+    publisher: DebugExpressionPublisher | None = field(init=False, default=None)
+    """
+    The publisher of the most recently compiled statechart, None before the first
+    compile.
+    """
+
+    def after_compile(self, executor: StatechartExecutor) -> None:
+        if self.publisher is not None:
+            self.publisher.stop()
+        self.publisher = DebugExpressionPublisher(
+            world=executor.context.world, node=self.ros_node
+        )
+        self.publisher.attach(executor.statechart)
