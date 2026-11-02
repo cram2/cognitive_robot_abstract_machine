@@ -9,8 +9,8 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Callable
 
-from krrood.entity_query_language.call_arguments import CallArguments
-from krrood.entity_query_language.exceptions import ArgumentsPassableOnlyByPosition
+from krrood.class_diagrams.call_arguments import CallArguments
+from krrood.class_diagrams.exceptions import ArgumentsPassableOnlyByPosition
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.caching import memoize
 from krrood.utils import is_hashable
@@ -62,22 +62,22 @@ class CallSignature:
             {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY}
         )
 
-    def bind(self, arguments: CallArguments) -> CallArguments:
+    def bind(self, /, *positional: Any, **keyword: Any) -> CallArguments:
         """
-        :param arguments: The arguments of a call.
+        :param positional: The arguments passed by position.
+        :param keyword: The arguments passed by name.
         :return: The arguments the callee receives, the same however they were passed
             and including the defaults that were left out.
         :raises TypeError: If the arguments do not fit the parameters.
         """
-        bound_arguments = self.parameters.bind(
-            *arguments.positional, **arguments.keyword
-        )
+        bound_arguments = self.parameters.bind(*positional, **keyword)
         bound_arguments.apply_defaults()
         return CallArguments(bound_arguments.args, bound_arguments.kwargs)
 
-    def keyword_arguments(self, arguments: CallArguments) -> dict[str, Any]:
+    def keyword_arguments(self, /, *positional: Any, **keyword: Any) -> dict[str, Any]:
         """
-        :param arguments: The arguments of a call.
+        :param positional: The arguments passed by position.
+        :param keyword: The arguments passed by name.
         :return: Each argument that was passed, by the name it is passed by, so calling
             the callee with these alone makes the same call. Defaults that were left out
             are not included.
@@ -85,9 +85,7 @@ class CallSignature:
             takes it only by position.
         :raises TypeError: If the arguments do not fit the parameters.
         """
-        passed = self.parameters.bind(
-            *arguments.positional, **arguments.keyword
-        ).arguments
+        passed = self.parameters.bind(*positional, **keyword).arguments
         kinds = {name: self.parameters.parameters[name].kind for name in passed.keys()}
         passed_only_by_position = tuple(
             name

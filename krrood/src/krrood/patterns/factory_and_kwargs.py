@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
 
 from krrood.adapters.json_serializer import list_like_classes
-from krrood.entity_query_language.call_signature import CallSignature
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 
 T = TypeVar("T")
