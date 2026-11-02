@@ -6,13 +6,13 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import select
 
-from giskardpy.model.exceptions import RobotDescriptionMissingError
 from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.exceptions import RobotDescriptionMissingError
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,

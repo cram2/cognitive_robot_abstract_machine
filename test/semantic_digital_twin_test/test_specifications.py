@@ -34,6 +34,7 @@ import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao 
 
 from .test_adapters.test_mjcf import VISUAL_ONLY_GEOM_SCENE
 
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     HandleWiderThanLong,
@@ -47,6 +48,7 @@ from semantic_digital_twin.exceptions import (
     UselessConceptError,
     DriveVelocityLimitsOnUndrivenRobot,
 )
+from semantic_digital_twin.robots.exceptions import RobotDescriptionMissingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_parts import AbstractRobotPart
@@ -543,9 +545,16 @@ def test_spawn_positional_name(empty_world):
 # %% robot specifications
 
 
-def _odom_bodies(world: World) -> list[Body]:
+def _odometry_of(robot: MinimalRobot) -> Body:
     """
-    Every odom body of a world, regardless of the prefix disambiguating it.
+    :return: The body a spawned robot is attached to.
+    """
+    return robot.root.parent_connection.parent
+
+
+def _odometry_bodies(world: World) -> list[Body]:
+    """
+    Every odometry body of a world, regardless of the prefix disambiguating it.
     """
     return [body for body in world.bodies if body.name.name == "odom"]
 
@@ -557,8 +566,10 @@ def test_world_specification_with_robot():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
-                    odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1.0
+                    ),
+                    odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
                         y=2.0
                     ),
                 )
@@ -567,16 +578,16 @@ def test_world_specification_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    odom_body = world.get_body_by_name("odom")
-    assert odom_body is not None
-    assert isinstance(odom_body.parent_connection, FixedConnection)
-    assert odom_body.parent_connection.parent is world.root
+    odometry_body = world.get_body_by_name("odom")
+    assert odometry_body is not None
+    assert isinstance(odometry_body.parent_connection, FixedConnection)
+    assert odometry_body.parent_connection.parent is world.root
 
     drive = world.get_body_by_name("base_footprint").parent_connection
     assert isinstance(drive, OmniDrive)
 
-    root_T_odom = world.compute_forward_kinematics(world.root, odom_body)
-    np.testing.assert_allclose(root_T_odom.position.to_np()[0], 1.0)
+    root_T_odometry = world.compute_forward_kinematics(world.root, odometry_body)
+    np.testing.assert_allclose(root_T_odometry.position.to_np()[0], 1.0)
 
 
 def test_robot_specification_applies_the_drive_velocity_limits_it_is_given():
@@ -672,9 +683,9 @@ def test_world_specification_from_urdf_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    odom_body = world.get_body_by_name("odom")
-    assert odom_body is not None
-    assert odom_body.parent_connection.parent is world.root
+    odometry_body = world.get_body_by_name("odom")
+    assert odometry_body is not None
+    assert odometry_body.parent_connection.parent is world.root
     drive = world.get_body_by_name("base_footprint").parent_connection
     assert isinstance(drive, OmniDrive)
 
@@ -696,11 +707,15 @@ def test_world_specification_with_several_robots():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+                    world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=1.0
+                    ),
                 ),
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
+                    world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=-1.0
+                    ),
                 ),
             ],
         ).to_domain_object()
@@ -709,18 +724,203 @@ def test_world_specification_with_several_robots():
 
     assert len(world.get_semantic_annotations_by_type(PR2)) == 2
 
-    odom_bodies = _odom_bodies(world)
-    assert len(odom_bodies) == 2
-    assert odom_bodies[0].name != odom_bodies[1].name
-    for odom_body in odom_bodies:
-        assert isinstance(odom_body.parent_connection, FixedConnection)
-        assert odom_body.parent_connection.parent is world.root
+    odometry_bodies = _odometry_bodies(world)
+    assert len(odometry_bodies) == 2
+    assert odometry_bodies[0].name != odometry_bodies[1].name
+    for odometry_body in odometry_bodies:
+        assert isinstance(odometry_body.parent_connection, FixedConnection)
+        assert odometry_body.parent_connection.parent is world.root
 
-    odom_positions = sorted(
-        world.compute_forward_kinematics(world.root, odom_body).position.to_np()[0]
-        for odom_body in odom_bodies
+    odometry_positions = sorted(
+        world.compute_forward_kinematics(world.root, odometry_body).position.to_np()[0]
+        for odometry_body in odometry_bodies
     )
-    np.testing.assert_allclose(odom_positions, [-1.0, 1.0])
+    np.testing.assert_allclose(odometry_positions, [-1.0, 1.0])
+
+
+# %% robot specifications: a movable localization
+
+
+def _adapter_dataset_file(file_name: str) -> Path:
+    """
+    :return: The path of a description file of the adapter test dataset.
+    """
+    return Path(__file__).resolve().parent / "test_adapters" / "dataset" / file_name
+
+
+def _parser_of_robot_rooted_at_map(prefix: str | None = None) -> URDFParser:
+    """
+    :param prefix: The prefix of every name the parser reads.
+    :return: A parser of a robot whose root link is called ``map``.
+    """
+    return URDFParser.from_file(
+        str(_adapter_dataset_file("robot_rooted_at_map.urdf")), prefix=prefix
+    )
+
+
+def test_a_localization_is_fixed_by_default(empty_world):
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+    ).spawn(empty_world)
+
+    assert type(_odometry_of(robot).parent_connection) is FixedConnection
+
+
+def test_a_movable_localization_starts_at_the_localization_pose(empty_world):
+    world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+        world_T_odometry=world_T_odometry,
+        localization_connection_type=Connection6DoF,
+    ).spawn(empty_world)
+
+    localization = _odometry_of(robot).parent_connection
+    assert isinstance(localization, Connection6DoF)
+    assert localization.parent is empty_world.root
+    np.testing.assert_allclose(localization.origin.to_np(), world_T_odometry.to_np())
+
+
+def test_a_movable_localization_moves(empty_world):
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+        localization_connection_type=Connection6DoF,
+    ).spawn(empty_world)
+    localization = _odometry_of(robot).parent_connection
+    moved_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=3.0, reference_frame=empty_world.root
+    )
+
+    localization.origin = moved_pose
+
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, robot.root).to_np(),
+        moved_pose.to_np(),
+    )
+
+
+# %% robot specifications: a robot read by the parser it is given
+
+
+def test_a_robot_is_spawned_from_the_description_its_parser_reads(empty_world):
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+    ).spawn(empty_world)
+
+    assert {body.name.name for body in robot.bodies_of_branch} == {"map", "base_link"}
+
+
+def test_a_spawned_robot_keeps_the_names_its_parser_gives_it(empty_world):
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(prefix=""),
+    ).spawn(empty_world)
+
+    assert str(robot.root.name) == "map"
+
+
+def test_a_robot_without_a_description_and_without_a_parser_cannot_be_spawned(
+    empty_world,
+):
+    with pytest.raises(RobotDescriptionMissingError) as raised:
+        RobotSpecification(semantic_annotation_type=MinimalRobot).spawn(empty_world)
+
+    assert raised.value.robot_class is MinimalRobot
+
+
+# %% robot specifications: the odometry body
+
+
+def test_an_odometry_body_carries_a_generated_name_by_default(empty_world):
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+    ).spawn(empty_world)
+
+    odometry_body = _odometry_of(robot)
+    assert odometry_body.name == PrefixedName("odom", str(odometry_body.id))
+
+
+def test_an_odometry_body_takes_the_name_it_is_given(empty_world):
+    odometry_body_name = PrefixedName("odom_combined")
+
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+        odometry_body_name=odometry_body_name,
+    ).spawn(empty_world)
+
+    assert _odometry_of(robot).name == odometry_body_name
+
+
+def test_a_robot_specification_survives_orm_round_trip():
+    specification = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(prefix=""),
+        localization_connection_type=Connection6DoF,
+        odometry_body_name=PrefixedName("odom_combined"),
+    )
+
+    reconstructed = to_dao(specification).from_dao()
+
+    assert (
+        reconstructed.localization_connection_type
+        is specification.localization_connection_type
+    )
+    assert reconstructed.description_parser == specification.description_parser
+    assert reconstructed.odometry_body_name == specification.odometry_body_name
+
+
+# %% world specifications whose environment contains robots
+
+
+def test_a_robot_the_environment_contains_is_annotated_in_place():
+    world = WorldSpecification(
+        world_parser=_parser_of_robot_rooted_at_map(prefix=""),
+        robots_in_environment=[MinimalRobot],
+    ).to_domain_object()
+
+    [robot] = world.get_semantic_annotations_by_type(MinimalRobot)
+    assert robot.root is world.root
+    assert {body.name.name for body in world.bodies} == {"map", "base_link"}
+
+
+def test_robots_are_spawned_into_an_environment_containing_a_robot():
+    world = WorldSpecification(
+        world_parser=_parser_of_robot_rooted_at_map(),
+        robots_in_environment=[MinimalRobot],
+        robots=[
+            RobotSpecification(
+                semantic_annotation_type=MinimalRobot,
+                description_parser=_parser_of_robot_rooted_at_map(),
+            )
+        ],
+    ).to_domain_object()
+
+    robot_roots = {
+        robot.root for robot in world.get_semantic_annotations_by_type(MinimalRobot)
+    }
+    [odometry_body] = _odometry_bodies(world)
+    assert robot_roots == {
+        world.root,
+        odometry_body.child_kinematic_structure_entities[0],
+    }
+    assert odometry_body.parent_connection.parent is world.root
+
+
+def test_a_world_specification_with_robots_in_its_environment_survives_orm_round_trip():
+    specification = WorldSpecification(
+        world_parser=_parser_of_robot_rooted_at_map(prefix=""),
+        robots_in_environment=[MinimalRobot],
+    )
+
+    reconstructed = to_dao(specification).from_dao()
+
+    assert reconstructed.robots_in_environment == specification.robots_in_environment
 
 
 # %% world specifications with starting objects

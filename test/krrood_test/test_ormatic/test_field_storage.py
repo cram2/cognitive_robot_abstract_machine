@@ -34,6 +34,7 @@ def field_named(ormatic: ORMatic, name: str) -> WrappedField:
     [
         ("number", FieldStorage.BUILTIN),
         ("kind", FieldStorage.TYPE),
+        ("kinds", FieldStorage.JSON),
         ("leaf", FieldStorage.MANY_TO_ONE),
         ("leaves", FieldStorage.MANY_TO_MANY),
         ("day", FieldStorage.CUSTOM_TYPE),

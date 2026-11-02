@@ -246,7 +246,7 @@ class GarmiApartmentDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odom_T_robot_start=ScenePose.GARMI_START.value.transform,
+            odometry_T_robot_start=ScenePose.GARMI_START.value.transform,
             drive_translation_velocity_limits=GarmiDrive.DEMONSTRATION.value.translation,
             drive_rotation_velocity_limits=GarmiDrive.DEMONSTRATION.value.rotation,
         )

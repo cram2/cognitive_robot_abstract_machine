@@ -221,6 +221,17 @@ def test_position_type_wrapper(session, database):
     assert result == dao
 
 
+def test_a_collection_of_classes_survives_a_round_trip(session, database):
+    wrapper = KRROODPositionTypesWrapper([KRROODPosition, KRROODPosition4D])
+    session.add(to_dao(wrapper))
+    session.commit()
+    session.expunge_all()
+
+    result = session.scalars(select(KRROODPositionTypesWrapperDAO)).one()
+
+    assert result.from_dao().position_types == wrapper.position_types
+
+
 def test_positions(session, database):
     p1 = KRROODPosition(1, 2, 3)
     p2 = KRROODPosition(2, 3, 4)
@@ -1002,9 +1013,9 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
         sa_event.remove(engine, "after_cursor_execute", _count)
 
     # from_dao() must issue no queries at all in either case.
-    assert (
-        queries_without == 0
-    ), f"Expected 0 queries without selectin_loading but got {queries_without}"
-    assert (
-        queries_with == 0
-    ), f"Expected 0 queries with selectin_loading but got {queries_with}"
+    assert queries_without == 0, (
+        f"Expected 0 queries without selectin_loading but got {queries_without}"
+    )
+    assert queries_with == 0, (
+        f"Expected 0 queries with selectin_loading but got {queries_with}"
+    )

@@ -51,9 +51,9 @@ def test_a_stationary_robot_is_bolted_to_the_world_through_a_fixed_drive():
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    world_T_odom = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
 
-    tracy = RobotSpecification(Tracy, world_T_odom=world_T_odom).spawn(world)
+    tracy = RobotSpecification(Tracy, world_T_odometry=world_T_odometry).spawn(world)
 
     odom_C_robot = tracy.root.parent_connection.parent.parent_connection
     root_C_odom = odom_C_robot.parent.parent_connection

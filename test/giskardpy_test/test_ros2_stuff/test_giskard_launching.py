@@ -17,10 +17,10 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import WorldWithPR2Config
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.model.exceptions import RobotDescriptionMissingError
 from giskardpy.model.world_config import WorldWithFixedRobot, WorldWithRobot
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.exceptions import RobotDescriptionMissingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
 

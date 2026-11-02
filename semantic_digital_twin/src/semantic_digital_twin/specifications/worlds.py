@@ -17,6 +17,7 @@ from semantic_digital_twin.world import World
 
 if TYPE_CHECKING:
     from semantic_digital_twin.adapters.package_resolver import PathResolver
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 # %% world specifications
 
@@ -29,8 +30,9 @@ class WorldSpecification:
 
     The environment is described by the parser that builds it (obtained from a model
     file with :meth:`from_urdf`, :meth:`from_mjcf` or :meth:`from_gazebo`). Applying it
-    (:meth:`to_domain_object`) parses the environment anew, merges every robot into it,
-    then spawns all starting objects, and returns the augmented environment world.
+    (:meth:`to_domain_object`) parses the environment anew, annotates the robots it
+    contains, merges every further robot into it, then spawns all starting objects, and
+    returns the augmented environment world.
     """
 
     world_parser: WorldModelParser | None = None
@@ -49,6 +51,12 @@ class WorldSpecification:
     objects: list[SpawnSpecification] = field(default_factory=list)
     """
     Specifications spawned relative to the world root once the robots are in place.
+    """
+
+    robots_in_environment: list[type[AbstractRobot]] = field(default_factory=list)
+    """
+    The robots the environment's description already contains, annotated where they are
+    instead of being merged into it.
     """
 
     @classmethod
@@ -159,8 +167,9 @@ class WorldSpecification:
         Materialize a new World from this specification.
 
         The environment is parsed anew, so the method can be applied repeatedly and no
-        two results share an entity identifier. Every robot is merged into the world
-        first, then all ``objects`` are spawned relative to the world root.
+        two results share an entity identifier. The robots the environment contains are
+        annotated first, then every further robot is merged into the world, then all
+        ``objects`` are spawned relative to the world root.
 
         :return: The augmented environment world.
         """
@@ -168,6 +177,8 @@ class WorldSpecification:
             world = self.world_parser.parse()
         else:
             world = World.create_with_root_body()
+        for robot_type in self.robots_in_environment:
+            robot_type.from_world(world)
         for robot_specification in self.robots:
             robot_specification.spawn(world)
 

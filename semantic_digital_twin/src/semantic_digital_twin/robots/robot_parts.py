@@ -65,6 +65,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.input_synchronization import InputSynchronizer
 from semantic_digital_twin.robots.exceptions import (
     MissingDriveConnectionError,
+    RobotDescriptionMissingError,
 )
 from semantic_digital_twin.robots.input_source import (
     BasePoseSource,
@@ -1262,10 +1263,15 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         :return: This robot, in a world holding nothing but it, read from its own
             description: the URDF :meth:`get_ros_file_path` points to, unless the robot
             is described in another format.
+        :raises RobotDescriptionMissingError: If this robot declares no description
+            file.
         """
+        description_file_path = cls.get_ros_file_path()
+        if not description_file_path:
+            raise RobotDescriptionMissingError(robot_class=cls)
         return cls.from_world(
             URDFParser.from_file(
-                cls.get_ros_file_path(),
+                description_file_path,
                 use_visual_as_collision_backup=cls.uses_visual_as_collision_backup,
             ).parse()
         )
