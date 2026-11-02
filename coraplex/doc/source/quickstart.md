@@ -39,9 +39,9 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").parse()
-milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").parse()
-pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").parse()
+apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").create_world()
+milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").create_world()
+pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 
 ```{note}
@@ -108,7 +108,7 @@ The plan will consist of the following steps:
 ```python
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext

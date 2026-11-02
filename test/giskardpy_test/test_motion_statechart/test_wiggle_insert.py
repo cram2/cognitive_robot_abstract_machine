@@ -19,7 +19,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.hsrb import HSRBJoint
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
 from test.semantic_digital_twin_test.test_orm.test_orm import hsr_world_state_reset
 from giskardpy.motion_control import MotionControl

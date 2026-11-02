@@ -12,7 +12,7 @@ from ..world_description.world_entity import Body
 from ..world_description.connections import FixedConnection
 from ..world_description.shape_collection import ShapeCollection
 from ..world_description.geometry import Mesh, Scale
-from ..spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from ..datastructures.prefixed_name import PrefixedName
 
 

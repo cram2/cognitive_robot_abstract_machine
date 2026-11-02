@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import open3d as o3d
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
 )

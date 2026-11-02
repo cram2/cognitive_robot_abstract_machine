@@ -55,9 +55,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
     CounterTop,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from coraplex.plans.context_extensions import RobotAccess
@@ -345,7 +343,7 @@ def _spawn_robot_and_prepare_pick_up(
 
     pr2_world = URDFParser.from_file(
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    ).parse()
+    ).create_world()
     with world.modify_world():
         drive = OmniDrive.create_with_dofs(
             parent=world.root, child=pr2_world.root, world=world
