@@ -5,7 +5,11 @@ from krrood.development_tools.agents.docstring_presence import (
 )
 
 from .dataset_files import DocstringSnippet
-from .dataset_lines import ModuleLine, UndocumentedDefinitionsLine
+from .dataset_lines import (
+    ModuleLine,
+    UnimportableDefinitionsLine,
+    UndocumentedDefinitionsLine,
+)
 
 # %% undocumented code
 
@@ -21,10 +25,19 @@ def undocumented_first_lines(snippet: DocstringSnippet) -> list[int]:
     )
 
 
-def test_an_undocumented_field_and_method_are_reported_and_an_override_is_not() -> None:
+def test_an_undocumented_field_and_methods_are_reported_and_an_abstract_implementation_is_not() -> (
+    None
+):
     assert undocumented_first_lines(DocstringSnippet.UNDOCUMENTED_DEFINITIONS) == [
         UndocumentedDefinitionsLine.FIELD,
+        UndocumentedDefinitionsLine.OVERRIDING_METHOD,
         UndocumentedDefinitionsLine.METHOD,
+    ]
+
+
+def test_an_unimportable_module_is_checked_except_for_its_methods() -> None:
+    assert undocumented_first_lines(DocstringSnippet.UNIMPORTABLE_DEFINITIONS) == [
+        UnimportableDefinitionsLine.FUNCTION
     ]
 
 

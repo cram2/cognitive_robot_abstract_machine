@@ -25,14 +25,30 @@ class UndocumentedDefinitionsLine(IntEnum):
     Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.DocstringSnippet.UNDOCUMENTED_DEFINITIONS`.
     """
 
-    FIELD = 32
+    FIELD = 38
     """
     The undocumented field.
     """
 
-    METHOD = 38
+    OVERRIDING_METHOD = 43
     """
-    The undocumented method.
+    The undocumented override of an implemented method.
+    """
+
+    METHOD = 46
+    """
+    The undocumented method that overrides nothing.
+    """
+
+
+class UnimportableDefinitionsLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.DocstringSnippet.UNIMPORTABLE_DEFINITIONS`.
+    """
+
+    FUNCTION = 19
+    """
+    The undocumented function.
     """
 
 

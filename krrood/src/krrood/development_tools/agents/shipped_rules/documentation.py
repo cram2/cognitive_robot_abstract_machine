@@ -20,8 +20,8 @@ class DocumentationRules(Section):
     DOCUMENT_EVERY_CONSTRUCT = (
         "Every module, class, function and field has a docstring. A field's "
         "docstring goes directly below the field, not in the class docstring. A "
-        "method decorated with `override` is exempt: it inherits its base's "
-        "docstring",
+        "method implementing an abstract method is exempt: the abstract method's "
+        "docstring is enough",
         (),
         MissingDocstringChecker(),
     )
@@ -32,9 +32,9 @@ class DocumentationRules(Section):
     )
 
     OVERRIDES_INHERIT_DOCSTRINGS = (
-        "An override that keeps its base contract has no docstring and inherits "
-        "the base one. One that changes the contract documents only the difference "
-        "and references the overridden method with `:meth:`"
+        "An implementation of an abstract method has no docstring and inherits "
+        "the base one. An override of an implemented method documents only what "
+        "differs from the base and references the overridden method with `:meth:`"
     )
 
     DOCSTRINGS_STATE_THE_CONTRACT = (

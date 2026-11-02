@@ -90,9 +90,9 @@
 
 # Documentation
 <!-- from DocumentationRules in krrood/development_tools/agents/shipped_rules/documentation.py -->
-- Every module, class, function and field has a docstring. A field's docstring goes directly below the field, not in the class docstring. A method decorated with `override` is exempt: it inherits its base's docstring (checked by `krrood check`)
+- Every module, class, function and field has a docstring. A field's docstring goes directly below the field, not in the class docstring. A method implementing an abstract method is exempt: the abstract method's docstring is enough (checked by `krrood check`)
 - Documentation is written in reStructuredText and is meaningful and non-trivial: it says something the name and the type hints do not
-- An override that keeps its base contract has no docstring and inherits the base one. One that changes the contract documents only the difference and references the overridden method with `:meth:`
+- An implementation of an abstract method has no docstring and inherits the base one. An override of an implemented method documents only what differs from the base and references the overridden method with `:meth:`
 - A docstring states what the code does and its contract, short and to the point. It never contains:
   - how the code does it
   - the ways a caller can supply a value (for example, that it may also be given as a query instead of a concrete object)

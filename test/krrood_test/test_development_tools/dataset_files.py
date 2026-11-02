@@ -8,6 +8,18 @@ from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
+from .dataset.missing_docstrings import (
+    documented_module,
+    no_module_docstring,
+    undocumented_definitions,
+)
+from .dataset.prose_length import (
+    comment_blocks,
+    fields_and_literal_blocks,
+    overlong_attribute_docstring,
+    overlong_module_docstring,
+)
+
 
 class DatasetFile(PathEnumeration):
     """
@@ -66,39 +78,22 @@ class ProseSnippet(PathEnumeration):
     The Python sources the prose length check measures.
     """
 
-    OVERLONG_MODULE_DOCSTRING = (
-        Path(__file__).parent
-        / "dataset"
-        / "prose_length"
-        / "overlong_module_docstring.py"
-    )
+    OVERLONG_MODULE_DOCSTRING = Path(overlong_module_docstring.__file__)
     """
     A module docstring of five prose lines.
     """
 
-    FIELDS_AND_LITERAL_BLOCKS = (
-        Path(__file__).parent
-        / "dataset"
-        / "prose_length"
-        / "fields_and_literal_blocks.py"
-    )
+    FIELDS_AND_LITERAL_BLOCKS = Path(fields_and_literal_blocks.__file__)
     """
     A function docstring of two prose lines, followed by a literal block and a field list.
     """
 
-    OVERLONG_ATTRIBUTE_DOCSTRING = (
-        Path(__file__).parent
-        / "dataset"
-        / "prose_length"
-        / "overlong_attribute_docstring.py"
-    )
+    OVERLONG_ATTRIBUTE_DOCSTRING = Path(overlong_attribute_docstring.__file__)
     """
     A field whose docstring holds five prose lines.
     """
 
-    COMMENT_BLOCKS = (
-        Path(__file__).parent / "dataset" / "prose_length" / "comment_blocks.py"
-    )
+    COMMENT_BLOCKS = Path(comment_blocks.__file__)
     """
     A three-line and a four-line comment block, and a section header above the first.
     """
@@ -109,33 +104,25 @@ class DocstringSnippet(PathEnumeration):
     The Python sources the missing docstring check reads.
     """
 
-    DOCUMENTED_MODULE = (
-        Path(__file__).parent
-        / "dataset"
-        / "missing_docstrings"
-        / "documented_module.py"
-    )
+    DOCUMENTED_MODULE = Path(documented_module.__file__)
     """
     A module that documents everything.
     """
 
-    NO_MODULE_DOCSTRING = (
-        Path(__file__).parent
-        / "dataset"
-        / "missing_docstrings"
-        / "no_module_docstring.py"
-    )
+    NO_MODULE_DOCSTRING = Path(no_module_docstring.__file__)
     """
     A module without a docstring whose function is documented.
     """
 
-    UNDOCUMENTED_DEFINITIONS = (
-        Path(__file__).parent
-        / "dataset"
-        / "missing_docstrings"
-        / "undocumented_definitions.py"
+    UNDOCUMENTED_DEFINITIONS = Path(undocumented_definitions.__file__)
+    """
+    A documented module whose class leaves one field and two methods undocumented, and
+    implements an abstract method, which needs no docstring.
+    """
+
+    UNIMPORTABLE_DEFINITIONS = Path(undocumented_definitions.__file__).with_name(
+        "unimportable_definitions.py"
     )
     """
-    A documented module whose class leaves one field and one method undocumented, and
-    whose override needs no docstring.
+    A module that raises when imported, whose method and function are undocumented.
     """

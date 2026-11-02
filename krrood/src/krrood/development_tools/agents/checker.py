@@ -86,14 +86,14 @@ class GitArgument(StrEnum):
     """
 
     GIT = "git"
-    DIFF = "diff"
+    DIFFERENCE = "diff"
     CACHED = "--cached"
     NO_CONTEXT = "--unified=0"
     NO_COLOR = "--no-color"
     PATHS_FOLLOW = "--"
 
 
-class DiffPattern(StrEnum):
+class DifferencePattern(StrEnum):
     """
     The patterns read from the output of ``git diff``.
     """
@@ -124,7 +124,7 @@ class StagedLines:
         :raises GitCommandFailed: If git cannot list the staged change.
         """
         arguments = (
-            GitArgument.DIFF,
+            GitArgument.DIFFERENCE,
             GitArgument.CACHED,
             GitArgument.NO_CONTEXT,
             GitArgument.NO_COLOR,
@@ -140,7 +140,9 @@ class StagedLines:
         if result.returncode != 0:
             raise GitCommandFailed(arguments, result.stderr)
         lines: set[int] = set()
-        for hunk in re.finditer(DiffPattern.HUNK_HEADER, result.stdout, re.MULTILINE):
+        for hunk in re.finditer(
+            DifferencePattern.HUNK_HEADER, result.stdout, re.MULTILINE
+        ):
             start = int(hunk[1])
             count = 1 if hunk[2] is None else int(hunk[2])
             lines.update(range(start, start + count))

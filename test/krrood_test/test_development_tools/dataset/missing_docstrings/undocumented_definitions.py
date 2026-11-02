@@ -1,27 +1,33 @@
 """
-A module whose class leaves a field and a method undocumented.
+A module whose class leaves a field and two methods undocumented.
 """
 
 from __future__ import annotations
 
-from typing import override
+from abc import ABC, abstractmethod
 
 
-class Base:
+class Base(ABC):
     """
     A documented class.
     """
 
+    @abstractmethod
     def describe(self) -> str:
         """
-        A documented method.
+        A documented abstract method.
+        """
+
+    def name(self) -> str:
+        """
+        A documented implemented method.
         """
         return ""
 
 
 class Undocumented(Base):
     """
-    A class with one undocumented field and one undocumented method.
+    A class with one undocumented field and two undocumented methods.
     """
 
     documented: int = 0
@@ -31,9 +37,11 @@ class Undocumented(Base):
 
     undocumented: int = 0
 
-    @override
     def describe(self) -> str:
-        return "inherits the base docstring"
+        return "implements the abstract method"
+
+    def name(self) -> str:
+        return "overrides the implemented method"
 
     def undocumented_method(self) -> None:
         pass
