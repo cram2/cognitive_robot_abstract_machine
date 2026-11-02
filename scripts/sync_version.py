@@ -20,7 +20,6 @@ from pathlib import Path
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
-from typing_extensions import Any
 
 
 # %% names the script reads
@@ -63,6 +62,82 @@ class CommandFlag(StrEnum):
     CHECK = "--check"
 
 
+# %% the pyproject.toml model
+@dataclass(frozen=True)
+class Pyproject:
+    """The parts of a ``pyproject.toml`` this script reads.
+
+    Only :meth:`from_text` knows where in the file they are.
+    """
+
+    distribution_name: str
+    """The ``[project]`` name as an installer compares names."""
+
+    dependencies: list[str]
+    """The ``[project]`` dependencies as written."""
+
+    version_attribute: str
+    """The dotted path of the attribute setuptools reads the version from;
+    empty when it reads it from elsewhere."""
+
+    named_package_directories: dict[str, str]
+    """The directory setuptools finds each package in, where ``package-dir``
+    names the package."""
+
+    default_package_directory: str | None
+    """The directory setuptools finds every package not named in
+    :attr:`named_package_directories` in; ``None`` without one."""
+
+    find_search_directories: list[str] | None
+    """The directories setuptools searches for packages; ``None`` when it does
+    not search."""
+
+    workspace_members: list[str]
+    """The ``[tool.uv.workspace]`` members; empty without a workspace."""
+
+    @classmethod
+    def from_text(cls, text: str) -> Pyproject:
+        """
+        :param text: The content of a ``pyproject.toml``.
+        :return: What this script reads of it.
+        """
+        document = tomllib.loads(text)
+        project = document[PyprojectKey.PROJECT]
+        tool = document.get(PyprojectKey.TOOL, {})
+        setuptools = tool.get(PyprojectKey.SETUPTOOLS, {})
+        package_directories = dict(setuptools.get(PyprojectKey.PACKAGE_DIRECTORY, {}))
+        default_package_directory = package_directories.pop(
+            PyprojectKey.ROOT_PACKAGE, None
+        )
+        packages = setuptools.get(PyprojectKey.PACKAGES, [])
+        search = (
+            packages.get(PyprojectKey.FIND, {}).get(PyprojectKey.WHERE, ["."])
+            if isinstance(packages, dict)
+            else None
+        )
+        return cls(
+            distribution_name=canonicalize_name(project[PyprojectKey.NAME]),
+            dependencies=project.get(PyprojectKey.DEPENDENCIES, []),
+            version_attribute=setuptools.get(PyprojectKey.DYNAMIC, {})
+            .get(PyprojectKey.VERSION, {})
+            .get(PyprojectKey.ATTRIBUTE, ""),
+            named_package_directories=package_directories,
+            default_package_directory=default_package_directory,
+            find_search_directories=search,
+            workspace_members=tool.get(PyprojectKey.UV, {})
+            .get(PyprojectKey.WORKSPACE, {})
+            .get(PyprojectKey.MEMBERS, []),
+        )
+
+    @classmethod
+    def from_directory(cls, directory: Path) -> Pyproject:
+        """
+        :param directory: A directory holding a ``pyproject.toml``.
+        :return: What this script reads of that file.
+        """
+        return cls.from_text((directory / RepositoryFile.PYPROJECT).read_text())
+
+
 # %% a package
 @dataclass(frozen=True)
 class VersionedPackage:
@@ -72,8 +147,8 @@ class VersionedPackage:
     directory: Path
     """The directory the package's ``pyproject.toml`` is in."""
 
-    pyproject: dict[str, Any]
-    """The parsed content of that file."""
+    pyproject: Pyproject
+    """What this script reads of that file."""
 
     @classmethod
     def from_directory(cls, directory: Path) -> VersionedPackage | None:
@@ -83,8 +158,7 @@ class VersionedPackage:
             own - a ``__version__`` set in the package's ``__init__`` is not this script's
             to write.
         """
-        pyproject = tomllib.loads((directory / RepositoryFile.PYPROJECT).read_text())
-        package = cls(directory, pyproject)
+        package = cls(directory, Pyproject.from_directory(directory))
         if len(package.version_module_path) < 2:
             return None
         return package
@@ -94,18 +168,7 @@ class VersionedPackage:
         """
         :return: The package's name as an installer compares names.
         """
-        return canonicalize_name(
-            self.pyproject[PyprojectKey.PROJECT][PyprojectKey.NAME]
-        )
-
-    @property
-    def setuptools(self) -> dict[str, Any]:
-        """
-        :return: The ``[tool.setuptools]`` table.
-        """
-        return self.pyproject.get(PyprojectKey.TOOL, {}).get(
-            PyprojectKey.SETUPTOOLS, {}
-        )
+        return self.pyproject.distribution_name
 
     @property
     def version_module_path(self) -> list[str]:
@@ -113,12 +176,7 @@ class VersionedPackage:
         :return: The dotted path of the module the version is read from, split, e.g.
             ``["krrood", "_version"]``; empty when the version is not read from one.
         """
-        attribute = (
-            self.setuptools.get(PyprojectKey.DYNAMIC, {})
-            .get(PyprojectKey.VERSION, {})
-            .get(PyprojectKey.ATTRIBUTE, "")
-        )
-        return attribute.split(".")[:-1]
+        return self.pyproject.version_attribute.split(".")[:-1]
 
     @property
     def package_directory(self) -> Path:
@@ -128,15 +186,12 @@ class VersionedPackage:
             directory, or else the package's own name beside its ``pyproject.toml``.
         """
         name = self.version_module_path[0]
-        mapping = self.setuptools.get(PyprojectKey.PACKAGE_DIRECTORY, {})
-        if name in mapping:
-            return self.directory / mapping[name]
-        if PyprojectKey.ROOT_PACKAGE in mapping:
-            return self.directory / mapping[PyprojectKey.ROOT_PACKAGE] / name
-        packages = self.setuptools.get(PyprojectKey.PACKAGES, [])
-        if isinstance(packages, dict):
-            search = packages.get(PyprojectKey.FIND, {}).get(PyprojectKey.WHERE, ["."])
-            return self.directory / search[0] / name
+        if name in self.pyproject.named_package_directories:
+            return self.directory / self.pyproject.named_package_directories[name]
+        if self.pyproject.default_package_directory is not None:
+            return self.directory / self.pyproject.default_package_directory / name
+        if self.pyproject.find_search_directories is not None:
+            return self.directory / self.pyproject.find_search_directories[0] / name
         return self.directory / name
 
     @property
@@ -172,9 +227,7 @@ class VersionedPackage:
             replaced; extras and markers stay, and so does everything else in the file.
         """
         text = self.pyproject_file.read_text()
-        for specifier in self.pyproject[PyprojectKey.PROJECT].get(
-            PyprojectKey.DEPENDENCIES, []
-        ):
+        for specifier in self.pyproject.dependencies:
             requirement = Requirement(specifier)
             name = canonicalize_name(requirement.name)
             if name not in siblings or name == self.distribution_name:
@@ -263,12 +316,7 @@ class Repository:
         """
         :return: The root and every member of the root's ``[tool.uv.workspace]``.
         """
-        root_pyproject = tomllib.loads(
-            (self.root / RepositoryFile.PYPROJECT).read_text()
-        )
-        members = root_pyproject[PyprojectKey.TOOL][PyprojectKey.UV][
-            PyprojectKey.WORKSPACE
-        ][PyprojectKey.MEMBERS]
+        members = Pyproject.from_directory(self.root).workspace_members
         return [self.root] + sorted(self.root / member for member in members)
 
     def versioned_packages(self) -> list[VersionedPackage]:
