@@ -84,6 +84,20 @@ class TestRotationMatrix:
                 0,
             )
 
+    @pytest.mark.parametrize("turned", [-1.2, -0.5, -0.1, 0.1, 0.5, 1.2])
+    def test_rotational_distance_is_the_shorter_way_round(self, turned):
+        """
+        Turning by ``turned`` towards an orientation half a turn away leaves the rest of
+        the half turn to go, whichever way the turn goes.
+        """
+        start_yaw = 1.47
+        goal = RotationMatrix.from_rpy(0, 0, start_yaw + np.pi)
+        current = RotationMatrix.from_rpy(0, 0, start_yaw + turned)
+
+        distance = current.rotational_distance(goal)
+
+        assert distance.to_np()[0] == pytest.approx(np.pi - abs(turned))
+
     def test_reference_frames(self):
         reference_frame = Body(name=PrefixedName("muh"))
         reference_frame2 = Body(name=PrefixedName("muh2"))
