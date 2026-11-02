@@ -6,6 +6,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 from krrood.adapters.json_serializer import to_json
 from krrood_spatial_math.spatial_types import Point2
 from robokudo.cas import CASViews
@@ -28,9 +29,9 @@ class RecordedFrame:
     Filename prefix and recording timestamp shared by the frame's files.
     """
 
-    timestamp_nanoseconds: int
+    acquired_at: np.datetime64
     """
-    Frame acquisition time in nanoseconds since the Unix epoch.
+    Frame acquisition time, to the nanosecond.
     """
 
 
@@ -68,11 +69,11 @@ class CupOnCounterRecording:
     frames: tuple[RecordedFrame, ...] = (
         RecordedFrame(
             file_stem="rk_1669996652.648549",
-            timestamp_nanoseconds=1662619014679565362,
+            acquired_at=np.datetime64("2022-09-08T06:36:54.679565362", "ns"),
         ),
         RecordedFrame(
             file_stem="rk_1669996652.766856",
-            timestamp_nanoseconds=1662619015071573884,
+            acquired_at=np.datetime64("2022-09-08T06:36:55.071573884", "ns"),
         ),
     )
     """
@@ -97,7 +98,9 @@ class CupOnCounterRecording:
                     {
                         "camera_frame": self.camera_frame,
                         "effective_camera_model": to_json(self.camera_model),
-                        "timestamp_nanoseconds": frame.timestamp_nanoseconds,
+                        "timestamp_nanoseconds": int(
+                            frame.acquired_at.astype(np.int64)
+                        ),
                     }
                 )
             )
