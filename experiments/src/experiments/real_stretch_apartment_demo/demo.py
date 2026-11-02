@@ -108,10 +108,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     def scene_specification(self) -> WorldSpecification:
         """
-        :return: A world holding nothing but a map body, which :meth:`populate_scene`
-            furnishes.
+        :return: The furnished apartment.
         """
-        return WorldSpecification(world_parser=None)
+        return WorldSpecification(world_source=ApartmentEnvironment())
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -127,12 +126,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     def populate_scene(self, world: World) -> None:
         """
-        Spawn the apartment and the cereal box on its shelf.
+        Spawn the cereal box on its shelf.
         """
-        ApartmentEnvironment().populate(world)
-
-        # %% cereal
-
         # The cereal is the one body perception moves, and a pose can only be written to
         # a connection that has the degrees of freedom to carry it, so it hangs off a
         # 6DoF connection rather than the default fixed one.

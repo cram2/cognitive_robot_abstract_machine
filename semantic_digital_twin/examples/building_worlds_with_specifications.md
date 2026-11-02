@@ -605,10 +605,11 @@ field, a key that is not a part-whole field, or a part-whole field smuggled in t
 ## World specifications
 
 The largest building block is `WorldSpecification`, which describes an entire scene: an
-environment, an optional robot, and the objects placed around them. Its environment is held as the
-parser that builds it — usually obtained from a model file with the `from_urdf` or `from_mjcf`
-classmethods. Calling `to_domain_object` re-parses the environment every time, so one specification
-can produce many independent worlds and no two of them share an entity identifier.
+environment, an optional robot, and the objects placed around them. Its environment comes from a
+world source — usually a parser obtained from a model file with the `from_urdf` or `from_mjcf`
+classmethods, or a map written in code. Calling `create_world` creates the environment anew every
+time, so one specification can produce many independent worlds and no two of them share an entity
+identifier.
 
 ```{code-cell} ipython3
 import os
@@ -633,12 +634,12 @@ specification = WorldSpecification.from_urdf(
     ],
 )
 
-world = specification.to_domain_object()
+world = specification.create_world()
 assert len(world.get_semantic_annotations_by_type(Milk)) == 1
 assert world.get_body_by_name("cup") is not None
 
 # The specification is reusable: each call yields an independent world.
-another_world = specification.to_domain_object()
+another_world = specification.create_world()
 assert world is not another_world
 assert len(another_world.get_semantic_annotations_by_type(Milk)) == 1
 print("Materialized two independent worlds, each with one milk and one cup")
@@ -650,7 +651,7 @@ print("Materialized two independent worlds, each with one milk and one cup")
 mjcf_world = WorldSpecification.from_mjcf(
     str(resources / "mjcf" / "table.xml"),
     objects=[BodySpecification.box("cup", Scale(0.07, 0.07, 0.1))],
-).to_domain_object()
+).create_world()
 
 assert mjcf_world.get_body_by_name("cup") is not None
 print("MJCF table world has", len(mjcf_world.bodies), "bodies")
@@ -679,7 +680,7 @@ world = WorldSpecification.from_urdf(
             odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(y=2.0),
         )
     ],
-).to_domain_object()
+).create_world()
 ```
 
 Because `robots` is a list, a world can hold several of them, each with its own localization —
@@ -701,7 +702,7 @@ two_robot_world = WorldSpecification.from_urdf(
             world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
         ),
     ],
-).to_domain_object()
+).create_world()
 
 assert len(two_robot_world.get_semantic_annotations_by_type(PR2)) == 2
 print("Two independently localized PR2s share one world")
@@ -737,7 +738,7 @@ world = WorldSpecification.from_urdf(
             ),
         ),
     ],
-).to_domain_object()
+).create_world()
 
 assert len(world.get_semantic_annotations_by_type(Drawer)) == 1
 assert len(world.get_semantic_annotations_by_type(Milk)) == 1
