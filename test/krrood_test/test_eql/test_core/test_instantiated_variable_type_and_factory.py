@@ -5,6 +5,7 @@ import pytest
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.exceptions import ResultTypeIsNotAType
 from krrood.entity_query_language.factories import inference, variable_from
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from ...dataset.instantiated_variable_operations import (
     Halved,
     Interval,
@@ -31,6 +32,13 @@ def test_inference_builds_with_a_factory_method():
     assert interval._type_ is Interval
     assert interval._factory_ == Interval.around
     assert interval.tolist() == [Interval.around(5, 2)]
+
+
+def test_inferred_variable_is_a_factory_with_keyword_arguments():
+    lower = variable_from([1])
+    interval = inference(Interval)(lower=lower, upper=variable_from([3]))
+    assert isinstance(interval, HasFactoryAndKwargs)
+    assert list(interval._stated_values_("lower")) == [lower]
 
 
 def test_a_result_type_that_is_not_a_type_is_rejected():

@@ -40,6 +40,7 @@ from krrood.entity_query_language.exceptions import (
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.entity_query_language.utils import (
     T,
     is_iterable,
@@ -191,7 +192,9 @@ class Literal(Variable[T]):
 @monitored
 @dataclass(eq=False, repr=False)
 class InstantiatedVariable(
-    MultiArityExpressionThatPerformsACartesianProduct, CanHaveDomainSource[T]
+    MultiArityExpressionThatPerformsACartesianProduct,
+    CanHaveDomainSource[T],
+    HasFactoryAndKwargs[T],
 ):
     """
     A variable which does not have an explicit domain, but builds its values by
@@ -215,11 +218,6 @@ class InstantiatedVariable(
     """
     The callable that builds the values this variable binds, such as the type itself, a
     factory method or a symbolic function. Defaults to :attr:`_type_`.
-    """
-
-    _kwargs_: dict[str, Any] = field(default_factory=dict)
-    """
-    The properties of the variable as keyword arguments.
     """
 
     _child_variables_: dict[str, SymbolicExpression] = field(
