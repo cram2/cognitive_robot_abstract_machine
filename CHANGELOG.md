@@ -378,6 +378,12 @@ Changes since 26.7.0.
 - A demonstration's scene is merged into the world fetched on real runs ([#779](https://github.com/cram2/cognitive_robot_abstract_machine/pull/779)).
 - Costmap obstacle inflation no longer copies every window ([#791](https://github.com/cram2/cognitive_robot_abstract_machine/pull/791)).
 
+### krrood_spatial_math
+
+New package: points, vectors, rotations and transformations in Cartesian frames, moved
+out of semantic_digital_twin and independent of it. Its `casadi` extra provides the
+symbolic types ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)). It is released on PyPI from this version on.
+
 ### Packages not published to PyPI
 
 These packages take the shared version but are not released on PyPI.
@@ -404,9 +410,6 @@ These packages take the shared version but are not released on PyPI.
   RANSAC is reproducible ([#652](https://github.com/cram2/cognitive_robot_abstract_machine/pull/652)), and empty clouds are handled ([#782](https://github.com/cram2/cognitive_robot_abstract_machine/pull/782)). The recorded frames its pipeline tests
   replay live in the tests, and the `robokudo.utils.data_downloader` test-data download
   and its `pooch` and `filelock` dependencies are removed ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
-- **krrood_spatial_math** (new): points, vectors, rotations and transformations in
-  Cartesian frames, moved out of semantic_digital_twin and independent of it. Its casadi
-  extra provides the symbolic types ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
 - **physics_simulators**: actuator-driven joints in MuJoCo ([#630](https://github.com/cram2/cognitive_robot_abstract_machine/pull/630), [#752](https://github.com/cram2/cognitive_robot_abstract_machine/pull/752)).
 - **experiments**: experiments for causal circuits, layered circuits, graphs of convex
   sets and shelf scenes ([#509](https://github.com/cram2/cognitive_robot_abstract_machine/pull/509), [#604](https://github.com/cram2/cognitive_robot_abstract_machine/pull/604), [#636](https://github.com/cram2/cognitive_robot_abstract_machine/pull/636), [#698](https://github.com/cram2/cognitive_robot_abstract_machine/pull/698), [#711](https://github.com/cram2/cognitive_robot_abstract_machine/pull/711)).

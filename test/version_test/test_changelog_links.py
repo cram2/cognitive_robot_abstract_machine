@@ -30,13 +30,25 @@ them with hyphens where the directory uses underscores.
 """
 
 
+def directory_of(package: str) -> Path:
+    """
+    :param package: The directory name of a package.
+    :return: The directory of the workspace member with that name.
+    """
+    root = tomllib.loads((REPOSITORY_ROOT / "pyproject.toml").read_text())
+    members = root["tool"]["uv"]["workspace"]["members"]
+    return REPOSITORY_ROOT / next(
+        member for member in members if Path(member).name == package
+    )
+
+
 def changelog_url_of(package: str) -> str | None:
     """
     :param package: The directory name of a package.
     :return: The ``Changelog`` entry of its ``[project.urls]``, or ``None`` without one.
     """
     pyproject = tomllib.loads(
-        (REPOSITORY_ROOT / package / "pyproject.toml").read_text()
+        (directory_of(package) / "pyproject.toml").read_text()
     )
     return pyproject["project"].get("urls", {}).get("Changelog")
 
