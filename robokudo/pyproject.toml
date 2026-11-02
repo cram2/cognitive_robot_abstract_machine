@@ -35,8 +35,8 @@ dependencies = [
     "setuptools",
     "pooch",
     "filelock",
-    "krrood",
-    "semantic_digital_twin",
+    "krrood>=26.10.0",
+    "semantic_digital_twin>=26.10.0",
     "transformers",
     "faiss-cpu",
     "ultralytics"

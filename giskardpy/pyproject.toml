@@ -36,9 +36,9 @@ dependencies = [
     "urdf-parser-py>=0.0.4",
     "giskardpy_bullet_bindings==1.0.1",
     "PyQT5>=5.15.11",
-    "krrood",
-    "semantic_digital_twin",
-    "cramph",
+    "krrood>=26.10.0",
+    "semantic_digital_twin>=26.10.0",
+    "cramph>=26.10.0",
 ]
 license = "LGPL-3.0-only"
 
