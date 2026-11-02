@@ -7,6 +7,7 @@ Cache utilities.
 
 This module provides caching datastructures and utilities.
 """
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from itertools import islice
 from typing_extensions import Generic, Iterable, Iterator
@@ -124,8 +125,21 @@ class InstanceFilteredDomain(Generic[T]):
         return (element for element in self.domain if isinstance(element, self.type_))
 
 
+class ReEnterableIterable(Generic[T], ABC):
+    """
+    A domain that can be iterated several times, each iteration yielding every one of
+    its values.
+    """
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[T]:
+        """
+        :return: An iterator over every value of the domain.
+        """
+
+
 @dataclass
-class ReEnterableLazyIterable(Generic[T]):
+class ReEnterableLazyIterable(ReEnterableIterable[T]):
     """
     A wrapper for an iterable that allows multiple iterations over its elements,
     materializing values as they are iterated over.

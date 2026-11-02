@@ -1,6 +1,6 @@
 """
-Tests for variables whose domain is an expression: the variable ranges, for each binding
-of the expression, over the elements of the value it evaluates to.
+Tests for matches and variables whose domain is an expression: they range, for each
+binding of the expression, over the elements of the value it evaluates to.
 """
 
 from __future__ import annotations
@@ -9,9 +9,13 @@ from dataclasses import dataclass
 
 import pytest
 
+from krrood.entity_query_language.exceptions import (
+    DomainExpressionAfterWhereCondition,
+)
 from krrood.entity_query_language.factories import (
     a,
     an,
+    flat_variable,
     set_of,
     variable,
     variable_from,
@@ -83,18 +87,18 @@ def two_worlds() -> TwoWorlds:
 # %% typed domains
 
 
-def test_variable_ranges_over_the_elements_of_its_domain_expression(two_worlds):
+def test_match_ranges_over_the_elements_of_its_domain_expression(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = a(variable(Connection, world.connections)).tolist()
+    result = a(Connection).from_(world.connections).tolist()
 
     assert result == [*two_worlds.first.connections, *two_worlds.second.connections]
 
 
-def test_variable_keeps_only_the_elements_of_its_type(two_worlds):
+def test_match_keeps_only_the_elements_of_its_type(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = a(variable(FixedConnection, world.connections)).tolist()
+    result = a(FixedConnection).from_(world.connections).tolist()
 
     assert result == [
         two_worlds.first.connections[0],
@@ -116,11 +120,28 @@ def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
 
 def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
     world = variable(World, two_worlds.worlds)
-    body = variable(Body, world.bodies)
+    body = an(Body).from_(world.bodies)
 
-    result = an(body).where(body.name == "handle 2").tolist()
+    result = body.where(body.name == "handle 2").tolist()
 
     assert result == [two_worlds.second.bodies[1]]
+
+
+def test_match_with_a_pattern_ranges_over_its_domain_expression(two_worlds):
+    world = variable(World, two_worlds.worlds)
+
+    result = an(Body)(name="handle 2").from_(world.bodies).tolist()
+
+    assert result == [two_worlds.second.bodies[1]]
+
+
+def test_domain_expression_after_a_where_condition_is_rejected(two_worlds):
+    world = variable(World, two_worlds.worlds)
+    body = an(Body)
+    body.where(body.name == "handle 2")
+
+    with pytest.raises(DomainExpressionAfterWhereCondition):
+        body.from_(world.bodies)
 
 
 # %% untyped domains
@@ -134,11 +155,9 @@ def test_variable_from_an_expression_ranges_over_its_elements(two_worlds):
     assert result == [*two_worlds.first.bodies, *two_worlds.second.bodies]
 
 
-def test_variable_from_an_expression_keeps_values_that_are_not_collections(
-    two_worlds,
-):
+def test_flattening_keeps_values_that_are_not_collections(two_worlds):
     body = variable(Body, two_worlds.first.bodies)
 
-    result = a(variable_from(body.name)).tolist()
+    result = a(flat_variable(body.name)).tolist()
 
     assert result == [live_body.name for live_body in two_worlds.first.bodies]

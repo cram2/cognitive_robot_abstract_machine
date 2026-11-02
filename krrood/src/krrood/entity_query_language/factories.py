@@ -32,8 +32,8 @@ from krrood.entity_query_language.operators.causal import (
 )
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
-    ExpressionDomainVariable,
     FlatVariable,
+    InstanceFilteredFlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
     Attribute,
@@ -194,7 +194,7 @@ def probability_of(
 
 def variable(
     type_: type[T],
-    domain: DomainType | HasSymbolicOperations | None = None,
+    domain: DomainType | None = None,
 ) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -217,7 +217,7 @@ def variable(
     :return: A Variable that can be queried for.
     """
     if isinstance(domain, HasSymbolicOperations):
-        return ExpressionDomainVariable(
+        return InstanceFilteredFlatVariable(
             domain._symbolic_expression_, _element_type_=type_
         )
     return Variable(
@@ -249,18 +249,18 @@ def deduced_variable(
 
 
 def variable_from(
-    domain: Union[Iterable[T], HasSymbolicOperations, T],
-) -> Union[T, Variable[T]]:
+    domain: DomainType | T,
+) -> T | Variable[T] | FlatVariable[T]:
     """
     Create a variable from a given domain.
 
     :param domain: An iterable to use as the variable's domain, or an expression whose
-        value, for each of its bindings, is the domain: the elements of a collection, or
-        the value itself otherwise.
+        value, for each of its bindings, is flattened into the domain as
+        :func:`flat_variable` flattens it.
     :return: A variable that can be queried for.
     """
     if isinstance(domain, HasSymbolicOperations):
-        return ExpressionDomainVariable(domain._symbolic_expression_)
+        return FlatVariable(domain._symbolic_expression_)
     return Variable(_domain_=domain)
 
 

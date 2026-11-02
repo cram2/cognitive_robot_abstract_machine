@@ -48,8 +48,9 @@ class State(TermReader):
 
     A state also adds and removes objects, as a difference from the live symbol graph.
     A variable without a domain ranges over the objects of the state the query is
-    evaluated with; explicit domains and the values of fluents are never filtered by
-    them.
+    evaluated with. A fluent whose value is a list, tuple or set reads without the
+    objects the state removes; a domain captured as a concrete collection is never
+    filtered.
 
     .. note:: An unassigned derived fluent follows the state only where its value comes
         from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
@@ -155,9 +156,24 @@ class State(TermReader):
 
     def values_of(self, term: GroundTerm) -> Iterator[Any]:
         if term.function_key in self.assigned_functions and term in self.assignments:
-            yield self.assignments[term]
+            yield self.without_removed_objects(self.assignments[term])
             return
-        yield from term.live_values()
+        yield from map(self.without_removed_objects, term.live_values())
+
+    def without_removed_objects(self, value: Any) -> Any:
+        """
+        :param value: The value of a fluent.
+        :return: *value* without the objects this state removes when it is a list, tuple,
+            set or frozenset that holds any of them, as a new collection of the same type;
+            otherwise *value* itself.
+        """
+        if type(value) not in (list, tuple, set, frozenset):
+            return value
+        if not any(id(element) in self.removed_objects for element in value):
+            return value
+        return type(value)(
+            element for element in value if id(element) not in self.removed_objects
+        )
 
     def instances_of(self, type_: type[T], live_instances: Iterable[T]) -> Iterator[T]:
         """

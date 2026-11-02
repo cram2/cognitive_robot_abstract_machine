@@ -2,9 +2,10 @@
 Tests for the objects a :class:`~krrood.planning.state.State` adds and removes, and for
 the domains of variables evaluated with it.
 
-A variable without a domain ranges over the objects of the state it is evaluated with:
-the live symbol graph's instances, less the objects the state removes, plus the objects
-it adds. A world's collection is an expression read through the state like any fluent.
+A match without a domain ranges over the objects of the state it is evaluated with: the
+live symbol graph's instances, less the objects the state removes, plus the objects it
+adds. A world's collection is an expression read through the state like any fluent, less
+the objects the state removes.
 """
 
 from __future__ import annotations
@@ -71,15 +72,15 @@ def planned_connection_world(handles_and_containers_world) -> PlannedConnectionW
 def fixed_connections_in(state: State | None = None) -> list[FixedConnection]:
     """
     :param state: The state to evaluate in, or ``None`` for the live objects.
-    :return: Every fixed connection, as a variable without a domain ranges over them.
+    :return: Every fixed connection, as a match without a domain ranges over them.
     """
-    return a(variable(FixedConnection)).tolist(state=state)
+    return a(FixedConnection).tolist(state=state)
 
 
 # %% default domains
 
 
-def test_variable_without_domain_ranges_over_objects_the_state_adds(
+def test_match_without_domain_ranges_over_objects_the_state_adds(
     planned_connection_world,
 ):
     state = State().with_objects_added(planned_connection_world.planned_connection)
@@ -90,7 +91,7 @@ def test_variable_without_domain_ranges_over_objects_the_state_adds(
     ]
 
 
-def test_variable_without_domain_skips_objects_the_state_removes(
+def test_match_without_domain_skips_objects_the_state_removes(
     planned_connection_world,
 ):
     removed, *kept = planned_connection_world.fixed_connections
@@ -99,7 +100,9 @@ def test_variable_without_domain_skips_objects_the_state_removes(
     assert fixed_connections_in(state) == kept
 
 
-def test_match_without_domain_ranges_over_the_state_objects(planned_connection_world):
+def test_match_without_domain_ranges_over_objects_added_and_removed_together(
+    planned_connection_world,
+):
     removed, *kept = planned_connection_world.fixed_connections
     state = (
         State()
@@ -107,7 +110,7 @@ def test_match_without_domain_ranges_over_the_state_objects(planned_connection_w
         .with_objects_added(planned_connection_world.planned_connection)
     )
 
-    result = a(FixedConnection)().tolist(state=state)
+    result = a(FixedConnection).tolist(state=state)
 
     assert result == [*kept, planned_connection_world.planned_connection]
 
@@ -116,7 +119,7 @@ def test_one_query_reads_the_objects_of_each_state_it_is_evaluated_with(
     planned_connection_world,
 ):
     removed, *kept = planned_connection_world.fixed_connections
-    query = a(variable(FixedConnection))
+    query = a(FixedConnection)
 
     assert query.tolist(state=State().with_objects_removed(removed)) == kept
     assert query.tolist() == planned_connection_world.fixed_connections
@@ -125,7 +128,7 @@ def test_one_query_reads_the_objects_of_each_state_it_is_evaluated_with(
 def test_objects_of_another_type_are_not_in_the_domain(planned_connection_world):
     state = State().with_objects_added(planned_connection_world.planned_connection)
 
-    result = a(variable(World)).tolist(state=state)
+    result = a(World).tolist(state=state)
 
     assert result == [planned_connection_world.world]
 
@@ -145,15 +148,48 @@ def test_state_objects_never_change_the_live_objects(planned_connection_world):
 # %% explicit domains
 
 
-def test_removed_object_stays_in_the_collections_that_hold_it(
+def test_removed_object_leaves_the_collections_that_hold_it(
     planned_connection_world,
 ):
+    removed, *kept = planned_connection_world.fixed_connections
+    state = State().with_objects_removed(removed)
+
+    result = (
+        a(FixedConnection)
+        .from_(literal(planned_connection_world.world).connections)
+        .tolist(state=state)
+    )
+
+    assert result == kept
+
+
+def test_removed_object_leaves_the_collections_the_state_assigns(
+    planned_connection_world,
+):
+    world = planned_connection_world.world
+    removed, *kept = planned_connection_world.fixed_connections
+    planned = planned_connection_world.planned_connection
+    state = (
+        State()
+        .with_objects_added(planned)
+        .with_facts(literal(world).connections == [*world.connections, planned])
+        .with_objects_removed(removed)
+    )
+
+    result = a(FixedConnection).from_(literal(world).connections).tolist(state=state)
+
+    assert result == [*kept, planned]
+
+
+def test_removed_object_stays_in_a_captured_list(planned_connection_world):
     removed = planned_connection_world.fixed_connections[0]
     state = State().with_objects_removed(removed)
 
-    result = a(
-        variable(FixedConnection, literal(planned_connection_world.world).connections)
-    ).tolist(state=state)
+    result = (
+        a(FixedConnection)
+        .from_(planned_connection_world.fixed_connections)
+        .tolist(state=state)
+    )
 
     assert result == planned_connection_world.fixed_connections
 
@@ -169,8 +205,10 @@ def test_world_collection_reads_the_collection_the_state_assigns(
         .with_facts(literal(world).connections == [*world.connections, planned])
     )
 
-    result = a(variable(FixedConnection, variable(World, [world]).connections)).tolist(
-        state=state
+    result = (
+        a(FixedConnection)
+        .from_(variable(World, [world]).connections)
+        .tolist(state=state)
     )
 
     assert result == [*planned_connection_world.fixed_connections, planned]
@@ -238,8 +276,8 @@ def test_states_with_equal_but_distinct_objects_differ(planned_connection_world)
 
 
 def test_connections_of_every_kind_follow_the_state(planned_connection_world):
-    live = a(variable(Connection)).tolist()
+    live = a(Connection).tolist()
     removed = live[0]
     state = State().with_objects_removed(removed)
 
-    assert a(variable(Connection)).tolist(state=state) == live[1:]
+    assert a(Connection).tolist(state=state) == live[1:]

@@ -14,7 +14,6 @@ from functools import cached_property
 from typing_extensions import (
     Any,
     Callable,
-    Generic,
     Iterable,
     Iterator,
     Union as TypingUnion,
@@ -26,13 +25,19 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     Selectable,
 )
-from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
+from krrood.entity_query_language.core.mapped_variable import (
+    CanBehaveLikeAVariable,
+    HasSymbolicOperations,
+)
 from krrood.entity_query_language.evaluation_context import (
     current_term_reader,
     values_in_current_context,
 )
 from krrood.entity_query_language.ground_term import CallTerm, GroundTermExpression
-from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
+from krrood.entity_query_language.cache_data import (
+    ReEnterableIterable,
+    ReEnterableLazyIterable,
+)
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import NoChildToReplace
 from krrood.entity_query_language.operators.set_operations import (
@@ -48,16 +53,17 @@ from krrood.entity_query_language._monitoring import (
 )
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
-DomainType = Iterable[T]
+DomainType = Iterable[T] | HasSymbolicOperations
 """
-The type of the domain used for the variable.
+The type of the domain used for the variable: its values, or an expression whose value,
+for each of its bindings, holds them.
 """
 
 # %% domains
 
 
 @dataclass
-class InstancesOfType(Generic[T]):
+class InstancesOfType(ReEnterableIterable[T]):
     """
     The domain of every instance of a type in the evaluation that iterates it: the
     instances the evaluation's
@@ -119,12 +125,12 @@ class Variable(CanHaveDomainSource[T]):
     It can be evaluated to yield values from its domain.
     """
 
-    _domain_: DomainType = field(default_factory=list)
+    _domain_: Iterable[T] = field(default_factory=list)
     """
     The original domain value.
     """
 
-    _re_enterable_domain_generator_: ReEnterableLazyIterable | InstancesOfType = field(
+    _re_enterable_domain_generator_: ReEnterableIterable[T] = field(
         init=False, default_factory=ReEnterableLazyIterable, repr=False
     )
     """
@@ -145,10 +151,10 @@ class Variable(CanHaveDomainSource[T]):
 
     def _update_domain_(self, domain):
         """
-        Set the domain and ensure it is a lazy re-enterable iterable, except for
-        :class:`InstancesOfType`, which is read anew by each evaluation.
+        Set the domain, keeping a :class:`ReEnterableIterable` as it is and wrapping any
+        other value in a :class:`ReEnterableLazyIterable`.
         """
-        if isinstance(domain, (ReEnterableLazyIterable, InstancesOfType)):
+        if isinstance(domain, ReEnterableIterable):
             self._re_enterable_domain_generator_ = domain
             return
         if not is_iterable(domain):

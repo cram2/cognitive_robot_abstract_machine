@@ -58,6 +58,7 @@ from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     CalledMatchAfterResolution,
     CalledMatchMultipleTimes,
+    DomainExpressionAfterWhereCondition,
     MatchTypeCannotBeDetermined,
     PositionalArgumentsInMatchPattern,
     NoAttributeWithAccessPathName,
@@ -493,11 +494,20 @@ class Match(
         ``__call__`` eagerly created one), its domain is updated in place instead of
         replacing the variable outright: conditions built earlier against ``self._variable_``
         (for example from an already-recorded ``where``) reference that same object, so
-        replacing it would silently orphan them from the re-scoped domain.
-        """
-        if self._variable_ is None:
-            from krrood.entity_query_language.factories import variable
+        replacing it would silently orphan them from the re-scoped domain. An expression
+        domain needs a variable of another kind, so it replaces the subject variable.
 
+        :raises DomainExpressionAfterWhereCondition: If the domain is an expression and a
+            ``where`` condition already refers to the subject variable.
+        """
+        from krrood.entity_query_language.factories import variable
+
+        if self._variable_ is None:
+            self._variable_ = variable(self._type_, domain=self._domain_)
+            return
+        if isinstance(self._domain_, HasSymbolicOperations):
+            if self._where_conditions_:
+                raise DomainExpressionAfterWhereCondition(self)
             self._variable_ = variable(self._type_, domain=self._domain_)
             return
 
@@ -832,8 +842,13 @@ class Match(
             replacing it, so a ``where`` recorded before this call keeps referencing the correct,
             now domain-scoped, variable.
 
+        An expression as ``domain`` ranges the match, for each binding of the expression,
+        over the instances of its type among the elements of the value it evaluates to.
+
         :param domain: The instances the match ranges over.
         :return: This match, for chaining.
+        :raises DomainExpressionAfterWhereCondition: If ``domain`` is an expression and a
+            ``where`` condition was already recorded on this match.
         """
         self._domain_ = domain
         self._create_or_update_variable_()
