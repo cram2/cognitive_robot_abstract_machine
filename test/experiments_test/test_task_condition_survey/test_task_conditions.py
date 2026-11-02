@@ -114,7 +114,7 @@ def test_comparison_takes_its_kind_from_the_value_it_compares():
     [proposition] = condition(measured_value("self.tray_offset") < 0.15).propositions()
 
     assert proposition.kind is PredicateKind.CONTINUOUS
-    assert proposition.expression.left._type_ is ContinuousValue
+    assert proposition.expression.left._factory_ is ContinuousValue
 
 
 # %% what a whole condition combines
