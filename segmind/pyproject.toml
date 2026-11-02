@@ -8,11 +8,11 @@ build-backend = "setuptools.build_meta"
 name = "segmind"
 dynamic = ["version"]
 dependencies = [
-    "cramph",
-    "krrood",
-    "random_events",
-    "semantic_digital_twin",
-    "krrood_spatial_math[casadi]",
+    "cramph>=26.10.0",
+    "krrood>=26.10.0",
+    "random_events>=26.10.0",
+    "semantic_digital_twin>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
 ]
 description = "Annotates activitiy episodes represented by meshes moving in a 3D environment with the corresponding events, actions and activities."
 readme = "README.md"

@@ -18,7 +18,7 @@ keywords = ["robotics", "geometry", "spatial"]
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
-    "krrood",
+    "krrood>=26.10.0",
     "typing_extensions",
 ]
 
