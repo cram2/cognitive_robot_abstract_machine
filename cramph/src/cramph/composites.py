@@ -2,7 +2,8 @@ from __future__ import annotations, division
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from itertools import combinations, count, takewhile
+from functools import partial
+from itertools import combinations, takewhile
 
 from typing_extensions import Any, Generator, Generic, Iterator, TypeVar
 
@@ -10,6 +11,7 @@ from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import QueryBackend
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -1432,17 +1434,19 @@ class StatementNode(NodeGroundingStatements):
             return None
         return {self: candidate}
 
-    def ground_on_from(self, ranking: RankedCandidates, handed: Any) -> None:
+    def ground_on_from(
+        self, source: StatementNode, read: list[Any], handed: Any
+    ) -> None:
         """
-        Takes over the grounding of the node `ranking` pulled its candidates from, which
-        handed this node `handed`, as if this node had pulled them: its next candidates
-        are the others `ranking` pulled, in rank order, then those beyond them.
+        Takes over the grounding of `source`, which handed this node `handed`, as if
+        this node had pulled the candidates `source` yielded: its next candidates are
+        the others of `read`, in their order, then those beyond them.
 
-        :param ranking: The ranking the candidate this node runs was taken from.
-        :param handed: The candidate of `ranking` this node runs.
+        :param source: The node whose statement yielded the candidate this node runs.
+        :param read: The candidates `source` yielded so far, in their order.
+        :param handed: The candidate of `read` this node runs.
         """
-        source = ranking.statement
-        others = [candidate for candidate in ranking.pulled if candidate is not handed]
+        others = [candidate for candidate in read if candidate is not handed]
         self.candidate_limit = source.candidate_limit
         self._candidates_pulled = source._candidates_pulled - len(others)
         self._candidates = self._chained(others, source._candidates)
@@ -1504,114 +1508,6 @@ class StatementNode(NodeGroundingStatements):
 # %% running a parallel whose statements are grounded together
 
 
-@dataclass
-class RankedCandidates:
-    """
-    The candidates a statement yields, in the order it yields them, pulled from it only
-    as far as they are asked for.
-    """
-
-    statement: StatementNode
-    """
-    The node whose statement yields the candidates.
-    """
-
-    query_backend: QueryBackend
-    """
-    The backend answering the statement.
-    """
-
-    default_candidate_limit: int
-    """
-    How many candidates the statement yields at most if it has no limit of its own.
-    """
-
-    pulled: list[Any] = field(default_factory=list, init=False)
-    """
-    The candidates pulled so far, in rank order.
-    """
-
-    exhausted: bool = field(default=False, init=False)
-    """
-    Whether there is no candidate beyond :attr:`pulled`.
-    """
-
-    def at(self, rank: int) -> Any | None:
-        """
-        :param rank: The position of the candidate in the ranking, the first at 0.
-        :return: The candidate at `rank`, or None if there are fewer.
-        """
-        while len(self.pulled) <= rank and not self.exhausted:
-            candidate = self.statement.next_candidate(
-                self.query_backend, self.default_candidate_limit
-            )
-            if candidate is None:
-                self.exhausted = True
-            else:
-                self.pulled.append(candidate)
-        return self.pulled[rank] if rank < len(self.pulled) else None
-
-
-@dataclass
-class CandidateCombinations:
-    """
-    The cartesian product of the rankings, the combinations with the lowest sum of ranks
-    first, so the candidates every ranking puts first are combined before any
-    combination takes a later one.
-
-    A ranking is pulled from only as far as a combination reaches into it.
-    """
-
-    rankings: list[RankedCandidates]
-    """
-    The rankings a combination takes one candidate of each, in their order.
-    """
-
-    def __iter__(self) -> Iterator[tuple[Any, ...]]:
-        """
-        :return: The combinations, each holding one candidate per ranking, in the order
-            of :attr:`rankings`.
-        """
-        for rank_sum in count():
-            for ranks in self._ranks_summing_to(rank_sum, len(self.rankings)):
-                combination = tuple(
-                    ranking.at(rank) for ranking, rank in zip(self.rankings, ranks)
-                )
-                if all(candidate is not None for candidate in combination):
-                    yield combination
-            # Every ranking was asked for its candidate at rank_sum above, so each is
-            # exhausted once rank_sum outgrew it.
-            if all(ranking.exhausted for ranking in self.rankings) and (
-                rank_sum >= self._highest_rank_sum
-            ):
-                return
-
-    @property
-    def _highest_rank_sum(self) -> int:
-        """
-        :return: The sum of the ranks of the last candidate pulled from every ranking.
-        """
-        highest_rank_sum = 0
-        for ranking in self.rankings:
-            highest_rank_sum += len(ranking.pulled) - 1
-        return highest_rank_sum
-
-    @classmethod
-    def _ranks_summing_to(cls, total: int, parts: int) -> Iterator[tuple[int, ...]]:
-        """
-        :param total: What the ranks add up to.
-        :param parts: How many ranks there are.
-        :return: Every tuple of `parts` ranks that add up to `total`.
-        """
-        if parts == 0:
-            if total == 0:
-                yield ()
-            return
-        for first in range(total + 1):
-            for rest in cls._ranks_summing_to(total - first, parts - 1):
-                yield first, *rest
-
-
 @dataclass(eq=False, repr=False, kw_only=True)
 class ParallelStatementNode(NodeGroundingStatements):
     """
@@ -1635,20 +1531,19 @@ class ParallelStatementNode(NodeGroundingStatements):
     The statements of :attr:`parallel` that are grounded together.
     """
 
+    _product: CartesianProductByRankSum | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The cartesian product of the candidates of :attr:`statements`, from the first pull
+    until it is exhausted or released by :meth:`stop_grounding`.
+    """
+
     _combinations: Iterator[tuple[Any, ...]] | None = field(
         default=None, init=False, repr=False
     )
     """
-    The combinations of the candidates of :attr:`statements`, open from the first pull
-    until they are exhausted or released by :meth:`stop_grounding`.
-    """
-
-    _rankings: dict[StatementNode, RankedCandidates] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    """
-    The ranking of the candidates of each of :attr:`statements` the combinations are
-    taken from, for as long as :attr:`_combinations` is open.
+    The combinations still to come from :attr:`_product`.
     """
 
     def next_combination(
@@ -1656,41 +1551,46 @@ class ParallelStatementNode(NodeGroundingStatements):
     ) -> dict[StatementNode, Any] | None:
         """
         Differs from :meth:`NodeGroundingStatements.next_combination` in taking the
-        combinations in the order of :class:`CandidateCombinations`, and in having none
+        combinations in the order of
+        :class:`~krrood.patterns.cartesian_product.CartesianProductByRankSum`, and in
+        having none
         left once a child was chosen in the current run: each statement whose candidate
         fails grounds a candidate of its own.
         """
         if self.latest_child is not None:
             return None
         if self._combinations is None:
-            self._rankings = {
-                statement: RankedCandidates(
-                    statement=statement,
-                    query_backend=query_backend,
-                    default_candidate_limit=default_candidate_limit,
-                )
-                for statement in self.statements
-            }
-            self._combinations = iter(
-                CandidateCombinations(rankings=list(self._rankings.values()))
+            self._product = CartesianProductByRankSum(
+                factors=[
+                    iter(
+                        partial(
+                            statement.next_candidate,
+                            query_backend,
+                            default_candidate_limit,
+                        ),
+                        None,
+                    )
+                    for statement in self.statements
+                ]
             )
+            self._combinations = iter(self._product)
         combination = next(self._combinations, None)
         if combination is None:
             self.stop_grounding()
             return None
         return dict(zip(self.statements, combination))
 
-    def ranking_of(self, statement: StatementNode) -> RankedCandidates:
+    def candidates_read_for(self, statement: StatementNode) -> list[Any]:
         """
         :param statement: One of :attr:`statements`.
-        :return: The ranking the candidate of `statement` in the latest combination was
-            taken from.
+        :return: The candidates `statement` yielded for the combinations so far, in the
+            order it yielded them.
         """
-        return self._rankings[statement]
+        return self._product.read[self.statements.index(statement)]
 
     def stop_grounding(self) -> None:
         self._combinations = None
-        self._rankings = {}
+        self._product = None
         for statement in self.statements:
             statement.stop_grounding()
 

@@ -728,7 +728,9 @@ class ParallelStatementChildChooser(ChooserGroundingStatements[ParallelStatement
         # Each statement goes on from its candidate once that failed, rather than
         # grounding its statement anew from the first candidate.
         for rebuilt, statement in built.originals.items():
-            rebuilt.ground_on_from(node.ranking_of(statement), combination[statement])
+            rebuilt.ground_on_from(
+                statement, node.candidates_read_for(statement), combination[statement]
+            )
         self._built[node] = built
         return Sequence(nodes=[built.root])
 

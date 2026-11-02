@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from cramph.composites import (
-    CandidateCombinations,
     Parallel,
-    RankedCandidates,
     StatementNode,
     ParallelStatementNode,
 )
@@ -24,17 +22,6 @@ def _statement_of_names(names: list[str]) -> Match[NodeSucceedingOnObservingTrue
     """
     return a(NodeSucceedingOnObservingTrue)(
         name=variable(str, domain=names), observation=ObservationStateValues.TRUE
-    )
-
-
-def _ranked_candidates_of_names(names: list[str]) -> RankedCandidates:
-    """
-    :return: The candidates of a statement with one candidate per name in `names`.
-    """
-    return RankedCandidates(
-        statement=StatementNode(statement=_statement_of_names(names)),
-        query_backend=EntityQueryLanguageGenerativeBackend(),
-        default_candidate_limit=10,
     )
 
 
@@ -61,45 +48,6 @@ def _names_of(
         statements.
     """
     return [candidate.name for candidate in combination.values()]
-
-
-# %% combining the candidates of several statements
-
-
-def test_combinations_take_the_candidates_ranked_first_before_later_ones() -> None:
-    """
-    Every combination comes up once, and none takes a later candidate of a statement
-    before the combinations of the candidates ranked before it.
-    """
-    combinations = CandidateCombinations(
-        rankings=[
-            _ranked_candidates_of_names(["a1", "a2"]),
-            _ranked_candidates_of_names(["b1", "b2", "b3"]),
-        ]
-    )
-
-    assert [
-        tuple(candidate.name for candidate in combination)
-        for combination in combinations
-    ] == [
-        ("a1", "b1"),
-        ("a1", "b2"),
-        ("a2", "b1"),
-        ("a1", "b3"),
-        ("a2", "b2"),
-        ("a2", "b3"),
-    ]
-
-
-def test_a_statement_without_candidates_leaves_no_combination() -> None:
-    combinations = CandidateCombinations(
-        rankings=[
-            _ranked_candidates_of_names(["a1"]),
-            _ranked_candidates_of_names([]),
-        ]
-    )
-
-    assert list(combinations) == []
 
 
 # %% grounding the statements of a parallel together
@@ -144,12 +92,10 @@ def test_stopping_the_grounding_starts_the_combinations_anew() -> None:
 # %% a statement going on from the candidate it was handed
 
 
-def test_a_statement_handed_a_candidate_goes_on_with_the_others_of_its_ranking() -> (
-    None
-):
+def test_a_statement_handed_a_candidate_goes_on_with_the_others_read_before() -> None:
     """
-    The statement goes on with the candidates its ranking pulled for earlier
-    combinations, then with those beyond, and never with the one it was handed.
+    The statement goes on with the candidates read for earlier combinations, then with
+    those beyond, and never with the one it was handed.
     """
     node = _parallel_statement_node(["a1", "a2", "a3"], ["b1"])
     backend = EntityQueryLanguageGenerativeBackend()
@@ -158,7 +104,9 @@ def test_a_statement_handed_a_candidate_goes_on_with_the_others_of_its_ranking()
     [statement, _] = node.statements
     continuation = StatementNode(statement=statement.statement)
 
-    continuation.ground_on_from(node.ranking_of(statement), combination[statement])
+    continuation.ground_on_from(
+        statement, node.candidates_read_for(statement), combination[statement]
+    )
 
     assert _names_of(combination) == ["a2", "b1"]
     assert [

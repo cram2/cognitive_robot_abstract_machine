@@ -89,7 +89,9 @@ still while it grounds. The next trial therefore starts from rest, in the world 
 
 When the parallel starts, its other branches start and the `ParallelStatementNode` is the only node that waits, so
 the robot is held still once rather than once per statement. Its chooser walks through combinations of the
-statements' candidates and tries each in what is left to run around it, the other branches included. The first
+statements' candidates and tries each in what is left to run around it, the other branches included. The combinations
+are the cartesian product of the statements' candidates, lowest rank sum first (krrood's `CartesianProductByRankSum`),
+and a statement's query is asked for a further candidate only once a combination needs it. The first
 combination that passes is built onto the real world as one child. Every grouped statement in it has already adopted
 its candidate, so nothing inside waits, the child travels to Giskard in one `ChildChoiceMessage`, and its branches
 start on the same tick.
