@@ -170,8 +170,8 @@ class ConstraintCollection:
             unless you know what you are doing
         :param upper_slack_limit: how much the upper error can be violated, don't use
             unless you know what you are doing
-        :param bound_cap: how the bound is limited to what one plan may demand; caps
-            the bound on its own if not given
+        :param bound_cap: how the bound is limited to what may be demanded within the
+            control horizon; caps the bound on its own if not given
         """
         if task_expression.shape != (1, 1):
             raise InvalidConstraintExpressionShapeError(list(task_expression.shape))

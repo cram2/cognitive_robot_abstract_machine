@@ -63,7 +63,7 @@ class GeometricConstraintBuilder:
         """
         frame_V_error = frame_P_goal - frame_P_current
         error_cap = VectorBoundCap(
-            bounds=sm.Vector([frame_V_error[i] for i in range(3)])
+            vector_bounds=sm.Vector([frame_V_error[i] for i in range(3)])
         )
         for i in range(3):
             self.collection.add_equality_constraint(
@@ -155,14 +155,14 @@ class GeometricConstraintBuilder:
         :param frame_R_goal: goal rotation as rotation matrix
         :param reference_velocity: value used for normalization rad/s. The constraints
             act on the vector part of the quaternion error, which changes by half the
-            angle, so one plan may demand a rotation of up to twice the angle this
-            velocity sustains.
+            angle, so a rotation of up to twice the angle this velocity sustains may be
+            demanded within the control horizon.
         """
         quaternion_error = self._quaternion_error(frame_R_current, frame_R_goal)
 
         # w is redundant
         error_cap = RotationBoundCap(
-            bounds=sm.Vector([-quaternion_error[i] for i in range(3)])
+            quaternion_error_bounds=sm.Vector([-quaternion_error[i] for i in range(3)])
         )
         for i in range(3):
             self.collection.add_equality_constraint(
@@ -193,8 +193,8 @@ class GeometricConstraintBuilder:
         :param frame_R_goal: goal rotation, of which only the yaw is reached
         :param reference_velocity: value used for normalization rad/s. The constraint
             acts on the z-component of the quaternion error, which changes by half the
-            angle, so one plan may demand a rotation of up to twice the angle this
-            velocity sustains.
+            angle, so a rotation of up to twice the angle this velocity sustains may be
+            demanded within the control horizon.
         """
         frame_R_goal_yaw = RotationMatrix.from_rpy(
             yaw=frame_R_goal.rpy[2], reference_frame=frame_R_goal.reference_frame
@@ -206,7 +206,9 @@ class GeometricConstraintBuilder:
             quadratic_weight=quadratic_weight,
             reference_velocity=reference_velocity,
             name=name,
-            bound_cap=RotationBoundCap(bounds=sm.Vector([-quaternion_error.z])),
+            bound_cap=RotationBoundCap(
+                quaternion_error_bounds=sm.Vector([-quaternion_error.z])
+            ),
         )
 
     @staticmethod

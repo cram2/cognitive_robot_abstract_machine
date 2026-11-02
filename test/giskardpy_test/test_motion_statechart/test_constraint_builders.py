@@ -37,8 +37,10 @@ def capped_equality_bounds(
         constraints=collection.equality_constraints,
         qp_controller_config=controller_config(),
     )
-    reach = strategy.reachable_change(strategy.constraints[0]).to_np().item()
-    return strategy.create_equality_bounds().to_np(), reach
+    reachable_change = (
+        strategy.reachable_change_of_constraint(strategy.constraints[0]).to_np().item()
+    )
+    return strategy.create_equality_bounds().to_np(), reachable_change
 
 
 def test_point_goal_writes_three_equality_constraints():
@@ -65,9 +67,9 @@ def test_point_goal_caps_the_length_of_its_error_and_keeps_its_direction():
         quadratic_weight=1.0,
     )
 
-    bounds, reach = capped_equality_bounds(collection)
+    bounds, reachable_change = capped_equality_bounds(collection)
 
-    assert np.linalg.norm(bounds) == pytest.approx(reach)
+    assert np.linalg.norm(bounds) == pytest.approx(reachable_change)
     assert np.allclose(bounds / np.linalg.norm(bounds), error / np.linalg.norm(error))
 
 
@@ -136,8 +138,8 @@ def rotation_goal_bounds(
     uncapped = np.array(
         [c.bound.to_np().item() for c in collection.equality_constraints]
     )
-    capped, reach = capped_equality_bounds(collection)
-    return uncapped, capped, reach
+    capped, reachable_change = capped_equality_bounds(collection)
+    return uncapped, capped, reachable_change
 
 
 def test_rotation_goal_caps_the_angle_it_demands(
@@ -148,26 +150,28 @@ def test_rotation_goal_caps_the_angle_it_demands(
 
     a far away goal demands a rotation of exactly twice the reachable change.
     """
-    uncapped, capped, reach = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
+    uncapped, capped, reachable_change = rotation_goal_bounds(
+        add_rotation_goal, np.pi / 2
+    )
     half_angle = np.arcsin(np.linalg.norm(uncapped))
 
     remaining_half_angle = np.arcsin(np.linalg.norm(uncapped) - np.linalg.norm(capped))
 
-    assert remaining_half_angle == pytest.approx(half_angle - reach)
+    assert remaining_half_angle == pytest.approx(half_angle - reachable_change)
 
 
 def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustains(
     add_rotation_goal: Callable[..., None],
 ):
     """
-    One plan may change the half angle by the reference velocity sustained over the
-    control horizon, as much as a single row of the quaternion error was allowed to
-    change before the angle was capped.
+    Within the control horizon, the half angle may change by the reference velocity
+    sustained over the control horizon, as much as a single row of the quaternion error
+    was allowed to change before the angle was capped.
     """
-    _, _, reach = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
+    _, _, reachable_change = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
     config = controller_config()
 
-    assert reach == pytest.approx(
+    assert reachable_change == pytest.approx(
         ROTATION_REFERENCE_VELOCITY
         * config.control_time_step.total_seconds()
         * config.control_horizon
@@ -177,9 +181,9 @@ def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustai
 def test_rotation_goal_within_reach_is_not_capped(
     add_rotation_goal: Callable[..., None],
 ):
-    uncapped, capped, reach = rotation_goal_bounds(add_rotation_goal, 0.01)
+    uncapped, capped, reachable_change = rotation_goal_bounds(add_rotation_goal, 0.01)
 
-    assert 0.01 < 2 * reach
+    assert 0.01 < 2 * reachable_change
     assert np.allclose(capped, uncapped)
 
 

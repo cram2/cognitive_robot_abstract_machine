@@ -87,7 +87,7 @@ class GiskardEqualityConstraint(GiskardConstraint):
 
     bound_cap: BoundCap = field(default_factory=ScalarBoundCap)
     """
-    How the bound is limited to what one plan may demand.
+    How the bound is limited to what may be demanded within the control horizon.
     """
 
 

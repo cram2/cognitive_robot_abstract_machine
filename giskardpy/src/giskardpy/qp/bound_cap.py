@@ -1,5 +1,5 @@
 """
-Rules for capping what an equality constraint may demand from one plan
+Rules for capping what an equality constraint may demand within the control horizon
 (:class:`BoundCap` and subclasses).
 """
 
@@ -15,17 +15,18 @@ from krrood.symbolic_math.symbolic_math import Scalar
 @dataclass
 class BoundCap(ABC):
     """
-    Limits the bound of an equality constraint to the largest change one plan may
-    demand, so that a far away goal does not ask for more motion than is reachable.
+    Limits the bound of an equality constraint to the largest change that may be
+    demanded within the control horizon, so that a far away goal does not ask for more
+    motion than is reachable.
     """
 
     @abstractmethod
-    def capped(self, bound: Scalar, reach: Scalar) -> Scalar:
+    def cap_bound(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
         """
         :param bound: The bound of one constraint.
-        :param reach: The largest change of the constraint's expression one plan may
-            demand.
-        :return: The bound, limited to what one plan may demand.
+        :param reachable_change: The largest change of the constraint's expression that
+            may be demanded within the control horizon.
+        :return: The bound, limited to the reachable change.
         """
 
 
@@ -35,8 +36,8 @@ class ScalarBoundCap(BoundCap):
     Caps a bound on its own, independently of any other constraint.
     """
 
-    def capped(self, bound: Scalar, reach: Scalar) -> Scalar:
-        return sm.limit(bound, -reach, reach)
+    def cap_bound(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+        return sm.limit(bound, -reachable_change, reachable_change)
 
 
 @dataclass
@@ -48,13 +49,15 @@ class VectorBoundCap(BoundCap):
     Every bound is scaled by the same factor, so the capped vector keeps its direction.
     """
 
-    bounds: sm.Vector
+    vector_bounds: sm.Vector
     """
     The bounds of all constraints that make up the vector.
     """
 
-    def capped(self, bound: Scalar, reach: Scalar) -> Scalar:
-        scale = sm.min(1, reach.safe_division(self.bounds.norm(), if_nan=1))
+    def cap_bound(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+        scale = sm.min(
+            1, reachable_change.safe_division(self.vector_bounds.norm(), if_nan=1)
+        )
         return bound * scale
 
 
@@ -65,21 +68,22 @@ class RotationBoundCap(BoundCap):
     of the vector part of the quaternion error, sin(angle / 2) * axis.
 
     The cap is applied to the rotation angle rather than to the vector part, so that the
-    angle one plan may demand does not depend on how far away the goal is. The reachable
-    change is read in units of the half angle, which the vector part changes by close to
-    the goal, so close to the goal the cap equals that of a single row.
+    angle that may be demanded within the control horizon does not depend on how far
+    away the goal is. The reachable change is read in units of the half angle, which the
+    vector part changes by close to the goal, so close to the goal the cap equals that
+    of a single row.
     """
 
-    bounds: sm.Vector
+    quaternion_error_bounds: sm.Vector
     """
     The bounds of the three constraints, the vector part of the quaternion error.
     """
 
-    def capped(self, bound: Scalar, reach: Scalar) -> Scalar:
-        sine_of_half_angle = self.bounds.norm()
+    def cap_bound(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
+        sine_of_half_angle = self.quaternion_error_bounds.norm()
         cosine_of_half_angle = sm.max(0, 1 - sine_of_half_angle**2) ** 0.5
         angle = 2 * sm.atan2(sine_of_half_angle, cosine_of_half_angle)
-        capped_angle = sm.min(angle, 2 * reach)
+        capped_angle = sm.min(angle, 2 * reachable_change)
         capped_sine_change = sine_of_half_angle - sm.sin((angle - capped_angle) / 2)
         scale = capped_sine_change.safe_division(sine_of_half_angle, if_nan=1)
         return bound * scale

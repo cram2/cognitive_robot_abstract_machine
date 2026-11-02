@@ -353,18 +353,22 @@ def _integral_inequality_strategy(
 
 def test_integral_strategy_caps_what_an_inequality_demands(prismatic_bot2):
     """
-    A bound that forces the expression to move is capped to what one plan may demand.
+    A bound that forces the expression to move is capped to what may be demanded within
+    the control horizon.
     """
     strategy = _integral_inequality_strategy(
         prismatic_bot2, bounds=[(1, np.inf), (-np.inf, -1)]
     )
-    reach = [strategy.reachable_change(c).to_np().item() for c in strategy.constraints]
+    reachable_changes = [
+        strategy.reachable_change_of_constraint(c).to_np().item()
+        for c in strategy.constraints
+    ]
 
     lower_bounds = strategy.create_lower_bounds().to_np()
     upper_bounds = strategy.create_upper_bounds().to_np()
 
-    assert lower_bounds[0] == pytest.approx(reach[0])
-    assert upper_bounds[1] == pytest.approx(-reach[1])
+    assert lower_bounds[0] == pytest.approx(reachable_changes[0])
+    assert upper_bounds[1] == pytest.approx(-reachable_changes[1])
 
 
 def test_integral_strategy_keeps_what_an_inequality_permits(prismatic_bot2):

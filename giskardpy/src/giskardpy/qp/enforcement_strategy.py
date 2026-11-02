@@ -156,19 +156,25 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         the getter.
         """
 
-    def lower_bound_of(self, constraint: GiskardInequalityConstraint) -> Scalar:
+    def lower_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
         """
         The lower bound this strategy enforces for an inequality constraint.
         """
         return constraint.lower_bound
 
-    def upper_bound_of(self, constraint: GiskardInequalityConstraint) -> Scalar:
+    def upper_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
         """
         The upper bound this strategy enforces for an inequality constraint.
         """
         return constraint.upper_bound
 
-    def equality_bound_of(self, constraint: GiskardEqualityConstraint) -> Scalar:
+    def equality_bound_of_constraint(
+        self, constraint: GiskardEqualityConstraint
+    ) -> Scalar:
         """
         The bound this strategy enforces for an equality constraint.
         """
@@ -179,21 +185,21 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         Builds the lower bounds of the inequality constraints.
         """
         self._require_constraint_type(GiskardInequalityConstraint)
-        return self.create_bounds(self.lower_bound_of)
+        return self.create_bounds(self.lower_bound_of_constraint)
 
     def create_upper_bounds(self) -> Vector:
         """
         Builds the upper bounds of the inequality constraints.
         """
         self._require_constraint_type(GiskardInequalityConstraint)
-        return self.create_bounds(self.upper_bound_of)
+        return self.create_bounds(self.upper_bound_of_constraint)
 
     def create_equality_bounds(self) -> Vector:
         """
         Builds the bounds of the equality constraints.
         """
         self._require_constraint_type(GiskardEqualityConstraint)
-        return self.create_bounds(self.equality_bound_of)
+        return self.create_bounds(self.equality_bound_of_constraint)
 
     def _require_constraint_type(self, expected: type[GiskardConstraint]) -> None:
         """
@@ -296,10 +302,10 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             names=[c.name for c in self.constraints],
         )
 
-    def reachable_change(self, constraint: GiskardConstraint) -> Scalar:
+    def reachable_change_of_constraint(self, constraint: GiskardConstraint) -> Scalar:
         """
-        The largest change of a constraint's expression one plan may demand: its
-        normalization factor sustained over the control horizon.
+        The largest change of a constraint's expression that may be demanded within the
+        control horizon: its normalization factor sustained over that horizon.
         """
         return (
             sm.Scalar(constraint.normalization_factor)
@@ -307,29 +313,39 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             * self.qp_controller_config.control_horizon
         )
 
-    def lower_bound_of(self, constraint: GiskardInequalityConstraint) -> Scalar:
+    def lower_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
         """
         A positive lower bound demands motion, so it is capped to the reachable change.
 
         A negative one only permits motion and is kept, however far away it is.
         """
-        return sm.min(constraint.lower_bound, self.reachable_change(constraint))
+        return sm.min(
+            constraint.lower_bound, self.reachable_change_of_constraint(constraint)
+        )
 
-    def upper_bound_of(self, constraint: GiskardInequalityConstraint) -> Scalar:
+    def upper_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
         """
         A negative upper bound demands motion, so it is capped to the reachable change.
 
         A positive one only permits motion and is kept, however far away it is.
         """
-        return sm.max(constraint.upper_bound, -self.reachable_change(constraint))
+        return sm.max(
+            constraint.upper_bound, -self.reachable_change_of_constraint(constraint)
+        )
 
-    def equality_bound_of(self, constraint: GiskardEqualityConstraint) -> Scalar:
+    def equality_bound_of_constraint(
+        self, constraint: GiskardEqualityConstraint
+    ) -> Scalar:
         """
         An equality bound always demands motion, so it is capped to the reachable change
         by the constraint's own bound cap.
         """
-        return constraint.bound_cap.capped(
-            constraint.bound, self.reachable_change(constraint)
+        return constraint.bound_cap.cap_bound(
+            constraint.bound, self.reachable_change_of_constraint(constraint)
         )
 
     def create_bounds(
