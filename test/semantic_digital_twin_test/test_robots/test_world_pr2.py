@@ -6,7 +6,8 @@ import pytest
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
-    BrokenWorldModificationHistoryError,
+    DuplicateRobotAssignmentsError,
+    PartiallyAppliedWorldModificationError,
 )
 from semantic_digital_twin.orm.ormatic_interface import *  # noqa
 from semantic_digital_twin.reasoning.predicates import LeftOf
@@ -109,8 +110,9 @@ def test_duplicate_robot_assignments_error_pr2(pr2_world_state_reset):
     assert pr2 is not None, "PR2 robot not found in world state reset"
 
     # Create another robot
-    with pytest.raises(BrokenWorldModificationHistoryError):
+    with pytest.raises(PartiallyAppliedWorldModificationError) as error_info:
         pr2_2 = PR2.from_world(pr2_world_state_reset)
+    assert isinstance(error_info.value.cause, DuplicateRobotAssignmentsError)
 
 
 def test_compute_chain_of_connections_error_pr2(pr2_world_state_reset):
