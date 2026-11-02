@@ -1,11 +1,11 @@
 import inspect
 from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
 
 from krrood.adapters.json_serializer import list_like_classes
+from krrood.entity_query_language.call_arguments import CallArguments
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 
 T = TypeVar("T")
@@ -103,19 +103,8 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         return any(
             parameter.kind is inspect.Parameter.VAR_KEYWORD or parameter.name == keyword
-            for parameter in HasFactoryAndKwargs._factory_signature_(
-                factory
-            ).parameters.values()
+            for parameter in CallArguments.signature_of(factory).parameters.values()
         )
-
-    @staticmethod
-    @lru_cache(maxsize=None)
-    def _factory_signature_(factory: Callable[..., Any]) -> inspect.Signature:
-        """
-        :param factory: A factory.
-        :return: Its signature, read once per factory.
-        """
-        return inspect.signature(factory)
 
     def _is_kept_out_of_construction_(self, keyword: str, value_type: type) -> bool:
         """
