@@ -166,6 +166,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         offset: float = 0.0,
         dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
+        dynamics: JointDynamics | None = None,
     ) -> Self:
         """
         Creates and returns an instance of the class with its single degree of freedom,
@@ -187,6 +188,8 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             0.0.
         :param dof_limits: Optional limits for the generated degree of freedom.
         :param axis: The axis vector defining the joint relation.
+        :param dynamics: The dynamic properties of the joint. Frictionless and undamped
+            if None.
         :return: An instance of the class representing the defined relationship with its
             DOF added to the world.
         """
@@ -205,6 +208,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             multiplier=multiplier,
             offset=offset,
             raw_dof=dof,
+            dynamics=dynamics or JointDynamics(),
         )
         return connection
 
@@ -418,6 +422,7 @@ class ScrewConnection(ActiveConnection1DOF):
         offset: float = 0.0,
         dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
+        dynamics: JointDynamics | None = None,
         screw_pitch: float,
     ) -> Self:
         """
@@ -443,6 +448,7 @@ class ScrewConnection(ActiveConnection1DOF):
             offset=offset,
             raw_dof=dof,
             screw_pitch=screw_pitch,
+            dynamics=dynamics or JointDynamics(),
         )
         return connection
 

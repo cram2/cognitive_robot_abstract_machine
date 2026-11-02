@@ -172,7 +172,7 @@ Your goal:
   specification (root `BodySpecification.box("milk", Scale(0.1, 0.1, 0.2))`) and a plain
   `BodySpecification.box("cup", Scale(0.07, 0.07, 0.1))`
 - Store it in a variable named `scene_specification`
-- Materialize it twice with `to_domain_object` into variables named `first_world` and `second_world`
+- Materialize it twice with `create_world` into variables named `first_world` and `second_world`
 
 ```{code-cell} ipython3
 :tags: [exercise]
@@ -181,8 +181,8 @@ Your goal:
 #     table_urdf,
 #     objects=[...],
 # )
-# first_world = scene_specification.to_domain_object()
-# second_world = scene_specification.to_domain_object()
+# first_world = scene_specification.create_world()
+# second_world = scene_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -198,8 +198,8 @@ scene_specification = WorldSpecification.from_urdf(
         BodySpecification.box("cup", Scale(0.07, 0.07, 0.1)),
     ],
 )
-first_world = scene_specification.to_domain_object()
-second_world = scene_specification.to_domain_object()
+first_world = scene_specification.create_world()
+second_world = scene_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -226,7 +226,7 @@ Your goal:
 #     table_urdf,
 #     robots=[RobotSpecification(semantic_annotation_type=..., world_T_odom=...)],
 # )
-# robot_world = robot_specification.to_domain_object()
+# robot_world = robot_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -240,7 +240,7 @@ robot_specification = WorldSpecification.from_urdf(
         )
     ],
 )
-robot_world = robot_specification.to_domain_object()
+robot_world = robot_specification.create_world()
 ```
 
 ```{code-cell} ipython3

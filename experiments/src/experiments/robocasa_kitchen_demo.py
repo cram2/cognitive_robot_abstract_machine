@@ -345,7 +345,7 @@ def _spawn_robot_and_prepare_pick_up(
 
     pr2_world = URDFParser.from_file(
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    ).parse()
+    ).create_world()
     with world.modify_world():
         drive = OmniDrive.create_with_dofs(
             parent=world.root, child=pr2_world.root, world=world

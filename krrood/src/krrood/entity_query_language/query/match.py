@@ -939,10 +939,10 @@ class AttributeMatch(AbstractMatchExpression[T]):
         return attr
 
     @property
-    def is_underspecified_single_value(self) -> bool:
+    def is_assigned_to_ellipsis(self) -> bool:
         """
-        Whether the attribute is assigned ``...`` itself, leaving its single value
-        underspecified; a collection holding ``...`` as an element does not count.
+        Whether the attribute is assigned ``...`` itself; a collection holding ``...``
+        as an element does not count.
         """
         return self.assigned_value is ...
 

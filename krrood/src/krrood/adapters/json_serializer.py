@@ -15,7 +15,6 @@ from typing_extensions import Dict, Any, Self, Union, TypeVar, TypeAlias, TYPE_C
 
 import numpy as np
 from scipy.sparse import coo_array, csr_array
-from sortedcontainers import SortedSet
 
 from krrood.adapters.exceptions import (
     MissingTypeError,
@@ -29,6 +28,7 @@ from krrood.adapters.exceptions import (
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.keyword_argument import SerializationKeywordArgument
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
+from krrood.collection_kind import CollectionKind
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from krrood.singleton import SingletonMeta
 from krrood.utils import (
@@ -37,12 +37,7 @@ from krrood.utils import (
     resolve_class_from_full_name as _resolve_class_from_full_name,
 )
 
-list_like_classes = (
-    list,
-    tuple,
-    set,
-    SortedSet,
-)  # classes that are serialized as a JSON array
+list_like_classes = CollectionKind.ELEMENT_SEQUENCE.value  # serialized as a JSON array
 leaf_types = (
     int,
     float,
@@ -542,7 +537,6 @@ class UUIDJSONKey(enum.StrEnum):
 
 @dataclass
 class UUIDJSONSerializer(ExternalClassJSONSerializer[uuid.UUID]):
-
     @classmethod
     def to_json(cls, instance: uuid.UUID, **kwargs) -> dict[str, Any]:
         return {
@@ -824,7 +818,6 @@ class EnumJSONKey(enum.StrEnum):
 
 @dataclass
 class EnumJSONSerializer(ExternalClassJSONSerializer[enum.Enum]):
-
     @classmethod
     def to_json(cls, instance: enum.Enum, **kwargs) -> dict[str, Any]:
         return {

@@ -196,6 +196,11 @@ class ClassWithSortedSet(DataclassJSONSerializer):
     a: SortedSet
 
 
+@dataclass
+class ClassWithFrozenSet(DataclassJSONSerializer):
+    a: frozenset
+
+
 class CustomEnum(str, Enum):
     A = "a"
     B = "b"
@@ -541,6 +546,16 @@ def test_dataclass_sorted_set():
     result = from_json(data)
     assert result == cls
     assert isinstance(result.a, SortedSet)
+
+
+def test_dataclass_frozen_set():
+    cls = ClassWithFrozenSet(frozenset({1, 2, 3}))
+    data = to_json(cls)
+    assert data["a"][JSONField.COLLECTION_TYPE] == get_full_class_name(frozenset)
+    assert sorted(data["a"][JSONField.ITEMS]) == [1, 2, 3]
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, frozenset)
 
 
 # %% durations

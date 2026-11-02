@@ -192,7 +192,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         pr2_file = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
 
         urdf_parser = URDFParser.from_file(file_path=pr2_file)
-        world_with_urdf = urdf_parser.parse()
+        world_with_urdf = urdf_parser.create_world()
         pr2 = PR2.from_world(world_with_urdf)
 
         with world_with_urdf.modify_world():
