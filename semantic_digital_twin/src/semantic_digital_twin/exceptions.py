@@ -39,10 +39,7 @@ if TYPE_CHECKING:
         WorldEntityWithID,
         KinematicStructureEntity,
     )
-    from semantic_digital_twin.spatial_types.spatial_types import (
-        SpatialType,
-    )
-    from semantic_digital_twin.spatial_types import Vector3, Point
+    from krrood_spatial_math.spatial_types import Vector3, Point
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
         DegreeOfFreedom,
@@ -1556,95 +1553,6 @@ class DuplicateRobotAssignmentsError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
-
-
-@dataclass
-class SpatialTypesError(UsageError):
-    pass
-
-
-@dataclass
-class InsufficientVectorsError(SpatialTypesError):
-    """
-    Raised when a rotation matrix is constructed from fewer than two vectors.
-    """
-
-    x: Vector3 | None
-    y: Vector3 | None
-    z: Vector3 | None
-
-    def error_message(self) -> str:
-        return (
-            f"from_vectors requires at least two of the vectors x, y, z to be provided; "
-            f"the third is computed via the cross product."
-            f"X Vector was: {self.x}"
-            f"Y Vector was: {self.y}"
-            f"Z Vector was: {self.z}"
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class ReferenceFrameMismatchError(SpatialTypesError):
-    expected_frame: KinematicStructureEntity | None
-    """
-    The frame the operation requires, or ``None`` if it requires no frame.
-    """
-
-    actual_frame: KinematicStructureEntity | None
-    """
-    The frame that was found instead, or ``None`` if the value has no frame.
-    """
-
-    context: str | None = None
-    """
-    Description of the value whose frame was checked, e.g. the argument name.
-    """
-
-    def error_message(self) -> str:
-        checked_value = self.context or "the given value"
-        return (
-            f"Expected {checked_value} to be expressed in "
-            f"{self._describe(self.expected_frame)}, "
-            f"but it is expressed in {self._describe(self.actual_frame)}."
-        )
-
-    @staticmethod
-    def _describe(frame: KinematicStructureEntity | None) -> str:
-        """
-        :param frame: The frame to describe.
-        :return: The frame as it reads in the error message.
-        """
-        if frame is None:
-            return "no frame"
-        return f"frame '{frame.name}'"
-
-    def suggest_correction(self) -> str:
-        return (
-            "transform it into the expected frame first, e.g. via "
-            "world.transform(value, target_frame), or construct it with the expected frame."
-        )
-
-
-@dataclass
-class MissingReferenceFrameError(SpatialTypesError):
-    """
-    Represents an error that occurs when a spatial type lacks a reference frame, even
-    though its required for the current operation.
-    """
-
-    spatial_type: SpatialType
-    """
-    Spatial type that lacks a reference frame.
-    """
-
-    def error_message(self) -> str:
-        return f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one."
-
-    def suggest_correction(self) -> str:
-        return "construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
 
 
 @dataclass

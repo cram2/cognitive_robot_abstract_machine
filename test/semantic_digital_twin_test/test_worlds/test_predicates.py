@@ -48,7 +48,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
 )
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector, TCamera
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (

@@ -1,9 +1,4 @@
-from semantic_digital_twin.spatial_types import (
-    AxisAngle,
-    Point3,
-    RotationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import AxisAngle, Point3, RotationMatrix, Vector3
 
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts

@@ -18,6 +18,7 @@ dependencies = [
     "pymysql",
     "random_events",
     "semantic_digital_twin",
+    "krrood_spatial_math[casadi]",
 ]
 
 [tool.setuptools]
@@ -33,6 +34,7 @@ workspace = [
     "cramph",
     "giskardpy",
     "krrood",
+    "krrood_spatial_math",
     "random_events",
     "semantic_digital_twin",
 ]

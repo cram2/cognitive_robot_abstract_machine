@@ -11,7 +11,7 @@ import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
@@ -80,7 +80,9 @@ def parse_object(stl_file_name: str, color: Color | None = None) -> World:
         appearance if None.
     :return: A world containing the mesh from the demo resources.
     """
-    object_world = STLParser(os.path.join(OBJECTS_DIRECTORY, stl_file_name)).parse()
+    object_world = STLParser(
+        os.path.join(OBJECTS_DIRECTORY, stl_file_name)
+    ).create_world()
     if color is not None:
         object_world.root.visual.dye_shapes(color)
     return object_world

@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import List
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Sphere, Box, Scale
@@ -94,7 +94,7 @@ from HasCaseA   sRootBody, has a list of Produces, for example our Apples, and d
 
 ```{code-cell} ipython3
 from semantic_digital_twin.semantic_annotations.mixins import HasCaseAsRootBody
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from krrood.ormatic.utils import classproperty
 from dataclasses import dataclass, field
 

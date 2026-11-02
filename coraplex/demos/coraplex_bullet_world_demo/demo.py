@@ -60,8 +60,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 # %% what the scene is built from

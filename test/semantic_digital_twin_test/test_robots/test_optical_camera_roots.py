@@ -19,7 +19,7 @@ from semantic_digital_twin.robots.daisy import DAiSyCamera
 from semantic_digital_twin.robots.armar7 import AzureKinectRGB
 from semantic_digital_twin.robots.unitree_g1 import D435
 from semantic_digital_twin.robots.robot_parts import Camera, RobotCamera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.testing import ray_test_world
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world import World

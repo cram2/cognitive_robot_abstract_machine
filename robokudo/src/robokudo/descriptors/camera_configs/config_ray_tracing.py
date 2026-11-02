@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.datastructures.camera_rendering import ColorRenderingMode
 
     from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-    from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+    from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 
 # %% World sources

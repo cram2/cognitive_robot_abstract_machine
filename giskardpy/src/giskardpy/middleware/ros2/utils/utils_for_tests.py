@@ -4,7 +4,7 @@ from time import sleep
 
 import numpy as np
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood_spatial_math.spatial_types as cas
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutorNode
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
@@ -20,7 +20,7 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -234,7 +234,7 @@ class GiskardTester(ABC):
                 parent_link
             )
         urdf_parser = URDFParser(urdf=urdf, prefix=name)
-        world_from_urdf = urdf_parser.parse()
+        world_from_urdf = urdf_parser.create_world()
         with self.api.world.modify_world():
             parent_C_urdf_root = FixedConnection(
                 parent=parent_link,

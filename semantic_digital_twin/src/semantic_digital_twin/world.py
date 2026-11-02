@@ -39,6 +39,7 @@ from semantic_digital_twin.collision_checking.collision_manager import Collision
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
     BulletCollisionDetector,
 )
+from krrood_spatial_math.exceptions import MissingReferenceFrameError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import (
@@ -47,7 +48,6 @@ from semantic_digital_twin.exceptions import (
     AlreadyBelongsToAWorldError,
     MissingWorldModificationContextError,
     WorldEntityWithIDNotFoundError,
-    MissingReferenceFrameError,
     MismatchingPublishChangesAttribute,
     AtomicWorldModificationNotAtomic,
     SemanticAnnotationCircularDependencyError,
@@ -66,11 +66,8 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 )
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -122,7 +119,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecompose
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.spatial_types import GenericSpatialType
+    from krrood_spatial_math.spatial_types import GenericSpatialType
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 
@@ -2620,7 +2617,7 @@ class World(HasSimulatorProperties):
         Transform a given spatial object from its reference frame to a target frame.
 
         How the transformation applies is the spatial type's own business -- see
-        :meth:`~semantic_digital_twin.spatial_types.spatial_types.SpatialType.transform`
+        :meth:`~krrood_spatial_math.spatial_types.SpatialType.transform`
         -- so a type that needs more than a matrix multiplication says so itself.
 
         :param spatial_object: The spatial object to be transformed.

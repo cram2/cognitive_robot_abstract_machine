@@ -29,8 +29,8 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale

@@ -11,16 +11,13 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    RotationMatrix,
-    SpatialType,
-)
+from krrood_spatial_math.spatial_types import RotationMatrix, SpatialType
 from semantic_digital_twin.world_description.world_entity import Body
 
 ROOT_FRAME_NAME = "map"

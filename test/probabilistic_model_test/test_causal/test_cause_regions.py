@@ -94,7 +94,7 @@ def regions(
     """
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         circuit_writing_one_range_two_ways,
-        MarginalDeterminismTreeNode.from_causal_graph([cause], [effect]),
+        MarginalDeterminismTreeNode.from_variable_order([cause]),
         [cause],
         [effect],
     )
@@ -180,7 +180,7 @@ def two_equally_weighted_regions(
         root.add_subcircuit(branch, math.log(0.5))
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([cause], [effect]),
+        MarginalDeterminismTreeNode.from_variable_order([cause]),
         [cause],
         [effect],
     )

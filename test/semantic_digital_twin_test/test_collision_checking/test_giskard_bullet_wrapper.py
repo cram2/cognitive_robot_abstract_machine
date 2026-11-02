@@ -25,7 +25,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd import (
 )
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import world_setup_simple
 from semantic_digital_twin.world_description.geometry import (
     Mesh,
@@ -56,7 +56,7 @@ def non_convex_mesh():
         "stl",
         "jeroen_cup.stl",
     )
-    world_with_stl = STLParser(stl_path).parse()
+    world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
 

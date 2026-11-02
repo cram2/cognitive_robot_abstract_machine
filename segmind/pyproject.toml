@@ -12,6 +12,7 @@ dependencies = [
     "krrood",
     "random_events",
     "semantic_digital_twin",
+    "krrood_spatial_math[casadi]",
 ]
 description = "Annotates activitiy episodes represented by meshes moving in a 3D environment with the corresponding events, actions and activities."
 readme = "README.md"
@@ -36,6 +37,7 @@ workspace = [
     "coraplex",
     "cramph",
     "krrood",
+    "krrood_spatial_math",
     "random_events",
     "semantic_digital_twin",
 ]

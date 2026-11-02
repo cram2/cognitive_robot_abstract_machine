@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
