@@ -92,7 +92,7 @@ def _build_two_region_causal_circuit() -> tuple:
 
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([arm], [outcome]),
+        MarginalDeterminismTreeNode.from_variable_order([arm]),
         [arm],
         [outcome],
     )
@@ -175,9 +175,7 @@ def _build_two_cause_candidates_circuit() -> TwoCauseCandidatesCircuit:
 
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph(
-            [decisive, uninformative], [outcome]
-        ),
+        MarginalDeterminismTreeNode.from_variable_order([decisive, uninformative]),
         [decisive, uninformative],
         [outcome],
     )
@@ -434,9 +432,7 @@ def _build_pick_attempt_ranking_circuit() -> TwoCauseCandidatesCircuit:
 
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph(
-            [decisive, uninformative], [outcome]
-        ),
+        MarginalDeterminismTreeNode.from_variable_order([decisive, uninformative]),
         [decisive, uninformative],
         [outcome],
     )
@@ -634,7 +630,7 @@ def _build_confounded_trial_circuit() -> CausalCircuit:
 
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([treatment, season], [outcome]),
+        MarginalDeterminismTreeNode.from_variable_order([treatment, season]),
         [treatment, season],
         [outcome],
     )
