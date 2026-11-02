@@ -28,10 +28,16 @@ section.
   objects and structured arrays are rejected with a dedicated exception ([#824](https://github.com/cram2/cognitive_robot_abstract_machine/pull/824)).
 - **probabilistic_model**: Queries return result classes instead of tuples ([#793](https://github.com/cram2/cognitive_robot_abstract_machine/pull/793)).
   `*WithFiniteSupport` base classes are renamed `*WithConstrainedSupport` ([#798](https://github.com/cram2/cognitive_robot_abstract_machine/pull/798)).
+  `MarginalDeterminismTreeNode.from_causal_graph` is renamed `from_variable_order` and no
+  longer takes a graph ([#844](https://github.com/cram2/cognitive_robot_abstract_machine/pull/844)).
 - **semantic_digital_twin**: The `Hinge`, `Slider` and `ScrewMechanism` bodies are
   replaced by plain connections ([#699](https://github.com/cram2/cognitive_robot_abstract_machine/pull/699)). `GraspDescription` is replaced by grasp poses
   that objects generate themselves ([#588](https://github.com/cram2/cognitive_robot_abstract_machine/pull/588)). `Pose2D.from_position_and_yaw` is replaced by
   the `Pose2D(position, yaw)` constructor and `Pose2D.from_xy_yaw` ([#746](https://github.com/cram2/cognitive_robot_abstract_machine/pull/746)).
+  The spatial types leave `semantic_digital_twin.spatial_types` for the new
+  `krrood_spatial_math` package, which has no re-export: import them from there
+  ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)). Everything that creates a world has one method, `create_world()`,
+  replacing `parse()`, `get_world()` and `WorldSpecification.to_domain_object()` ([#832](https://github.com/cram2/cognitive_robot_abstract_machine/pull/832)).
 - **coraplex**: A plan runs as one cramph statechart. The plan tree, `MotionDesignator`,
   the plan factories, action pre- and postconditions, `Attempt`/`RepeatOnStall` and the
   ROS 1 modules are removed ([#810](https://github.com/cram2/cognitive_robot_abstract_machine/pull/810)).
@@ -102,6 +108,8 @@ repos:
 
 #### Added
 
+- `ObjectReference` serialises a reference to an object that has an identifier and a name, and
+  `HasID` and `HasName` declare them ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
 - **Probabilistic queries in EQL**: `distribution_of(match, *variables)` returns the
   conditioned and truncated model a match describes, and `probability_of(condition)`
   returns its probability. Expectations reuse `average()` ([#575](https://github.com/cram2/cognitive_robot_abstract_machine/pull/575)). `probability_of`
@@ -133,6 +141,8 @@ repos:
 
 #### Changed
 
+- `DeserializedObjectTracker.get` takes the name a reference went by, so an untracked
+  object is reported under it ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
 - **A match reads like an instance of the class it matches** ([#662](https://github.com/cram2/cognitive_robot_abstract_machine/pull/662)). The match's own
   state moves to underscore names (`_type_`, `_kwargs_`, ...), so `a(Drawer).body` is
   the drawer's `body`. A match implements `where`, `having`, `ordered_by`, `distinct`,
@@ -154,6 +164,8 @@ repos:
 
 #### Fixed
 
+- A predicate or symbolic function called with a match among its arguments becomes part
+  of the query instead of being computed on the spot ([#836](https://github.com/cram2/cognitive_robot_abstract_machine/pull/836)).
 - EQL: conditions-root resolution ([#486](https://github.com/cram2/cognitive_robot_abstract_machine/pull/486)), truth of operation results ([#491](https://github.com/cram2/cognitive_robot_abstract_machine/pull/491)), splicing
   rules with `insert_at` ([#498](https://github.com/cram2/cognitive_robot_abstract_machine/pull/498), [#644](https://github.com/cram2/cognitive_robot_abstract_machine/pull/644)), shared nodes in the query graph ([#500](https://github.com/cram2/cognitive_robot_abstract_machine/pull/500)), the query
   root of a variable shared by two queries ([#532](https://github.com/cram2/cognitive_robot_abstract_machine/pull/532)), query-rooted attributes in a query's
@@ -208,6 +220,9 @@ Changes since 26.7.0.
 
 #### Changed
 
+- `MarginalDeterminismTreeNode.from_causal_graph` is renamed `from_variable_order`: it
+  builds the tree from the cause variables in priority order and never read a graph
+  ([#844](https://github.com/cram2/cognitive_robot_abstract_machine/pull/844)).
 - Queries return result classes from `probabilistic_model.query_results` instead of
   tuples ([#793](https://github.com/cram2/cognitive_robot_abstract_machine/pull/793)).
 - `ContinuousDistributionWithFiniteSupport`, `ContinuousLayerWithFiniteSupport` and
@@ -254,6 +269,9 @@ Changes since 26.7.0.
 
 #### Added
 
+- `WorldSource`, the base of everything a world can be created from, with the one
+  method `create_world()` ([#832](https://github.com/cram2/cognitive_robot_abstract_machine/pull/832)). Two-finger grippers name the squeeze their
+  grasps close with, so the HSR keeps hold of an object ([#830](https://github.com/cram2/cognitive_robot_abstract_machine/pull/830)).
 - **Specifications**: world-independent, reusable descriptions of bodies, regions,
   connections, annotations, robots and whole worlds, which an explicit step turns into
   world entities. Each one materialises a fresh world ([#402](https://github.com/cram2/cognitive_robot_abstract_machine/pull/402), [#525](https://github.com/cram2/cognitive_robot_abstract_machine/pull/525)).
@@ -283,6 +301,15 @@ Changes since 26.7.0.
 
 #### Changed
 
+- **The spatial types moved to `krrood_spatial_math`.** `semantic_digital_twin.spatial_types`
+  is deleted, `MissingReferenceFrameError` moves along, and `Derivatives` and
+  `DerivativeMap` move to `semantic_digital_twin.world_description.derivatives`. A value is
+  brought into another frame with `CartesianFrame3D.express_in_own_frame` ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
+- **Worlds are created with `create_world()`.** It replaces `parse()` on every parser,
+  `get_world()` on the predefined maps and `WorldSpecification.to_domain_object()`; the
+  specification's `world_parser` field is now `world_source`. `WorldModelParser` moves to
+  `semantic_digital_twin.world_source`, and `JointDescription` and
+  `ApartmentEnvironment.populate` are removed ([#832](https://github.com/cram2/cognitive_robot_abstract_machine/pull/832)).
 - `Hinge`, `Slider` and `ScrewMechanism` bodies are replaced by plain connections ([#699](https://github.com/cram2/cognitive_robot_abstract_machine/pull/699)).
 - `Pose2D(position, yaw, reference_frame)` and `Pose2D.from_xy_yaw` replace
   `from_position_and_yaw` ([#746](https://github.com/cram2/cognitive_robot_abstract_machine/pull/746)).
@@ -343,6 +370,8 @@ Changes since 26.7.0.
 
 #### Fixed
 
+- The physics executor closes a two-finger gripper by the squeeze the robot names, so
+  the HSR no longer lets go of what it grasps ([#830](https://github.com/cram2/cognitive_robot_abstract_machine/pull/830)).
 - Collision avoidance in worlds with several robots ([#823](https://github.com/cram2/cognitive_robot_abstract_machine/pull/823)) and in motion charts ([#589](https://github.com/cram2/cognitive_robot_abstract_machine/pull/589)).
 - Attachments held by the physics are reported as executed ([#813](https://github.com/cram2/cognitive_robot_abstract_machine/pull/813)).
 - Location poses no longer assume the robot's parent is the world root ([#533](https://github.com/cram2/cognitive_robot_abstract_machine/pull/533)).
@@ -372,7 +401,12 @@ These packages take the shared version but are not released on PyPI.
   the core, `ClipAnnotator` is renamed `ZeroShotClassificationAnnotator` ([#740](https://github.com/cram2/cognitive_robot_abstract_machine/pull/740)), and an
   open-vocabulary annotator is added ([#719](https://github.com/cram2/cognitive_robot_abstract_machine/pull/719)). Camera models are shared with
   semantic_digital_twin ([#761](https://github.com/cram2/cognitive_robot_abstract_machine/pull/761)), and the ROS life cycle is improved ([#567](https://github.com/cram2/cognitive_robot_abstract_machine/pull/567), [#664](https://github.com/cram2/cognitive_robot_abstract_machine/pull/664)). Plane
-  RANSAC is reproducible ([#652](https://github.com/cram2/cognitive_robot_abstract_machine/pull/652)), and empty clouds are handled ([#782](https://github.com/cram2/cognitive_robot_abstract_machine/pull/782)).
+  RANSAC is reproducible ([#652](https://github.com/cram2/cognitive_robot_abstract_machine/pull/652)), and empty clouds are handled ([#782](https://github.com/cram2/cognitive_robot_abstract_machine/pull/782)). The recorded frames its pipeline tests
+  replay live in the tests, and the `robokudo.utils.data_downloader` test-data download
+  and its `pooch` and `filelock` dependencies are removed ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
+- **krrood_spatial_math** (new): points, vectors, rotations and transformations in
+  Cartesian frames, moved out of semantic_digital_twin and independent of it. Its casadi
+  extra provides the symbolic types ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
 - **physics_simulators**: actuator-driven joints in MuJoCo ([#630](https://github.com/cram2/cognitive_robot_abstract_machine/pull/630), [#752](https://github.com/cram2/cognitive_robot_abstract_machine/pull/752)).
 - **experiments**: experiments for causal circuits, layered circuits, graphs of convex
   sets and shelf scenes ([#509](https://github.com/cram2/cognitive_robot_abstract_machine/pull/509), [#604](https://github.com/cram2/cognitive_robot_abstract_machine/pull/604), [#636](https://github.com/cram2/cognitive_robot_abstract_machine/pull/636), [#698](https://github.com/cram2/cognitive_robot_abstract_machine/pull/698), [#711](https://github.com/cram2/cognitive_robot_abstract_machine/pull/711)).
