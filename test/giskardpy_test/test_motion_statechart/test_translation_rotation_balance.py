@@ -29,8 +29,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.robots.tracy import TracyJoint
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,

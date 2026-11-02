@@ -30,9 +30,8 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world import World
 
 # %% building a goal for a robot
