@@ -13,6 +13,7 @@ from ...dataset.instantiated_variable_operations import (
     doubled,
     repeated,
     unannotated_doubled,
+    unconstrained_doubled,
 )
 
 
@@ -38,7 +39,8 @@ def test_inferred_variable_is_a_factory_with_keyword_arguments():
     lower = variable_from([1])
     interval = inference(Interval)(lower=lower, upper=variable_from([3]))
     assert isinstance(interval, HasFactoryAndKwargs)
-    assert list(interval._stated_values_("lower")) == [lower]
+    (stated_lower,) = interval._stated_values_("lower")
+    assert stated_lower is lower
 
 
 def test_a_result_type_that_is_not_a_type_is_rejected():
@@ -61,6 +63,10 @@ def test_symbolic_function_returning_a_generic_has_the_generic_origin_as_type():
 
 def test_unannotated_symbolic_function_has_object_as_type():
     assert unannotated_doubled(variable_from([1]))._type_ is object
+
+
+def test_symbolic_function_returning_any_has_object_as_type():
+    assert unconstrained_doubled(variable_from([1]))._type_ is object
 
 
 def test_symbolic_function_is_named_after_its_function():

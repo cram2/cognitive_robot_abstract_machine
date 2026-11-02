@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import Any
+
 from krrood.entity_query_language.predicate import (
     Predicate,
     SymbolicFunction,
@@ -69,6 +71,15 @@ def unannotated_doubled(number):
     """
     :param number: An integer.
     :return: Twice *number*.
+    """
+    return 2 * number
+
+
+@symbolic_function
+def unconstrained_doubled(number: int) -> Any:
+    """
+    :param number: An integer.
+    :return: Twice *number*, annotated as any value.
     """
     return 2 * number
 

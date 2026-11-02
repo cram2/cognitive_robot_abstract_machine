@@ -251,9 +251,12 @@ class InstantiatedVariable(
         :param function: A function or method.
         :return: The class its return annotation names, the origin of a parameterized
             generic it names (``list`` for ``list[int]``), and :class:`object` when it has
-            no return annotation or the annotation names no class.
+            no return annotation, the annotation is :data:`~typing.Any` or it names no
+            class.
         """
         return_annotation = get_type_hints_of_object(function).get("return")
+        if return_annotation is Any:
+            return object
         if isclass(return_annotation):
             return return_annotation
         if isclass(get_origin(return_annotation)):
