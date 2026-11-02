@@ -4,6 +4,7 @@ A few sections standing in for the ones krrood ships.
 
 from __future__ import annotations
 
+from krrood.development_tools.agents.prose_length import ProseLengthChecker
 from krrood.development_tools.agents.rule import Section
 from krrood.ormatic.utils import classproperty
 
@@ -40,7 +41,7 @@ class VerificationRules(Section):
 
 class AssertionsRules(Section):
     """
-    The subsection of a section without rules of its own.
+    The subsection of a section without rules of its own, with a checked rule.
     """
 
     @classproperty
@@ -48,6 +49,8 @@ class AssertionsRules(Section):
         return VerificationRules
 
     ASSERT_EXACTLY = "A rule about assertions"
+
+    KEEP_ASSERTIONS_SHORT = "A rule a checker enforces", (), ProseLengthChecker()
 
 
 class ReleasesThroughCIRules(Section):

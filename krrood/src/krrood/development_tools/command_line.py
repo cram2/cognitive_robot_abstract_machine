@@ -14,32 +14,18 @@ from pathlib import Path
 
 from typing_extensions import Sequence
 
+from krrood.development_tools.agents.checker import CodeRulesCheck, StagedLines
 from krrood.development_tools.agents.instructions import AgentsInstructions
 from krrood.development_tools.formatting import DocstringFormatter
 from krrood.development_tools.agents.repository_files import (
     RepositoryInstructionsFile,
 )
+from krrood.development_tools.subcommand import Subcommand
 
 logger = logging.getLogger(__name__)
 
 
 # %% command line vocabulary
-
-
-class Subcommand(StrEnum):
-    """
-    The subcommands of ``krrood``.
-    """
-
-    FORMAT = "format"
-    """
-    Format Python files with ruff and docformatter.
-    """
-
-    AGENTS_MD = "agents-md"
-    """
-    Generate the repository's ``AGENTS.md``.
-    """
 
 
 class Option(StrEnum):
@@ -50,6 +36,11 @@ class Option(StrEnum):
     CHECK = "--check"
     """
     Verify a generated file instead of writing it.
+    """
+
+    ALL_LINES = "--all-lines"
+    """
+    Check every line of a file, not only those the staged change touches.
     """
 
 
@@ -79,7 +70,7 @@ class CommandLine:
     command line names.
     """
 
-    program_name: str = "krrood"
+    program_name: str = Subcommand.program_name
     """
     The name the command is invoked by.
     """
@@ -124,6 +115,18 @@ class CommandLine:
         )
         agents_parser.set_defaults(run=self.generate_agents_instructions)
 
+        check_parser = subparsers.add_parser(
+            Subcommand.CHECK,
+            help="Report the code that breaks a rule a checker enforces.",
+        )
+        check_parser.add_argument("files", nargs="*", type=Path)
+        check_parser.add_argument(
+            Option.ALL_LINES,
+            action="store_true",
+            help="Check every line, not only those the staged change touches.",
+        )
+        check_parser.set_defaults(run=self.check_files)
+
         return parser
 
     def format_files(self, arguments: argparse.Namespace) -> ExitStatus:
@@ -159,6 +162,25 @@ class CommandLine:
             return ExitStatus.FAILURE
         if instructions.write():
             logger.info("Wrote %s", RepositoryInstructionsFile.AGENTS)
+            return ExitStatus.FAILURE
+        return ExitStatus.SUCCESS
+
+    def check_files(self, arguments: argparse.Namespace) -> ExitStatus:
+        """
+        Report the code in the files named on the command line that breaks a rule a
+        checker enforces.
+
+        :param arguments: The parsed command line.
+        :return: :attr:`ExitStatus.FAILURE` if any code breaks a rule.
+        """
+        instructions = AgentsInstructions.from_repository(Path.cwd())
+        staged = None if arguments.all_lines else StagedLines(Path.cwd())
+        violations = CodeRulesCheck(instructions.checkers, staged).violations(
+            arguments.files
+        )
+        for violation in violations:
+            logger.error(violation.render())
+        if violations:
             return ExitStatus.FAILURE
         return ExitStatus.SUCCESS
 

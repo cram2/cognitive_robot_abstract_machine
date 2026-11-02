@@ -20,3 +20,12 @@
   language: system
   pass_filenames: false
   always_run: true
+
+- id: krrood-check
+  name: Check the staged code against the rules that have a checker
+  description: >
+    Reports the lines the staged change adds or changes that break a rule a checker
+    enforces.
+  entry: krrood check
+  language: system
+  types: [python]
