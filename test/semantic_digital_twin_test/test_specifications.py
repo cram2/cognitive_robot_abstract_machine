@@ -895,7 +895,7 @@ def test_an_odometry_body_carries_a_generated_name_by_default(empty_world):
 
 
 def test_an_odometry_body_takes_the_name_it_is_given(empty_world):
-    odometry_body_name = PrefixedName("odom_combined")
+    odometry_body_name = "odom_combined"
 
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
@@ -903,7 +903,7 @@ def test_an_odometry_body_takes_the_name_it_is_given(empty_world):
         odometry_body_name=odometry_body_name,
     ).spawn(empty_world)
 
-    assert _odometry_of(robot).name == odometry_body_name
+    assert _odometry_of(robot).name == PrefixedName(odometry_body_name)
 
 
 def test_a_robot_specification_survives_orm_round_trip():
@@ -911,7 +911,7 @@ def test_a_robot_specification_survives_orm_round_trip():
         semantic_annotation_type=MinimalRobot,
         description_parser=_parser_of_robot_rooted_at_map(prefix=""),
         localization_connection_type=Connection6DoF,
-        odometry_body_name=PrefixedName("odom_combined"),
+        odometry_body_name="odom_combined",
     )
 
     reconstructed = to_dao(specification).from_dao()
@@ -929,9 +929,9 @@ def test_a_robot_specification_survives_orm_round_trip():
 
 def test_a_robot_the_environment_contains_is_annotated_in_place():
     world = WorldSpecification(
-        world_parser=_parser_of_robot_rooted_at_map(prefix=""),
+        world_source=_parser_of_robot_rooted_at_map(prefix=""),
         robots_in_environment=[MinimalRobot],
-    ).to_domain_object()
+    ).create_world()
 
     [robot] = world.get_semantic_annotations_by_type(MinimalRobot)
     assert robot.root is world.root
@@ -940,7 +940,7 @@ def test_a_robot_the_environment_contains_is_annotated_in_place():
 
 def test_robots_are_spawned_into_an_environment_containing_a_robot():
     world = WorldSpecification(
-        world_parser=_parser_of_robot_rooted_at_map(),
+        world_source=_parser_of_robot_rooted_at_map(),
         robots_in_environment=[MinimalRobot],
         robots=[
             RobotSpecification(
@@ -948,7 +948,7 @@ def test_robots_are_spawned_into_an_environment_containing_a_robot():
                 description_parser=_parser_of_robot_rooted_at_map(),
             )
         ],
-    ).to_domain_object()
+    ).create_world()
 
     robot_roots = {
         robot.root for robot in world.get_semantic_annotations_by_type(MinimalRobot)
@@ -963,7 +963,7 @@ def test_robots_are_spawned_into_an_environment_containing_a_robot():
 
 def test_a_world_specification_with_robots_in_its_environment_survives_orm_round_trip():
     specification = WorldSpecification(
-        world_parser=_parser_of_robot_rooted_at_map(prefix=""),
+        world_source=_parser_of_robot_rooted_at_map(prefix=""),
         robots_in_environment=[MinimalRobot],
     )
 

@@ -5,13 +5,13 @@ Specifications of robots placed into a world.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, cast
 from uuid import uuid4
 
-from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
+from typing_extensions import TYPE_CHECKING, cast
+
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import DriveVelocityLimitsOnUndrivenRobot
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -20,6 +20,7 @@ from semantic_digital_twin.world_description.connections import (
     WheeledDrive,
 )
 from semantic_digital_twin.world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_source import WorldModelParser
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -88,7 +89,7 @@ class RobotSpecification:
     The connection attaching the robot's odometry body to the ``world.root``.
     """
 
-    odometry_body_name: PrefixedName | None = None
+    odometry_body_name: str | None = None
     """
     The name of the robot's odometry body.
 
@@ -170,7 +171,9 @@ class RobotSpecification:
         """
         if self.description_parser is None:
             return self.semantic_annotation_type.from_description()
-        return self.semantic_annotation_type.from_world(self.description_parser.parse())
+        return self.semantic_annotation_type.from_world(
+            self.description_parser.create_world()
+        )
 
     def _create_localization(
         self, world: World, odometry_body: Body
@@ -241,7 +244,7 @@ class RobotSpecification:
         :return: The created odometry body, named :attr:`odometry_body_name` if given.
         """
         if self.odometry_body_name is not None:
-            return Body(name=self.odometry_body_name)
+            return Body(name=PrefixedName(name=self.odometry_body_name))
         identifier = uuid4()
         return Body(
             name=PrefixedName(name="odom", prefix=str(identifier)), id=identifier
