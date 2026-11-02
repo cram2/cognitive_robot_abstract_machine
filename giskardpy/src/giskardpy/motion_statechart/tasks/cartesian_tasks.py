@@ -34,13 +34,13 @@ from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     RotationMatrix,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, SpatialType
+from krrood_spatial_math.spatial_types import Pose, SpatialType
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -890,6 +890,86 @@ class HoldPose(HoldOrientation):
             <= self.translation_threshold,
         )
         return artifacts
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class RigidCoupling(Task):
+    """
+    Keeps a link at rest relative to another at every step of the predicted trajectory,
+    so that neither moves without the other.
+
+    An invariant rather than a goal: it observes nothing and is always true.
+
+    .. warning:: It adds one constraint per step of the prediction horizon for each of
+        its nine rows, which makes the optimization problem larger.
+    """
+
+    root_link: KinematicStructureEntity
+    """
+    The link the other one is coupled to.
+    """
+
+    tip_link: KinematicStructureEntity
+    """
+    The link kept at rest relative to :attr:`root_link`.
+    """
+
+    reference_linear_velocity: float = CartesianPosition.default_reference_velocity
+    """
+    Unit: m/s. Normalizes the translational constraints against the others.
+    """
+
+    reference_angular_velocity: float = CartesianOrientation.default_reference_velocity
+    """
+    Unit: rad/s. Normalizes the rotational constraints against the others.
+    """
+
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+    """
+    Task priority relative to other tasks.
+    """
+
+    def build_artifacts(self) -> MotionNodeArtifacts:
+        """
+        Constrain the velocity of the position and of two axes of :attr:`tip_link`,
+        relative to :attr:`root_link`, to zero.
+        """
+        artifacts = MotionNodeArtifacts()
+        root_T_tip = self.context.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
+        )
+        root_R_tip = root_T_tip.rotation_matrix
+        self._keep_at_rest(
+            artifacts, root_T_tip.position, self.reference_linear_velocity, "position"
+        )
+        self._keep_at_rest(
+            artifacts, root_R_tip.x_vector(), self.reference_angular_velocity, "x_axis"
+        )
+        self._keep_at_rest(
+            artifacts, root_R_tip.y_vector(), self.reference_angular_velocity, "y_axis"
+        )
+        artifacts.observation = sm.Scalar.const_true()
+        return artifacts
+
+    def _keep_at_rest(
+        self,
+        artifacts: MotionNodeArtifacts,
+        vector: Point3 | Vector3,
+        reference_velocity: float,
+        name: str,
+    ) -> None:
+        """
+        Constrain the velocity of every coordinate of `vector` to zero at every step of
+        the predicted trajectory.
+        """
+        for index in range(3):
+            artifacts.constraints.add_velocity_eq_constraint(
+                velocity_goal=0,
+                quadratic_weight=self.weight,
+                task_expression=vector[index],
+                velocity_limit=reference_velocity,
+                name=f"{name}/{index}",
+            )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

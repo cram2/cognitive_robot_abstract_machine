@@ -16,3 +16,9 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      - id: sync-version
+        name: Sync VERSION into every package and its workspace dependency bounds
+        entry: python scripts/sync_version.py
+        language: system
+        pass_filenames: false
+        always_run: true

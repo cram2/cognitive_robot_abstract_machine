@@ -39,7 +39,7 @@ inside your ROS2 workspace.
 from semantic_digital_twin.adapters.urdf import URDFParser  
   
 parser = URDFParser.from_file(apartment)  
-world = parser.parse()  
+world = parser.create_world()  
 ```
 
 This constructs a world you can visualize, interact and annotate. Be aware that worlds loaded from files have no semantic annotations and serve as purely kinematic models.

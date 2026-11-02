@@ -41,15 +41,15 @@ from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.world_description.derivatives import Derivatives
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
@@ -345,7 +345,6 @@ def record_tip_path(
 
 
 class TestCartesianPositionTrajectory:
-
     def _points_to_np(self, positions: list[Point3] | np.ndarray) -> np.ndarray:
         """
         Convert a sequence of `Point3` or an `ndarray` of shape (N, 3) into an `ndarray`
@@ -2305,9 +2304,9 @@ class TestVelocityTasks:
             limit_node=half_velocity_limit,
         )
 
-        assert (
-            tight_cycles >= 2 * loose_cycles
-        ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        assert tight_cycles >= 2 * loose_cycles, (
+            f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        )
 
     @pytest.mark.parametrize(
         "limit_cls",
@@ -2348,9 +2347,9 @@ class TestVelocityTasks:
             limit_node=half_velocity_limit,
         )
 
-        assert (
-            tight_cycles >= 2 * loose_cycles
-        ), f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        assert tight_cycles >= 2 * loose_cycles, (
+            f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
+        )
 
 
 class TestDebugExpressions:
@@ -2491,7 +2490,6 @@ class TestDebugExpressions:
 
 
 class TestDistanceAlongAxis:
-
     def test_points_on_two_links_end_the_distance_apart_along_the_axis(
         self, prismatic_bot2: World
     ) -> None:

@@ -75,7 +75,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -289,7 +289,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             )
 
         return cls(
-            world_loader=lambda: URDFParser.from_file(str(urdf_path)).parse(),
+            world_loader=lambda: URDFParser.from_file(str(urdf_path)).create_world(),
             search_space_factory=_search_space_factory,
             environment_name=Path(urdf_path).stem,
         )
@@ -492,9 +492,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             true_free_volume_bound=true_free_volume_bound,
             graph_of_convex_polygons_construction_duration=MeanAndStandardDeviation.from_measurements(
                 polygon_construction_elapsed, unit=Unit.SECONDS
-            ).to(
-                Unit.MILLISECONDS
-            ),
+            ).to(Unit.MILLISECONDS),
             graph_of_convex_polygons_region_count=graph_of_convex_polygons.region_count,
             graph_of_convex_polygons_region_volume_sum=round(region_volume_sum, 4),
             graph_of_convex_polygons_coverage_bound=coverage_bound,

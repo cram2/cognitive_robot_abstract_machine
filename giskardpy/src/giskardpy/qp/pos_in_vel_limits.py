@@ -23,7 +23,7 @@ from krrood.symbolic_math.symbolic_math import (
     Vector,
     substitution_cache,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 # %% braking to rest
 

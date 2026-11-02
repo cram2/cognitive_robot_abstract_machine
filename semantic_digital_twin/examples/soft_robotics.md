@@ -63,7 +63,7 @@ from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 executor_pcc = StatechartExecutor(
     context=StatechartContext(world=world_pcc),

@@ -87,7 +87,7 @@ run(Sequence(nodes=[ParkArmsAction(arms=pr2_view.all_arms),
 ```python
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.locations.locations import ReachabilityLocation
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 location = ReachabilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")),
@@ -160,7 +160,7 @@ location samples at most `number_of_samples` candidates. It draws them with the 
 `StatementGrounding` in its context, which is 0 unless set; a seed of `None` draws different candidates each time.
 
 ```python
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 location = VisibilityLocation(
     Pose(Point3.from_iterable([-1, 0, 1.2]), reference_frame=world.root),

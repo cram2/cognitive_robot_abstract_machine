@@ -24,7 +24,7 @@ keywords=["probabilistic models", "probabilistic machine learning", "probability
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
-    "random-events>=4.1.2",
+    "random-events>=26.10.0",
     "networkx",
     "plotly",
     "scipy>=1.10",
@@ -51,12 +51,13 @@ dependencies = [
     "PySide6",
     "qt-material",
     "superqt",
-    "krrood",
+    "krrood>=26.10.0",
 ]
 
 [project.urls]
 "Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
 "Bug Tracker" = 'https://github.com/cram2/cognitive_robot_abstract_machine/issues'
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)
