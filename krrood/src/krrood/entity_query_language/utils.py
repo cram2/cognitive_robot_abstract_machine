@@ -4,10 +4,8 @@ Utilities for hashing, rendering, and general helpers used by the symbolic query
 
 from __future__ import annotations
 
-import inspect
 import itertools
 import re
-from functools import lru_cache
 
 from typing_extensions import (
     Any,
@@ -189,50 +187,6 @@ def chain_stages(
             yield from evaluate_next_stage_or_yield(stage_index + 1, next_result)
 
     yield from evaluate_next_stage_or_yield(0, initial)
-
-
-@lru_cache
-def get_function_argument_names(function: Callable) -> list[str]:
-    """
-    :param function: A function to inspect
-    :return: The argument names of the function
-    """
-    return list(inspect.signature(function).parameters.keys())
-
-
-def merge_args_and_kwargs(
-    function_or_class: Callable,
-    args: tuple[Any, ...],
-    kwargs: dict[str, Any],
-    ignore_first: bool = False,
-) -> dict[str, Any]:
-    """
-    Merge the arguments and keyword-arguments of a function/class into a dict of
-    keyword-arguments. If a class is passed, the arguments are assumed to be the
-    `__init__` arguments.
-
-    :param function_or_class: The function/class to get the argument names from
-    :param args: The arguments passed to the function
-    :param kwargs: The keyword arguments passed to the function
-    :param ignore_first: Whether to ignore the first argument or not. Use this when
-        `function_or_class` contains something like `self`
-    :return: The dict of assigned keyword-arguments.
-    """
-    starting_index = 1 if ignore_first else 0
-    function_or_class = (
-        function_or_class.__init__
-        if inspect.isclass(function_or_class)
-        else function_or_class
-    )
-    all_kwargs = {
-        name: arg
-        for name, arg in zip(
-            get_function_argument_names(function_or_class)[starting_index:],
-            args,
-        )
-    }
-    all_kwargs.update(kwargs)
-    return all_kwargs
 
 
 def camel_case_to_words(name: str) -> str:
