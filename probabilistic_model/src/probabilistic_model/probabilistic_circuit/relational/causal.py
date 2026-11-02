@@ -198,9 +198,7 @@ class RelationalCausalCircuit:
                 registered_variables
             )
 
-        tree = MarginalDeterminismTreeNode.from_causal_graph(
-            causal_variables, effect_variables
-        )
+        tree = MarginalDeterminismTreeNode.from_variable_order(causal_variables)
         causal_circuit = CausalCircuit.from_probabilistic_circuit(
             grounded_circuit, tree, causal_variables, effect_variables
         )

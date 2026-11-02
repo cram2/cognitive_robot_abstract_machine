@@ -519,9 +519,7 @@ def _causal_circuit_for(model):
         for variable in model.variables
         if variable.name == "SceneRoom.objects[0].type"
     )
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
+    tree = MarginalDeterminismTreeNode.from_variable_order([chair_count_variable])
     return CausalCircuit.from_probabilistic_circuit(
         model, tree, [chair_count_variable], [object_type_variable]
     )
@@ -756,9 +754,7 @@ def test_exact_grounding_preserves_correlation_with_the_retained_latent(
         if variable.name == "SceneRoom.objects[0].type"
     )
 
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
+    tree = MarginalDeterminismTreeNode.from_variable_order([chair_count_variable])
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         grounded, tree, [chair_count_variable], [object_type_variable]
     )
