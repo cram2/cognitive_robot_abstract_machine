@@ -29,6 +29,13 @@ from semantic_digital_twin.specifications.semantic_annotations import (
 )
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.predefined_maps.apartment_environment import (
+    ApartmentEnvironment,
+)
+from semantic_digital_twin.predefined_maps.kitchen_environment import (
+    KitchenEnvironment,
+)
+from semantic_digital_twin.world_source import WorldSource
 from krrood.ormatic.data_access_objects.helper import to_dao
 import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao looks up
 
@@ -85,6 +92,7 @@ from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     OmniDrive,
 )
+from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -250,20 +258,20 @@ def test_nested_annotation_on_non_part_whole_field_raises():
 
 def test_world_specification_robotless():
     world = WorldSpecification(
-        world_parser=None,
+        world_source=None,
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
-    ).to_domain_object()
+    ).create_world()
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
 
 
-def test_to_domain_object_is_repeatable():
+def test_create_world_is_repeatable():
     spec = WorldSpecification(
-        world_parser=None,
+        world_source=None,
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
     )
-    first = spec.to_domain_object()
-    second = spec.to_domain_object()
+    first = spec.create_world()
+    second = spec.create_world()
 
     assert first is not second
     assert len(first.bodies) == 2
@@ -273,7 +281,7 @@ def test_to_domain_object_is_repeatable():
 def test_world_specification_from_urdf_environment():
     world = WorldSpecification.from_urdf(
         os.path.join(RESOURCES, "urdf", "table.urdf")
-    ).to_domain_object()
+    ).create_world()
     assert not world.is_empty()
     assert world.root is not None
 
@@ -282,8 +290,8 @@ def test_materialized_environments_share_no_entity_ids():
     specification = WorldSpecification.from_urdf(
         os.path.join(RESOURCES, "urdf", "table.urdf")
     )
-    first = specification.to_domain_object()
-    second = specification.to_domain_object()
+    first = specification.create_world()
+    second = specification.create_world()
 
     first_ids = {body.id for body in first.bodies}
     second_ids = {body.id for body in second.bodies}
@@ -291,18 +299,59 @@ def test_materialized_environments_share_no_entity_ids():
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_world_specification_builds_on_a_map_written_in_code():
+    specification = WorldSpecification(
+        world_source=KitchenEnvironment(),
+        objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
+    )
+    world = specification.create_world()
+
+    assert len(world.bodies) == len(KitchenEnvironment().create_world().bodies) + 1
+    assert world.get_body_by_name("obj").parent_kinematic_structure_entity == world.root
+
+
+def test_world_specification_builds_on_another_world_specification():
+    inner = WorldSpecification(
+        objects=[BodySpecification.box("inner_obj", Scale(1, 1, 1))]
+    )
+    world = WorldSpecification(
+        world_source=inner,
+        objects=[BodySpecification.box("outer_obj", Scale(1, 1, 1))],
+    ).create_world()
+
+    assert {body.name.name for body in world.bodies} == {
+        world.root.name.name,
+        "inner_obj",
+        "outer_obj",
+    }
+
+
+@pytest.mark.parametrize(
+    "world_source",
+    [KitchenEnvironment(), ApartmentEnvironment()],
+    ids=["kitchen", "apartment"],
+)
+def test_predefined_maps_share_no_entity_ids(world_source: WorldSource):
+    first = world_source.create_world()
+    second = world_source.create_world()
+
+    first_ids = {body.id for body in first.bodies}
+    assert len(first_ids) == len(first.bodies)
+    assert first_ids.isdisjoint(body.id for body in second.bodies)
+
+
 def test_world_specification_from_mjcf_environment():
     pytest.importorskip("mujoco")
     world = WorldSpecification.from_mjcf(
         os.path.join(RESOURCES, "mjcf", "table.xml")
-    ).to_domain_object()
+    ).create_world()
     assert not world.is_empty()
     assert world.root is not None
 
 
 def test_world_specification_from_mjcf_keeps_visual_only_geoms_out_of_collision():
     pytest.importorskip("mujoco")
-    world = WorldSpecification.from_mjcf(VISUAL_ONLY_GEOM_SCENE).to_domain_object()
+    world = WorldSpecification.from_mjcf(VISUAL_ONLY_GEOM_SCENE).create_world()
 
     shelf = world.get_body_by_name("shelf")
     assert len(shelf.visual.shapes) == 1
@@ -313,7 +362,7 @@ def test_world_specification_from_mjcf_collides_every_geom_when_asked():
     pytest.importorskip("mujoco")
     world = WorldSpecification.from_mjcf(
         VISUAL_ONLY_GEOM_SCENE, use_visual_as_collision_backup=True
-    ).to_domain_object()
+    ).create_world()
 
     shelf = world.get_body_by_name("shelf")
     assert len(shelf.collision.shapes) == 1
@@ -323,7 +372,7 @@ def test_world_specification_from_gazebo_environment():
     world = WorldSpecification.from_gazebo(
         os.path.join(RESOURCES, "gazebo", "mini_warehouse", "worlds", "mini.world"),
         objects=[BodySpecification.box("obj", Scale(1, 1, 1))],
-    ).to_domain_object()
+    ).create_world()
 
     assert not world.is_empty()
     assert world.get_body_by_name("obj") is not None
@@ -553,7 +602,7 @@ def _odom_bodies(world: World) -> list[Body]:
 def test_world_specification_with_robot():
     try:
         world = WorldSpecification(
-            world_parser=None,
+            world_source=None,
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
@@ -563,7 +612,7 @@ def test_world_specification_with_robot():
                     ),
                 )
             ],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -584,7 +633,7 @@ def test_robot_specification_applies_the_drive_velocity_limits_it_is_given():
     rotation_velocity_limits = 0.2
     try:
         world = WorldSpecification(
-            world_parser=None,
+            world_source=None,
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
@@ -592,7 +641,7 @@ def test_robot_specification_applies_the_drive_velocity_limits_it_is_given():
                     drive_rotation_velocity_limits=rotation_velocity_limits,
                 )
             ],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -607,9 +656,9 @@ def test_robot_specification_keeps_the_drives_own_velocity_limits_by_default():
     drive_defaults = inspect.signature(OmniDrive.create_with_dofs).parameters
     try:
         world = WorldSpecification(
-            world_parser=None,
+            world_source=None,
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -668,7 +717,7 @@ def test_world_specification_from_urdf_with_robot():
         world = WorldSpecification.from_urdf(
             os.path.join(RESOURCES, "urdf", "table.urdf"),
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -692,7 +741,7 @@ def test_robot_specification_returns_spawned_annotation(empty_world):
 def test_world_specification_with_several_robots():
     try:
         world = WorldSpecification(
-            world_parser=None,
+            world_source=None,
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
@@ -703,7 +752,7 @@ def test_world_specification_with_several_robots():
                     world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
                 ),
             ],
-        ).to_domain_object()
+        ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
@@ -728,14 +777,14 @@ def test_world_specification_with_several_robots():
 
 def test_world_specification_annotation_starting_object():
     world = WorldSpecification(
-        world_parser=None,
+        world_source=None,
         objects=[
             Milk.get_annotation_specification(
                 "milk",
                 BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
             )
         ],
-    ).to_domain_object()
+    ).create_world()
     milks = world.get_semantic_annotations_by_type(Milk)
     assert len(milks) == 1
 
@@ -779,6 +828,7 @@ def test_active_1dof_spec_defaults():
         "multiplier": 1.0,
         "offset": 0.0,
         "dof_limits": None,
+        "dynamics": JointDynamics(),
     }
 
 
@@ -856,6 +906,28 @@ def test_connection_spec_connect_active_forwards_kwargs(empty_world):
     assert isinstance(connection, PrismaticConnection)
     assert connection.dof.limits.upper.velocity == 1.5
     assert connection.dof.limits.lower.velocity == -1.5
+
+
+@pytest.mark.parametrize(
+    "specification",
+    [
+        RevoluteConnectionSpecification(
+            axis=Vector3.Z(), dynamics=JointDynamics(damping=0.7, dry_friction=0.3)
+        ),
+        ScrewConnectionSpecification(
+            axis=Vector3.Z(),
+            screw_pitch=0.005,
+            dynamics=JointDynamics(damping=0.7, dry_friction=0.3),
+        ),
+    ],
+    ids=["revolute", "screw"],
+)
+def test_connection_spec_connect_applies_dynamics(
+    empty_world, specification: ActiveConnection1DOFSpecification
+):
+    child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
+    connection = specification.connect(empty_world, child=child)
+    assert connection.dynamics == specification.dynamics
 
 
 def test_screw_connection_spec_connect_forwards_pitch(empty_world):
