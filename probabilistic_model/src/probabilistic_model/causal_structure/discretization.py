@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
+from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
 
 # %% discretizing a table
 
@@ -38,16 +39,21 @@ class Discretization:
         :param columns: The names of the columns to discretize.
         :return: Those columns, each as integer levels, in the rows' order.
         """
-        return pd.DataFrame(
-            {column: self.levels_of(rows[column]) for column in columns},
-            index=rows.index,
-        )
-
-    def levels_of(self, values: pd.Series) -> pd.Series:
-        """
-        :param values: One column.
-        :return: Its values as integer levels.
-        """
-        if is_numeric_dtype(values) and values.nunique() > self.maximum_levels:
-            return pd.qcut(values, self.bin_count, labels=False, duplicates="drop")
-        return pd.Series(pd.factorize(values)[0], index=values.index)
+        binned = [
+            column
+            for column in columns
+            if is_numeric_dtype(rows[column])
+            and rows[column].nunique() > self.maximum_levels
+        ]
+        kept = [column for column in columns if column not in binned]
+        levels = pd.DataFrame(index=rows.index)
+        if binned:
+            levels[binned] = KBinsDiscretizer(
+                n_bins=self.bin_count,
+                encode="ordinal",
+                strategy="quantile",
+                quantile_method="averaged_inverted_cdf",
+            ).fit_transform(rows[binned])
+        if kept:
+            levels[kept] = OrdinalEncoder().fit_transform(rows[kept])
+        return levels[columns].astype(int)

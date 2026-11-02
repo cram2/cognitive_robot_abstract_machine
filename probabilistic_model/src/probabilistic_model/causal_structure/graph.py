@@ -6,14 +6,14 @@ as the data settles it, and the directed acyclic graphs it stands for.
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from functools import cached_property
 
-import networkx
 from random_events.variable import Variable
-from typing_extensions import Callable
+from typing_extensions import Callable, Iterable
 
+from probabilistic_model.directed_acyclic_graph import DirectedAcyclicGraph
 from probabilistic_model.causal_structure.exceptions import (
     CyclicGraph,
     EquivalenceClassTooLarge,
@@ -184,6 +184,46 @@ class GraphEdge:
         return self.second if self.mark_at_first is EdgeMark.TAIL else self.first
 
 
+# %% the directed acyclic graphs a causal graph stands for
+
+
+@dataclass
+class MemberGraph(DirectedAcyclicGraph[str]):
+    """
+    One of the directed acyclic graphs a causal graph stands for, over the names of its
+    nodes.
+    """
+
+    indices: dict[str, int] = field(default_factory=dict, repr=False)
+    """
+    The index of every node in :attr:`graph`, by name.
+    """
+
+    def index_of(self, node: str) -> int:
+        return self.indices[node]
+
+    def add_node(self, node: str) -> None:
+        if node not in self.indices:
+            self.indices[node] = self.graph.add_node(node)
+
+    def copy(self) -> MemberGraph:
+        """
+        :return: A graph with the same nodes and edges, changed independently of this
+            one.
+        """
+        return MemberGraph(graph=self.graph.copy(), indices=dict(self.indices))
+
+    def without_edges(self, edges: Iterable[tuple[str, str]]) -> MemberGraph:
+        """
+        :param edges: Edges of the graph, each as its parent and its child.
+        :return: A copy of the graph without them.
+        """
+        result = self.copy()
+        for parent, child in edges:
+            result.graph.remove_edge(self.index_of(parent), self.index_of(child))
+        return result
+
+
 # %% the graph
 
 
@@ -252,14 +292,16 @@ class CausalGraph:
         :return: Every ``a → c ← b`` among the directed edges with ``a`` and ``b`` not
             adjacent, as ``(a, c, b)`` with ``a`` sorted before ``b``.
         """
-        directed = networkx.DiGraph(
-            [(edge.parent, edge.child) for edge in self.edges if edge.is_directed]
+        directed = MemberGraph()
+        directed.add_nodes_from(self.node_names)
+        directed.add_edges_from(
+            (edge.parent, edge.child) for edge in self.edges if edge.is_directed
         )
         return self.colliders_of(directed, self.adjacent)
 
     @staticmethod
     def colliders_of(
-        directed: networkx.DiGraph, adjacent: Callable[[str, str], bool]
+        directed: MemberGraph, adjacent: Callable[[str, str], bool]
     ) -> set[tuple[str, str, str]]:
         """
         :param directed: Directed edges.
@@ -269,14 +311,14 @@ class CausalGraph:
         """
         return {
             (first, child, second)
-            for child in directed.nodes
+            for child in directed.nodes()
             for first, second in itertools.combinations(
                 sorted(directed.predecessors(child)), 2
             )
             if not adjacent(first, second)
         }
 
-    def member_graphs(self) -> list[networkx.DiGraph]:
+    def member_graphs(self) -> list[MemberGraph]:
         """
         :return: Every directed acyclic graph the graph stands for: each orientation of
             the undirected edges that is acyclic and has exactly the graph's unshielded
@@ -305,7 +347,7 @@ class CausalGraph:
         return bool(self._member_graphs)
 
     @cached_property
-    def _member_graphs(self) -> list[networkx.DiGraph]:
+    def _member_graphs(self) -> list[MemberGraph]:
         """
         :return: The member graphs, as :meth:`member_graphs` describes them, listed
             once; none if no orientation qualifies.
@@ -315,15 +357,14 @@ class CausalGraph:
             raise EquivalenceClassTooLarge(
                 len(undirected), self.maximum_undirected_edges
             )
-        directed = networkx.DiGraph()
+        directed = MemberGraph()
         directed.add_nodes_from(self.node_names)
         directed.add_edges_from(
             (edge.parent, edge.child) for edge in self.edges if edge.is_directed
         )
         if not undirected:
-            if not networkx.is_directed_acyclic_graph(directed):
-                cycle = networkx.find_cycle(directed)
-                raise CyclicGraph([parent for parent, _ in cycle])
+            if not directed.is_acyclic:
+                raise CyclicGraph(directed.cycle())
             return [directed]
         colliders = self.unshielded_colliders()
         members = []
@@ -333,7 +374,7 @@ class CausalGraph:
                 (edge.second, edge.first) if reverse else (edge.first, edge.second)
                 for edge, reverse in zip(undirected, reversals)
             )
-            if networkx.is_directed_acyclic_graph(member) and (
+            if member.is_acyclic and (
                 self.colliders_of(member, self.adjacent) == colliders
             ):
                 members.append(member)
@@ -345,6 +386,4 @@ class CausalGraph:
         :return: The names of the nodes with a directed path to it in at least one
             member graph.
         """
-        return set().union(
-            *(networkx.ancestors(member, name) for member in self.member_graphs())
-        )
+        return set().union(*(member.ancestors(name) for member in self.member_graphs()))

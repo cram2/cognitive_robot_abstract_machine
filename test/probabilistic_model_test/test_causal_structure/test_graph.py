@@ -29,7 +29,7 @@ from .graphs import (
 def test_member_graphs_keep_v_structures():
     [member] = collider_with_an_undirected_child().member_graphs()
 
-    assert set(member.edges) == {("A", "C"), ("B", "C"), ("C", "D")}
+    assert set(member.edges()) == {("A", "C"), ("B", "C"), ("C", "D")}
 
 
 def test_too_many_undirected_edges_raises():

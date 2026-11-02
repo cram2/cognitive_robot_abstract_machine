@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
 
-import networkx
 import pandas as pd
 
 from probabilistic_model.causal_structure.discretization import (
@@ -24,6 +23,7 @@ from probabilistic_model.causal_structure.exceptions import (
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
+    MemberGraph,
 )
 
 # %% the adjustment criterion in one graph
@@ -56,7 +56,7 @@ class AdjustmentCheck:
     The adjustment criterion for one cause and one effect in one directed acyclic graph.
     """
 
-    member_graph: networkx.DiGraph
+    member_graph: MemberGraph
     """
     The directed acyclic graph.
     """
@@ -77,8 +77,8 @@ class AdjustmentCheck:
         :return: The nodes other than the cause on a directed path from the cause to
             the effect, the effect included if there is such a path.
         """
-        return networkx.descendants(self.member_graph, self.cause) & (
-            networkx.ancestors(self.member_graph, self.effect) | {self.effect}
+        return self.member_graph.descendants(self.cause) & (
+            self.member_graph.ancestors(self.effect) | {self.effect}
         )
 
     @cached_property
@@ -88,24 +88,22 @@ class AdjustmentCheck:
         """
         return {self.cause}.union(
             *(
-                networkx.descendants(self.member_graph, node) | {node}
+                self.member_graph.descendants(node) | {node}
                 for node in self.causal_path_nodes
             )
         )
 
     @cached_property
-    def proper_backdoor_graph(self) -> networkx.DiGraph:
+    def proper_backdoor_graph(self) -> MemberGraph:
         """
         :return: The graph without the edges from the cause into a node on a causal
             path, which leaves only the paths that are not causal to connect the two.
         """
-        graph = self.member_graph.copy()
-        graph.remove_edges_from(
+        return self.member_graph.without_edges(
             (self.cause, node)
             for node in self.causal_path_nodes
-            if graph.has_edge(self.cause, node)
+            if self.member_graph.has_edge(self.cause, node)
         )
-        return graph
 
     def failure_reason(
         self, adjustment: frozenset[str]
@@ -119,8 +117,8 @@ class AdjustmentCheck:
             return InvalidAdjustmentReason.CONTAINS_CAUSE_OR_EFFECT
         if self.forbidden_nodes & adjustment:
             return InvalidAdjustmentReason.CONTAINS_FORBIDDEN_NODE
-        if not networkx.is_d_separator(
-            self.proper_backdoor_graph, {self.cause}, {self.effect}, set(adjustment)
+        if not self.proper_backdoor_graph.is_d_separated(
+            {self.cause}, {self.effect}, set(adjustment)
         ):
             return InvalidAdjustmentReason.LEAVES_NON_CAUSAL_PATH_OPEN
         return None
