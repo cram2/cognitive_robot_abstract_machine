@@ -16,8 +16,7 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.math import inverse_frame
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
@@ -215,7 +214,9 @@ class ForwardKinematicsManager(ModelChangeCallback):
         if not root_is_world:
             i = self.body_id_to_all_fk_index[root]
             map_T_root = self.forward_kinematics_for_all_bodies[i : i + 4]
-            root_T_map = inverse_frame(map_T_root)
+            root_T_map = HomogeneousTransformationMatrix.invert_numeric_matrix(
+                map_T_root
+            )
             if tip_is_world:
                 return root_T_map
 

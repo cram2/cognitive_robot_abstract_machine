@@ -1,0 +1,21 @@
+[project]
+name = "release-root"
+dynamic = ["version"]
+dependencies = [
+    "alpha",
+    "third-party>=2.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["release_root*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "release_root._version.__version__"}
+
+[tool.uv.workspace]
+members = [
+    "alpha",
+    "nested/beta",
+    "unversioned",
+]

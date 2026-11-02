@@ -7,9 +7,9 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 from ..conftest import SAMPLING_SEED
 from .conftest import expand

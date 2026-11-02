@@ -14,7 +14,7 @@ from giskardpy.qp.exceptions import (
 )
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world import World
 
 CONTROL_FREQUENCIES = [20, 50, 100]

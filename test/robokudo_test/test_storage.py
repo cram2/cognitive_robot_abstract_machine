@@ -17,12 +17,12 @@ from robokudo.io.sensor_world import RecordedCameraWorld
 from robokudo.types.camera import CameraObservation
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
-from semantic_digital_twin.spatial_types import Point2
+from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 # %% Camera behavior
 

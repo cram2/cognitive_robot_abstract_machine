@@ -89,7 +89,7 @@ class PartNetMobilityDatasetLoader:
             path_resolver=FileUriResolver(
                 base_directory=self.directory / str(model_id)
             ),
-        ).parse()
+        ).create_world()
         self._apply_semantics_to_world(world, model_id)
         return world
 
@@ -180,7 +180,6 @@ class PartNetMobilityDatasetLoader:
         with open(
             os.path.join(package_directory, "generated_semantic_annotations.py"), "w"
         ) as f:
-
             # Write the output to the file
             f.write(output)
 
