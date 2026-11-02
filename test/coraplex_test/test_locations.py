@@ -64,13 +64,13 @@ def _world_with_a_robot_behind_a_displaced_odom(
     A world holding nothing but a PR2, reached through a displaced odom.
     """
     specification = WorldSpecification(
-        world_parser=None,
+        world_source=None,
         robots=[
             RobotSpecification(semantic_annotation_type=PR2, world_T_odom=world_T_odom)
         ],
     )
     try:
-        return specification.to_domain_object()
+        return specification.create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
