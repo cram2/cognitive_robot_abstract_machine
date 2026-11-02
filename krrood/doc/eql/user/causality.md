@@ -99,7 +99,7 @@ for season_value, ice_cream_range, drowning_value, weight in branches:
 
 causal_circuit = CausalCircuit.from_probabilistic_circuit(
     circuit,
-    MarginalDeterminismTreeNode.from_causal_graph([ice_cream_sales], [drowning_incidents]),
+    MarginalDeterminismTreeNode.from_variable_order([ice_cream_sales]),
     [ice_cream_sales],
     [drowning_incidents],
 )
