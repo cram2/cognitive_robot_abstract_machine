@@ -7,10 +7,11 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_source import WorldSource
 
 
 @dataclass
-class MeshParser:
+class MeshParser(WorldSource):
     """
     Adapter for mesh files.
     """
@@ -20,11 +21,9 @@ class MeshParser:
     The path to the mesh file.
     """
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parse the mesh file to a body and return a world containing that body.
-
-        :return: A World object containing the parsed body.
+        :return: A world holding a single body shaped by the mesh.
         """
         file_name = os.path.basename(self.file_path)
 

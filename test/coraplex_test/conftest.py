@@ -44,6 +44,7 @@ try:
     )
 except ModuleNotFoundError:
     pass
+from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
@@ -134,6 +135,19 @@ def stretch_apartment_context(stretch_apartment_world):
     snapshot = WorldSnapshot.capture(stretch_apartment_world)
     robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
     yield stretch_apartment_world, robot, robot_extensions(robot)
+    snapshot.restore()
+
+
+@pytest.fixture(scope="function")
+def hsr_apartment_context(hsr_apartment_world):
+    """
+    The shared HSR apartment world, its robot and the context extensions of its plans,
+    returned to its initial model and state after the test.
+    """
+    world, _, _ = hsr_apartment_world
+    snapshot = WorldSnapshot.capture(world)
+    robot = world.get_semantic_annotations_by_type(HSRB)[0]
+    yield world, robot, robot_extensions(robot)
     snapshot.restore()
 
 

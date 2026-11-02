@@ -24,12 +24,16 @@ from semantic_digital_twin.adapters.usd.exceptions import (
     UnsupportedUsdPhysicsJointTypeError,
     UsdPhysicsJointMissingChildBodyError,
 )
-from semantic_digital_twin.adapters.world_model_parser import (
-    JointDescription,
-    WorldModelParser,
-)
+from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.usd_semantics import UsdSemanticLabels
+from semantic_digital_twin.specifications.connections import (
+    ConnectionSpecification,
+    FixedConnectionSpecification,
+    ConnectionSpecificationWithEndpoints,
+    PrismaticConnectionSpecification,
+    RevoluteConnectionSpecification,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -38,11 +42,7 @@ from semantic_digital_twin.spatial_types.spatial_types import (
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    Connection,
     Connection6DoF,
-    FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -220,14 +220,14 @@ class UsdPhysicsJointType(StrEnum):
     PRISMATIC = "PhysicsPrismaticJoint"
 
     @property
-    def connection_type(self) -> type[Connection]:
+    def connection_specification_type(self) -> type[ConnectionSpecification]:
         """
-        :return: The Connection class this joint type becomes.
+        :return: The specification of the connection this joint type becomes.
         """
         return {
-            UsdPhysicsJointType.FIXED: FixedConnection,
-            UsdPhysicsJointType.REVOLUTE: RevoluteConnection,
-            UsdPhysicsJointType.PRISMATIC: PrismaticConnection,
+            UsdPhysicsJointType.FIXED: FixedConnectionSpecification,
+            UsdPhysicsJointType.REVOLUTE: RevoluteConnectionSpecification,
+            UsdPhysicsJointType.PRISMATIC: PrismaticConnectionSpecification,
         }[self]
 
 
@@ -565,11 +565,12 @@ class USDParser(WorldModelParser):
 
     # %% entry point
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parses the stage into a world.
+        Differs from
+        :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in the
+        joints it rejects.
 
-        :return: The parsed world.
         :raises UnsupportedUsdPhysicsJointTypeError: If the stage contains a physics
             joint of a type this parser does not build a Connection for.
         :raises UsdPhysicsJointMissingChildBodyError: If a physics joint's ``body1``
@@ -604,7 +605,7 @@ class USDParser(WorldModelParser):
         # further: a World left partway through a failed modification is unusable, so
         # anything that can raise must run before entering another modify_world block.
         link_bodies: dict[str, Body] = {}
-        descriptions = [
+        connection_specifications_with_endpoints = [
             self._describe_joint(joint_prim, root_body, link_bodies)
             for joint_prim in joint_prims
         ]
@@ -617,8 +618,10 @@ class USDParser(WorldModelParser):
                 self._attach_semantic_labels(
                     world, self.stage.GetPrimAtPath(path_string), link_body_instance
                 )
-            for description in descriptions:
-                world.add_connection(self._create_connection(world, description))
+            for (
+                connection_specification_with_endpoints
+            ) in connection_specifications_with_endpoints:
+                connection_specification_with_endpoints.connect(world)
 
         return world
 
@@ -691,9 +694,9 @@ class USDParser(WorldModelParser):
         joint_prim: Usd.Prim,
         root_body: Body,
         link_bodies: dict[str, Body],
-    ) -> JointDescription:
+    ) -> ConnectionSpecificationWithEndpoints:
         """
-        Validates and describes the Connection one physics joint prim becomes, without
+        Validates and specifies the joint one physics joint prim states, without
         touching a world - a World left partway through a failed modification is
         unusable, so every joint is described before any world modification begins.
 
@@ -702,7 +705,7 @@ class USDParser(WorldModelParser):
             joint's ``body0`` relationship has no target.
         :param link_bodies: The link Bodies created so far, by stage path - extended in
             place as new links are resolved.
-        :return: The description of the connection the joint becomes.
+        :return: The specification of the joint.
         :raises UnsupportedUsdPhysicsJointTypeError: If the joint's type has no
             Connection counterpart.
         :raises UsdPhysicsJointMissingChildBodyError: If the joint's ``body1``
@@ -717,7 +720,7 @@ class USDParser(WorldModelParser):
                 joint_type=joint_prim.GetTypeName(),
                 supported_types=list(UsdPhysicsJointType),
             ) from error
-        connection_type = usd_joint_type.connection_type
+        specification_type = usd_joint_type.connection_specification_type
 
         joint = UsdPhysics.Joint(joint_prim)
         body0_targets = joint.GetBody0Rel().GetTargets()
@@ -748,24 +751,25 @@ class USDParser(WorldModelParser):
         )
         connection_T_child = child_T_connection.inverse()
 
-        if connection_type is FixedConnection:
-            return JointDescription(
-                connection_type=connection_type,
+        if specification_type is FixedConnectionSpecification:
+            return ConnectionSpecificationWithEndpoints(
+                connection_specification=FixedConnectionSpecification(
+                    connection_T_child=connection_T_child
+                ),
                 parent=parent,
                 child=child,
                 parent_T_connection=parent_T_connection,
-                connection_T_child=connection_T_child,
             )
 
         axis_joint = (
             UsdPhysics.RevoluteJoint(joint_prim)
-            if connection_type is RevoluteConnection
+            if specification_type is RevoluteConnectionSpecification
             else UsdPhysics.PrismaticJoint(joint_prim)
         )
         axis = UsdAxis(axis_joint.GetAxisAttr().Get()).vector(reference_frame=parent)
         lower = axis_joint.GetLowerLimitAttr().Get()
         upper = axis_joint.GetUpperLimitAttr().Get()
-        if connection_type is RevoluteConnection:
+        if specification_type is RevoluteConnectionSpecification:
             lower, upper = math.radians(lower), math.radians(upper)
         if lower > upper:
             # Seen authored this way on a mirrored part (e.g. one blade of a pair of
@@ -775,16 +779,17 @@ class USDParser(WorldModelParser):
             # just its two extremes, so swapping the values (not negating them) keeps
             # the authored range of motion intact.
             lower, upper = upper, lower
-        return JointDescription(
-            connection_type=connection_type,
+        return ConnectionSpecificationWithEndpoints(
+            connection_specification=specification_type(
+                connection_T_child=connection_T_child,
+                axis=axis,
+                dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    lower_position=lower, upper_position=upper
+                ),
+            ),
             parent=parent,
             child=child,
             parent_T_connection=parent_T_connection,
-            connection_T_child=connection_T_child,
-            axis=axis,
-            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
-                lower_position=lower, upper_position=upper
-            ),
         )
 
     def _resolve_link_body(
@@ -811,38 +816,6 @@ class USDParser(WorldModelParser):
         if path_string not in link_bodies:
             link_bodies[path_string] = self._create_link_body(prim)
         return link_bodies[path_string]
-
-    @staticmethod
-    def _create_connection(world: World, description: JointDescription) -> Connection:
-        """
-        Creates the Connection a joint description denotes, adding its degree of freedom
-        to the world.
-
-        :param world: The world the degree of freedom is added to.
-        :param description: The description of the joint.
-        :return: The connection describing the joint.
-        """
-        if description.connection_type is FixedConnection:
-            return FixedConnection.create_with_dofs(
-                world=world,
-                name=description.name,
-                parent=description.parent,
-                child=description.child,
-                parent_T_connection_expression=description.parent_T_connection,
-                connection_T_child_expression=description.connection_T_child,
-            )
-        connection = description.connection_type.create_with_dofs(
-            world=world,
-            name=description.name,
-            parent=description.parent,
-            child=description.child,
-            parent_T_connection_expression=description.parent_T_connection,
-            connection_T_child_expression=description.connection_T_child,
-            axis=description.axis,
-            dof_limits=description.limits,
-        )
-        connection.dynamics = description.dynamics
-        return connection
 
     # %% links and shapes
 

@@ -88,6 +88,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     DistanceAlongAxis,
     HoldOrientation,
     HoldPose,
+    RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.drive_tasks import (
     BaseHeading,
@@ -287,7 +288,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 ],
                 WorldFixture.PR2_WORLD,
             )
-            for node_type in [HoldOrientation, HoldPose]
+            for node_type in [HoldOrientation, HoldPose, RigidCoupling]
         ],
         NodeRoundTripCase(
             CartesianPosition,

@@ -10,10 +10,10 @@ from typing_extensions import Self, TYPE_CHECKING
 
 
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_source import WorldSource
 
 if TYPE_CHECKING:
     from semantic_digital_twin.adapters.package_resolver import PathResolver
@@ -22,20 +22,15 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class WorldSpecification:
+class WorldSpecification(WorldSource):
     """
     World-independent description of a world: an environment, the robots in it, and
     objects around them.
-
-    The environment is described by the parser that builds it (obtained from a model
-    file with :meth:`from_urdf`, :meth:`from_mjcf` or :meth:`from_gazebo`). Applying it
-    (:meth:`to_domain_object`) parses the environment anew, merges every robot into it,
-    then spawns all starting objects, and returns the augmented environment world.
     """
 
-    world_parser: WorldModelParser | None = None
+    world_source: WorldSource | None = None
     """
-    The parser building the environment the robots and starting objects are added to.
+    Describes the world the robots and starting objects are added to.
 
     ``None`` describes an environment holding nothing but its root body.
     """
@@ -72,11 +67,11 @@ class WorldSpecification:
         :param objects: Specifications spawned once the robots are in place.
         :return: The created specification.
         """
-        world_parser = URDFParser.from_file(
+        world_source = URDFParser.from_file(
             file_path, prefix=prefix, path_resolver=path_resolver
         )
         return cls(
-            world_parser=world_parser,
+            world_source=world_source,
             robots=robots or [],
             objects=objects or [],
         )
@@ -108,14 +103,14 @@ class WorldSpecification:
         """
         from semantic_digital_twin.adapters.mjcf import MJCFParser
 
-        world_parser = MJCFParser(
+        world_source = MJCFParser(
             file_path=file_path,
             mimic_joints=mimic_joints or {},
             prefix=prefix,
             use_visual_as_collision_backup=use_visual_as_collision_backup,
         )
         return cls(
-            world_parser=world_parser,
+            world_source=world_source,
             robots=robots or [],
             objects=objects or [],
         )
@@ -145,27 +140,26 @@ class WorldSpecification:
         """
         from semantic_digital_twin.adapters.gazebo import GazeboParser
 
-        world_parser = GazeboParser.from_file(
+        world_source = GazeboParser.from_file(
             file_path, prefix=prefix, path_resolver=path_resolver
         )
         return cls(
-            world_parser=world_parser,
+            world_source=world_source,
             robots=robots or [],
             objects=objects or [],
         )
 
-    def to_domain_object(self) -> World:
+    def create_world(self) -> World:
         """
-        Materialize a new World from this specification.
+        Differs from
+        :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in
+        merging every robot into a new world of :attr:`world_source` first, then
+        spawning all :attr:`objects` relative to the world root.
 
-        The environment is parsed anew, so the method can be applied repeatedly and no
-        two results share an entity identifier. Every robot is merged into the world
-        first, then all ``objects`` are spawned relative to the world root.
-
-        :return: The augmented environment world.
+        :return: The world of :attr:`world_source`, holding the robots and objects.
         """
-        if self.world_parser is not None:
-            world = self.world_parser.parse()
+        if self.world_source is not None:
+            world = self.world_source.create_world()
         else:
             world = World.create_with_root_body()
         for robot_specification in self.robots:
