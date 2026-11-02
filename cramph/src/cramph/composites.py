@@ -1275,11 +1275,83 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         return NodeArtifacts(observation=Scalar(latest_child.last_observation))
 
 
-# %% running a child grounded from a statement
+# %% running a child grounded from statements
+
+
+GenericNodeGroundingStatements = TypeVar(
+    "GenericNodeGroundingStatements", bound="NodeGroundingStatements"
+)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class StatementNode(CompositeNodeChoosingItsChild):
+class NodeGroundingStatements(CompositeNodeChoosingItsChild, ABC):
+    """
+    Runs children grounded from underspecified `a(...)` / `an(...)` statements, each
+    statement grounded into one of its candidates when this node chooses its child.
+
+    The statements are not serialized: a process ticking the statechart elsewhere
+    receives the chosen children rather than grounding them itself.
+    """
+
+    @abstractmethod
+    def next_combination(
+        self, query_backend: QueryBackend, default_candidate_limit: int
+    ) -> dict[StatementNode, Any] | None:
+        """
+        Grounds the statements of this node into their next combination of candidates,
+        against the world as it is now.
+
+        The grounding is left suspended in between, so the next call resumes where this
+        one stopped.
+
+        :param query_backend: The backend answering the statements.
+        :param default_candidate_limit: How many candidates a statement without a limit
+            of its own yields.
+        :return: One candidate of each statement, or None once there is no combination
+            left.
+        """
+
+    @abstractmethod
+    def stop_grounding(self) -> None:
+        """
+        Releases the candidates of the statements once no further child will be asked
+        for.
+
+        The next :meth:`next_combination` grounds the statements anew.
+        """
+
+    @property
+    @abstractmethod
+    def ran_out_of_candidates(self) -> bool:
+        """
+        :return: Whether this node failed because its statements had no combination of
+            candidates left that it could run.
+        """
+
+    @property
+    @abstractmethod
+    def statement_at_candidate_limit(self) -> StatementNode | None:
+        """
+        :return: A statement of this node whose grounding stopped because it yielded as
+            many candidates as it may, or None if there is none.
+        """
+
+    def cleanup(self) -> None:
+        self.stop_grounding()
+
+    def to_json(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        :return: The JSON representation of the node choosing its child that this is,
+            since the statements are not sent.
+        """
+        return {
+            **super().to_json(**kwargs),
+            JSONField.TYPE: get_full_class_name(CompositeNodeChoosingItsChild),
+        }
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class StatementNode(NodeGroundingStatements):
     """
     Runs a node described by an underspecified `a(...)` / `an(...)` statement.
 
@@ -1291,9 +1363,6 @@ class StatementNode(CompositeNodeChoosingItsChild):
     statement: Match = field(metadata=JSONMetadata(serialize=False).as_dict())
     """
     The underspecified statement the children are grounded from.
-
-    Not serialized: a process ticking the statechart elsewhere receives the chosen
-    children rather than grounding them itself.
     """
 
     candidate_limit: int | None = field(default=None, init=False, repr=False)
@@ -1355,6 +1424,14 @@ class StatementNode(CompositeNodeChoosingItsChild):
         self._candidates_pulled += 1
         return candidate
 
+    def next_combination(
+        self, query_backend: QueryBackend, default_candidate_limit: int
+    ) -> dict[StatementNode, Any] | None:
+        candidate = self.next_candidate(query_backend, default_candidate_limit)
+        if candidate is None:
+            return None
+        return {self: candidate}
+
     def ground_on_from(self, ranking: RankedCandidates, handed: Any) -> None:
         """
         Takes over the grounding of the node `ranking` pulled its candidates from, which
@@ -1386,21 +1463,24 @@ class StatementNode(CompositeNodeChoosingItsChild):
             yield from rest
 
     def stop_grounding(self) -> None:
-        """
-        Releases the candidates of the statement once no further child will be asked
-        for.
-
-        A suspended generator keeps every value its frame holds alive, so closing it
-        frees whatever the statement only holds to ground candidates with. The next
-        :meth:`next_candidate` grounds the statement anew.
-        """
         if self._candidates is None:
             return
+        # A suspended generator keeps every value its frame holds alive, so closing it
+        # frees whatever the statement only holds to ground candidates with.
         self._candidates.close()
         self._candidates = None
 
-    def cleanup(self) -> None:
-        self.stop_grounding()
+    @property
+    def ran_out_of_candidates(self) -> bool:
+        return self.ran_out_of_children
+
+    @property
+    def statement_at_candidate_limit(self) -> StatementNode | None:
+        """
+        :return: This node, if the latest run through its statement stopped at
+            :attr:`candidate_limit`, otherwise None.
+        """
+        return self if self.reached_candidate_limit else None
 
     @property
     def grounded_nodes(self) -> list[StatechartNode]:
@@ -1416,16 +1496,6 @@ class StatementNode(CompositeNodeChoosingItsChild):
             )
             for child in self.chosen_children
         ]
-
-    def to_json(self, **kwargs: Any) -> dict[str, Any]:
-        """
-        :return: The JSON representation of the node choosing its child that this is,
-            since the statement is not sent.
-        """
-        return {
-            **super().to_json(**kwargs),
-            JSONField.TYPE: get_full_class_name(CompositeNodeChoosingItsChild),
-        }
 
     def __repr__(self) -> str:
         return f"{self.statement._type_.__name__}"
@@ -1485,9 +1555,11 @@ class RankedCandidates:
 @dataclass
 class CandidateCombinations:
     """
-    Every combination of one candidate of each ranking, those with the lowest sum of
-    ranks first, so the candidates every ranking puts first are combined before any
+    The cartesian product of the rankings, the combinations with the lowest sum of ranks
+    first, so the candidates every ranking puts first are combined before any
     combination takes a later one.
+
+    A ranking is pulled from only as far as a combination reaches into it.
     """
 
     rankings: list[RankedCandidates]
@@ -1541,7 +1613,7 @@ class CandidateCombinations:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
+class ParallelStatementNode(NodeGroundingStatements):
     """
     Runs a parallel whose statements are grounded together, into one combination of
     their candidates, when this node starts, so that every branch starts with the
@@ -1554,9 +1626,6 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
     parallel: Parallel = field(metadata=JSONMetadata(serialize=False).as_dict())
     """
     The parallel as it was written, which belongs to no statechart.
-
-    Not serialized: a process ticking the statechart elsewhere receives the chosen
-    child rather than building it itself.
     """
 
     statements: list[StatementNode] = field(
@@ -1564,8 +1633,6 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
     )
     """
     The statements of :attr:`parallel` that are grounded together.
-
-    Not serialized, like :attr:`parallel`.
     """
 
     _combinations: Iterator[tuple[Any, ...]] | None = field(
@@ -1588,15 +1655,13 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
         self, query_backend: QueryBackend, default_candidate_limit: int
     ) -> dict[StatementNode, Any] | None:
         """
-        Grounds :attr:`statements` into their next combination of candidates, against
-        the world as it is now, see :class:`CandidateCombinations`.
-
-        :param query_backend: The backend answering the statements.
-        :param default_candidate_limit: How many candidates a statement without a limit
-            of its own yields.
-        :return: The candidate of each of :attr:`statements`, or None once there is no
-            combination left.
+        Differs from :meth:`NodeGroundingStatements.next_combination` in taking the
+        combinations in the order of :class:`CandidateCombinations`, and in having none
+        left once a child was chosen in the current run: each statement whose candidate
+        fails grounds a candidate of its own.
         """
+        if self.latest_child is not None:
+            return None
         if self._combinations is None:
             self._rankings = {
                 statement: RankedCandidates(
@@ -1624,12 +1689,6 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
         return self._rankings[statement]
 
     def stop_grounding(self) -> None:
-        """
-        Releases the combinations and the candidates of :attr:`statements` once no
-        further child will be asked for.
-
-        The next :meth:`next_combination` grounds the statements anew.
-        """
         self._combinations = None
         self._rankings = {}
         for statement in self.statements:
@@ -1643,18 +1702,24 @@ class UnderspecifiedParallel(CompositeNodeChoosingItsChild):
         super().on_reset()
         self.stop_grounding()
 
-    def cleanup(self) -> None:
-        self.stop_grounding()
+    @property
+    def ran_out_of_candidates(self) -> bool:
+        """
+        :return: Whether this node failed without choosing a child in its current run,
+            rather than after the parallel it chose failed.
+        """
+        return self.ran_out_of_children and self.latest_child is None
 
-    def to_json(self, **kwargs: Any) -> dict[str, Any]:
-        """
-        :return: The JSON representation of the node choosing its child that this is,
-            since the parallel is not sent.
-        """
-        return {
-            **super().to_json(**kwargs),
-            JSONField.TYPE: get_full_class_name(CompositeNodeChoosingItsChild),
-        }
+    @property
+    def statement_at_candidate_limit(self) -> StatementNode | None:
+        return next(
+            (
+                statement
+                for statement in self.statements
+                if statement.reached_candidate_limit
+            ),
+            None,
+        )
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({', '.join(map(repr, self.statements))})"

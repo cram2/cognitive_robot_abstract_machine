@@ -16,7 +16,7 @@ from cramph.composites import (
     Parallel,
     Sequence,
     StatementNode,
-    UnderspecifiedParallel,
+    ParallelStatementNode,
 )
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -1081,7 +1081,7 @@ def test_a_parallel_of_statements_is_grounded_by_one_node(
     _prepared(plan, extensions)
 
     [grounding] = plan.nodes
-    assert isinstance(grounding, UnderspecifiedParallel)
+    assert isinstance(grounding, ParallelStatementNode)
     assert grounding.parallel is side_by_side
     assert grounding.statements == side_by_side.nodes
 
@@ -1098,7 +1098,7 @@ def test_a_top_level_parallel_of_statements_is_grounded_by_one_node(
     executor = _prepared(side_by_side, extensions)
 
     [grounding] = executor.plan_nodes
-    assert isinstance(grounding, UnderspecifiedParallel)
+    assert isinstance(grounding, ParallelStatementNode)
     assert grounding.parallel is side_by_side
 
 
@@ -1152,7 +1152,7 @@ def test_a_branch_without_a_statement_starting_with_it_stays_beside_the_grounded
 
     assert plan.nodes == [side_by_side]
     [grounding, kept] = side_by_side.nodes
-    assert isinstance(grounding, UnderspecifiedParallel)
+    assert isinstance(grounding, ParallelStatementNode)
     assert kept is beside
     assert grounding.parallel.nodes == [first, second]
     assert grounding.statements == [first, second]
@@ -1179,7 +1179,7 @@ def test_a_parallel_needing_a_number_of_successes_is_grounded_as_a_whole(
     _prepared(plan, extensions)
 
     [grounding] = plan.nodes
-    assert isinstance(grounding, UnderspecifiedParallel)
+    assert isinstance(grounding, ParallelStatementNode)
     assert grounding.parallel is side_by_side
 
 
@@ -1231,7 +1231,7 @@ def _grounded_parallel_of(plan: Sequence) -> Parallel:
         runs, which it chose as its one child.
     """
     [grounding] = [
-        node for node in plan.descendants if isinstance(node, UnderspecifiedParallel)
+        node for node in plan.descendants if isinstance(node, ParallelStatementNode)
     ]
     [steps] = grounding.chosen_children
     [parallel] = steps.nodes
@@ -1633,7 +1633,7 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
 
     [parallel] = plan.nodes
     [grounding] = [
-        node for node in parallel.nodes if isinstance(node, UnderspecifiedParallel)
+        node for node in parallel.nodes if isinstance(node, ParallelStatementNode)
     ]
     assert parallel.life_cycle_state == LifeCycleValues.FAILED
     assert len(grounding.chosen_children) == 1

@@ -26,7 +26,7 @@ from coraplex.plans.underspecified import (
     ActionTrial,
     GroundTheStatementsOfAParallelTogether,
     UnderspecifiedChildChooser,
-    UnderspecifiedParallelChildChooser,
+    ParallelStatementChildChooser,
 )
 from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.plan_transformations import (
@@ -44,8 +44,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
 )
 from cramph.composites import (
     ChildChooserAccess,
-    StatementNode,
-    UnderspecifiedParallel,
+    NodeGroundingStatements,
 )
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -101,7 +100,7 @@ class PlanExecutor(Executor, ABC):
     succeeded or one of them ended without succeeding, and the stall detection.
     Underspecified actions are grounded while it runs, see
     :class:`~coraplex.plans.underspecified.UnderspecifiedChildChooser` and
-    :class:`~coraplex.plans.underspecified.UnderspecifiedParallelChildChooser`.
+    :class:`~coraplex.plans.underspecified.ParallelStatementChildChooser`.
     """
 
     supplied_context_extensions: list[ContextExtension] = field(init=False)
@@ -131,7 +130,7 @@ class PlanExecutor(Executor, ABC):
     Grounds the underspecified actions of the plan while it runs.
     """
 
-    parallel_child_chooser: UnderspecifiedParallelChildChooser = field(init=False)
+    parallel_statement_child_chooser: ParallelStatementChildChooser = field(init=False)
     """
     Grounds the underspecified actions that start with a parallel together while the
     plan runs.
@@ -175,11 +174,13 @@ class PlanExecutor(Executor, ABC):
             executor=self, trial_executor_type=KinematicallySimulatedPlanExecutor
         )
         self.child_chooser = UnderspecifiedChildChooser(trial=trial)
-        self.parallel_child_chooser = UnderspecifiedParallelChildChooser(trial=trial)
+        self.parallel_statement_child_chooser = ParallelStatementChildChooser(
+            trial=trial
+        )
         # Raises for a context another executor runs on before anything of it changed.
         self.context.add_extension(
             ChildChooserAccess(
-                choosers=[self.child_chooser, self.parallel_child_chooser]
+                choosers=[self.child_chooser, self.parallel_statement_child_chooser]
             )
         )
         rewriting = self.context.get_extension(PlanRewriting)
@@ -353,23 +354,21 @@ class PlanExecutor(Executor, ABC):
 
     def _raise_if_out_of_candidates(self) -> None:
         """
-        :raises CandidateLimitReached: If a statement node tried as many actions
-            as it may.
-        :raises EmptyUnderspecified: If a statement node ran out of actions to
-            try, or a node grounding the statements of a parallel together ran out of
+        :raises CandidateLimitReached: If a node grounding statements ran out of
+            combinations to try because one of its statements tried as many actions as
+            it may.
+        :raises EmptyUnderspecified: If a node grounding statements ran out of
             combinations to try.
         """
-        for node in self.statechart.get_nodes_by_type(StatementNode):
-            if not node.ran_out_of_children:
+        for node in self.statechart.get_nodes_by_type(NodeGroundingStatements):
+            if not node.ran_out_of_candidates:
                 continue
-            if node.reached_candidate_limit:
+            limited = node.statement_at_candidate_limit
+            if limited is not None:
                 raise CandidateLimitReached(
-                    node=node, candidate_limit=node.candidate_limit
+                    node=limited, candidate_limit=limited.candidate_limit
                 )
             raise EmptyUnderspecified(node=node)
-        for node in self.statechart.get_nodes_by_type(UnderspecifiedParallel):
-            if node.ran_out_of_children and not node.chosen_children:
-                raise EmptyUnderspecified(node=node)
 
 
 @dataclass
@@ -524,8 +523,9 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         kw_only=True,
     )
     """
-    The plan transformations adapting every plan to being performed in physics. Unless
-    one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
+    The plan transformations adapting every plan to being performed in physics.
+
+    Unless one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
     is put first that squeezes by the
     :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.squeeze` of the
     robot's two-finger grippers.

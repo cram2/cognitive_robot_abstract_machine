@@ -5,7 +5,7 @@ from cramph.composites import (
     Parallel,
     RankedCandidates,
     StatementNode,
-    UnderspecifiedParallel,
+    ParallelStatementNode,
 )
 from cramph.data_types import ObservationStateValues
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
@@ -38,9 +38,9 @@ def _ranked_candidates_of_names(names: list[str]) -> RankedCandidates:
     )
 
 
-def _underspecified_parallel(
+def _parallel_statement_node(
     *names_per_statement: list[str],
-) -> UnderspecifiedParallel:
+) -> ParallelStatementNode:
     """
     :return: A node grounding together one statement per list of names.
     """
@@ -48,7 +48,7 @@ def _underspecified_parallel(
         StatementNode(statement=_statement_of_names(names))
         for names in names_per_statement
     ]
-    return UnderspecifiedParallel(
+    return ParallelStatementNode(
         parallel=Parallel(nodes=list(statements)), statements=statements
     )
 
@@ -106,7 +106,7 @@ def test_a_statement_without_candidates_leaves_no_combination() -> None:
 
 
 def test_the_first_combination_takes_the_candidate_each_statement_ranks_first() -> None:
-    node = _underspecified_parallel(["a1", "a2"], ["b1", "b2"])
+    node = _parallel_statement_node(["a1", "a2"], ["b1", "b2"])
 
     combination = node.next_combination(EntityQueryLanguageGenerativeBackend(), 10)
 
@@ -115,7 +115,7 @@ def test_the_first_combination_takes_the_candidate_each_statement_ranks_first() 
 
 
 def test_the_combinations_go_on_where_the_last_one_stopped() -> None:
-    node = _underspecified_parallel(["a1", "a2"], ["b1"])
+    node = _parallel_statement_node(["a1", "a2"], ["b1"])
     backend = EntityQueryLanguageGenerativeBackend()
 
     combinations = [
@@ -132,7 +132,7 @@ def test_the_combinations_go_on_where_the_last_one_stopped() -> None:
 
 
 def test_stopping_the_grounding_starts_the_combinations_anew() -> None:
-    node = _underspecified_parallel(["a1", "a2"], ["b1"])
+    node = _parallel_statement_node(["a1", "a2"], ["b1"])
     backend = EntityQueryLanguageGenerativeBackend()
     node.next_combination(backend, 10)
 
@@ -144,12 +144,14 @@ def test_stopping_the_grounding_starts_the_combinations_anew() -> None:
 # %% a statement going on from the candidate it was handed
 
 
-def test_a_statement_handed_a_candidate_goes_on_with_the_others_of_its_ranking() -> None:
+def test_a_statement_handed_a_candidate_goes_on_with_the_others_of_its_ranking() -> (
+    None
+):
     """
     The statement goes on with the candidates its ranking pulled for earlier
     combinations, then with those beyond, and never with the one it was handed.
     """
-    node = _underspecified_parallel(["a1", "a2", "a3"], ["b1"])
+    node = _parallel_statement_node(["a1", "a2", "a3"], ["b1"])
     backend = EntityQueryLanguageGenerativeBackend()
     node.next_combination(backend, 10)
     combination = node.next_combination(backend, 10)
