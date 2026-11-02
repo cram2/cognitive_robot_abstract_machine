@@ -33,9 +33,9 @@ dependencies = [
     "opencv-python>=4.11.0.86",
     "matplotlib>=3.0",
     "setuptools",
-    "krrood",
-    "semantic_digital_twin",
-    "krrood_spatial_math[casadi]",
+    "krrood>=26.10.0",
+    "semantic_digital_twin>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
     "transformers",
     "faiss-cpu",
     "ultralytics"

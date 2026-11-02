@@ -39,11 +39,11 @@ dependencies = [
     "embreex",  # Hardware acceleration for trimesh raycasting
     "rtree",  # For spatial indexing in trimesh
     "xxhash",  # Fast hashing for trimesh, which hashes meshes to check its caches
-    "random_events",
+    "random_events>=26.10.0",
     "plotly",
     "daqp",
     "pathlib",
-    "probabilistic_model",
+    "probabilistic_model>=26.10.0",
     "python-fcl",
     "manifold3d",
     "polytope",
@@ -61,16 +61,17 @@ dependencies = [
     "imageio",
     "imageio-ffmpeg",
     "psutil~=5.9.0",
-    "giskardpy",
-    "krrood",
-    "krrood_spatial_math[casadi]",
-    "physics_simulators",
+    "giskardpy>=26.10.0",
+    "krrood>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
+    "physics_simulators>=26.10.0",
 ]
 license = "LGPL-3.0-only"
 
 [project.urls]
 "Source" = 'https://github.com/cram2/semantic_digital_twin'
 "Bug Tracker" = 'https://github.com/cram2/semantic_digital_twin/issues'
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)

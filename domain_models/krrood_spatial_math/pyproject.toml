@@ -18,7 +18,7 @@ keywords = ["robotics", "geometry", "spatial"]
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
-    "krrood",
+    "krrood>=26.10.0",
     "typing_extensions",
 ]
 
@@ -33,6 +33,8 @@ dev = [
 
 [project.urls]
 "Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
