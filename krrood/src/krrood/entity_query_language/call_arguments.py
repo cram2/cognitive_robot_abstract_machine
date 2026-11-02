@@ -54,76 +54,49 @@ class CallArguments:
         :return: The arguments *callee* receives, the same however they were passed and
             including the defaults that were left out.
         """
-        bound_arguments = cls.bind(callee, positional, keyword)
+        signature = (
+            cls.signature_of(callee)
+            if is_hashable(callee)
+            else inspect.signature(callee)
+        )
+        bound_arguments = signature.bind(*positional, **keyword)
         bound_arguments.apply_defaults()
         return cls(bound_arguments.args, bound_arguments.kwargs)
 
-    @classmethod
+    @staticmethod
     def named_by_parameter(
-        cls,
-        callee: Callable[..., Any],
+        signature: inspect.Signature,
         positional: tuple[Any, ...],
         keyword: Mapping[str, Any],
-        without_first: bool = False,
     ) -> dict[str, Any]:
         """
-        :param callee: The function the arguments are passed to.
+        :param signature: The parameters the arguments are passed to.
         :param positional: The arguments passed by position.
         :param keyword: The arguments passed by name.
-        :param without_first: Whether the first parameter of *callee* is not passed,
-            as for the ``self`` of a method that is not bound.
         :return: Each argument that was passed, by the name of the parameter that
             receives it. Defaults that were left out are not included.
+        :raises TypeError: If the arguments do not fit the parameters.
         """
-        return dict(cls.bind(callee, positional, keyword, without_first).arguments)
-
-    @classmethod
-    def bind(
-        cls,
-        callee: Callable[..., Any],
-        positional: tuple[Any, ...],
-        keyword: Mapping[str, Any],
-        without_first: bool = False,
-    ) -> inspect.BoundArguments:
-        """
-        :param callee: The function or class the arguments are passed to.
-        :param positional: The arguments passed by position.
-        :param keyword: The arguments passed by name.
-        :param without_first: Whether the first parameter of *callee* is not passed.
-        :return: The arguments bound to the parameters of *callee*.
-        :raises TypeError: If the arguments do not fit the parameters of *callee*.
-        """
-        signature = (
-            cls.signature_of(callee, without_first)
-            if is_hashable(callee)
-            else cls.read_signature(callee, without_first)
-        )
-        return signature.bind(*positional, **keyword)
+        return dict(signature.bind(*positional, **keyword).arguments)
 
     @classmethod
     @memoize
-    def signature_of(
-        cls, callee: Callable[..., Any], without_first: bool = False
-    ) -> inspect.Signature:
+    def signature_of(cls, callee: Callable[..., Any]) -> inspect.Signature:
         """
         :param callee: A function or class that can be hashed.
-        :param without_first: Whether the first parameter is left out of the result.
-        :return: The signature of *callee*, read once.
-        """
-        return cls.read_signature(callee, without_first)
-
-    @staticmethod
-    def read_signature(
-        callee: Callable[..., Any], without_first: bool
-    ) -> inspect.Signature:
-        """
-        :param callee: A function or class.
-        :param without_first: Whether the first parameter is left out of the result.
         :return: The signature of *callee*.
         """
-        signature = inspect.signature(callee)
-        if not without_first:
-            return signature
+        return inspect.signature(callee)
+
+    @classmethod
+    @memoize
+    def initializer_signature_of(cls, constructed_type: type) -> inspect.Signature:
+        """
+        :param constructed_type: A class that can be hashed.
+        :return: The signature of its ``__init__`` without the ``self`` parameter, which
+            is not passed by the caller.
+        """
+        signature = inspect.signature(constructed_type.__init__)
         return signature.replace(parameters=list(signature.parameters.values())[1:])
 
     @cached_property

@@ -73,7 +73,9 @@ def symbolic_function(
 
     @wraps(function)
     def wrapper(*args, **kwargs) -> Any | None:
-        all_kwargs = CallArguments.named_by_parameter(function, args, kwargs)
+        all_kwargs = CallArguments.named_by_parameter(
+            CallArguments.signature_of(function), args, kwargs
+        )
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=function,
@@ -229,7 +231,7 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
 
     def __new__(cls, *args, **kwargs):
         all_kwargs = CallArguments.named_by_parameter(
-            cls.__init__, args, kwargs, without_first=True
+            CallArguments.initializer_signature_of(cls), args, kwargs
         )
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
