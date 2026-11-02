@@ -66,6 +66,14 @@ class ConnectionModificationTestCase(unittest.TestCase):
             connection = FixedConnection(b1, b2)
             w.add_connection(connection)
 
+        modifications = w.get_world_model_manager().model_modification_blocks[-1]
+        assert [type(m) for m in modifications.modifications] == [
+            AddKinematicStructureEntityModification,
+            AddKinematicStructureEntityModification,
+            AddConnectionModification,
+        ]
+        assert w.get_connection(b1, b2) is connection
+
     def test_ChangeDofHasHardwareInterface(self):
         w = World()
 

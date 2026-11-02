@@ -65,7 +65,7 @@ if controls_real_robot:
 
     WorldSynchronizer(_world=world, node=node)
 else:
-    world = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
+    world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
     Tracy.from_world(world)
     VizMarkerPublisher(_world=world, node=node)
 

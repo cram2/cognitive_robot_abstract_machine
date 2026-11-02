@@ -117,7 +117,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
         """
         :return: A world holding nothing, since the gripper motions touch no objects.
         """
-        return WorldSpecification(world_parser=None)
+        return WorldSpecification()
 
     def robot_specification(self) -> RobotSpecification:
         """

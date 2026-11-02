@@ -90,9 +90,9 @@ def test_publishes_line_list_on_collision_check(rclpy_node, cylinder_bot_world):
     assert len(marker.colors) == len(marker.points)
 
 
-def test_color_green_when_below_buffer_threshold(rclpy_node, cylinder_bot_world):
+def test_color_yellow_when_inside_buffer_zone(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
-    # Threshold above every contact distance, so all contacts must be red.
+    # Every contact is inside the buffer zone and none is violated.
     publisher = CollisionVisualizationMarkerPublisher(
         node=rclpy_node, world=cylinder_bot_world
     )
@@ -104,20 +104,18 @@ def test_color_green_when_below_buffer_threshold(rclpy_node, cylinder_bot_world)
     colors = recorder.last_msg.markers[0].colors
     assert colors
     for color in colors:
-        assert color.r == 1.0
-        assert color.g == 1.0
-        assert color.b == 0.0
-        assert color.a == 1.0
+        assert color == ContactProximity.INSIDE_BUFFER_ZONE.color
 
 
-def test_color_green_when_below_violated_threshold(rclpy_node, cylinder_bot_world):
+def test_color_red_when_violated(rclpy_node, cylinder_bot_world):
     collision_manager = _avoid_robot_environment_collisions(cylinder_bot_world)
-    # Threshold above every contact distance, so all contacts must be red.
     publisher = CollisionVisualizationMarkerPublisher(
         node=rclpy_node, world=cylinder_bot_world
     )
     recorder = _subscribe(rclpy_node, publisher)
 
+    # The robot is moved into one environment body; the other stays inside the buffer
+    # zone.
     cylinder_bot_world.get_connections_by_type(OmniDrive)[
         0
     ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
@@ -126,12 +124,9 @@ def test_color_green_when_below_violated_threshold(rclpy_node, cylinder_bot_worl
 
     _wait_for_message(recorder)
     colors = recorder.last_msg.markers[0].colors
-    assert colors
-    for color in colors:
-        if color.r == 1.0 and color.g == 0.0 and color.b == 0.0 and color.a == 1.0:
-            break
-    else:
-        assert False, "No red color found"
+    # Each contact is a line, drawn with one color per end point.
+    assert colors.count(ContactProximity.VIOLATED.color) == 2
+    assert colors.count(ContactProximity.INSIDE_BUFFER_ZONE.color) == 2
 
 
 def test_color_green_when_above_buffer_threshold(rclpy_node, cylinder_bot_world):
