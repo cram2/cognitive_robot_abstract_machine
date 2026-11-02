@@ -1456,7 +1456,7 @@ class FloatVariableTracker(DeserializedObjectTracker[UUID, FloatVariable]):
     def _has_untracked(self, key: UUID) -> bool:
         return key in FloatVariable._registry_by_id
 
-    def _get_untracked(self, key: UUID) -> FloatVariable:
+    def _get_untracked(self, key: UUID, name: Any = None) -> FloatVariable:
         return FloatVariable._registry_by_id[key]
 
 

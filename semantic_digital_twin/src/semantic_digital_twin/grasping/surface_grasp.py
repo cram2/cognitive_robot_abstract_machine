@@ -17,11 +17,8 @@ from krrood.parametrization.model_registries import (
 )
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
-from semantic_digital_twin.spatial_types.spatial_types import AxisAngle, Quaternion
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import AxisAngle, Quaternion
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -261,7 +258,7 @@ def axis_angle_of(rotation: NDArray[np.float64]) -> AxisAngle:
     :param rotation: A rotation matrix.
     :return: The rotation as an angle in [0, pi] about a unit axis. No rotation is the
         angle zero about the z-axis, as
-        :meth:`~semantic_digital_twin.spatial_types.spatial_types.AxisAngle.from_quaternion`
+        :meth:`~krrood_spatial_math.spatial_types.AxisAngle.from_quaternion`
         reads it.
     """
     x, y, z, w = Rotation.from_matrix(rotation).as_quat(canonical=True)

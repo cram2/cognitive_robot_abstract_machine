@@ -26,7 +26,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,

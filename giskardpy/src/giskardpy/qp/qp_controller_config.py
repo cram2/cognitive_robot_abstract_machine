@@ -15,8 +15,8 @@ from giskardpy.qp.exceptions import (
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 if TYPE_CHECKING:
     from giskardpy.qp.solvers.qp_solver import QPSolver

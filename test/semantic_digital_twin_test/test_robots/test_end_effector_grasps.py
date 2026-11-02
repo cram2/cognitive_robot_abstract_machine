@@ -20,8 +20,8 @@ from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,

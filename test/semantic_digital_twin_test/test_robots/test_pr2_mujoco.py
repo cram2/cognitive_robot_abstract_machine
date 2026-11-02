@@ -32,9 +32,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (

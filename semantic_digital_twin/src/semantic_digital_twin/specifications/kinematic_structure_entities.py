@@ -13,7 +13,7 @@ from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from random_events.product_algebra import Event
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,

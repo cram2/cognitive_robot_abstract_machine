@@ -20,7 +20,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import MissingConnectionAxisError
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
@@ -645,7 +645,7 @@ class Connection6DoF(Connection):
 
         :param transformation: The desired parent-to-child origin. Must carry a
             reference frame (:meth:`World.transform` raises
-            :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
+            :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
             otherwise); does not need to already be expressed in the parent frame. Other
             spatial types (e.g. ``Pose``) must be converted with their own
             ``homogeneous_matrix`` before being assigned here.
