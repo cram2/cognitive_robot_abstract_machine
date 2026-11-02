@@ -945,9 +945,6 @@ class TestPoint3:
         assert np.allclose(distance, 5.0)
         assert np.allclose(point, np.array([0, 0, 0, 1]))
 
-    def test_distance_to_line_segment(self):
-        pass
-
     def test_project_to_plane(self):
         p = Point3(x=0, y=0, z=1)
         actual, distance = p.project_to_plane(
@@ -1544,14 +1541,14 @@ class TestTransformationMatrix:
         assert np.allclose(r1, r2)
 
     def test_dot(self):
-        s = sm.FloatVariable(name="x")
-        m1 = HomogeneousTransformationMatrix()
-        m2 = HomogeneousTransformationMatrix.from_xyz_rpy(x=s)
-        m1.dot(m2)
-
-    def test_TransformationMatrix(self):
-        f = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
-        assert isinstance(f, HomogeneousTransformationMatrix)
+        x = sm.FloatVariable(name="x")
+        m1 = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        m2 = HomogeneousTransformationMatrix.from_xyz_rpy(x=x)
+        actual = m1.dot(m2).substitute([x], [0.5])
+        expected = (
+            m1.to_np() @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5).to_np()
+        )
+        assert np.allclose(actual.to_np(), expected)
 
     def test_wrong_dimensions(self):
         data = np.eye(2)

@@ -12,6 +12,7 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -45,6 +46,7 @@ if TYPE_CHECKING:
         DegreeOfFreedom,
     )
     from semantic_digital_twin.world_description.world_modification import (
+        WorldModelModificationBlock,
         WorldModification,
     )
     from semantic_digital_twin.collision_checking.collision_matrix import (
@@ -438,26 +440,54 @@ class WorldIsNotATreeError(WorldValidationError):
 
 
 @dataclass
-class BrokenWorldModificationHistoryError(WorldValidationError):
+class PartiallyAppliedWorldModificationError(WorldValidationError):
     """
-    Raised when the world's modification history was detected to be broken.
+    Raised when an exception escapes a modification block after the block already
+    changed the world.
+
+    The changes stay in the world, but they are neither in its modification history nor
+    published, so copies and synchronized worlds no longer match it.
+
+    .. warning::
+        This always signals a bug, never a condition to handle.
     """
 
-    potential_cause: DataclassException | None = None
+    cause: Exception
     """
-    The exception that was thrown and caused the world's modification history to be
-    broken.
+    The exception that escaped the modification block.
     """
+
+    applied_modifications: WorldModelModificationBlock
+    """
+    The modifications the block applied to the world before the exception.
+    """
+
+    @classproperty
+    def issue_tracker_url(cls) -> str:
+        """
+        :return: Where to report a failed modification block.
+        """
+        return "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
     def error_message(self) -> str:
+        applied_modification_types = ", ".join(
+            type(modification).__name__ for modification in self.applied_modifications
+        )
         return (
-            f"The world's modification history was detected to be broken. "
-            f"The world is {self.world}"
-            f" Potential cause: {self.potential_cause}"
+            f"A modification block raised {type(self.cause).__name__}: {self.cause}\n"
+            f"It had already applied {len(self.applied_modifications)} "
+            f"modification(s): {applied_modification_types}. They stay in the world but "
+            f"are not in its modification history and were not published, so copies and "
+            f"synchronized worlds no longer match {self.world}"
         )
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            f"this is a bug, not a condition to handle: a modification block must not "
+            f"raise. Find where the cause above was raised and fix it there; if the "
+            f"mistake is not in your code, or you cannot tell, report it at "
+            f"{self.issue_tracker_url} with this traceback."
+        )
 
 
 @dataclass
