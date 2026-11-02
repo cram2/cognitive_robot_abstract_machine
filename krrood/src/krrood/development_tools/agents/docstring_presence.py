@@ -1,13 +1,10 @@
-"""
-Finds modules, classes, functions and fields that have no docstring.
-"""
+"""Finds modules, classes, functions and fields that have no docstring."""
 
 from __future__ import annotations
 
 import abc
 import ast
 import importlib
-import sys
 from dataclasses import dataclass
 from functools import cached_property
 from enum import StrEnum
@@ -18,86 +15,52 @@ from typing_extensions import Iterator, override
 
 from krrood.development_tools.agents.checker import CodeRuleChecker, CodeRuleViolation
 from krrood.development_tools.agents.prose_length import SourceProse
+from krrood.utils import get_import_path_from_path, make_path_importable
 
 # %% what is documented
 
 
 class DocumentedKind(StrEnum):
-    """
-    The kinds of code that carry a docstring.
-    """
+    """The kinds of code that carry a docstring."""
 
     MODULE = "module"
-    """
-    A whole source file.
-    """
+    """A whole source file."""
 
     CLASS = "class"
-    """
-    A class definition.
-    """
+    """A class definition."""
 
     FUNCTION = "function"
-    """
-    A function or method definition.
-    """
+    """A function or method definition."""
 
     FIELD = "field"
-    """
-    An annotated assignment in a class body.
-    """
-
+    """An annotated assignment in a class body."""
 
 @dataclass(frozen=True)
 class ImportedModule:
-    """
-    A source file as the module Python imports it, which tells whether a method
-    implements an abstract method of a base class.
-    """
+    """A source file as the module Python imports it, which tells whether a
+    method implements an abstract method of a base class."""
 
     path: Path
-    """
-    The source file of the module.
-    """
+    """The source file of the module."""
 
     @cached_property
     def module(self) -> ModuleType | None:
-        """
-        The module imported from :attr:`path`; none when it cannot be imported.
-
-        A module that fails to import for any reason is skipped, not reported.
-        """
-        for name in self.candidate_names:
-            try:
-                module = importlib.import_module(name)
-            except Exception:
-                continue
-            if module.__file__ is not None and Path(module.__file__).resolve() == (
-                self.path.resolve()
-            ):
-                return module
-        return None
-
-    @property
-    def candidate_names(self) -> list[str]:
-        """
-        The dotted names :attr:`path` has relative to the import roots, shortest first.
-        """
-        names: list[str] = []
-        package_root = self.path.resolve().parent
-        while (package_root / "__init__.py").is_file():
-            package_root = package_root.parent
-        roots = [package_root, Path.cwd(), *(Path(entry) for entry in sys.path)]
-        for root in roots:
-            if not self.path.resolve().is_relative_to(root.resolve()):
-                continue
-            parts = (
-                self.path.resolve().relative_to(root.resolve()).with_suffix("").parts
-            )
-            name = ".".join(parts).removesuffix(".__init__")
-            if name and name not in names:
-                names.append(name)
-        return sorted(names, key=len)
+        """The module imported from :attr:`path`; none when it cannot be
+        imported."""
+        make_path_importable(self.path.parent)
+        package = get_import_path_from_path(str(self.path.parent))
+        name = self.path.stem if package is None else f"{package}.{self.path.stem}"
+        try:
+            module = importlib.import_module(name.removesuffix(".__init__"))
+        except Exception:
+            # Handle unimportable modules gracefully: whatever the import raises, only
+            # the methods of this module go unchecked.
+            return None
+        if module.__file__ is None or Path(module.__file__).resolve() != (
+            self.path.resolve()
+        ):
+            return None
+        return module
 
     def class_named(self, scope: tuple[str, ...] | None) -> type | None:
         """
@@ -136,10 +99,8 @@ class ImportedModule:
 
 @dataclass(frozen=True)
 class MissingDocstringChecker(CodeRuleChecker):
-    """
-    Finds undocumented code; a method implementing an abstract method inherits its
-    base's docstring and needs none of its own.
-    """
+    """Finds undocumented code; a method implementing an abstract method
+    inherits its base's docstring and needs none of its own."""
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
