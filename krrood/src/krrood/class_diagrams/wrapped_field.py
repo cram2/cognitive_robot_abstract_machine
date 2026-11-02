@@ -33,7 +33,7 @@ from krrood.class_diagrams.utils import (
     get_type_hints_of_object,
     is_union_annotation,
 )
-from krrood.collection_kind import CollectionKind
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -170,7 +170,7 @@ class WrappedField:
     def holds_collection(self) -> bool:
         """
         Whether the field's value is a collection of any
-        :class:`~krrood.collection_kind.CollectionKind`, or, for a union such as
+        :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union such as
         ``Optional``, whether any member of the union is.
         """
         annotations = (
