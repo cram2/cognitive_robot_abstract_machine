@@ -40,7 +40,7 @@ from krrood.symbol_graph.helpers import get_wrapped_field
 
 
 @dataclass
-class RDRMatchParser:
+class RippleDownRulesMatchParser:
     """
     Reads an underspecified :class:`Match` for RDR-based attribute inference.
     """
@@ -51,9 +51,7 @@ class RDRMatchParser:
     """
 
     def __post_init__(self) -> None:
-        # Callers hand in a freshly built, unresolved template (e.g. an(Animal)(species=...));
-        # every property below reads match._type_/._variable_/._matches_with_variables_, which only
-        # exist once resolved. Match.resolve() is idempotent, so this is safe if already resolved.
+        # The properties below read attributes that exist only on a resolved match.
         self.match.resolve()
 
     @property
@@ -78,7 +76,7 @@ class RDRMatchParser:
         targets = [
             attribute_match
             for attribute_match in self.match._matches_with_variables_
-            if attribute_match.is_underspecified_single_value
+            if attribute_match.is_assigned_to_ellipsis
         ]
         for target in targets:
             self._guard_single_valued(target)
@@ -117,7 +115,7 @@ class RDRMatchParser:
         """
         conditions: List[Any] = []
         for leaf in self.match._matches_with_variables_:
-            if leaf.is_underspecified_single_value:
+            if leaf.is_assigned_to_ellipsis:
                 continue
             attribute = getattr(self.variable, leaf.attribute_name)
             conditions.append(attribute == leaf.assigned_variable._value_)

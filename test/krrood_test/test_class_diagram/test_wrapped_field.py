@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, fields, Field
 import pytest
 from types import NoneType
 
+from sortedcontainers import SortedSet
 from typing_extensions import List, Type, TypeVar
 
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -217,7 +218,8 @@ def test_common_base_class():
 @dataclass
 class FieldsOfEveryValueShape:
     """
-    Fields typed as single values and as collections, each optionally wrapped in a union.
+    Fields typed as single values and as collections, each optionally wrapped in a
+    union.
     """
 
     single_value: float
@@ -250,6 +252,16 @@ class FieldsOfEveryValueShape:
     A mapping, which is a collection of key-value pairs.
     """
 
+    frozen_collection: frozenset[str]
+    """
+    An immutable collection of values.
+    """
+
+    sorted_collection: SortedSet[str]
+    """
+    A sorted collection of values, whose class is not a subclass of :class:`set`.
+    """
+
 
 @pytest.mark.parametrize(
     "field_name, holds_collection",
@@ -260,6 +272,8 @@ class FieldsOfEveryValueShape:
         ("collection", True),
         ("optional_collection", True),
         ("mapping", True),
+        ("frozen_collection", True),
+        ("sorted_collection", True),
     ],
 )
 def test_holds_collection(field_name: str, holds_collection: bool):
