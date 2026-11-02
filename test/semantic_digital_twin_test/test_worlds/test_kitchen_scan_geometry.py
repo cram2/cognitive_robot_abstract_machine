@@ -11,6 +11,7 @@ import pytest
 from semantic_digital_twin.predefined_maps.kitchen_environment import KitchenEnvironment
 from semantic_digital_twin.world import World
 from semantic_digital_twin.spatial_types.spatial_types import Point3
+from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 from .test_kitchen_environment import visual_world_bounds
 
@@ -217,3 +218,122 @@ def test_cable_channel_leaves_the_lower_wall_strip_exposed(
     assert not channel_mesh.contains(point)[0]
     assert lower_mesh.contains(point)[0]
     assert channel_mesh.contains(np.array([[4.95, -1.0, 0.15]]))[0]
+
+
+# %% Handle mounting positions
+@pytest.mark.parametrize(
+    ("handle_name", "axis", "coordinate"),
+    [
+        ("fridge_door_handle", 0, 1.0595),
+        ("fridge_drawer_handle", 2, 0.455),
+        ("module_1_handle", 2, 0.6245),
+        ("counter_drawer_0_handle", 2, 0.3385),
+        ("counter_drawer_1_handle", 2, 0.6275),
+        ("counter_drawer_2_handle", 2, 0.769),
+        ("oven_side_handle_left", 0, 3.306),
+        ("oven_side_handle_right", 0, 4.206),
+        ("oven_cabinet_handle", 2, 0.674),
+        ("oven_center_drawer_handle", 2, 0.822),
+        ("sideboard_drawer_0_0_handle", 2, 0.348),
+        ("sideboard_drawer_0_1_handle", 2, 0.637),
+        ("sideboard_drawer_1_0_handle", 2, 0.342),
+        ("sideboard_drawer_1_1_handle", 2, 0.636),
+        ("sideboard_drawer_2_0_handle", 2, 0.342),
+        ("sideboard_drawer_2_1_handle", 2, 0.634),
+        ("dishwasher_handle", 2, 0.789),
+        ("oven_handle", 2, 1.3265),
+    ],
+)
+def test_handle_mount_matches_reviewed_scan_candidate(
+    measured_kitchen: World,
+    handle_name: str,
+    axis: int,
+    coordinate: float,
+) -> None:
+    """
+    Handle mounts occupy reviewed transverse positions in the closed kitchen.
+    """
+    handle = measured_kitchen.get_body_by_name(handle_name)
+    pose = measured_kitchen.compute_forward_kinematics_np(measured_kitchen.root, handle)
+    assert pose[axis, 3] == pytest.approx(coordinate, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("handle_name", "parent_name"),
+    [
+        ("fridge_door_handle", "fridge_door"),
+        ("counter_drawer_0_handle", "counter_drawer_0"),
+        ("sideboard_drawer_1_1_handle", "sideboard_drawer_1_1"),
+    ],
+)
+def test_handle_retains_its_mount_when_parent_opens(
+    measured_kitchen: World,
+    handle_name: str,
+    parent_name: str,
+) -> None:
+    """
+    A corrected handle follows its door or drawer with a fixed mounting pose.
+    """
+    handle = measured_kitchen.get_body_by_name(handle_name)
+    parent = measured_kitchen.get_body_by_name(parent_name)
+    assert handle.parent_connection.parent is parent
+    before = measured_kitchen.compute_forward_kinematics_np(parent, handle)
+    root_before = measured_kitchen.compute_forward_kinematics_np(
+        measured_kitchen.root, handle
+    )
+    connection = parent.get_first_parent_connection_of_type(ActiveConnection1DOF)
+    connection.position = 0.1
+    after = measured_kitchen.compute_forward_kinematics_np(parent, handle)
+    root_after = measured_kitchen.compute_forward_kinematics_np(
+        measured_kitchen.root, handle
+    )
+    np.testing.assert_allclose(after, before, atol=1e-9)
+    assert not np.allclose(root_after, root_before)
+
+
+# %% Sofa placement
+def test_sofa_uses_scan_fitted_horizontal_placement(measured_kitchen: World) -> None:
+    """
+    The sofa follows its observed front and side without changing floor contact.
+    """
+    sofa = measured_kitchen.get_body_by_name("sofa")
+    root_T_sofa = measured_kitchen.compute_forward_kinematics_np(
+        measured_kitchen.root, sofa
+    )
+    np.testing.assert_allclose(
+        root_T_sofa[:3, 3], (3.70718969, 1.23349163, 0.34), atol=1e-7
+    )
+    assert np.arctan2(root_T_sofa[1, 0], root_T_sofa[0, 0]) == pytest.approx(
+        4.719151098618833 - 2 * np.pi
+    )
+
+
+def test_sofa_retains_its_nominal_dimensions(measured_kitchen: World) -> None:
+    """
+    Pose fitting preserves the existing sofa collision-box dimensions.
+    """
+    sofa = measured_kitchen.get_body_by_name("sofa")
+    np.testing.assert_allclose(sofa.collision.combined_mesh.extents, (0.94, 1.68, 0.68))
+
+
+def test_sofa_stays_behind_the_island_corpus(measured_kitchen: World) -> None:
+    """
+    The fitted sofa box does not penetrate the island's rear supporting plane.
+    """
+    cabinet = measured_kitchen.get_body_by_name("sideboard_cabinet")
+    root_T_cabinet = measured_kitchen.compute_forward_kinematics_np(
+        measured_kitchen.root, cabinet
+    )
+    normal = root_T_cabinet[:3, 0]
+    rear_coordinate = (
+        normal @ root_T_cabinet[:3, 3] + cabinet.collision.combined_mesh.bounds[1, 0]
+    )
+    sofa = measured_kitchen.get_body_by_name("sofa")
+    root_T_sofa = measured_kitchen.compute_forward_kinematics_np(
+        measured_kitchen.root, sofa
+    )
+    vertices = (
+        sofa.collision.combined_mesh.vertices @ root_T_sofa[:3, :3].T
+        + root_T_sofa[:3, 3]
+    )
+    assert (vertices @ normal).min() >= rear_coordinate - 1e-6
