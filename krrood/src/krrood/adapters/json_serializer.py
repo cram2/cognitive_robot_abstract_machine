@@ -28,7 +28,7 @@ from krrood.adapters.exceptions import (
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.keyword_argument import SerializationKeywordArgument
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
-from krrood.collection_kind import CollectionKind
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from krrood.singleton import SingletonMeta
 from krrood.utils import (
