@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     )
 
 from krrood.entity_query_language.call_arguments import CallArguments
+from krrood.entity_query_language.call_signature import CallSignature
 from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.variable import (
     Variable,
@@ -71,11 +72,11 @@ def symbolic_function(
     :return: The decorated function.
     """
 
+    signature = CallSignature.of(function)
+
     @wraps(function)
     def wrapper(*args, **kwargs) -> Any | None:
-        all_kwargs = CallArguments.named_by_parameter(
-            CallArguments.signature_of(function), args, kwargs
-        )
+        all_kwargs = signature.keyword_arguments(CallArguments(args, kwargs))
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=function,
@@ -230,8 +231,8 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """
 
     def __new__(cls, *args, **kwargs):
-        all_kwargs = CallArguments.named_by_parameter(
-            CallArguments.initializer_signature_of(cls), args, kwargs
+        all_kwargs = CallSignature.of(cls).keyword_arguments(
+            CallArguments(args, kwargs)
         )
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
