@@ -5,7 +5,7 @@ What can go wrong reading a causal graph or choosing an adjustment set from it.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from krrood.exceptions import DataclassException
+from probabilistic_model.exceptions import ProbabilisticModelException
 from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class UnknownGraphNode(DataclassException):
+class UnknownGraphNode(ProbabilisticModelException):
     """
     Raised when a graph is asked for a node it does not have.
     """
@@ -43,7 +43,7 @@ class UnknownGraphNode(DataclassException):
 
 
 @dataclass
-class NotAPartAttribute(DataclassException):
+class NotAPartAttribute(ProbabilisticModelException):
     """
     Raised when a node that does not stand for an attribute of a collection's parts is
     asked for the variable of one part.
@@ -68,7 +68,7 @@ class NotAPartAttribute(DataclassException):
 
 
 @dataclass
-class CyclicGraph(DataclassException):
+class CyclicGraph(ProbabilisticModelException):
     """
     Raised when a graph whose edges are all directed has a directed cycle.
     """
@@ -86,7 +86,7 @@ class CyclicGraph(DataclassException):
 
 
 @dataclass
-class InconsistentGraph(DataclassException):
+class InconsistentGraph(ProbabilisticModelException):
     """
     Raised when no way of orienting a graph's undirected edges gives a directed acyclic
     graph with the graph's unshielded colliders.
@@ -108,7 +108,7 @@ class InconsistentGraph(DataclassException):
 
 
 @dataclass
-class EquivalenceClassTooLarge(DataclassException):
+class EquivalenceClassTooLarge(ProbabilisticModelException):
     """
     Raised when a graph has more undirected edges than the graphs it stands for can be
     listed over.
@@ -141,7 +141,7 @@ class EquivalenceClassTooLarge(DataclassException):
 
 
 @dataclass
-class InvalidAdjustmentSet(DataclassException):
+class InvalidAdjustmentSet(ProbabilisticModelException):
     """
     Raised when a declared adjustment set does not identify the effect of the cause on
     the effect in a graph the causal graph stands for.
