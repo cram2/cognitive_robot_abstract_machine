@@ -1054,11 +1054,12 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :param other: The second orientation.
         :return: The angle between the two orientations the shorter way round, in
-            [0, pi], see :meth:`Quaternion.rotational_distance`.
+            [0, pi].
         """
-        return Quaternion.from_rotation_matrix(self).rotational_distance(
-            Quaternion.from_rotation_matrix(other)
-        )
+        rotation = self.generic_matrix[:3, :3]
+        other_rotation = other.generic_matrix[:3, :3]
+        relative_rotation = rotation.dot(other_rotation.T)
+        return sm.safe_acos((relative_rotation.trace() - 1) / 2)
 
 
 class Point(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
