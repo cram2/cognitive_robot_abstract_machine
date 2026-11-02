@@ -186,10 +186,17 @@ class ControlStructureNode(CompositeNode, ABC):
             which can hold a neighbour of whatever holds `node` below it.
         :raises NoControlStructureNodeAboveError: If no control structure node is above `node`.
         """
-        for ancestor in node.path:
-            if isinstance(ancestor, ControlStructureNode):
-                return ancestor
-        raise NoControlStructureNodeAboveError(node=node)
+        parent = node.parent_node
+        holder = (
+            None
+            if parent is None
+            else parent.find_upwards(
+                lambda ancestor: isinstance(ancestor, ControlStructureNode)
+            )
+        )
+        if holder is None:
+            raise NoControlStructureNodeAboveError(node=node)
+        return holder
 
     @staticmethod
     def step_holding(node: StatechartNode) -> StatechartNode:
@@ -199,15 +206,12 @@ class ControlStructureNode(CompositeNode, ABC):
             above `node` holds as a step, or the top-level node above `node` when no
             control structure node is above it.
         """
-        holders = [node, *node.path]
-        return next(
-            (
-                holder
-                for holder in holders
-                if isinstance(holder.parent_node, ControlStructureNode)
-            ),
-            holders[-1],
+        step = node.find_upwards(
+            lambda holder: isinstance(holder.parent_node, ControlStructureNode)
         )
+        if step is not None:
+            return step
+        return node.path[-1] if node.path else node
 
     def adopt_handed_children(self) -> None:
         """
@@ -257,10 +261,10 @@ class ControlStructureNode(CompositeNode, ABC):
         :return: The position of the child that is `reference` or holds it.
         :raises NodeIsNotAChildError: If no child is or holds `reference`.
         """
-        for holder in [reference, *reference.path]:
-            if holder in self.nodes:
-                return self.nodes.index(holder)
-        raise NodeIsNotAChildError(node=self, child=reference)
+        holder = reference.find_upwards(lambda candidate: candidate in self.nodes)
+        if holder is None:
+            raise NodeIsNotAChildError(node=self, child=reference)
+        return self.nodes.index(holder)
 
     def _check_is_not_a_child(self, node: StatechartNode) -> None:
         """

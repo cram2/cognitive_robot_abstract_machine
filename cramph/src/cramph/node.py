@@ -999,6 +999,19 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             ancestor = ancestor.parent_node
         return ancestors
 
+    def find_upwards(
+        self, predicate: Callable[[StatechartNode], bool]
+    ) -> StatechartNode | None:
+        """
+        :param predicate: Whether a node is the one looked for.
+        :return: This node, or the closest node above it, for which `predicate` holds,
+            or None if it holds for none of them.
+        """
+        return next(
+            (node for node in [self, *self.path] if predicate(node)),
+            None,
+        )
+
     @property
     def depth(self) -> int:
         """
