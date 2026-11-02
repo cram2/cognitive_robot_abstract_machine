@@ -11,14 +11,9 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.exceptions import (
-    MissingConnectionAxisError,
-    MissingReferenceFrameError,
-)
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from semantic_digital_twin.exceptions import MissingConnectionAxisError
+from krrood_spatial_math.exceptions import MissingReferenceFrameError
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,

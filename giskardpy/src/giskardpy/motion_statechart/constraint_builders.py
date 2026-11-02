@@ -9,7 +9,7 @@ from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     Point3,
     Quaternion,

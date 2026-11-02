@@ -21,7 +21,10 @@ from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, RotationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    RotationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -44,7 +47,7 @@ Finally, in our kinematic structure, each entity has a name. For this we can use
 
 ```{code-cell} ipython3
 import os
-from semantic_digital_twin.spatial_types import AxisAngle, Point3, Vector3
+from krrood_spatial_math.spatial_types import AxisAngle, Point3, Vector3
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 

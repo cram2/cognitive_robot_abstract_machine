@@ -12,7 +12,7 @@ from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.utils.ros_frames import normalize_ros_frame_id
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:

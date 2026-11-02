@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood_spatial_math"
+authors = [
+    { name = "Simon Stelter", email = "stelter@uni-bremen.de" },
+]
+description = "Points, vectors, rotations and transformations in Cartesian frames."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+keywords = ["robotics", "geometry", "spatial"]
+license = "LGPL-3.0-only"
+dynamic = ["version"]
+dependencies = [
+    "krrood",
+    "typing_extensions",
+]
+
+[project.optional-dependencies]
+casadi = [
+    "casadi~=3.7.0",
+    "numpy",
+]
+dev = [
+    "pytest>=7.0.0,<8.0.0",
+]
+
+[project.urls]
+"Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood_spatial_math*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "krrood_spatial_math._version.__version__" }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 
 import py_trees
 import pytest
@@ -22,6 +23,8 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
 from robokudo.identifier import BBIdentifier
+
+from .dataset.cup_on_counter import CupOnCounterRecording
 
 # %% Mongo storage preservation
 
@@ -188,3 +191,14 @@ def annotator_output_buffer() -> AnnotatorOutputPerPipelineMap:
     buffer = AnnotatorOutputPerPipelineMap()
     Blackboard().set("annotator_output_pipeline_map_buffer", buffer)
     return buffer
+
+
+# %% recorded RGB-D frames
+
+
+@pytest.fixture
+def cup_on_counter_directory(tmp_path: Path) -> Path:
+    """
+    Provide a directory holding the :class:`CupOnCounterRecording` frames.
+    """
+    return CupOnCounterRecording().write_to(tmp_path)

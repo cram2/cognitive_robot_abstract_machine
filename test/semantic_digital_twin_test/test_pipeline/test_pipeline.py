@@ -21,9 +21,7 @@ from semantic_digital_twin.pipeline.pipeline import (
     CenterLocalGeometryAndPreserveWorldPose,
     BodyFactoryReplace,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body

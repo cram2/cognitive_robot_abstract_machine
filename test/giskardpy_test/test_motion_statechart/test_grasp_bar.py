@@ -7,7 +7,7 @@ from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
