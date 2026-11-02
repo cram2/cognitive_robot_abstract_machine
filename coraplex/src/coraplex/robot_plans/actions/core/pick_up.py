@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -54,40 +54,6 @@ class HasGraspChoice:
     """
     The arm that should be used.
     """
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class GripperContactAction(SequentialAction):
-    """
-    Runs the steps of another action during which a gripper touches its object or what
-    the object stands on, and lets that gripper, with whatever it holds, touch its
-    surroundings for those steps only.
-
-    The rest of the action stays checked for collisions, so a gripper on its way to or
-    from its object, or an object carried through the scene, passes through nothing. The
-    allowance is this action's own, so it also holds between two of its steps, such as
-    while a grasped object is put under the gripper.
-    """
-
-    end_effector: EndEffector
-    """
-    The gripper that touches its surroundings during :attr:`steps`.
-    """
-
-    steps: list[StatechartNode] = field(default_factory=list)
-    """
-    The steps during which the gripper touches its surroundings, in order.
-    """
-
-    def create_temporary_collision_rules(self) -> list[CollisionRule]:
-        """
-        :return: An allowance for :attr:`end_effector`, and whatever it holds, to touch
-            its surroundings.
-        """
-        return [AllowCollisionForEndEffector(end_effector=self.end_effector)]
-
-    def create_steps(self) -> list[StatechartNode]:
-        return list(self.steps)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -329,18 +295,18 @@ class GraspingAction(
 @dataclass(eq=False, repr=False, kw_only=True)
 class FixateObjectAction(ParallelAction):
     """
-    Keeps what an arm's gripper holds exactly where it is, by keeping the gripper where
-    it is when the action starts, whether the object hangs off the gripper or not, such
-    as the handle of a drawer the gripper holds open.
+    Keeps what a gripper holds exactly where it is, by keeping the gripper where it is
+    when the action starts, whether the object hangs off the gripper or not, such as the
+    handle of a drawer the gripper holds open.
 
     Like the task it holds, it leaves its end to its owner: beside other nodes in a
     parallel it keeps the object in place for as long as the parallel runs, while a
     sequence ends it as soon as the gripper holds still.
     """
 
-    arm: Arm
+    end_effector: EndEffector
     """
-    The arm whose gripper holds the object.
+    The gripper that holds the object.
     """
 
     @property
@@ -356,10 +322,10 @@ class FixateObjectAction(ParallelAction):
         """
         :return: An allowance for the gripper to touch the object it is around.
         """
-        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
+        return [AllowCollisionForEndEffector(end_effector=self.end_effector)]
 
     def create_steps(self) -> list[StatechartNode]:
-        tool_frame = self.arm.end_effector.tool_frame
+        tool_frame = self.end_effector.tool_frame
         return [
             CartesianPose(
                 name="Keep the gripper in place",

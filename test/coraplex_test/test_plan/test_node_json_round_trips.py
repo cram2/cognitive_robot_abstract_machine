@@ -51,7 +51,6 @@ from coraplex.robot_plans.actions.core.navigation import (
 from coraplex.robot_plans.actions.core.pick_up import (
     FixateObjectAction,
     GraspingAction,
-    GripperContactAction,
     PickUpAction,
     ReachAction,
 )
@@ -384,16 +383,8 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            FixateObjectAction, lambda world: [FixateObjectAction(arm=_arm(world))]
-        ),
-        ActionRoundTripCase(
-            GripperContactAction,
-            lambda world: [
-                GripperContactAction(
-                    end_effector=_arm(world).end_effector,
-                    steps=[_navigate(world)],
-                )
-            ],
+            FixateObjectAction,
+            lambda world: [FixateObjectAction(end_effector=_arm(world).end_effector)],
         ),
         ActionRoundTripCase(
             MoveAndPickUpAction, lambda world: [_move_and_pick_up(world)]

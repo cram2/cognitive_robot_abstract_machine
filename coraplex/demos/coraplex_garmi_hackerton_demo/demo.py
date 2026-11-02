@@ -36,7 +36,6 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import (
     FixateObjectAction,
     GraspingAction,
-    GripperContactAction,
     PickUpAction,
 )
 from coraplex.robot_plans.actions.core.placing import PlaceAction
@@ -469,7 +468,9 @@ class GarmiHackathonDemonstration(RobotDemonstration):
                                     connection=drawer_mechanism,
                                     position=drawer_mechanism.dof.limits.upper.position,
                                 ),
-                                monitored_node=FixateObjectAction(arm=left_arm),
+                                monitored_node=FixateObjectAction(
+                                    end_effector=left_hand
+                                ),
                             ),
                             UpdateTemporaryCollisionRules.for_end_effector(left_hand),
                         ]
@@ -491,19 +492,14 @@ class GarmiHackathonDemonstration(RobotDemonstration):
                         ]
                     ),
                     # Back off the handle the way the hand came in.
-                    GripperContactAction(
+                    MoveManipulatorAction(
+                        target_pose=HasApproachesGraspPoses.pre_grasp_pose(
+                            handle_grasp.grasp_pose,
+                            left_hand,
+                            HandDistance.HANDLE_RELEASE_CLEARANCE.value,
+                        ),
                         end_effector=left_hand,
-                        steps=[
-                            MoveManipulatorAction(
-                                target_pose=HasApproachesGraspPoses.pre_grasp_pose(
-                                    handle_grasp.grasp_pose,
-                                    left_hand,
-                                    HandDistance.HANDLE_RELEASE_CLEARANCE.value,
-                                ),
-                                end_effector=left_hand,
-                                allow_gripper_collision=False,
-                            ),
-                        ],
+                        allow_gripper_collision=True,
                     ),
                     Parallel(
                         nodes=[
