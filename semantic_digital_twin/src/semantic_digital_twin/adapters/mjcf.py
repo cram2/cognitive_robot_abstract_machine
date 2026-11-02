@@ -25,7 +25,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoTendon,
 )
 from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
-from semantic_digital_twin.adapters.world_model_parser import WorldModelParser
+from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
 from semantic_digital_twin.spatial_types import (
@@ -174,15 +174,7 @@ class MJCFParser(WorldModelParser):
             file_path, use_visual_as_collision_backup=use_visual_as_collision_backup
         )
 
-    def parse(self) -> World:
-        """
-        Parse the MJCF file and convert it into a World object.
-
-        The world is built per call, so parsing repeatedly yields independent worlds
-        that share no entity identifiers.
-
-        :return: The World object representing the MJCF scene.
-        """
+    def create_world(self) -> World:
         self.world = World()
         worldbody: mujoco.MjsBody = self.spec.worldbody
         with self.world.modify_world():
