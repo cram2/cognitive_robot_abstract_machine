@@ -17,7 +17,10 @@ from semantic_digital_twin.exceptions import (
     InvalidConnectionLimits,
     MimicDofLimitOverwriteError,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.world_description.derivatives import (
+    Derivatives,
+    DerivativeMap,
+)
 
 
 class DegreeOfFreedomVariableJSONKey(StrEnum):

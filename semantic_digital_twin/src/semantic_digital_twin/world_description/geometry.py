@@ -31,7 +31,7 @@ from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point,
     Point2,
@@ -1424,8 +1424,8 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
 PointT = TypeVar("PointT", bound=Point)
 """
 The point type an :class:`AxisAlignedBox` subclass is asked about --
-:class:`~semantic_digital_twin.spatial_types.Point3` for a box expressed over three
-axes, :class:`~semantic_digital_twin.spatial_types.Point2` for one expressed over a
+:class:`~krrood_spatial_math.spatial_types.Point3` for a box expressed over three
+axes, :class:`~krrood_spatial_math.spatial_types.Point2` for one expressed over a
 plane.
 """
 

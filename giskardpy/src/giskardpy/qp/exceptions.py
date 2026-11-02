@@ -17,7 +17,7 @@ from giskardpy.data_types.exceptions import (
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
     from giskardpy.qp.qp_data import QPData
-    from semantic_digital_twin.spatial_types.derivatives import Derivatives
+    from semantic_digital_twin.world_description.derivatives import Derivatives
 
 
 @dataclass

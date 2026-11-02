@@ -21,10 +21,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     ShelfLayer,
     Cabinet,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose2D,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import (

@@ -22,7 +22,7 @@ from semantic_digital_twin.orm.model import (
     WorldMapping,
     WorldStateMapping,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Pose,

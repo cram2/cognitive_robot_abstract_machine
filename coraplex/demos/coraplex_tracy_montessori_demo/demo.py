@@ -34,7 +34,7 @@ from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     ShapeSortingPiece,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,

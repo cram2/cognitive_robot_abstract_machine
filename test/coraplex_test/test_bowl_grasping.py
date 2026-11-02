@@ -14,8 +14,8 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Rim
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 
 from ..conftest import SAMPLING_SEED
 from ..plan_running import context_of, robot_extensions

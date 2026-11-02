@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
