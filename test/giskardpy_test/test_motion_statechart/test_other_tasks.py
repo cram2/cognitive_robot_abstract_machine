@@ -58,7 +58,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
