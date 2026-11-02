@@ -26,6 +26,7 @@ from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValues
 from cramph.exceptions import NodeNotFoundError
 from cramph.executor import StatechartExecutor
+from cramph.failure_handling import FailureHandlingNode, HandledOnFailure
 from cramph.monitors import (
     CheckTickCount,
     CountNodeResets,
@@ -220,7 +221,7 @@ def node_types_needing_a_case() -> set[type[StatechartNode]]:
     return (
         concrete_node_types(cramph)
         - concrete_node_types(nodes_for_testing)
-        - {FunctionCall}
+        - {FunctionCall, FailureHandlingNode, HandledOnFailure}
     )
 
 
