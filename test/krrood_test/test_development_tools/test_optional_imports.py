@@ -5,82 +5,74 @@ from pathlib import Path
 import pytest
 
 import krrood
+from krrood.development_tools.agents.optional_imports import OptionalImportChecker
+from krrood.development_tools.agents.shipped_rules.imports import ImportsRules
+from krrood.development_tools.command_line import CommandLine, ExitStatus, Option
+from krrood.development_tools.subcommand import Subcommand
 
-from krrood.development_tools.command_line import (
-    CommandLine,
-    ExitStatus,
-    Option,
-    Subcommand,
-)
-from krrood.development_tools.optional_imports import (
-    OptionalImportCheck,
-    UnguardedOptionalImport,
-)
-from krrood.optional_modules import KrroodOptionalModule
+from .dataset_files import DatasetMarker, OptionalLibrarySnippet
 
-from .dataset_files import DatasetFile, DatasetMarker
+# %% module-level imports in core
 
 
-@pytest.fixture
-def check() -> OptionalImportCheck:
-    return OptionalImportCheck(list(KrroodOptionalModule))
-
-
-# %% finding unguarded imports
-
-
-def test_reports_every_unguarded_import(check: OptionalImportCheck) -> None:
-    path = DatasetFile.OPTIONAL_IMPORTS_UNGUARDED
+def test_module_level_imports_of_an_optional_library_in_core_are_reported() -> None:
+    path = OptionalLibrarySnippet.UNGUARDED_CORE_MODULE
     marked_lines = [
         line_number
         for line_number, line in enumerate(path.read_text().splitlines(), start=1)
         if line.endswith(DatasetMarker.UNGUARDED_IMPORT)
     ]
 
-    assert check.find_unguarded_imports([path]) == [
-        UnguardedOptionalImport(path, line_number, KrroodOptionalModule.MATPLOTLIB)
-        for line_number in marked_lines
+    reported_lines = [
+        violation.first_line for violation in OptionalImportChecker().violations(path)
     ]
 
-
-def test_accepts_decorated_functions_and_type_checking_blocks(
-    check: OptionalImportCheck,
-) -> None:
-    assert check.find_unguarded_imports([DatasetFile.OPTIONAL_IMPORTS_GUARDED]) == []
-
-
-def test_ignores_modules_that_only_resemble_an_optional_one(
-    check: OptionalImportCheck,
-) -> None:
-    assert check.find_unguarded_imports([DatasetFile.OPTIONAL_IMPORTS_UNRELATED]) == []
-
-
-def test_krrood_imports_its_optional_modules_only_where_guarded(
-    check: OptionalImportCheck,
-) -> None:
-    source_directory = Path(krrood.__file__).parent
-
-    assert check.find_unguarded_imports(sorted(source_directory.rglob("*.py"))) == []
-
-
-# %% command line
+    assert reported_lines == marked_lines
 
 
 @pytest.mark.parametrize(
-    "dataset_file, exit_status",
+    "path",
     [
-        (DatasetFile.OPTIONAL_IMPORTS_GUARDED, ExitStatus.SUCCESS),
-        (DatasetFile.OPTIONAL_IMPORTS_UNGUARDED, ExitStatus.FAILURE),
+        OptionalLibrarySnippet.GUARDED_CORE_MODULE,
+        OptionalLibrarySnippet.MODULE_OUTSIDE_CORE,
+        OptionalLibrarySnippet.MODULE_OF_UNDECLARED_CORE,
     ],
 )
-def test_command_line_exit_status(
-    dataset_file: DatasetFile, exit_status: ExitStatus
-) -> None:
-    command_line = [
-        Subcommand.OPTIONAL_IMPORTS,
-        Option.OPTIONAL_MODULES,
-        f"{KrroodOptionalModule.__module__}:{KrroodOptionalModule.__name__}",
-        str(dataset_file),
+def test_imports_outside_module_level_core_code_are_not_reported(path: Path) -> None:
+    assert list(OptionalImportChecker().violations(path)) == []
+
+
+def test_krrood_core_imports_no_optional_library_at_module_level() -> None:
+    source = Path(krrood.__file__).parent
+    checker = OptionalImportChecker()
+
+    violations = [
+        violation
+        for path in sorted(source.rglob("*.py"))
+        for violation in checker.violations(path)
     ]
 
-    assert CommandLine.main(command_line) == exit_status
+    assert violations == []
+
+
+# %% the rule and the command
+
+
+def test_the_optional_import_rule_carries_the_checker() -> None:
+    assert ImportsRules.IMPORT_OPTIONAL_LIBRARIES_WHERE_USED.checker == (
+        OptionalImportChecker()
+    )
+
+
+def test_checking_a_core_module_importing_an_optional_library_fails(
+    repository_root: Path,
+) -> None:
+    exit_status = CommandLine.main(
+        [
+            Subcommand.CHECK,
+            Option.ALL_LINES,
+            str(OptionalLibrarySnippet.UNGUARDED_CORE_MODULE),
+        ]
+    )
+
+    assert exit_status == ExitStatus.FAILURE

@@ -4,6 +4,7 @@ The input files of the development tools tests.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -125,4 +126,58 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+
+class OptionalLibrarySnippet(PathEnumeration):
+    """
+    The Python sources the optional-library checker reads, inside mimic distributions
+    whose ``pyproject.toml`` the checker finds above them.
+    """
+
+    GUARDED_CORE_MODULE = (
+        Path(__file__).parent
+        / "dataset"
+        / "optional_library_distribution"
+        / "src"
+        / "mimic_package"
+        / "core"
+        / "guarded.py"
+    )
+    """
+    A core module importing matplotlib only in functions and under ``TYPE_CHECKING``.
+    """
+
+    UNGUARDED_CORE_MODULE = GUARDED_CORE_MODULE.with_name("unguarded.py")
+    """
+    A core module importing matplotlib at module level, each such line marked with
+    :attr:`DatasetMarker.UNGUARDED_IMPORT`.
+    """
+
+    MODULE_OUTSIDE_CORE = GUARDED_CORE_MODULE.parents[1] / "drawing.py"
+    """
+    A module outside core importing matplotlib at module level.
+    """
+
+    MODULE_OF_UNDECLARED_CORE = (
+        Path(__file__).parent
+        / "dataset"
+        / "undeclared_core_distribution"
+        / "src"
+        / "undeclared_package"
+        / "drawing.py"
+    )
+    """
+    A module importing matplotlib at module level in a distribution declaring no core.
+    """
+
+
+class DatasetMarker(StrEnum):
+    """
+    Comments marking lines of the dataset files that a test expects a finding on.
+    """
+
+    UNGUARDED_IMPORT = "# unguarded"
+    """
+    An import the optional-library checker reports.
     """

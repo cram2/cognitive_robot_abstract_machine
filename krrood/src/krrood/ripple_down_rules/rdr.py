@@ -1,3 +1,7 @@
+"""
+Ripple down rules classifiers: single-class, multi-class and general.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -71,7 +75,6 @@ from krrood.ripple_down_rules.utils import (
     copy_case,
 )
 from krrood.code_generation.imports import get_imports_from_types
-from krrood.optional_modules import KrroodOptionalModule
 from krrood.code_generation.source_extraction_utils import extract_function_source
 from krrood.utils import (
     get_import_path_from_path,
@@ -350,12 +353,14 @@ class RippleDownRules(ABC):
         :param n_iter: The number of iterations to fit the classifier for.
         :param animate_tree: Whether to draw the tree while fitting the classifier.
         :param kwargs_for_fit_case: The keyword arguments to pass to the fit_case method.
-        :raises OptionalModuleNotInstalled: If the tree is animated and matplotlib is not
+        :raises ModuleNotFoundError: If the tree is animated and matplotlib is not
             installed.
         """
         targets = []
         if animate_tree:
-            self.start_tree_animation()
+            from matplotlib import pyplot as plt
+
+            plt.ion()
         i = 0
         stop_iterating = False
         num_rules: int = 0
@@ -393,30 +398,8 @@ class RippleDownRules(ABC):
                 break
         logger.info(f"Finished training in {i} iterations")
         if animate_tree:
-            self.show_tree_animation()
-
-    @KrroodOptionalModule.MATPLOTLIB.require
-    def start_tree_animation(self) -> None:
-        """
-        Make the figures of the tree redraw as soon as :meth:`update_figures` changes them.
-
-        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
-        """
-        from matplotlib import pyplot as plt
-
-        plt.ion()
-
-    @KrroodOptionalModule.MATPLOTLIB.require
-    def show_tree_animation(self) -> None:
-        """
-        Stop redrawing the figures of the tree on change and show them until they are closed.
-
-        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
-        """
-        from matplotlib import pyplot as plt
-
-        plt.ioff()
-        plt.show()
+            plt.ioff()
+            plt.show()
 
     def __call__(
         self, case: Case | SQLTable
@@ -597,12 +580,11 @@ class RippleDownRules(ABC):
         """
         pass
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def update_figures(self) -> None:
         """
         Update the figures of the classifier.
 
-        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
+        :raises ModuleNotFoundError: If matplotlib is not installed.
         """
         from matplotlib import pyplot as plt
 

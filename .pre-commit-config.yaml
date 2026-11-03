@@ -16,9 +16,9 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-      - id: krrood-optional-imports
-        name: Check that optional modules are imported only where they are guarded
-        entry: krrood optional-imports --optional-modules krrood.optional_modules:KrroodOptionalModule
+      - id: krrood-check
+        name: Check the staged code against the rules that have a checker
+        entry: krrood check
         language: system
         types: [python]
         files: ^krrood/src/krrood/

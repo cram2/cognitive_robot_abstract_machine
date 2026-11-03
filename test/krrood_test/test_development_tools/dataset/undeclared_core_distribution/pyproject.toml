@@ -1,0 +1,7 @@
+# A distribution that declares no core, read by the optional-library checker's tests.
+[project]
+name = "undeclared-core-distribution"
+version = "0.0.0"
+
+[project.optional-dependencies]
+drawing = ["matplotlib"]

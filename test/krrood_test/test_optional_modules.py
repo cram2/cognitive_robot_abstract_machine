@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tomllib
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -15,8 +16,6 @@ import krrood.entity_query_language.query_graph
 import krrood.ormatic.ormatic
 import krrood.rustworkx_utils.rxnode
 import krrood.symbol_graph.symbol_graph
-from krrood.optional_modules import KrroodOptionalModule
-from krrood.patterns.exceptions import OptionalModuleNotInstalled
 from krrood.ripple_down_rules.rdr import SingleClassRDR
 from krrood.ripple_down_rules.utils import draw_tree
 from krrood.rustworkx_utils.graph_visualizer import GraphVisualizer
@@ -28,12 +27,23 @@ The directory holding krrood's ``pyproject.toml``.
 """
 
 
+class OptionalModule(StrEnum):
+    """
+    The modules krrood imports only inside the functions that need them.
+    """
+
+    MATPLOTLIB = "matplotlib"
+    """
+    Draws graphs and rule trees.
+    """
+
+
 @pytest.fixture
 def matplotlib_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Make matplotlib look uninstalled for the duration of a test.
     """
-    monkeypatch.setitem(sys.modules, KrroodOptionalModule.MATPLOTLIB.value, None)
+    monkeypatch.setitem(sys.modules, OptionalModule.MATPLOTLIB, None)
 
 
 # %% importing loads no optional dependency
@@ -78,90 +88,40 @@ def test_importing_loads_no_optional_dependency(module_name: str):
     assert loaded_top_level_packages & optional == set()
 
 
-# %% a missing optional module names its extra
-
-
-def test_missing_optional_module_names_its_extra(matplotlib_not_installed: None):
-    with pytest.raises(OptionalModuleNotInstalled) as error:
-        KrroodOptionalModule.MATPLOTLIB.ensure_installed()
-
-    assert error.value.module is KrroodOptionalModule.MATPLOTLIB
-    extra = KrroodOptionalModule.MATPLOTLIB.extra
-    assert f"{extra.distribution}[{extra}]" in error.value.suggest_correction()
-
-
-def test_extra_names_the_distribution_that_declares_it():
-    assert KrroodOptionalModule.MATPLOTLIB.extra.distribution == krrood.__name__
-
-
-def test_missing_optional_module_is_a_module_not_found_error(
-    matplotlib_not_installed: None,
-):
-    with pytest.raises(ModuleNotFoundError):
-        KrroodOptionalModule.MATPLOTLIB.ensure_installed()
-
-
-def test_installed_optional_module_passes_the_check():
-    KrroodOptionalModule.MATPLOTLIB.ensure_installed()
-
-
-# %% the decorator
-
-
-def test_decorated_function_runs_when_the_module_is_installed():
-    @KrroodOptionalModule.MATPLOTLIB.require
-    def double(number: int) -> int:
-        return 2 * number
-
-    assert double(3) == 6
-
-
-def test_decorated_function_raises_when_the_module_is_missing(
-    matplotlib_not_installed: None,
-):
-    @KrroodOptionalModule.MATPLOTLIB.require
-    def draw() -> None: ...
-
-    with pytest.raises(OptionalModuleNotInstalled) as error:
-        draw()
-
-    assert error.value.module is KrroodOptionalModule.MATPLOTLIB
-
-
 # %% drawing without matplotlib
 
 
 def test_rendering_a_graph_without_matplotlib_raises(matplotlib_not_installed: None):
     visualizer = GraphVisualizer(RWXNode("Root", rx.PyDAG()))
 
-    with pytest.raises(OptionalModuleNotInstalled) as error:
+    with pytest.raises(ModuleNotFoundError) as error:
         visualizer.render()
 
-    assert error.value.module is KrroodOptionalModule.MATPLOTLIB
+    assert error.value.name == OptionalModule.MATPLOTLIB
 
 
 def test_animating_a_rule_tree_without_matplotlib_raises(
     matplotlib_not_installed: None,
 ):
-    with pytest.raises(OptionalModuleNotInstalled) as error:
+    with pytest.raises(ModuleNotFoundError) as error:
         SingleClassRDR().fit([], animate_tree=True)
 
-    assert error.value.module is KrroodOptionalModule.MATPLOTLIB
+    assert error.value.name == OptionalModule.MATPLOTLIB
 
 
 def test_updating_rule_tree_figures_without_matplotlib_raises(
     matplotlib_not_installed: None,
 ):
-    with pytest.raises(OptionalModuleNotInstalled) as error:
+    with pytest.raises(ModuleNotFoundError) as error:
         SingleClassRDR().update_figures()
 
-    assert error.value.module is KrroodOptionalModule.MATPLOTLIB
+    assert error.value.name == OptionalModule.MATPLOTLIB
 
 
 def test_drawing_a_rule_tree_without_matplotlib_raises(
     matplotlib_not_installed: None,
 ):
-    with pytest.raises(OptionalModuleNotInstalled) as error:
+    with pytest.raises(ModuleNotFoundError) as error:
         draw_tree(None, None)
 
-    assert error.value.module is KrroodOptionalModule.MATPLOTLIB
+    assert error.value.name == OptionalModule.MATPLOTLIB

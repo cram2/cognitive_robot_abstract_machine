@@ -110,8 +110,8 @@
 - Imports are absolute. Exception: a test imports another test module (a shared mimic or fixture from the test datasets) relatively
 - Imports go at the top of the module; fix an import cycle by restructuring the modules, never with a local import
 - Guard type-only imports with `TYPE_CHECKING`
-- A library that only one extra of the distribution installs is an optional module; declare it as a member of the distribution's subclass of `krrood.patterns.optional_module.OptionalModule`, naming its `krrood.patterns.optional_module.Extra` member. Import it only inside the functions that need it, each decorated with the member's `require`, which raises `OptionalModuleNotInstalled` naming the extra. This is the one exception to importing at the top of the module; a type-only import of an optional module goes under `TYPE_CHECKING`
-- Run `krrood optional-imports` over the distribution's source, through the repository's pre-commit hook, so every optional import is guarded
+- A library whose distribution only an extra requires is optional. A core module - one of the source modules of the import-linter contract that `core-contract` in `[tool.krrood.core-boundary]` of the distribution's `pyproject.toml` names - imports it only inside the functions that need it, or under `TYPE_CHECKING`, never at module level. This is the one exception to importing at the top of the module (checked by `krrood check`)
+- Run `krrood check` over the distribution's source through the repository's pre-commit hook, so no core module imports an optional library at module level
 
 # Rule application
 <!-- from RuleApplicationRules in krrood/development_tools/agents/shipped_rules/rule_application.py -->

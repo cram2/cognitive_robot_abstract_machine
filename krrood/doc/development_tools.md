@@ -57,10 +57,35 @@ a module only imports, or one defined anywhere else, is never listed. Top-level
 sections appear in alphabetical order of their headings, and nested sections in the
 order they are written.
 
+## Optional libraries
+
+A library whose distribution only an extra requires is optional, and core modules
+import it only inside the functions that need it. `krrood check` reports a core module
+that imports one at module level. Core is declared in the distribution's
+`pyproject.toml`: `core-contract` in `[tool.krrood.core-boundary]` names the
+import-linter contract whose `source_modules` are core, and every module outside them
+may import optional libraries at the top.
+
+```toml
+[[tool.importlinter.contracts]]
+id = "core-imports-no-all-module"
+type = "forbidden"
+source_modules = ["my_package.core"]
+forbidden_modules = ["my_package.drawing"]
+
+[tool.krrood.core-boundary]
+core-contract = "core-imports-no-all-module"
+```
+
+The check maps an imported package to its distribution through the installed
+packages, so it recognizes only the optional libraries installed where it runs: run it
+in the distribution's development environment, with its extras installed. A
+distribution without `core-contract` is not checked.
+
 ## Installation
 
 The formatting tools are an optional dependency, pinned so every repository formats
-alike:
+alike. The development tools need Python 3.11 or later:
 
 ```bash
 pip install "krrood[development-tools]"
@@ -87,7 +112,16 @@ repos:
         additional_dependencies: ["krrood[development-tools]==<version>"]
         pass_filenames: false
         always_run: true
+      - id: krrood-check
+        name: Check the staged code against the rules that have a checker
+        entry: krrood check
+        language: system
+        types: [python]
 ```
+
+`krrood-check` runs with `language: system`, in the environment that has the
+distribution and its extras installed, because the optional-library check reads the
+installed packages.
 
 To use rules that are not released yet, replace the requirement with a commit of
 cognitive_robot_abstract_machine:

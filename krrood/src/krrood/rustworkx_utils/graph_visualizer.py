@@ -1,3 +1,7 @@
+"""
+Drawing a rustworkx graph as a layered diagram with matplotlib.
+"""
+
 from __future__ import annotations
 
 import sys
@@ -7,7 +11,6 @@ from textwrap import fill
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Any
 
-from krrood.optional_modules import KrroodOptionalModule
 from krrood.rustworkx_utils.utils import ColorLegend
 
 if TYPE_CHECKING:
@@ -59,13 +62,12 @@ class GraphVisualizer:
         )
         self.ctx: dict[str, Any] = {}
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def render(self):
         """
         Draw the graph rooted at :attr:`node` and save it to the configured file.
 
         :return: The figure and axes the graph is drawn on.
-        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
+        :raises ModuleNotFoundError: If matplotlib is not installed.
         """
         import matplotlib
 
@@ -180,7 +182,6 @@ class GraphVisualizer:
                 )
         self.ctx["layers"] = layers
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def _assign_coordinates(self):
         layout = self.params["layout"]
         layer = self.ctx["layer"]
@@ -343,7 +344,6 @@ class GraphVisualizer:
         )
         self.ctx["figsize"] = (base_w * w_scale, base_h * h_scale)
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def _setup_figure(self):
         from matplotlib import pyplot as plt
 
@@ -494,7 +494,6 @@ class GraphVisualizer:
         ax.set_xlim(self.ctx["xlim"])
         ax.set_ylim(self.ctx["ylim"])
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def _draw_wrap_boxes(self, ax):
         from matplotlib.patches import FancyBboxPatch
 
@@ -636,7 +635,6 @@ class GraphVisualizer:
                     code1 = outcode(x1, y1, xmin, xmax, ymin, ymax)
         return False
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def _draw_edges(self, ax):
         from matplotlib.patches import FancyArrowPatch
         from matplotlib.path import Path
@@ -1143,7 +1141,6 @@ class GraphVisualizer:
         self.ctx["colors"] = colors
         self.ctx["any_enclosed"] = any_enclosed
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def _draw_legend(self, fig, ax):
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
@@ -1207,7 +1204,6 @@ class GraphVisualizer:
         )
         legend.get_title().set_color("black")
 
-    @KrroodOptionalModule.MATPLOTLIB.require
     def _style_and_save(self, fig, ax):
         from matplotlib import pyplot as plt
 

@@ -85,6 +85,7 @@ development-tools = [
     "ruff==0.17.2",
     "docformatter==1.7.8",
     "tqdm",
+    "packaging",
 ]
 
 [project.scripts]
@@ -205,6 +206,8 @@ ignore_imports = [
 ]
 
 [tool.krrood.core-boundary]
+# The import-linter contract whose source modules are core.
+core-contract = "core-imports-no-all-module"
 # The distributions core may load, with everything they require.
 dependencies = [
     "typing-extensions",
@@ -323,8 +326,6 @@ modules-loading-other-distributions = [
     "krrood.patterns.role",
     "krrood.patterns.role_predicates",
     "krrood.patterns.subclass_safe_generic",
-    "krrood.rustworkx_utils.graph_visualizer",
-    "krrood.rustworkx_utils.rxnode",
     "krrood.symbol_graph.helpers",
     "krrood.symbol_graph.symbol_graph",
 ]

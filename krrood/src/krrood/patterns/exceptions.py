@@ -1,14 +1,15 @@
+"""
+The exceptions the patterns raise.
+"""
+
 from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING, Any, Callable
+from typing_extensions import Any, Callable
 
 from krrood.exceptions import DataclassException
-
-if TYPE_CHECKING:
-    from krrood.patterns.optional_module import OptionalModule
 
 
 @dataclass
@@ -193,22 +194,3 @@ class InterfaceInstantiationError(DataclassException, TypeError):
 
     def suggest_correction(self) -> str:
         return f"Instantiate a subclass that implements {self.interface.__name__}."
-
-
-@dataclass
-class OptionalModuleNotInstalled(DataclassException, ModuleNotFoundError):
-    """
-    Raised when a feature needs an optional module that is not installed.
-    """
-
-    module: OptionalModule
-    """
-    The optional module the feature needs.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.module} is not installed, but this feature needs it."
-
-    def suggest_correction(self) -> str:
-        extra = self.module.extra
-        return f"Install it with: pip install {extra.distribution}[{extra}]"

@@ -1,3 +1,7 @@
+"""
+Helpers shared by the ripple down rules classifiers.
+"""
+
 from __future__ import annotations
 
 import builtins
@@ -28,7 +32,6 @@ from graphviz import Source
 from sqlalchemy.exc import NoInspectionAvailable
 from krrood.ripple_down_rules import logger
 from krrood.code_generation.imports import get_imports_from_types
-from krrood.optional_modules import KrroodOptionalModule
 from krrood.utils import (
     is_builtin_type,
     get_import_path_from_path,
@@ -1701,14 +1704,13 @@ def render_tree(
                 logger.warning(f"{e}")
 
 
-@KrroodOptionalModule.MATPLOTLIB.require
 def draw_tree(root: Node | None, fig: Figure) -> None:
     """
     Draw the rule tree on the figure, replacing what the figure showed before.
 
     :param root: The root rule of the tree; nothing is drawn if it is ``None``.
     :param fig: The figure to draw on.
-    :raises OptionalModuleNotInstalled: If matplotlib is not installed.
+    :raises ModuleNotFoundError: If matplotlib is not installed.
     """
     from matplotlib import pyplot as plt
 
