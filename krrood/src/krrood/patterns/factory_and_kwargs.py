@@ -5,7 +5,7 @@ from functools import lru_cache
 
 from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 
 T = TypeVar("T")
@@ -42,7 +42,7 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         constructed_kwargs = {}
         for key, value in self._factory_keyword_arguments_.items():
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 constructed_kwargs[key] = type(value)(
                     self._recurse_construct_instance_and_get_value(element)
                     for element in value

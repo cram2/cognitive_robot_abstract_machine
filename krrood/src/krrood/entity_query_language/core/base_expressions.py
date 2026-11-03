@@ -34,7 +34,7 @@ from typing_extensions import (
     TypeAlias,
 )
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.evaluation_context import (
     EvaluationContext,
     get_evaluation_context,
@@ -1215,7 +1215,7 @@ class BinaryExpression(SymbolicExpression, ABC):
         value = self.right._value_
         if isinstance(value, EllipsisType):
             return False
-        return not isinstance(value, list_like_classes)
+        return not isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value)
 
     def _is_literal_comparator_(self) -> bool:
         """
