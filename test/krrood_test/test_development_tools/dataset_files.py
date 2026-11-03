@@ -4,6 +4,7 @@ The input files of the development tools tests.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
@@ -58,4 +59,38 @@ class DatasetFile(PathEnumeration):
     The ``AGENTS.md`` listing the design principles and verification sections of
     ``dataset/rule_sections.py``, with ``{source_path}`` standing for the path of that
     module.
+    """
+
+    OPTIONAL_IMPORTS_GUARDED = (
+        Path(__file__).parent / "dataset" / "optional_imports_guarded.py"
+    )
+    """
+    A module importing matplotlib only in decorated functions and under
+    ``TYPE_CHECKING``.
+    """
+
+    OPTIONAL_IMPORTS_UNGUARDED = (
+        Path(__file__).parent / "dataset" / "optional_imports_unguarded.py"
+    )
+    """
+    A module importing matplotlib where nothing guards it, each such line marked with
+    :attr:`DatasetMarker.UNGUARDED_IMPORT`.
+    """
+
+    OPTIONAL_IMPORTS_UNRELATED = (
+        Path(__file__).parent / "dataset" / "optional_imports_unrelated.py"
+    )
+    """
+    A module importing modules whose names only resemble matplotlib's.
+    """
+
+
+class DatasetMarker(StrEnum):
+    """
+    Comments marking lines of the dataset files that a test expects a finding on.
+    """
+
+    UNGUARDED_IMPORT = "# unguarded"
+    """
+    An import the optional-import check reports.
     """

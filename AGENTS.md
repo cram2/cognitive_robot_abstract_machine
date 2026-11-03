@@ -108,6 +108,8 @@
 - Imports are absolute. Exception: a test imports another test module (a shared mimic or fixture from the test datasets) relatively
 - Imports go at the top of the module; fix an import cycle by restructuring the modules, never with a local import
 - Guard type-only imports with `TYPE_CHECKING`
+- A library that only one extra of the distribution installs is an optional module; declare it as a member of the distribution's subclass of `krrood.patterns.optional_module.OptionalModule`, naming its `krrood.patterns.optional_module.Extra` member. Import it only inside the functions that need it, each decorated with the member's `require`, which raises `OptionalModuleNotInstalled` naming the extra. This is the one exception to importing at the top of the module; a type-only import of an optional module goes under `TYPE_CHECKING`
+- Run `krrood optional-imports` over the distribution's source, through the repository's pre-commit hook, so every optional import is guarded
 
 # Rule application
 <!-- from RuleApplicationRules in krrood/development_tools/agents/shipped_rules/rule_application.py -->
@@ -185,10 +187,6 @@
 - `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events` and `probabilistic_model`, which `krrood`'s source already depends on
 - When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
 - Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
-
-# Krrood optional modules
-<!-- from KrroodOptionalModulesRules in agent_rules.py -->
-- `krrood` imports a library that only one of its extras installs inside the method that needs it, right after that library's `krrood.optional_modules.OptionalModule` member's `ensure_installed()`, which raises `OptionalModuleNotInstalled` naming the extra. This is the one exception to importing at the top of the module; a type-only import of such a library goes under `TYPE_CHECKING`
 
 # Pull request labels
 <!-- from PullRequestLabelsRules in agent_rules.py -->

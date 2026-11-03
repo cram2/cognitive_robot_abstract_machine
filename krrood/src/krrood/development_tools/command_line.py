@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import pkgutil
 import sys
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
@@ -16,6 +17,7 @@ from typing_extensions import Sequence
 
 from krrood.development_tools.agents.instructions import AgentsInstructions
 from krrood.development_tools.formatting import DocstringFormatter
+from krrood.development_tools.optional_imports import OptionalImportCheck
 from krrood.development_tools.agents.repository_files import (
     RepositoryInstructionsFile,
 )
@@ -41,6 +43,11 @@ class Subcommand(StrEnum):
     Generate the repository's ``AGENTS.md``.
     """
 
+    OPTIONAL_IMPORTS = "optional-imports"
+    """
+    Check that Python files import optional modules only where they are guarded.
+    """
+
 
 class Option(StrEnum):
     """
@@ -50,6 +57,12 @@ class Option(StrEnum):
     CHECK = "--check"
     """
     Verify a generated file instead of writing it.
+    """
+
+    OPTIONAL_MODULES = "--optional-modules"
+    """
+    The enumeration of optional modules whose imports are checked, as
+    ``package.module:ClassName``.
     """
 
 
@@ -65,7 +78,7 @@ class ExitStatus(IntEnum):
 
     FAILURE = 1
     """
-    Files were modified, or a checked file is stale.
+    Files were modified, a checked file is stale, or a checked file breaks a rule.
     """
 
 
@@ -124,6 +137,20 @@ class CommandLine:
         )
         agents_parser.set_defaults(run=self.generate_agents_instructions)
 
+        optional_imports_parser = subparsers.add_parser(
+            Subcommand.OPTIONAL_IMPORTS,
+            help="Check that optional modules are imported only where they are guarded.",
+        )
+        optional_imports_parser.add_argument(
+            Option.OPTIONAL_MODULES,
+            action="append",
+            required=True,
+            type=pkgutil.resolve_name,
+            help="An OptionalModule subclass, as package.module:ClassName; repeatable.",
+        )
+        optional_imports_parser.add_argument("files", nargs="*", type=Path)
+        optional_imports_parser.set_defaults(run=self.check_optional_imports)
+
         return parser
 
     def format_files(self, arguments: argparse.Namespace) -> ExitStatus:
@@ -159,6 +186,28 @@ class CommandLine:
             return ExitStatus.FAILURE
         if instructions.write():
             logger.info("Wrote %s", RepositoryInstructionsFile.AGENTS)
+            return ExitStatus.FAILURE
+        return ExitStatus.SUCCESS
+
+    def check_optional_imports(self, arguments: argparse.Namespace) -> ExitStatus:
+        """
+        Report every import of an optional module in the files named on the command line
+        that is not guarded.
+
+        :param arguments: The parsed command line.
+        :return: :attr:`ExitStatus.FAILURE` if any import is unguarded.
+        """
+        check = OptionalImportCheck(
+            [
+                module
+                for enumeration in arguments.optional_modules
+                for module in enumeration
+            ]
+        )
+        unguarded_imports = check.find_unguarded_imports(arguments.files)
+        for unguarded_import in unguarded_imports:
+            logger.error("%s", unguarded_import)
+        if unguarded_imports:
             return ExitStatus.FAILURE
         return ExitStatus.SUCCESS
 

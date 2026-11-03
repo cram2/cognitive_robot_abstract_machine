@@ -71,7 +71,7 @@ from krrood.ripple_down_rules.utils import (
     copy_case,
 )
 from krrood.code_generation.imports import get_imports_from_types
-from krrood.optional_modules import OptionalModule
+from krrood.optional_modules import KrroodOptionalModule
 from krrood.code_generation.source_extraction_utils import extract_function_source
 from krrood.utils import (
     get_import_path_from_path,
@@ -355,10 +355,7 @@ class RippleDownRules(ABC):
         """
         targets = []
         if animate_tree:
-            OptionalModule.MATPLOTLIB.ensure_installed()
-            from matplotlib import pyplot as plt
-
-            plt.ion()
+            self.start_tree_animation()
         i = 0
         stop_iterating = False
         num_rules: int = 0
@@ -396,8 +393,30 @@ class RippleDownRules(ABC):
                 break
         logger.info(f"Finished training in {i} iterations")
         if animate_tree:
-            plt.ioff()
-            plt.show()
+            self.show_tree_animation()
+
+    @KrroodOptionalModule.MATPLOTLIB.require
+    def start_tree_animation(self) -> None:
+        """
+        Make the figures of the tree redraw as soon as :meth:`update_figures` changes them.
+
+        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
+        """
+        from matplotlib import pyplot as plt
+
+        plt.ion()
+
+    @KrroodOptionalModule.MATPLOTLIB.require
+    def show_tree_animation(self) -> None:
+        """
+        Stop redrawing the figures of the tree on change and show them until they are closed.
+
+        :raises OptionalModuleNotInstalled: If matplotlib is not installed.
+        """
+        from matplotlib import pyplot as plt
+
+        plt.ioff()
+        plt.show()
 
     def __call__(
         self, case: Case | SQLTable
@@ -578,13 +597,13 @@ class RippleDownRules(ABC):
         """
         pass
 
-    def update_figures(self):
+    @KrroodOptionalModule.MATPLOTLIB.require
+    def update_figures(self) -> None:
         """
         Update the figures of the classifier.
 
         :raises OptionalModuleNotInstalled: If matplotlib is not installed.
         """
-        OptionalModule.MATPLOTLIB.ensure_installed()
         from matplotlib import pyplot as plt
 
         if isinstance(self, GeneralRDR):

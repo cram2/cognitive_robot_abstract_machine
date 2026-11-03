@@ -13,8 +13,42 @@ can use the same conventions:
   With `--check` it writes nothing and exits non-zero when the file differs; run that in
   CI.
 
-Both commands exit with 1 when they modified a file, following pre-commit's convention
-for formatting hooks.
+- `krrood optional-imports --optional-modules package.module:ClassName FILE...` reports
+  every import of an optional module outside a function decorated with that module's
+  `require` and outside `if TYPE_CHECKING:`. Pass `--optional-modules` once for each
+  `OptionalModule` subclass the repository declares.
+
+The commands exit with 1 when they modified a file or found a violation, following
+pre-commit's convention for hooks.
+
+## Optional modules
+
+A library that only one extra of a distribution installs is an optional module. The
+distribution declares its extras in a subclass of
+`krrood.patterns.optional_module.Extra` and its optional modules in a subclass of
+`krrood.patterns.optional_module.OptionalModule`, both inside its own package. Each
+member names the module's import name and the extra that installs it:
+
+```python
+from krrood.patterns.optional_module import Extra, OptionalModule
+
+
+class MyExtra(Extra):
+    PLOTTING = "plotting"
+
+
+class MyOptionalModule(OptionalModule):
+    MATPLOTLIB = "matplotlib", MyExtra.PLOTTING
+
+
+@MyOptionalModule.MATPLOTLIB.require
+def plot() -> None:
+    from matplotlib import pyplot
+```
+
+Calling `plot` without matplotlib installed raises `OptionalModuleNotInstalled`, whose
+suggestion names the `pip install` that adds the extra. `krrood optional-imports`
+checks that every import of the module is guarded this way.
 
 ## Rules
 
@@ -80,7 +114,17 @@ repos:
         additional_dependencies: ["krrood[development-tools]==<version>"]
         pass_filenames: false
         always_run: true
+      - id: krrood-optional-imports
+        name: Check that optional modules are imported only where they are guarded
+        entry: krrood optional-imports
+        args: ["--optional-modules=my_package.optional_modules:MyOptionalModule"]
+        language: system
+        types: [python]
 ```
+
+`krrood optional-imports` imports the enumerations it is given, so it runs in the
+development environment that has the repository's own package installed
+(`language: system`).
 
 To use rules that are not released yet, replace the requirement with a commit of
 cognitive_robot_abstract_machine:

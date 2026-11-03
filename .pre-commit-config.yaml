@@ -16,6 +16,12 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      - id: krrood-optional-imports
+        name: Check that optional modules are imported only where they are guarded
+        entry: krrood optional-imports --optional-modules krrood.optional_modules:KrroodOptionalModule
+        language: system
+        types: [python]
+        files: ^krrood/src/krrood/
       - id: sync-version
         name: Sync VERSION into every package and its workspace dependency bounds
         entry: python scripts/sync_version.py
