@@ -20,11 +20,10 @@ from scripts.cramployer.vocabulary import (
     OptionalPackage,
     Program,
 )
-from scripts.cramployer.launcher_vocabulary import ExitStatus
+from scripts.cramployer.launcher_vocabulary import EnvironmentVariable, ExitStatus
 
 from .dataset.paths import FixturePath
 from .dataset.install_command import InstallationRecorder, RecorderSetting
-from .dataset.docker import EnvironmentVariable
 
 
 # %% Installation inputs
@@ -117,8 +116,11 @@ def dependency_installation(tmp_path: Path) -> DependencyInstallation:
         {
             **os.environ,
             RecorderSetting.COMMAND_LOG: str(command_log),
-            EnvironmentVariable.PATH: os.pathsep.join(
-                [str(executable_directory), os.environ[EnvironmentVariable.PATH]]
+            EnvironmentVariable.EXECUTABLE_PATH: os.pathsep.join(
+                [
+                    str(executable_directory),
+                    os.environ[EnvironmentVariable.EXECUTABLE_PATH],
+                ]
             ),
         },
     )

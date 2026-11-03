@@ -21,7 +21,7 @@ from scripts.cramployer.launcher_vocabulary import (
 )
 from scripts.cramployer.settings import DeploymentSettings
 
-from .dataset.docker import EnvironmentVariable as RecordingEnvironment
+from .dataset.docker import FixtureEnvironment
 from .dataset.paths import FixturePath
 
 if TYPE_CHECKING:
@@ -136,8 +136,6 @@ def test_graphical_access_rejects_an_empty_cookie(
     empty_cookie = tmp_path / "empty-cookie"
     empty_cookie.touch()
     settings.process_environment[EnvironmentVariable.DISPLAY] = ":12"
-    settings.process_environment[RecordingEnvironment.DESKTOP_COOKIE] = str(
-        empty_cookie
-    )
+    settings.process_environment[FixtureEnvironment.DESKTOP_COOKIE] = str(empty_cookie)
     with pytest.raises(DesktopUnavailable):
         GraphicalAccess().configure(settings, authorize_desktop=True)

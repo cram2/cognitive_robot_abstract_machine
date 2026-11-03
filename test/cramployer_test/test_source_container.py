@@ -15,7 +15,7 @@ from scripts.cramployer.commands import EnvironmentSetup
 from scripts.cramployer.source_container import SourceContainer
 from scripts.cramployer.launcher_vocabulary import DockerArgument
 
-from .dataset.docker import EnvironmentVariable
+from .dataset.docker import FixtureEnvironment
 from .dataset.paths import FixturePath
 
 if TYPE_CHECKING:
@@ -35,7 +35,7 @@ def test_source_container_copies_sources(
     archive_source.mkdir()
     source_file = archive_source / FixturePath.EXISTING_PACKAGE
     source_file.write_text(str(archive_source))
-    monkeypatch.setenv(EnvironmentVariable.SOURCE_DIRECTORY, str(archive_source))
+    monkeypatch.setenv(FixtureEnvironment.SOURCE_DIRECTORY, str(archive_source))
     destination = tmp_path / "extracted-sources"
     destination.mkdir()
     settings = DeploymentSettings(
@@ -97,7 +97,7 @@ def test_setup_warns_when_image_sources_differ_without_overwriting_host(
         image_file.unlink()
     else:
         image_file.write_text(str(image_sources))
-    monkeypatch.setenv(EnvironmentVariable.SOURCE_DIRECTORY, str(image_sources))
+    monkeypatch.setenv(FixtureEnvironment.SOURCE_DIRECTORY, str(image_sources))
     host_sources = tmp_path / FixturePath.ROBOT_WORKSPACE_SOURCES
     settings = DeploymentSettings(
         deployment.deployment_directory, tmp_path / FixturePath.CHECKOUT, host_sources
@@ -117,7 +117,7 @@ def test_setup_does_not_warn_for_identical_sources(
 ) -> None:
     """Accept identical source content without a drift warning."""
     host_sources = tmp_path / FixturePath.ROBOT_WORKSPACE_SOURCES
-    monkeypatch.setenv(EnvironmentVariable.SOURCE_DIRECTORY, str(host_sources))
+    monkeypatch.setenv(FixtureEnvironment.SOURCE_DIRECTORY, str(host_sources))
     settings = DeploymentSettings(
         deployment.deployment_directory, tmp_path / FixturePath.CHECKOUT, host_sources
     )

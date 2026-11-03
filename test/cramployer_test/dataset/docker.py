@@ -12,10 +12,12 @@ from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from pathlib import Path
 
+from scripts.cramployer.launcher_vocabulary import EnvironmentVariable
+
 
 # %% Command vocabulary
-class EnvironmentVariable(StrEnum):
-    """Environment shared by command fixtures and their recording executable."""
+class FixtureEnvironment(StrEnum):
+    """Environment settings specific to deployment fixtures and command mimics."""
 
     SOURCE_DIRECTORY = "DOCKER_SOURCE_DIRECTORY"
     """Host directory streamed by the source-container mimic."""
@@ -27,14 +29,10 @@ class EnvironmentVariable(StrEnum):
     """Container names returned by the Docker mimic."""
     TEST_ROOT = "DEPLOY_TEST_ROOT"
     """Root of the isolated source directories."""
+    MODULE_SEARCH_PATH = "PYTHONPATH"
+    """Module directories available to copied command mimics."""
     REPOSITORY = "CRAM_REPOSITORY"
     """Checkout enclosing the deployment scripts."""
-    CRAM_SOURCE = "CRAM_SOURCE"
-    """Editable source mounted in containers."""
-    ROBOT_WORKSPACE_SOURCES = "ROS_SOURCE"
-    """ROS sources mounted in containers."""
-    PATH = "PATH"
-    """Executable search directories."""
     MIDDLEWARE = "RMW_IMPLEMENTATION"
     """ROS middleware selection."""
     FAILURE_ARGUMENT = "DOCKER_FAILURE_ARGUMENT"
@@ -108,15 +106,15 @@ class CommandRecorder:
 if __name__ == "__main__":
     raise SystemExit(
         CommandRecorder(
-            Path(os.environ[EnvironmentVariable.COMMAND_LOG]),
-            os.environ.get(EnvironmentVariable.RUNNING_CONTAINERS, ""),
-            os.environ.get(EnvironmentVariable.SOURCE_DIRECTORY, ""),
-            failure_argument=os.environ.get(EnvironmentVariable.FAILURE_ARGUMENT, ""),
+            Path(os.environ[FixtureEnvironment.COMMAND_LOG]),
+            os.environ.get(FixtureEnvironment.RUNNING_CONTAINERS, ""),
+            os.environ.get(FixtureEnvironment.SOURCE_DIRECTORY, ""),
+            failure_argument=os.environ.get(FixtureEnvironment.FAILURE_ARGUMENT, ""),
             failure_status=int(
                 os.environ.get(
-                    EnvironmentVariable.FAILURE_STATUS, str(RecordedExitStatus.FAILURE)
+                    FixtureEnvironment.FAILURE_STATUS, str(RecordedExitStatus.FAILURE)
                 )
             ),
-            source_checkout=os.environ.get(EnvironmentVariable.CRAM_SOURCE, ""),
+            source_checkout=os.environ.get(EnvironmentVariable.SOURCE_CHECKOUT, ""),
         ).record(sys.argv[1:])
     )

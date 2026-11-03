@@ -20,7 +20,7 @@ from scripts.cramployer.launcher_vocabulary import (
 )
 from scripts.cramployer.settings import DeploymentSettings
 
-from .dataset.docker import EnvironmentVariable, RecordedExitStatus
+from .dataset.docker import FixtureEnvironment, RecordedExitStatus
 from .dataset.paths import FixturePath
 
 if TYPE_CHECKING:
@@ -59,11 +59,11 @@ def test_commands_preserve_failure_status(
         CommandName.BUILD_ROBOT_WORKSPACE: DeploymentName.ROBOT_WORKSPACE_SCRIPT,
         CommandName.GENERATE_INTERFACES: DeploymentName.INTERFACE_GENERATOR,
     }
-    monkeypatch.setenv(EnvironmentVariable.RUNNING_CONTAINERS, DeploymentName.SERVICE)
+    monkeypatch.setenv(FixtureEnvironment.RUNNING_CONTAINERS, DeploymentName.SERVICE)
     monkeypatch.setenv(
-        EnvironmentVariable.FAILURE_ARGUMENT, failure_arguments[command_name]
+        FixtureEnvironment.FAILURE_ARGUMENT, failure_arguments[command_name]
     )
-    monkeypatch.setenv(EnvironmentVariable.FAILURE_STATUS, str(failure_status))
+    monkeypatch.setenv(FixtureEnvironment.FAILURE_STATUS, str(failure_status))
     result = deployment.run(command_name)
     assert (result.returncode, result.stderr) == (failure_status, "")
 
@@ -74,7 +74,7 @@ def test_shell_preserves_application_failure_status(
     """
     Pass a supplied application's failing status through the shell command.
     """
-    monkeypatch.setenv(EnvironmentVariable.FAILURE_ARGUMENT, DockerArgument.RUN)
+    monkeypatch.setenv(FixtureEnvironment.FAILURE_ARGUMENT, DockerArgument.RUN)
     result = deployment.run(CommandName.SHELL, Executable.PYTHON)
     assert (result.returncode, result.stderr) == (RecordedExitStatus.FAILURE, "")
 
@@ -85,7 +85,7 @@ def test_root_shell_preserves_container_listing_failure_status(
     """
     Stop before container selection when Docker cannot list containers.
     """
-    monkeypatch.setenv(EnvironmentVariable.FAILURE_ARGUMENT, DockerArgument.LIST)
+    monkeypatch.setenv(FixtureEnvironment.FAILURE_ARGUMENT, DockerArgument.LIST)
     result = deployment.run(CommandName.ROOT_SHELL)
     assert (result.returncode, result.stderr) == (RecordedExitStatus.FAILURE, "")
     assert len(deployment.read_commands()) == 1
@@ -104,7 +104,7 @@ def test_setup_stops_at_failed_container_stage(
     """
     Stop setup at the failing build stage and return its status.
     """
-    monkeypatch.setenv(EnvironmentVariable.FAILURE_ARGUMENT, failure_argument)
+    monkeypatch.setenv(FixtureEnvironment.FAILURE_ARGUMENT, failure_argument)
     result = deployment.run(CommandName.SETUP)
     assert result.returncode == RecordedExitStatus.FAILURE
     assert deployment.read_commands()[-1][-1] == failure_argument
@@ -118,7 +118,7 @@ def test_setup_image_build_still_raises_on_failure(
     """
     Keep image builds checked so setup cannot continue after a failed build.
     """
-    monkeypatch.setenv(EnvironmentVariable.FAILURE_ARGUMENT, DockerArgument.BUILD)
+    monkeypatch.setenv(FixtureEnvironment.FAILURE_ARGUMENT, DockerArgument.BUILD)
     settings = DeploymentSettings(
         deployment.deployment_directory,
         tmp_path / FixturePath.CHECKOUT,

@@ -13,10 +13,12 @@ from pathlib import Path
 
 import pytest
 
-from .dataset.deployment import DevelopmentEnvironment
-from .dataset.docker import EnvironmentVariable
-from .dataset.paths import FixturePath
+from scripts.cramployer.launcher_vocabulary import EnvironmentVariable
 from scripts.cramployer.vocabulary import FileName
+
+from .dataset.deployment import DevelopmentEnvironment
+from .dataset.docker import FixtureEnvironment
+from .dataset.paths import FixturePath
 
 
 # %% Checkout fixtures
@@ -50,22 +52,28 @@ def deployment(
     docker_executable = executable_directory / FixturePath.DOCKER
     shutil.copyfile(FixturePath.RECORDER, docker_executable)
     docker_executable.chmod(0o755)
+    module_directories = [str(FixturePath.REPOSITORY)]
+    if module_search_path := os.environ.get(FixtureEnvironment.MODULE_SEARCH_PATH):
+        module_directories.append(module_search_path)
     monkeypatch.setenv(
-        EnvironmentVariable.PATH,
+        FixtureEnvironment.MODULE_SEARCH_PATH, os.pathsep.join(module_directories)
+    )
+    monkeypatch.setenv(
+        EnvironmentVariable.EXECUTABLE_PATH,
         os.pathsep.join(
             [
                 str(executable_directory),
                 str(Path(sys.executable).parent),
-                os.environ[EnvironmentVariable.PATH],
+                os.environ[EnvironmentVariable.EXECUTABLE_PATH],
             ]
         ),
     )
-    monkeypatch.setenv(EnvironmentVariable.TEST_ROOT, str(tmp_path))
+    monkeypatch.setenv(FixtureEnvironment.TEST_ROOT, str(tmp_path))
     monkeypatch.setenv(
-        EnvironmentVariable.COMMAND_LOG, str(directory / FixturePath.COMMAND_LOG)
+        FixtureEnvironment.COMMAND_LOG, str(directory / FixturePath.COMMAND_LOG)
     )
     monkeypatch.setenv(
-        EnvironmentVariable.DESKTOP_COOKIE, str(FixturePath.DESKTOP_COOKIE)
+        FixtureEnvironment.DESKTOP_COOKIE, str(FixturePath.DESKTOP_COOKIE)
     )
     checkout_directory = tmp_path / FixturePath.CHECKOUT
     (checkout_directory / FixturePath.GIT).mkdir(parents=True)
@@ -78,7 +86,7 @@ def deployment(
     robot_workspace_sources.mkdir(parents=True)
     (robot_workspace_sources / FixturePath.EXISTING_PACKAGE).touch()
     monkeypatch.setenv(
-        EnvironmentVariable.SOURCE_DIRECTORY, str(robot_workspace_sources)
+        FixtureEnvironment.SOURCE_DIRECTORY, str(robot_workspace_sources)
     )
     return DevelopmentEnvironment(directory, docker_executable)
 

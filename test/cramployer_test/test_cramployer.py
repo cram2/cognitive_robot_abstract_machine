@@ -12,7 +12,7 @@ import pytest
 from typing_extensions import TYPE_CHECKING
 
 from .dataset.docker import (
-    EnvironmentVariable,
+    FixtureEnvironment,
 )
 from scripts.cramployer.launcher_vocabulary import (
     CommandName,
@@ -87,7 +87,7 @@ def test_root_shell_attaches_with_the_development_environment(
     deployment: DevelopmentEnvironment, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Open root Bash in the sole running container with ROS and Python sourced."""
-    monkeypatch.setenv(EnvironmentVariable.RUNNING_CONTAINERS, ContainerName.FIRST)
+    monkeypatch.setenv(FixtureEnvironment.RUNNING_CONTAINERS, ContainerName.FIRST)
     deployment.run(CommandName.ROOT_SHELL).check_returncode()
     assert deployment.read_commands()[-1] == [
         DockerArgument.EXECUTE,
@@ -108,7 +108,7 @@ def test_root_shell_requires_selection_with_multiple_containers(
 ) -> None:
     """Require a selection when several development containers are running."""
     monkeypatch.setenv(
-        EnvironmentVariable.RUNNING_CONTAINERS,
+        FixtureEnvironment.RUNNING_CONTAINERS,
         "\n".join([ContainerName.FIRST, ContainerName.SECOND]),
     )
     assert (
@@ -122,7 +122,7 @@ def test_root_shell_accepts_an_explicit_running_container(
 ) -> None:
     """Attach to the selected container when several shells are open."""
     monkeypatch.setenv(
-        EnvironmentVariable.RUNNING_CONTAINERS,
+        FixtureEnvironment.RUNNING_CONTAINERS,
         "\n".join([ContainerName.FIRST, ContainerName.SECOND]),
     )
     deployment.run(CommandName.ROOT_SHELL, ContainerName.SECOND).check_returncode()
@@ -141,7 +141,7 @@ def test_root_shell_rejects_an_unrelated_container(
     deployment: DevelopmentEnvironment, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Restrict privileged attachment to the project's running development containers."""
-    monkeypatch.setenv(EnvironmentVariable.RUNNING_CONTAINERS, ContainerName.FIRST)
+    monkeypatch.setenv(FixtureEnvironment.RUNNING_CONTAINERS, ContainerName.FIRST)
     assert (
         deployment.run(CommandName.ROOT_SHELL, ContainerName.UNRELATED).returncode
         == ExitStatus.INVALID_SELECTION
@@ -161,7 +161,7 @@ def test_example_configuration_uses_enclosing_checkout(
     result = subprocess.run(
         [Executable.BASH, str(FixturePath.READ_SOURCE)],
         cwd=directory,
-        env={**os.environ, EnvironmentVariable.REPOSITORY: str(repository)},
+        env={**os.environ, FixtureEnvironment.REPOSITORY: str(repository)},
         capture_output=True,
         text=True,
         check=True,
@@ -178,7 +178,7 @@ def test_launcher_finds_checkout_from_another_working_directory(
         directory / FixturePath.EXAMPLE, directory / FixturePath.CONFIGURATION
     )
     monkeypatch.setenv(
-        EnvironmentVariable.REPOSITORY, str(tmp_path / ContainerName.UNRELATED)
+        FixtureEnvironment.REPOSITORY, str(tmp_path / ContainerName.UNRELATED)
     )
     result = deployment.run(CommandName.CONFIGURATION, working_directory=tmp_path)
     result.check_returncode()

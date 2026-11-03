@@ -17,10 +17,11 @@ from scripts.cramployer.vocabulary import PayloadKey
 from scripts.cramployer.launcher_vocabulary import (
     ContainerArgument,
     DockerArgument,
+    EnvironmentVariable,
     Executable,
 )
 
-from .dataset.docker import EnvironmentVariable
+from .dataset.docker import FixtureEnvironment
 from .dataset.paths import FixturePath
 
 if TYPE_CHECKING:
@@ -105,9 +106,9 @@ def configuration(
     shutil.copyfile(
         FixturePath.DEPLOYMENT / FixturePath.COMPOSE, tmp_path / FixturePath.COMPOSE
     )
-    monkeypatch.setenv(EnvironmentVariable.CRAM_SOURCE, str(tmp_path))
+    monkeypatch.setenv(EnvironmentVariable.SOURCE_CHECKOUT, str(tmp_path))
     monkeypatch.setenv(EnvironmentVariable.ROBOT_WORKSPACE_SOURCES, str(tmp_path))
-    monkeypatch.delenv(EnvironmentVariable.MIDDLEWARE, raising=False)
+    monkeypatch.delenv(FixtureEnvironment.MIDDLEWARE, raising=False)
     return ContainerConfiguration(tmp_path, docker_executable)
 
 
@@ -133,4 +134,4 @@ def test_missing_environment_file_keeps_middleware_unset(
     """
     Allow a fresh checkout to use the default middleware without a local env file.
     """
-    assert EnvironmentVariable.MIDDLEWARE not in configuration.resolve_environment()
+    assert FixtureEnvironment.MIDDLEWARE not in configuration.resolve_environment()
