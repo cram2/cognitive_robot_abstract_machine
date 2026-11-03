@@ -35,7 +35,7 @@ from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     Vector,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world import World
 
 

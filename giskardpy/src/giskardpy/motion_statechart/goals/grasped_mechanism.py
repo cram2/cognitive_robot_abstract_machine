@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -13,7 +13,10 @@ from semantic_digital_twin.world_description.world_entity import (
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.node import CompositeNode, NodeArtifacts
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    RigidCoupling,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
 
@@ -21,7 +24,8 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
     """
     Drive the degree of freedom of a 1-dof mechanism in an environment to a position
-    while keeping the end effector fixed relative to the grasped part.
+    while keeping the end effector fixed relative to the grasped part. The mechanism
+    moves only as fast as the end effector can move with it.
 
     Assumes that the grasped part (e.g. a handle or a bottle cap) has already been
     grasped. Works with any mechanism whose grasped part hangs below an
@@ -55,7 +59,7 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
 
     grasp_weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Weight of the goal keeping the end effector fixed relative to the grasped part.
+    Weight of the tasks keeping the end effector fixed relative to the grasped part.
 
     .. warning:: Unlike most goals, this one is weighted above collision avoidance on
         purpose. Holding on to the grasped part has to matter more than both moving the
@@ -87,6 +91,12 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
                     goal_pose=Pose(reference_frame=self.tip_link),
+                    weight=self.grasp_weight,
+                ),
+                RigidCoupling(
+                    name="move with handle",
+                    root_link=self.environment_link,
+                    tip_link=self.tip_link,
                     weight=self.grasp_weight,
                 ),
             ]

@@ -70,7 +70,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoorWithType,
     EntryWay,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,

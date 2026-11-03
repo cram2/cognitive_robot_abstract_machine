@@ -29,7 +29,7 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import ConditionParameters
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Point2,

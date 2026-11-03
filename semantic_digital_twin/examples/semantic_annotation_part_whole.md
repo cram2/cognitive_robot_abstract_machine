@@ -48,7 +48,7 @@ drawer hangs from, which `drawer.movable_joint` returns.
 ```{code-cell} ipython3
 import numpy as np
 
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )

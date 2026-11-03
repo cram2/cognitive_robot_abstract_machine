@@ -86,7 +86,7 @@ def show(node, depth=0):
 from cramph.composites import Sequence
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 grasp = milk.grasp_candidates()[0]
@@ -152,7 +152,7 @@ import os
 import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Spoon
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 spoon = STLParser(
