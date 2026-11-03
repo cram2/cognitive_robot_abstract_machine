@@ -19,7 +19,7 @@ from timeit import default_timer
 import cv2
 import numpy as np
 from py_trees.common import Status
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import TYPE_CHECKING
 

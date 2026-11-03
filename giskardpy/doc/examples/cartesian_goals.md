@@ -25,7 +25,7 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
+from krrood_spatial_math.spatial_types import Pose, Vector3, Quaternion
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.world_entity import Body
@@ -36,7 +36,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF, 
 # We use the same configuration as in pr2_world_setup
 urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
 urdf_parser = URDFParser.from_file(file_path=urdf_path)
-world = urdf_parser.parse()
+world = urdf_parser.create_world()
 
 # Initialize PR2 semantic annotation
 try:
