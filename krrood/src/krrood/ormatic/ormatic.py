@@ -26,6 +26,7 @@ from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
 from krrood.ormatic.type_dict import TypeDict
 from krrood.ormatic.utils import classes_of_package
+from krrood.code_generation.type_hints import extract_types
 from krrood.utils import module_and_class_name, recursive_subclasses, get_module_of_type
 from krrood.ormatic.wrapped_table import (
     WrappedTable,
@@ -138,9 +139,11 @@ class ORMatic:
         self._create_wrapped_tables()
         self.create_type_annotations_map()
 
+        # a specialized generic's DAO names the classes of its type arguments too
         for wrapped_table in self.wrapped_tables.values():
-            self.imported_modules.add(
-                get_module_of_type(wrapped_table.wrapped_clazz.clazz)
+            self.imported_modules.update(
+                get_module_of_type(named_class)
+                for named_class in extract_types(wrapped_table.wrapped_clazz.clazz)
             )
 
         # externally-mapped classes may live further up the chain than the immediate dependency
@@ -172,7 +175,6 @@ class ORMatic:
 
     def _create_wrapped_tables(self):
         for wrapped_clazz in self.wrapped_classes_in_topological_order:
-
             # already mapped by a dependency: reuse it instead of regenerating it
             if dao_class := self.externally_mapped_classes.get(wrapped_clazz.clazz):
                 self.external_tables[wrapped_clazz] = ExternalTable(
