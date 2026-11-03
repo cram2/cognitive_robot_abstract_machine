@@ -541,7 +541,7 @@ class CartesianPositionStraight(CartesianTask):
     """Distance threshold for goal achievement in meters."""
 
     weight: float = field(
-        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE.value, kw_only=True
+        default=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE, kw_only=True
     )
     """
     Cost of falling behind on the line; leaving the line costs
