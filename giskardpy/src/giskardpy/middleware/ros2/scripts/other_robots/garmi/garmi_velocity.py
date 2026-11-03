@@ -7,7 +7,6 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.other_robots.garmi.configs import (
     GarmiInteractiveMarkerChain,
     GarmiVelocityInterface,
-    WorldWithGarmiConfig,
 )
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     InteractiveMarkerNode,
@@ -17,6 +16,11 @@ from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.robots.garmi import Garmi
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.world_description.connections import Connection6DoF
 
 
 @dataclass
@@ -39,7 +43,7 @@ class GarmiGiskard(Giskard):
         freedom exist only once the world is built.
         """
         super().setup()
-        drive = self.world_config.world.get_connections_by_type(OmniDrive)[0]
+        drive = self.world.get_connections_by_type(OmniDrive)[0]
         for degree_of_freedom in drive.active_dofs:
             self.qp_controller_config.set_dof_weight(
                 degree_of_freedom.name, Derivatives.velocity, self.base_velocity_weight
@@ -60,7 +64,15 @@ def main() -> None:
     robot_description = load_xacro("package://garmi_description/urdf/garmi.urdf")
 
     giskard = GarmiGiskard(
-        world_config=WorldWithGarmiConfig(urdf=robot_description),
+        world_source=WorldSpecification(
+            robots=[
+                RobotSpecification(
+                    semantic_annotation_type=Garmi,
+                    description_parser=URDFParser(urdf=robot_description, prefix=""),
+                    localization_connection_type=Connection6DoF,
+                )
+            ]
+        ),
         robot_interface_config=GarmiVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(

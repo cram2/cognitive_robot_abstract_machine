@@ -18,9 +18,6 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    WorldWithPR2Config,
-)
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
@@ -56,7 +53,11 @@ from krrood.utils import recursive_subclasses
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
-from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.world_description.connections import Connection6DoF
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
@@ -207,10 +208,16 @@ class BenchmarkRobot(GiskardTester):
     def setup_giskard(self) -> Giskard:
         records_trajectory = self.plotter_mode.records_trajectory
         return Giskard(
-            world_config=WorldWithPR2Config(
-                urdf=load_xacro(
-                    "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-                )
+            world_source=WorldSpecification(
+                robots=[
+                    RobotSpecification(
+                        semantic_annotation_type=PR2,
+                        description_parser=URDFParser.from_file(
+                            PR2.get_ros_file_path(), prefix=""
+                        ),
+                        localization_connection_type=Connection6DoF,
+                    )
+                ]
             ),
             robot_interface_config=RealTimeStandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(

@@ -6,9 +6,6 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDAiSyConfig,
-)
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
 from giskardpy.middleware.ros2.utils.utils_for_tests import compare_poses, GiskardTester
@@ -21,6 +18,9 @@ from cramph.statechart import (
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 # %% trajectory length limit
 
@@ -61,7 +61,10 @@ class DAiSyTester(GiskardTester):
             "package://iai_daisy_description/robots/daisy.urdf.xacro"
         )
         return Giskard(
-            world_config=WorldWithDAiSyConfig(urdf=robot_desc),
+            world_source=WorldSpecification(
+                world_source=URDFParser(urdf=robot_desc, prefix=""),
+                robots_in_environment=[DAiSy],
+            ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
                 debug_mode=True,

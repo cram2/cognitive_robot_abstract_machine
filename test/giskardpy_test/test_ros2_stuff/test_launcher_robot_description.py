@@ -14,6 +14,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 
 from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.urdf import URDFParser
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy import (
     daisy_standalone,
@@ -38,7 +39,31 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.utils import daisy_installed, tracy_installed
+
+# %% reading the robot of a world specification
+
+
+def urdfs_read_by(specification: WorldSpecification) -> list[str]:
+    """
+    :return: The URDFs the environment and the robots of ``specification`` are read
+        from, as their parsers normalized them.
+    """
+    parsers = [specification.world_source] + [
+        robot.description_parser for robot in specification.robots
+    ]
+    return [parser.urdf for parser in parsers if isinstance(parser, URDFParser)]
+
+
+def robot_classes_of(specification: WorldSpecification) -> list[type[AbstractRobot]]:
+    """
+    :return: The robot classes ``specification`` annotates.
+    """
+    return specification.robots_in_environment + [
+        robot.semantic_annotation_type for robot in specification.robots
+    ]
+
 
 # %% commanding a real robot
 
@@ -75,7 +100,9 @@ def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
 ) -> None:
     giskard = launcher.create_giskard()
 
-    assert giskard.world_config.urdf == published_robot_description
+    assert urdfs_read_by(giskard.world_source) == [
+        URDFParser(urdf=published_robot_description).urdf
+    ]
 
 
 # %% simulating a robot
@@ -108,5 +135,7 @@ def test_a_standalone_launcher_uses_the_description_its_robot_class_declares(
 ) -> None:
     giskard = launcher.create_giskard()
 
-    assert giskard.world_config.urdf is None
-    assert giskard.world_config.robot_class is robot_class
+    assert urdfs_read_by(giskard.world_source) == [
+        URDFParser.from_file(robot_class.get_ros_file_path()).urdf
+    ]
+    assert robot_classes_of(giskard.world_source) == [robot_class]

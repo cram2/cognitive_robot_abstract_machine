@@ -4,10 +4,12 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyVelocityInterface,
-    WorldWithDAiSyConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.robots.daisy import DAiSy
 
 
 def create_giskard() -> Giskard:
@@ -19,7 +21,10 @@ def create_giskard() -> Giskard:
         read from its topic.
     """
     return Giskard(
-        world_config=WorldWithDAiSyConfig(urdf=get_robot_description()),
+        world_source=WorldSpecification(
+            world_source=URDFParser(urdf=get_robot_description(), prefix=""),
+            robots_in_environment=[DAiSy],
+        ),
         robot_interface_config=DAiSyVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(

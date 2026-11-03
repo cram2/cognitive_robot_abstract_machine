@@ -53,12 +53,11 @@ from semantic_digital_twin.exceptions import (
     PartWholeFieldInAnnotationKwargs,
     UnknownPartWholeRelationshipField,
     UselessConceptError,
-    DriveVelocityLimitsOnUndrivenRobot,
 )
 from semantic_digital_twin.robots.exceptions import RobotDescriptionMissingError
-from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.pr2 import PR2, PR2MobileBase
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.robot_parts import AbstractRobotPart
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, AbstractRobotPart
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
     Milk,
@@ -601,11 +600,16 @@ def _odometry_of(robot: MinimalRobot) -> Body:
     return robot.root.parent_connection.parent
 
 
-def _odometry_bodies(world: World) -> list[Body]:
+def _odometry_bodies(world: World, robot_class: type[AbstractRobot]) -> list[Body]:
     """
-    Every odometry body of a world, regardless of the prefix disambiguating it.
+    Every odometry body of the robots of a class in a world, regardless of the prefix
+    disambiguating it.
     """
-    return [body for body in world.bodies if body.name.name == "odom"]
+    return [
+        body
+        for body in world.bodies
+        if body.name.name == robot_class.odometry_body_name
+    ]
 
 
 def test_world_specification_with_robot():
@@ -627,7 +631,7 @@ def test_world_specification_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    odometry_body = world.get_body_by_name("odom")
+    odometry_body = world.get_body_by_name(PR2.odometry_body_name)
     assert odometry_body is not None
     assert isinstance(odometry_body.parent_connection, FixedConnection)
     assert odometry_body.parent_connection.parent is world.root
@@ -639,59 +643,21 @@ def test_world_specification_with_robot():
     np.testing.assert_allclose(root_T_odometry.position.to_np()[0], 1.0)
 
 
-def test_robot_specification_applies_the_drive_velocity_limits_it_is_given():
-    translation_velocity_limits = 0.1
-    rotation_velocity_limits = 0.2
+def test_a_spawned_robot_drives_at_the_velocity_limits_its_mobile_base_declares():
     try:
         world = WorldSpecification(
-            world_source=None,
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=PR2,
-                    drive_translation_velocity_limits=translation_velocity_limits,
-                    drive_rotation_velocity_limits=rotation_velocity_limits,
-                )
-            ],
-        ).create_world()
-    except ParsingError as error:
-        pytest.skip(f"PR2 URDF not available: {error}")
-
-    drive = world.get_body_by_name("base_footprint").parent_connection
-    assert drive.x_velocity.limits.upper.velocity == translation_velocity_limits
-    assert drive.x_velocity.limits.lower.velocity == -translation_velocity_limits
-    assert drive.yaw.limits.upper.velocity == rotation_velocity_limits
-    assert drive.yaw.limits.lower.velocity == -rotation_velocity_limits
-
-
-def test_robot_specification_keeps_the_drives_own_velocity_limits_by_default():
-    drive_defaults = inspect.signature(OmniDrive.create_with_dofs).parameters
-    try:
-        world = WorldSpecification(
-            world_source=None,
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
         ).create_world()
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
     drive = world.get_body_by_name("base_footprint").parent_connection
-    assert (
-        drive.x_velocity.limits.upper.velocity
-        == drive_defaults["translation_velocity_limits"].default
-    )
-    assert (
-        drive.yaw.limits.upper.velocity
-        == drive_defaults["rotation_velocity_limits"].default
-    )
-
-
-def test_robot_specification_rejects_drive_velocity_limits_for_an_undriven_robot(
-    empty_world,
-):
-    with pytest.raises(DriveVelocityLimitsOnUndrivenRobot):
-        RobotSpecification(
-            semantic_annotation_type=MinimalRobot,
-            drive_translation_velocity_limits=0.1,
-        ).spawn(empty_world)
+    limits = PR2MobileBase.drive_velocity_limits
+    assert drive.x_velocity.limits.upper.velocity == limits.translation
+    assert drive.x_velocity.limits.lower.velocity == -limits.translation
+    assert drive.y_velocity.limits.upper.velocity == limits.translation
+    assert drive.yaw.limits.upper.velocity == limits.rotation
+    assert drive.yaw.limits.lower.velocity == -limits.rotation
 
 
 @dataclass(eq=False)
@@ -732,7 +698,7 @@ def test_world_specification_from_urdf_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    odometry_body = world.get_body_by_name("odom")
+    odometry_body = world.get_body_by_name(PR2.odometry_body_name)
     assert odometry_body is not None
     assert odometry_body.parent_connection.parent is world.root
     drive = world.get_body_by_name("base_footprint").parent_connection
@@ -756,12 +722,18 @@ def test_world_specification_with_several_robots():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
+                    description_parser=URDFParser.from_file(
+                        PR2.get_ros_file_path(), prefix="first"
+                    ),
                     world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=1.0
                     ),
                 ),
                 RobotSpecification(
                     semantic_annotation_type=PR2,
+                    description_parser=URDFParser.from_file(
+                        PR2.get_ros_file_path(), prefix="second"
+                    ),
                     world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-1.0
                     ),
@@ -773,7 +745,7 @@ def test_world_specification_with_several_robots():
 
     assert len(world.get_semantic_annotations_by_type(PR2)) == 2
 
-    odometry_bodies = _odometry_bodies(world)
+    odometry_bodies = _odometry_bodies(world, PR2)
     assert len(odometry_bodies) == 2
     assert odometry_bodies[0].name != odometry_bodies[1].name
     for odometry_body in odometry_bodies:
@@ -884,26 +856,31 @@ def test_a_robot_without_a_description_and_without_a_parser_cannot_be_spawned(
 # %% robot specifications: the odometry body
 
 
-def test_an_odometry_body_carries_a_generated_name_by_default(empty_world):
+def test_an_odometry_body_is_named_as_its_robot_declares_in_the_namespace_of_the_robot(
+    empty_world,
+):
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
-        description_parser=_parser_of_robot_rooted_at_map(),
+        description_parser=_parser_of_robot_rooted_at_map(prefix="described"),
     ).spawn(empty_world)
 
-    odometry_body = _odometry_of(robot)
-    assert odometry_body.name == PrefixedName("odom", str(odometry_body.id))
+    assert _odometry_of(robot).name == PrefixedName(
+        MinimalRobot.odometry_body_name, robot.root.name.prefix
+    )
 
 
-def test_an_odometry_body_takes_the_name_it_is_given(empty_world):
-    odometry_body_name = "odom_combined"
+def test_a_pr2_reports_its_odometry_relative_to_the_body_its_robot_class_declares(
+    empty_world,
+):
+    try:
+        robot = RobotSpecification(
+            semantic_annotation_type=PR2,
+            description_parser=URDFParser.from_file(PR2.get_ros_file_path(), prefix=""),
+        ).spawn(empty_world)
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
 
-    robot = RobotSpecification(
-        semantic_annotation_type=MinimalRobot,
-        description_parser=_parser_of_robot_rooted_at_map(),
-        odometry_body_name=odometry_body_name,
-    ).spawn(empty_world)
-
-    assert _odometry_of(robot).name == PrefixedName(odometry_body_name)
+    assert str(robot.mobile_base.drive.parent.name) == PR2.odometry_body_name
 
 
 def test_a_robot_specification_survives_orm_round_trip():
@@ -911,7 +888,6 @@ def test_a_robot_specification_survives_orm_round_trip():
         semantic_annotation_type=MinimalRobot,
         description_parser=_parser_of_robot_rooted_at_map(prefix=""),
         localization_connection_type=Connection6DoF,
-        odometry_body_name="odom_combined",
     )
 
     reconstructed = to_dao(specification).from_dao()
@@ -921,7 +897,6 @@ def test_a_robot_specification_survives_orm_round_trip():
         is specification.localization_connection_type
     )
     assert reconstructed.description_parser == specification.description_parser
-    assert reconstructed.odometry_body_name == specification.odometry_body_name
 
 
 # %% world specifications whose environment contains robots
@@ -953,7 +928,7 @@ def test_robots_are_spawned_into_an_environment_containing_a_robot():
     robot_roots = {
         robot.root for robot in world.get_semantic_annotations_by_type(MinimalRobot)
     }
-    [odometry_body] = _odometry_bodies(world)
+    [odometry_body] = _odometry_bodies(world, MinimalRobot)
     assert robot_roots == {
         world.root,
         odometry_body.child_kinematic_structure_entities[0],

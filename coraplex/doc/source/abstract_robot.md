@@ -59,6 +59,8 @@ allowing higher-level code to discover how to command base motion without hard-c
 For safety and performance tuning, the robot provides `tighten_dof_velocity_limits_of_1dof_connections` and
 `tighten_dof_velocity_limits_proportionally` to constrain the velocity limits of its one-degree-of-freedom active
 connections.
+A mobile base declares how fast the drive of the real robot may move it in `drive_velocity_limits`; a
+`RobotSpecification` creates the drive with these limits.
 
 ## Construction and Extensibility
 

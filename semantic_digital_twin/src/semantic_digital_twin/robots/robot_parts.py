@@ -116,6 +116,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
+    DriveVelocityLimits,
     JointDrive,
     JointServo,
 )
@@ -1060,6 +1061,37 @@ class MobileBase(
         """
         return None
 
+    @classproperty
+    def drive_velocity_limits(cls) -> DriveVelocityLimits:
+        """
+        How fast the drive of the real robot may move this base.
+        """
+        return DriveVelocityLimits(translation=0.2, rotation=0.2)
+
+    @classmethod
+    def create_drive(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+    ) -> TGenericDrive:
+        """
+        Create the drive this base declares, limited to :attr:`drive_velocity_limits`.
+
+        :param world: The world the drive's degrees of freedom are added to.
+        :param parent: The body the base drives relative to.
+        :param child: The root of the base's robot.
+        :return: The created drive.
+        """
+        limits = cls.drive_velocity_limits
+        return cls.get_drive_connection_type().create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            translation_velocity_limits=limits.translation,
+            rotation_velocity_limits=limits.rotation,
+        )
+
     def _setup_servos(self) -> None:
         drive = self._robot.drive
         if drive is None:
@@ -1283,6 +1315,13 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         Returns the name of the root body of the robot in the world, which serves as the
         entry point for traversing the robot's kinematic structure.
         """
+
+    @classproperty
+    def odometry_body_name(cls) -> str:
+        """
+        The name of the frame the real robot reports its odometry relative to.
+        """
+        return "odom"
 
     @classmethod
     def get_drive_connection_type(cls) -> type[Connection]:

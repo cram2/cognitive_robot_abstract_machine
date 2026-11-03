@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from giskardpy.middleware.ros2.command_publishing import (
@@ -13,9 +13,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     RootTipPair,
 )
-from giskardpy.model.world_config import WorldWithMobileRobot
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.garmi import Garmi, GarmiJoint
+from semantic_digital_twin.robots.garmi import GarmiJoint
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     OmniDrive,
@@ -29,23 +27,6 @@ class GarmiInteractiveMarkerChain(Enum):
 
     LEFT_ARM = RootTipPair(root_link="map", tip_link="left_fr3_hand_tcp")
     RIGHT_ARM = RootTipPair(root_link="map", tip_link="right_fr3_hand_tcp")
-
-
-@dataclass
-class WorldWithGarmiConfig(WorldWithMobileRobot):
-    """
-    World configuration for the GARMI robot.
-
-    Builds a map -> odom -> GARMI kinematic tree using an omni-drive base.
-    """
-
-    odometry_body_name: PrefixedName = field(
-        default_factory=lambda: PrefixedName("odom")
-    )
-    robot_class: type[Garmi] = field(kw_only=True, default=Garmi, init=False)
-    """
-    The robot class that is applied to the parsed description.
-    """
 
 
 @dataclass

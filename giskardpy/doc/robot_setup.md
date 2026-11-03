@@ -19,7 +19,7 @@ Giskard is configured with four objects:
 
 | Object | What it decides |
 |---|---|
-| `WorldConfig` | Which robot description is loaded and how the robot is attached to the world. |
+| `WorldSpecification` | Which robot description is loaded and how the robot is attached to the world. |
 | `RobotInterfaceConfig` | Whether a motion is only simulated (`StandAloneRobotInterfaceConfig`) or sent to the robot (a `ClosedLoopRobotInterfaceConfig`), and for a real robot where its state is read from and where commands are sent. |
 | `GiskardServerConfig` | The goal lifecycle and the debug output of the motion server. |
 | `QPControllerConfig` | The control frequency and the tuning of the controller. |
@@ -39,11 +39,13 @@ to be listed by hand.
 :language: python
 ```
 
-- `WorldWithFixedRobot` loads the robot description and fixes the robot to the world. It
-  suits an arm that is bolted down. The description is read from the
+- The `WorldSpecification` takes the robot description as its world and annotates
+  everything in it as a `MinimalRobot`, so the arm is fixed where its description puts
+  it. It suits an arm that is bolted down. The description is read from the
   `/robot_description` topic, so Giskard uses the same model as the driver. The
-  section "Where the robot description comes from" below says when to read it from a
-  file instead.
+  `prefix=""` keeps the names of the description, which the tf frames and joint states
+  of the robot use. The section "Where the robot description comes from" below says when
+  to read it from a file instead.
 - `ControllerManagerInterface` asks the controller manager for its active controllers.
   It reads the joint states from the broadcaster and sends velocities to the velocity
   controller.
@@ -75,11 +77,12 @@ Tracy runs one per arm, each in its own namespace:
   that belongs to a gripper. A listed controller that is not loaded or not active stops
   Giskard at startup instead of leaving its joints uncontrolled.
 
-The world config of such a robot only names the robot class:
+Tracy's description starts at the `map` link, so the description is the world and the
+world specification only names the robot class Tracy is annotated with:
 
-```{literalinclude} ../src/giskardpy/middleware/ros2/scripts/iai_robots/tracy/configs.py
+```{literalinclude} ../src/giskardpy/middleware/ros2/scripts/iai_robots/tracy/tracy_velocity.py
 :language: python
-:pyobject: WorldWithTracyConfig
+:pyobject: create_giskard
 ```
 
 With a robot class Giskard avoids collisions and uses the velocity limits the class
@@ -87,17 +90,25 @@ declares.
 
 ## Robots with a mobile base
 
-A robot that drives uses `WorldWithMobileRobot` instead of `WorldWithFixedRobot`. It adds
-an odometry body below the root of the world and connects the robot to it with a drive.
+A robot that drives is merged into the world by a `RobotSpecification`. It adds an
+odometry body below the root of the world, `map`, and connects the robot to it with the
+drive its robot class declares, an `OmniDrive` or a `DifferentialDrive`. The robot class
+also declares what the real robot uses: the name of the odometry frame, `odom` or
+`odom_combined` for the PR2, and how fast the drive may move. The HSR is set up like
+this:
+
+```{literalinclude} ../src/giskardpy/middleware/ros2/scripts/iai_robots/hsr/hsr_velocity.py
+:language: python
+:pyobject: create_giskard
+```
 
 | Field | What it decides |
 |---|---|
-| `drive_class` | `OmniDrive` (the default) or `DifferentialDrive`. |
-| `root_name`, `odometry_body_name` | The names of the root and the odometry body, `map` and `odom` by default. |
-| `translation_velocity_limit`, `rotation_velocity_limit` | The velocity limits of the base. |
+| `description_parser` | Reads the robot description. |
+| `localization_connection_type` | `Connection6DoF` lets the localization, the pose of the odometry body in the root, move. |
 
 The interface then says where the pose of the base is read from and where its velocity is
-sent. The HSR does it like this:
+sent. For the HSR:
 
 ```{literalinclude} ../src/giskardpy/middleware/ros2/scripts/iai_robots/hsr/configs.py
 :language: python
@@ -123,8 +134,8 @@ always applied first.
 - On a real robot, Giskard reads the description from `/robot_description` with
   `get_robot_description()`, so it uses the same model as the robot. It waits until the
   description is published.
-- In standalone mode, leave out `urdf`. The world config then loads the file its robot
-  class declares.
+- In standalone mode, there is no robot to publish it. Giskard reads the file the robot
+  class declares instead, with `URDFParser.from_file(Tracy.get_ros_file_path(), prefix="")`.
 
 ## Running it
 

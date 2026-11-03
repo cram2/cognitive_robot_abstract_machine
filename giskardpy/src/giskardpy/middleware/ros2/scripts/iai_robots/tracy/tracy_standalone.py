@@ -1,8 +1,8 @@
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
-    WorldWithTracyConfig,
-)
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
 def create_giskard() -> Giskard:
@@ -11,7 +11,10 @@ def create_giskard() -> Giskard:
     declares.
     """
     return Giskard.standalone(
-        world_config=WorldWithTracyConfig(),
+        world_source=WorldSpecification(
+            world_source=URDFParser.from_file(Tracy.get_ros_file_path(), prefix=""),
+            robots_in_environment=[Tracy],
+        ),
         qp_controller_config=QPControllerConfig(target_frequency=33),
     )
 

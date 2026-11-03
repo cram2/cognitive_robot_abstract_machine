@@ -3,12 +3,10 @@ from datetime import timedelta
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     StretchVelocityInterface,
-    WorldWithStretchConfigDiffDrive,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.robots.stretch import Stretch, StretchJoint
+from semantic_digital_twin.robots.stretch import StretchJoint
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     DifferentialDrive,
@@ -41,7 +39,9 @@ def test_velocity_controlled_joints_exist_in_the_world(stretch_world_copy):
         assert isinstance(connection, ActiveConnection1DOF)
 
 
-def test_velocity_interface_sets_up_against_the_robot_description(init_rospy):
+def test_velocity_interface_sets_up_against_the_robot_description(
+    init_rospy, stretch_world_specification
+):
     """
     The configuration the robot actually runs comes up against the robot description:
     the hardware topics are wired and every controlled joint resolves.
@@ -50,9 +50,7 @@ def test_velocity_interface_sets_up_against_the_robot_description(init_rospy):
     than motion.
     """
     giskard = Giskard(
-        world_config=WorldWithStretchConfigDiffDrive(
-            urdf=load_xacro(Stretch.get_ros_file_path())
-        ),
+        world_source=stretch_world_specification,
         robot_interface_config=StretchVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(

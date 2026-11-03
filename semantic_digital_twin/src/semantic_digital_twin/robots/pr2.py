@@ -703,6 +703,10 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
     def _get_root_body_name(cls) -> str:
         return "base_footprint"
 
+    @classproperty
+    def odometry_body_name(cls) -> str:
+        return "odom_combined"
+
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(
             lambda: 1.0,

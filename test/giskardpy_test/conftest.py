@@ -25,6 +25,7 @@ from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformation
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
     FixedConnection,
     PrismaticConnection,
 )
@@ -37,9 +38,15 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
-from semantic_digital_twin.robots.daisy import DAiSyJoint
-from semantic_digital_twin.robots.hsrb import HSRBJoint
-from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
+from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
+from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
 @pytest.fixture()
@@ -339,3 +346,81 @@ def prismatic_world_with_low_jerk_limit(request):
             )
         ]
     )
+
+
+# %% worlds of single robots as Giskard sets them up
+
+
+def _world_specification_of_mobile_robot(
+    robot_class: type[AbstractRobot],
+) -> WorldSpecification:
+    """
+    :param robot_class: The robot, which has a mobile base.
+    :return: A world holding only the robot, read from the file its class declares with
+        the names it has on the real robot, and localized by a movable connection.
+    """
+    return WorldSpecification(
+        robots=[
+            RobotSpecification(
+                semantic_annotation_type=robot_class,
+                description_parser=URDFParser.from_file(
+                    robot_class.get_ros_file_path(), prefix=""
+                ),
+                localization_connection_type=Connection6DoF,
+            )
+        ]
+    )
+
+
+def _world_specification_of_fixed_robot(
+    robot_class: type[AbstractRobot],
+) -> WorldSpecification:
+    """
+    :param robot_class: The robot, whose description starts at the world root.
+    :return: A world that is the description the robot class declares, read with the
+        names it has on the real robot.
+    """
+    return WorldSpecification(
+        world_source=URDFParser.from_file(robot_class.get_ros_file_path(), prefix=""),
+        robots_in_environment=[robot_class],
+    )
+
+
+@pytest.fixture()
+def pr2_world_specification() -> WorldSpecification:
+    """
+    The PR2 alone, as Giskard sets it up.
+    """
+    return _world_specification_of_mobile_robot(PR2)
+
+
+@pytest.fixture()
+def hsr_world_specification() -> WorldSpecification:
+    """
+    The HSR alone, as Giskard sets it up.
+    """
+    return _world_specification_of_mobile_robot(HSRB)
+
+
+@pytest.fixture()
+def stretch_world_specification() -> WorldSpecification:
+    """
+    Stretch alone, as Giskard sets it up.
+    """
+    return _world_specification_of_mobile_robot(Stretch)
+
+
+@pytest.fixture()
+def tracy_world_specification() -> WorldSpecification:
+    """
+    Tracy alone, as Giskard sets it up.
+    """
+    return _world_specification_of_fixed_robot(Tracy)
+
+
+@pytest.fixture()
+def daisy_world_specification() -> WorldSpecification:
+    """
+    DAiSy alone, as Giskard sets it up.
+    """
+    return _world_specification_of_fixed_robot(DAiSy)

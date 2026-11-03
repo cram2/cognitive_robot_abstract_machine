@@ -189,34 +189,6 @@ class ScenePose(Enum):
     """
 
 
-# %% how the run is set up
-
-
-@dataclass(frozen=True)
-class DriveVelocityLimits:
-    """
-    How fast a base may move.
-    """
-
-    translation: float
-    """
-    In meter per second.
-    """
-
-    rotation: float
-    """
-    In radian per second.
-    """
-
-
-class GarmiDrive(Enum):
-    """
-    How fast GARMI's base moves in this demonstration.
-    """
-
-    DEMONSTRATION = DriveVelocityLimits(translation=0.1, rotation=0.1)
-
-
 # %% the demonstration
 
 
@@ -242,13 +214,11 @@ class GarmiApartmentDemonstration(RobotDemonstration):
 
     def robot_specification(self) -> RobotSpecification:
         """
-        :return: GARMI at its start, driving at the demonstration's speed.
+        :return: GARMI at its start.
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
             odometry_T_robot_start=ScenePose.GARMI_START.value.transform,
-            drive_translation_velocity_limits=GarmiDrive.DEMONSTRATION.value.translation,
-            drive_rotation_velocity_limits=GarmiDrive.DEMONSTRATION.value.rotation,
         )
 
     def is_scene_populated(self, world: World) -> bool:

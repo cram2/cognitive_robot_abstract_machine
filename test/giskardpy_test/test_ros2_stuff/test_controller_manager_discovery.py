@@ -38,22 +38,19 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyVelocityInterface,
-    WorldWithDAiSyConfig,
 )
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     TracyVelocityInterface,
-    WorldWithTracyConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.adapters.ros.input_synchronization import (
     PendingJointStateSynchronizer,
 )
-from semantic_digital_twin.robots.daisy import DAiSy, DAiSyController, DAiSyJoint
+from semantic_digital_twin.robots.daisy import DAiSyController, DAiSyJoint
 from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.tracy import (
-    Tracy,
     TracyController,
     TracyControllerManager,
     TracyJoint,
@@ -365,6 +362,7 @@ def joints_by_command_topic(
 
 def test_a_controller_manager_in_a_namespace_yields_its_velocity_controller(
     serve,
+    pr2_world_specification,
 ) -> None:
     manager = ControllerManagerMimic(
         name="head/controller_manager",
@@ -377,14 +375,18 @@ def test_a_controller_manager_in_a_namespace_yields_its_velocity_controller(
         ],
     )
     start(serve, manager)
-    giskard = closed_loop_pr2(DiscoveringInterface(manager.name))
+    giskard = closed_loop_pr2(
+        DiscoveringInterface(manager.name), pr2_world_specification
+    )
 
     giskard.setup()
 
     assert commanded_joint_names_by_topic(giskard) == joints_by_command_topic(manager)
 
 
-def test_an_inactive_velocity_controller_is_not_commanded(serve) -> None:
+def test_an_inactive_velocity_controller_is_not_commanded(
+    serve, pr2_world_specification
+) -> None:
     active = ControllerMimic(
         name="head_velocity_controller",
         controller_type=ControllerType.JOINT_GROUP_VELOCITY,
@@ -400,14 +402,18 @@ def test_an_inactive_velocity_controller_is_not_commanded(serve) -> None:
         name="controller_manager", controllers=[active, inactive]
     )
     start(serve, manager)
-    giskard = closed_loop_pr2(DiscoveringInterface(manager.name))
+    giskard = closed_loop_pr2(
+        DiscoveringInterface(manager.name), pr2_world_specification
+    )
 
     giskard.setup()
 
-    assert controlled_joint_names(giskard.world_config.world) == set(active.joints)
+    assert controlled_joint_names(giskard.world) == set(active.joints)
 
 
-def test_a_whitelist_limits_the_commanded_controllers(serve) -> None:
+def test_a_whitelist_limits_the_commanded_controllers(
+    serve, pr2_world_specification
+) -> None:
     listed = ControllerMimic(
         name="head_velocity_controller",
         controller_type=ControllerType.JOINT_GROUP_VELOCITY,
@@ -423,15 +429,18 @@ def test_a_whitelist_limits_the_commanded_controllers(serve) -> None:
     )
     start(serve, manager)
     giskard = closed_loop_pr2(
-        DiscoveringInterface(manager.name, whitelist=[listed.name])
+        DiscoveringInterface(manager.name, whitelist=[listed.name]),
+        pr2_world_specification,
     )
 
     giskard.setup()
 
-    assert controlled_joint_names(giskard.world_config.world) == set(listed.joints)
+    assert controlled_joint_names(giskard.world) == set(listed.joints)
 
 
-def test_a_whitelisted_controller_that_is_not_loaded_raises(serve) -> None:
+def test_a_whitelisted_controller_that_is_not_loaded_raises(
+    serve, pr2_world_specification
+) -> None:
     manager = ControllerManagerMimic(
         name="controller_manager",
         controllers=[
@@ -444,14 +453,17 @@ def test_a_whitelisted_controller_that_is_not_loaded_raises(serve) -> None:
     )
     start(serve, manager)
     giskard = closed_loop_pr2(
-        DiscoveringInterface(manager.name, whitelist=["controller_that_is_not_loaded"])
+        DiscoveringInterface(manager.name, whitelist=["controller_that_is_not_loaded"]),
+        pr2_world_specification,
     )
 
     with pytest.raises(ControllersNotLoadedError):
         giskard.setup()
 
 
-def test_a_whitelisted_controller_that_is_not_active_raises(serve) -> None:
+def test_a_whitelisted_controller_that_is_not_active_raises(
+    serve, pr2_world_specification
+) -> None:
     inactive = ControllerMimic(
         name="head_velocity_controller",
         controller_type=ControllerType.JOINT_GROUP_VELOCITY,
@@ -461,7 +473,8 @@ def test_a_whitelisted_controller_that_is_not_active_raises(serve) -> None:
     manager = ControllerManagerMimic(name="controller_manager", controllers=[inactive])
     start(serve, manager)
     giskard = closed_loop_pr2(
-        DiscoveringInterface(manager.name, whitelist=[inactive.name])
+        DiscoveringInterface(manager.name, whitelist=[inactive.name]),
+        pr2_world_specification,
     )
 
     with pytest.raises(ControllersNotActiveError):
@@ -473,6 +486,7 @@ def test_a_whitelisted_controller_that_is_not_active_raises(serve) -> None:
 
 def test_a_diff_drive_controller_is_commanded_on_its_topic_in_its_message_type(
     serve,
+    pr2_world_specification,
 ) -> None:
     diff_drive = ControllerMimic(
         name="diff_drive_controller", controller_type=ControllerType.DIFF_DRIVE
@@ -481,7 +495,9 @@ def test_a_diff_drive_controller_is_commanded_on_its_topic_in_its_message_type(
         name="base/controller_manager", controllers=[diff_drive]
     )
     start(serve, manager)
-    giskard = closed_loop_pr2(DiscoveringInterface(manager.name))
+    giskard = closed_loop_pr2(
+        DiscoveringInterface(manager.name), pr2_world_specification
+    )
 
     giskard.setup()
 
@@ -516,12 +532,15 @@ def manager_with_broadcaster_and_velocity_controller() -> ControllerManagerMimic
     )
 
 
-def test_a_whitelist_without_the_broadcaster_reads_no_joint_state_topic(serve) -> None:
+def test_a_whitelist_without_the_broadcaster_reads_no_joint_state_topic(
+    serve, pr2_world_specification
+) -> None:
     manager = manager_with_broadcaster_and_velocity_controller()
     start(serve, manager)
     [_, velocity_controller] = manager.controllers
     giskard = closed_loop_pr2(
-        DiscoveringInterface(manager.name, whitelist=[velocity_controller.name])
+        DiscoveringInterface(manager.name, whitelist=[velocity_controller.name]),
+        pr2_world_specification,
     )
 
     giskard.setup()
@@ -531,11 +550,14 @@ def test_a_whitelist_without_the_broadcaster_reads_no_joint_state_topic(serve) -
 
 def test_discovering_everything_reads_the_topic_of_the_joint_state_broadcaster(
     serve,
+    pr2_world_specification,
 ) -> None:
     manager = manager_with_broadcaster_and_velocity_controller()
     start(serve, manager)
     [broadcaster, _] = manager.controllers
-    giskard = closed_loop_pr2(DiscoveringInterface(manager.name))
+    giskard = closed_loop_pr2(
+        DiscoveringInterface(manager.name), pr2_world_specification
+    )
 
     giskard.setup()
 
@@ -544,10 +566,13 @@ def test_discovering_everything_reads_the_topic_of_the_joint_state_broadcaster(
 
 def test_discovering_asks_the_controller_manager_for_its_controllers_once(
     serve,
+    pr2_world_specification,
 ) -> None:
     manager = manager_with_broadcaster_and_velocity_controller()
     start(serve, manager)
-    giskard = closed_loop_pr2(DiscoveringInterface(manager.name))
+    giskard = closed_loop_pr2(
+        DiscoveringInterface(manager.name), pr2_world_specification
+    )
 
     giskard.setup()
 
@@ -614,23 +639,25 @@ def tracy_right_arm_manager() -> ControllerManagerMimic:
     )
 
 
-def closed_loop_tracy() -> Giskard:
+def closed_loop_tracy(tracy_world_specification: WorldSpecification) -> Giskard:
     """
     A Giskard that commands Tracy through its velocity interface.
     """
     return Giskard(
-        world_config=WorldWithTracyConfig(urdf=load_xacro(Tracy.get_ros_file_path())),
+        world_source=tracy_world_specification,
         robot_interface_config=TracyVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),
     )
 
 
-def test_tracy_commands_the_joints_its_two_controller_managers_report(serve) -> None:
+def test_tracy_commands_the_joints_its_two_controller_managers_report(
+    serve, tracy_world_specification
+) -> None:
     left = tracy_left_arm_manager()
     right = tracy_right_arm_manager()
     start(serve, left, right)
-    giskard = closed_loop_tracy()
+    giskard = closed_loop_tracy(tracy_world_specification)
 
     giskard.setup()
 
@@ -639,25 +666,29 @@ def test_tracy_commands_the_joints_its_two_controller_managers_report(serve) -> 
     )
 
 
-def test_tracy_does_not_command_a_velocity_controller_of_a_gripper(serve) -> None:
+def test_tracy_does_not_command_a_velocity_controller_of_a_gripper(
+    serve, tracy_world_specification
+) -> None:
     gripper = arm_velocity_controller(
         "gripper_velocity_controller", [TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE]
     )
     left = tracy_left_arm_manager(gripper)
     start(serve, left, tracy_right_arm_manager())
-    giskard = closed_loop_tracy()
+    giskard = closed_loop_tracy(tracy_world_specification)
 
     giskard.setup()
 
     assert left.command_topic_of(gripper) not in commanded_joint_names_by_topic(giskard)
 
 
-def test_tracy_fails_when_an_arm_has_not_loaded_its_velocity_controller(serve) -> None:
+def test_tracy_fails_when_an_arm_has_not_loaded_its_velocity_controller(
+    serve, tracy_world_specification
+) -> None:
     left_without_controllers = ControllerManagerMimic(
         name=TracyControllerManager.LEFT_ARM, controllers=[]
     )
     start(serve, left_without_controllers, tracy_right_arm_manager())
-    giskard = closed_loop_tracy()
+    giskard = closed_loop_tracy(tracy_world_specification)
 
     with pytest.raises(ControllersNotLoadedError):
         giskard.setup()
@@ -697,32 +728,36 @@ def daisy_right_arm_controller() -> ControllerMimic:
     )
 
 
-def closed_loop_daisy() -> Giskard:
+def closed_loop_daisy(daisy_world_specification: WorldSpecification) -> Giskard:
     """
     A Giskard that commands DAiSy through its velocity interface.
     """
     return Giskard(
-        world_config=WorldWithDAiSyConfig(urdf=load_xacro(DAiSy.get_ros_file_path())),
+        world_source=daisy_world_specification,
         robot_interface_config=DAiSyVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),
     )
 
 
-def test_daisy_commands_the_joints_its_controller_manager_reports(serve) -> None:
+def test_daisy_commands_the_joints_its_controller_manager_reports(
+    serve, daisy_world_specification
+) -> None:
     manager = ControllerManagerMimic(
         name="controller_manager",
         controllers=[daisy_left_arm_controller(), daisy_right_arm_controller()],
     )
     start(serve, manager)
-    giskard = closed_loop_daisy()
+    giskard = closed_loop_daisy(daisy_world_specification)
 
     giskard.setup()
 
     assert commanded_joint_names_by_topic(giskard) == joints_by_command_topic(manager)
 
 
-def test_daisy_does_not_command_a_velocity_controller_of_a_gripper(serve) -> None:
+def test_daisy_does_not_command_a_velocity_controller_of_a_gripper(
+    serve, daisy_world_specification
+) -> None:
     gripper = arm_velocity_controller(
         "gripper_velocity_controller", [DAiSyJoint.LEFT_GRIPPER_FINGER]
     )
@@ -735,7 +770,7 @@ def test_daisy_does_not_command_a_velocity_controller_of_a_gripper(serve) -> Non
         ],
     )
     start(serve, manager)
-    giskard = closed_loop_daisy()
+    giskard = closed_loop_daisy(daisy_world_specification)
 
     giskard.setup()
 
@@ -744,12 +779,14 @@ def test_daisy_does_not_command_a_velocity_controller_of_a_gripper(serve) -> Non
     )
 
 
-def test_daisy_fails_when_an_arm_has_not_loaded_its_velocity_controller(serve) -> None:
+def test_daisy_fails_when_an_arm_has_not_loaded_its_velocity_controller(
+    serve, daisy_world_specification
+) -> None:
     manager = ControllerManagerMimic(
         name="controller_manager", controllers=[daisy_left_arm_controller()]
     )
     start(serve, manager)
-    giskard = closed_loop_daisy()
+    giskard = closed_loop_daisy(daisy_world_specification)
 
     with pytest.raises(ControllersNotLoadedError):
         giskard.setup()

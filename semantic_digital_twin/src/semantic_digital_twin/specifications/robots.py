@@ -5,21 +5,18 @@ Specifications of robots placed into a world.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import uuid4
 
 from typing_extensions import TYPE_CHECKING, cast
 
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import DriveVelocityLimitsOnUndrivenRobot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     Connection6DoF,
     FixedConnection,
-    WheeledDrive,
 )
-from semantic_digital_twin.world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_source import WorldModelParser
 
 if TYPE_CHECKING:
@@ -68,33 +65,11 @@ class RobotSpecification:
     If None, identity is used.
     """
 
-    drive_translation_velocity_limits: float | None = None
-    """
-    Velocity limit of the drive's translational degrees of freedom, in meter per second.
-
-    If None, the drive connection's own default is kept.
-    """
-
-    drive_rotation_velocity_limits: float | None = None
-    """
-    Velocity limit of the drive's rotational degrees of freedom, in radian per second.
-
-    If None, the drive connection's own default is kept.
-    """
-
     localization_connection_type: type[FixedConnection | Connection6DoF] = (
         FixedConnection
     )
     """
     The connection attaching the robot's odometry body to the ``world.root``.
-    """
-
-    odometry_body_name: str | None = None
-    """
-    The name of the robot's odometry body.
-
-    If None, the body's own identifier prefixes the name ``odom``, which keeps the
-    odometry bodies of several robots distinguishable.
     """
 
     def spawn(self, world: World) -> AbstractRobot:
@@ -104,7 +79,7 @@ class RobotSpecification:
 
         The odometry body is attached to the world root by a
         :attr:`localization_connection_type` at the localization pose. The connection
-        attaching the robot to it is the drive declared by the robot's mobile base, or a
+        attaching the robot to it is the drive the robot's mobile base creates, or a
         fixed connection when the robot has no mobile base. An active drive is marked as
         controlled, driven by the servos its mobile base declares. Poses backed by
         degrees of freedom are applied after the merge, those of fixed connections at
@@ -116,35 +91,36 @@ class RobotSpecification:
 
         :param world: The world the robot is merged into.
         :return: The semantic annotation of the merged robot.
-        :raises DriveVelocityLimitsOnUndrivenRobot: If a drive velocity limit is given
-            for a robot that has no drive.
         :raises RobotDescriptionMissingError: If no :attr:`description_parser` is given
             and the robot class declares no description file.
         """
-        connection_type = self.semantic_annotation_type.get_drive_connection_type()
-        is_active = issubclass(connection_type, ActiveConnection)
-        drive_velocity_limits = self._drive_velocity_limits(connection_type)
+        is_active = issubclass(
+            self.semantic_annotation_type.get_drive_connection_type(), ActiveConnection
+        )
 
         described_robot = self._create_described_robot()
         robot_world = described_robot._world
+        robot_root = cast(Body, robot_world.root)
         robot_id = described_robot.id
 
         with world.modify_world():
-            odometry_body = self._create_odometry_body()
+            odometry_body = self._create_odometry_body(described_robot)
             localization = self._create_localization(world, odometry_body)
             world.add_connection(localization)
 
             # A fixed connection has no DoFs, so its start pose must be set at creation;
             # an active drive carries it as DoF state applied after the block.
-            odometry_C_robot = connection_type.create_with_dofs(
-                world=world,
-                parent=odometry_body,
-                child=cast(Body, robot_world.root),
-                parent_T_connection_expression=(
-                    None if is_active else self.odometry_T_robot_start
-                ),
-                **drive_velocity_limits,
-            )
+            if is_active:
+                odometry_C_robot = described_robot.mobile_base.create_drive(
+                    world=world, parent=odometry_body, child=robot_root
+                )
+            else:
+                odometry_C_robot = FixedConnection.create_with_dofs(
+                    world=world,
+                    parent=odometry_body,
+                    child=robot_root,
+                    parent_T_connection_expression=self.odometry_T_robot_start,
+                )
             world.merge_world(robot_world, root_connection=odometry_C_robot)
             robot = cast("AbstractRobot", world.get_semantic_annotation_by_id(robot_id))
             if is_active:
@@ -210,42 +186,14 @@ class RobotSpecification:
             new_reference_frame=world.root, new_child_frame=odometry_body
         )
 
-    def _drive_velocity_limits(
-        self, connection_type: type[Connection]
-    ) -> dict[str, float]:
+    def _create_odometry_body(self, robot: AbstractRobot) -> Body:
         """
-        Collect the velocity limits to create the drive connection with.
-
-        :param connection_type: The connection the robot attaches to its odometry body
-            with.
-        :return: The limits that were set, keyed by the keyword ``create_with_dofs``
-            takes them under.
-        :raises DriveVelocityLimitsOnUndrivenRobot: If a limit is set but the connection
-            carries no velocity limits.
+        :param robot: The robot whose odometry body is created.
+        :return: The odometry body, named as the robot class declares, with the prefix
+            of the robot's own names.
         """
-        limits = {
-            "translation_velocity_limits": self.drive_translation_velocity_limits,
-            "rotation_velocity_limits": self.drive_rotation_velocity_limits,
-        }
-        given_limits = {
-            keyword: limit for keyword, limit in limits.items() if limit is not None
-        }
-        if given_limits and not issubclass(connection_type, WheeledDrive):
-            raise DriveVelocityLimitsOnUndrivenRobot(
-                robot_type_name=self.semantic_annotation_type.__name__,
-                connection_type_name=connection_type.__name__,
-            )
-        return given_limits
-
-    def _create_odometry_body(self) -> Body:
-        """
-        Create the odometry body of a single robot.
-
-        :return: The created odometry body, named :attr:`odometry_body_name` if given.
-        """
-        if self.odometry_body_name is not None:
-            return Body(name=PrefixedName(name=self.odometry_body_name))
-        identifier = uuid4()
         return Body(
-            name=PrefixedName(name="odom", prefix=str(identifier)), id=identifier
+            name=PrefixedName(
+                name=robot.odometry_body_name, prefix=robot.root.name.prefix
+            )
         )

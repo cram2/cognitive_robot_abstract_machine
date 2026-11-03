@@ -1,11 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
 )
-from giskardpy.model.world_config import WorldWithMobileRobot
-from semantic_digital_twin.robots.stretch import Stretch, StretchJoint
+from semantic_digital_twin.robots.stretch import StretchJoint
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     DifferentialDrive,
@@ -62,29 +61,3 @@ class StretchVelocityInterface(ClosedLoopRobotInterfaceConfig):
                 StretchJoint.GRIPPER_LEFT_FINGER: 0.0,
             },
         )
-
-
-@dataclass
-class WorldWithStretchConfig(WorldWithMobileRobot):
-    """
-    A world containing only Stretch, modelled with an omnidirectional base.
-    """
-
-    robot_class: type[Stretch] = field(kw_only=True, default=Stretch, init=False)
-    """
-    The robot class that is applied to the parsed description.
-    """
-
-
-@dataclass
-class WorldWithStretchConfigDiffDrive(WorldWithStretchConfig):
-    """
-    A world containing only Stretch, which drives on a differential base.
-    """
-
-    drive_class: type[DifferentialDrive] = field(
-        kw_only=True, default=DifferentialDrive, init=False
-    )
-    """
-    The kind of connection between the odometry body and the robot.
-    """
