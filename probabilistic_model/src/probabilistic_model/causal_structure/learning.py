@@ -19,6 +19,19 @@ from causallearn.utils.PCUtils.BackgroundKnowledge import (
 )
 from typing_extensions import Any
 
+from krrood.class_diagrams.causal_relation import (
+    AttributeEndpoint,
+    CausalEndpoint,
+    CausalRelation,
+    CausalRelationsOfClass,
+    StatisticEndpoint,
+)
+from krrood.class_diagrams.class_diagram import ClassDiagram
+from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.parametrization.feature_extraction.feature_extractor import (
+    FeatureExtractor,
+)
+
 from probabilistic_model.causal_structure.domain_causal_knowledge import (
     DomainCausalKnowledge,
 )
@@ -207,13 +220,19 @@ class PeterClarkStructureLearner(CausalStructureLearner):
 @dataclass
 class LearnedCausalStructure:
     """
-    A causal graph learned from a model's training rows, ready to choose the variables a
-    causal query over that model adjusts for.
+    The causal structure learned for one class, ready to choose the variables a causal
+    query about the class adjusts for. Its edges are the causal relations of the class
+    in a class diagram, read as they are when asked.
     """
 
-    selector: AdjustmentSelector
+    relations: CausalRelationsOfClass
     """
-    What chooses an adjustment set from the learned graph.
+    The causal relations of the class.
+    """
+
+    nodes: list[GraphNode]
+    """
+    A node for each variable of the class's model.
     """
 
     training_rows: pd.DataFrame
@@ -221,6 +240,13 @@ class LearnedCausalStructure:
     The model's training rows, one column per example-level node, named as the graph's
     nodes are, which rank the valid adjustment sets by their support.
     """
+
+    @property
+    def selector(self) -> AdjustmentSelector:
+        """
+        :return: What chooses an adjustment set from the class's causal relations.
+        """
+        return AdjustmentSelector(self.relations.causal_graph(self.nodes))
 
 
 # %% learning from a relational circuit's tables
@@ -237,6 +263,15 @@ class RelationalCausalStructureLearner:
     ``Class.collection.attribute``. The circuit lets an instance's attributes reach a
     part's attributes only through the aggregation statistics, so no edge joins an
     instance attribute and a part attribute.
+
+    The learned graph is kept in a class diagram, as causal relations of the circuit's
+    class.
+    """
+
+    class_diagram: ClassDiagram
+    """
+    The diagram that keeps the learned relations, holding every class an attribute of
+    the circuit's variables belongs to.
     """
 
     learner: CausalStructureLearner = field(default_factory=PeterClarkStructureLearner)
@@ -289,9 +324,71 @@ class RelationalCausalStructureLearner:
                 part, rows, part_nodes, example_nodes, knowledge
             )
         return LearnedCausalStructure(
-            selector=AdjustmentSelector(CausalGraph.from_edges(nodes, edges)),
+            relations=self.record_in_class_diagram(circuit, edges),
+            nodes=nodes,
             training_rows=tables.example_rows,
         )
+
+    def record_in_class_diagram(
+        self, circuit: RelationalProbabilisticCircuit, edges: list[GraphEdge]
+    ) -> CausalRelationsOfClass:
+        """
+        Replace the causal relations of the circuit's class in :attr:`class_diagram`
+        with the learned edges.
+
+        :param circuit: A fitted relational circuit.
+        :param edges: The learned edges.
+        :return: The causal relations of the class.
+        """
+        relations = CausalRelationsOfClass(
+            self.class_diagram, self.class_diagram.get_wrapped_class(circuit.class_)
+        )
+        endpoints = self.create_endpoints(circuit.feature_extractor, None)
+        for part, template in circuit.exchangeable_distribution_templates.items():
+            endpoints += self.create_endpoints(
+                template.template_distribution.feature_extractor,
+                relations.owner.get_field(part),
+            )
+        endpoint_of = {endpoint.name: endpoint for endpoint in endpoints}
+        relations.replace_relations(
+            [
+                CausalRelation(
+                    source=relations.owner,
+                    target=relations.owner,
+                    first=endpoint_of[edge.first],
+                    second=endpoint_of[edge.second],
+                    mark_at_first=edge.mark_at_first,
+                    mark_at_second=edge.mark_at_second,
+                )
+                for edge in edges
+            ]
+        )
+        return relations
+
+    def create_endpoints(
+        self, extractor: FeatureExtractor, collection: WrappedField | None
+    ) -> list[CausalEndpoint]:
+        """
+        :param extractor: The feature extractor of the circuit's class, or of the parts
+            in one of its collections.
+        :param collection: The field of the class holding those parts, or ``None`` for
+            the class itself.
+        :return: The variable of the class each feature is.
+        """
+        prefix = () if collection is None else (collection,)
+        return [
+            (
+                StatisticEndpoint(feature, collection)
+                if feature in extractor.aggregation_features
+                else AttributeEndpoint(
+                    prefix
+                    + AttributeEndpoint.along(
+                        self.class_diagram, feature._access_path_
+                    ).fields
+                )
+            )
+            for feature in extractor.features
+        ]
 
     @staticmethod
     def create_part_nodes(

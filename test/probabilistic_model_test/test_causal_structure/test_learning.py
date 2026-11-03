@@ -7,40 +7,41 @@ from probabilistic_model.causal_structure.domain_causal_knowledge import (
     DeterministicCopy,
 )
 from probabilistic_model.causal_structure.exceptions import UnknownGraphNode
-from probabilistic_model.causal_structure.graph import GraphEdge, GraphNode, NodeLevel
+from probabilistic_model.causal_structure.graph import (
+    CausalGraph,
+    GraphEdge,
+    GraphNode,
+    NodeLevel,
+)
 from probabilistic_model.causal_structure.identification import (
     AdjustmentSelector,
     IdentifiedEffect,
 )
-from probabilistic_model.causal_structure.learning import (
-    LearnedCausalStructure,
-    PeterClarkStructureLearner,
-)
+from probabilistic_model.causal_structure.learning import PeterClarkStructureLearner
 
 from .structural_causal_models import chain_with_a_copy, collider, season_fork
 
 # %% learning from one table
 
 
-def structure_of(
+def graph_of(
     rows: pd.DataFrame,
     knowledge: DomainCausalKnowledge | None = None,
     variable_type: type[Integer | Continuous] = Integer,
-) -> LearnedCausalStructure:
+) -> CausalGraph:
     """
     :param rows: One column per variable.
     :param knowledge: What is known in advance.
     :param variable_type: The type of every variable.
-    :return: The structure learned from them.
+    :return: The graph learned from them.
     """
     nodes = [
         GraphNode(variable=variable_type(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for name in rows.columns
     ]
-    graph = PeterClarkStructureLearner().learn(
+    return PeterClarkStructureLearner().learn(
         rows, nodes, knowledge or DomainCausalKnowledge()
     )
-    return LearnedCausalStructure(AdjustmentSelector(graph), rows)
 
 
 def test_fork_with_tiers_is_recovered():
@@ -48,7 +49,7 @@ def test_fork_with_tiers_is_recovered():
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
 
-    graph = structure_of(season_fork(), knowledge).selector.graph
+    graph = graph_of(season_fork(), knowledge)
 
     assert set(graph.edges()) == {
         GraphEdge.directed("season", "ice_cream_sales"),
@@ -57,7 +58,7 @@ def test_fork_with_tiers_is_recovered():
 
 
 def test_collider_is_oriented_without_tiers():
-    graph = structure_of(collider()).selector.graph
+    graph = graph_of(collider())
 
     assert {
         (edge.parent, edge.child) for edge in graph.edges() if edge.is_directed
@@ -73,7 +74,7 @@ def test_deterministic_copy_is_restored_as_child():
         deterministic_copies=[DeterministicCopy(copy="D", source="B")],
     )
 
-    graph = structure_of(chain_with_a_copy(), knowledge).selector.graph
+    graph = graph_of(chain_with_a_copy(), knowledge)
 
     assert set(graph.edges()) == {
         GraphEdge.directed("A", "B"),
@@ -85,20 +86,17 @@ def test_knowledge_naming_an_unknown_variable_raises():
     knowledge = DomainCausalKnowledge(tiers=[["winter"]])
 
     with pytest.raises(UnknownGraphNode):
-        structure_of(season_fork(), knowledge)
+        graph_of(season_fork(), knowledge)
 
 
 def test_learned_fork_supplies_the_confounder():
     knowledge = DomainCausalKnowledge(
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
-    structure = structure_of(season_fork(), knowledge)
+    rows = season_fork()
 
-    identification = structure.selector.identify(
-        "ice_cream_sales",
-        "drowning_incidents",
-        {"season"},
-        structure.training_rows,
+    identification = AdjustmentSelector(graph_of(rows, knowledge)).identify(
+        "ice_cream_sales", "drowning_incidents", {"season"}, rows
     )
 
     assert identification == IdentifiedEffect(frozenset({"season"}))
@@ -111,7 +109,7 @@ def test_continuous_columns_are_tested_after_discretization():
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
 
-    graph = structure_of(rows, knowledge, Continuous).selector.graph
+    graph = graph_of(rows, knowledge, Continuous)
 
     assert {(edge.parent, edge.child) for edge in graph.edges()} == {
         ("season", "ice_cream_sales"),

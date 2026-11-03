@@ -42,6 +42,7 @@ from typing_extensions import Generic
 from krrood.class_diagrams.exceptions import (
     ClassIsUnMappedInClassDiagram,
     CouldNotResolveType,
+    FieldIsUnMappedInClassDiagram,
 )
 
 if TYPE_CHECKING:
@@ -347,6 +348,17 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
         :return: The name of the class that is wrapped.
         """
         return self.clazz.__name__
+
+    def get_field(self, name: str) -> WrappedField:
+        """
+        :param name: The public name of one of the class's fields.
+        :return: That field.
+        :raises FieldIsUnMappedInClassDiagram: If the class has no field of that name.
+        """
+        for wrapped_field in self.fields:
+            if wrapped_field.name == name:
+                return wrapped_field
+        raise FieldIsUnMappedInClassDiagram(self.clazz, name)
 
     @cached_property
     def factory_methods(self) -> tuple[str, ...]:
