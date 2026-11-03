@@ -336,9 +336,8 @@ class CustomTypeRule(FieldStorageRule):
 
 class JSONRule(FieldStorageRule):
     """
-    Values that krrood's JSON serializer writes: collections of builtins, of classes or
-    of mapped types, and values or collections of a type with a JSON serializer of its
-    own.
+    Values that krrood's JSON serializer writes: collections of builtins or of mapped
+    types, and values or collections of a type with a JSON serializer of its own.
     """
 
     storage = FieldStorage.JSON
@@ -353,7 +352,6 @@ class JSONRule(FieldStorageRule):
         if field_to_store.wrapped_field.is_container:
             return (
                 field_to_store.wrapped_field.is_collection_of_builtins
-                or field_to_store.wrapped_field.is_collection_of_types
                 or field_to_store.has_type_mapping(type_endpoint)
                 or field_to_store.has_json_serializer(type_endpoint)
             )

@@ -221,17 +221,6 @@ def test_position_type_wrapper(session, database):
     assert result == dao
 
 
-def test_a_collection_of_classes_survives_a_round_trip(session, database):
-    wrapper = KRROODPositionTypesWrapper([KRROODPosition, KRROODPosition4D])
-    session.add(to_dao(wrapper))
-    session.commit()
-    session.expunge_all()
-
-    result = session.scalars(select(KRROODPositionTypesWrapperDAO)).one()
-
-    assert result.from_dao().position_types == wrapper.position_types
-
-
 def test_positions(session, database):
     p1 = KRROODPosition(1, 2, 3)
     p2 = KRROODPosition(2, 3, 4)
