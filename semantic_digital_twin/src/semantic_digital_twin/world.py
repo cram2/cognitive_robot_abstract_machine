@@ -2134,21 +2134,21 @@ class World(HasSimulatorProperties):
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
-        Computes all child entities of a given KinematicStructureEntity in the world
-        recursively.
+        Computes the entities below a given KinematicStructureEntity in the world.
 
         :param kinematic_structure_entity: The KinematicStructureEntity for which to
-            compute children.
-        :return: A list of all child KinematicStructureEntities.
+            compute descendants.
+        :return: Every descendant once, each after its parent.
         """
-        children = self.compute_child_kinematic_structure_entities(
+        descendants = []
+        for child in self.compute_child_kinematic_structure_entities(
             kinematic_structure_entity
-        )
-        for child in children:
-            children.extend(
+        ):
+            descendants.append(child)
+            descendants.extend(
                 self.compute_descendent_child_kinematic_structure_entities(child)
             )
-        return children
+        return descendants
 
     @memoize
     def compute_child_kinematic_structure_entities(
