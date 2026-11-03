@@ -45,7 +45,6 @@ dev = [
     "bokeh",
     "mypy>=1.8",
     "krrood[development-tools]",
-    "import-linter",
 ]
 
 doc = [

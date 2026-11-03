@@ -85,6 +85,7 @@ development-tools = [
     "ruff==0.17.2",
     "docformatter==1.7.8",
     "tqdm",
+    "packaging",
 ]
 
 [project.scripts]
@@ -146,14 +147,11 @@ exclude_lines = [
 
 # Core is everything a plain `pip install krrood` needs. Its modules are the source modules of
 # the contract below, and the packages they may load are core's dependencies further down.
-[tool.importlinter]
-root_package = "krrood"
-
-[[tool.importlinter.contracts]]
-id = "core-imports-no-all-module"
-name = "Core imports no module of the all extra"
-type = "forbidden"
-source_modules = [
+[tool.krrood.core-boundary]
+# The packages and modules a plain `pip install krrood` must be able to load; every other
+# module of krrood is not core. `krrood check` reports a core module that loads a module
+# outside core, or a distribution outside `dependencies`, at module level.
+core = [
     "krrood._version",
     "krrood.adapters",
     "krrood.bounds",
@@ -170,41 +168,6 @@ source_modules = [
     "krrood.symbol_graph",
     "krrood.utils",
 ]
-forbidden_modules = [
-    "krrood.code_generation",
-    "krrood.development_tools",
-    "krrood.ontomatic",
-    "krrood.ormatic",
-    "krrood.parametrization",
-    "krrood.ripple_down_rules",
-    "krrood.rustworkx_utils.visualization",
-    "krrood.symbolic_math",
-]
-# Today's imports from core into krrood[all]. Entries are only ever removed.
-ignore_imports = [
-    "krrood.adapters.json_serializer -> krrood.ormatic.data_access_objects.base",
-    "krrood.class_diagrams.attribute_introspector -> krrood.ontomatic.property_descriptor",
-    "krrood.class_diagrams.module_generation -> krrood.code_generation.formatting",
-    "krrood.class_diagrams.wrapped_field -> krrood.ontomatic.property_descriptor.property_descriptor",
-    "krrood.entity_query_language.backends -> krrood.ormatic.eql_interface",
-    "krrood.entity_query_language.backends -> krrood.parametrization.exceptions",
-    "krrood.entity_query_language.backends -> krrood.parametrization.model_registries",
-    "krrood.entity_query_language.backends -> krrood.parametrization.parameterizer",
-    "krrood.entity_query_language.operators.probabilistic_queries -> krrood.parametrization.exceptions",
-    "krrood.entity_query_language.operators.probabilistic_queries -> krrood.parametrization.model_registries",
-    "krrood.entity_query_language.operators.probabilistic_queries -> krrood.parametrization.parameterizer",
-    "krrood.entity_query_language.operators.probabilistic_queries -> krrood.parametrization.random_events_translator",
-    "krrood.entity_query_language.orm.model -> krrood.ormatic.data_access_objects.alternative_mappings",
-    "krrood.entity_query_language.testing.result_generation -> krrood.code_generation.formatting",
-    "krrood.entity_query_language.testing.result_generation -> krrood.code_generation.generator",
-    "krrood.entity_query_language.testing.result_generation -> krrood.code_generation.imports",
-    "krrood.entity_query_language.testing.result_generation -> krrood.code_generation.type_hints",
-    "krrood.entity_query_language.testing.result_verification -> krrood.ormatic.utils",
-    "krrood.symbol_graph.helpers -> krrood.symbolic_math.symbolic_math",
-    "krrood.symbol_graph.symbol_graph -> krrood.ontomatic.property_descriptor.attribute_introspector",
-]
-
-[tool.krrood.core-boundary]
 # The distributions core may load, with everything they require.
 dependencies = [
     "typing-extensions",
@@ -212,121 +175,6 @@ dependencies = [
     "numpy",
     "ordered-set",
     "sortedcontainers",
-]
-# Today's core modules that load another distribution. Entries are only ever removed.
-modules-loading-other-distributions = [
-    "krrood.adapters.deserialized_object_tracker",
-    "krrood.adapters.json_serializer",
-    "krrood.bounds",
-    "krrood.class_diagrams.class_diagram",
-    "krrood.class_diagrams.module_generation",
-    "krrood.entity_query_language.backends",
-    "krrood.entity_query_language.core.base_expressions",
-    "krrood.entity_query_language.core.expression_structure",
-    "krrood.entity_query_language.core.helpers",
-    "krrood.entity_query_language.core.mapped_variable",
-    "krrood.entity_query_language.core.variable",
-    "krrood.entity_query_language.evaluation",
-    "krrood.entity_query_language.explanation.explanation",
-    "krrood.entity_query_language.factories",
-    "krrood.entity_query_language.operators.aggregators",
-    "krrood.entity_query_language.operators.arithmetic",
-    "krrood.entity_query_language.operators.causal",
-    "krrood.entity_query_language.operators.comparator",
-    "krrood.entity_query_language.operators.concatenation",
-    "krrood.entity_query_language.operators.conditionals",
-    "krrood.entity_query_language.operators.core_logical_operators",
-    "krrood.entity_query_language.operators.logical_quantifiers",
-    "krrood.entity_query_language.operators.probabilistic_queries",
-    "krrood.entity_query_language.operators.set_operations",
-    "krrood.entity_query_language.orm.model",
-    "krrood.entity_query_language.predicate",
-    "krrood.entity_query_language.query.aggregation_structure",
-    "krrood.entity_query_language.query.builders",
-    "krrood.entity_query_language.query.match",
-    "krrood.entity_query_language.query.operations",
-    "krrood.entity_query_language.query.quantifiers",
-    "krrood.entity_query_language.query.query",
-    "krrood.entity_query_language.query.result_transformers",
-    "krrood.entity_query_language.query_graph",
-    "krrood.entity_query_language.rdr.backward_inference",
-    "krrood.entity_query_language.rdr.branch_semantics",
-    "krrood.entity_query_language.rdr.condition_resolver",
-    "krrood.entity_query_language.rdr.guard_condition",
-    "krrood.entity_query_language.rules.conclusion",
-    "krrood.entity_query_language.rules.conclusion_selector",
-    "krrood.entity_query_language.scope",
-    "krrood.entity_query_language.testing.result_generation",
-    "krrood.entity_query_language.testing.result_verification",
-    "krrood.entity_query_language.verbalization._example_domain",
-    "krrood.entity_query_language.verbalization.attribute_predicates",
-    "krrood.entity_query_language.verbalization.boolean_predicate",
-    "krrood.entity_query_language.verbalization.context",
-    "krrood.entity_query_language.verbalization.engine",
-    "krrood.entity_query_language.verbalization.fragments.base",
-    "krrood.entity_query_language.verbalization.grammar.aggregation.assembler",
-    "krrood.entity_query_language.verbalization.grammar.aggregation.rules",
-    "krrood.entity_query_language.verbalization.grammar.chain.assembler",
-    "krrood.entity_query_language.verbalization.grammar.chain.planner",
-    "krrood.entity_query_language.verbalization.grammar.chain.rules",
-    "krrood.entity_query_language.verbalization.grammar.clauses.assembler",
-    "krrood.entity_query_language.verbalization.grammar.clauses.composer",
-    "krrood.entity_query_language.verbalization.grammar.clauses.planner",
-    "krrood.entity_query_language.verbalization.grammar.conditions.assembler",
-    "krrood.entity_query_language.verbalization.grammar.conditions.placement",
-    "krrood.entity_query_language.verbalization.grammar.conditions.predication",
-    "krrood.entity_query_language.verbalization.grammar.conditions.recognition",
-    "krrood.entity_query_language.verbalization.grammar.conditions.rules",
-    "krrood.entity_query_language.verbalization.grammar.conditions.scoping",
-    "krrood.entity_query_language.verbalization.grammar.conditions.subject",
-    "krrood.entity_query_language.verbalization.grammar.framework.assembler",
-    "krrood.entity_query_language.verbalization.grammar.framework.phrase_rule",
-    "krrood.entity_query_language.verbalization.grammar.framework.planner",
-    "krrood.entity_query_language.verbalization.grammar.framework.registry",
-    "krrood.entity_query_language.verbalization.grammar.inference.assembler",
-    "krrood.entity_query_language.verbalization.grammar.inference.planner",
-    "krrood.entity_query_language.verbalization.grammar.inference.rules",
-    "krrood.entity_query_language.verbalization.grammar.instantiated.assembler",
-    "krrood.entity_query_language.verbalization.grammar.instantiated.planner",
-    "krrood.entity_query_language.verbalization.grammar.instantiated.rules",
-    "krrood.entity_query_language.verbalization.grammar.match.assembler",
-    "krrood.entity_query_language.verbalization.grammar.match.planner",
-    "krrood.entity_query_language.verbalization.grammar.probabilistic_queries.rules",
-    "krrood.entity_query_language.verbalization.grammar.query.assembler",
-    "krrood.entity_query_language.verbalization.grammar.query.planner",
-    "krrood.entity_query_language.verbalization.grammar.query.ranking",
-    "krrood.entity_query_language.verbalization.grammar.query.rules",
-    "krrood.entity_query_language.verbalization.grammar.query.selection",
-    "krrood.entity_query_language.verbalization.grammar.terms.rules",
-    "krrood.entity_query_language.verbalization.microplanning.coordination",
-    "krrood.entity_query_language.verbalization.microplanning.microplan",
-    "krrood.entity_query_language.verbalization.microplanning.possessive",
-    "krrood.entity_query_language.verbalization.microplanning.referring",
-    "krrood.entity_query_language.verbalization.morphology",
-    "krrood.entity_query_language.verbalization.navigation_path",
-    "krrood.entity_query_language.verbalization.pipeline",
-    "krrood.entity_query_language.verbalization.relational_attributes",
-    "krrood.entity_query_language.verbalization.rendering.coreference_processor",
-    "krrood.entity_query_language.verbalization.rendering.determiner_processor",
-    "krrood.entity_query_language.verbalization.rendering.discourse",
-    "krrood.entity_query_language.verbalization.rendering.morphology_processor",
-    "krrood.entity_query_language.verbalization.rendering.orthography_processor",
-    "krrood.entity_query_language.verbalization.rendering.passes",
-    "krrood.entity_query_language.verbalization.rendering.realization",
-    "krrood.entity_query_language.verbalization.rendering.renderer",
-    "krrood.entity_query_language.verbalization.verbalizer",
-    "krrood.entity_query_language.verbalization.vocabulary.english",
-    "krrood.entity_query_language.verbalization.vocabulary.parts_of_speech",
-    "krrood.entity_query_language.verbalization.vocabulary.words",
-    "krrood.inheritance_path_length",
-    "krrood.patterns.factory_and_kwargs",
-    "krrood.patterns.role",
-    "krrood.patterns.role_predicates",
-    "krrood.patterns.subclass_safe_generic",
-    "krrood.rustworkx_utils.graph_visualizer",
-    "krrood.rustworkx_utils.rxnode",
-    "krrood.symbol_graph.helpers",
-    "krrood.symbol_graph.symbol_graph",
 ]
 
 [tool.setuptools.dynamic]

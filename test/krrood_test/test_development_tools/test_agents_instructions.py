@@ -16,6 +16,7 @@ from krrood.development_tools.agents.rule_module import RuleModule
 from krrood.development_tools.agents.shipped_rules.documentation import (
     DocumentationRules,
 )
+from krrood.development_tools.agents.shipped_rules.imports import ImportsRules
 from krrood.development_tools.command_line import (
     CommandLine,
     ExitStatus,
@@ -123,6 +124,7 @@ def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
     assert RuleModule(shipped_rules).checkers == (
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_PROSE.checker,
+        ImportsRules.CORE_LOADS_ONLY_CORE.checker,
     )
 
 
