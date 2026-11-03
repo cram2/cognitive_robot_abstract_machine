@@ -13,8 +13,10 @@ from krrood.development_tools.agents import shipped_rules
 from krrood.development_tools.agents.repository_files import (
     RepositoryInstructionsFile,
 )
+from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
 from krrood.development_tools.agents.rule_module import RuleModule
+from krrood.development_tools.subcommand import Subcommand
 from krrood.patterns.path_enumeration import PathEnumeration
 
 # %% file contents
@@ -65,6 +67,15 @@ class AgentsInstructions:
         return cls(repository_root, sections)
 
     @property
+    def checkers(self) -> tuple[CodeRuleChecker, ...]:
+        """
+        The checker of every rule in :attr:`sections` and the sections nested in them.
+        """
+        return tuple(
+            checker for section in self.sections for checker in section.checkers
+        )
+
+    @property
     def path(self) -> Path:
         """
         The path of the repository's ``AGENTS.md``.
@@ -80,6 +91,7 @@ class AgentsInstructions:
         return CodeGenerator(str(TemplateFile.AGENTS.parent)).render(
             TemplateFile.AGENTS.name,
             sections=self.sections,
+            check_command=Subcommand.CHECK.invocation,
         )
 
     def is_current(self) -> bool:

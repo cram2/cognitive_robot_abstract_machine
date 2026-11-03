@@ -161,6 +161,16 @@ def default_daisy_pose() -> dict[str, float]:
     }
 
 
+@pytest.fixture()
+def orientation_speed_ratio_tolerance() -> float:
+    """
+    :return: How much faster a far away orientation goal may turn than a close one.
+        Both turn at the speed the reference velocity sets once they are under way; the
+        margin covers that the closer goal starts braking sooner.
+    """
+    return 1.15
+
+
 @pytest.fixture(scope="function")
 def pr2_with_box(pr2_world_copy) -> World:
     with pr2_world_copy.modify_world():

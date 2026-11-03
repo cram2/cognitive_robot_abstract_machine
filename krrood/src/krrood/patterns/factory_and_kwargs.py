@@ -1,10 +1,9 @@
-import inspect
 from copy import deepcopy
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
 
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 
@@ -91,31 +90,7 @@ class HasFactoryAndKwargs(Generic[T]):
         :return: Whether :attr:`_factory_` takes that keyword, as a parameter of that
             name or through arbitrary keywords (a ``**kwargs`` parameter).
         """
-        return self._factory_takes_keyword_(self._factory_, keyword)
-
-    @staticmethod
-    def _factory_takes_keyword_(factory: Callable[..., Any], keyword: str) -> bool:
-        """
-        :param factory: A factory.
-        :param keyword: A keyword argument.
-        :return: Whether the factory takes that keyword, as a parameter of that name or
-            through arbitrary keywords (a ``**kwargs`` parameter).
-        """
-        return any(
-            parameter.kind is inspect.Parameter.VAR_KEYWORD or parameter.name == keyword
-            for parameter in HasFactoryAndKwargs._factory_signature_(
-                factory
-            ).parameters.values()
-        )
-
-    @staticmethod
-    @lru_cache(maxsize=None)
-    def _factory_signature_(factory: Callable[..., Any]) -> inspect.Signature:
-        """
-        :param factory: A factory.
-        :return: Its signature, read once per factory.
-        """
-        return inspect.signature(factory)
+        return CallSignature.of(self._factory_).accepts_keyword(keyword)
 
     def _is_kept_out_of_construction_(self, keyword: str, value_type: type) -> bool:
         """

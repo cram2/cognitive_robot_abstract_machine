@@ -140,17 +140,17 @@ def correlated_gaussian_samples(
 
 
 def fit_joint_probability_tree(
-    data: pd.DataFrame, min_samples_per_quantile: int
+    data: pd.DataFrame, minimum_samples_per_quantile: int
 ) -> ProbabilisticCircuit:
     """
     :param data: The data to fit the tree to.
-    :param min_samples_per_quantile: The minimal number of samples per quantile of the
+    :param minimum_samples_per_quantile: The minimal number of samples per quantile of the
         variables inferred from the data.
     :return: A joint probability tree fitted to the data.
     """
     variables = infer_variables_from_dataframe(
-        data, min_samples_per_quantile=min_samples_per_quantile
+        data, minimum_samples_per_quantile=minimum_samples_per_quantile
     )
     return JointProbabilityTree(
-        annotated_variables=variables, min_samples_per_leaf=0.1
+        annotated_variables=variables, minimum_samples_per_leaf=0.1
     ).fit(data)

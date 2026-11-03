@@ -41,22 +41,23 @@ class AnnotatedVariable:
     The minimal distance between two values of the variable.
     """
 
-    min_likelihood_improvement: float | None = field(default=0.1)
+    split_penalty_factor: float = 1.0
     """
-    The minimum likelihood improvement passed to the Nyga Distributions.
+    The factor on the penalty a split of the Nyga Distributions has to outweigh in log
+    likelihood.
     """
 
-    min_samples_per_quantile: int | None = field(default=10)
+    minimum_samples_per_quantile: int | None = field(default=10)
     """
     The minimum number of samples per quantile passed to the Nyga Distributions.
     """
 
-    min_impurity_improvement: float | None = field(default=0)
+    minimum_impurity_improvement: float | None = field(default=0)
     """
     The minimum impurity improvement for JPT learning.
     """
 
-    max_standard_deviation: float | None = field(default=None)
+    maximum_standard_deviation: float | None = field(default=None)
     """
     The precision a JPT has to reach for this variable: a node is only split while the
     standard deviation of some numeric target in it is above that target's maximum.
@@ -71,9 +72,9 @@ class AnnotatedVariable:
 def infer_variables_from_dataframe(
     data: pd.DataFrame,
     minimal_distance: float = 1.0,
-    min_likelihood_improvement: float = 0.1,
-    min_samples_per_quantile: int = 10,
-    min_impurity_improvement: float = 0,
+    split_penalty_factor: float = 1.0,
+    minimum_samples_per_quantile: int = 10,
+    minimum_impurity_improvement: float = 0,
 ) -> list[AnnotatedVariable]:
     """
     Infer the variables from a dataframe.
@@ -82,11 +83,12 @@ def infer_variables_from_dataframe(
 
     :param data: The dataframe to infer the variables from.
     :param minimal_distance: The minimal distance between two values of the variable.
-    :param min_likelihood_improvement: The minimum likelihood improvement passed to the
-        Continuous Variables.
-    :param min_samples_per_quantile: The minimum number of samples per quantile passed
-        to the Continuous Variables.
-    :param min_impurity_improvement: The minimum impurity improvement for JPT learning.
+    :param split_penalty_factor: The factor on the penalty a split of the Nyga
+        Distributions of the continuous variables has to outweigh in log likelihood.
+    :param minimum_samples_per_quantile: The minimum number of samples per quantile
+        passed to the Continuous Variables.
+    :param minimum_impurity_improvement: The minimum impurity improvement for JPT
+        learning.
     :return: The inferred variables.
     """
     result = []
@@ -120,9 +122,9 @@ def infer_variables_from_dataframe(
             mean=mean,
             standard_deviation=standard_deviation,
             minimal_distance=minimal_distance,
-            min_likelihood_improvement=min_likelihood_improvement,
-            min_samples_per_quantile=min_samples_per_quantile,
-            min_impurity_improvement=min_impurity_improvement,
+            split_penalty_factor=split_penalty_factor,
+            minimum_samples_per_quantile=minimum_samples_per_quantile,
+            minimum_impurity_improvement=minimum_impurity_improvement,
         )
 
         result.append(annotated_variable)
