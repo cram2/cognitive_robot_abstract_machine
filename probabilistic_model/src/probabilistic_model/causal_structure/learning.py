@@ -17,7 +17,6 @@ from causallearn.search.ConstraintBased.PC import pc as peter_clark
 from causallearn.utils.PCUtils.BackgroundKnowledge import (
     BackgroundKnowledge as CausalLearnKnowledge,
 )
-from random_events.variable import Variable
 from typing_extensions import Any
 
 from probabilistic_model.causal_structure.domain_causal_knowledge import (
@@ -150,13 +149,13 @@ class PeterClarkStructureLearner(CausalStructureLearner):
             stable=True,
             show_progress=False,
             node_names=tested,
-            background_knowledge=self.causal_learn_knowledge(
+            background_knowledge=self.to_causal_learn_knowledge(
                 knowledge.restricted_to(tested)
             ),
         ).G.graph
         return CausalGraph.from_edges(
             nodes,
-            self.edges_of_adjacency_matrix(graph, tested)
+            self.read_adjacency_matrix(graph, tested)
             + [
                 GraphEdge.directed(copy.source, copy.copy)
                 for copy in knowledge.deterministic_copies
@@ -164,7 +163,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         )
 
     @staticmethod
-    def causal_learn_knowledge(
+    def to_causal_learn_knowledge(
         knowledge: DomainCausalKnowledge,
     ) -> CausalLearnKnowledge:
         """
@@ -186,9 +185,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         return translated
 
     @staticmethod
-    def edges_of_adjacency_matrix(
-        graph: np.ndarray, names: list[str]
-    ) -> list[GraphEdge]:
+    def read_adjacency_matrix(graph: np.ndarray, names: list[str]) -> list[GraphEdge]:
         """
         :param graph: causal-learn's adjacency matrix over the named nodes.
         :param names: The names of its nodes, in its order.
@@ -201,9 +198,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
                 mark_at_first=AdjacencyMatrixMark(graph[first, second]).mark,
                 mark_at_second=AdjacencyMatrixMark(graph[second, first]).mark,
             )
-            for first in range(len(names))
-            for second in range(first + 1, len(names))
-            if graph[first, second] != 0
+            for first, second in np.argwhere(np.triu(graph != 0, k=1))
         ]
 
 
@@ -227,33 +222,6 @@ class LearnedCausalStructure:
     The model's training rows, one column per example-level node, named as the graph's
     nodes are, which rank the valid adjustment sets by their support.
     """
-
-    @classmethod
-    def from_rows(
-        cls,
-        rows: pd.DataFrame,
-        variables: list[Variable],
-        learner: CausalStructureLearner | None = None,
-        knowledge: DomainCausalKnowledge | None = None,
-    ) -> LearnedCausalStructure:
-        """
-        :param rows: The table a flat model was fitted on, one column per variable.
-        :param variables: The model's variables.
-        :param learner: What learns the graph; the Peter-Clark algorithm if not given.
-        :param knowledge: What is known about the structure in advance.
-        :return: The structure learned from the table.
-        """
-        learner = learner or PeterClarkStructureLearner()
-        nodes = [
-            GraphNode(variable=variable, level=NodeLevel.EXAMPLE_ATTRIBUTE)
-            for variable in variables
-        ]
-        return cls(
-            selector=AdjustmentSelector(
-                learner.learn(rows, nodes, knowledge or DomainCausalKnowledge())
-            ),
-            training_rows=rows,
-        )
 
 
 # %% learning from a relational circuit's tables
@@ -316,16 +284,18 @@ class RelationalCausalStructureLearner:
         )
         nodes, edges = list(example_nodes), example_graph.edges()
         for part, rows in tables.part_rows.items():
-            part_nodes = self.part_nodes_of(circuit, part)
+            part_nodes = self.create_part_nodes(circuit, part)
             nodes += part_nodes
-            edges += self.part_edges(part, rows, part_nodes, example_nodes, knowledge)
+            edges += self.learn_part_edges(
+                part, rows, part_nodes, example_nodes, knowledge
+            )
         return LearnedCausalStructure(
             selector=AdjustmentSelector(CausalGraph.from_edges(nodes, edges)),
             training_rows=tables.example_rows,
         )
 
     @staticmethod
-    def part_nodes_of(
+    def create_part_nodes(
         circuit: RelationalProbabilisticCircuit, part: str
     ) -> list[GraphNode]:
         """
@@ -348,7 +318,7 @@ class RelationalCausalStructureLearner:
             if variable.name not in statistic_names
         ]
 
-    def part_edges(
+    def learn_part_edges(
         self,
         part: str,
         rows: pd.DataFrame,

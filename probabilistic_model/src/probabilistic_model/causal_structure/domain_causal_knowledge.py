@@ -86,11 +86,12 @@ class DomainCausalKnowledge:
     The variables that only copy another.
     """
 
-    def named_variables(self) -> set[str]:
+    def check_names(self, known_names: list[str]) -> None:
         """
-        :return: Every variable name the knowledge mentions.
+        :param known_names: The names of the variables the graph is learned over.
+        :raises UnknownGraphNode: If the knowledge names a variable not among them.
         """
-        return (
+        named = (
             set(itertools.chain.from_iterable(self.tiers))
             | {
                 name
@@ -103,14 +104,9 @@ class DomainCausalKnowledge:
                 for name in (copy.copy, copy.source)
             }
         )
-
-    def check_names(self, known_names: list[str]) -> None:
-        """
-        :param known_names: The names of the variables the graph is learned over.
-        :raises UnknownGraphNode: If the knowledge names a variable not among them.
-        """
-        for name in sorted(self.named_variables() - set(known_names)):
-            raise UnknownGraphNode(name, known_names)
+        unknown = sorted(named - set(known_names))
+        if unknown:
+            raise UnknownGraphNode(unknown[0], known_names)
 
     def restricted_to(self, names: list[str]) -> DomainCausalKnowledge:
         """
@@ -139,16 +135,4 @@ class DomainCausalKnowledge:
                 for copy in self.deterministic_copies
                 if {copy.copy, copy.source} <= kept
             ],
-        )
-
-    def merged_with(self, other: DomainCausalKnowledge) -> DomainCausalKnowledge:
-        """
-        :param other: More knowledge.
-        :return: Both, with the other's tiers placed after this knowledge's.
-        """
-        return DomainCausalKnowledge(
-            tiers=self.tiers + other.tiers,
-            required_edges=self.required_edges + other.required_edges,
-            forbidden_edges=self.forbidden_edges + other.forbidden_edges,
-            deterministic_copies=self.deterministic_copies + other.deterministic_copies,
         )

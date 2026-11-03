@@ -7,8 +7,11 @@ from probabilistic_model.causal_structure.domain_causal_knowledge import (
     DeterministicCopy,
 )
 from probabilistic_model.causal_structure.exceptions import UnknownGraphNode
-from probabilistic_model.causal_structure.graph import GraphEdge
-from probabilistic_model.causal_structure.identification import IdentifiedEffect
+from probabilistic_model.causal_structure.graph import GraphEdge, GraphNode, NodeLevel
+from probabilistic_model.causal_structure.identification import (
+    AdjustmentSelector,
+    IdentifiedEffect,
+)
 from probabilistic_model.causal_structure.learning import (
     LearnedCausalStructure,
     PeterClarkStructureLearner,
@@ -20,16 +23,24 @@ from .structural_causal_models import chain_with_a_copy, collider, season_fork
 
 
 def structure_of(
-    rows: pd.DataFrame, knowledge: DomainCausalKnowledge | None = None
+    rows: pd.DataFrame,
+    knowledge: DomainCausalKnowledge | None = None,
+    variable_type: type[Integer | Continuous] = Integer,
 ) -> LearnedCausalStructure:
     """
-    :param rows: Integer columns.
+    :param rows: One column per variable.
     :param knowledge: What is known in advance.
+    :param variable_type: The type of every variable.
     :return: The structure learned from them.
     """
-    return LearnedCausalStructure.from_rows(
-        rows, [Integer(name) for name in rows.columns], knowledge=knowledge
+    nodes = [
+        GraphNode(variable=variable_type(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        for name in rows.columns
+    ]
+    graph = PeterClarkStructureLearner().learn(
+        rows, nodes, knowledge or DomainCausalKnowledge()
     )
+    return LearnedCausalStructure(AdjustmentSelector(graph), rows)
 
 
 def test_fork_with_tiers_is_recovered():
@@ -100,9 +111,7 @@ def test_continuous_columns_are_tested_after_discretization():
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
 
-    graph = LearnedCausalStructure.from_rows(
-        rows, [Continuous(name) for name in rows.columns], knowledge=knowledge
-    ).selector.graph
+    graph = structure_of(rows, knowledge, Continuous).selector.graph
 
     assert {(edge.parent, edge.child) for edge in graph.edges()} == {
         ("season", "ice_cream_sales"),
