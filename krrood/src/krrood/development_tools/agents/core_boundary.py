@@ -376,28 +376,35 @@ class CoreBoundary:
         The normalized names of the distribution itself, of :attr:`dependencies` and of
         every installed distribution they require.
         """
+        return {self.distribution} | self.with_requirements(set(self.dependencies))
+
+    @staticmethod
+    def with_requirements(distributions: set[str]) -> set[str]:
+        """
+        :param distributions: Names of distributions.
+        :return: Their normalized names and those of every installed distribution they
+            require, directly or in turn, without extras.
+        """
         installed = {
             canonicalize_name(distribution.name): distribution
             for distribution in importlib.metadata.distributions()
         }
-        allowed = {self.distribution}
-        pending = [canonicalize_name(name) for name in self.dependencies]
+        closure: set[str] = set()
+        pending = [canonicalize_name(name) for name in distributions]
         while pending:
             distribution = pending.pop()
-            if distribution in allowed:
+            if distribution in closure:
                 continue
-            allowed.add(distribution)
+            closure.add(distribution)
             if distribution not in installed:
                 continue
             pending.extend(
                 canonicalize_name(requirement.name)
-                for requirement in map(
-                    Requirement, installed[distribution].requires or []
-                )
+                for requirement in map(Requirement, installed[distribution].requires or [])
                 if requirement.marker is None
                 or requirement.marker.evaluate({"extra": ""})
             )
-        return allowed
+        return closure
 
     @cached_property
     def distributions_by_package(self) -> dict[str, list[str]]:
