@@ -423,10 +423,12 @@ class NygaInduction:
     most the data's own range widened by `tolerance_at_extremes` on both sides.
     """
 
-    globally_optimal: bool = False
+    maximum_unique_values_for_optimal_partition: int = 5000
     """
-    Whether :meth:`fit` finds the partition of the data with the highest penalized log
-    likelihood instead of splitting greedily.
+    The largest number of unique values :meth:`fit` finds the partition with the highest
+    penalized log likelihood for.
+
+    Data with more unique values is split greedily.
     """
 
     probabilistic_circuit: ProbabilisticCircuit = field(
@@ -527,7 +529,7 @@ class NygaInduction:
 
         self.root_unit = SumUnit(probabilistic_circuit=self.probabilistic_circuit)
 
-        if self.globally_optimal:
+        if len(sorted_unique_data) <= self.maximum_unique_values_for_optimal_partition:
             initial_induction_step.mount_optimal_partition()
         else:
             initial_induction_step.mount_greedy_partition()

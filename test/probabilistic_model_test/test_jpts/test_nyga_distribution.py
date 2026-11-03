@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+from dataclasses import replace
 
 import numpy as np
 import plotly.graph_objects as go
@@ -418,7 +419,7 @@ def test_empty_copy_keeps_every_parameter(x):
         min_samples_per_quantile=3,
         tolerance_at_extremes=1e-3,
         support=closed(0.0, 5.0).simple_sets[0],
-        globally_optimal=True,
+        maximum_unique_values_for_optimal_partition=10,
     )
     induction.fit(np.random.uniform(1.0, 4.0, 50))
     copy = induction.empty_copy()
@@ -477,29 +478,68 @@ def test_optimal_segment_boundaries_maximize_the_penalized_likelihood(
     )
 
 
-def test_optimal_partition_is_at_least_as_likely_as_the_greedy_one(x):
-    data = np.array([2.0, 6.0, 10.0, 20.0, 30.0, 36.0, 37.0, 40.0, 50.0])
-    greedy = NygaInduction(x, min_samples_per_quantile=1, split_penalty_factor=0.3)
-    optimal = NygaInduction(
-        x, min_samples_per_quantile=1, split_penalty_factor=0.3, globally_optimal=True
-    )
-    greedy_log_likelihood = greedy.fit(data).log_likelihood(data.reshape(-1, 1)).sum()
-    optimal_log_likelihood = optimal.fit(data).log_likelihood(data.reshape(-1, 1)).sum()
-    greedy_pieces = len(greedy.probabilistic_circuit.root.subcircuits)
-    optimal_pieces = len(optimal.probabilistic_circuit.root.subcircuits)
-    penalty = optimal.minimum_split_gain(np.ones(len(data)))
-    assert optimal_log_likelihood - penalty * optimal_pieces >= (
-        greedy_log_likelihood - penalty * greedy_pieces - 1e-9
-    )
+@pytest.fixture
+def unevenly_spaced_data() -> np.ndarray:
+    """
+    Data on which splitting greedily misses the partition with the highest penalized
+    likelihood at a split penalty factor of 0.1.
+    """
+    return np.array([2.0, 6.0, 10.0, 20.0, 30.0, 36.0, 37.0, 40.0, 50.0])
 
 
-def test_globally_optimal_fit_has_one_piece_per_optimal_segment(x):
-    induction = NygaInduction(x, min_samples_per_quantile=5, globally_optimal=True)
+def fitted_pieces(induction: NygaInduction, data: np.ndarray) -> set:
+    """
+    :return: The uniform distributions of the circuit the induction fits to the data.
+    """
+    return {leaf.distribution for leaf in induction.fit(data).leaves}
+
+
+def optimal_pieces(induction: NygaInduction, data: np.ndarray) -> set:
+    """
+    :return: The uniform distributions over the parts of the optimal partition of the
+        data, within the support the induction narrowed while fitting.
+    """
+    step = induction.initial_induction_step(data)
+    return {
+        step.create_uniform_distribution_from_indices(begin_index, end_index)
+        for begin_index, end_index in itertools.pairwise(
+            step.optimal_segment_boundaries()
+        )
+    }
+
+
+def test_fit_partitions_optimally_up_to_the_limit(x, unevenly_spaced_data):
+    induction = NygaInduction(
+        x,
+        min_samples_per_quantile=1,
+        split_penalty_factor=0.1,
+        maximum_unique_values_for_optimal_partition=len(unevenly_spaced_data),
+    )
+    pieces = fitted_pieces(induction, unevenly_spaced_data)
+    assert pieces == optimal_pieces(induction, unevenly_spaced_data)
+
+
+def test_fit_splits_greedily_above_the_limit(x, unevenly_spaced_data):
+    above_the_limit = NygaInduction(
+        x,
+        min_samples_per_quantile=1,
+        split_penalty_factor=0.1,
+        maximum_unique_values_for_optimal_partition=len(unevenly_spaced_data) - 1,
+    )
+    pieces = fitted_pieces(above_the_limit, unevenly_spaced_data)
+    always_greedy = replace(
+        above_the_limit, maximum_unique_values_for_optimal_partition=0
+    )
+    assert pieces == fitted_pieces(always_greedy, unevenly_spaced_data)
+    assert pieces != optimal_pieces(above_the_limit, unevenly_spaced_data)
+
+
+def test_optimally_partitioned_fit_is_a_deterministic_distribution(x):
+    induction = NygaInduction(x, min_samples_per_quantile=5)
     data = np.concatenate(
         [np.random.normal(0.0, 1.0, 300), np.random.normal(6.0, 0.3, 300)]
     )
-    boundaries = induction.initial_induction_step(data).optimal_segment_boundaries()
     circuit = induction.fit(data)
-    assert len(circuit.root.subcircuits) == len(boundaries) - 1
+    assert len(data) <= induction.maximum_unique_values_for_optimal_partition
     assert circuit.is_deterministic()
     assert logsumexp(circuit.root.log_weights) == pytest.approx(0.0)

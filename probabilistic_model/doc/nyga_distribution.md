@@ -176,9 +176,9 @@ information criterion.
 The recursive splitting is greedy and therefore not guaranteed to find the partition with the highest penalized
 likelihood. 
 Since the boundaries are fixed by the indices of the data, the best partition can also be found exactly by dynamic 
-programming {cite}`jackson2005algorithm`, which `globally_optimal=True` does with the pruning of
-{cite}`killick2012optimal`. 
-It is slower, especially on large datasets.
+programming {cite}`jackson2005algorithm` with the pruning of {cite}`killick2012optimal`. 
+It is slower on large datasets, so the induction searches for the best partition only up to
+`maximum_unique_values_for_optimal_partition` unique values and splits greedily above that.
 
 This algorithm is implemented in the [NygaInduction](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/learning/nyga_induction/index.html#probabilistic_model.learning.nyga_induction.NygaInduction).
 
