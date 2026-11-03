@@ -64,14 +64,8 @@ class VectorBoundCap(BoundCap):
 @dataclass
 class RotationBoundCap(BoundCap):
     """
-    Caps the bounds of the three constraints of a rotation goal, which demand a change
-    of the vector part of the quaternion error, sin(angle / 2) * axis.
-
-    The cap is applied to the rotation angle rather than to the vector part, so that the
-    angle that may be demanded within the control horizon does not depend on how far
-    away the goal is. The reachable change is read in units of the half angle, which the
-    vector part changes by close to the goal, so close to the goal the cap equals that
-    of a single row.
+    Caps the three constraints of a rotation goal by the rotation angle, so the angle
+    demanded within the control horizon does not depend on how far away the goal is.
     """
 
     quaternion_error_bounds: sm.Vector

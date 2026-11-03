@@ -27,6 +27,7 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
 )
 from giskardpy.motion_statechart.graph_node import Task, ConvergingTask
+from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from krrood.symbolic_math.symbolic_math import (
     VariableParameters,
@@ -544,13 +545,13 @@ class CartesianPositionStraight(CartesianTask):
     )
     """
     Cost of falling behind on the line; leaving the line costs
-    :attr:`LATERAL_WEIGHT_FACTOR` times as much.
+    :attr:`lateral_weight_factor` times as much.
     """
 
     _line_start_binding: ForwardKinematicsBinding = field(init=False)
     """Binding for the tip pose the line starts at."""
 
-    LATERAL_WEIGHT_FACTOR: ClassVar[float] = 2
+    lateral_weight_factor: float = 2
     """How much more expensive leaving the line is than falling behind on it."""
 
     @property
@@ -604,7 +605,7 @@ class CartesianPositionStraight(CartesianTask):
         root_R_line = RotationMatrix.from_x_axis(root_V_line)
         line_V_travelled = root_R_line.inverse() @ (root_P_tip - root_P_line_start)
 
-        lateral_weight = self.weight * self.LATERAL_WEIGHT_FACTOR
+        lateral_weight = self.weight * self.lateral_weight_factor
         artifacts.geometry.add_position_constraint(
             expression_current=line_V_travelled[0],
             expression_goal=line_length,

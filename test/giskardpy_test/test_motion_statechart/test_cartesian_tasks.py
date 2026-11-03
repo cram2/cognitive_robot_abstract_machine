@@ -1798,7 +1798,7 @@ class TestCartesianTasks:
             constraint.name: constraint.quadratic_weight
             for constraint in artifacts.constraints.equality_constraints
         }
-        lateral_weight = task.weight * task.LATERAL_WEIGHT_FACTOR
+        lateral_weight = task.weight * task.lateral_weight_factor
         assert weights == {
             "line/progress": task.weight,
             "line/y": lateral_weight,
