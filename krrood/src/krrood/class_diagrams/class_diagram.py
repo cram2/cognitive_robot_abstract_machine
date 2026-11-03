@@ -639,8 +639,7 @@ class ClassDiagram:
         Build parent map from inheritance edges: child_idx -> set(parent_idx)
         """
         parent_map: dict[int, set[int]] = {}
-        for u, v in self._dependency_graph.edge_list():
-            rel = self._dependency_graph.get_edge_data(u, v)
+        for u, v, rel in self._dependency_graph.weighted_edge_list():
             if isinstance(rel, Inheritance):
                 parent_map.setdefault(v, set()).add(u)
         return parent_map
@@ -678,8 +677,7 @@ class ClassDiagram:
             values are sets of tuples representing association keys.
         """
         assoc_keys_by_source = {}
-        for u, v in self._dependency_graph.edge_list():
-            rel = self._dependency_graph.get_edge_data(u, v)
+        for u, v, rel in self._dependency_graph.weighted_edge_list():
             if isinstance(rel, Association):
                 assoc_keys_by_source.setdefault(u, set()).add(
                     rel.get_key(include_field_name)
@@ -697,17 +695,15 @@ class ClassDiagram:
 
         Inheritance edges are preserved.
         """
-        # Rebuild a fresh diagram from the same classes to avoid mutating this instance
         result = copy(self)
-        # Convenience locals
+        result._dependency_graph = self._dependency_graph.copy()
         g = result._dependency_graph
 
         assoc_keys_by_source = result.get_assoc_keys_by_source(include_field_name)
 
         # Mark redundant descendant association edges for removal
-        edges_to_remove: list[tuple[int, int]] = []
-        for u, v in g.edge_list():
-            rel = g.get_edge_data(u, v)
+        edges_to_remove: list[int] = []
+        for edge_index, (u, v, rel) in g.edge_index_map().items():
             if not isinstance(rel, Association):
                 continue
 
@@ -718,20 +714,12 @@ class ClassDiagram:
                 inherited_keys |= assoc_keys_by_source.get(anc, set())
 
             if key in inherited_keys:
-                edges_to_remove.append((u, v))
+                edges_to_remove.append(edge_index)
 
-        # Remove redundant edges
-        result.remove_edges(edges_to_remove)
+        for edge_index in edges_to_remove:
+            g.remove_edge_from_index(edge_index)
 
         return result
-
-    def remove_edges(self, edges):
-        """Remove edges from the dependency graph"""
-        for u, v in edges:
-            try:
-                self._dependency_graph.remove_edge(u, v)
-            except Exception:
-                pass
 
     @property
     def wrapped_classes(self):
@@ -1043,6 +1031,17 @@ class ClassDiagram:
         relation.index = self._dependency_graph.add_edge(
             relation.source.index, relation.target.index, relation
         )
+        clear_memoization_cache(self)
+
+    def remove_relation(self, relation: ClassRelation) -> None:
+        """
+        Removes a relation that :meth:`add_relation` added.
+
+        :param relation: The relation to remove.
+        """
+        self._dependency_graph.remove_edge_from_index(relation.index)
+        relation.index = None
+        clear_memoization_cache(self)
 
     def to_dot(
         self,
