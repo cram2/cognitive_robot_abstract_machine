@@ -116,7 +116,7 @@ class StagedLines:
     The directory of the git repository the commit is prepared in.
     """
 
-    def of(self, path: Path) -> set[int]:
+    def find_changed_lines(self, path: Path) -> set[int]:
         """
         :param path: A file in the repository.
         :return: The line numbers, in the staged file, that the staged change adds or
@@ -175,7 +175,9 @@ class CodeRulesCheck:
         """
         violations: list[CodeRuleViolation] = []
         for path in paths:
-            changed = None if self.staged is None else self.staged.of(path)
+            changed = (
+                None if self.staged is None else self.staged.find_changed_lines(path)
+            )
             found = [
                 violation
                 for checker in self.checkers

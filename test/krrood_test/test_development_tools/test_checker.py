@@ -65,4 +65,4 @@ def test_every_violation_is_reported_without_a_staged_change(
 
 def test_listing_the_staged_change_outside_a_repository_fails(tmp_path: Path) -> None:
     with pytest.raises(GitCommandFailed):
-        StagedLines(tmp_path).of(tmp_path / "module.py")
+        StagedLines(tmp_path).find_changed_lines(tmp_path / "module.py")
