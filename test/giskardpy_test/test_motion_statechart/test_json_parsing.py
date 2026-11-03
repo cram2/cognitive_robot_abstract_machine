@@ -16,7 +16,10 @@ from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    CartesianPositionStraight,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -31,7 +34,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -77,6 +80,19 @@ def test_to_json_joint_position_list(mini_world):
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
     assert node_copy.goal_state == node.goal_state
+
+
+def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
+    root, tip = mini_world.bodies
+    node = CartesianPositionStraight(
+        root_link=root,
+        tip_link=tip,
+        goal_point=Point3(1, 0, 0, reference_frame=root),
+    )
+    new_json_data = json.loads(json.dumps(to_json(node)))
+    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    node_copy = from_json(new_json_data, **tracker.create_kwargs())
+    assert node_copy.weight == node.weight
 
 
 def test_executing_json_parsed_statechart(tmp_path):
