@@ -20,6 +20,7 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 # %% trajectory length limit
@@ -62,8 +63,12 @@ class DAiSyTester(GiskardTester):
         )
         return Giskard(
             world_source=WorldSpecification(
-                world_source=URDFParser(urdf=robot_desc, prefix=""),
-                robots_in_environment=[DAiSy],
+                robots=[
+                    RobotSpecification(
+                        semantic_annotation_type=DAiSy,
+                        description_parser=URDFParser(urdf=robot_desc, prefix=""),
+                    )
+                ]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(

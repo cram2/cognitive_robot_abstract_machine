@@ -10,6 +10,7 @@ from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
@@ -20,8 +21,14 @@ def create_giskard() -> Giskard:
     """
     return Giskard.standalone(
         world_source=WorldSpecification(
-            world_source=URDFParser.from_file(DAiSy.get_ros_file_path(), prefix=""),
-            robots_in_environment=[DAiSy],
+            robots=[
+                RobotSpecification(
+                    semantic_annotation_type=DAiSy,
+                    description_parser=URDFParser.from_file(
+                        DAiSy.get_ros_file_path(), prefix=""
+                    ),
+                )
+            ]
         ),
         qp_controller_config=QPControllerConfig(target_frequency=33),
     )

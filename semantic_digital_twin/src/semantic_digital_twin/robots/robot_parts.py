@@ -1062,6 +1062,14 @@ class MobileBase(
         return None
 
     @classproperty
+    def odometry_body_name(cls) -> str:
+        """
+        The name of the frame the real robot reports the odometry of this base relative
+        to.
+        """
+        return "odom"
+
+    @classproperty
     def drive_velocity_limits(cls) -> DriveVelocityLimits:
         """
         How fast the drive of the real robot may move this base.
@@ -1315,13 +1323,6 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         Returns the name of the root body of the robot in the world, which serves as the
         entry point for traversing the robot's kinematic structure.
         """
-
-    @classproperty
-    def odometry_body_name(cls) -> str:
-        """
-        The name of the frame the real robot reports its odometry relative to.
-        """
-        return "odom"
 
     @classmethod
     def get_drive_connection_type(cls) -> type[Connection]:

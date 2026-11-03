@@ -17,7 +17,6 @@ from semantic_digital_twin.world_source import WorldSource
 
 if TYPE_CHECKING:
     from semantic_digital_twin.adapters.package_resolver import PathResolver
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 # %% world specifications
 
@@ -45,12 +44,6 @@ class WorldSpecification(WorldSource):
     objects: list[SpawnSpecification] = field(default_factory=list)
     """
     Specifications spawned relative to the world root once the robots are in place.
-    """
-
-    robots_in_environment: list[type[AbstractRobot]] = field(default_factory=list)
-    """
-    The robots the environment's description already contains, annotated where they are
-    instead of being merged into it.
     """
 
     @classmethod
@@ -169,8 +162,6 @@ class WorldSpecification(WorldSource):
             world = self.world_source.create_world()
         else:
             world = World.create_with_root_body()
-        for robot_type in self.robots_in_environment:
-            robot_type.from_world(world)
         for robot_specification in self.robots:
             robot_specification.spawn(world)
 

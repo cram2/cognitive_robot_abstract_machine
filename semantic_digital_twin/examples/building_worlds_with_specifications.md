@@ -661,26 +661,23 @@ print("MJCF table world has", len(mjcf_world.bodies), "bodies")
 
 A world specification can also merge robots into the environment. Each one is described by a
 `RobotSpecification`, which bundles a robot's [semantic annotation class](adding-robots) with
-the poses that place it: `world_T_odometry` sets the localization pose, and
-`odometry_T_robot_start` the robot's start pose. The robot is parsed from its own description
-and inserted as `world.root -> odometry -> connection -> robot`. The connection attaching the
-robot to its odometry body is the drive determined by the robot's mobile base, or a fixed
-connection when the robot has no mobile base.
+the poses that place it. The robot is parsed from its own description and inserted below the
+world root by its localization, at `localization_pose`:
+
+- A robot with a mobile base is inserted as `world.root -> odometry -> drive -> robot`. The
+  odometry body is named as its mobile base declares, and the drive is the one the mobile base
+  creates. `odometry_T_robot_start` sets the robot's start pose relative to its odometry body.
+- Any other robot is inserted as `world.root -> robot`, with the root of its description
+  attached directly. It has no odometry body, so it takes no start pose.
 
 A few more fields cover robots whose world has to line up with a running system:
 
-- `localization_connection_type` attaches the odometry body to the world root. It is fixed by
+- `localization_connection_type` attaches the localized body to the world root. It is fixed by
   default; a `Connection6DoF` lets the localization move, for example when it is read from tf.
 - `description_parser` reads the robot's description instead of the file the robot class
   declares, for example a `URDFParser` of the XML on the `/robot_description` topic. The robot
   keeps the names the parser gives it, so a parser with an empty `prefix` leaves them
   unprefixed and matching the frames the robot publishes.
-- `odometry_body_name` names the odometry body. Give each robot its own when a world holds
-  several.
-
-Some descriptions already contain the frame the robot stands in, such as a `map` link. Such a
-description is an environment: parse it as the specification's environment and list the robot
-class in `robots_in_environment`, which annotates the robot where it is instead of spawning it.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -691,7 +688,7 @@ world = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
             odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(y=2.0),
         )
     ],
@@ -699,22 +696,26 @@ world = WorldSpecification.from_urdf(
 ```
 
 Because `robots` is a list, a world can hold several of them, each with its own localization —
-including several instances of the same robot. Names are not unique in a world, so two PR2s
-contribute two joints called `pr2/torso_lift_joint`. Each robot is therefore annotated while it
-still owns the world it was parsed into, and its odometry body carries its own identifier as a
-name prefix, so the localization frames stay distinguishable.
+including several instances of the same robot. Names are not unique in a world, so each robot is
+annotated while it still owns the world it was parsed into. Its odometry body takes the prefix of
+the robot's own names, so robots read with different prefixes keep their localization frames
+apart.
 
 ```{code-cell} ipython3
+from semantic_digital_twin.adapters.urdf import URDFParser
+
 two_robot_world = WorldSpecification.from_urdf(
     file_path=table_urdf,
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            description_parser=URDFParser.from_file(PR2.get_ros_file_path(), prefix="left_pr2"),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
         ),
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
+            description_parser=URDFParser.from_file(PR2.get_ros_file_path(), prefix="right_pr2"),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
         ),
     ],
 ).create_world()

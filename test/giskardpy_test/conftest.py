@@ -351,13 +351,16 @@ def prismatic_world_with_low_jerk_limit(request):
 # %% worlds of single robots as Giskard sets them up
 
 
-def _world_specification_of_mobile_robot(
+def _world_specification_of(
     robot_class: type[AbstractRobot],
+    localization_connection_type: type[FixedConnection | Connection6DoF],
 ) -> WorldSpecification:
     """
-    :param robot_class: The robot, which has a mobile base.
+    :param robot_class: The robot.
+    :param localization_connection_type: The connection localizing the robot in the
+        world.
     :return: A world holding only the robot, read from the file its class declares with
-        the names it has on the real robot, and localized by a movable connection.
+        the names it has on the real robot.
     """
     return WorldSpecification(
         robots=[
@@ -366,23 +369,9 @@ def _world_specification_of_mobile_robot(
                 description_parser=URDFParser.from_file(
                     robot_class.get_ros_file_path(), prefix=""
                 ),
-                localization_connection_type=Connection6DoF,
+                localization_connection_type=localization_connection_type,
             )
         ]
-    )
-
-
-def _world_specification_of_fixed_robot(
-    robot_class: type[AbstractRobot],
-) -> WorldSpecification:
-    """
-    :param robot_class: The robot, whose description starts at the world root.
-    :return: A world that is the description the robot class declares, read with the
-        names it has on the real robot.
-    """
-    return WorldSpecification(
-        world_source=URDFParser.from_file(robot_class.get_ros_file_path(), prefix=""),
-        robots_in_environment=[robot_class],
     )
 
 
@@ -391,7 +380,7 @@ def pr2_world_specification() -> WorldSpecification:
     """
     The PR2 alone, as Giskard sets it up.
     """
-    return _world_specification_of_mobile_robot(PR2)
+    return _world_specification_of(PR2, Connection6DoF)
 
 
 @pytest.fixture()
@@ -399,7 +388,7 @@ def hsr_world_specification() -> WorldSpecification:
     """
     The HSR alone, as Giskard sets it up.
     """
-    return _world_specification_of_mobile_robot(HSRB)
+    return _world_specification_of(HSRB, Connection6DoF)
 
 
 @pytest.fixture()
@@ -407,7 +396,7 @@ def stretch_world_specification() -> WorldSpecification:
     """
     Stretch alone, as Giskard sets it up.
     """
-    return _world_specification_of_mobile_robot(Stretch)
+    return _world_specification_of(Stretch, Connection6DoF)
 
 
 @pytest.fixture()
@@ -415,7 +404,7 @@ def tracy_world_specification() -> WorldSpecification:
     """
     Tracy alone, as Giskard sets it up.
     """
-    return _world_specification_of_fixed_robot(Tracy)
+    return _world_specification_of(Tracy, FixedConnection)
 
 
 @pytest.fixture()
@@ -423,4 +412,4 @@ def daisy_world_specification() -> WorldSpecification:
     """
     DAiSy alone, as Giskard sets it up.
     """
-    return _world_specification_of_fixed_robot(DAiSy)
+    return _world_specification_of(DAiSy, FixedConnection)

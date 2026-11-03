@@ -99,7 +99,7 @@ def build_world() -> World:
         robots=[
             RobotSpecification(
                 semantic_annotation_type=UnitreeG1,
-                world_T_odometry=ROBOT_START_POSE.homogeneous_matrix,
+                localization_pose=ROBOT_START_POSE.homogeneous_matrix,
             )
         ],
         objects=[

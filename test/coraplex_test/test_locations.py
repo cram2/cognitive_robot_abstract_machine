@@ -67,7 +67,7 @@ def _world_with_a_robot_behind_a_displaced_odom(
         world_source=None,
         robots=[
             RobotSpecification(
-                semantic_annotation_type=PR2, world_T_odometry=world_T_odometry
+                semantic_annotation_type=PR2, localization_pose=world_T_odometry
             )
         ],
     )

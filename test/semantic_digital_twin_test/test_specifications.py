@@ -54,10 +54,16 @@ from semantic_digital_twin.exceptions import (
     UnknownPartWholeRelationshipField,
     UselessConceptError,
 )
-from semantic_digital_twin.robots.exceptions import RobotDescriptionMissingError
+from semantic_digital_twin.robots.exceptions import (
+    RobotDescriptionMissingError,
+    StartPoseWithoutMobileBaseError,
+)
 from semantic_digital_twin.robots.pr2 import PR2, PR2MobileBase
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, AbstractRobotPart
+from semantic_digital_twin.robots.robot_parts import (
+    AbstractRobotPart,
+    MobileBase,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cabinet,
     Milk,
@@ -100,7 +106,11 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.geometry import Color, Scale, Box
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, Region
+from semantic_digital_twin.world_description.world_entity import (
+    Body,
+    Connection,
+    Region,
+)
 
 RESOURCES = Path(__file__).resolve().parents[2] / "semantic_digital_twin" / "resources"
 
@@ -593,22 +603,23 @@ def test_spawn_positional_name(empty_world):
 # %% robot specifications
 
 
-def _odometry_of(robot: MinimalRobot) -> Body:
+def _localization_of(robot: MinimalRobot) -> Connection:
     """
-    :return: The body a spawned robot is attached to.
+    :return: The connection attaching a spawned robot without a mobile base to the
+        world root.
     """
-    return robot.root.parent_connection.parent
+    return robot.root.parent_connection
 
 
-def _odometry_bodies(world: World, robot_class: type[AbstractRobot]) -> list[Body]:
+def _odometry_bodies(world: World, mobile_base_class: type[MobileBase]) -> list[Body]:
     """
-    Every odometry body of the robots of a class in a world, regardless of the prefix
-    disambiguating it.
+    Every odometry body of the robots with a mobile base of a class in a world,
+    regardless of the prefix disambiguating it.
     """
     return [
         body
         for body in world.bodies
-        if body.name.name == robot_class.odometry_body_name
+        if body.name.name == mobile_base_class.odometry_body_name
     ]
 
 
@@ -619,7 +630,7 @@ def test_world_specification_with_robot():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=1.0
                     ),
                     odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -631,7 +642,7 @@ def test_world_specification_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    odometry_body = world.get_body_by_name(PR2.odometry_body_name)
+    odometry_body = world.get_body_by_name(PR2MobileBase.odometry_body_name)
     assert odometry_body is not None
     assert isinstance(odometry_body.parent_connection, FixedConnection)
     assert odometry_body.parent_connection.parent is world.root
@@ -698,7 +709,7 @@ def test_world_specification_from_urdf_with_robot():
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    odometry_body = world.get_body_by_name(PR2.odometry_body_name)
+    odometry_body = world.get_body_by_name(PR2MobileBase.odometry_body_name)
     assert odometry_body is not None
     assert odometry_body.parent_connection.parent is world.root
     drive = world.get_body_by_name("base_footprint").parent_connection
@@ -725,7 +736,7 @@ def test_world_specification_with_several_robots():
                     description_parser=URDFParser.from_file(
                         PR2.get_ros_file_path(), prefix="first"
                     ),
-                    world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=1.0
                     ),
                 ),
@@ -734,7 +745,7 @@ def test_world_specification_with_several_robots():
                     description_parser=URDFParser.from_file(
                         PR2.get_ros_file_path(), prefix="second"
                     ),
-                    world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-1.0
                     ),
                 ),
@@ -745,7 +756,7 @@ def test_world_specification_with_several_robots():
 
     assert len(world.get_semantic_annotations_by_type(PR2)) == 2
 
-    odometry_bodies = _odometry_bodies(world, PR2)
+    odometry_bodies = _odometry_bodies(world, PR2MobileBase)
     assert len(odometry_bodies) == 2
     assert odometry_bodies[0].name != odometry_bodies[1].name
     for odometry_body in odometry_bodies:
@@ -785,23 +796,23 @@ def test_a_localization_is_fixed_by_default(empty_world):
         description_parser=_parser_of_robot_rooted_at_map(),
     ).spawn(empty_world)
 
-    assert type(_odometry_of(robot).parent_connection) is FixedConnection
+    assert type(_localization_of(robot)) is FixedConnection
 
 
 def test_a_movable_localization_starts_at_the_localization_pose(empty_world):
-    world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
 
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
         description_parser=_parser_of_robot_rooted_at_map(),
-        world_T_odometry=world_T_odometry,
+        localization_pose=localization_pose,
         localization_connection_type=Connection6DoF,
     ).spawn(empty_world)
 
-    localization = _odometry_of(robot).parent_connection
+    localization = _localization_of(robot)
     assert isinstance(localization, Connection6DoF)
     assert localization.parent is empty_world.root
-    np.testing.assert_allclose(localization.origin.to_np(), world_T_odometry.to_np())
+    np.testing.assert_allclose(localization.origin.to_np(), localization_pose.to_np())
 
 
 def test_a_movable_localization_moves(empty_world):
@@ -810,7 +821,7 @@ def test_a_movable_localization_moves(empty_world):
         description_parser=_parser_of_robot_rooted_at_map(),
         localization_connection_type=Connection6DoF,
     ).spawn(empty_world)
-    localization = _odometry_of(robot).parent_connection
+    localization = _localization_of(robot)
     moved_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=3.0, reference_frame=empty_world.root
     )
@@ -853,23 +864,89 @@ def test_a_robot_without_a_description_and_without_a_parser_cannot_be_spawned(
     assert raised.value.robot_class is MinimalRobot
 
 
-# %% robot specifications: the odometry body
+# %% robot specifications: a robot without a mobile base
 
 
-def test_an_odometry_body_is_named_as_its_robot_declares_in_the_namespace_of_the_robot(
+@dataclass(eq=False)
+class RobotBelowTheRootOfItsDescription(MinimalRobot):
+    """
+    A robot whose description places it below a frame that is not part of the robot.
+    """
+
+    @classmethod
+    def from_world(cls, world: World) -> Self:
+        return cls.from_branch_in_world(world.get_body_by_name("base_link"))
+
+
+def test_a_robot_without_a_mobile_base_hangs_from_the_world_root_by_its_localization(
     empty_world,
 ):
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
-        description_parser=_parser_of_robot_rooted_at_map(prefix="described"),
+        description_parser=_parser_of_robot_rooted_at_map(),
     ).spawn(empty_world)
 
-    assert _odometry_of(robot).name == PrefixedName(
-        MinimalRobot.odometry_body_name, robot.root.name.prefix
+    assert _localization_of(robot).parent is empty_world.root
+
+
+def test_a_robot_without_a_mobile_base_starts_at_the_localization_pose(empty_world):
+    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+
+    robot = RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+        localization_pose=localization_pose,
+    ).spawn(empty_world)
+
+    np.testing.assert_allclose(
+        empty_world.compute_forward_kinematics(empty_world.root, robot.root).to_np(),
+        localization_pose.to_np(),
     )
 
 
-def test_a_pr2_reports_its_odometry_relative_to_the_body_its_robot_class_declares(
+def test_a_localization_attaches_the_root_of_the_robots_description(empty_world):
+    robot = RobotSpecification(
+        semantic_annotation_type=RobotBelowTheRootOfItsDescription,
+        description_parser=_parser_of_robot_rooted_at_map(),
+    ).spawn(empty_world)
+
+    description_root = robot.root.parent_connection.parent
+    assert description_root.name.name == "map"
+    assert description_root.parent_connection.parent is empty_world.root
+
+
+def test_a_start_pose_is_rejected_for_a_robot_without_a_mobile_base():
+    with pytest.raises(StartPoseWithoutMobileBaseError) as raised:
+        RobotSpecification(
+            semantic_annotation_type=MinimalRobot,
+            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+        )
+
+    assert raised.value.robot_class is MinimalRobot
+
+
+# %% robot specifications: the odometry body
+
+
+def test_an_odometry_body_is_named_as_its_mobile_base_declares_in_the_namespace_of_the_robot(
+    empty_world,
+):
+    try:
+        robot = RobotSpecification(
+            semantic_annotation_type=PR2,
+            description_parser=URDFParser.from_file(
+                PR2.get_ros_file_path(), prefix="described"
+            ),
+        ).spawn(empty_world)
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
+
+    assert robot.mobile_base.drive.parent.name == PrefixedName(
+        PR2MobileBase.odometry_body_name, robot.root.name.prefix
+    )
+
+
+def test_a_pr2_reports_its_odometry_relative_to_the_body_its_mobile_base_declares(
     empty_world,
 ):
     try:
@@ -880,7 +957,7 @@ def test_a_pr2_reports_its_odometry_relative_to_the_body_its_robot_class_declare
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
 
-    assert str(robot.mobile_base.drive.parent.name) == PR2.odometry_body_name
+    assert str(robot.mobile_base.drive.parent.name) == PR2MobileBase.odometry_body_name
 
 
 def test_a_robot_specification_survives_orm_round_trip():
@@ -897,54 +974,6 @@ def test_a_robot_specification_survives_orm_round_trip():
         is specification.localization_connection_type
     )
     assert reconstructed.description_parser == specification.description_parser
-
-
-# %% world specifications whose environment contains robots
-
-
-def test_a_robot_the_environment_contains_is_annotated_in_place():
-    world = WorldSpecification(
-        world_source=_parser_of_robot_rooted_at_map(prefix=""),
-        robots_in_environment=[MinimalRobot],
-    ).create_world()
-
-    [robot] = world.get_semantic_annotations_by_type(MinimalRobot)
-    assert robot.root is world.root
-    assert {body.name.name for body in world.bodies} == {"map", "base_link"}
-
-
-def test_robots_are_spawned_into_an_environment_containing_a_robot():
-    world = WorldSpecification(
-        world_source=_parser_of_robot_rooted_at_map(),
-        robots_in_environment=[MinimalRobot],
-        robots=[
-            RobotSpecification(
-                semantic_annotation_type=MinimalRobot,
-                description_parser=_parser_of_robot_rooted_at_map(),
-            )
-        ],
-    ).create_world()
-
-    robot_roots = {
-        robot.root for robot in world.get_semantic_annotations_by_type(MinimalRobot)
-    }
-    [odometry_body] = _odometry_bodies(world, MinimalRobot)
-    assert robot_roots == {
-        world.root,
-        odometry_body.child_kinematic_structure_entities[0],
-    }
-    assert odometry_body.parent_connection.parent is world.root
-
-
-def test_a_world_specification_with_robots_in_its_environment_survives_orm_round_trip():
-    specification = WorldSpecification(
-        world_source=_parser_of_robot_rooted_at_map(prefix=""),
-        robots_in_environment=[MinimalRobot],
-    )
-
-    reconstructed = to_dao(specification).from_dao()
-
-    assert reconstructed.robots_in_environment == specification.robots_in_environment
 
 
 # %% world specifications with starting objects

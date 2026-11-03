@@ -60,9 +60,7 @@ def robot_classes_of(specification: WorldSpecification) -> list[type[AbstractRob
     """
     :return: The robot classes ``specification`` annotates.
     """
-    return specification.robots_in_environment + [
-        robot.semantic_annotation_type for robot in specification.robots
-    ]
+    return [robot.semantic_annotation_type for robot in specification.robots]
 
 
 # %% commanding a real robot

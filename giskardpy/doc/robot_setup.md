@@ -39,9 +39,9 @@ to be listed by hand.
 :language: python
 ```
 
-- The `WorldSpecification` takes the robot description as its world and annotates
-  everything in it as a `MinimalRobot`, so the arm is fixed where its description puts
-  it. It suits an arm that is bolted down. The description is read from the
+- The `RobotSpecification` reads the robot description and annotates everything in it
+  as a `MinimalRobot`. Without a mobile base, the robot is attached directly to the root
+  of the world, `map`, so it suits an arm that is bolted down. The description is read from the
   `/robot_description` topic, so Giskard uses the same model as the driver. The
   `prefix=""` keeps the names of the description, which the tf frames and joint states
   of the robot use. The section "Where the robot description comes from" below says when
@@ -77,8 +77,8 @@ Tracy runs one per arm, each in its own namespace:
   that belongs to a gripper. A listed controller that is not loaded or not active stops
   Giskard at startup instead of leaving its joints uncontrolled.
 
-Tracy's description starts at the `map` link, so the description is the world and the
-world specification only names the robot class Tracy is annotated with:
+Tracy has no mobile base either, so its description, which starts at the footprint of its
+table, is attached directly to `map`:
 
 ```{literalinclude} ../src/giskardpy/middleware/ros2/scripts/iai_robots/tracy/tracy_velocity.py
 :language: python
@@ -92,7 +92,7 @@ declares.
 
 A robot that drives is merged into the world by a `RobotSpecification`. It adds an
 odometry body below the root of the world, `map`, and connects the robot to it with the
-drive its robot class declares, an `OmniDrive` or a `DifferentialDrive`. The robot class
+drive its robot class declares, an `OmniDrive` or a `DifferentialDrive`. The mobile base
 also declares what the real robot uses: the name of the odometry frame, `odom` or
 `odom_combined` for the PR2, and how fast the drive may move. The HSR is set up like
 this:
@@ -106,7 +106,6 @@ this:
 |---|---|
 | `description_parser` | Reads the robot description. |
 | `localization_connection_type` | `Connection6DoF` lets the localization, the pose of the odometry body in the root, move. |
-
 The interface then says where the pose of the base is read from and where its velocity is
 sent. For the HSR:
 

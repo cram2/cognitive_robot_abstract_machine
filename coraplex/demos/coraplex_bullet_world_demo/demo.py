@@ -287,7 +287,7 @@ class BulletWorldDemonstration(RobotDemonstration):
         :return: The PR2, placed at :attr:`robot_start` through its odom.
         """
         return RobotSpecification(
-            semantic_annotation_type=self.used_robot, world_T_odometry=self.robot_start
+            semantic_annotation_type=self.used_robot, localization_pose=self.robot_start
         )
 
     def is_scene_populated(self, world: World) -> bool:

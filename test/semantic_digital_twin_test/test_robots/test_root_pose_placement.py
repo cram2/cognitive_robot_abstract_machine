@@ -23,7 +23,7 @@ def _pr2_behind_an_odom(
     world = World.create_with_root_body("root")
     try:
         robot = RobotSpecification(
-            semantic_annotation_type=PR2, world_T_odometry=world_T_odometry
+            semantic_annotation_type=PR2, localization_pose=world_T_odometry
         ).spawn(world)
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")

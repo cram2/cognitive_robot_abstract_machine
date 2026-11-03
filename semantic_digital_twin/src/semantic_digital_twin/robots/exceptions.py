@@ -316,3 +316,25 @@ class RobotDescriptionMissingError(UsageError):
             "Give the robot specification a parser of the robot's description, or "
             "use a robot class that declares its description file."
         )
+
+
+@dataclass
+class StartPoseWithoutMobileBaseError(UsageError):
+    """
+    Raised when a robot without a mobile base is given a start pose relative to an
+    odometry frame it does not have.
+    """
+
+    robot_class: type[AbstractRobot]
+    """
+    The robot class without a mobile base.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.robot_class.__name__} has no mobile base, so it has no odometry "
+            f"frame a start pose could be relative to."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Place the robot with its localization pose instead."

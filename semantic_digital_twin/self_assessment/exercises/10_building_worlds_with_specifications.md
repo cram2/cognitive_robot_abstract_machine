@@ -216,7 +216,7 @@ class with the poses that place it. `WorldSpecification.robots` takes a list of 
 
 Your goal:
 - Build a `WorldSpecification` from `table_urdf` whose `robots` hold a single `RobotSpecification`
-  for `PR2`, localized at `world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)`
+  for `PR2`, localized at `localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)`
 - Store it in a variable named `robot_specification` and materialize it into `robot_world`
 
 ```{code-cell} ipython3
@@ -224,7 +224,7 @@ Your goal:
 # TODO: describe a scene that contains a robot
 # robot_specification = WorldSpecification.from_urdf(
 #     table_urdf,
-#     robots=[RobotSpecification(semantic_annotation_type=..., world_T_odometry=...)],
+#     robots=[RobotSpecification(semantic_annotation_type=..., localization_pose=...)],
 # )
 # robot_world = robot_specification.create_world()
 ```
@@ -236,7 +236,7 @@ robot_specification = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odometry=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
         )
     ],
 )

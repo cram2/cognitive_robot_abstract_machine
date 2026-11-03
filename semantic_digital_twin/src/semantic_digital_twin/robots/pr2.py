@@ -640,6 +640,10 @@ class PR2Torso(
 @dataclass(eq=False)
 class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseLidar]):
     @classproperty
+    def odometry_body_name(cls) -> str:
+        return "odom_combined"
+
+    @classproperty
     def topic_name(cls) -> str:
         """
         The topic the PR2 publishes the pose of its base on.
@@ -702,10 +706,6 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
     @classmethod
     def _get_root_body_name(cls) -> str:
         return "base_footprint"
-
-    @classproperty
-    def odometry_body_name(cls) -> str:
-        return "odom_combined"
 
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(

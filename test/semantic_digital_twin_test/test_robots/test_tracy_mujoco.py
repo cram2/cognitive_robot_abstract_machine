@@ -41,23 +41,22 @@ def mounted_tracy() -> Tracy:
     return RobotSpecification(Tracy).spawn(world)
 
 
-def test_a_stationary_robot_is_bolted_to_the_world_through_a_fixed_drive():
+def test_a_stationary_robot_stands_at_its_localization_pose():
     """
-    Tracy has no mobile base, so its drive is a fixed connection like every robot's
-    odom, and the localization pose it is spawned with is where its root ends up.
+    Tracy has no mobile base, so the footprint of its table hangs from the world root by
+    its fixed localization, and the localization pose it is spawned with is where its
+    table stands.
     """
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
 
-    tracy = RobotSpecification(Tracy, world_T_odometry=world_T_odometry).spawn(world)
+    tracy = RobotSpecification(Tracy, localization_pose=localization_pose).spawn(world)
 
-    odom_C_robot = tracy.root.parent_connection.parent.parent_connection
-    root_C_odom = odom_C_robot.parent.parent_connection
-    assert isinstance(odom_C_robot, FixedConnection)
-    assert isinstance(root_C_odom, FixedConnection)
-    assert root_C_odom.parent is world.root
+    localization = tracy.root.parent_connection.parent.parent_connection
+    assert isinstance(localization, FixedConnection)
+    assert localization.parent is world.root
     root_position = world.compute_forward_kinematics_np(world.root, tracy.root)[:3, 3]
     assert root_position[:2] == pytest.approx([1.0, 2.0])
 

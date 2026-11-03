@@ -497,7 +497,7 @@ def _spawn_localized_pr2(
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
     return RobotSpecification(
         PR2,
-        world_T_odometry=world_T_odometry,
+        localization_pose=world_T_odometry,
         odometry_T_robot_start=odometry_T_robot_start,
     ).spawn(world)
 
