@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from random_events.variable import Symbolic, Variable
 from typing_extensions import Any, Self
 
-from probabilistic_model.directed_acyclic_graph import DirectedAcyclicGraph
+from probabilistic_model.graph import DirectedAcyclicGraph
 from probabilistic_model.distributions.distributions import SymbolicDistribution
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -108,9 +108,6 @@ class BayesianNetwork(DirectedAcyclicGraph[Node]):
             and self.root
         )
 
-    def index_of(self, node: Node) -> int:
-        return node.index
-
     def add_node(self, node: Node) -> None:
         if node.bayesian_network is self and node.index is not None:
             return
@@ -123,6 +120,7 @@ class BayesianNetwork(DirectedAcyclicGraph[Node]):
 
         # write self as the nodes bn
         node.bayesian_network = self
+        self.indices[node] = node.index
 
     def in_edges(self, node: Node) -> list[tuple[Node, Node, float | None]]:
         return [

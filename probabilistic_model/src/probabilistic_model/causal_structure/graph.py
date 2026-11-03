@@ -6,14 +6,15 @@ as the data settles it, and the directed acyclic graphs it stands for.
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import cached_property
 
+from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from random_events.variable import Variable
-from typing_extensions import Callable, Iterable
+from typing_extensions import Any, Callable, Iterable, Self
 
-from probabilistic_model.directed_acyclic_graph import DirectedAcyclicGraph
+from probabilistic_model.graph import DirectedAcyclicGraph, Graph
 from probabilistic_model.causal_structure.exceptions import (
     CyclicGraph,
     EquivalenceClassTooLarge,
@@ -187,24 +188,12 @@ class GraphEdge:
 # %% the directed acyclic graphs a causal graph stands for
 
 
-@dataclass
+@dataclass(eq=False)
 class MemberGraph(DirectedAcyclicGraph[str]):
     """
     One of the directed acyclic graphs a causal graph stands for, over the names of its
     nodes.
     """
-
-    indices: dict[str, int] = field(default_factory=dict, repr=False)
-    """
-    The index of every node in :attr:`graph`, by name.
-    """
-
-    def index_of(self, node: str) -> int:
-        return self.indices[node]
-
-    def add_node(self, node: str) -> None:
-        if node not in self.indices:
-            self.indices[node] = self.graph.add_node(node)
 
     def copy(self) -> MemberGraph:
         """
@@ -227,21 +216,32 @@ class MemberGraph(DirectedAcyclicGraph[str]):
 # %% the graph
 
 
-@dataclass
-class CausalGraph:
+class CausalGraphJSONKey(StrEnum):
+    """
+    The keys of a causal graph's JSON dict.
+    """
+
+    NODES = "nodes"
+    """
+    The nodes, in the graph's order.
+    """
+
+    EDGES = "edges"
+    """
+    The edges, in the graph's order.
+    """
+
+    MAXIMUM_UNDIRECTED_EDGES = "maximum_undirected_edges"
+    """
+    The graph's :attr:`CausalGraph.maximum_undirected_edges`.
+    """
+
+
+@dataclass(eq=False)
+class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
     """
     A causal graph: a directed acyclic graph, or the equivalence class of those the data
     cannot tell apart, whose undirected edges any of them may orient either way.
-    """
-
-    nodes: list[GraphNode]
-    """
-    The nodes, one per variable.
-    """
-
-    edges: list[GraphEdge]
-    """
-    The edges, at most one between two nodes.
     """
 
     maximum_undirected_edges: int = 12
@@ -250,23 +250,75 @@ class CausalGraph:
     stands for to be listed, each undirected edge doubling their candidates.
     """
 
+    @classmethod
+    def from_edges(
+        cls, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]
+    ) -> CausalGraph:
+        """
+        :param nodes: The nodes, one per variable.
+        :param edges: The edges between them, at most one between two nodes.
+        :return: The graph.
+        :raises UnknownGraphNode: If an edge names a node that is not among the nodes.
+        """
+        graph = cls()
+        graph.add_nodes_from(nodes)
+        for edge in edges:
+            graph.add_edge(edge)
+        return graph
+
+    def add_edge(self, edge: GraphEdge) -> None:
+        """
+        :param edge: An edge between two of the graph's nodes.
+        :raises UnknownGraphNode: If the graph lacks one of them.
+        """
+        self.graph.add_edge(
+            self.index_of(self.node(edge.first)),
+            self.index_of(self.node(edge.second)),
+            edge,
+        )
+
+    def edges(self) -> list[GraphEdge]:
+        """
+        :return: The edges, in the order they were added.
+        """
+        return self.graph.edges()
+
     def node(self, name: str) -> GraphNode:
         """
         :param name: The name of a node's variable.
         :return: The node.
         :raises UnknownGraphNode: If the graph has no such node.
         """
-        for node in self.nodes:
+        for node in self.nodes():
             if node.name == name:
                 return node
-        raise UnknownGraphNode(name, [node.name for node in self.nodes])
+        raise UnknownGraphNode(name, self.node_names)
 
     @property
     def node_names(self) -> list[str]:
         """
         :return: The names of the nodes, in the graph's order.
         """
-        return [node.name for node in self.nodes]
+        return [node.name for node in self.nodes()]
+
+    def to_json(self, **kwargs) -> dict[str, Any]:
+        return {
+            **super().to_json(**kwargs),
+            CausalGraphJSONKey.NODES: to_json(self.nodes(), **kwargs),
+            CausalGraphJSONKey.EDGES: to_json(self.edges(), **kwargs),
+            CausalGraphJSONKey.MAXIMUM_UNDIRECTED_EDGES: self.maximum_undirected_edges,
+        }
+
+    @classmethod
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        graph = cls.from_edges(
+            from_json(data[CausalGraphJSONKey.NODES], **kwargs),
+            from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
+        )
+        graph.maximum_undirected_edges = data[
+            CausalGraphJSONKey.MAXIMUM_UNDIRECTED_EDGES
+        ]
+        return graph
 
     def edge_between(self, first: str, second: str) -> GraphEdge | None:
         """
@@ -274,7 +326,7 @@ class CausalGraph:
         :param second: The name of another.
         :return: The edge between them, or ``None`` if they are not adjacent.
         """
-        for edge in self.edges:
+        for edge in self.edges():
             if {edge.first, edge.second} == {first, second}:
                 return edge
         return None
@@ -295,7 +347,7 @@ class CausalGraph:
         directed = MemberGraph()
         directed.add_nodes_from(self.node_names)
         directed.add_edges_from(
-            (edge.parent, edge.child) for edge in self.edges if edge.is_directed
+            (edge.parent, edge.child) for edge in self.edges() if edge.is_directed
         )
         return self.colliders_of(directed, self.adjacent)
 
@@ -330,7 +382,7 @@ class CausalGraph:
         """
         if not self.has_member_graphs:
             raise InconsistentGraph(
-                len([edge for edge in self.edges if edge.is_undirected])
+                len([edge for edge in self.edges() if edge.is_undirected])
             )
         return self._member_graphs
 
@@ -352,7 +404,7 @@ class CausalGraph:
         :return: The member graphs, as :meth:`member_graphs` describes them, listed
             once; none if no orientation qualifies.
         """
-        undirected = [edge for edge in self.edges if edge.is_undirected]
+        undirected = [edge for edge in self.edges() if edge.is_undirected]
         if len(undirected) > self.maximum_undirected_edges:
             raise EquivalenceClassTooLarge(
                 len(undirected), self.maximum_undirected_edges
@@ -360,7 +412,7 @@ class CausalGraph:
         directed = MemberGraph()
         directed.add_nodes_from(self.node_names)
         directed.add_edges_from(
-            (edge.parent, edge.child) for edge in self.edges if edge.is_directed
+            (edge.parent, edge.child) for edge in self.edges() if edge.is_directed
         )
         if not undirected:
             if not directed.is_acyclic:

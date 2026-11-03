@@ -48,7 +48,7 @@ def graph_of(
     ],
 )
 def test_d_separation_of_three_nodes(edges, given, separated):
-    assert graph_of(edges).is_d_separated({"X"}, {"Y"}, given) is separated
+    assert graph_of(edges).is_directionally_separated({"X"}, {"Y"}, given) is separated
 
 
 def test_d_separation_agrees_with_networkx_on_random_graphs():
@@ -66,7 +66,7 @@ def test_d_separation_agrees_with_networkx_on_random_graphs():
         for first, second in itertools.combinations(names, 2):
             others = [name for name in names if name not in (first, second)]
             given = set(generator.choice(others, size=2, replace=False))
-            assert graph.is_d_separated({first}, {second}, given) == (
+            assert graph.is_directionally_separated({first}, {second}, given) == (
                 networkx.is_d_separator(reference, {first}, {second}, given)
             )
 

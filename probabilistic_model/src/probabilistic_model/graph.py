@@ -1,11 +1,10 @@
 """
-Directed acyclic graphs over the variables of a model, as a Bayesian network and the
-graphs a causal graph stands for have them.
+Graphs whose nodes are the objects they hold, as Bayesian networks and causal graphs
+have them.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import rustworkx as rx
@@ -18,14 +17,19 @@ NodeType = TypeVar("NodeType")
 
 
 @dataclass
-class DirectedAcyclicGraph(Generic[NodeType], SubClassSafeGeneric, ABC):
+class Graph(Generic[NodeType], SubClassSafeGeneric):
     """
-    A directed acyclic graph whose nodes are the objects it holds.
+    A graph whose nodes are the objects it holds, each held once.
     """
 
-    graph: rx.PyDAG = field(default_factory=lambda: rx.PyDAG(multigraph=False))
+    graph: rx.PyDiGraph = field(default_factory=lambda: rx.PyDiGraph(multigraph=False))
     """
     The graph, whose node data are the nodes.
+    """
+
+    indices: dict[NodeType, int] = field(default_factory=dict, repr=False)
+    """
+    The index of every node in :attr:`graph`.
     """
 
     def __len__(self) -> int:
@@ -34,20 +38,34 @@ class DirectedAcyclicGraph(Generic[NodeType], SubClassSafeGeneric, ABC):
     def __iter__(self) -> Iterator[NodeType]:
         return iter(self.graph.nodes())
 
-    @abstractmethod
+    def __eq__(self, other: object) -> bool:
+        """
+        :param other: Another object.
+        :return: Whether it is a graph of the same nodes, in the same order, and the
+            same edges.
+        """
+        return (
+            isinstance(other, Graph)
+            and self.nodes() == other.nodes()
+            and list(self.graph.weighted_edge_list())
+            == list(other.graph.weighted_edge_list())
+        )
+
     def index_of(self, node: NodeType) -> int:
         """
         :param node: A node of the graph.
         :return: Its index in :attr:`graph`.
         """
+        return self.indices[node]
 
-    @abstractmethod
     def add_node(self, node: NodeType) -> None:
         """
         Add a node, unless the graph already has it.
 
         :param node: The node.
         """
+        if node not in self.indices:
+            self.indices[node] = self.graph.add_node(node)
 
     def add_nodes_from(self, nodes: Iterable[NodeType]) -> None:
         """
@@ -55,6 +73,22 @@ class DirectedAcyclicGraph(Generic[NodeType], SubClassSafeGeneric, ABC):
         """
         for node in nodes:
             self.add_node(node)
+
+    def nodes(self) -> list[NodeType]:
+        """
+        :return: The nodes, in the order they were added.
+        """
+        return self.graph.nodes()
+
+
+# %% directed acyclic graphs
+
+
+@dataclass(eq=False)
+class DirectedAcyclicGraph(Graph[NodeType]):
+    """
+    A graph whose edges each lead from a parent to a child, with no directed cycle.
+    """
 
     def add_edge(self, parent: NodeType, child: NodeType) -> None:
         """
@@ -73,12 +107,6 @@ class DirectedAcyclicGraph(Generic[NodeType], SubClassSafeGeneric, ABC):
         """
         for parent, child in edges:
             self.add_edge(parent, child)
-
-    def nodes(self) -> list[NodeType]:
-        """
-        :return: The nodes.
-        """
-        return self.graph.nodes()
 
     def edges(self) -> list[tuple[NodeType, NodeType]]:
         """
@@ -150,15 +178,15 @@ class DirectedAcyclicGraph(Generic[NodeType], SubClassSafeGeneric, ABC):
         """
         return [self.graph[parent] for parent, _ in rx.digraph_find_cycle(self.graph)]
 
-    def is_d_separated(
+    def is_directionally_separated(
         self, first: set[NodeType], second: set[NodeType], given: set[NodeType]
     ) -> bool:
         """
         :param first: Nodes.
         :param second: Other nodes, none of them in the first.
         :param given: The nodes conditioned on, none of them in the first or second.
-        :return: Whether every path between the first and the second nodes is blocked
-            by the given nodes (Koller and Friedman, 2009, algorithm 3.1).
+        :return: Whether the given nodes d-separate the first from the second: every
+            path between them is blocked (Koller and Friedman, 2009, algorithm 3.1).
         """
         opens_colliders = set(given).union(*(self.ancestors(node) for node in given))
         reached: set[NodeType] = set()

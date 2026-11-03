@@ -3,15 +3,19 @@ import pytest
 from krrood.adapters.json_serializer import from_json, to_json
 from random_events.variable import Continuous
 
-from probabilistic_model.causal_structure.discretization import (
-    Discretization,
-)
+from sklearn.base import clone
+from sklearn.exceptions import NotFittedError
+from sklearn.pipeline import make_pipeline
+
+from probabilistic_model.causal_structure.discretization import Discretizer
 from probabilistic_model.causal_structure.exceptions import (
     EquivalenceClassTooLarge,
     InconsistentGraph,
+    UnknownGraphNode,
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
+    GraphEdge,
     GraphNode,
     NodeLevel,
 )
@@ -44,6 +48,16 @@ def test_graph_without_member_graphs_raises():
         without_member_graphs().member_graphs()
 
 
+# %% building a graph
+
+
+def test_an_edge_to_a_node_the_graph_lacks_raises():
+    graph = confounded()
+
+    with pytest.raises(UnknownGraphNode):
+        graph.add_edge(GraphEdge.directed("X", "W"))
+
+
 # %% storing a graph
 
 
@@ -70,9 +84,37 @@ def test_variable_of_part_names_the_indexed_copy():
 
 
 def test_continuous_columns_are_discretized_into_bin_count_levels():
-    discretization = Discretization()
+    discretizer = Discretizer()
     rows = pd.DataFrame({"x": [position / 10 for position in range(100)]})
 
-    codes = discretization.apply(rows, ["x"])
+    codes = discretizer.fit_transform(rows)
 
-    assert codes["x"].nunique() == discretization.bin_count
+    assert codes["x"].nunique() == discretizer.bin_count
+
+
+def test_columns_with_few_values_keep_one_level_per_value_in_column_order():
+    rows = pd.DataFrame(
+        {
+            "colour": ["red", "blue", "red", "green"] * 25,
+            "x": [position / 10 for position in range(100)],
+        }
+    )
+
+    codes = Discretizer().fit_transform(rows)
+
+    assert list(codes.columns) == list(rows.columns)
+    assert codes["colour"].tolist() == [2, 0, 2, 1] * 25
+
+
+def test_the_discretizer_works_as_a_step_of_a_scikit_learn_pipeline():
+    discretizer = Discretizer(bin_count=3)
+    rows = pd.DataFrame({"x": [position / 10 for position in range(100)]})
+
+    codes = make_pipeline(clone(discretizer)).fit_transform(rows)
+
+    assert codes.equals(discretizer.fit_transform(rows))
+
+
+def test_transforming_before_fitting_raises():
+    with pytest.raises(NotFittedError):
+        Discretizer().transform(pd.DataFrame({"x": [0.0]}))

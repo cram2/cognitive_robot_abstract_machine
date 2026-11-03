@@ -15,9 +15,7 @@ from functools import cached_property
 
 import pandas as pd
 
-from probabilistic_model.causal_structure.discretization import (
-    Discretization,
-)
+from probabilistic_model.causal_structure.discretization import Discretizer
 from probabilistic_model.causal_structure.exceptions import (
     InvalidAdjustmentSet,
 )
@@ -117,7 +115,7 @@ class AdjustmentCheck:
             return InvalidAdjustmentReason.CONTAINS_CAUSE_OR_EFFECT
         if self.forbidden_nodes & adjustment:
             return InvalidAdjustmentReason.CONTAINS_FORBIDDEN_NODE
-        if not self.proper_backdoor_graph.is_d_separated(
+        if not self.proper_backdoor_graph.is_directionally_separated(
             {self.cause}, {self.effect}, set(adjustment)
         ):
             return InvalidAdjustmentReason.LEAVES_NON_CAUSAL_PATH_OPEN
@@ -227,7 +225,7 @@ class AdjustmentSelector:
     values needs to count as supported.
     """
 
-    discretization: Discretization = field(default_factory=Discretization)
+    discretizer: Discretizer = field(default_factory=Discretizer)
     """
     How the training rows are cut into combinations of values.
     """
@@ -329,7 +327,9 @@ class AdjustmentSelector:
         if training_rows is None or not set(columns) <= set(training_rows.columns):
             return 0
         cell_sizes = (
-            self.discretization.apply(training_rows, columns).groupby(columns).size()
+            self.discretizer.fit_transform(training_rows[columns])
+            .groupby(columns)
+            .size()
         )
         return int(((cell_sizes > 0) & (cell_sizes < self.minimum_rows_per_cell)).sum())
 

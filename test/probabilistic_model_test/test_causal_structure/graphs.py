@@ -32,12 +32,12 @@ def graph_of(
     names = sorted(
         {name for edge in directed + undirected for name in edge} | set(isolated or [])
     )
-    return CausalGraph(
-        nodes=[
+    return CausalGraph.from_edges(
+        [
             GraphNode(variable=Continuous(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
             for name in names
         ],
-        edges=[GraphEdge.directed(parent, child) for parent, child in directed]
+        [GraphEdge.directed(parent, child) for parent, child in directed]
         + [GraphEdge.undirected(first, second) for first, second in undirected],
     )
 
