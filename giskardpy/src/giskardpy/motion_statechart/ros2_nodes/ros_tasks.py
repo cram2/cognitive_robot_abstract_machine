@@ -27,7 +27,7 @@ from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)

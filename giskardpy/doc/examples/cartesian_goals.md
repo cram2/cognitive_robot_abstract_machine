@@ -25,7 +25,7 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
+from krrood_spatial_math.spatial_types import Pose, Vector3, Quaternion
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.world_entity import Body

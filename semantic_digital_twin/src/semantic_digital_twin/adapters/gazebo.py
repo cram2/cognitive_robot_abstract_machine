@@ -31,7 +31,7 @@ from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,

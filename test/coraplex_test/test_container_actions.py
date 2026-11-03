@@ -10,11 +10,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Pose,
-    RotationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix, Vector3
 from .conftest import left_or_only_arm
 from ..plan_running import simulated_executor, statechart_of
 
