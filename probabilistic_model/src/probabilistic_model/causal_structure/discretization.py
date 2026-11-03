@@ -11,7 +11,8 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import KBinsDiscretizer, OrdinalEncoder
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import FunctionTransformer, KBinsDiscretizer, OrdinalEncoder
 from sklearn.utils.validation import check_is_fitted
 from typing_extensions import Self
 
@@ -23,7 +24,7 @@ class Discretizer(TransformerMixin, BaseEstimator):
     """
     A scikit-learn transformer that turns the columns of a table into a few integer
     levels each: a numeric column with many values into quantile bins, every other
-    column into one level per value.
+    column into one level per value, whatever type the values have.
     """
 
     bin_count: int = 4
@@ -75,7 +76,14 @@ class Discretizer(TransformerMixin, BaseEstimator):
                         binned,
                     )
                 ],
-                remainder=OrdinalEncoder(),
+                remainder=make_pipeline(
+                    FunctionTransformer(
+                        pd.DataFrame.astype,
+                        kw_args=dict(dtype=str),
+                        feature_names_out="one-to-one",
+                    ),
+                    OrdinalEncoder(),
+                ),
                 verbose_feature_names_out=False,
             )
             .set_output(transform="pandas")

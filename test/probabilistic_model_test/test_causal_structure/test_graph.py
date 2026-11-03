@@ -1,3 +1,5 @@
+from enum import Enum
+
 import pandas as pd
 import pytest
 from krrood.adapters.json_serializer import from_json, to_json
@@ -26,6 +28,25 @@ from .graphs import (
     undirected_chain,
     without_member_graphs,
 )
+
+# %% values that are neither numbers nor text
+
+
+class Shape(Enum):
+    """
+    Values a column can hold that cannot be ordered.
+    """
+
+    ROUND = 1
+    """
+    A round shape.
+    """
+
+    SQUARE = 2
+    """
+    A square shape.
+    """
+
 
 # %% the graphs an equivalence class stands for
 
@@ -104,6 +125,15 @@ def test_columns_with_few_values_keep_one_level_per_value_in_column_order():
 
     assert list(codes.columns) == list(rows.columns)
     assert codes["colour"].tolist() == [2, 0, 2, 1] * 25
+
+
+def test_a_column_of_enum_members_keeps_one_level_per_member():
+    rows = pd.DataFrame({"kind": [Shape.ROUND, Shape.SQUARE] * 5})
+
+    codes = Discretizer().fit_transform(rows)
+
+    assert codes["kind"].nunique() == 2
+    assert codes["kind"].tolist() == codes["kind"][:2].tolist() * 5
 
 
 def test_the_discretizer_works_as_a_step_of_a_scikit_learn_pipeline():
