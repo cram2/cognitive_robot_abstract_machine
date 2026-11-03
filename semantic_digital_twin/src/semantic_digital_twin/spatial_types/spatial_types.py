@@ -1052,11 +1052,17 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def rotational_distance(self, other: RotationMatrix) -> sm.Scalar:
         """
-        :param other: The second orientation.
-        :return: The angle between the two orientations the shorter way round, in
-            [0, pi].
+        Calculate the rotational error between two rotation matrices.
+
+        This function computes the angular difference between two rotation matrices by
+        computing the dot product of the first matrix and the inverse of the second.
+        Subsequently, it generates the angle of the resulting rotation matrix.
+
+        :param other: The second rotation matrix.
+        :return: The angular error between the two rotation matrices as an expression.
         """
-        return self.dot(other.inverse()).angle
+        r_distance = self.dot(other.inverse())
+        return r_distance.angle
 
 
 class Point(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
