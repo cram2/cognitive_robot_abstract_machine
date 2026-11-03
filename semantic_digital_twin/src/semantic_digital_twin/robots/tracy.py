@@ -41,7 +41,7 @@ from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraM
 from semantic_digital_twin.robots.robotiq_85_gripper import Robotiq85Gripper
 from semantic_digital_twin.robots.ur10e_arm import UR10eArm
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )

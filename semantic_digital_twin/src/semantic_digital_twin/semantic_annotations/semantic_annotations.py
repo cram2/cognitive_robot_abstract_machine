@@ -57,12 +57,12 @@ from semantic_digital_twin.grasping.surface_grasp import (
     any_surface_grasp,
     from_any_side,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )

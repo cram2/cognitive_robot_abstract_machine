@@ -28,7 +28,7 @@ from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Point3,

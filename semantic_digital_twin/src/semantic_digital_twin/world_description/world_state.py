@@ -20,7 +20,7 @@ from semantic_digital_twin.exceptions import (
     WrongWorldModelVersion,
     NonMonotonicTimeError,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
