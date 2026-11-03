@@ -82,6 +82,92 @@ class TestRotationMatrix:
                 0,
             )
 
+    @pytest.mark.parametrize("turned", [-1.2, -0.5, -0.1, 0.1, 0.5, 1.2])
+    def test_rotational_distance_is_the_shorter_way_round(self, turned):
+        """
+        Turning by ``turned`` towards an orientation half a turn away leaves the rest of
+        the half turn to go, whichever way the turn goes.
+        """
+        start_yaw = 1.47
+        goal = RotationMatrix.from_rpy(0, 0, start_yaw + np.pi)
+        current = RotationMatrix.from_rpy(0, 0, start_yaw + turned)
+
+        distance = current.rotational_distance(goal)
+
+        assert distance.to_np()[0] == pytest.approx(np.pi - abs(turned))
+
+    @pytest.mark.parametrize(
+        "angle", [0.3, np.pi / 2 - 0.01, np.pi / 2 + 0.01, 2.5, np.pi - 1e-4]
+    )
+    @pytest.mark.parametrize(
+        "axis",
+        [
+            Vector3.Z(),
+            Vector3.unit_vector(1, 1, 1),
+            Vector3.unit_vector(0.2, -0.9, 0.3),
+        ],
+    )
+    def test_axis_angle_is_the_rotation_the_matrix_was_built_from(self, axis, angle):
+        """
+        A rotation by less than half a turn reads back as the axis and angle it was
+        built from.
+        """
+        axis_angle = RotationMatrix.from_axis_angle(AxisAngle(axis, angle)).axis_angle
+
+        assert axis_angle.angle.to_np()[0] == pytest.approx(angle)
+        assert np.allclose(axis_angle.axis.to_np(), axis.to_np())
+
+    @pytest.mark.parametrize("angle", [np.pi + 0.1, 1.5 * np.pi, 2 * np.pi - 0.3])
+    def test_axis_angle_of_more_than_half_a_turn_is_the_shorter_way_round(self, angle):
+        """
+        A rotation by more than half a turn reads back as the rest of the full turn
+        around the opposite axis.
+        """
+        axis = Vector3.unit_vector(0.2, -0.9, 0.3)
+
+        axis_angle = RotationMatrix.from_axis_angle(AxisAngle(axis, angle)).axis_angle
+
+        assert axis_angle.angle.to_np()[0] == pytest.approx(2 * np.pi - angle)
+        assert np.allclose(axis_angle.axis.to_np(), (-axis).to_np())
+
+    def test_axis_angle_of_half_a_turn_describes_the_matrix(self):
+        """
+        Half a turn reads back as an angle of pi around an axis that rebuilds the
+        matrix, as both directions of the axis describe the same rotation.
+        """
+        rotation = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.unit_vector(0.2, -0.9, 0.3), np.pi)
+        )
+
+        axis_angle = rotation.axis_angle
+
+        assert axis_angle.angle.to_np()[0] == pytest.approx(np.pi)
+        assert np.allclose(axis_angle.rotation_matrix.to_np(), rotation.to_np())
+
+    def test_axis_angle_of_the_identity_turns_by_zero_around_z(self):
+        """
+        The identity has no axis of its own and reads back as no turn around z.
+        """
+        axis_angle = RotationMatrix().axis_angle
+
+        assert axis_angle.angle.to_np()[0] == 0
+        assert np.allclose(axis_angle.axis.to_np(), Vector3.Z().to_np())
+
+    @pytest.mark.parametrize("angle", [0, np.pi])
+    def test_axis_angle_has_a_finite_derivative_where_its_angle_is_extreme(self, angle):
+        """
+        The angle keeps a finite derivative at no turn and at half a turn, where its
+        cosine reaches the ends of its range.
+        """
+        variable = sm.FloatVariable("angle")
+        rotation = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.unit_vector(0.2, -0.9, 0.3), variable)
+        )
+
+        derivative = rotation.axis_angle.angle.jacobian([variable])
+
+        assert np.isfinite(derivative.substitute([variable], [angle]).to_np()).all()
+
     def test_reference_frames(self):
         reference_frame = Body(name=PrefixedName("muh"))
         reference_frame2 = Body(name=PrefixedName("muh2"))
