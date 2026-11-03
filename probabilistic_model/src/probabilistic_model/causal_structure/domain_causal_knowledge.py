@@ -56,7 +56,7 @@ class DeterministicCopy:
 
 
 @dataclass
-class BackgroundKnowledge:
+class DomainCausalKnowledge:
     """
     Domain knowledge about a causal structure that no data supplies.
 
@@ -112,13 +112,13 @@ class BackgroundKnowledge:
         for name in sorted(self.named_variables() - set(known_names)):
             raise UnknownGraphNode(name, known_names)
 
-    def restricted_to(self, names: list[str]) -> BackgroundKnowledge:
+    def restricted_to(self, names: list[str]) -> DomainCausalKnowledge:
         """
         :param names: The names of the variables one table is learned over.
         :return: The knowledge about those variables alone.
         """
         kept = set(names)
-        return BackgroundKnowledge(
+        return DomainCausalKnowledge(
             tiers=[
                 [name for name in tier if name in kept]
                 for tier in self.tiers
@@ -141,12 +141,12 @@ class BackgroundKnowledge:
             ],
         )
 
-    def merged_with(self, other: BackgroundKnowledge) -> BackgroundKnowledge:
+    def merged_with(self, other: DomainCausalKnowledge) -> DomainCausalKnowledge:
         """
         :param other: More knowledge.
         :return: Both, with the other's tiers placed after this knowledge's.
         """
-        return BackgroundKnowledge(
+        return DomainCausalKnowledge(
             tiers=self.tiers + other.tiers,
             required_edges=self.required_edges + other.required_edges,
             forbidden_edges=self.forbidden_edges + other.forbidden_edges,

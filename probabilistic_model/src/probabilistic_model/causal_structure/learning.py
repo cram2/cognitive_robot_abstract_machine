@@ -20,8 +20,8 @@ from causallearn.utils.PCUtils.BackgroundKnowledge import (
 from random_events.variable import Variable
 from typing_extensions import Any
 
-from probabilistic_model.causal_structure.background_knowledge import (
-    BackgroundKnowledge,
+from probabilistic_model.causal_structure.domain_causal_knowledge import (
+    DomainCausalKnowledge,
 )
 from probabilistic_model.causal_structure.discretization import Discretizer
 from probabilistic_model.causal_structure.graph import (
@@ -91,7 +91,7 @@ class CausalStructureLearner(ABC):
         self,
         rows: pd.DataFrame,
         nodes: list[GraphNode],
-        knowledge: BackgroundKnowledge,
+        knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         """
         :param rows: The table, one column per node, named by the node.
@@ -129,7 +129,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         self,
         rows: pd.DataFrame,
         nodes: list[GraphNode],
-        knowledge: BackgroundKnowledge,
+        knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         """
         Deterministic copies and columns that never vary are left out of the tests; a
@@ -164,7 +164,9 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         )
 
     @staticmethod
-    def causal_learn_knowledge(knowledge: BackgroundKnowledge) -> CausalLearnKnowledge:
+    def causal_learn_knowledge(
+        knowledge: DomainCausalKnowledge,
+    ) -> CausalLearnKnowledge:
         """
         :param knowledge: Knowledge about the tested variables.
         :return: The same knowledge as causal-learn takes it.
@@ -232,7 +234,7 @@ class LearnedCausalStructure:
         rows: pd.DataFrame,
         variables: list[Variable],
         learner: CausalStructureLearner | None = None,
-        knowledge: BackgroundKnowledge | None = None,
+        knowledge: DomainCausalKnowledge | None = None,
     ) -> LearnedCausalStructure:
         """
         :param rows: The table a flat model was fitted on, one column per variable.
@@ -248,7 +250,7 @@ class LearnedCausalStructure:
         ]
         return cls(
             selector=AdjustmentSelector(
-                learner.learn(rows, nodes, knowledge or BackgroundKnowledge())
+                learner.learn(rows, nodes, knowledge or DomainCausalKnowledge())
             ),
             training_rows=rows,
         )
@@ -279,7 +281,7 @@ class RelationalCausalStructureLearner:
         self,
         circuit: RelationalProbabilisticCircuit,
         instances: list[Any],
-        knowledge: BackgroundKnowledge | None = None,
+        knowledge: DomainCausalKnowledge | None = None,
     ) -> LearnedCausalStructure:
         """
         :param circuit: A fitted relational circuit.
@@ -288,7 +290,7 @@ class RelationalCausalStructureLearner:
             attributes by their template node.
         :return: The structure learned from the circuit's training tables.
         """
-        knowledge = knowledge or BackgroundKnowledge()
+        knowledge = knowledge or DomainCausalKnowledge()
         tables = circuit.training_tables(instances)
         statistic_names = {
             variable.name
@@ -352,7 +354,7 @@ class RelationalCausalStructureLearner:
         rows: pd.DataFrame,
         part_nodes: list[GraphNode],
         example_nodes: list[GraphNode],
-        knowledge: BackgroundKnowledge,
+        knowledge: DomainCausalKnowledge,
     ) -> list[GraphEdge]:
         """
         :param part: An exchangeable part.

@@ -2,8 +2,8 @@ import pandas as pd
 import pytest
 from random_events.variable import Continuous, Integer
 
-from probabilistic_model.causal_structure.background_knowledge import (
-    BackgroundKnowledge,
+from probabilistic_model.causal_structure.domain_causal_knowledge import (
+    DomainCausalKnowledge,
     DeterministicCopy,
 )
 from probabilistic_model.causal_structure.exceptions import UnknownGraphNode
@@ -20,7 +20,7 @@ from .structural_causal_models import chain_with_a_copy, collider, season_fork
 
 
 def structure_of(
-    rows: pd.DataFrame, knowledge: BackgroundKnowledge | None = None
+    rows: pd.DataFrame, knowledge: DomainCausalKnowledge | None = None
 ) -> LearnedCausalStructure:
     """
     :param rows: Integer columns.
@@ -33,7 +33,7 @@ def structure_of(
 
 
 def test_fork_with_tiers_is_recovered():
-    knowledge = BackgroundKnowledge(
+    knowledge = DomainCausalKnowledge(
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
 
@@ -57,7 +57,7 @@ def test_collider_is_oriented_without_tiers():
 
 
 def test_deterministic_copy_is_restored_as_child():
-    knowledge = BackgroundKnowledge(
+    knowledge = DomainCausalKnowledge(
         tiers=[["A"], ["B"]],
         deterministic_copies=[DeterministicCopy(copy="D", source="B")],
     )
@@ -71,14 +71,14 @@ def test_deterministic_copy_is_restored_as_child():
 
 
 def test_knowledge_naming_an_unknown_variable_raises():
-    knowledge = BackgroundKnowledge(tiers=[["winter"]])
+    knowledge = DomainCausalKnowledge(tiers=[["winter"]])
 
     with pytest.raises(UnknownGraphNode):
         structure_of(season_fork(), knowledge)
 
 
 def test_learned_fork_supplies_the_confounder():
-    knowledge = BackgroundKnowledge(
+    knowledge = DomainCausalKnowledge(
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
     structure = structure_of(season_fork(), knowledge)
@@ -96,7 +96,7 @@ def test_learned_fork_supplies_the_confounder():
 def test_continuous_columns_are_tested_after_discretization():
     rows = season_fork().astype(float)
     rows["season"] += pd.Series(range(len(rows))) / (10 * len(rows))
-    knowledge = BackgroundKnowledge(
+    knowledge = DomainCausalKnowledge(
         tiers=[["season"], ["ice_cream_sales", "drowning_incidents"]]
     )
 
