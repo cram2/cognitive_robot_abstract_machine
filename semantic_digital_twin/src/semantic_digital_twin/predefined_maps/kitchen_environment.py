@@ -667,85 +667,6 @@ class KitchenSofa:
         return sofa
 
 
-# %% Handle mounting measurements
-@dataclass
-class HandleRowOffsets:
-    """
-    Vertical mounting corrections for a two-row drawer column.
-    """
-
-    lower_height: float
-    """
-    Lower drawer handle height correction.
-    """
-    upper_height: float
-    """
-    Upper drawer handle height correction.
-    """
-
-
-@dataclass
-class KitchenHandleOffsets:
-    """
-    Reviewed transverse mounting corrections with nominal handle depth retained.
-    """
-
-    refrigerator_door_lateral: float = -0.011
-    """
-    Vertical refrigerator pull correction along its local transverse axis.
-    """
-    refrigerator_drawer_height: float = -0.014
-    """
-    Refrigerator drawer handle height correction.
-    """
-    counter_door_height: float = -0.004
-    """
-    First counter module door handle height correction.
-    """
-    counter_lower_drawer_height: float = -0.019
-    """
-    Lower counter drawer handle height correction.
-    """
-    counter_middle_drawer_height: float = -0.020
-    """
-    Middle counter drawer handle height correction.
-    """
-    counter_upper_drawer_height: float = -0.024
-    """
-    Upper counter drawer handle height correction.
-    """
-    oven_side_lateral: float = 0.008
-    """
-    Both vertical oven-side pulls' local transverse correction.
-    """
-    oven_cabinet_height: float = 0.002
-    """
-    Lower oven cabinet handle height correction.
-    """
-    oven_drawer_height: float = 0.005
-    """
-    Centre oven drawer handle height correction.
-    """
-    island_window_column: HandleRowOffsets = field(
-        default_factory=lambda: HandleRowOffsets(0.011, 0.012)
-    )
-    """
-    Handle height corrections for the island column nearest the window wall.
-    """
-    island_middle_column: HandleRowOffsets = field(
-        default_factory=lambda: HandleRowOffsets(0.005, 0.011)
-    )
-    """
-    Handle height corrections for the middle island column.
-    """
-    island_room_column: HandleRowOffsets = field(
-        default_factory=lambda: HandleRowOffsets(0.005, 0.009)
-    )
-    """
-    Handle height corrections for the island column farthest from the window wall.
-    """
-
-
 # %% Measured kitchen geometry
 @dataclass
 class KitchenMeasurements:
@@ -824,10 +745,6 @@ class KitchenMeasurements:
     window_wall: KitchenWindowWall = field(default_factory=KitchenWindowWall)
     """
     Observed oven-side wall recesses and surface-mounted features.
-    """
-    handle_offsets: KitchenHandleOffsets = field(default_factory=KitchenHandleOffsets)
-    """
-    Reviewed handle mounting corrections relative to unchanged parent fronts.
     """
     sofa_shape: KitchenSofa = field(default_factory=KitchenSofa)
     """
@@ -1237,7 +1154,7 @@ class KitchenEnvironment(WorldSource):
                 hinge_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-door_thickness / 2,
-                    y=fridge_front_width - 0.03,
+                    y=fridge_front_width - 0.041,
                 )
             )
             fridge_door_handle = Handle.get_annotation_specification(
@@ -1252,10 +1169,7 @@ class KitchenEnvironment(WorldSource):
                 ),
             ).spawn(
                 world,
-                parent_T_self=door_handle_world_pose
-                @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    y=self.measurements.handle_offsets.refrigerator_door_lateral
-                ),
+                parent_T_self=door_handle_world_pose,
             )
             for shape in fridge_door_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
@@ -1265,7 +1179,7 @@ class KitchenEnvironment(WorldSource):
                 drawer_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-drawer_depth / 2,
-                    z=fridge_drawer_height / 2 - 0.03,
+                    z=fridge_drawer_height / 2 - 0.044,
                     roll=np.pi / 2,
                 )
             )
@@ -1281,10 +1195,7 @@ class KitchenEnvironment(WorldSource):
                 ),
             ).spawn(
                 world,
-                parent_T_self=drawer_handle_world_pose
-                @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    y=self.measurements.handle_offsets.refrigerator_drawer_height
-                ),
+                parent_T_self=drawer_handle_world_pose,
             )
             for shape in fridge_drawer_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
@@ -1383,7 +1294,7 @@ class KitchenEnvironment(WorldSource):
                 module_1_door_height - counter_cabinet_height
             ) / 2
             module_1_handle_width = standard_handle_width
-            module_1_handle_top_inset = 0.04
+            module_1_handle_top_inset = 0.044
             module_2_door_gap = 0.005
             module_2_door_height = counter_cabinet_height - module_2_door_gap
 
@@ -1473,7 +1384,6 @@ class KitchenEnvironment(WorldSource):
                         module_1_door_height / 2
                         - module_1_handle_top_inset
                         - module_1_handle_width / 2
-                        + self.measurements.handle_offsets.counter_door_height
                     ),
                     roll=np.pi / 2,
                 ),
@@ -1617,13 +1527,7 @@ class KitchenEnvironment(WorldSource):
                     drawer_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-module_3_drawer_depth / 2,
-                        z=face_height / 2
-                        - 0.03
-                        + (
-                            self.measurements.handle_offsets.counter_lower_drawer_height,
-                            self.measurements.handle_offsets.counter_middle_drawer_height,
-                            self.measurements.handle_offsets.counter_upper_drawer_height,
-                        )[drawer_index],
+                        z=face_height / 2 - (0.049, 0.050, 0.054)[drawer_index],
                         roll=np.pi / 2,
                     )
                 )
@@ -1800,7 +1704,7 @@ class KitchenEnvironment(WorldSource):
                     side_drawer_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-oven_depth / 2,
-                        y=self.measurements.handle_offsets.oven_side_lateral,
+                        y=0.008,
                     )
                 )
                 handle = Handle.get_annotation_specification(
@@ -1869,9 +1773,7 @@ class KitchenEnvironment(WorldSource):
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-center_door_thickness / 2,
                     y=-center_front_width / 2,
-                    z=center_cabinet_door_height / 2
-                    - 0.05
-                    + self.measurements.handle_offsets.oven_cabinet_height,
+                    z=center_cabinet_door_height / 2 - 0.048,
                     roll=np.pi / 2,
                 ),
             )
@@ -1927,9 +1829,7 @@ class KitchenEnvironment(WorldSource):
                 parent_T_self=drawer_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-center_drawer_depth / 2,
-                    z=center_drawer_height / 2
-                    - 0.05
-                    + self.measurements.handle_offsets.oven_drawer_height,
+                    z=center_drawer_height / 2 - 0.045,
                     roll=np.pi / 2,
                 ),
             )
@@ -2201,11 +2101,6 @@ class KitchenEnvironment(WorldSource):
                 sideboard_cabinet.add_object(upper_face_plate)
 
                 for row_index, z_offset in enumerate(z_offsets):
-                    handle_rows = (
-                        self.measurements.handle_offsets.island_window_column,
-                        self.measurements.handle_offsets.island_middle_column,
-                        self.measurements.handle_offsets.island_room_column,
-                    )[column_index]
                     drawer_id = f"sideboard_drawer_{column_index}_{row_index}"
                     drawer_pose = (
                         sideboard_pose
@@ -2239,12 +2134,9 @@ class KitchenEnvironment(WorldSource):
                         @ HomogeneousTransformationMatrix.from_xyz_rpy(
                             x=-sideboard_drawer_depth / 2,
                             z=sideboard_drawer_height / 2
-                            - 0.05
-                            + (
-                                handle_rows.lower_height
-                                if row_index == 0
-                                else handle_rows.upper_height
-                            ),
+                            - ((0.039, 0.038), (0.045, 0.039), (0.045, 0.041))[
+                                column_index
+                            ][row_index],
                             roll=np.pi / 2,
                         )
                     )
