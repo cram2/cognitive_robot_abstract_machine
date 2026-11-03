@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any
+from typing_extensions import Any, Self
 
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -43,6 +43,14 @@ class Interval:
         :return: The range from ``center - radius`` to ``center + radius``.
         """
         return cls(center - radius, center + radius)
+
+    @classmethod
+    def point(cls, value: int) -> Self:
+        """
+        :param value: The only integer in the range.
+        :return: The range that holds only *value*.
+        """
+        return cls(value, value)
 
 
 # %% symbolic functions

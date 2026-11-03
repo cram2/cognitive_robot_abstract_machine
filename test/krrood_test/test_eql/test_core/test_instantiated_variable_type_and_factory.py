@@ -56,6 +56,14 @@ def test_match_on_a_factory_method_has_the_type_the_method_returns():
     assert an(Interval.around)._type_ is Interval
 
 
+def test_match_on_a_factory_method_returning_self_has_the_class_it_is_bound_to():
+    assert an(Interval.point)._type_ is Interval
+
+
+def test_inference_with_a_factory_method_returning_self_has_the_class_it_is_bound_to():
+    assert inference(Interval.point)(value=variable_from([4]))._type_ is Interval
+
+
 # %% symbolic functions
 
 
