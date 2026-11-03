@@ -240,6 +240,13 @@ def main():
         "ros-jazzy-control-msgs",
         "ros-jazzy-ur-robot-driver",
         "ros-jazzy-ur-client-library",
+        # Build dependencies of robokudo_foundation_pose_tensorrt in cram_ros2_packages.
+        # Its CUDA extension additionally needs nvidia-cuda-toolkit and the TensorRT
+        # wheel of the CRAM environment, and is skipped without them.
+        "python3-dev",
+        "libeigen3-dev",
+        "libassimp-dev",
+        "libopencv-dev",
     ]
     manager.dep_manager.install_packages(packages)
 
