@@ -18,9 +18,7 @@ from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.utils import tracy_installed
 from semantic_digital_twin.world import World
@@ -131,7 +129,7 @@ def test_the_grippers_keep_the_descriptions_own_velocity_limit(mounted_tracy):
     world = mounted_tracy._world
     knuckle = world.get_connection_by_name(TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE)
     wrist = world.get_connection_by_name(TracyJoint.LEFT_WRIST_3)
-    description = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
+    description = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
     described_knuckle_velocity = description.get_connection_by_name(
         TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE
     ).raw_dof.limits.upper.velocity

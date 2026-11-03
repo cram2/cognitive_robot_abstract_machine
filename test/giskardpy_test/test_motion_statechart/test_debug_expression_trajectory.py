@@ -14,7 +14,7 @@ from giskardpy.motion_statechart.plotters.debug_expression_trajectory_plotter im
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.exceptions import NonMonotonicTimeError
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import DebugExpressionRecording
 from giskardpy.motion_control import MotionControl

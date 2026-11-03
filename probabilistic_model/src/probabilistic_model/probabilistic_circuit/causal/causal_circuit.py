@@ -47,8 +47,8 @@ class MarginalDeterminismTreeNode(NodeMixin):
     Inherits from anytree.NodeMixin, which provides parent / children management,
     is_leaf and is_root properties, and PreOrderIter / findall traversal utilities.
 
-    Build using MarginalDeterminismTreeNode.from_causal_graph() rather than constructing
-    nodes manually.
+    Build using MarginalDeterminismTreeNode.from_variable_order() rather than
+    constructing nodes manually.
 
     :param variables: All Variables in this node's subtree.
     :param query_set: Variables for which the mixtures at this level must be support-
@@ -105,19 +105,19 @@ class MarginalDeterminismTreeNode(NodeMixin):
         return [node.query_set for node in PreOrderIter(self) if node.query_set]
 
     @classmethod
-    def from_causal_graph(
+    def from_variable_order(
         cls,
         causal_variables: list[Variable],
-        effect_variables: list[Variable],
-        causal_priority_order: list[Variable] = None,
+        causal_priority_order: list[Variable] | None = None,
     ) -> MarginalDeterminismTreeNode:
         """
-        Build a Marginal Determinism Variable Tree from a causal graph specification.
+        Build a Marginal Determinism Variable Tree over the cause variables, in priority
+        order.
 
         :param causal_variables: All input Variables that causally affect the outcome.
-        :param effect_variables: All outcome Variables.
         :param causal_priority_order: Ordering of cause Variables from most to least
             important. Defaults to causal_variables order if None.
+        :returns: The root of the tree.
         """
         ordered = (
             causal_priority_order

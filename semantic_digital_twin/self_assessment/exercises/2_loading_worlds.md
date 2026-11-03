@@ -58,7 +58,7 @@ world = ...
 root = Path(files("semantic_digital_twin")).parent.parent
 table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
 
-world = URDFParser.from_file(table_urdf).parse()
+world = URDFParser.from_file(table_urdf).create_world()
 ```
 
 ```{code-cell} ipython3

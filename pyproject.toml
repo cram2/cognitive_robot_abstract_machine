@@ -14,17 +14,18 @@ authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 # Add dependencies on all workspace members by their distribution names
 # uv will resolve these to editable installs via [tool.uv.sources]
 dependencies = [
-  "coraplex",
-  "giskardpy",
-  "cramph",
-  "semantic_digital_twin",
-  "krrood",
-  "random-events",
-  "probabilistic_model",
-  "robokudo",
-  "physics_simulators",
-  "experiments",
-  "segmind",
+  "coraplex>=26.10.0",
+  "giskardpy>=26.10.0",
+  "cramph>=26.10.0",
+  "semantic_digital_twin>=26.10.0",
+  "krrood>=26.10.0",
+  "random-events>=26.10.0",
+  "probabilistic_model>=26.10.0",
+  "robokudo>=26.10.0",
+  "physics_simulators>=26.10.0",
+  "experiments>=26.10.0",
+  "segmind>=26.10.0",
+  "krrood_spatial_math>=26.10.0",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -94,7 +95,8 @@ members = [
   "physics_simulators",
   "robokudo",
   "experiments",
-  "segmind"
+  "segmind",
+  "domain_models/krrood_spatial_math"
 ]
 
 [tool.uv.sources]
@@ -109,6 +111,7 @@ robokudo              = { workspace = true }
 physics_simulators    = { workspace = true }
 segmind               = { workspace = true }
 experiments           = { workspace = true }
+krrood_spatial_math   = { workspace = true }
 
 [tool.poetry]
 package-mode = false
@@ -125,6 +128,7 @@ robokudo = { path = "robokudo", develop = true }
 physics_simulators = { path = "physics_simulators", develop = true }
 experiments = { path = "experiments", develop = true }
 segmind = { path = "segmind", develop = true }
+krrood_spatial_math = { path = "domain_models/krrood_spatial_math", develop = true }
 
 [tool.setuptools]
 packages = ["cognitive_robot_abstract_machine"]

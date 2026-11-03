@@ -68,6 +68,7 @@ from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
@@ -690,7 +691,7 @@ class Match(
         :return: Whether that keyword is left out of construction, decided once per
             factory, matched class, keyword and value type.
         """
-        if HasFactoryAndKwargs._factory_takes_keyword_(factory, keyword):
+        if CallSignature.of(factory).accepts_keyword(keyword):
             return False
         return keyword in dir(matched_type) or issubclass(value_type, CausalRoleMarker)
 
@@ -937,6 +938,14 @@ class AttributeMatch(AbstractMatchExpression[T]):
             attr = attr[self.index_access]
         self._variable_ = attr
         return attr
+
+    @property
+    def is_assigned_to_ellipsis(self) -> bool:
+        """
+        Whether the attribute is assigned ``...`` itself; a collection holding ``...``
+        as an element does not count.
+        """
+        return self.assigned_value is ...
 
     @cached_property
     def is_type_filter_needed(self):

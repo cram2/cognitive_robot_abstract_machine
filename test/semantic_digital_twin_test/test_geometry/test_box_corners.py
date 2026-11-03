@@ -5,7 +5,7 @@ from random_events.interval import Bound, SimpleInterval
 from krrood.bounds import BoundsInterface
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,

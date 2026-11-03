@@ -101,7 +101,7 @@ def joint_probability_tree() -> ProbabilisticCircuit:
     A joint probability tree fitted to samples of a correlated two dimensional Gaussian.
     """
     return fit_joint_probability_tree(
-        correlated_gaussian_samples(2), min_samples_per_quantile=100
+        correlated_gaussian_samples(2), minimum_samples_per_quantile=100
     )
 
 

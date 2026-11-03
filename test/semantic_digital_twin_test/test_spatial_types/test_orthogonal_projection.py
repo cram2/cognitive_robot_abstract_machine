@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import ReferenceFrameMismatchError
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
+from krrood_spatial_math.spatial_types import (
     Line3,
     OrthogonalProjection,
     Point2,

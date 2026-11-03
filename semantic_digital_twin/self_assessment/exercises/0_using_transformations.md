@@ -42,7 +42,7 @@ from importlib.resources import files
 from pathlib import Path
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import Connection6DoF, FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
@@ -52,7 +52,7 @@ from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 root = Path(files("semantic_digital_twin")).parent.parent
 urdf_path = os.path.join(root, "resources", "urdf", "table.urdf")
-table_world = URDFParser.from_file(urdf_path).parse()
+table_world = URDFParser.from_file(urdf_path).create_world()
 
 root_C_left_leg = table_world.get_body_by_name("left_front_leg").parent_connection
 moved_root_T_left_leg = HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5, y=-0.5)
@@ -176,5 +176,5 @@ rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ## Final Notes
 
-This is just a very basic introduction to transformations. To learn more about transformations, please refer to the [Wikipedia Article about transformations](https://en.wikipedia.org/wiki/Transformation_matrix), as well as our [TransformationMatrix API](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#semantic_digital_twin.spatial_types.spatial_types.TransformationMatrix) for further details.
+This is just a very basic introduction to transformations. To learn more about transformations, please refer to the [Wikipedia Article about transformations](https://en.wikipedia.org/wiki/Transformation_matrix), as well as our [TransformationMatrix API](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/domain_models/krrood_spatial_math/src/krrood_spatial_math/spatial_types.py) for further details.
 

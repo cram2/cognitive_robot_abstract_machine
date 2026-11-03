@@ -43,7 +43,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 # Replace this with the path to your robot's URDF or MJCF file.
 parser = URDFParser.from_file("/path/to/your/robot.urdf")
-world = parser.parse()
+world = parser.create_world()
 world.visualize_world_structure()
 ```
 
@@ -288,7 +288,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
 
@@ -573,7 +573,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 # Re-parse your URDF to get a fresh world, then annotate it with your robot class.
 parser = URDFParser.from_file("/path/to/your/robot.urdf")
-world = parser.parse()
+world = parser.create_world()
 
 robot = MyRobot.from_world(world)
 
