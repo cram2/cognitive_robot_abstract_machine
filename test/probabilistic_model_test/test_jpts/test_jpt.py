@@ -29,6 +29,7 @@ from probabilistic_model.learning.jpt.variables import (
     AnnotatedVariable,
     infer_variables_from_dataframe,
 )
+from probabilistic_model.learning.nyga_induction import NygaInduction
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
@@ -136,6 +137,22 @@ def test_leaf_node_has_a_distribution_per_variable(tree, mixed_data):
     assert isinstance(leaf_node.subcircuits[0].distribution, SymbolicDistribution)
     likelihood = leaf_node.probabilistic_circuit.likelihood(mixed_data.to_numpy())
     assert np.all(likelihood > 0)
+
+
+def test_leaf_node_splits_continuous_variables_with_their_split_penalty(mixed_data):
+    real = mixed_data[["real"]]
+    (annotated_variable,) = infer_variables_from_dataframe(
+        real, split_penalty_factor=0.0, min_samples_per_quantile=1
+    )
+    tree = JointProbabilityTree(annotated_variables=[annotated_variable])
+    data = tree.preprocess_data(real)
+    leaf_node = tree.create_leaf_node(data)
+    expected = NygaInduction(
+        annotated_variable.variable,
+        split_penalty_factor=annotated_variable.split_penalty_factor,
+        min_samples_per_quantile=annotated_variable.min_samples_per_quantile,
+    ).fit(data[:, 0])
+    assert len(leaf_node.subcircuits[0].subcircuits) == len(expected.root.subcircuits)
 
 
 def test_fit_without_an_improving_split_is_one_leaf(tree, mixed_data):

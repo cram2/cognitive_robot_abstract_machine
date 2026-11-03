@@ -311,7 +311,6 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
 
         # if the max gain is insufficient
         if max_gain <= self.min_impurity_improvement:
-
             # create decomposable product node
             other_rows = np.concatenate([self.indices[:start], self.indices[end:]])
             leaf_node = self.create_leaf_node(
@@ -394,7 +393,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             if isinstance(annotated_variable.variable, Continuous):
                 distribution = NygaInduction(
                     annotated_variable.variable,
-                    min_likelihood_improvement=annotated_variable.min_likelihood_improvement,
+                    split_penalty_factor=annotated_variable.split_penalty_factor,
                     min_samples_per_quantile=annotated_variable.min_samples_per_quantile,
                 )
                 if other_data is not None:
