@@ -939,6 +939,14 @@ class AttributeMatch(AbstractMatchExpression[T]):
         self._variable_ = attr
         return attr
 
+    @property
+    def is_assigned_to_ellipsis(self) -> bool:
+        """
+        Whether the attribute is assigned ``...`` itself; a collection holding ``...``
+        as an element does not count.
+        """
+        return self.assigned_value is ...
+
     @cached_property
     def is_type_filter_needed(self):
         """

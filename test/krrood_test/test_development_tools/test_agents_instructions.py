@@ -124,7 +124,7 @@ def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
     assert RuleModule(shipped_rules).checkers == (
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_PROSE.checker,
-        ImportsRules.IMPORT_OPTIONAL_LIBRARIES_WHERE_USED.checker,
+        ImportsRules.CORE_LOADS_ONLY_CORE.checker,
     )
 
 

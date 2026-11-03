@@ -57,30 +57,30 @@ a module only imports, or one defined anywhere else, is never listed. Top-level
 sections appear in alphabetical order of their headings, and nested sections in the
 order they are written.
 
-## Optional libraries
+## Core boundary
 
-A library whose distribution only an extra requires is optional, and core modules
-import it only inside the functions that need it. `krrood check` reports a core module
-that imports one at module level. Core is declared in the distribution's
-`pyproject.toml`: `core-contract` in `[tool.krrood.core-boundary]` names the
-import-linter contract whose `source_modules` are core, and every module outside them
-may import optional libraries at the top.
+A distribution can declare a light core that a plain `pip install` must be able to load,
+in its `pyproject.toml`:
 
 ```toml
-[[tool.importlinter.contracts]]
-id = "core-imports-no-all-module"
-type = "forbidden"
-source_modules = ["my_package.core"]
-forbidden_modules = ["my_package.drawing"]
-
 [tool.krrood.core-boundary]
-core-contract = "core-imports-no-all-module"
+# The packages and modules of core; every other module of the distribution is not core.
+core = ["my_package.core"]
+# The distributions core may load, with everything they require.
+dependencies = ["typing-extensions"]
 ```
 
-The check maps an imported package to its distribution through the installed
-packages, so it recognizes only the optional libraries installed where it runs: run it
-in the distribution's development environment, with its extras installed. A
-distribution without `core-contract` is not checked.
+`krrood check` then reports every import that a core module runs when it is loaded
+(outside functions and `if TYPE_CHECKING:`) and that loads a module outside core, or a
+distribution outside `dependencies` and what they require. It reads the whole
+distribution's import graph, so for a module outside core it also names the
+distributions that module loads in turn, however long the chain. It maps an imported
+package to its distribution through the installed packages, so it runs in the
+distribution's development environment. Core may import anything inside a function.
+
+Like every checker, it checks only the lines a commit changes, so existing crossings do
+not block a commit and a new one cannot slip in; `krrood check --all-lines` lists all of
+them.
 
 ## Installation
 
@@ -120,7 +120,7 @@ repos:
 ```
 
 `krrood-check` runs with `language: system`, in the environment that has the
-distribution and its extras installed, because the optional-library check reads the
+distribution and its extras installed, because the core boundary check reads the
 installed packages.
 
 To use rules that are not released yet, replace the requirement with a commit of

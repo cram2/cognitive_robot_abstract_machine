@@ -10,7 +10,6 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     to_json,
     from_json,
-    list_like_classes,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (

@@ -18,7 +18,7 @@ from typing_extensions import (
 
 
 from krrood import logger
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
@@ -416,12 +416,12 @@ class SubClassSafeGeneric(ABC):
                     )
                 return current_type
 
-            if isinstance(current_type, list_like_classes):
+            if isinstance(current_type, CollectionKind.ELEMENT_SEQUENCE.value):
                 resolved_items = []
                 for item in current_type:
                     result = _resolve_recursive(item, visited)
                     if get_origin(item) is Unpack and isinstance(
-                        result, list_like_classes
+                        result, CollectionKind.ELEMENT_SEQUENCE.value
                     ):
                         resolved_items.extend(result)
                     else:

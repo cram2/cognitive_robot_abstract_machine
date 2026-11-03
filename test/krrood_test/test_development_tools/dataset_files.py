@@ -129,34 +129,33 @@ class DocstringSnippet(PathEnumeration):
     """
 
 
-class OptionalLibrarySnippet(PathEnumeration):
+class CoreBoundarySnippet(PathEnumeration):
     """
-    The Python sources the optional-library checker reads, inside mimic distributions
+    The Python sources the core boundary checker reads, inside mimic distributions
     whose ``pyproject.toml`` the checker finds above them.
     """
 
-    GUARDED_CORE_MODULE = (
-        Path(__file__).parent
-        / "dataset"
-        / "optional_library_distribution"
-        / "src"
-        / "mimic_package"
-        / "core"
-        / "guarded.py"
+    DISTRIBUTION = Path(__file__).parent / "dataset" / "core_boundary_distribution"
+    """
+    The mimic distribution whose core may load only typing-extensions.
+    """
+
+    INSIDE_THE_BOUNDARY = (
+        DISTRIBUTION / "src" / "mimic_package" / "core" / "inside_the_boundary.py"
     )
     """
-    A core module importing matplotlib only in functions and under ``TYPE_CHECKING``.
+    A core module loading only core modules, core dependencies and the standard library.
     """
 
-    UNGUARDED_CORE_MODULE = GUARDED_CORE_MODULE.with_name("unguarded.py")
+    CROSSING_THE_BOUNDARY = INSIDE_THE_BOUNDARY.with_name("crossing_the_boundary.py")
     """
-    A core module importing matplotlib at module level, each such line marked with
-    :attr:`DatasetMarker.UNGUARDED_IMPORT`.
+    A core module loading modules outside core, each such import marked with
+    :attr:`DatasetMarker.CROSSING_IMPORT`.
     """
 
-    MODULE_OUTSIDE_CORE = GUARDED_CORE_MODULE.parents[1] / "drawing.py"
+    MODULE_OUTSIDE_CORE = INSIDE_THE_BOUNDARY.parents[1] / "drawing.py"
     """
-    A module outside core importing matplotlib at module level.
+    A module outside core loading matplotlib.
     """
 
     MODULE_OF_UNDECLARED_CORE = (
@@ -168,7 +167,7 @@ class OptionalLibrarySnippet(PathEnumeration):
         / "drawing.py"
     )
     """
-    A module importing matplotlib at module level in a distribution declaring no core.
+    A module loading matplotlib in a distribution declaring no core.
     """
 
 
@@ -177,7 +176,30 @@ class DatasetMarker(StrEnum):
     Comments marking lines of the dataset files that a test expects a finding on.
     """
 
-    UNGUARDED_IMPORT = "# unguarded"
+    CROSSING_IMPORT = "# crosses"
     """
-    An import the optional-library checker reports.
+    An import the core boundary checker reports.
+    """
+
+
+class MimicModule(StrEnum):
+    """
+    The dotted names of modules of the mimic distribution
+    :attr:`CoreBoundarySnippet.DISTRIBUTION`.
+    """
+
+    DRAWING = "mimic_package.drawing"
+    """
+    The module outside core that loads matplotlib.
+    """
+
+
+class MimicDistribution(StrEnum):
+    """
+    The distributions the mimic distribution's modules load.
+    """
+
+    MATPLOTLIB = "matplotlib"
+    """
+    The distribution only the mimic distribution's drawing extra requires.
     """

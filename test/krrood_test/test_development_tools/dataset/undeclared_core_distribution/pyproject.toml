@@ -1,4 +1,4 @@
-# A distribution that declares no core, read by the optional-library checker's tests.
+# A distribution that declares no core, read by the core boundary checker's tests.
 [project]
 name = "undeclared-core-distribution"
 version = "0.0.0"

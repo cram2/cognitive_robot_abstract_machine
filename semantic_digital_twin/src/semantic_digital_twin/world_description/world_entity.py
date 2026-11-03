@@ -17,13 +17,13 @@ import trimesh.boolean
 from typing_extensions import TYPE_CHECKING
 from typing_extensions import TypeVar, Any, Self, ClassVar
 
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     ReferenceWriter,
     SubclassJSONSerializer,
     to_json,
     from_json,
-    list_like_classes,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
@@ -283,7 +283,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 current_result = value.__class__(
                     [_resolve_item(item, world) for item in value]
                 )
@@ -832,7 +832,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for item in value:
                     result.extend(_resolve_item(item))
             else:
@@ -930,7 +930,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
 
             if isinstance(value, SemanticAnnotation):
                 dependencies.add(value)
-            elif isinstance(value, list_like_classes):
+            elif isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for item in value:
                     if isinstance(item, SemanticAnnotation):
                         dependencies.add(item)

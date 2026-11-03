@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime
 import importlib
 import inspect
 import json
@@ -8,7 +7,6 @@ import logging
 import pkgutil
 import types
 from contextlib import suppress
-from enum import Enum
 from functools import lru_cache
 from typing_extensions import TypeVar, Iterable, Any, Callable, Generic, get_type_hints
 
@@ -102,8 +100,6 @@ def classes_of_package(package: types.ModuleType, recursive=True) -> list[type]:
 
 
 T = TypeVar("T")
-
-leaf_types = (int, float, str, Enum, datetime.datetime, bool, type(Ellipsis))
 
 
 def _drop_fk_constraints(engine: Engine, tables: Iterable[str]) -> None:
