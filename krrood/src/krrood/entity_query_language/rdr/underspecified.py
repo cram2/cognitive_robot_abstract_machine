@@ -88,7 +88,9 @@ class RippleDownRulesMatchParser:
         if not targets:
             raise NoInferenceTarget(self.case_type)
         if len(targets) > 1:
-            raise MultipleInferenceTargets([t.attribute_name for t in targets])
+            raise MultipleInferenceTargets(
+                [target.attribute_name for target in targets]
+            )
         return targets[0]
 
     @property
