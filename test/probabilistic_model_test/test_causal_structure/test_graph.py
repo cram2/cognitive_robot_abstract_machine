@@ -25,6 +25,7 @@ from probabilistic_model.causal_structure.graph import (
 from .graphs import (
     collider_with_an_undirected_child,
     confounded,
+    mediated,
     undirected_chain,
     without_member_graphs,
 )
@@ -77,6 +78,23 @@ def test_an_edge_to_a_node_the_graph_lacks_raises():
 
     with pytest.raises(UnknownGraphNode):
         graph.add_edge(GraphEdge.directed("X", "W"))
+
+
+def test_the_edge_between_two_nodes_is_found_from_either_end():
+    graph = confounded()
+    x, z = graph.node("X"), graph.node("Z")
+
+    assert (
+        graph.edge_between(x, z)
+        == graph.edge_between(z, x)
+        == GraphEdge.directed("Z", "X")
+    )
+
+
+def test_nodes_without_an_edge_are_not_adjacent():
+    graph = mediated()
+
+    assert not graph.adjacent(graph.node("X"), graph.node("Y"))
 
 
 # %% storing a graph

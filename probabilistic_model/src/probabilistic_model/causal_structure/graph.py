@@ -12,7 +12,7 @@ from functools import cached_property
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from random_events.variable import Variable
-from typing_extensions import Any, Callable, Iterable, Self
+from typing_extensions import Any, Iterable, Self
 
 from probabilistic_model.graph import DirectedAcyclicGraph, Graph
 from probabilistic_model.causal_structure.exceptions import (
@@ -320,21 +320,21 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         ]
         return graph
 
-    def edge_between(self, first: str, second: str) -> GraphEdge | None:
+    def edge_between(self, first: GraphNode, second: GraphNode) -> GraphEdge | None:
         """
-        :param first: The name of one node.
-        :param second: The name of another.
+        :param first: A node.
+        :param second: Another node.
         :return: The edge between them, or ``None`` if they are not adjacent.
         """
         for edge in self.edges():
-            if {edge.first, edge.second} == {first, second}:
+            if {edge.first, edge.second} == {first.name, second.name}:
                 return edge
         return None
 
-    def adjacent(self, first: str, second: str) -> bool:
+    def adjacent(self, first: GraphNode, second: GraphNode) -> bool:
         """
-        :param first: The name of one node.
-        :param second: The name of another.
+        :param first: A node.
+        :param second: Another node.
         :return: Whether an edge joins them.
         """
         return self.edge_between(first, second) is not None
@@ -349,17 +349,13 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         directed.add_edges_from(
             (edge.parent, edge.child) for edge in self.edges() if edge.is_directed
         )
-        return self.colliders_of(directed, self.adjacent)
+        return self.colliders_of(directed)
 
-    @staticmethod
-    def colliders_of(
-        directed: MemberGraph, adjacent: Callable[[str, str], bool]
-    ) -> set[tuple[str, str, str]]:
+    def colliders_of(self, directed: MemberGraph) -> set[tuple[str, str, str]]:
         """
-        :param directed: Directed edges.
-        :param adjacent: Whether two nodes are joined by any edge.
-        :return: Every unshielded collider among the directed edges, as
-            :meth:`unshielded_colliders` gives them.
+        :param directed: Directed edges over the names of the graph's nodes.
+        :return: Every collider among the directed edges whose two parents are not
+            :meth:`adjacent` in this graph, as :meth:`unshielded_colliders` gives them.
         """
         return {
             (first, child, second)
@@ -367,7 +363,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             for first, second in itertools.combinations(
                 sorted(directed.predecessors(child)), 2
             )
-            if not adjacent(first, second)
+            if not self.adjacent(self.node(first), self.node(second))
         }
 
     def member_graphs(self) -> list[MemberGraph]:
@@ -426,16 +422,6 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
                 (edge.second, edge.first) if reverse else (edge.first, edge.second)
                 for edge, reverse in zip(undirected, reversals)
             )
-            if member.is_acyclic and (
-                self.colliders_of(member, self.adjacent) == colliders
-            ):
+            if member.is_acyclic and (self.colliders_of(member) == colliders):
                 members.append(member)
         return members
-
-    def possible_ancestors(self, name: str) -> set[str]:
-        """
-        :param name: The name of a node.
-        :return: The names of the nodes with a directed path to it in at least one
-            member graph.
-        """
-        return set().union(*(member.ancestors(name) for member in self.member_graphs()))
