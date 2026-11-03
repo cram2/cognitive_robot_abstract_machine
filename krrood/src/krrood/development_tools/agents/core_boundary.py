@@ -400,7 +400,9 @@ class CoreBoundary:
                 continue
             pending.extend(
                 canonicalize_name(requirement.name)
-                for requirement in map(Requirement, installed[distribution].requires or [])
+                for requirement in map(
+                    Requirement, installed[distribution].requires or []
+                )
                 if requirement.marker is None
                 or requirement.marker.evaluate({"extra": ""})
             )
