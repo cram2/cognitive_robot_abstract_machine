@@ -42,7 +42,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.12",
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
 )

@@ -128,13 +128,13 @@ class TutorialJPT(JPT):
         number_of_samples = end - start
         root = self.root
         # if the inducing in this step results in inadmissible nodes, skip the impurity calculation
-        if depth >= self.max_depth or number_of_samples < 2 * self.min_samples_leaf:
-            max_gain = -float("inf")
+        if depth >= self.maximum_depth or number_of_samples < 2 * self.minimum_samples_leaf:
+            maximum_gain = -float("inf")
         else:
-            max_gain = self.impurity.compute_best_split(start, end)
+            maximum_gain = self.impurity.compute_best_split(start, end)
 
         # if the max gain is insufficient
-        if max_gain <= self.min_impurity_improvement:
+        if maximum_gain <= self.minimum_impurity_improvement:
 
             # create decomposable product node
             leaf_node = self.create_leaf_node(data[self.indices[start:end]])
@@ -175,8 +175,8 @@ class TutorialJPT(JPT):
 Next, let's define, and fit the model. Plot the decision criteria and the resulting distribution.
 
 ```{code-cell} ipython3
-variables = infer_variables_from_dataframe(dataset, min_likelihood_improvement=2.5)
-model = TutorialJPT(variables, min_impurity_improvement=0.05, min_samples_per_leaf=500)
+variables = infer_variables_from_dataframe(dataset)
+model = TutorialJPT(variables, minimum_impurity_improvement=0.05, minimum_samples_per_leaf=500)
 model.fig = fig
 pc = model.fit(dataset)
 model.fig.show()

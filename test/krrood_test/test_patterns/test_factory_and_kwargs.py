@@ -5,7 +5,6 @@ import pytest
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.operators.causal import cause
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
-from krrood.patterns import factory_and_kwargs
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 
 from ..dataset.derived_attributes import Rectangle
@@ -90,7 +89,7 @@ def test_repeated_construction_reads_the_factory_signature_once(monkeypatch):
         signature_reads.append(callable_)
         return read_signature(callable_)
 
-    monkeypatch.setattr(factory_and_kwargs.inspect, "signature", counting_signature)
+    monkeypatch.setattr(inspect, "signature", counting_signature)
     rectangle = a(make_rectangle)(width=3.0, height=4.0, area=12.0)
     rectangle.construct_instance()
     rectangle.construct_instance()

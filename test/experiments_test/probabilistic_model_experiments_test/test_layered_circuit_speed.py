@@ -19,7 +19,9 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
 
 @pytest.fixture(scope="module")
 def tree_factory() -> CorrelatedNormalTreeFactory:
-    return CorrelatedNormalTreeFactory(number_of_samples=500, min_samples_per_leaf=0.1)
+    return CorrelatedNormalTreeFactory(
+        number_of_samples=500, minimum_samples_per_leaf=0.1
+    )
 
 
 @pytest.fixture(scope="module")

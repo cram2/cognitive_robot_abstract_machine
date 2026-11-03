@@ -317,12 +317,12 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
     4), so conditioning on 4 objects there pins the aggregates down to a single value
     regardless of sample count.
 
-    Both rooms are fitted into one leaf (``min_samples_per_leaf=2``): grounding draws a
+    Both rooms are fitted into one leaf (``minimum_samples_per_leaf=2``): grounding draws a
     leaf's own samples whenever the shared ones miss its values, so an ambiguity has to
     sit within one leaf for the sample count to decide how much of it is discovered.
     """
     model = RelationalProbabilisticCircuit(
-        learning_method=JointProbabilityTree(min_samples_per_leaf=2)
+        learning_method=JointProbabilityTree(minimum_samples_per_leaf=2)
     )
     model.fit(_rooms_with_ambiguous_total_count_4())
     return model
@@ -331,7 +331,9 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
 @pytest.fixture
 def layered_relational_probabilistic_circuit_with_ambiguous_total_count_4():
     return RelationalProbabilisticCircuit(
-        learning_method=LayeredLearning(JointProbabilityTree(min_samples_per_leaf=2)),
+        learning_method=LayeredLearning(
+            JointProbabilityTree(minimum_samples_per_leaf=2)
+        ),
         part_learning_methods=PartLearningMethods(
             LayeredLearning(JointProbabilityTree())
         ),
@@ -346,18 +348,14 @@ def test_monte_carlo_sample_count_controls_mixture_size(
     exchangeable-distribution instance (and its sum units) to the mixture.
     """
     np.random.seed(0)
-    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = (
-        1
-    )
+    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = 1
     single = len(
         relational_probabilistic_circuit_with_ambiguous_total_count_4.ground(
             room_query_4
         ).nodes()
     )
     np.random.seed(0)
-    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = (
-        50
-    )
+    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = 50
     many = len(
         relational_probabilistic_circuit_with_ambiguous_total_count_4.ground(
             room_query_4
