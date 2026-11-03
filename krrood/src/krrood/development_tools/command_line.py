@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import pkgutil
 import sys
 from dataclasses import dataclass
 from enum import IntEnum, StrEnum
@@ -15,38 +14,18 @@ from pathlib import Path
 
 from typing_extensions import Sequence
 
+from krrood.development_tools.agents.checker import CodeRulesCheck, StagedLines
 from krrood.development_tools.agents.instructions import AgentsInstructions
 from krrood.development_tools.formatting import DocstringFormatter
-from krrood.development_tools.optional_imports import OptionalImportCheck
 from krrood.development_tools.agents.repository_files import (
     RepositoryInstructionsFile,
 )
+from krrood.development_tools.subcommand import Subcommand
 
 logger = logging.getLogger(__name__)
 
 
 # %% command line vocabulary
-
-
-class Subcommand(StrEnum):
-    """
-    The subcommands of ``krrood``.
-    """
-
-    FORMAT = "format"
-    """
-    Format Python files with ruff and docformatter.
-    """
-
-    AGENTS_MD = "agents-md"
-    """
-    Generate the repository's ``AGENTS.md``.
-    """
-
-    OPTIONAL_IMPORTS = "optional-imports"
-    """
-    Check that Python files import optional modules only where they are guarded.
-    """
 
 
 class Option(StrEnum):
@@ -59,10 +38,9 @@ class Option(StrEnum):
     Verify a generated file instead of writing it.
     """
 
-    OPTIONAL_MODULES = "--optional-modules"
+    ALL_LINES = "--all-lines"
     """
-    The enumeration of optional modules whose imports are checked, as
-    ``package.module:ClassName``.
+    Check every line of a file, not only those the staged change touches.
     """
 
 
@@ -78,7 +56,7 @@ class ExitStatus(IntEnum):
 
     FAILURE = 1
     """
-    Files were modified, a checked file is stale, or a checked file breaks a rule.
+    Files were modified, or a checked file is stale.
     """
 
 
@@ -92,7 +70,7 @@ class CommandLine:
     command line names.
     """
 
-    program_name: str = "krrood"
+    program_name: str = Subcommand.program_name
     """
     The name the command is invoked by.
     """
@@ -137,19 +115,17 @@ class CommandLine:
         )
         agents_parser.set_defaults(run=self.generate_agents_instructions)
 
-        optional_imports_parser = subparsers.add_parser(
-            Subcommand.OPTIONAL_IMPORTS,
-            help="Check that optional modules are imported only where they are guarded.",
+        check_parser = subparsers.add_parser(
+            Subcommand.CHECK,
+            help="Report the code that breaks a rule a checker enforces.",
         )
-        optional_imports_parser.add_argument(
-            Option.OPTIONAL_MODULES,
-            action="append",
-            required=True,
-            type=pkgutil.resolve_name,
-            help="An OptionalModule subclass, as package.module:ClassName; repeatable.",
+        check_parser.add_argument("files", nargs="*", type=Path)
+        check_parser.add_argument(
+            Option.ALL_LINES,
+            action="store_true",
+            help="Check every line, not only those the staged change touches.",
         )
-        optional_imports_parser.add_argument("files", nargs="*", type=Path)
-        optional_imports_parser.set_defaults(run=self.check_optional_imports)
+        check_parser.set_defaults(run=self.check_files)
 
         return parser
 
@@ -189,25 +165,22 @@ class CommandLine:
             return ExitStatus.FAILURE
         return ExitStatus.SUCCESS
 
-    def check_optional_imports(self, arguments: argparse.Namespace) -> ExitStatus:
+    def check_files(self, arguments: argparse.Namespace) -> ExitStatus:
         """
-        Report every import of an optional module in the files named on the command line
-        that is not guarded.
+        Report the code in the files named on the command line that breaks a rule a
+        checker enforces.
 
         :param arguments: The parsed command line.
-        :return: :attr:`ExitStatus.FAILURE` if any import is unguarded.
+        :return: :attr:`ExitStatus.FAILURE` if any code breaks a rule.
         """
-        check = OptionalImportCheck(
-            [
-                module
-                for enumeration in arguments.optional_modules
-                for module in enumeration
-            ]
+        instructions = AgentsInstructions.from_repository(Path.cwd())
+        staged = None if arguments.all_lines else StagedLines(Path.cwd())
+        violations = CodeRulesCheck(instructions.checkers, staged).violations(
+            arguments.files
         )
-        unguarded_imports = check.find_unguarded_imports(arguments.files)
-        for unguarded_import in unguarded_imports:
-            logger.error("%s", unguarded_import)
-        if unguarded_imports:
+        for violation in violations:
+            logger.error(violation.render())
+        if violations:
             return ExitStatus.FAILURE
         return ExitStatus.SUCCESS
 

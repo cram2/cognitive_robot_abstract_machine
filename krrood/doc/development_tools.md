@@ -13,42 +13,13 @@ can use the same conventions:
   With `--check` it writes nothing and exits non-zero when the file differs; run that in
   CI.
 
-- `krrood optional-imports --optional-modules package.module:ClassName FILE...` reports
-  every import of an optional module outside a function decorated with that module's
-  `require` and outside `if TYPE_CHECKING:`. Pass `--optional-modules` once for each
-  `OptionalModule` subclass the repository declares.
+- `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
+  enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
+  the staged change (`git diff --cached`) adds or changes are checked, because existing
+  code has many violations; `--all-lines` checks every line.
 
-The commands exit with 1 when they modified a file or found a violation, following
-pre-commit's convention for hooks.
-
-## Optional modules
-
-A library that only one extra of a distribution installs is an optional module. The
-distribution declares its extras in a subclass of
-`krrood.patterns.optional_module.Extra` and its optional modules in a subclass of
-`krrood.patterns.optional_module.OptionalModule`, both inside its own package. Each
-member names the module's import name and the extra that installs it:
-
-```python
-from krrood.patterns.optional_module import Extra, OptionalModule
-
-
-class MyExtra(Extra):
-    PLOTTING = "plotting"
-
-
-class MyOptionalModule(OptionalModule):
-    MATPLOTLIB = "matplotlib", MyExtra.PLOTTING
-
-
-@MyOptionalModule.MATPLOTLIB.require
-def plot() -> None:
-    from matplotlib import pyplot
-```
-
-Calling `plot` without matplotlib installed raises `OptionalModuleNotInstalled`, whose
-suggestion names the `pip install` that adds the extra. `krrood optional-imports`
-checks that every import of the module is guarded this way.
+`format` and `agents-md` exit with 1 when they modified a file, and `check` when it
+found a violation, following pre-commit's convention for hooks.
 
 ## Rules
 
@@ -56,7 +27,9 @@ The rules are code. A section is an enum subclassing `Section`, named for one to
 followed by `Rules`. Its members are its rules: each names one rule, and its value is
 the rule's statement, or the statement followed by the details that spell it out.
 Every member is an `AgentRule`, so `ExceptionModellingRules.NEVER_TRY_EXCEPT.statement`
-is one of the rules on modelling exceptions. A nested section names the section it is
+is one of the rules on modelling exceptions. A rule can carry a checker, a `CodeRuleChecker` that finds the code breaking it; give it
+as the third element of the member's value. When a script can check only part of a
+rule, split the rule so the checkable part carries the checker. A nested section names the section it is
 part of by overriding the `parent` classproperty. A section's heading is its topic in
 words, in sentence case (`ExternalServicesAndCIRules` becomes "External services and
 CI"). A rule that names code builds that name from the imported object with
@@ -114,17 +87,7 @@ repos:
         additional_dependencies: ["krrood[development-tools]==<version>"]
         pass_filenames: false
         always_run: true
-      - id: krrood-optional-imports
-        name: Check that optional modules are imported only where they are guarded
-        entry: krrood optional-imports
-        args: ["--optional-modules=my_package.optional_modules:MyOptionalModule"]
-        language: system
-        types: [python]
 ```
-
-`krrood optional-imports` imports the enumerations it is given, so it runs in the
-development environment that has the repository's own package installed
-(`language: system`).
 
 To use rules that are not released yet, replace the requirement with a commit of
 cognitive_robot_abstract_machine:

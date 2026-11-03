@@ -60,7 +60,7 @@ def test_a_joint_probability_tree_fitted_with_given_variables_honours_the_leaf_m
 ):
     variables = infer_variables_from_dataframe(two_groups)
 
-    circuit = JointProbabilityTree(min_samples_per_leaf=len(two_groups)).fit(
+    circuit = JointProbabilityTree(minimum_samples_per_leaf=len(two_groups)).fit(
         two_groups, variables
     )
 
@@ -84,8 +84,8 @@ def test_stratified_learning_infers_the_variables_when_none_are_given(two_groups
 
 def test_a_joint_probability_tree_fits_each_call_into_a_circuit_of_its_own(two_groups):
     """
-    A stratified fit reuses one tree for every partition, so fitting again must not
-    pile a second tree into the first fit's circuit.
+    A stratified fit reuses one tree for every partition, so fitting again must not pile
+    a second tree into the first fit's circuit.
     """
     variables = infer_variables_from_dataframe(two_groups)
     tree = JointProbabilityTree()
@@ -102,7 +102,9 @@ def test_stratified_learning_fits_one_branch_per_value_weighted_by_frequency(
 ):
     variables = infer_variables_from_dataframe(two_groups)
 
-    circuit = StratifiedLearning(variables=["group"], method=JointProbabilityTree()).fit(two_groups, variables)
+    circuit = StratifiedLearning(
+        variables=["group"], method=JointProbabilityTree()
+    ).fit(two_groups, variables)
 
     root = circuit.root
     assert isinstance(root, SumUnit)
@@ -114,7 +116,9 @@ def test_stratified_learning_fits_one_branch_per_value_weighted_by_frequency(
 
 def test_stratified_learning_keeps_each_value_under_exactly_one_branch(two_groups):
     variables = infer_variables_from_dataframe(two_groups)
-    circuit = StratifiedLearning(variables=["group"], method=JointProbabilityTree()).fit(two_groups, variables)
+    circuit = StratifiedLearning(
+        variables=["group"], method=JointProbabilityTree()
+    ).fit(two_groups, variables)
     group = next(variable for variable in circuit.variables if variable.name == "group")
 
     for value in (1, 3):
@@ -135,11 +139,12 @@ def test_stratified_learning_fits_every_partition_with_the_wrapped_method(two_gr
     variables = infer_variables_from_dataframe(two_groups)
     method = StratifiedLearning(
         variables=["group"],
-        method=JointProbabilityTree(min_samples_per_leaf=30),
+        method=JointProbabilityTree(minimum_samples_per_leaf=30),
     )
 
     circuit = method.fit(two_groups, variables)
 
-    assert [
-        _tree_leaf_count(partition) for partition in circuit.root.subcircuits
-    ] == [1, 1]
+    assert [_tree_leaf_count(partition) for partition in circuit.root.subcircuits] == [
+        1,
+        1,
+    ]

@@ -21,13 +21,11 @@
   pass_filenames: false
   always_run: true
 
-- id: krrood-optional-imports
-  name: Check that optional modules are imported only where they are guarded
+- id: krrood-check
+  name: Check the staged code against the rules that have a checker
   description: >
-    Reports every import of an optional module outside a function decorated with that
-    module's `require` and outside `if TYPE_CHECKING:`. Name each of the repository's
-    OptionalModule subclasses in `args`, as
-    `--optional-modules=package.module:ClassName`.
-  entry: krrood optional-imports
+    Reports the lines the staged change adds or changes that break a rule a checker
+    enforces.
+  entry: krrood check
   language: system
   types: [python]
