@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from enum import Enum, StrEnum
+from typing_extensions import cast
 
 import trimesh
 
@@ -40,7 +41,11 @@ from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
     RegionSpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -58,7 +63,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color, Mesh
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Body, Region
 from semantic_digital_twin.world_source import WorldSource
 
 
@@ -185,7 +190,6 @@ class WallStrip:
         """
         Add a closed collision and visual solid backed by the wall plane.
         """
-        panel = WallPanel.create_with_new_body_in_world(name=name, world=world)
         vertices = [
             (depth_x, along_wall_y, height_z)
             for along_wall_y in (wall.start_y, wall.end_y)
@@ -200,13 +204,16 @@ class WallStrip:
         ]
         mesh = Mesh.from_trimesh(
             trimesh.points.PointCloud(vertices).convex_hull,
-            origin=HomogeneousTransformationMatrix(reference_frame=panel.root),
             directory=wall.geometry_directory,
         )
-        geometry = ShapeCollection([mesh], reference_frame=panel.root)
-        panel.root.visual = geometry
-        panel.root.collision = geometry
-        return panel
+        specification = SemanticAnnotationWithRootSpecification(
+            name=name,
+            semantic_annotation_type=WallPanel,
+            root_specification=BodySpecification(
+                name=None, shapes=ShapeCollection([mesh])
+            ),
+        )
+        return specification.spawn(world)
 
 
 # %% Window recesses
@@ -593,12 +600,6 @@ class KitchenSofa:
         """
         Add a semantic sofa with a watertight upholstery envelope and seat support.
         """
-        sofa = Sofa.create_with_new_body_in_world(
-            world=world,
-            name="sofa",
-            world_root_T_self=root_T_sofa,
-            scale=Scale(self.depth, self.width, self.base_height),
-        )
         base = trimesh.creation.box(extents=(self.depth, self.width, self.base_height))
         base.apply_translation((0, 0, self.base_height / 2 - self.origin_height))
         meshes = [base]
@@ -632,29 +633,35 @@ class KitchenSofa:
         envelope = trimesh.boolean.union(meshes, engine="manifold")
         shape = Mesh.from_trimesh(
             envelope,
-            origin=HomogeneousTransformationMatrix(reference_frame=sofa.root),
             directory=self.geometry_directory,
         )
         shape.color = Color.BEIGE()
-        geometry = ShapeCollection([shape], reference_frame=sofa.root)
-        sofa.root.visual = geometry
-        sofa.root.collision = geometry
+        seat_surface = RegionSpecification.box(
+            name="sofa_seat_surface",
+            scale=Scale(
+                self.seat_surface_depth,
+                2 * (inner_width - self.seat_surface_width_margin),
+                self.seat_surface_thickness,
+            ),
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=self.seat_surface_center_depth,
+                z=self.seat_surface_height - self.origin_height,
+                pitch=np.arctan(self.seat_surface_slope),
+            ),
+        )
+        specification = SemanticAnnotationWithRootSpecification(
+            name="sofa",
+            semantic_annotation_type=Sofa,
+            root_specification=BodySpecification(
+                name=None,
+                shapes=ShapeCollection([shape]),
+                child_specifications=[seat_surface],
+            ),
+        )
+        sofa = specification.spawn(world, parent_T_self=root_T_sofa)
         sofa.add_supporting_surface(
-            RegionSpecification.box(
-                name="sofa_seat_surface",
-                scale=Scale(
-                    self.seat_surface_depth,
-                    2 * (inner_width - self.seat_surface_width_margin),
-                    self.seat_surface_thickness,
-                ),
-            ).spawn(
-                world,
-                parent=sofa.root,
-                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=self.seat_surface_center_depth,
-                    z=self.seat_surface_height - self.origin_height,
-                    pitch=np.arctan(self.seat_surface_slope),
-                ),
+            cast(
+                Region, world.get_kinematic_structure_entity_by_name(seat_surface.name)
             )
         )
         return sofa
