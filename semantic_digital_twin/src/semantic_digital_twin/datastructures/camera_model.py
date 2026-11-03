@@ -11,7 +11,7 @@ from typing_extensions import Self, Sequence
 
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.specificity_ranking import concrete_subclasses
-from semantic_digital_twin.spatial_types import Point2
+from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.exceptions import (

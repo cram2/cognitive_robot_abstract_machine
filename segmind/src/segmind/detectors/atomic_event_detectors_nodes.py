@@ -17,7 +17,7 @@ from segmind.datastructures.events import (
 )
 from segmind.detectors.base import SegmindContext, AbstractDetector
 from semantic_digital_twin.reasoning.predicates import InContactWith
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 

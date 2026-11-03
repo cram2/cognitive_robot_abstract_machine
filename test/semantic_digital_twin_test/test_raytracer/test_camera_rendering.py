@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from PIL import Image, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
-from semantic_digital_twin.spatial_types import Point2
+from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,
     PlumbBobCameraDistortion,
@@ -38,7 +38,7 @@ from semantic_digital_twin.spatial_computations.exceptions import (
     RayPointShapeMismatch,
     UnsupportedCameraProjection,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.testing import ray_test_world
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body

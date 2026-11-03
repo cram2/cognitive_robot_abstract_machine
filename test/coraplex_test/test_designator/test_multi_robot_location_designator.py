@@ -7,7 +7,7 @@ from typing_extensions import Generator, List, Tuple
 
 
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
 from cramph.threaded_nodes import FunctionCall
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
@@ -24,9 +24,7 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 from ...conftest import SAMPLING_SEED
