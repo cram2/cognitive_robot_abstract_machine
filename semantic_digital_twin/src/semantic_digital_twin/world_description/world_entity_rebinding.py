@@ -9,7 +9,7 @@ from dataclasses import dataclass, field, fields, is_dataclass
 
 from typing_extensions import Any, TYPE_CHECKING, TypeVar
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from semantic_digital_twin.exceptions import (
     WorldEntityWithIDBelongsToAnotherWorld,
     WorldEntityWithIDNotFoundError,
@@ -56,7 +56,7 @@ class WorldEntityRebinding:
             return self.rebound[id(obj)]
         if self._is_walked_dataclass(obj):
             return self._rebound_dataclass(obj)
-        if isinstance(obj, list_like_classes):
+        if isinstance(obj, CollectionKind.ELEMENT_SEQUENCE.value):
             rebound = type(obj)(self.rebind(item) for item in obj)
         elif isinstance(obj, dict):
             rebound = {key: self.rebind(value) for key, value in obj.items()}

@@ -10,7 +10,6 @@ from datetime import timedelta, timezone
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, fields, is_dataclass
 from dataclasses import field
-from types import NoneType
 from typing_extensions import Dict, Any, Self, Union, TypeVar, TypeAlias, TYPE_CHECKING
 
 import numpy as np
@@ -29,6 +28,7 @@ from krrood.adapters.json_field import JSONField
 from krrood.adapters.keyword_argument import SerializationKeywordArgument
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood.class_diagrams.leaf_kind import LeafKind
 from krrood.ormatic.data_access_objects.base import HasGeneric
 from krrood.singleton import SingletonMeta
 from krrood.utils import (
@@ -37,18 +37,9 @@ from krrood.utils import (
     resolve_class_from_full_name as _resolve_class_from_full_name,
 )
 
-list_like_classes = CollectionKind.ELEMENT_SEQUENCE.value  # serialized as a JSON array
-leaf_types = (
-    int,
-    float,
-    str,
-    bool,
-    NoneType,
-)  # containers that can be serialized by the built-in JSON module
-
 JSON_DICT_TYPE = Dict[str, Any]  # Commonly referred JSON dict
 JSON_RETURN_TYPE = Union[
-    JSON_DICT_TYPE, list[Any], *leaf_types
+    JSON_DICT_TYPE, list[Any], *LeafKind.JSON_SCALAR.value
 ]  # Commonly referred JSON types
 if TYPE_CHECKING:
     JSONData: TypeAlias = JSON_RETURN_TYPE
@@ -188,10 +179,10 @@ class SubclassJSONSerializer:
             subclass.
         :return: The correct instance of the subclass
         """
-        if isinstance(data, leaf_types):
+        if isinstance(data, LeafKind.JSON_SCALAR.value):
             return data
 
-        if isinstance(data, list_like_classes):
+        if isinstance(data, CollectionKind.ELEMENT_SEQUENCE.value):
             return [from_json(d, **kwargs) for d in data]
 
         fully_qualified_class_name = data.get(JSONField.TYPE)
@@ -275,10 +266,10 @@ def to_json(obj: SubclassJSONSerializer | Any, **kwargs) -> JSON_RETURN_TYPE:
     if isinstance(obj, enum.Enum):
         return EnumJSONSerializer.to_json(obj)
 
-    if isinstance(obj, (leaf_types)):
+    if isinstance(obj, LeafKind.JSON_SCALAR.value):
         return obj
 
-    if isinstance(obj, list_like_classes):
+    if isinstance(obj, CollectionKind.ELEMENT_SEQUENCE.value):
         return [to_json(item, **kwargs) for item in obj]
 
     reference_writer = ReferenceWriter.find_for(obj, kwargs)
@@ -417,7 +408,7 @@ def _compute_attribute_diff(
     original_values = original_json.get(key)
     new_values = new_json.get(key)
 
-    if not isinstance(original_values, list_like_classes):
+    if not isinstance(original_values, CollectionKind.ELEMENT_SEQUENCE.value):
         if original_values == new_values:
             return None
         return JSONAttributeDiff(
@@ -1006,7 +997,7 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
     Generic JSON serializer for dataclasses.
 
     It creates a dict where all fields are serialized using the to_json function. A
-    ``list``-like field (see :data:`list_like_classes`) always serializes as a JSON
+    ``list``-like field (see :attr:`CollectionKind.ELEMENT_SEQUENCE`) always serializes as a JSON
     object that also records its collection type as a fully qualified class name, so
     ``from_json`` restores that same type on the way back rather than guessing or
     defaulting to ``list``. If this is not enough, you still need to implement a custom
@@ -1020,7 +1011,7 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
         for field_ in introspector.discover(instance.__class__):
             value = getattr(instance, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 current_result = {
                     JSONField.COLLECTION_TYPE: get_full_class_name(type(value)),
                     JSONField.ITEMS: [to_json(item, **kwargs) for item in value],
