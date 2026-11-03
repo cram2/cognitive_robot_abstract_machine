@@ -161,7 +161,7 @@ $$
 so a split never lowers the likelihood.
 A threshold on the likelihood alone would therefore never stop the induction.
 Instead, every split has to pay for the two parameters it adds, its boundary and its weight, with the penalty of the
-Bayesian information criterion. 
+Bayesian information criterion {cite}`schwarz1978estimating`. 
 A split is made if and only if
 
 $$
@@ -176,7 +176,8 @@ information criterion.
 The recursive splitting is greedy and therefore not guaranteed to find the partition with the highest penalized
 likelihood. 
 Since the boundaries are fixed by the indices of the data, the best partition can also be found exactly by dynamic 
-programming, which `globally_optimal=True` does. 
+programming {cite}`jackson2005algorithm`, which `globally_optimal=True` does with the pruning of
+{cite}`killick2012optimal`. 
 It is slower, especially on large datasets.
 
 This algorithm is implemented in the [NygaInduction](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/learning/nyga_induction/index.html#probabilistic_model.learning.nyga_induction.NygaInduction).

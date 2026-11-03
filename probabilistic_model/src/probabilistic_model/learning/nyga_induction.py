@@ -310,9 +310,9 @@ class InductionStep:
         each hold at least :attr:`min_samples_per_quantile` unique values.
 
         .. note::
-            This is optimal partitioning with PELT pruning (Killick, Fearnhead and
-            Eckley, 2012). Pruning is exact here, since a split never lowers the log
-            likelihood.
+            This is optimal partitioning :cite:p:`jackson2005algorithm` with PELT
+            pruning :cite:p:`killick2012optimal`. Pruning is exact here, since a split
+            never lowers the log likelihood.
 
         :return: The indices that bound the parts, :attr:`begin_index` and
             :attr:`end_index` included.
@@ -393,8 +393,8 @@ class NygaInduction:
     """
     The factor on the penalty a split has to outweigh in log likelihood.
 
-    At 1 the penalty is the Bayesian information criterion of the two parameters a split
-    adds.
+    At 1 the penalty is the Bayesian information criterion
+    :cite:p:`schwarz1978estimating` of the two parameters a split adds.
     """
 
     min_samples_per_quantile: int = 2
@@ -544,8 +544,9 @@ class NygaInduction:
     @staticmethod
     def from_uniform_mixture(mixture: ProbabilisticCircuit) -> ProbabilisticCircuit:
         """
-        Construct a Nyga Distribution from a mixture of uniform distributions. The
-        mixture does not have to be deterministic.
+        Construct a Nyga Distribution from a mixture of uniform distributions.
+
+        The mixture does not have to be deterministic.
 
         :param mixture: An arbitrary, univariate mixture of uniform distributions
         :return: A Nyga Distribution describing the same function.
