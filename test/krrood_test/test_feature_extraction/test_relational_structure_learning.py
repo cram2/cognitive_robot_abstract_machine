@@ -1,7 +1,9 @@
 import pytest
 
 from probabilistic_model.causal_structure.graph import NodeLevel
-from probabilistic_model.causal_structure.learning import RelationalStructureLearner
+from probabilistic_model.causal_structure.learning import (
+    RelationalCausalStructureLearner,
+)
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
     TrainingTableColumn,
@@ -56,7 +58,9 @@ def test_learned_graph_variables_match_query_variables(
     fitted_circuit, scenario, room_query_4, request
 ):
     circuit: RelationalProbabilisticCircuit = request.getfixturevalue(fitted_circuit)
-    graph = RelationalStructureLearner().learn(circuit, list(scenario)).selector.graph
+    graph = (
+        RelationalCausalStructureLearner().learn(circuit, list(scenario)).selector.graph
+    )
     grounded_names = {
         variable.name for variable in circuit.ground(room_query_4).variables
     }
@@ -80,7 +84,7 @@ def test_learned_graph_variables_match_query_variables(
 
 def test_statistics_are_aggregation_nodes(relational_probabilistic_circuit, scenario):
     graph = (
-        RelationalStructureLearner()
+        RelationalCausalStructureLearner()
         .learn(relational_probabilistic_circuit, list(scenario))
         .selector.graph
     )
@@ -93,4 +97,3 @@ def test_statistics_are_aggregation_nodes(relational_probabilistic_circuit, scen
         for node in graph.nodes()
         if node.level is NodeLevel.AGGREGATION_STATISTIC
     } == {variable.name for variable in template.latent_variables}
-

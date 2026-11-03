@@ -1,7 +1,7 @@
 """
-Learning a causal graph from the rows a model is fitted on, with the PC algorithm of
-causal-learn (Zheng et al., 2024), from a flat table or from the tables a relational
-circuit is fitted on.
+Learning a causal graph from the rows a model is fitted on, with the Peter-Clark
+algorithm of causal-learn (Zheng et al., 2024), from a flat table or from the tables a
+relational circuit is fitted on.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from enum import IntEnum, StrEnum
 import numpy as np
 import pandas as pd
 from causallearn.graph.GraphNode import GraphNode as CausalLearnNode
-from causallearn.search.ConstraintBased.PC import pc
+from causallearn.search.ConstraintBased.PC import pc as peter_clark
 from causallearn.utils.PCUtils.BackgroundKnowledge import (
     BackgroundKnowledge as CausalLearnKnowledge,
 )
@@ -40,10 +40,10 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
 # %% learning from one table
 
 
-class IndependenceTest(StrEnum):
+class ConditionalIndependenceTest(StrEnum):
     """
-    The conditional independence tests the PC algorithm can run on discretized columns,
-    by the name causal-learn gives them.
+    The conditional independence tests the Peter-Clark algorithm can run on discretized
+    columns, by the name causal-learn gives them.
     """
 
     G_SQUARED = "gsq"
@@ -57,7 +57,7 @@ class IndependenceTest(StrEnum):
     """
 
 
-class CausalLearnEndpoint(IntEnum):
+class AdjacencyMatrixMark(IntEnum):
     """
     How causal-learn's adjacency matrix marks the end of an edge at a node: entry ``[i,
     j]`` is the mark the edge between nodes ``i`` and ``j`` shows at ``i``.
@@ -81,7 +81,7 @@ class CausalLearnEndpoint(IntEnum):
         return EdgeMark[self.name]
 
 
-class StructureLearner(ABC):
+class CausalStructureLearner(ABC):
     """
     Learns a causal graph from the rows of one table.
     """
@@ -102,10 +102,10 @@ class StructureLearner(ABC):
 
 
 @dataclass
-class PCStructureLearner(StructureLearner):
+class PeterClarkStructureLearner(CausalStructureLearner):
     """
-    The PC algorithm in its order-independent form, on the table's columns discretized
-    into a few levels each.
+    The Peter-Clark algorithm in its order-independent form, on the table's columns
+    discretized into a few levels each.
     """
 
     significance_level: float = 0.05
@@ -113,7 +113,9 @@ class PCStructureLearner(StructureLearner):
     The level below which a test's p-value rejects independence.
     """
 
-    independence_test: IndependenceTest = IndependenceTest.G_SQUARED
+    independence_test: ConditionalIndependenceTest = (
+        ConditionalIndependenceTest.G_SQUARED
+    )
     """
     The conditional independence test.
     """
@@ -141,7 +143,7 @@ class PCStructureLearner(StructureLearner):
             name for name in names if name not in copies and rows[name].nunique() > 1
         ]
         codes = self.discretizer.fit_transform(rows[tested])
-        graph = pc(
+        graph = peter_clark(
             codes.to_numpy(dtype=np.int64),
             self.significance_level,
             self.independence_test,
@@ -154,7 +156,7 @@ class PCStructureLearner(StructureLearner):
         ).G.graph
         return CausalGraph.from_edges(
             nodes,
-            self.edges_of(graph, tested)
+            self.edges_of_adjacency_matrix(graph, tested)
             + [
                 GraphEdge.directed(copy.source, copy.copy)
                 for copy in knowledge.deterministic_copies
@@ -182,7 +184,9 @@ class PCStructureLearner(StructureLearner):
         return translated
 
     @staticmethod
-    def edges_of(graph: np.ndarray, names: list[str]) -> list[GraphEdge]:
+    def edges_of_adjacency_matrix(
+        graph: np.ndarray, names: list[str]
+    ) -> list[GraphEdge]:
         """
         :param graph: causal-learn's adjacency matrix over the named nodes.
         :param names: The names of its nodes, in its order.
@@ -192,8 +196,8 @@ class PCStructureLearner(StructureLearner):
             GraphEdge(
                 first=names[first],
                 second=names[second],
-                mark_at_first=CausalLearnEndpoint(graph[first, second]).mark,
-                mark_at_second=CausalLearnEndpoint(graph[second, first]).mark,
+                mark_at_first=AdjacencyMatrixMark(graph[first, second]).mark,
+                mark_at_second=AdjacencyMatrixMark(graph[second, first]).mark,
             )
             for first in range(len(names))
             for second in range(first + 1, len(names))
@@ -227,17 +231,17 @@ class LearnedCausalStructure:
         cls,
         rows: pd.DataFrame,
         variables: list[Variable],
-        learner: StructureLearner | None = None,
+        learner: CausalStructureLearner | None = None,
         knowledge: BackgroundKnowledge | None = None,
     ) -> LearnedCausalStructure:
         """
         :param rows: The table a flat model was fitted on, one column per variable.
         :param variables: The model's variables.
-        :param learner: What learns the graph; the PC algorithm if not given.
+        :param learner: What learns the graph; the Peter-Clark algorithm if not given.
         :param knowledge: What is known about the structure in advance.
         :return: The structure learned from the table.
         """
-        learner = learner or PCStructureLearner()
+        learner = learner or PeterClarkStructureLearner()
         nodes = [
             GraphNode(variable=variable, level=NodeLevel.EXAMPLE_ATTRIBUTE)
             for variable in variables
@@ -254,7 +258,7 @@ class LearnedCausalStructure:
 
 
 @dataclass
-class RelationalStructureLearner:
+class RelationalCausalStructureLearner:
     """
     Learns a causal graph over a relational circuit's variables: over the instances'
     attributes and aggregation statistics from the class table, and over each
@@ -266,7 +270,7 @@ class RelationalStructureLearner:
     instance attribute and a part attribute.
     """
 
-    learner: StructureLearner = field(default_factory=PCStructureLearner)
+    learner: CausalStructureLearner = field(default_factory=PeterClarkStructureLearner)
     """
     What learns the graph of each table.
     """

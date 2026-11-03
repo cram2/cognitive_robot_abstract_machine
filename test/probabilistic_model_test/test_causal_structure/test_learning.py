@@ -11,10 +11,10 @@ from probabilistic_model.causal_structure.graph import GraphEdge
 from probabilistic_model.causal_structure.identification import IdentifiedEffect
 from probabilistic_model.causal_structure.learning import (
     LearnedCausalStructure,
-    PCStructureLearner,
+    PeterClarkStructureLearner,
 )
 
-from .scm import chain_with_a_copy, collider, season_fork
+from .structural_causal_models import chain_with_a_copy, collider, season_fork
 
 # %% learning from one table
 
