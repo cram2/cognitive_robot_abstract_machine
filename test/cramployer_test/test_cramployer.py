@@ -177,7 +177,6 @@ def test_launcher_finds_checkout_from_another_working_directory(
     shutil.copyfile(
         directory / FixturePath.EXAMPLE, directory / FixturePath.CONFIGURATION
     )
-    shutil.copyfile(FixturePath.SOURCE_PROBE, deployment.docker_executable)
     monkeypatch.setenv(
         EnvironmentVariable.REPOSITORY, str(tmp_path / ContainerName.UNRELATED)
     )

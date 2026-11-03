@@ -76,11 +76,6 @@ class FixturePath(PathEnumeration):
     Shell probe for source configuration.
     """
 
-    SOURCE_PROBE = Path(__file__).parent / "docker-source.py"
-    """
-    Docker mimic reporting its source checkout.
-    """
-
     IMAGE_SOURCES = Path("image-sources")
     """
     ROS source tree supplied by the base-image mimic.

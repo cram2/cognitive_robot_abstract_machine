@@ -61,12 +61,14 @@ class RecordedCommandName(StrEnum):
     """Stream an archive of source files."""
     LIST = "ps"
     """List running development containers."""
+    CONFIGURATION = "config"
+    """Report the source checkout supplied to Compose."""
 
 
 # %% Command recording
 @dataclass
 class CommandRecorder:
-    """Record Docker arguments and supply configured running containers."""
+    """Record Docker arguments and supply container and checkout responses."""
 
     command_log: Path
     """File receiving each invocation's arguments."""
@@ -81,13 +83,17 @@ class CommandRecorder:
     """Argument identifying a failing invocation."""
     failure_status: int = RecordedExitStatus.FAILURE
     """Exit status returned by a failing invocation."""
+    source_checkout: str = ""
+    """Source checkout reported by the configuration command."""
 
     def record(self, arguments: list[str]) -> int:
-        """Record an invocation and return its configured output and exit status."""
+        """Record an invocation, emit its response, and return its exit status."""
         with self.command_log.open("a") as stream:
             stream.write(json.dumps(arguments) + "\n")
         if self.failure_argument in arguments:
             return self.failure_status
+        if arguments[-1:] == [RecordedCommandName.CONFIGURATION]:
+            print(self.source_checkout)
         if arguments[:1] == [RecordedCommandName.LIST]:
             print(self.running_containers)
         if arguments[:1] == [RecordedCommandName.CREATE]:
@@ -111,5 +117,6 @@ if __name__ == "__main__":
                     EnvironmentVariable.FAILURE_STATUS, str(RecordedExitStatus.FAILURE)
                 )
             ),
+            source_checkout=os.environ.get(EnvironmentVariable.CRAM_SOURCE, ""),
         ).record(sys.argv[1:])
     )
