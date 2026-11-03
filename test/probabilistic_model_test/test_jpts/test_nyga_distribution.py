@@ -30,7 +30,7 @@ def induction_step_over(
     :param support: The allowed span of the support of the induced distribution.
     :return: The first induction step over the equally weighted data 1, 2, 3, 4, 7, 9.
     """
-    induction = NygaInduction(variable, min_samples_per_quantile=1, support=support)
+    induction = NygaInduction(variable, minimum_samples_per_quantile=1, support=support)
     return induction.initial_induction_step(np.array([1, 2, 3, 4, 7, 9]))
 
 
@@ -56,7 +56,7 @@ def spiked_induction_step(x, spiked_data) -> InductionStep:
     """
     The first induction step over :func:`spiked_data`.
     """
-    induction = NygaInduction(x, min_samples_per_quantile=1)
+    induction = NygaInduction(x, minimum_samples_per_quantile=1)
     return induction.initial_induction_step(spiked_data)
 
 
@@ -158,7 +158,7 @@ def test_best_split(induction_step):
 
 
 def test_best_split_of_too_few_samples_is_none(induction_step):
-    induction_step.nyga_induction.min_samples_per_quantile = 4
+    induction_step.nyga_induction.minimum_samples_per_quantile = 4
     maximum, index = induction_step.compute_best_split()
     assert index is None
     assert maximum == -float("inf")
@@ -194,7 +194,7 @@ def test_induction_steps_of_the_sides_share_the_data(
 
 def test_fit_has_at_most_one_piece_per_quantile(induction_step):
     induction = induction_step.nyga_induction
-    induction.min_samples_per_quantile = 20
+    induction.minimum_samples_per_quantile = 20
     induction.split_penalty_factor = 0
     data = np.random.normal(0, 1, 500).tolist()
     circuit = induction.fit(data)
@@ -257,7 +257,7 @@ def fitted_induction(x, standard_normal_data) -> NygaInduction:
     """
     An induction fitted to :func:`standard_normal_data`.
     """
-    induction = NygaInduction(x, min_samples_per_quantile=300)
+    induction = NygaInduction(x, minimum_samples_per_quantile=300)
     induction.fit(standard_normal_data)
     return induction
 
@@ -282,7 +282,7 @@ def test_plot_of_a_fitted_distribution_has_traces(fitted_induction):
 
 
 def test_fit_narrows_the_default_support_to_data_range_widened_by_tolerance(x):
-    induction = NygaInduction(x, min_samples_per_quantile=1, split_penalty_factor=0)
+    induction = NygaInduction(x, minimum_samples_per_quantile=1, split_penalty_factor=0)
     induction.fit([1.0, 2.0, 3.0])
     # a simple interval stores its bounds in single precision, so the bounds pick up
     # rounding noise around the scale of the tolerance itself
@@ -299,7 +299,7 @@ def test_fit_narrows_a_given_support_no_further_than_the_tolerance_window(x):
     induction = NygaInduction(
         x,
         support=closed(0.0, 10.0).simple_sets[0],
-        min_samples_per_quantile=1,
+        minimum_samples_per_quantile=1,
         split_penalty_factor=0,
     )
     induction.fit([1.0, 2.0, 3.0])
@@ -316,7 +316,7 @@ def test_fit_narrows_a_given_support_to_stay_inside_it(x):
     induction = NygaInduction(
         x,
         support=closed(0.0, 3.0000005).simple_sets[0],
-        min_samples_per_quantile=1,
+        minimum_samples_per_quantile=1,
         split_penalty_factor=0,
     )
     induction.fit([1.0, 2.0, 3.0])
@@ -362,7 +362,7 @@ def test_gain_of_a_split_is_the_weighted_divergence_of_its_two_sides(
 
 
 def test_weights_of_duplicate_values_add_up(x):
-    induction = NygaInduction(x, min_samples_per_quantile=1, split_penalty_factor=0)
+    induction = NygaInduction(x, minimum_samples_per_quantile=1, split_penalty_factor=0)
     weighted = induction.initial_induction_step(
         np.array([2.0, 0.0, 0.0, 1.0]), np.array([1.0, 3.0, 1.0, 2.0])
     )
@@ -396,7 +396,7 @@ def test_minimum_split_gain_scales_with_the_weights(x):
 @pytest.mark.parametrize("split_penalty_factor, expected", [(1.0, False), (0.0, True)])
 def test_split_has_to_outweigh_the_penalty(x, split_penalty_factor, expected):
     induction = NygaInduction(
-        x, min_samples_per_quantile=1, split_penalty_factor=split_penalty_factor
+        x, minimum_samples_per_quantile=1, split_penalty_factor=split_penalty_factor
     )
     step = induction.initial_induction_step(np.array([1, 2, 3, 4, 7, 9]))
     maximum_log_likelihood, _ = step.compute_best_split()
@@ -404,7 +404,7 @@ def test_split_has_to_outweigh_the_penalty(x, split_penalty_factor, expected):
 
 
 def test_fit_of_evenly_spaced_data_is_one_piece(x):
-    induction = NygaInduction(x, min_samples_per_quantile=1)
+    induction = NygaInduction(x, minimum_samples_per_quantile=1)
     circuit = induction.fit(np.linspace(0.0, 1.0, 1000))
     assert len(circuit.root.subcircuits) == 1
 
@@ -416,7 +416,7 @@ def test_empty_copy_keeps_every_parameter(x):
     induction = NygaInduction(
         x,
         split_penalty_factor=2.0,
-        min_samples_per_quantile=3,
+        minimum_samples_per_quantile=3,
         tolerance_at_extremes=1e-3,
         support=closed(0.0, 5.0).simple_sets[0],
         maximum_unique_values_for_optimal_partition=10,
@@ -456,19 +456,19 @@ def best_penalized_log_likelihood_by_enumeration(step: InductionStep) -> float:
         boundaries
         for boundaries in partitions
         if len(boundaries) == 2
-        or min(np.diff(boundaries)) >= step.min_samples_per_quantile
+        or min(np.diff(boundaries)) >= step.minimum_samples_per_quantile
     ]
     return max(penalized_log_likelihood(step, boundaries) for boundaries in admissible)
 
 
-@pytest.mark.parametrize("min_samples_per_quantile", [1, 2])
+@pytest.mark.parametrize("minimum_samples_per_quantile", [1, 2])
 @pytest.mark.parametrize("split_penalty_factor", [0.0, 0.3, 1.0])
 def test_optimal_segment_boundaries_maximize_the_penalized_likelihood(
-    x, min_samples_per_quantile, split_penalty_factor
+    x, minimum_samples_per_quantile, split_penalty_factor
 ):
     induction = NygaInduction(
         x,
-        min_samples_per_quantile=min_samples_per_quantile,
+        minimum_samples_per_quantile=minimum_samples_per_quantile,
         split_penalty_factor=split_penalty_factor,
     )
     step = induction.initial_induction_step(np.random.randint(0, 13, 40).astype(float))
@@ -511,7 +511,7 @@ def optimal_pieces(induction: NygaInduction, data: np.ndarray) -> set:
 def test_fit_partitions_optimally_up_to_the_limit(x, unevenly_spaced_data):
     induction = NygaInduction(
         x,
-        min_samples_per_quantile=1,
+        minimum_samples_per_quantile=1,
         split_penalty_factor=0.1,
         maximum_unique_values_for_optimal_partition=len(unevenly_spaced_data),
     )
@@ -522,7 +522,7 @@ def test_fit_partitions_optimally_up_to_the_limit(x, unevenly_spaced_data):
 def test_fit_splits_greedily_above_the_limit(x, unevenly_spaced_data):
     above_the_limit = NygaInduction(
         x,
-        min_samples_per_quantile=1,
+        minimum_samples_per_quantile=1,
         split_penalty_factor=0.1,
         maximum_unique_values_for_optimal_partition=len(unevenly_spaced_data) - 1,
     )
@@ -535,7 +535,7 @@ def test_fit_splits_greedily_above_the_limit(x, unevenly_spaced_data):
 
 
 def test_optimally_partitioned_fit_is_a_deterministic_distribution(x):
-    induction = NygaInduction(x, min_samples_per_quantile=5)
+    induction = NygaInduction(x, minimum_samples_per_quantile=5)
     data = np.concatenate(
         [np.random.normal(0.0, 1.0, 300), np.random.normal(6.0, 0.3, 300)]
     )

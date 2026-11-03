@@ -468,7 +468,7 @@ def test_plain_fit_honours_the_minimum_samples_per_leaf(many_chair_count_rooms):
     """
     model = RelationalProbabilisticCircuit(
         learning_method=JointProbabilityTree(
-            min_samples_per_leaf=len(many_chair_count_rooms)
+            minimum_samples_per_leaf=len(many_chair_count_rooms)
         ),
     )
     model.fit(many_chair_count_rooms)
@@ -485,7 +485,7 @@ def test_stratified_fit_honours_the_minimum_samples_per_leaf(many_chair_count_ro
     model = RelationalProbabilisticCircuit(
         learning_method=StratifiedLearning(
             variables=[chair_count_variable._name_],
-            method=JointProbabilityTree(min_samples_per_leaf=20),
+            method=JointProbabilityTree(minimum_samples_per_leaf=20),
         ),
     )
     model.fit(many_chair_count_rooms)
@@ -502,7 +502,7 @@ def test_minimum_samples_per_leaf_reaches_an_exchangeable_parts_template(
         part_learning_methods=PartLearningMethods.from_methods_and_default(
             {
                 variable(SceneRoom).objects: JointProbabilityTree(
-                    min_samples_per_leaf=object_count
+                    minimum_samples_per_leaf=object_count
                 )
             },
             JointProbabilityTree(),
@@ -582,12 +582,12 @@ def _part_attribute_causal_circuit(rooms, correlated_room_query) -> CausalCircui
     whose object template is stratified by type.
     """
     model = RelationalProbabilisticCircuit(
-        learning_method=JointProbabilityTree(min_samples_per_leaf=5),
+        learning_method=JointProbabilityTree(minimum_samples_per_leaf=5),
         part_learning_methods=PartLearningMethods.from_methods_and_default(
             {
                 variable(SceneRoom).objects: StratifiedLearning(
                     variables=["type"],
-                    method=JointProbabilityTree(min_samples_per_leaf=5),
+                    method=JointProbabilityTree(minimum_samples_per_leaf=5),
                 )
             },
             JointProbabilityTree(),

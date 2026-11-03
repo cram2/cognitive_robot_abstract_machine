@@ -69,11 +69,11 @@ class InductionStep:
         return self.nyga_induction.variable
 
     @property
-    def min_samples_per_quantile(self) -> int:
+    def minimum_samples_per_quantile(self) -> int:
         """
         The minimal number of unique values on each side of a split.
         """
-        return self.nyga_induction.min_samples_per_quantile
+        return self.nyga_induction.minimum_samples_per_quantile
 
     @property
     def total_weights(self) -> float:
@@ -204,10 +204,10 @@ class InductionStep:
 
         :return: The maximum log likelihood and the best split index.
         """
-        first_split_index = self.begin_index + self.min_samples_per_quantile
-        last_split_index = self.end_index - self.min_samples_per_quantile + 1
+        first_split_index = self.begin_index + self.minimum_samples_per_quantile
+        last_split_index = self.end_index - self.minimum_samples_per_quantile + 1
 
-        # empty candidate range: too few samples to leave min_samples_per_quantile on
+        # empty candidate range: too few samples to leave minimum_samples_per_quantile on
         # both sides of any split (e.g. this step's own segment is already that small)
         if first_split_index >= last_split_index:
             return -float("inf"), None
@@ -307,7 +307,7 @@ class InductionStep:
         """
         Find the partition of the segment that maximizes the log likelihood minus
         :attr:`minimum_split_gain` for every split, among all partitions whose parts
-        each hold at least :attr:`min_samples_per_quantile` unique values.
+        each hold at least :attr:`minimum_samples_per_quantile` unique values.
 
         .. note::
             This is optimal partitioning :cite:p:`jackson2005algorithm` with PELT
@@ -317,7 +317,7 @@ class InductionStep:
         :return: The indices that bound the parts, :attr:`begin_index` and
             :attr:`end_index` included.
         """
-        if self.end_index - self.begin_index < 2 * self.min_samples_per_quantile:
+        if self.end_index - self.begin_index < 2 * self.minimum_samples_per_quantile:
             return [self.begin_index, self.end_index]
 
         # best penalized log likelihood of the data before each index, where the first
@@ -337,7 +337,7 @@ class InductionStep:
             ] + self.log_likelihood_of_segments(
                 candidates, np.full_like(candidates, end_index)
             )
-            admissible = end_index - candidates >= self.min_samples_per_quantile
+            admissible = end_index - candidates >= self.minimum_samples_per_quantile
 
             if np.any(admissible):
                 best = int(np.argmax(np.where(admissible, log_likelihoods, -np.inf)))
@@ -348,7 +348,7 @@ class InductionStep:
 
             dominated = log_likelihoods <= best_log_likelihood[end_index]
             dominated_from[dominated] = np.minimum(
-                dominated_from[dominated], end_index + self.min_samples_per_quantile
+                dominated_from[dominated], end_index + self.minimum_samples_per_quantile
             )
             kept = dominated_from > end_index + 1
             candidates, dominated_from = candidates[kept], dominated_from[kept]
@@ -397,7 +397,7 @@ class NygaInduction:
     :cite:p:`schwarz1978estimating` of the two parameters a split adds.
     """
 
-    min_samples_per_quantile: int = 2
+    minimum_samples_per_quantile: int = 2
     """
     The minimal number of unique values on each side of a split.
     """

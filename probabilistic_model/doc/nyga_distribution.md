@@ -274,7 +274,7 @@ import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
-distribution = NygaInduction(Continuous("x"), min_samples_per_quantile=100)
+distribution = NygaInduction(Continuous("x"), minimum_samples_per_quantile=100)
 distribution = distribution.fit(dataset)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
