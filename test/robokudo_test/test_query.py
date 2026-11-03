@@ -26,7 +26,6 @@ import robokudo.io.storage_reader_interface
 import robokudo.types.annotation
 import robokudo.types.scene
 import robokudo.utils.tree_execution
-import robokudo.utils.data_downloader
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
@@ -40,20 +39,21 @@ import robokudo.scripts.query_test_client
 
 # %% Query execution
 class QueryWorkerThread(threading.Thread):
-    def __init__(self, node):
+    def __init__(self, node, recording_directory: Path):
         threading.Thread.__init__(self)
         self.node = node
+        self.recording_directory = recording_directory
         self.result = None
 
     def run(self):
-        self.result = query_simple_pipeline(self.node)
+        self.result = query_simple_pipeline(self.node, self.recording_directory)
 
 
-def query_simple_pipeline(node):
+def query_simple_pipeline(node, recording_directory: Path):
     cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=True,
-        target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
+        target_dir=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
 
@@ -85,9 +85,9 @@ def query_simple_pipeline(node):
 
 # %% Query fixtures
 @pytest.fixture
-def tree_run(node):
+def tree_run(node, cup_on_counter_directory: Path):
     logging.debug("tree_run")
-    return query_simple_pipeline(node)
+    return query_simple_pipeline(node, cup_on_counter_directory)
 
 
 # %% Query interface tests
@@ -98,7 +98,7 @@ class TestQueryInterface:
         # We are not sending a query just yet. So the QueryAnnotator should block indefinitely with RUNNING
         assert tree_result is py_trees.common.Status.RUNNING
 
-    def test_query(self, node):
+    def test_query(self, node, cup_on_counter_directory: Path):
         # seq, tree_result = query_simple_pipeline(node)
         multiprocessing.set_start_method("spawn", force=True)
 
@@ -119,7 +119,7 @@ class TestQueryInterface:
 
         logging.debug("Starting QueryWorker Thread")
         # Start the ActionServer/Query Interface PPT after its client is ready.
-        worker_thread = QueryWorkerThread(node)
+        worker_thread = QueryWorkerThread(node, cup_on_counter_directory)
         worker_thread.start()
 
         worker_thread.join()

@@ -29,10 +29,7 @@ from semantic_digital_twin.exceptions import (
     ConnectionCannotBeTrackedByTfFrameError,
     UnboundMessageTypeError,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -138,9 +135,9 @@ def omni_drive_world() -> World:
 
 
 @pytest.fixture()
-def world_with_two_connections() -> (
-    tuple[World, ActiveConnection1DOF, ActiveConnection1DOF]
-):
+def world_with_two_connections() -> tuple[
+    World, ActiveConnection1DOF, ActiveConnection1DOF
+]:
     """
     A world whose root drives two separate one degree of freedom connections, standing
     for the joints of two different robot parts.

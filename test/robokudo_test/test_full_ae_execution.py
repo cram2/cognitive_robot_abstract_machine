@@ -20,7 +20,6 @@ import robokudo.behaviours.clear_annotator_outputs
 import robokudo.pipeline
 import robokudo.types.annotation
 import robokudo.types.scene
-import robokudo.utils.data_downloader
 import robokudo.utils.tree_execution
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
@@ -51,14 +50,16 @@ def clean_semantic_world():
 
 
 class TestFullAEExecution(object):
-    def test_run_simple_ae_successfully(self, node) -> None:
+    def test_run_simple_ae_successfully(
+        self, node, cup_on_counter_directory: Path
+    ) -> None:
         # rclpy.init()
         # node = Node(robokudo.defs.TEST_ROS_NODE_NAME)
 
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
             loop=False,
-            target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
+            target_dir=cup_on_counter_directory,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",
@@ -94,12 +95,12 @@ class TestFullAEExecution(object):
         assert types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 1
 
     def test_run_file_reader_ae_synchronizes_semantic_digital_twin_belief_state(
-        self, node, clean_semantic_world
+        self, node, clean_semantic_world, cup_on_counter_directory: Path
     ) -> None:
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
             "file_reader",
             loop=False,
-            target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
+            target_dir=cup_on_counter_directory,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
             static_camera_transform_enabled=True,
             static_world_frame="map",

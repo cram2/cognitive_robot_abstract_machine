@@ -7,7 +7,7 @@ from enum import Enum, StrEnum
 
 import casadi as ca
 import numpy as np
-from typing_extensions import Any, TYPE_CHECKING, overload, Self, Callable, TypeVar
+from typing_extensions import Any, overload, Self, Callable, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -16,19 +16,16 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
 )
 from krrood.symbolic_math.symbolic_math import Matrix, to_sx
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityReference,
+from krrood_spatial_math.cartesian_frame_3d import (
+    CartesianFrame3D,
+    CartesianFrame3DReference,
+    ValueInCartesianFrame3D,
 )
-from semantic_digital_twin.exceptions import (
+from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
     ReferenceFrameMismatchError,
     SpatialTypesError,
 )
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world_description.world_entity import (
-        KinematicStructureEntity,
-    )
 
 
 class _ConstantMatrixParts(ca.SX, Enum):
@@ -67,13 +64,13 @@ class SpatialFrameKey(StrEnum):
 
 
 @dataclass(eq=False, repr=False)
-class SpatialType(ABC):
+class SpatialType(ValueInCartesianFrame3D, ABC):
     """
     Provides functionality to associate a reference frame with an object.
 
     This mixin class allows the inclusion of a reference frame within objects that
     require spatial or kinematic context. The reference frame is represented by a
-    `KinematicStructureEntity`, which provides the necessary structural and spatial
+    `CartesianFrame3D`, which provides the necessary structural and spatial
     information.
     """
 
@@ -82,7 +79,7 @@ class SpatialType(ABC):
     Implement Symbolic Math protocol.
     """
 
-    reference_frame: KinematicStructureEntity | None = field(kw_only=True, default=None)
+    reference_frame: CartesianFrame3D | None = field(kw_only=True, default=None)
     """
     The reference frame associated with the object.
 
@@ -124,7 +121,7 @@ class SpatialType(ABC):
         :param data: The json of this value.
         """
         if self.reference_frame is not None:
-            WorldEntityReference(SpatialFrameKey.REFERENCE).write(
+            CartesianFrame3DReference(SpatialFrameKey.REFERENCE).write(
                 data, self.reference_frame
             )
 
@@ -167,7 +164,7 @@ class SpatialType(ABC):
     @classmethod
     def _parse_optional_frame_from_json(
         cls, data: dict[str, Any], frame: SpatialFrameKey, **kwargs
-    ) -> KinematicStructureEntity | None:
+    ) -> CartesianFrame3D | None:
         """
         Resolve a kinematic structure entity a serialized spatial type refers to.
 
@@ -175,9 +172,8 @@ class SpatialType(ABC):
         :param frame: which of its frames the spatial type is asked for
         :param kwargs: addition kwargs of _from_json
         :return: None if the spatial type refers to no such entity.
-        :raises WorldEntityWithIDNotInKwargs: If nothing known carries that id.
         """
-        reference = WorldEntityReference(frame)
+        reference = CartesianFrame3DReference(frame)
         if not data.get(reference.id_key):
             return None
         return reference.resolve(data, **kwargs)
@@ -185,7 +181,7 @@ class SpatialType(ABC):
     @staticmethod
     def _ensure_consistent_frame(
         spatial_objects: list[SpatialType | None],
-    ) -> KinematicStructureEntity | None:
+    ) -> CartesianFrame3D | None:
         """
         Ensures that all provided spatial objects have a consistent reference frame.
 
@@ -265,7 +261,7 @@ class HomogeneousTransformationMatrix(
     and create transformations from various inputs such as Euler angles or quaternions.
     """
 
-    child_frame: KinematicStructureEntity | None = field(kw_only=True, default=None)
+    child_frame: CartesianFrame3D | None = field(kw_only=True, default=None)
     """
     child_frame of this transformation matrix.
     """
@@ -273,8 +269,8 @@ class HomogeneousTransformationMatrix(
     def __init__(
         self,
         data: sm.MatrixData | None = None,
-        reference_frame: KinematicStructureEntity | None = None,
-        child_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+        child_frame: CartesianFrame3D | None = None,
     ):
         """
         :param data: A 4x4 matrix of some form that represents the rotation matrix.
@@ -342,7 +338,9 @@ class HomogeneousTransformationMatrix(
     def _frames_to_json(self, data: dict[str, Any]) -> None:
         super()._frames_to_json(data)
         if self.child_frame is not None:
-            WorldEntityReference(SpatialFrameKey.CHILD).write(data, self.child_frame)
+            CartesianFrame3DReference(SpatialFrameKey.CHILD).write(
+                data, self.child_frame
+            )
 
     def _frames_from_json(self, data: dict[str, Any], **kwargs) -> None:
         super()._frames_from_json(data, **kwargs)
@@ -361,8 +359,8 @@ class HomogeneousTransformationMatrix(
         cls,
         point: Point3 | None = None,
         rotation_matrix: RotationMatrix | None = None,
-        reference_frame: KinematicStructureEntity | None = None,
-        child_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+        child_frame: CartesianFrame3D | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Constructs a TransformationMatrix object from a given point, a rotation matrix,
@@ -405,8 +403,8 @@ class HomogeneousTransformationMatrix(
         roll: sm.ScalarData = 0,
         pitch: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
-        child_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+        child_frame: CartesianFrame3D | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Creates a TransformationMatrix object from position (x, y, z) and Euler angles
@@ -440,8 +438,8 @@ class HomogeneousTransformationMatrix(
         quat_y: sm.ScalarData = 0,
         quat_z: sm.ScalarData = 0,
         quat_w: sm.ScalarData = 1,
-        reference_frame: KinematicStructureEntity | None = None,
-        child_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+        child_frame: CartesianFrame3D | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Creates a `TransformationMatrix` instance from the provided position coordinates
@@ -477,8 +475,8 @@ class HomogeneousTransformationMatrix(
         z: sm.ScalarData = 0,
         axis: Vector3 | sm.NumericalVector = None,
         angle: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
-        child_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+        child_frame: CartesianFrame3D | None = None,
     ) -> Self:
         """
         Creates an instance of the class from x, y, z coordinates, axis and angle.
@@ -578,6 +576,24 @@ class HomogeneousTransformationMatrix(
         inv[:3, 3] = (-inv[:3, :3]).dot(self[:3, 3])
         return inv
 
+    @staticmethod
+    def invert_numeric_matrix(f1_T_f2: np.ndarray) -> np.ndarray:
+        """
+        Invert a numeric rigid homogeneous transformation without building a symbolic
+        expression.
+
+        :param f1_T_f2: A 4x4 rigid homogeneous transformation from frame f2 to f1.
+        :return: f2_T_f1, a new 4x4 array of the same dtype.
+        """
+        R = f1_T_f2[:3, :3]
+        t = f1_T_f2[:3, 3]
+        Rt = R.T
+        f2_T_f1 = np.empty((4, 4), dtype=f1_T_f2.dtype)
+        f2_T_f1[:3, :3] = Rt
+        f2_T_f1[:3, 3] = -Rt @ t
+        f2_T_f1[3] = [0, 0, 0, 1]
+        return f2_T_f1
+
     @property
     def position(self) -> Point3:
         """
@@ -637,8 +653,8 @@ class HomogeneousTransformationMatrix(
 
     def copy_with_new_reference_frames(
         self,
-        new_reference_frame: KinematicStructureEntity,
-        new_child_frame: KinematicStructureEntity | None,
+        new_reference_frame: CartesianFrame3D,
+        new_child_frame: CartesianFrame3D | None,
     ) -> HomogeneousTransformationMatrix:
         """
         Copies the transformation matrix and changes the reference and child frames.
@@ -677,7 +693,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def __init__(
         self,
         data: sm.MatrixData | None = None,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ):
         """
         :param data: A 4x4 matrix of some form that represents the rotation matrix.
@@ -873,12 +889,12 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :return: The rotation this matrix describes.
         """
-        return self.quaternion.axis_angle
+        return AxisAngle.from_rotation_matrix(self)
 
     @property
     def angle(self) -> sm.Scalar:
         """
-        :return: The angle of the rotation around its axis in radians, in [0, 2 pi].
+        :return: The angle of the rotation around its axis in radians, in [0, pi].
         """
         return self.axis_angle.angle
 
@@ -895,7 +911,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         x: Vector3 | None = None,
         y: Vector3 | None = None,
         z: Vector3 | None = None,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> RotationMatrix:
         """
         Create a rotation matrix from 2 or 3 orthogonal vectors.
@@ -934,7 +950,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_x_axis(
         cls,
         x_vector: Vector3,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> RotationMatrix:
         """
         Create a rotation matrix from the direction its x-axis points along.
@@ -969,7 +985,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         roll: sm.ScalarData | None = None,
         pitch: sm.ScalarData | None = None,
         yaw: sm.ScalarData | None = None,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> RotationMatrix:
         """
         Conversion of roll, pitch, yaw to 4x4 rotation matrix according to:
@@ -1116,7 +1132,7 @@ class Point3(Point):
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ):
         """
 
@@ -1144,7 +1160,7 @@ class Point3(Point):
     def from_iterable(
         cls,
         data: sm.VectorData,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Point3:
         """
         Creates an instance of Point3 from provided iterable data.
@@ -1157,7 +1173,7 @@ class Point3(Point):
 
         :param data: The array-like data or object such as a list, tuple, or numpy array
             used to initialize the Point3 instance.
-        :param reference_frame: A reference to a `KinematicStructureEntity` object,
+        :param reference_frame: A reference to a `CartesianFrame3D` object,
             representing the frame of reference for the Point3 instance. If the data has
             a `reference_frame` attribute, and this parameter is not specified, it will
             be taken from the data.
@@ -1365,7 +1381,7 @@ class Point2(Point):
         self,
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ):
         """
         :param x: X-coordinate of the point. Defaults to 0.
@@ -1386,7 +1402,7 @@ class Point2(Point):
     def from_point3(
         cls,
         point: Point3,
-        plane_frame: KinematicStructureEntity | None = None,
+        plane_frame: CartesianFrame3D | None = None,
     ) -> Point2:
         """
         The :meth:`OrthogonalProjection.project` of ``point`` onto the x-y plane of
@@ -1404,7 +1420,7 @@ class Point2(Point):
     def from_pose(
         cls,
         pose: Pose,
-        plane_frame: KinematicStructureEntity | None = None,
+        plane_frame: CartesianFrame3D | None = None,
     ) -> Point2:
         """
         The :meth:`from_point3` of ``pose``'s position.
@@ -1492,7 +1508,7 @@ class OrthogonalProjection:
     z-coordinate in :attr:`plane_frame` is ``h``.
     """
 
-    plane_frame: KinematicStructureEntity | None
+    plane_frame: CartesianFrame3D | None
     """
     The frame whose x-y plane points are projected onto.
 
@@ -1515,7 +1531,7 @@ class OrthogonalProjection:
                     actual_frame=point.reference_frame,
                     context="the projected Point3",
                 )
-            point = self.plane_frame._world.transform(point, self.plane_frame)
+            point = self.plane_frame.express_in_own_frame(point)
         return Point2(point.x, point.y, reference_frame=self.plane_frame)
 
     def unproject(self, point: Point2, height: sm.ScalarData = 0) -> Point3:
@@ -1566,15 +1582,15 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     .. note:: this is represented as a 4d vector, where the last entry is always a 0.
     """
 
-    visualisation_frame: KinematicStructureEntity = field(default=None)
+    visualisation_frame: CartesianFrame3D = field(default=None)
 
     def __init__(
         self,
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
-        visualisation_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+        visualisation_frame: CartesianFrame3D | None = None,
     ):
         """
 
@@ -1620,7 +1636,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_iterable(
         cls,
         data: sm.VectorData,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Vector3:
         """
         Creates an instance of Vector3 from provided iterable data.
@@ -1633,7 +1649,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
         :param data: The array-like data or object such as a list, tuple, or numpy array
             used to initialize the Vector3 instance.
-        :param reference_frame: A reference to a `KinematicStructureEntity` object,
+        :param reference_frame: A reference to a `CartesianFrame3D` object,
             representing the frame of reference for the Vector3 instance. If the data
             has a `reference_frame` attribute, and this parameter is not specified, it
             will be taken from the data.
@@ -1652,33 +1668,27 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return result
 
     @classmethod
-    def X(cls, reference_frame: KinematicStructureEntity | None = None) -> Vector3:
+    def X(cls, reference_frame: CartesianFrame3D | None = None) -> Vector3:
         return cls(x=1, y=0, z=0, reference_frame=reference_frame)
 
     @classmethod
-    def Y(cls, reference_frame: KinematicStructureEntity | None = None) -> Vector3:
+    def Y(cls, reference_frame: CartesianFrame3D | None = None) -> Vector3:
         return cls(x=0, y=1, z=0, reference_frame=reference_frame)
 
     @classmethod
-    def Z(cls, reference_frame: KinematicStructureEntity | None = None) -> Vector3:
+    def Z(cls, reference_frame: CartesianFrame3D | None = None) -> Vector3:
         return cls(x=0, y=0, z=1, reference_frame=reference_frame)
 
     @classmethod
-    def NEGATIVE_X(
-        cls, reference_frame: KinematicStructureEntity | None = None
-    ) -> Vector3:
+    def NEGATIVE_X(cls, reference_frame: CartesianFrame3D | None = None) -> Vector3:
         return cls(x=-1, y=0, z=0, reference_frame=reference_frame)
 
     @classmethod
-    def NEGATIVE_Y(
-        cls, reference_frame: KinematicStructureEntity | None = None
-    ) -> Vector3:
+    def NEGATIVE_Y(cls, reference_frame: CartesianFrame3D | None = None) -> Vector3:
         return cls(x=0, y=-1, z=0, reference_frame=reference_frame)
 
     @classmethod
-    def NEGATIVE_Z(
-        cls, reference_frame: KinematicStructureEntity | None = None
-    ) -> Vector3:
+    def NEGATIVE_Z(cls, reference_frame: CartesianFrame3D | None = None) -> Vector3:
         return cls(x=0, y=0, z=-1, reference_frame=reference_frame)
 
     @classmethod
@@ -1687,7 +1697,7 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Vector3:
         v = cls(x=x, y=y, z=z, reference_frame=reference_frame)
         v.scale(1, unsafe=True)
@@ -1949,7 +1959,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         y: sm.ScalarData = 0,
         z: sm.ScalarData = 0,
         w: sm.ScalarData = 1,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ):
         """
 
@@ -1994,7 +2004,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_iterable(
         cls,
         data: sm.VectorData,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Quaternion:
         """
         Creates an instance of Quaternion from provided iterable data.
@@ -2007,7 +2017,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
         :param data: The array-like data or object such as a list, tuple, or numpy array
             used to initialize the Quaternion instance.
-        :param reference_frame: A reference to a `KinematicStructureEntity` object,
+        :param reference_frame: A reference to a `CartesianFrame3D` object,
             representing the frame of reference for the Quaternion instance. If the data
             has a `reference_frame` attribute, and this parameter is not specified, it
             will be taken from the data.
@@ -2081,7 +2091,7 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         roll: sm.ScalarData,
         pitch: sm.ScalarData,
         yaw: sm.ScalarData,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Quaternion:
         """
         Creates a Quaternion instance from specified roll, pitch, and yaw angles.
@@ -2289,7 +2299,7 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self,
         axis: Vector3 | None = None,
         angle: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ):
         """
         :param axis: The unit axis to rotate around. Defaults to the z-axis.
@@ -2351,6 +2361,63 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference_frame=quaternion.reference_frame,
         )
 
+    @classmethod
+    def from_rotation_matrix(cls, rotation_matrix: RotationMatrix) -> AxisAngle:
+        """
+        The identity rotation has no axis of its own and is read as a rotation by zero
+        around the z-axis.
+
+        :param rotation_matrix: The rotation to describe.
+        :return: The rotation the matrix describes, with an angle in [0, pi].
+        """
+        rotation = rotation_matrix.generic_matrix[:3, :3]
+        cosine = (rotation.trace() - 1) / 2
+        # the guards keep the derivative finite where acos has none
+        angle = sm.if_greater_eq(
+            cosine,
+            1,
+            sm.Scalar(0),
+            sm.if_less_eq(cosine, -1, sm.Scalar(np.pi), sm.acos(cosine)),
+        )
+
+        # 2 sin(angle) times the axis, which vanishes at half a turn
+        scaled_axis = Vector3(
+            x=rotation[2, 1] - rotation[1, 2],
+            y=rotation[0, 2] - rotation[2, 0],
+            z=rotation[1, 0] - rotation[0, 1],
+        )
+        scaled_axis_length = scaled_axis.norm()
+        axis_within_quarter_turn = sm.if_eq_zero(
+            scaled_axis_length,
+            Vector3.Z(),
+            scaled_axis / sm.if_eq_zero(scaled_axis_length, 1, scaled_axis_length),
+        )
+
+        # (1 - cos(angle)) times the axis times its transpose, which vanishes at no
+        # turn; its column with the largest diagonal entry is the axis up to its sign
+        axis_outer_product = (rotation + rotation.T) / 2 - sm.Matrix.eye(3) * cosine
+        columns = [
+            Vector3(*(axis_outer_product[row, column] for row in range(3)))
+            for column in range(3)
+        ]
+        largest_column = sm.if_greater(
+            rotation[2, 2],
+            sm.max(rotation[0, 0], rotation[1, 1]),
+            columns[2],
+            sm.if_greater(rotation[1, 1], rotation[0, 0], columns[1], columns[0]),
+        )
+        axis_up_to_sign = largest_column / largest_column.norm()
+        axis_beyond_quarter_turn = sm.if_less(
+            axis_up_to_sign @ scaled_axis, 0, -axis_up_to_sign, axis_up_to_sign
+        )
+
+        axis = sm.if_greater_zero(
+            cosine, axis_within_quarter_turn, axis_beyond_quarter_turn
+        )
+        return cls(
+            axis=axis, angle=angle, reference_frame=rotation_matrix.reference_frame
+        )
+
     @property
     def axis(self) -> Vector3:
         """
@@ -2384,12 +2451,11 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
 @dataclass(eq=False, init=False, repr=False)
 class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
-
     def __init__(
         self,
         position: Point3 | None = None,
         orientation: Quaternion | None = None,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ):
         """
         Initialize a 3D point with orientation and a reference frame in a kinematic
@@ -2449,7 +2515,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         roll: sm.ScalarData = 0,
         pitch: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Self:
         """
         Creates a Pose object from position (x, y, z) and Euler angles (roll, pitch,
@@ -2480,7 +2546,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         quat_y: sm.ScalarData = 0,
         quat_z: sm.ScalarData = 0,
         quat_w: sm.ScalarData = 1,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Self:
         """
         Creates a `Pose` instance from the provided position coordinates and quaternion
@@ -2511,7 +2577,7 @@ class Pose(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         z: sm.ScalarData = 0,
         axis: Vector3 | sm.NumericalVector = None,
         angle: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Self:
         """
         Creates an instance of the class from x, y, z coordinates, axis and angle.
@@ -2641,7 +2707,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         self,
         position: Point2 | None = None,
         yaw: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> None:
         """
         :param position: Where the pose is. Defaults to the origin.
@@ -2742,7 +2808,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     def from_pose(
         cls,
         pose: Pose,
-        plane_frame: KinematicStructureEntity | None = None,
+        plane_frame: CartesianFrame3D | None = None,
     ) -> Pose2D:
         """
         Extract a Pose2D from a 3D Pose by dropping z, roll, pitch.
@@ -2755,7 +2821,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         frame = plane_frame if plane_frame is not None else pose.reference_frame
         if frame is not pose.reference_frame:
-            pose = frame._world.transform(pose, frame)
+            pose = frame.express_in_own_frame(pose)
         _, _, yaw = pose.rotation_matrix.rpy
         return cls.from_xy_yaw(x=pose.x, y=pose.y, yaw=yaw, reference_frame=frame)
 
@@ -2783,7 +2849,7 @@ class Pose2D(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         yaw: sm.ScalarData = 0,
-        reference_frame: KinematicStructureEntity | None = None,
+        reference_frame: CartesianFrame3D | None = None,
     ) -> Pose2D:
         """
         Create a Pose2D from its coordinates and bearing.

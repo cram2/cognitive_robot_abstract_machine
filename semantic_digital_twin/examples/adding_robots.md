@@ -288,7 +288,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
 

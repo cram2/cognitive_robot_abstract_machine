@@ -9,13 +9,13 @@ from sqlalchemy import TypeDecorator, types
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from semantic_digital_twin.mixin import HasSimulatorProperties
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     RotationMatrix,
     Vector3,
     Point3,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Quaternion,
     Pose,
     Point2,

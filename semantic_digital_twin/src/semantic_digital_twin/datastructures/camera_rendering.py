@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
-    from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+    from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
     from semantic_digital_twin.world_description.world_entity import Body
     from semantic_digital_twin.world import World
 

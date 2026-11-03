@@ -91,13 +91,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Agent,
     Table,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
