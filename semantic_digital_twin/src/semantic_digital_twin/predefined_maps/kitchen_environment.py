@@ -38,6 +38,9 @@ from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
 )
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    RegionSpecification,
+)
 from semantic_digital_twin.spatial_types.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -296,6 +299,227 @@ class KitchenWindowWall:
         return wall
 
 
+# %% Sofa surface measurements
+@dataclass
+class SofaProfilePoint:
+    """A depth and floor-relative height on an upholstered side profile."""
+
+    depth: float
+    """Coordinate along the sofa's local depth axis."""
+    height: float
+    """Height above the room floor."""
+
+
+@dataclass
+class SofaProfile:
+    """A convex upholstery profile extruded across a specified width interval."""
+
+    points: list[SofaProfilePoint]
+    """Observed profile corners in depth and floor-relative height."""
+
+    def create_mesh(
+        self, minimum_width: float, maximum_width: float, origin_height: float
+    ) -> trimesh.Trimesh:
+        """Create a closed solid expressed relative to the sofa body origin."""
+        vertices = [
+            (point.depth, width, point.height - origin_height)
+            for width in (minimum_width, maximum_width)
+            for point in self.points
+        ]
+        return trimesh.points.PointCloud(vertices).convex_hull
+
+
+class SofaResource(StrEnum):
+    """Persistent geometry resource category for the kitchen sofa."""
+
+    GEOMETRY = "kitchen_sofa"
+
+
+@dataclass
+class KitchenSofa:
+    """A sofa with two seat cushions, two back cushions and solid armrests."""
+
+    origin_height: float = 0.34
+    """Retained sofa body origin height above the floor."""
+    width: float = 1.68
+    """Retained outer width across the armrests."""
+    depth: float = 0.94
+    """Retained base depth, excluding the observed front cushion overhang."""
+    base_height: float = 0.29
+    """Top of the conservative solid lower frame."""
+    back_support_front: float = 0.20
+    """Front of the conservative backing beneath the back cushions."""
+    back_support_height: float = 0.40
+    """Top of the conservative backing beneath the back cushions."""
+    arm_width: float = 0.14
+    """Width of each armrest."""
+    cushion_gap: float = 0.012
+    """Separation between the two seat and back cushions."""
+    seat_surface_depth: float = 0.40
+    """Depth of the semantic seating support patch."""
+    seat_surface_width_margin: float = 0.05
+    """Inset of the seating support patch from each inner arm face."""
+    seat_surface_center_depth: float = -0.12
+    """Centre of the seating support patch along the sofa depth axis."""
+    seat_surface_height: float = 0.435
+    """Floor-relative height of the seating support patch centre."""
+    seat_surface_slope: float = 0.075
+    """Seating support height decrease per metre toward the back."""
+    seat_surface_thickness: float = 0.005
+    """Thickness of the virtual seating support region."""
+    geometry_directory: Path = field(
+        default_factory=lambda: create_cache_dir(SofaResource.GEOMETRY)
+    )
+    """Persistent directory for the sofa's generated visual and collision mesh."""
+    seat: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(-0.50, 0.28),
+                SofaProfilePoint(-0.50, 0.35),
+                SofaProfilePoint(-0.48, 0.41),
+                SofaProfilePoint(-0.44, 0.44),
+                SofaProfilePoint(-0.36, 0.453),
+                SofaProfilePoint(-0.25, 0.444),
+                SofaProfilePoint(-0.15, 0.435),
+                SofaProfilePoint(-0.05, 0.428),
+                SofaProfilePoint(0.05, 0.421),
+                SofaProfilePoint(0.18, 0.406),
+                SofaProfilePoint(0.20, 0.28),
+            ]
+        )
+    )
+    """Rounded front and gently sloping upper surface of each seat cushion."""
+    arm: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(-0.47, 0.10),
+                SofaProfilePoint(-0.47, 0.59),
+                SofaProfilePoint(-0.455, 0.64),
+                SofaProfilePoint(-0.42, 0.665),
+                SofaProfilePoint(-0.30, 0.670),
+                SofaProfilePoint(0.20, 0.675),
+                SofaProfilePoint(0.40, 0.660),
+                SofaProfilePoint(0.47, 0.62),
+                SofaProfilePoint(0.47, 0.06),
+                SofaProfilePoint(-0.43, 0.06),
+            ]
+        )
+    )
+    """Armrest silhouette below the adjacent island worktop."""
+    left_back: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(0.12, 0.40),
+                SofaProfilePoint(0.092, 0.50),
+                SofaProfilePoint(0.093, 0.55),
+                SofaProfilePoint(0.108, 0.60),
+                SofaProfilePoint(0.130, 0.65),
+                SofaProfilePoint(0.149, 0.70),
+                SofaProfilePoint(0.168, 0.75),
+                SofaProfilePoint(0.197, 0.80),
+                SofaProfilePoint(0.230, 0.83),
+                SofaProfilePoint(0.270, 0.842),
+                SofaProfilePoint(0.300, 0.838),
+                SofaProfilePoint(0.335, 0.82),
+                SofaProfilePoint(0.350, 0.78),
+                SofaProfilePoint(0.385, 0.65),
+                SofaProfilePoint(0.425, 0.28),
+            ]
+        )
+    )
+    """Higher back cushion over the negative-width seating half."""
+    right_back: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(0.077, 0.40),
+                SofaProfilePoint(0.080, 0.50),
+                SofaProfilePoint(0.090, 0.55),
+                SofaProfilePoint(0.111, 0.60),
+                SofaProfilePoint(0.136, 0.65),
+                SofaProfilePoint(0.168, 0.70),
+                SofaProfilePoint(0.220, 0.75),
+                SofaProfilePoint(0.280, 0.79),
+                SofaProfilePoint(0.320, 0.806),
+                SofaProfilePoint(0.345, 0.80),
+                SofaProfilePoint(0.370, 0.76),
+                SofaProfilePoint(0.400, 0.65),
+                SofaProfilePoint(0.425, 0.28),
+            ]
+        )
+    )
+    """Lower, more reclined back cushion over the positive-width seating half."""
+
+    def create_in_world(
+        self, world: World, root_T_sofa: HomogeneousTransformationMatrix
+    ) -> Sofa:
+        """Add a semantic sofa with a watertight upholstery envelope and seat support."""
+        sofa = Sofa.create_with_new_body_in_world(
+            world=world,
+            name="sofa",
+            world_root_T_self=root_T_sofa,
+            scale=Scale(self.depth, self.width, self.base_height),
+        )
+        base = trimesh.creation.box(extents=(self.depth, self.width, self.base_height))
+        base.apply_translation((0, 0, self.base_height / 2 - self.origin_height))
+        meshes = [base]
+        inner_width = self.width / 2 - self.arm_width
+        backing = trimesh.creation.box(
+            extents=(
+                self.depth / 2 - self.back_support_front,
+                2 * inner_width,
+                self.back_support_height - self.base_height,
+            )
+        )
+        backing.apply_translation(
+            (
+                (self.depth / 2 + self.back_support_front) / 2,
+                0,
+                (self.back_support_height + self.base_height) / 2 - self.origin_height,
+            )
+        )
+        meshes.append(backing)
+        for minimum, maximum in (
+            (-self.width / 2, -inner_width),
+            (inner_width, self.width / 2),
+        ):
+            meshes.append(self.arm.create_mesh(minimum, maximum, self.origin_height))
+        for minimum, maximum, back in (
+            (-inner_width, -self.cushion_gap / 2, self.left_back),
+            (self.cushion_gap / 2, inner_width, self.right_back),
+        ):
+            meshes.append(self.seat.create_mesh(minimum, maximum, self.origin_height))
+            meshes.append(back.create_mesh(minimum, maximum, self.origin_height))
+        envelope = trimesh.boolean.union(meshes, engine="manifold")
+        shape = Mesh.from_trimesh(
+            envelope,
+            origin=HomogeneousTransformationMatrix(reference_frame=sofa.root),
+            directory=self.geometry_directory,
+        )
+        shape.color = Color.BEIGE()
+        geometry = ShapeCollection([shape], reference_frame=sofa.root)
+        sofa.root.visual = geometry
+        sofa.root.collision = geometry
+        sofa.add_supporting_surface(
+            RegionSpecification.box(
+                name="sofa_seat_surface",
+                scale=Scale(
+                    self.seat_surface_depth,
+                    2 * (inner_width - self.seat_surface_width_margin),
+                    self.seat_surface_thickness,
+                ),
+            ).spawn(
+                world,
+                parent=sofa.root,
+                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=self.seat_surface_center_depth,
+                    z=self.seat_surface_height - self.origin_height,
+                    pitch=np.arctan(self.seat_surface_slope),
+                ),
+            )
+        )
+        return sofa
+
+
 # %% Handle mounting measurements
 @dataclass
 class HandleRowOffsets:
@@ -366,6 +590,10 @@ class KitchenMeasurements:
     """Worktop depth between the wall and observed front edge in metres."""
     oven_tower_depth: float = 0.599
     """Oven tower depth under the flush-back constraint in metres."""
+    oven_left_drawer_outward_offset: float = 0.010
+    """Left oven-side drawer mounting correction toward the room in metres."""
+    oven_right_drawer_outward_offset: float = 0.012
+    """Right oven-side drawer mounting correction toward the room in metres."""
     island_center_x: float = 3.52835439
     """Measured island corpus centre along root X in metres."""
     island_center_y: float = 0.46312429
@@ -382,6 +610,8 @@ class KitchenMeasurements:
     """Observed oven-side wall recesses and surface-mounted features."""
     handle_offsets: KitchenHandleOffsets = field(default_factory=KitchenHandleOffsets)
     """Reviewed handle mounting corrections relative to unchanged parent fronts."""
+    sofa_shape: KitchenSofa = field(default_factory=KitchenSofa)
+    """Observed seat, backrest and armrest surfaces of the sofa."""
 
 
 # %% Environment construction
@@ -1318,6 +1548,11 @@ class KitchenEnvironment:
                 side_drawer_pose = (
                     tower_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=-(
+                            self.measurements.oven_left_drawer_outward_offset
+                            if side == -1
+                            else self.measurements.oven_right_drawer_outward_offset
+                        ),
                         y=side * (center_width / 2 + side_width / 2),
                         z=(
                             -oven_height / 2
@@ -1812,19 +2047,15 @@ class KitchenEnvironment:
                     drawer.add(handle)
 
             # %% Sofa
-            sofa = Sofa.create_with_new_body_in_world(
-                world=world,
-                name="sofa",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            self.measurements.sofa_shape.create_in_world(
+                world,
+                HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=self.measurements.sofa_center_x,
                     y=self.measurements.sofa_center_y,
-                    z=0.34,
+                    z=self.measurements.sofa_shape.origin_height,
                     yaw=self.measurements.sofa_yaw,
                 ),
-                scale=Scale(x=0.94, y=1.68, z=0.68),
             )
-            for color in sofa.bodies[0].visual.shapes:
-                color.color = Color.BEIGE()
 
             # %% Coffee table
             self._build_coffee_table(world)

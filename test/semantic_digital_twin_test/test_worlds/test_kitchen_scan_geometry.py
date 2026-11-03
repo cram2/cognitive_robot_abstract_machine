@@ -264,6 +264,8 @@ def test_handle_mount_matches_reviewed_scan_candidate(
         ("fridge_door_handle", "fridge_door"),
         ("counter_drawer_0_handle", "counter_drawer_0"),
         ("sideboard_drawer_1_1_handle", "sideboard_drawer_1_1"),
+        ("oven_side_handle_left", "oven_side_drawer_left"),
+        ("oven_side_handle_right", "oven_side_drawer_right"),
     ],
 )
 def test_handle_retains_its_mount_when_parent_opens(
@@ -291,6 +293,23 @@ def test_handle_retains_its_mount_when_parent_opens(
     assert not np.allclose(root_after, root_before)
 
 
+# %% Oven-side drawer fronts
+@pytest.mark.parametrize(
+    ("drawer_name", "front_y"),
+    [("oven_side_drawer_left", -1.871), ("oven_side_drawer_right", -1.869)],
+)
+def test_oven_side_drawer_front_matches_reviewed_scan_plane(
+    measured_kitchen: World,
+    drawer_name: str,
+    front_y: float,
+) -> None:
+    """
+    The two pull-out fronts occupy their reviewed outward positions.
+    """
+    bounds = visual_world_bounds(measured_kitchen, drawer_name)
+    assert bounds[1, 1] == pytest.approx(front_y, abs=1e-6)
+
+
 # %% Sofa placement
 def test_sofa_uses_scan_fitted_horizontal_placement(measured_kitchen: World) -> None:
     """
@@ -308,12 +327,65 @@ def test_sofa_uses_scan_fitted_horizontal_placement(measured_kitchen: World) -> 
     )
 
 
-def test_sofa_retains_its_nominal_dimensions(measured_kitchen: World) -> None:
+def test_sofa_envelope_matches_observed_cushions(measured_kitchen: World) -> None:
     """
-    Pose fitting preserves the existing sofa collision-box dimensions.
+    The refined envelope includes the cushion overhang and taller backrest.
     """
     sofa = measured_kitchen.get_body_by_name("sofa")
-    np.testing.assert_allclose(sofa.collision.combined_mesh.extents, (0.94, 1.68, 0.68))
+    np.testing.assert_allclose(
+        sofa.collision.combined_mesh.extents, (0.97, 1.68, 0.842), atol=1e-6
+    )
+
+
+def test_sofa_seating_space_is_clear_above_cushions(measured_kitchen: World) -> None:
+    """
+    The seating cavity is free while the sloping back remains solid.
+    """
+    sofa = measured_kitchen.get_body_by_name("sofa")
+    points = np.array(
+        [
+            [-0.2, 0.3, 0.60 - 0.34],
+            [0.22, -0.3, 0.75 - 0.34],
+            [-0.2, -0.77, 0.60 - 0.34],
+        ]
+    )
+    np.testing.assert_array_equal(
+        sofa.collision.combined_mesh.contains(points), [False, True, True]
+    )
+
+
+def test_sofa_support_region_tracks_the_seat_instead_of_the_back(
+    measured_kitchen: World,
+) -> None:
+    """
+    Semantic support occupies the gently inclined seating area.
+    """
+    sofa = measured_kitchen.get_semantic_annotation_by_name("sofa")
+    surface = sofa.supporting_surface
+    pose = measured_kitchen.compute_forward_kinematics_np(
+        measured_kitchen.root, surface
+    )
+    assert pose[2, 3] == pytest.approx(0.435)
+    assert surface.parent_connection.parent is sofa.root
+    np.testing.assert_allclose(surface.area.combined_mesh.extents, (0.40, 1.30, 0.005))
+
+
+def test_sofa_back_does_not_intersect_island_worktop(measured_kitchen: World) -> None:
+    """
+    The taller backrest remains clear of the island's rear overhang.
+    """
+    sofa = measured_kitchen.get_body_by_name("sofa")
+    worktop = measured_kitchen.get_body_by_name("sideboard")
+    meshes = []
+    for body in (sofa, worktop):
+        mesh = body.collision.combined_mesh.copy()
+        mesh.apply_transform(
+            measured_kitchen.compute_forward_kinematics_np(measured_kitchen.root, body)
+        )
+        meshes.append(mesh)
+    assert meshes[0].intersection(meshes[1], engine="manifold").volume == pytest.approx(
+        0, abs=1e-9
+    )
 
 
 def test_sofa_stays_behind_the_island_corpus(measured_kitchen: World) -> None:
