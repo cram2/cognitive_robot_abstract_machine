@@ -10,7 +10,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from scripts.cramployer.exceptions import SourceCopyFailed
 from scripts.cramployer.source_tree import SourceTree
@@ -27,9 +27,16 @@ if TYPE_CHECKING:
     from scripts.cramployer.settings import DeploymentSettings
 
 
+# %% Context result type
+SourceContainerType = TypeVar("SourceContainerType", bound="SourceContainer")
+"""Concrete source-container subtype preserved when entering its context."""
+
+
 # %% Source container lifetime
 @dataclass
-class SourceContainer(AbstractContextManager[object]):
+class SourceContainer(
+    AbstractContextManager[SourceContainerType], Generic[SourceContainerType]
+):
     """
     Supply base-image sources and remove the temporary container on exit.
     """
@@ -41,7 +48,7 @@ class SourceContainer(AbstractContextManager[object]):
     Container created for the current extraction.
     """
 
-    def __enter__(self) -> SourceContainer:
+    def __enter__(self: SourceContainerType) -> SourceContainerType:
         """
         Create the temporary source container.
         """
