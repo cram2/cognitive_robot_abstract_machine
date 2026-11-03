@@ -213,6 +213,13 @@ class InstantiatedVariable(
     method or a symbolic function.
     """
 
+    _declared_factory_: Callable[..., Any] | None = field(default=None, kw_only=True)
+    """
+    The callable as the query states it: the decorated function for a
+    :func:`~krrood.entity_query_language.predicate.symbolic_function`, otherwise
+    :attr:`_factory_` when not given.
+    """
+
     _type_: type[T] | None = field(default=None, kw_only=True)
     """
     The type of the values this variable binds (the value of `T`), always a type.
@@ -240,6 +247,8 @@ class InstantiatedVariable(
             :attr:`_factory_` names no type it builds.
         :raises ResultTypeIsNotAType: If the given :attr:`_type_` is not a type.
         """
+        if self._declared_factory_ is None:
+            self._declared_factory_ = self._factory_
         if self._type_ is None:
             self._type_ = self._type_built_by_(self._factory_)
         if self._type_ is None:

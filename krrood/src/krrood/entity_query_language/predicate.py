@@ -78,6 +78,7 @@ def symbolic_function(
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _factory_=function,
+                _declared_factory_=wrapper,
                 _kwargs_=all_kwargs,
             )
         return function(*args, **kwargs)

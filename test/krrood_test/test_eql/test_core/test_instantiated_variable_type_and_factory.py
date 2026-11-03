@@ -39,6 +39,11 @@ def test_inference_builds_with_a_factory_method():
     assert interval.tolist() == [Interval.around(5, 2)]
 
 
+def test_declared_factory_of_an_inferred_type_is_its_factory():
+    interval = inference(Interval)(lower=variable_from([1]), upper=variable_from([3]))
+    assert interval._declared_factory_ is Interval
+
+
 def test_inferred_variable_is_a_factory_with_keyword_arguments():
     lower = variable_from([1])
     interval = inference(Interval)(lower=lower, upper=variable_from([3]))
@@ -71,6 +76,10 @@ def test_symbolic_function_factory_is_the_function_and_type_its_return_type():
     expression = doubled(variable_from([1]))
     assert expression._factory_ is doubled.__wrapped__
     assert expression._type_ is int
+
+
+def test_symbolic_function_declared_factory_is_the_decorated_function():
+    assert doubled(variable_from([1]))._declared_factory_ is doubled
 
 
 def test_symbolic_function_returning_a_generic_has_the_generic_origin_as_type():
