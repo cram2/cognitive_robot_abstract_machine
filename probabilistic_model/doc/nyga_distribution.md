@@ -206,8 +206,8 @@ Let's calculate the log likelihood for every split.
  RHS &= W_{right} \left( log(w_{right}) - log(d_N - d_{split}) \right) \\
  &= 5 \cdot \left( log \left( \frac{5}{6} \right) - log(9 - 1.5) \right) \\
  &\approx -10.99 \\
- log \left( L(\mathcal{D}| 1, 1.5, 9) \right) &= -1.1 -10.99  \\
- &\approx -12.09
+ log \left( L(\mathcal{D}| 1, 1.5, 9) \right) &\approx -1.0986 - 10.9861  \\
+ &\approx -12.08
 \end{align*}
 
 
@@ -256,7 +256,7 @@ Let's calculate the log likelihood for every split.
 We can see that the split at 3.5 has the highest likelihood. But is it worth its two parameters?
 Its gain is
 $$
--12.02 - (-12.48) \approx 0.45,
+-12.0220 - (-12.4766) \approx 0.45,
 $$
 while the penalty with $\alpha = 1$ is $log(6) \approx 1.79$. 
 Six samples are too few to justify a split, so the induction keeps a single uniform distribution.
