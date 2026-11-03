@@ -20,7 +20,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from krrood_spatial_math.spatial_types import Point2
 from typing_extensions import TYPE_CHECKING
 
-from robokudo.annotators.foundation_pose.pose_estimator import (
+from robokudo.annotators.foundation_pose_annotator import (
     ObjectObservation,
     ObjectPoseEstimator,
     RGBDFrame,

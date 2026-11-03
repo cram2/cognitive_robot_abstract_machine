@@ -16,23 +16,18 @@ from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
-from robokudo.annotators.foundation_pose.cad_model import CadModel, CadModelSource
-from robokudo.annotators.foundation_pose.exceptions import DuplicateCadModelClass
-from robokudo.annotators.foundation_pose.foundation_pose_annotator import (
+from robokudo.annotators.exceptions import DuplicateCadModelClass
+from robokudo.annotators.foundation_pose_annotator import (
+    CadModel,
+    CadModelSource,
+    DrawableGeometryKey,
     FoundationPoseAnnotator,
-    PoseUpdateMode,
-)
-from robokudo.annotators.foundation_pose.pose_estimator import (
     ObjectObservation,
     ObjectPoseEstimator,
-)
-from robokudo.annotators.foundation_pose.tracking import (
+    PoseUpdateMode,
+    PoseVisualization,
     PosedObject,
     PreviousFramePoses,
-)
-from robokudo.annotators.foundation_pose.visualization import (
-    DrawableGeometryKey,
-    PoseVisualization,
     VisualizationFrame,
 )
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap

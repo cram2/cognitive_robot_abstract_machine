@@ -13,10 +13,10 @@ pytest.importorskip(
     reason="needs the GPU build of the ROS package robokudo_foundation_pose_tensorrt",
 )
 
-from robokudo.annotators.foundation_pose.pose_estimator import (  # noqa: E402
+from robokudo.annotators.foundation_pose_annotator import (  # noqa: E402
     ObjectObservation,
 )
-from robokudo.annotators.foundation_pose.tensorrt_pose_estimator import (  # noqa: E402
+from robokudo.annotators.tensorrt_foundation_pose import (  # noqa: E402
     TensorRTFoundationPose,
 )
 

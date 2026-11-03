@@ -1,48 +1,572 @@
 """
-6D pose estimation and tracking of classified object hypotheses whose CAD models are known.
+6D pose estimation and tracking of classified object hypotheses whose CAD models are
+known.
 """
 
 from __future__ import annotations
 
 import tempfile
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
+from functools import cached_property
 from pathlib import Path
 from timeit import default_timer
 
 import cv2
 import numpy
+import open3d
+import trimesh
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING
+from semantic_digital_twin.world_description.geometry import Color
+from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
-from robokudo.annotators.foundation_pose.cad_model import CadModel, CadModelSource
-from robokudo.annotators.foundation_pose.exceptions import DuplicateCadModelClass
-from robokudo.annotators.foundation_pose.pose_estimator import (
-    ObjectObservation,
-    ObjectPoseEstimator,
-    RGBDFrame,
-)
-from robokudo.annotators.foundation_pose.tracking import (
-    PosedObject,
-    PreviousFramePoses,
-)
-from robokudo.annotators.foundation_pose.visualization import (
-    PoseVisualization,
-    VisualizationFrame,
-)
+from robokudo.annotators.exceptions import DuplicateCadModelClass
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification, PoseAnnotation
+from robokudo.types.cv import ColorToDepthRatio, Point2D, Rect
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+from robokudo.utils.non_maxima_suppression import _iou
 from robokudo.utils.transform import (
     get_quaternion_from_transform_matrix,
     get_transform_matrix_from_q,
+    get_transform_matrix_from_translation,
     get_translation_from_transform_matrix,
 )
 
 if TYPE_CHECKING:
     import numpy.typing as numpy_typing
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+
+
+# %% Pose estimator interface
+
+
+@dataclass
+class RGBDFrame:
+    """
+    A color and a depth image of the same resolution, taken by one camera.
+    """
+
+    rgb_image: numpy_typing.NDArray[numpy.uint8]
+    """
+    Color image in RGB channel order, at the resolution of :attr:`depth_image`.
+    """
+
+    depth_image: numpy_typing.NDArray[numpy.float32]
+    """
+    Depth image in meters; pixels without a measurement are zero.
+    """
+
+    camera_model: PinholeCameraModel
+    """
+    Calibration of the camera at the resolution of the images.
+    """
+
+
+@dataclass
+class ObjectObservation:
+    """
+    One object in an RGB-D frame, marked by a mask.
+    """
+
+    frame: RGBDFrame
+    """
+    The frame the object is seen in.
+    """
+
+    mask: numpy_typing.NDArray[numpy.bool_]
+    """
+    Pixels of :attr:`frame` that show the object.
+    """
+
+    @cached_property
+    def mask_region(self) -> Rect:
+        """
+        The smallest rectangle containing every pixel of :attr:`mask`.
+        """
+        left, top, width, height = cv2.boundingRect(self.mask.astype(numpy.uint8))
+        return Rect(pos=Point2D(x=left, y=top), width=width, height=height)
+
+
+@dataclass
+class ObjectPoseEstimator(ABC):
+    """
+    Estimates and tracks the pose of an object in the camera frame, given the mesh of
+    the object.
+
+    Poses are 4x4 homogeneous transforms from the frame of the mesh to the camera frame.
+    """
+
+    @abstractmethod
+    def load_meshes(self, mesh_files: list[Path]) -> None:
+        """
+        Load meshes so that selecting any of them with :meth:`select_mesh` is immediate.
+
+        :param mesh_files: Mesh files in meters, each holding a single mesh.
+        """
+
+    @abstractmethod
+    def select_mesh(self, mesh_file: Path) -> None:
+        """
+        Use a mesh for the following pose estimates and tracks.
+
+        :param mesh_file: Mesh file in meters, holding a single mesh.
+        """
+
+    @abstractmethod
+    def estimate_pose(
+        self, observation: ObjectObservation
+    ) -> numpy_typing.NDArray[numpy.float64] | None:
+        """
+        Estimate the pose of the selected mesh without prior knowledge.
+
+        :param observation: The object to estimate the pose of.
+        :return: The pose of the mesh, or ``None`` if the observation holds no depth
+            measurement of the object.
+        """
+
+    @abstractmethod
+    def track_pose(
+        self,
+        observation: ObjectObservation,
+        previous_pose: numpy_typing.NDArray[numpy.float64],
+    ) -> numpy_typing.NDArray[numpy.float64]:
+        """
+        Refine a known pose of the selected mesh to an observation of the object that
+        moved a little since.
+
+        :param observation: The object to track.
+        :param previous_pose: The pose of the mesh before it moved.
+        :return: The refined pose of the mesh.
+        """
+
+
+# %% CAD models
+
+
+@dataclass
+class CadModelSource:
+    """
+    A mesh file showing the objects of one class.
+    """
+
+    class_name: str
+    """
+    Class name of the :class:`robokudo.types.annotation.Classification` the objects are
+    detected with.
+    """
+
+    mesh_file: Path
+    """
+    The mesh file, in any format :func:`trimesh.load` reads.
+    """
+
+    scale_to_meters: float = 1.0
+    """
+    Factor that converts the units of :attr:`mesh_file` to meters.
+    """
+
+
+@dataclass
+class CadModel:
+    """
+    The mesh of an object class, in meters.
+    """
+
+    source: CadModelSource
+    """
+    The mesh file the CAD model is loaded from.
+    """
+
+    mesh: trimesh.Trimesh
+    """
+    The mesh, in meters.
+    """
+
+    estimator_mesh_file: Path
+    """
+    File holding exactly :attr:`mesh`, as one mesh in meters.
+    """
+
+    @classmethod
+    def from_source(
+        cls, source: CadModelSource, rewritten_mesh_directory: Path
+    ) -> CadModel:
+        """
+        Load a mesh file, merging all its meshes into one and converting it to meters.
+
+        :param source: The mesh file to load.
+        :param rewritten_mesh_directory: Directory to write the mesh to if it differs from
+            the content of :attr:`CadModelSource.mesh_file`.
+        :return: The CAD model of the source.
+        """
+        loaded = trimesh.load(source.mesh_file)
+        if isinstance(loaded, trimesh.Trimesh):
+            mesh, is_single_mesh = loaded, True
+        else:
+            mesh, is_single_mesh = loaded.to_mesh(), len(loaded.geometry) == 1
+        mesh.apply_scale(source.scale_to_meters)
+        estimator_mesh_file = source.mesh_file
+        if not is_single_mesh or source.scale_to_meters != 1.0:
+            estimator_mesh_file = (
+                rewritten_mesh_directory / source.class_name / source.mesh_file.name
+            )
+            estimator_mesh_file.parent.mkdir(parents=True, exist_ok=True)
+            mesh.export(estimator_mesh_file)
+        return cls(source=source, mesh=mesh, estimator_mesh_file=estimator_mesh_file)
+
+
+# %% Tracking across frames
+
+
+@dataclass(eq=False)
+class PosedObject:
+    """
+    An object whose pose was determined in a frame.
+
+    Posed objects are equal only to themselves.
+    """
+
+    class_name: str
+    """
+    Class name of the object's CAD model.
+    """
+
+    pose: numpy_typing.NDArray[numpy.float64]
+    """
+    Pose of the CAD model in the camera frame, as a 4x4 homogeneous transform.
+    """
+
+    mask_region: Rect
+    """
+    The smallest rectangle containing the object's mask, in depth image pixels.
+    """
+
+
+@dataclass
+class PreviousFramePoses:
+    """
+    Objects posed in the previous frame that are not yet matched to an object of the
+    current frame.
+    """
+
+    unmatched_objects: list[PosedObject] = field(default_factory=list)
+    """
+    Posed objects still available for matching.
+    """
+
+    def take_match(
+        self, class_name: str, mask_region: Rect, minimum_overlap: float
+    ) -> numpy_typing.NDArray[numpy.float64] | None:
+        """
+        Remove and return the pose of the unmatched object of a class whose mask region
+        overlaps most with a mask region of the current frame.
+
+        :param class_name: Class name of the object of the current frame.
+        :param mask_region: Mask region of the object of the current frame.
+        :param minimum_overlap: Intersection over union below which mask regions do not
+            match.
+        :return: The pose of the matching object, or ``None`` if none overlaps enough.
+        """
+        candidates = [
+            posed_object
+            for posed_object in self.unmatched_objects
+            if posed_object.class_name == class_name
+        ]
+        if not candidates:
+            return None
+        overlaps = [
+            _iou(
+                candidate.mask_region.get_corner_points(),
+                mask_region.get_corner_points(),
+            )
+            for candidate in candidates
+        ]
+        best_overlap = max(overlaps)
+        if best_overlap < minimum_overlap:
+            return None
+        match = candidates[overlaps.index(best_overlap)]
+        self.unmatched_objects.remove(match)
+        return match.pose
+
+
+# %% Visualization
+
+
+class VisualizationFrame(Enum):
+    """
+    Frame the axes and the bounding box of a posed CAD model are drawn in.
+    """
+
+    MESH = auto()
+    """
+    The frame of the mesh, with the bounding box aligned to its axes.
+    """
+
+    SMALLEST_BOUNDING_BOX = auto()
+    """
+    The frame of the smallest oriented bounding box of the mesh.
+    """
+
+
+class DrawableGeometryKey(StrEnum):
+    """
+    Keys of a named geometry in the 3D view, as :func:`open3d.visualization.draw` reads
+    them.
+    """
+
+    NAME = "name"
+    """
+    Unique name of the geometry.
+    """
+
+    GEOMETRY = "geometry"
+    """
+    The geometry to draw.
+    """
+
+
+@dataclass
+class PoseVisualization:
+    """
+    The color image and the 3D geometries showing posed CAD models.
+    """
+
+    color_image: numpy_typing.NDArray[numpy.uint8]
+    """
+    Color image in BGR channel order, drawn into.
+    """
+
+    color_to_depth_ratio: ColorToDepthRatio
+    """
+    Size of the depth image relative to :attr:`color_image`.
+    """
+
+    camera_model: PinholeCameraModel
+    """
+    Calibration of the camera at depth image resolution.
+    """
+
+    frame: VisualizationFrame = VisualizationFrame.MESH
+    """
+    Frame the axes and the bounding box are drawn in.
+    """
+
+    center_axes_on_bounding_box: bool = False
+    """
+    Whether the axes start at the center of the smallest oriented bounding box instead of
+    the origin of the mesh, when drawn in :attr:`VisualizationFrame.MESH`.
+    """
+
+    show_object_mesh: bool = False
+    """
+    Whether the posed mesh is added to the 3D view.
+    """
+
+    object_mesh_color: Color = field(
+        default_factory=lambda: Color.from_rgba(red=0.6, green=0.1, blue=0.9)
+    )
+    """
+    Color of the posed mesh in the 3D view.
+    """
+
+    axis_length: float = 0.1
+    """
+    Length of the drawn axes, in meters.
+    """
+
+    line_thickness: int = 2
+    """
+    Thickness of the lines drawn into :attr:`color_image`, in pixels.
+    """
+
+    label_font_scale: float = 0.6
+    """
+    Scale of the label font relative to its base size.
+    """
+
+    geometries: list[dict[DrawableGeometryKey, Any]] = field(default_factory=list)
+    """
+    Named geometries of the 3D view, in the camera frame at depth image resolution.
+    """
+
+    def draw(
+        self,
+        cad_model: CadModel,
+        pose: numpy_typing.NDArray[numpy.float64],
+        label: str,
+    ) -> None:
+        """
+        Draw a posed CAD model into the color image and add it to the 3D view.
+
+        :param cad_model: The CAD model.
+        :param pose: Pose of the mesh in the camera frame.
+        :param label: Unique text identifying the object.
+        """
+        bounding_box = self.bounding_box(cad_model, pose)
+        axes_pose = self.axes_pose(cad_model, pose)
+        self.draw_bounding_box(bounding_box, label)
+        self.draw_axes(axes_pose)
+
+        axes = open3d.geometry.TriangleMesh.create_coordinate_frame(
+            size=self.axis_length
+        )
+        axes.transform(axes_pose)
+        self.add_geometry(f"{label} bounding box", bounding_box)
+        self.add_geometry(f"{label} axes", axes)
+        if self.show_object_mesh:
+            self.add_geometry(f"{label} mesh", self.posed_mesh(cad_model, pose))
+
+    def bounding_box(
+        self, cad_model: CadModel, pose: numpy_typing.NDArray[numpy.float64]
+    ) -> open3d.geometry.OrientedBoundingBox:
+        """
+        :param cad_model: The CAD model.
+        :param pose: Pose of the mesh in the camera frame.
+        :return: The bounding box of the posed mesh in :attr:`frame`.
+        """
+        if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
+            smallest_box = cad_model.mesh.bounding_box_oriented.primitive
+            box_pose = pose @ smallest_box.transform
+            return open3d.geometry.OrientedBoundingBox(
+                box_pose[:3, 3], box_pose[:3, :3], smallest_box.extents
+            )
+        lower_corner, upper_corner = cad_model.mesh.bounds
+        center = pose @ numpy.append((lower_corner + upper_corner) / 2, 1.0)
+        return open3d.geometry.OrientedBoundingBox(
+            center[:3], pose[:3, :3], upper_corner - lower_corner
+        )
+
+    def axes_pose(
+        self, cad_model: CadModel, pose: numpy_typing.NDArray[numpy.float64]
+    ) -> numpy_typing.NDArray[numpy.float64]:
+        """
+        :param cad_model: The CAD model.
+        :param pose: Pose of the mesh in the camera frame.
+        :return: Pose of the drawn axes in the camera frame.
+        """
+        smallest_box_pose = cad_model.mesh.bounding_box_oriented.primitive.transform
+        if self.frame is VisualizationFrame.SMALLEST_BOUNDING_BOX:
+            return pose @ smallest_box_pose
+        if not self.center_axes_on_bounding_box:
+            return pose
+        return pose @ get_transform_matrix_from_translation(smallest_box_pose[:3, 3])
+
+    def draw_bounding_box(
+        self, bounding_box: open3d.geometry.OrientedBoundingBox, label: str
+    ) -> None:
+        """
+        Draw the edges of a bounding box into the color image, labeled above its top left
+        corner.
+
+        :param bounding_box: Bounding box in the camera frame.
+        :param label: Text drawn above the bounding box.
+        """
+        edges = open3d.geometry.LineSet.create_from_oriented_bounding_box(bounding_box)
+        pixels = self.color_pixels(numpy.asarray(edges.points))
+        for start, end in numpy.asarray(edges.lines):
+            self.draw_line(pixels[start], pixels[end], Color.GREEN())
+        left, top = pixels.min(axis=0)
+        cv2.putText(
+            self.color_image,
+            label,
+            (int(left), int(top)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            self.label_font_scale,
+            self.bgr(Color.WHITE()),
+            lineType=cv2.LINE_AA,
+        )
+
+    def draw_axes(self, axes_pose: numpy_typing.NDArray[numpy.float64]) -> None:
+        """
+        Draw the x, y and z axes of a pose in red, green and blue into the color image.
+
+        :param axes_pose: Pose of the axes in the camera frame.
+        """
+        axis_ends = numpy.vstack([numpy.zeros(3), numpy.eye(3) * self.axis_length])
+        homogeneous_ends = numpy.hstack([axis_ends, numpy.ones((len(axis_ends), 1))])
+        pixels = self.color_pixels((homogeneous_ends @ axes_pose.T)[:, :3])
+        origin = pixels[0]
+        for axis_end, color in zip(
+            pixels[1:], (Color.RED(), Color.GREEN(), Color.BLUE())
+        ):
+            self.draw_line(origin, axis_end, color)
+
+    def draw_line(
+        self,
+        start: numpy_typing.NDArray[numpy.int_],
+        end: numpy_typing.NDArray[numpy.int_],
+        color: Color,
+    ) -> None:
+        """
+        Draw a line into the color image.
+
+        :param start: Color image pixel the line starts at.
+        :param end: Color image pixel the line ends at.
+        :param color: Color of the line.
+        """
+        cv2.line(
+            self.color_image,
+            (int(start[0]), int(start[1])),
+            (int(end[0]), int(end[1])),
+            self.bgr(color),
+            self.line_thickness,
+            cv2.LINE_AA,
+        )
+
+    def color_pixels(
+        self, points: numpy_typing.NDArray[numpy.float64]
+    ) -> numpy_typing.NDArray[numpy.int_]:
+        """
+        Project points in the camera frame into the color image.
+
+        :param points: Points in the camera frame, one per row.
+        :return: The (x, y) color image pixel of each point, one per row.
+        """
+        projected = points @ self.camera_model.intrinsic_matrix.T
+        depth_pixels = projected[:, :2] / projected[:, 2:]
+        return self.color_to_depth_ratio.color_pixels(depth_pixels)
+
+    def posed_mesh(
+        self, cad_model: CadModel, pose: numpy_typing.NDArray[numpy.float64]
+    ) -> open3d.geometry.TriangleMesh:
+        """
+        :param cad_model: The CAD model.
+        :param pose: Pose of the mesh in the camera frame.
+        :return: The mesh in the camera frame, painted in :attr:`object_mesh_color`.
+        """
+        mesh = open3d.geometry.TriangleMesh(
+            open3d.utility.Vector3dVector(cad_model.mesh.vertices),
+            open3d.utility.Vector3iVector(cad_model.mesh.faces),
+        )
+        mesh.paint_uniform_color(self.object_mesh_color.to_rgb())
+        mesh.transform(pose)
+        mesh.compute_vertex_normals()
+        return mesh
+
+    def add_geometry(self, name: str, geometry: open3d.geometry.Geometry3D) -> None:
+        """
+        Add a named geometry to the 3D view.
+
+        :param name: Unique name of the geometry.
+        :param geometry: Geometry in the camera frame.
+        """
+        self.geometries.append(
+            {DrawableGeometryKey.NAME: name, DrawableGeometryKey.GEOMETRY: geometry}
+        )
+
+    @staticmethod
+    def bgr(color: Color) -> tuple[int, int, int]:
+        """
+        :param color: A color.
+        :return: The color as OpenCV byte channels in BGR order.
+        """
+        maximum = numpy.iinfo(numpy.uint8).max
+        red, green, blue = color.to_rgb()
+        return round(blue * maximum), round(green * maximum), round(red * maximum)
 
 
 # %% Pose update modes
@@ -152,9 +676,7 @@ class EstimatedPose:
         """
         Text identifying the posed object in visualizations.
         """
-        return (
-            f"{self.request.object_hypothesis.id}: {self.request.cad_model.class_name}"
-        )
+        return f"{self.request.object_hypothesis.id}: {self.request.cad_model.source.class_name}"
 
 
 # %% FoundationPose annotator
@@ -331,7 +853,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
             self.annotate_pose(estimated_pose)
         self.previous_frame_objects = [
             PosedObject(
-                class_name=estimated_pose.request.cad_model.class_name,
+                class_name=estimated_pose.request.cad_model.source.class_name,
                 pose=estimated_pose.pose,
                 mask_region=estimated_pose.request.observation.mask_region,
             )
@@ -435,7 +957,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         previous_pose = None
         if pose_annotation is None and mode.tracks and parameters.track_across_frames:
             previous_pose = previous_frame_poses.take_match(
-                class_name=cad_model.class_name,
+                class_name=cad_model.source.class_name,
                 mask_region=observation.mask_region,
                 minimum_overlap=parameters.minimum_track_overlap,
             )
@@ -493,7 +1015,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
             if self.is_plausible_track(request, tracked_pose):
                 return tracked_pose
             self.rk_logger.debug(
-                f"Tracked pose of {request.cad_model.class_name} left its mask, "
+                f"Tracked pose of {request.cad_model.source.class_name} left its mask, "
                 f"estimating it anew."
             )
         return self.pose_estimator.estimate_pose(request.observation)

@@ -57,7 +57,7 @@ pip install "robokudo[dev]"
 
 #### FoundationPose pose estimation
 
-The `FoundationPoseAnnotator` (`robokudo.annotators.foundation_pose`) estimates and tracks 6D object poses with
+The `FoundationPoseAnnotator` (`robokudo.annotators.foundation_pose_annotator`) estimates and tracks 6D object poses with
 `TensorRTFoundationPose`, which runs on an NVIDIA GPU through the ROS package `robokudo_foundation_pose_tensorrt` of
 `cram_ros2_packages`. The ROS workspace setup builds that package without its CUDA extension; build the extension
 from the activated CRAM environment:
