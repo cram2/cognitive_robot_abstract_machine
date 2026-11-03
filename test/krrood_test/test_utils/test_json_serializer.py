@@ -569,6 +569,14 @@ def test_json_scalar_serializes_as_itself(leaf_class):
     assert from_json(value) is value
 
 
+@pytest.mark.parametrize(
+    "value",
+    [1, 1.5, "text", CustomEnum.A, datetime.datetime(2026, 1, 1), True, ...],
+)
+def test_orm_scalar_covers_single_column_values(value):
+    assert isinstance(value, LeafKind.ORM_SCALAR.value)
+
+
 # %% durations
 
 
