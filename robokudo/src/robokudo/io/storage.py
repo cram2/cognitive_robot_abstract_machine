@@ -17,7 +17,10 @@ The module handles:
 """
 
 from __future__ import annotations
+
+# %% Imports
 import os
+from enum import StrEnum
 
 from pymongo import MongoClient
 from typing_extensions import Any, TYPE_CHECKING
@@ -29,10 +32,37 @@ from robokudo.io.cas_annotation_codecs import (
     deserialize_annotations,
 )
 from robokudo.io.cas_view_codecs import CASViewCodecRegistry
+from robokudo.io.exceptions import (
+    RecordedViewMissing,
+    CASViewCodecMissing,
+    ViewStorageFailed,
+    RecordedViewNameMismatch,
+)
 
 if TYPE_CHECKING:
     from pymongo.results import InsertOneResult
     from pymongo.synchronous.database import Database
+
+
+class StorageDocumentField(StrEnum):
+    """
+    Identify fields shared by recorded CAS documents.
+    """
+
+    WORLD = "world"
+    """
+    Full semantic-world snapshot at the recorded frame.
+    """
+
+    VIEW_IDS = "view_ids"
+    """
+    References to persisted CAS view documents.
+    """
+
+    VIEWS = "views"
+    """
+    Decoded CAS views attached during playback.
+    """
 
 
 class Storage:
@@ -166,6 +196,11 @@ class Storage:
     def encode_view_document(view_name: str, view_value: Any) -> dict[str, Any]:
         """
         Encode one CAS view value into a serializable view document.
+
+        :param view_name: Name identifying the view in the stored document.
+        :param view_value: View contents to serialize.
+        :return: Encoded view document.
+        :raises CASViewCodecMissing: If no codec accepts the view contents.
         """
         document = Storage.cas_view_codecs.encode_view(
             view_name=view_name,
@@ -173,9 +208,7 @@ class Storage:
             strict=True,
         )
         if document is None:
-            raise TypeError(
-                f"No codec registered for view '{view_name}' with type '{type(view_value)}'."
-            )
+            raise CASViewCodecMissing(view_name=view_name, value_type=type(view_value))
         return document
 
     @staticmethod
@@ -201,9 +234,7 @@ class Storage:
             )
             result = self.db[Storage.VIEW_COLLECTION_NAME].insert_one(view_document)
             if not result.acknowledged:
-                raise RuntimeError(
-                    f'Mongo DB error when trying to store view "{view_name}".'
-                )
+                raise ViewStorageFailed(view_name=view_name)
 
             cas_dict["view_ids"][view_name] = result.inserted_id
 
@@ -211,36 +242,59 @@ class Storage:
         self,
         cas_document: dict[str, Any],
         excluded_view_names: set[str] | None = None,
+        included_view_names: set[str] | None = None,
     ) -> None:
         """
         Load views from MongoDB into a CAS document.
 
-        Retrieve and decode each persisted view referenced in ``view_ids``.
+        Retrieve and decode each persisted view referenced in
+        ``view_ids``.
 
         :param cas_document: CAS document to update with loaded views
-        :param excluded_view_names: View names to leave undecoded for caller-specific
-            handling.
+        :param excluded_view_names: View names to leave undecoded for
+            caller-specific handling.
+        :param included_view_names: View names to decode when a reader
+            selects inputs.
         """
         excluded_view_names = excluded_view_names or set()
-        for expected_view_name, view_id in cas_document["view_ids"].items():
+        for expected_view_name, view_id in cas_document[
+            StorageDocumentField.VIEW_IDS
+        ].items():
             if expected_view_name in excluded_view_names:
                 continue
-            view_document = self.db[Storage.VIEW_COLLECTION_NAME].find_one(
-                {"_id": view_id}
-            )
-            if not view_document:
-                raise RuntimeError(
-                    f"Couldn't find view '{expected_view_name}' with id={view_id}."
-                )
+            if (
+                included_view_names is not None
+                and expected_view_name not in included_view_names
+            ):
+                continue
+            view_document = self.load_view_document(cas_document, expected_view_name)
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
                 view_document
             )
             if decoded_view_name != expected_view_name:
-                raise RuntimeError(
-                    f"Decoded view name '{decoded_view_name}' does not match expected "
-                    f"view name '{expected_view_name}' for id={view_id}."
+                raise RecordedViewNameMismatch(
+                    expected_name=expected_view_name, recorded_name=decoded_view_name
                 )
-            cas_document["views"][decoded_view_name] = decoded_view_value
+            cas_document[StorageDocumentField.VIEWS][decoded_view_name] = (
+                decoded_view_value
+            )
+
+    def load_view_document(
+        self, cas_document: dict[str, Any], view_name: str
+    ) -> dict[str, Any]:
+        """
+        Fetch one CAS view document referenced by a recorded frame.
+
+        :param cas_document: Recorded frame containing references to stored views.
+        :param view_name: Name of the view to retrieve.
+        :return: Stored document referenced by the frame for the requested view.
+        :raises RecordedViewMissing: If the referenced view document does not exist.
+        """
+        view_id = cas_document[StorageDocumentField.VIEW_IDS][view_name]
+        document = self.db[Storage.VIEW_COLLECTION_NAME].find_one({"_id": view_id})
+        if document is None:
+            raise RecordedViewMissing(view_name=view_name, view_id=view_id)
+        return document
 
     @staticmethod
     def load_annotations_from_mongo_in_cas(
@@ -249,12 +303,14 @@ class Storage:
         """
         Load annotations from MongoDB into a CAS.
 
-        Restore the annotations from the database and insert them into the CAS. If no
-        (pickled) annotations are available, cas will be untouched.
+        Restore the annotations from the database and insert them into
+        the CAS. If no (pickled) annotations are available, cas will be
+        untouched.
 
-        :param cas_document: A dict representing a frame of a CAS in the database
-        :param cas: The 'robokudo.cas.CAS' instance where the annotations shall be
-            inserted to
+        :param cas_document: A dict representing a frame of a CAS in the
+            database
+        :param cas: The 'robokudo.cas.CAS' instance where the
+            annotations shall be inserted to
         """
         if cas_document["annotations"]:
             tracker = world.get_world_entity_tracker()

@@ -343,6 +343,33 @@ class DomainElementsIndistinguishableInSamples(ProbabilisticModelException):
 
 
 @dataclass
+class AssignedValueHasNoRandomEventRepresentation(DataclassException):
+    """
+    Raised when an attribute of a match is assigned an expression that no random event
+    variable can stand for, so its value could neither be sampled nor conditioned on.
+    """
+
+    attribute_match: AttributeMatch
+    """
+    The attribute whose assigned expression has no random event representation.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The attribute {self.attribute_match} is assigned "
+            f"{self.attribute_match.assigned_variable}, which is neither a literal, a "
+            f"variable, an expression derived from a variable, nor a causal marker, so "
+            f"no random event variable stands for it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Assign the attribute a literal, a variable with a domain, an expression "
+            "derived from a variable, or ``...``."
+        )
+
+
+@dataclass
 class UnboundedParameterError(ProbabilisticModelException):
     """
     Raised when a uniform prior is asked for a parameter that the statement's ``where``

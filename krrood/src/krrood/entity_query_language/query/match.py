@@ -68,6 +68,7 @@ from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
@@ -207,12 +208,16 @@ class AbstractMatchExpression(MatchAssignedValue, Generic[T], ABC):
     @property
     def _matches_with_variables_(self) -> Iterator[AttributeMatch]:
         """
-        :return: All attribute matches where the assigned variable is a variable.
-        These matches are typically the leaves of a match expression.
+        :return: All attribute matches where the assigned variable is a variable, or
+            where the pattern assigns an expression derived from one, such as its
+            attribute or its flattened values. These matches are typically the leaves of
+            a match expression.
         """
         self.resolve()
         for expression in self._descendants_:
-            if isinstance(expression.assigned_variable, Variable):
+            if isinstance(expression.assigned_variable, Variable) or isinstance(
+                expression.assigned_value, CanBehaveLikeAVariable
+            ):
                 yield expression
 
 
@@ -686,7 +691,7 @@ class Match(
         :return: Whether that keyword is left out of construction, decided once per
             factory, matched class, keyword and value type.
         """
-        if HasFactoryAndKwargs._factory_takes_keyword_(factory, keyword):
+        if CallSignature.of(factory).accepts_keyword(keyword):
             return False
         return keyword in dir(matched_type) or issubclass(value_type, CausalRoleMarker)
 

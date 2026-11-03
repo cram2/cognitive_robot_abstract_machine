@@ -2,16 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import (
-    List,
-    Iterable,
-    Iterator,
-    Optional,
-    Self,
-    Tuple,
-    TYPE_CHECKING,
-    Union,
-)
+from typing_extensions import Iterable, Iterator, Self, TYPE_CHECKING
 
 import math
 
@@ -66,12 +57,12 @@ from semantic_digital_twin.grasping.surface_grasp import (
     any_surface_grasp,
     from_any_side,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -114,12 +105,6 @@ class Handle(HasGraspCandidates):
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
     """
-
-    def default_grasp_candidates(self) -> list[GraspCandidate]:
-        """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
-        """
-        return self.drawn_grasp_candidates()
 
     def surface_grasp_statement(
         self,
@@ -212,6 +197,36 @@ class Handle(HasGraspCandidates):
             name, handle_event, connection_specification=connection_specification
         )
 
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        The grasps at the centre of the handle's bar that close around it, one
+        approaching from each of the four sides around it.
+
+        The bar runs along the longest extent of the root's collision geometry.
+
+        :raises NoGraspGeometry: If the root body has no collision geometry to tell
+            which way the bar runs.
+        """
+        if not self.root.has_collision():
+            raise NoGraspGeometry(self)
+        mesh = self.root.combined_mesh
+        bar_axis = np.argmax(mesh.extents)
+        bar_direction = Vector3.from_iterable(np.eye(3)[bar_axis])
+        across_bar = np.delete(np.eye(3), bar_axis, axis=0)
+        return [
+            GraspCandidate(
+                self,
+                Pose(
+                    position=Point3.from_iterable(mesh.bounds.mean(axis=0)),
+                    orientation=RotationMatrix.from_vectors(
+                        x=approach, y=bar_direction.cross(approach)
+                    ).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+            for approach in map(Vector3.from_iterable, [*across_bar, *-across_bar])
+        ]
+
 
 @dataclass(eq=False)
 class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
@@ -221,6 +236,19 @@ class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
 
     It typically has a front door that opens to reveal racks for loading dirty items and
     a control panel for selecting wash cycles.
+    """
+
+    @classproperty
+    def _hole_direction_axis(cls) -> Vector3:
+        return Vector3.NEGATIVE_X()
+
+
+@dataclass(eq=False)
+class WashingMachine(HasCaseAsRootBody, HasDoors, HasDrawers):
+    """
+    A washing machine is a household appliance that washes laundry in a drum.
+
+    It typically has a front door to load the drum and a pull-out detergent drawer.
     """
 
     @classproperty
@@ -351,7 +379,7 @@ class EntryWay(Aperture):
         return RegionSpecification.box(
             name,
             scale or Scale(),
-            color=color or Color(R=1.0, G=1.0, B=1.0, A=0.2),
+            color=color or Color.from_rgba(red=1.0, green=1.0, blue=1.0, opacity=0.2),
             connection_specification=connection_specification,
         )
 
@@ -675,6 +703,19 @@ class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
 
 @dataclass(eq=False)
 class Fridge(Cabinet): ...
+
+
+@dataclass(eq=False)
+class TumbleDryer(HasCaseAsRootBody, HasDoors, HasDrawers):
+    """
+    A tumble dryer is a household appliance that dries laundry in a rotating drum.
+
+    It typically has a front door to load the drum and a pull-out water tank.
+    """
+
+    @classproperty
+    def _hole_direction_axis(cls) -> Vector3:
+        return Vector3.NEGATIVE_X()
 
 
 @dataclass(eq=False)
@@ -1261,7 +1302,7 @@ class Desk(Table, HasLegs):
 
 
 @dataclass(eq=False)
-class Chair(Furniture):
+class Chair(Furniture, HasRootBody):
     """
     Abstract class for chairs.
     """

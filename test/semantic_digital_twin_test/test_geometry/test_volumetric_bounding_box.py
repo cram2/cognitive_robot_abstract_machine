@@ -5,7 +5,7 @@ from random_events.interval import closed
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox

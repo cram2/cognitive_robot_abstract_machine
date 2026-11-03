@@ -10,7 +10,7 @@ import pytest
 
 from semantic_digital_twin.predefined_maps.kitchen_environment import KitchenEnvironment
 from semantic_digital_twin.world import World
-from semantic_digital_twin.spatial_types.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 from .test_kitchen_environment import visual_world_bounds
@@ -22,7 +22,7 @@ def measured_kitchen() -> World:
     """
     Construct the predefined kitchen with its default scan measurements.
     """
-    return KitchenEnvironment().get_world()
+    return KitchenEnvironment().create_world()
 
 
 @pytest.mark.parametrize(

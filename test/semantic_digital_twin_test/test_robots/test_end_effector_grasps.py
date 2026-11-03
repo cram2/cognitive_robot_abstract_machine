@@ -1,26 +1,31 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
 import pytest
 
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     GripperAxesNotPerpendicular,
     MoreThanOneBodyHeld,
     NothingHeld,
 )
+from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.connections import FixedConnection
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Point3, Vector3
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection1DOF,
+    FixedConnection,
+)
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import (
@@ -177,14 +182,14 @@ def test_every_robot_states_its_axes_in_the_frame_they_belong_to(
     robot there is.
     """
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         abstract_robot.from_world(world)
 
         for end_effector in world.get_semantic_annotations_by_type(EndEffector):
             assert end_effector.approach_axis.reference_frame is end_effector.tool_frame
             assert end_effector.closing_axis.reference_frame is end_effector.tool_frame
         for camera in world.get_semantic_annotations_by_type(Camera):
-            assert camera.forward_facing_axis.reference_frame is camera.root
+            assert camera.viewing_direction.reference_frame is camera.root
 
 
 # %% tool frame goals
@@ -330,18 +335,16 @@ def test_every_two_finger_gripper_can_measure_where_its_fingers_meet(
     gripper there is answers them rather than only the one they were written against.
     """
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).parse()
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
         abstract_robot.from_world(world)
 
         for gripper in world.get_semantic_annotations_by_type(EndEffector):
             if not isinstance(gripper, HasTwoFingers):
                 continue
             assert gripper.fingertips.tool_P_grasp.reference_frame is gripper.tool_frame
-            assert gripper.fingertips.surface_depth >= 0.0
-            assert np.linalg.norm(
-                gripper.fingertips.finger_P_thumb(0.05).to_np()[:3].ravel()
-            ) > np.linalg.norm(
-                gripper.fingertips.finger_P_thumb(0.02).to_np()[:3].ravel()
+            assert (
+                gripper.fingertips.thumb_P_facing_point.reference_frame
+                is gripper.fingertips.thumb
             )
 
 
@@ -381,40 +384,39 @@ def test_the_goal_for_a_grasp_turns_the_gripper_the_same_way_as_the_tool_frame_g
     )
 
 
-# %% how wide the fingers are sent
+# %% how wide the fingers stand
 
 
-def test_a_wider_object_sends_the_fingertip_frames_further_apart(pr2_gripper):
-    narrower = np.linalg.norm(
-        pr2_gripper.fingertips.finger_P_thumb(0.02).to_np()[:3].ravel()
-    )
-    wider = np.linalg.norm(
-        pr2_gripper.fingertips.finger_P_thumb(0.05).to_np()[:3].ravel()
-    )
-
-    assert wider - narrower == pytest.approx(0.03)
-
-
-def test_the_separation_a_goal_is_built_for_is_the_one_asked_for(pr2_gripper):
-    """
-    The surfaces stand where they were asked to, which is the distance between the
-    fingertip frames less what each surface sits inside its own frame.
-    """
-    separation = 0.04
-
-    frames_apart = np.linalg.norm(
-        pr2_gripper.fingertips.finger_P_thumb(separation).to_np()[:3].ravel()
+def test_the_finger_to_thumb_axis_points_from_the_finger_to_the_thumb(
+    pr2_gripper,
+) -> None:
+    fingertips = pr2_gripper.fingertips
+    thumb, finger = (
+        fingertips._bounding_box(tip).center.vector3.dot(
+            fingertips.tool_V_finger_to_thumb
+        )
+        for tip in fingertips.both
     )
 
-    assert frames_apart - 2 * pr2_gripper.fingertips.surface_depth == pytest.approx(
-        separation
-    )
+    assert thumb > finger
 
 
-def test_the_thumb_tip_goal_is_read_in_the_other_fingertips_frame(pr2_gripper):
-    goal = pr2_gripper.fingertips.finger_P_thumb(0.04)
+def test_each_facing_point_is_read_in_its_own_tips_frame(pr2_gripper) -> None:
+    fingertips = pr2_gripper.fingertips
 
-    assert goal.reference_frame is pr2_gripper.finger.tip
+    assert fingertips.thumb_P_facing_point.reference_frame is fingertips.thumb
+    assert fingertips.finger_P_facing_point.reference_frame is fingertips.finger
+
+
+def test_opening_the_gripper_moves_the_facing_points_apart(pr2_gripper) -> None:
+    world = pr2_gripper._world
+    with world.reset_state_context():
+        pr2_gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        closed = pr2_gripper.fingertips.separation
+        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        opened = pr2_gripper.fingertips.separation
+
+    assert opened > closed
 
 
 # %% reading where the fingers meet for a state the world does not stand in
@@ -486,3 +488,128 @@ def test_reading_the_travel_stands_the_world_back_up(tracy_world):
     gripper.travel_when_closing
 
     np.testing.assert_array_equal(tracy_world.state.positions, positions_before)
+
+
+# %% how wide a gripper opens
+
+
+def test_a_gripper_opens_as_wide_as_its_fingertips_stand_in_its_open_state(
+    pr2_gripper,
+) -> None:
+    world = pr2_gripper._world
+    pr2_gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+    positions_before = world.state.positions.copy()
+    with world.reset_state_context():
+        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        expected = pr2_gripper.fingertips.separation
+
+    assert pr2_gripper.separation_when_open == pytest.approx(expected)
+    np.testing.assert_array_equal(world.state.positions, positions_before)
+
+
+def test_a_gripper_stands_as_wide_in_a_state_as_its_fingertips_do_there(
+    pr2_gripper,
+) -> None:
+    world = pr2_gripper._world
+    positions_before = world.state.positions.copy()
+    with world.reset_state_context():
+        pr2_gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        expected = pr2_gripper.fingertips.separation
+
+    assert pr2_gripper.separation_in(GripperState.CLOSE) == pytest.approx(expected)
+    np.testing.assert_array_equal(world.state.positions, positions_before)
+
+
+def test_the_finger_connections_are_those_the_grippers_states_drive(
+    pr2_gripper,
+) -> None:
+    driven = [
+        connection
+        for state_type in (GripperState.OPEN, GripperState.CLOSE)
+        for connection in pr2_gripper.get_joint_state_by_type(state_type).connections
+    ]
+
+    assert set(pr2_gripper.finger_connections) == set(driven)
+    assert len(pr2_gripper.finger_connections) == len(set(driven))
+
+
+def test_every_two_finger_gripper_drives_every_joint_up_to_its_fingertips(
+    supported_abstract_robots,
+) -> None:
+    """
+    A gripper's states decide alone where its fingertips stand, for every robot there
+    is, so a goal on the fingertips moves only joints the gripper's states drive.
+    """
+    for abstract_robot in supported_abstract_robots:
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
+        abstract_robot.from_world(world)
+
+        for gripper in world.get_semantic_annotations_by_type(EndEffector):
+            if not isinstance(gripper, HasTwoFingers):
+                continue
+            driven = {connection.raw_dof for connection in gripper.finger_connections}
+            undriven = [
+                connection.name
+                for tip in gripper.fingertips.both
+                for connection in world.compute_chain_of_connections(gripper.root, tip)
+                if isinstance(connection, ActiveConnection1DOF)
+                and connection.raw_dof not in driven
+            ]
+            assert undriven == [], gripper.name
+
+
+def test_an_hsr_opens_with_its_motor_and_springs_at_their_upper_limits(
+    hsr_world_copy,
+) -> None:
+    [hsr] = hsr_world_copy.get_semantic_annotations_by_type(HSRB)
+    gripper = hsr.all_arms[0].end_effector
+    open_state = gripper.get_joint_state_by_type(GripperState.OPEN)
+    connections = [
+        hsr_world_copy.get_connection_by_name(joint)
+        for joint in (
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        )
+    ]
+
+    assert dict(open_state.items()) == {
+        connection: connection.raw_dof.limits.upper.position
+        for connection in connections
+    }
+
+
+def test_every_two_finger_gripper_stands_narrower_closed_than_open(
+    supported_abstract_robots,
+) -> None:
+    """
+    A gripper's closed state brings its fingertips closer together than its open state,
+    for every robot there is.
+    """
+    for abstract_robot in supported_abstract_robots:
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
+        abstract_robot.from_world(world)
+
+        for gripper in world.get_semantic_annotations_by_type(EndEffector):
+            if not isinstance(gripper, HasTwoFingers):
+                continue
+            separations = {}
+            with world.reset_state_context():
+                for state_type in (GripperState.OPEN, GripperState.CLOSE):
+                    gripper.get_joint_state_by_type(state_type).apply_to(world)
+                    separations[state_type] = gripper.fingertips.separation
+            assert separations[GripperState.CLOSE] < separations[GripperState.OPEN], (
+                gripper.name
+            )
+
+
+def test_a_robotiq_2f_85_opens_as_wide_as_its_name_says(tracy_world) -> None:
+    """
+    The 2F-85 is named for the 85 mm its pads stand apart when open, so this is read on
+    the pads' surfaces rather than on the fingertip frames.
+    """
+    gripper = tracy_world.get_semantic_annotations_by_type(Tracy)[
+        0
+    ].left_arm.end_effector
+
+    assert gripper.separation_when_open == pytest.approx(0.085, abs=0.001)

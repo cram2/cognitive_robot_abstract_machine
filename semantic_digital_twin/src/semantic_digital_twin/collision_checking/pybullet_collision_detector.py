@@ -1,10 +1,12 @@
 import hashlib
 import logging
 import os
+import tempfile
 from dataclasses import dataclass, field
+from enum import StrEnum
 from importlib.resources import files
 from pathlib import Path
-from typing_extensions import Any
+from typing_extensions import Any, Callable
 from uuid import UUID
 
 import giskardpy_bullet_bindings as bullet
@@ -28,6 +30,7 @@ from semantic_digital_twin.world_description.geometry import (
     Cylinder,
     Scale,
     Mesh,
+    MeshFileFormat,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -36,6 +39,17 @@ logger = logging.getLogger(__name__)
 
 CACHE_DIR = create_cache_dir("convex_decompositions")
 LOG_DIR = create_cache_dir("log")
+
+
+class BulletMeshFileFormat(StrEnum):
+    """
+    A mesh file format Bullet loads.
+    """
+
+    OBJ = MeshFileFormat.OBJ
+    STL = MeshFileFormat.STL
+    DAE = MeshFileFormat.DAE
+
 
 _shape_cache: dict[Any, bullet.CollisionShape] = {}
 """
@@ -265,8 +279,10 @@ def load_convex_mesh_shape(
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(
             mesh=mesh, mesh_decomposer=mesh_decomposer
         )
-    else:
+    elif mesh.local_file.suffix.removeprefix(".").lower() in BulletMeshFileFormat:
         obj_pkg_filename = str(mesh.local_file)
+    else:
+        obj_pkg_filename = convert_to_obj_and_save_in_tmp(mesh=mesh)
     return bullet.load_convex_shape(
         obj_pkg_filename,
         single_shape=single_shape,
@@ -293,6 +309,9 @@ def convert_to_decomposed_obj_and_save_in_tmp(
     """
     Converts a mesh to a convex decomposition and saves it in a cache file.
 
+    The cache file appears only once it is complete, so a process that finds it never
+    reads a decomposition that is still being written.
+
     :param mesh: the mesh to convert.
     :param mesh_decomposer: optional decomposer used for non-convex meshes.
     :param cache_dir: the cache directory to save the convex decomposition in.
@@ -300,21 +319,67 @@ def convert_to_decomposed_obj_and_save_in_tmp(
     :return: the path to the convex decomposition file.
     """
     trimesh_obj = mesh.mesh
-    file_hash = trimesh_quantized_hash(trimesh_obj)
-    obj_file_name = str(cache_dir / f"{file_hash}.obj")
-    if not os.path.exists(obj_file_name):
-        obj_str = trimesh.exchange.obj.export_obj(trimesh_obj)
-        create_path(obj_file_name)
-        with open(obj_file_name, "w") as f:
-            f.write(obj_str)
+
+    def write(unfinished_file_name: str) -> None:
+        Path(unfinished_file_name).write_text(
+            trimesh.exchange.obj.export_obj(trimesh_obj)
+        )
         if not trimesh_obj.is_convex and mesh_decomposer is not None:
             with suppress_stdout_stderr():
-                mesh_decomposer.apply_to_mesh_and_save(mesh, obj_file_name)
-            logging.info(f'Saved convex decomposition to "{obj_file_name}".')
-        else:
-            logging.info(f'Saved obj to "{obj_file_name}".')
-    else:
+                mesh_decomposer.apply_to_mesh_and_save(mesh, unfinished_file_name)
+
+    return save_in_cache(
+        obj_file_name=str(cache_dir / f"{trimesh_quantized_hash(trimesh_obj)}.obj"),
+        write=write,
+    )
+
+
+def convert_to_obj_and_save_in_tmp(mesh: Mesh, cache_dir: Path = CACHE_DIR) -> str:
+    """
+    Saves the geometry of a mesh, before its scale is applied, as an .obj file in the
+    cache, for a mesh whose file Bullet cannot read.
+
+    The file is named apart from the mesh's convex decomposition, so neither is read in
+    place of the other.
+
+    :param mesh: the mesh to convert.
+    :param cache_dir: the cache directory to save the .obj file in.
+    :return: the path to the .obj file.
+    """
+    trimesh_obj = mesh.unscaled_mesh
+    return save_in_cache(
+        obj_file_name=str(
+            cache_dir / f"{trimesh_quantized_hash(trimesh_obj)}_undecomposed.obj"
+        ),
+        write=lambda unfinished_file_name: Path(unfinished_file_name).write_text(
+            trimesh.exchange.obj.export_obj(trimesh_obj)
+        ),
+    )
+
+
+def save_in_cache(obj_file_name: str, write: Callable[[str], None]) -> str:
+    """
+    Writes a cache file unless it is cached already.
+
+    The cache file appears only once it is complete, so a process that finds it never
+    reads a file that is still being written.
+
+    :param obj_file_name: the cache file.
+    :param write: writes the file's content to the path it is given.
+    :return: the cache file.
+    """
+    if os.path.exists(obj_file_name):
         logging.debug(f'Cache hit, loaded "{obj_file_name}".')
+        return obj_file_name
+
+    create_path(obj_file_name)
+    with tempfile.NamedTemporaryFile(
+        dir=os.path.dirname(obj_file_name), suffix=".obj", delete=False
+    ) as unfinished_file:
+        pass
+    write(unfinished_file.name)
+    logging.info(f'Saved obj to "{obj_file_name}".')
+    os.replace(unfinished_file.name, obj_file_name)
     return obj_file_name
 
 

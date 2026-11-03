@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, Iterable, Any
 
 import numpy as np
 import trimesh.boolean
 from trimesh.collision import CollisionManager
+from typing_extensions import TYPE_CHECKING, Iterable, Any
 
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -33,11 +34,8 @@ from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
-from semantic_digital_twin.spatial_types import Vector3, Point3, math
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
+from krrood_spatial_math.spatial_types import Vector3, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -242,11 +240,13 @@ class SupportedBy(Triple[TBody, TBody]):
     How far apart, in metres, the two may be and still count as touching, and so how far
     above the supporting body the supported body may stand and still rest on it.
 
-    A body is set down by a motion that stops where it can rather than exactly on the
-    surface, so a support read from overlapping volume alone would hold for almost no
-    placement at all. Measured on a robot stacking boxes, a placement missed the surface
-    it was aimed at by 1.9 mm; the default leaves room for that while staying far below
-    the centimetres by which a body that is genuinely in the air clears a surface.
+    A body is set down by a motion that stops where it can rather than
+    exactly on the surface, so a support read from overlapping volume
+    alone would hold for almost no placement at all. Measured on a robot
+    stacking boxes, a placement missed the surface it was aimed at by
+    1.9 mm; the default leaves room for that while staying far below the
+    centimetres by which a body that is genuinely in the air clears a
+    surface.
     """
 
     maximum_slope: float = np.radians(30.0)

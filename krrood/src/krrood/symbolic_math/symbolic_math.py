@@ -255,15 +255,15 @@ class CompiledFunction:
     Whether to return a sparse matrix or a dense numpy matrix.
     """
 
-    _layout: _Layout = field(init=False)
+    _layout: _Layout = field(init=False, repr=False)
     """
     The layout strategy to use for the compiled function.
     """
 
-    _compiled_casadi_function: ca.Function = field(init=False)
+    _compiled_casadi_function: ca.Function = field(init=False, repr=False)
 
-    _function_buffer: ca.FunctionBuffer = field(init=False)
-    _function_evaluator: partial = field(init=False)
+    _function_buffer: ca.FunctionBuffer = field(init=False, repr=False)
+    _function_evaluator: partial = field(init=False, repr=False)
     """
     Helpers to avoid new memory allocation during function evaluation.
     """
@@ -1015,7 +1015,7 @@ class ExpressionGraph(SubclassJSONSerializer):
         casadi_function = ca.Function(
             cls.__name__,
             [ca.vertcat(*[variable.casadi_sx for variable in free_variables])],
-            [expression.casadi_sx],
+            [ca.densify(expression.casadi_sx)],
         )
         return cls(free_variables=free_variables, casadi_function=casadi_function)
 
@@ -1456,7 +1456,7 @@ class FloatVariableTracker(DeserializedObjectTracker[UUID, FloatVariable]):
     def _has_untracked(self, key: UUID) -> bool:
         return key in FloatVariable._registry_by_id
 
-    def _get_untracked(self, key: UUID) -> FloatVariable:
+    def _get_untracked(self, key: UUID, name: Any = None) -> FloatVariable:
         return FloatVariable._registry_by_id[key]
 
 
@@ -2425,6 +2425,52 @@ def logic_not(expression: ScalarData) -> Scalar:
     return ~expression
 
 
+def boolean_expression_to_str(expression: ScalarData) -> str:
+    """
+    Renders a boolean expression, with every variable quoted by its name. Unlike
+    :meth:`Scalar.__str__`, it accepts only boolean expressions.
+
+    :param expression: The expression to render.
+    :return: The rendered expression, using ``and``, ``or``, ``not``, ``True`` and
+        ``False``.
+    :raises CannotConvertToStringError: If `expression` contains anything but those
+        operators, variables and the constants true and false.
+    """
+    casadi_expression = to_sx(expression)
+    if casadi_expression.is_symbolic():
+        return f'"{casadi_expression}"'
+    if casadi_expression.is_constant():
+        return _boolean_constant_to_str(expression, float(casadi_expression))
+    match casadi_expression.op():
+        case ca.OP_AND:
+            left = boolean_expression_to_str(casadi_expression.dep(0))
+            right = boolean_expression_to_str(casadi_expression.dep(1))
+            return f"({left} and {right})"
+        case ca.OP_OR:
+            left = boolean_expression_to_str(casadi_expression.dep(0))
+            right = boolean_expression_to_str(casadi_expression.dep(1))
+            return f"({left} or {right})"
+        case ca.OP_NOT:
+            return f"not {boolean_expression_to_str(casadi_expression.dep(0))}"
+        case _:
+            raise CannotConvertToStringError(expression=expression)
+
+
+def _boolean_constant_to_str(expression: ScalarData, value: float) -> str:
+    """
+    :param expression: The constant expression being rendered, reported if it is
+        neither true nor false.
+    :param value: The value of that constant.
+    :return: ``True`` or ``False``.
+    :raises CannotConvertToStringError: If `value` is neither true nor false.
+    """
+    if value == float(Scalar.const_true()):
+        return "True"
+    if value == float(Scalar.const_false()):
+        return "False"
+    raise CannotConvertToStringError(expression=expression)
+
+
 def logic_any(args: VectorData | MatrixData) -> Scalar:
     """
     Returns True if any element evaluates to True.
@@ -2446,6 +2492,8 @@ def logic_all(args: GenericVectorOrMatrixType) -> Scalar:
 
 
 # %% trinary logic
+
+
 def trinary_logic_not(expression: FloatVariable | Scalar) -> Scalar:
     """
     |   Not ------------------ True    |  False Unknown | Unknown False   |  True.
@@ -2511,52 +2559,6 @@ def trinary_logic_or(*args: FloatVariable | Scalar) -> Scalar:
         return trinary_logic_or(args[0], trinary_logic_or(*args[1:]))
 
 
-def trinary_logic_to_str(expression: Scalar) -> str:
-    """
-    Converts a trinary logic expression into its string representation.
-
-    This function processes an expression with trinary logic values (True, False,
-    Unknown) and translates it into a comprehensible string format. It takes into
-    account the logical operations involved and recursively evaluates the components if
-    necessary. The function handles variables representing trinary logic values, as well
-    as logical constructs such as "and", "or", and "not". If the expression cannot be
-    evaluated, an exception is raised.
-
-    :param expression: The trinary logic expression to be converted into a string
-        representation.
-    :return: A string representation of the trinary logic expression, displaying the
-        appropriate logical variables and structure.
-    :raises SpatialTypesError: If the provided expression cannot be converted into a
-        string representation.
-    """
-    cas_expr = to_sx(expression)
-
-    # Constant case
-    if cas_expr.n_dep() == 0:
-        if not cas_expr.is_constant():
-            return f'"{expression}"'
-        if float(expression) == 1.0:
-            return "True"
-        if float(expression) == 0.0:
-            return "False"
-        if float(expression) == 0.5:
-            return "Unknown"
-
-    match cas_expr.op():
-        case ca.OP_SUB:  # trinary "not" is 1-x
-            return f"not {trinary_logic_to_str(cas_expr.dep(1))}"
-        case ca.OP_FMIN:  # trinary "and" is min(left, right)
-            left = trinary_logic_to_str(cas_expr.dep(0))
-            right = trinary_logic_to_str(cas_expr.dep(1))
-            return f"({left} and {right})"
-        case ca.OP_FMAX:  # trinary "or" is max(left, right)
-            left = trinary_logic_to_str(cas_expr.dep(0))
-            right = trinary_logic_to_str(cas_expr.dep(1))
-            return f"({left} or {right})"
-        case _:
-            raise CannotConvertToStringError(expression=expression)
-
-
 # %% ifs
 
 
@@ -2572,12 +2574,25 @@ def if_else(
     else:
         return else_result
     """
-    condition = to_sx(condition)
-    if_result_sx = to_sx(if_result)
-    else_result_sx = to_sx(else_result)
-    return_type = _create_return_type(if_result)
-    return return_type.from_casadi_sx(
-        ca.if_else(condition, if_result_sx, else_result_sx)
+    return _create_return_type(if_result).from_casadi_sx(
+        _if_else_sx(to_sx(condition), to_sx(if_result), to_sx(else_result))
+    )
+
+
+def _if_else_sx(condition: ca.SX, if_result: ca.SX, else_result: ca.SX) -> ca.SX:
+    """
+    :param condition: The condition selecting between the results.
+    :param if_result: The result while `condition` is not 0.
+    :param else_result: The result while `condition` is 0.
+    :return: The same expression as ``ca.if_else``, without the cost of resolving its
+        overloads.
+    """
+    return ca.SX.binary(
+        ca.OP_ADD,
+        ca.SX.binary(ca.OP_IF_ELSE_ZERO, condition, if_result),
+        ca.SX.binary(
+            ca.OP_IF_ELSE_ZERO, ca.SX.unary(ca.OP_NOT, condition), else_result
+        ),
     )
 
 
@@ -2721,24 +2736,21 @@ def if_eq_cases(
     else_result: GenericSymbolicType,
 ) -> GenericSymbolicType:
     """
-    If a == b_result_cases[0][0]:
+    Selects the result of the case whose value equals `a`.
 
-    return b_result_cases[0][1]
-    elif a == b_result_cases[1][0]:
-        return b_result_cases[1][1]
-    ...
-    else:
-        return else_result
+    .. note:: If several cases equal `a`, the last of them is selected.
+
+    :param a: The value compared against every case.
+    :param b_result_cases: The (value, result) pairs.
+    :param else_result: The result while no case equals `a`.
+    :return: The expression selecting between the results.
     """
     a_sx = to_sx(a)
-    result_sx_list = []
-    ind = to_sx(-1)
-    for i, (b, b_result) in enumerate(b_result_cases):
-        b_sx = to_sx(b)
-        ind = ca.if_else(ca.SX.binary(ca.OP_EQ, a_sx, b_sx), i, ind)
-        result_sx_list.append(to_sx(b_result))
-
-    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
+    result_sx = to_sx(else_result)
+    for b, b_result in b_result_cases:
+        result_sx = _if_else_sx(
+            ca.SX.binary(ca.OP_EQ, a_sx, to_sx(b)), to_sx(b_result), result_sx
+        )
     return _create_return_type(else_result).from_casadi_sx(result_sx)
 
 
@@ -2755,16 +2767,33 @@ def if_cases(
     ...
     else:
         return else_result
-    """
-    result_sx_list = []
-    ind = to_sx(len(cases))
-    for i in reversed(range(len(cases))):
-        case = to_sx(cases[i][0])
-        ind = ca.if_else(case, i, ind)
-        result_sx_list.insert(0, to_sx(cases[i][1]))
 
-    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
+    .. warning:: Any guard that is not 0 selects its case, the trinary Unknown included.
+        Use :func:`trinary_if_cases` for guards in trinary logic.
+    """
+    result_sx = to_sx(else_result)
+    for guard, result in reversed(cases):
+        result_sx = _if_else_sx(to_sx(guard), to_sx(result), result_sx)
     return _create_return_type(else_result).from_casadi_sx(result_sx)
+
+
+def trinary_if_cases(
+    cases: Sequence[tuple[ScalarData, GenericSymbolicType]],
+    else_result: GenericSymbolicType,
+) -> GenericSymbolicType:
+    """
+    Like :func:`if_cases`, for guards in trinary logic: a case is selected only while its
+    guard is True, never while it is Unknown.
+
+    :param cases: The (guard, result) pairs; the first guard that is True selects its
+        result.
+    :param else_result: The result while no guard is True.
+    :return: The expression selecting between the results.
+    """
+    return if_cases(
+        cases=[(Scalar(guard).is_true(), result) for guard, result in cases],
+        else_result=else_result,
+    )
 
 
 def if_less_eq_cases(
@@ -2784,14 +2813,11 @@ def if_less_eq_cases(
         return else_result
     """
     a_sx = to_sx(a)
-    result_sx_list = []
-    ind = to_sx(len(b_result_cases))
-    for i in reversed(range(len(b_result_cases))):
-        b_sx = to_sx(b_result_cases[i][0])
-        ind = ca.if_else(ca.SX.binary(ca.OP_LE, a_sx, b_sx), i, ind)
-        result_sx_list.insert(0, to_sx(b_result_cases[i][1]))
-
-    result_sx = ca.conditional(ind, result_sx_list, to_sx(else_result))
+    result_sx = to_sx(else_result)
+    for b, b_result in reversed(b_result_cases):
+        result_sx = _if_else_sx(
+            ca.SX.binary(ca.OP_LE, a_sx, to_sx(b)), to_sx(b_result), result_sx
+        )
     return _create_return_type(else_result).from_casadi_sx(result_sx)
 
 

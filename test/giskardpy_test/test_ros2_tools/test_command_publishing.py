@@ -6,6 +6,7 @@ from typing_extensions import Any
 import numpy as np
 import pytest
 from control_msgs.msg import MultiDOFCommand
+from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray
@@ -19,10 +20,13 @@ from giskardpy.middleware.ros2.command_publishing import (
     JointMinimumVelocities,
     MinimumVelocity,
     MultiDOFCommandFormat,
+    DriveCommandFormat,
+    TwistFormat,
+    TwistStampedFormat,
 )
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -705,6 +709,7 @@ def build_drive_publisher(
     world: World,
     minimum_linear_velocity: float = 0.0,
     minimum_angular_velocity: float = 0.0,
+    command_format: DriveCommandFormat | None = None,
 ) -> DriveVelocityCommandPublisher:
     """
     Build a drive publisher for the only drive of the world.
@@ -715,6 +720,7 @@ def build_drive_publisher(
         connection=world.get_connection_by_name("brumbrum"),
         minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
         minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
+        command_format=command_format or TwistFormat(),
     )
 
 
@@ -770,6 +776,54 @@ def test_drive_without_minimums_publishes_unchanged_velocities(init_rospy):
 
     assert command.linear.x == pytest.approx(0.001)
     assert command.angular.z == pytest.approx(0.002)
+
+
+# %% drive command message formats
+
+
+def test_default_drive_format_publishes_a_twist(init_rospy):
+    world = build_drive_world(OmniDrive)
+    drive = world.get_connection_by_name("brumbrum")
+    world.state[drive.x_velocity.id].velocity = 0.3
+
+    command = publish_drive(build_drive_publisher(world)).published_message
+
+    assert isinstance(command, Twist)
+    assert command.linear.x == pytest.approx(0.3)
+
+
+def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
+    init_rospy,
+):
+    world = build_drive_world(OmniDrive)
+    drive = world.get_connection_by_name("brumbrum")
+    world.state[drive.x_velocity.id].velocity = 0.3
+    world.state[drive.yaw.id].velocity = 0.4
+    publisher = build_drive_publisher(world, command_format=TwistStampedFormat())
+
+    command = publish_drive(publisher).published_message
+
+    assert isinstance(command, TwistStamped)
+    assert command.header.frame_id == drive.child.name.name
+    assert command.twist.linear.x == pytest.approx(0.3)
+    assert command.twist.angular.z == pytest.approx(0.4)
+
+
+def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(init_rospy):
+    world = build_drive_world(OmniDrive)
+    drive = world.get_connection_by_name("brumbrum")
+    world.state[drive.x_velocity.id].velocity = 0.3
+    publisher = build_drive_publisher(world, command_format=TwistStampedFormat())
+    recorder = RecordingPublisher()
+    publisher.velocity_publisher = recorder
+
+    publisher.stop()
+
+    assert isinstance(recorder.published_message, TwistStamped)
+    assert recorder.published_message.twist == Twist()
+
+
+# %% drive publisher and model changes
 
 
 def test_drive_publisher_follows_its_dofs_through_a_model_change(init_rospy):

@@ -3,7 +3,7 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.types.cv import ColorToDepthRatio
 
@@ -46,7 +46,7 @@ class ColorComponent:
     ROS color topic name. Must be set by camera configs using this component.
     """
 
-    filterBlurredImages: bool = True
+    filter_blurred_images: bool = True
     """
     Flag to enable/disable filtering of blurred images
     """
@@ -81,7 +81,9 @@ class TfComponent:
 
 @dataclass(kw_only=True)
 class StaticCameraTransformComponent:
-    """Camera component with configuration for a fixed camera transform."""
+    """
+    Camera component with configuration for a fixed camera transform.
+    """
 
     static_camera_transform_enabled: bool = False
     """
@@ -89,10 +91,9 @@ class StaticCameraTransformComponent:
     """
 
     static_world_frame: str = "map"
-    """World frame ID for the configured static camera transform."""
-
-    static_camera_frame: str = "camera"
-    """Camera frame ID for the configured static camera transform."""
+    """
+    World frame ID for the configured static camera transform.
+    """
 
     static_world_T_camera: HomogeneousTransformationMatrix = field(
         default_factory=HomogeneousTransformationMatrix

@@ -1,16 +1,18 @@
 from __future__ import annotations, absolute_import
 
+# %% Imports
 from dataclasses import dataclass, field, Field
 from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
-from typing_extensions import TYPE_CHECKING, Callable, Any
 from uuid import UUID
 
 import mujoco
+from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -38,18 +40,19 @@ if TYPE_CHECKING:
         WorldEntityWithID,
         KinematicStructureEntity,
     )
-    from semantic_digital_twin.spatial_types.spatial_types import (
-        SpatialType,
-    )
-    from semantic_digital_twin.spatial_types import Vector3, Point
+    from krrood_spatial_math.spatial_types import Vector3, Point
     from semantic_digital_twin.world_description.degree_of_freedom import (
         DegreeOfFreedomLimits,
         DegreeOfFreedom,
     )
     from semantic_digital_twin.world_description.world_modification import (
+        WorldModelModificationBlock,
         WorldModification,
     )
-    from semantic_digital_twin.collision_checking.collision_matrix import CollisionCheck
+    from semantic_digital_twin.collision_checking.collision_matrix import (
+        CollisionCheck,
+        CollisionRule,
+    )
 
 
 @dataclass
@@ -299,6 +302,99 @@ class InvalidCameraResolutionError(UsageError):
 
 
 @dataclass
+class InvalidCameraFieldOfViewError(UsageError):
+    """
+    Raised when camera viewing angles cannot describe a projection.
+    """
+
+    horizontal_angle: float
+    """
+    Invalid horizontal viewing angle in radians.
+    """
+
+    vertical_angle: float
+    """
+    Invalid vertical viewing angle in radians.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "Camera field-of-view angles must be between zero and pi radians, "
+            f"got horizontal={self.horizontal_angle} and vertical={self.vertical_angle}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide positive viewing angles smaller than pi radians."
+
+
+@dataclass
+class InvalidCameraDistortionError(UsageError):
+    """
+    Raised when distortion coefficients do not match their model.
+    """
+
+    model: str
+    """
+    Distortion model whose coefficients are invalid.
+    """
+
+    reason: str
+    """
+    Reason the distortion value is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid camera distortion model '{self.model}': {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "provide finite coefficients defined by the distortion model."
+
+
+@dataclass
+class InvalidPinholeCameraModelError(UsageError):
+    """
+    Raised when pinhole calibration parameters cannot describe an image.
+    """
+
+    reason: str
+    """
+    Reason the calibration is invalid.
+    """
+
+    def error_message(self) -> str:
+        return f"Invalid pinhole camera model: {self.reason}."
+
+    def suggest_correction(self) -> str:
+        return "provide positive focal lengths and a principal point within the image."
+
+
+@dataclass
+class InvalidCameraRangeError(UsageError):
+    """
+    Raised when a camera distance interval is empty or negative.
+    """
+
+    minimum_distance: float
+    """
+    Invalid minimum distance in meters.
+    """
+
+    maximum_distance: float
+    """
+    Invalid maximum distance in meters.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "Camera range requires a non-negative minimum below its maximum, "
+            f"got minimum={self.minimum_distance} and maximum={self.maximum_distance}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "provide an ordered, non-negative distance interval."
+
+
+@dataclass
 class ROSNodeNotRegisteredError(UsageError, RuntimeError):
     """
     Raised when shared ROS node access is requested before registration.
@@ -344,26 +440,54 @@ class WorldIsNotATreeError(WorldValidationError):
 
 
 @dataclass
-class BrokenWorldModificationHistoryError(WorldValidationError):
+class PartiallyAppliedWorldModificationError(WorldValidationError):
     """
-    Raised when the world's modification history was detected to be broken.
+    Raised when an exception escapes a modification block after the block already
+    changed the world.
+
+    The changes stay in the world, but they are neither in its modification history nor
+    published, so copies and synchronized worlds no longer match it.
+
+    .. warning::
+        This always signals a bug, never a condition to handle.
     """
 
-    potential_cause: DataclassException | None = None
+    cause: Exception
     """
-    The exception that was thrown and caused the world's modification history to be
-    broken.
+    The exception that escaped the modification block.
     """
+
+    applied_modifications: WorldModelModificationBlock
+    """
+    The modifications the block applied to the world before the exception.
+    """
+
+    @classproperty
+    def issue_tracker_url(cls) -> str:
+        """
+        :return: Where to report a failed modification block.
+        """
+        return "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
 
     def error_message(self) -> str:
+        applied_modification_types = ", ".join(
+            type(modification).__name__ for modification in self.applied_modifications
+        )
         return (
-            f"The world's modification history was detected to be broken. "
-            f"The world is {self.world}"
-            f" Potential cause: {self.potential_cause}"
+            f"A modification block raised {type(self.cause).__name__}: {self.cause}\n"
+            f"It had already applied {len(self.applied_modifications)} "
+            f"modification(s): {applied_modification_types}. They stay in the world but "
+            f"are not in its modification history and were not published, so copies and "
+            f"synchronized worlds no longer match {self.world}"
         )
 
     def suggest_correction(self) -> str:
-        return ""
+        return (
+            f"this is a bug, not a condition to handle: a modification block must not "
+            f"raise. Find where the cause above was raised and fix it there; if the "
+            f"mistake is not in your code, or you cannot tell, report it at "
+            f"{self.issue_tracker_url} with this traceback."
+        )
 
 
 @dataclass
@@ -473,6 +597,99 @@ class WorldEntityWithIDBelongsToAnotherWorld(WorldValidationError):
 
 
 @dataclass
+class WorldHasNoUniqueRootError(WorldValidationError):
+    """
+    Raised when a non-empty world has none or more than one root.
+    """
+
+    possible_roots: list[KinematicStructureEntity]
+    """
+    The kinematic structure entities without incoming connections that were found.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A world must have exactly one root, but found {len(self.possible_roots)}: "
+            f"{self.possible_roots}."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class CopiedWorldDiffersFromOriginalError(WorldValidationError):
+    """
+    Raised when deepcopying a world does not reproduce the original world's entities.
+    """
+
+    differing_entity_hashes: list[int]
+    """
+    Hashes of the entities that are only in the original world or only in the copy.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Deepcopying the world changed its entity set; "
+            f"{len(self.differing_entity_hashes)} entities differ between the original "
+            f"and the copy (hashes: {self.differing_entity_hashes})."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class NoControlledConnectionInChainError(UsageError):
+    """
+    Raised when the kinematic chain between two entities contains no controlled
+    connection.
+    """
+
+    root: KinematicStructureEntity
+    """
+    The start of the chain.
+    """
+
+    tip: KinematicStructureEntity
+    """
+    The end of the chain.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The chain between {self.root} and {self.tip} contains no controlled "
+            f"connection."
+        )
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class RobotPartBelongsToAnotherRobotError(UsageError):
+    """
+    Raised when a robot part refers to a robot other than the one that holds it.
+    """
+
+    robot_part: AbstractRobotPart
+    """
+    The robot part whose robot reference was checked.
+    """
+
+    robot: AbstractRobot
+    """
+    The robot that holds the part but is not referred to by it.
+    """
+
+    def error_message(self) -> str:
+        return f"Robot part {self.robot_part} does not refer to robot {self.robot}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
 class InvalidConnectionLimits(UsageError):
     """
     Raised when the lower limit is not less than the upper limit for a degree of
@@ -491,6 +708,33 @@ class InvalidConnectionLimits(UsageError):
 
     def error_message(self) -> str:
         return f"Lower limit for {self.name} must be less than upper limit. Given limits: {self.limits}."
+
+    def suggest_correction(self) -> str:
+        return ""
+
+
+@dataclass
+class MissingPositionLimits(UsageError):
+    """
+    Raised when a target position must be derived from the limits of a degree of freedom
+    that declares no position limits.
+    """
+
+    name: PrefixedName
+    """
+    The name of the degree of freedom.
+    """
+
+    limits: DegreeOfFreedomLimits
+    """
+    The limits without positions.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Degree of freedom {self.name} must declare position limits. "
+            f"Given limits: {self.limits}."
+        )
 
     def suggest_correction(self) -> str:
         return ""
@@ -693,8 +937,8 @@ class AmbiguousPart(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            f"consider if its practical to use the 'field_name' keyword argument for the `add` method to"
-            f" disambiguate the matching cases."
+            "consider if its practical to use the 'field_name' keyword argument for the `add` method to"
+            " disambiguate the matching cases."
         )
 
 
@@ -729,8 +973,7 @@ class UnknownPartWholeRelationshipField(UsageError):
 
     def suggest_correction(self) -> str:
         return (
-            f"the available fields are:"
-            f" {', '.join(self.available_fields) or '(none)'}"
+            f"the available fields are: {', '.join(self.available_fields) or '(none)'}"
         )
 
 
@@ -851,6 +1094,36 @@ class PartWholeFieldInAnnotationKwargs(UsageError):
 
     def suggest_correction(self) -> str:
         return "move these entries to part_specifications instead of annotation_kwargs."
+
+
+@dataclass
+class MechanicalJointAlreadyMounted(UsageError):
+    """
+    Raised when a mechanical joint that already connects a child is mounted onto a
+    different whole.
+
+    If you think a single Mechanical Joint should be able to have multiple children,
+    contact @LucaKro.
+    """
+
+    joint: SemanticAnnotation
+    """
+    The mechanical joint being mounted.
+    """
+
+    main_has_root_body_annotation: SemanticAnnotation
+    """
+    The annotation (the whole) the joint was being mounted onto.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.joint).__name__} already connects a child and cannot be mounted onto "
+            f"{type(self.main_has_root_body_annotation).__name__}: a mechanical joint connects exactly one child."
+        )
+
+    def suggest_correction(self) -> str:
+        return "if you think that you found a case where this error does not apply, please contact @LucaKro"
 
 
 @dataclass
@@ -1313,95 +1586,6 @@ class DuplicateRobotAssignmentsError(UsageError):
 
 
 @dataclass
-class SpatialTypesError(UsageError):
-    pass
-
-
-@dataclass
-class InsufficientVectorsError(SpatialTypesError):
-    """
-    Raised when a rotation matrix is constructed from fewer than two vectors.
-    """
-
-    x: Vector3 | None
-    y: Vector3 | None
-    z: Vector3 | None
-
-    def error_message(self) -> str:
-        return (
-            f"from_vectors requires at least two of the vectors x, y, z to be provided; "
-            f"the third is computed via the cross product."
-            f"X Vector was: {self.x}"
-            f"Y Vector was: {self.y}"
-            f"Z Vector was: {self.z}"
-        )
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class ReferenceFrameMismatchError(SpatialTypesError):
-    expected_frame: KinematicStructureEntity | None
-    """
-    The frame the operation requires, or ``None`` if it requires no frame.
-    """
-
-    actual_frame: KinematicStructureEntity | None
-    """
-    The frame that was found instead, or ``None`` if the value has no frame.
-    """
-
-    context: str | None = None
-    """
-    Description of the value whose frame was checked, e.g. the argument name.
-    """
-
-    def error_message(self) -> str:
-        checked_value = self.context or "the given value"
-        return (
-            f"Expected {checked_value} to be expressed in "
-            f"{self._describe(self.expected_frame)}, "
-            f"but it is expressed in {self._describe(self.actual_frame)}."
-        )
-
-    @staticmethod
-    def _describe(frame: KinematicStructureEntity | None) -> str:
-        """
-        :param frame: The frame to describe.
-        :return: The frame as it reads in the error message.
-        """
-        if frame is None:
-            return "no frame"
-        return f"frame '{frame.name}'"
-
-    def suggest_correction(self) -> str:
-        return (
-            "transform it into the expected frame first, e.g. via "
-            "world.transform(value, target_frame), or construct it with the expected frame."
-        )
-
-
-@dataclass
-class MissingReferenceFrameError(SpatialTypesError):
-    """
-    Represents an error that occurs when a spatial type lacks a reference frame, even
-    though its required for the current operation.
-    """
-
-    spatial_type: SpatialType
-    """
-    Spatial type that lacks a reference frame.
-    """
-
-    def error_message(self) -> str:
-        return f"Spatial type {self.spatial_type} has no reference frame, but this operation requires one."
-
-    def suggest_correction(self) -> str:
-        return "construct it with an explicit frame, e.g. Point3(x, y, z, reference_frame=some_body)."
-
-
-@dataclass
 class ParsingError(DataclassException, Exception):
     """
     An error that happens during parsing of files.
@@ -1775,9 +1959,9 @@ class WorldEntityWithIDNotInKwargs(UntrackedObjectError):
     """
     The name the reference to that entity went by when it was written.
 
-    Says which entity is meant where the id alone says nothing. ``None`` where the
-    reference carries no name, and never used to look an entity up: the id is its
-    identity.
+    Says which entity is meant where the id alone says nothing. ``None``
+    where the reference carries no name, and never used to look an
+    entity up: the id is its identity.
     """
 
     def error_message(self) -> str:
@@ -1868,6 +2052,37 @@ class BodyHasNoGeometryError(InvalidCollisionCheckError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class TemporaryCollisionRulesDependOnOrder(CollisionCheckingError):
+    """
+    Raised when temporary collision rules are put in force next to others, and which
+    body pairs are checked at which distance would depend on which of them came first.
+    """
+
+    rules_in_force: list[CollisionRule]
+    """
+    The temporary rules that were in force already.
+    """
+
+    added_rules: list[CollisionRule]
+    """
+    The temporary rules that were to be put in force next to them.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The temporary collision rules {self.added_rules} and the ones already "
+            f"in force, {self.rules_in_force}, decide differently about the same "
+            f"body pairs, so the outcome would depend on which were added first."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Put rules that overrule each other in force together, in the order "
+            "they are meant to apply, or do not let them be in force at once."
+        )
 
 
 @dataclass
@@ -2123,6 +2338,37 @@ class MergedRobotAnnotationNotFound(UsageError):
         return (
             "check that merging the robot world replays its semantic annotations into "
             "the target world."
+        )
+
+
+@dataclass
+class ConnectionsOutsideEndEffector(UsageError):
+    """
+    Raised when a gripper specification's joint state moves connections that do not
+    belong to the specification's end effector.
+    """
+
+    end_effector: EndEffector
+    """
+    The end effector the specification was built for.
+    """
+
+    foreign_connection_names: list[str]
+    """
+    The names of the connections in the joint state that are not active connections of
+    the end effector.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The joint state moves connections that do not belong to the end effector "
+            f"'{self.end_effector.name}': {self.foreign_connection_names}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "build the specification from a joint state whose connections are all "
+            "active connections of the same end effector."
         )
 
 

@@ -24,10 +24,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Oven,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Vector3,
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -57,7 +54,6 @@ from semantic_digital_twin.world_description.world_modification import (
 
 
 class ConnectionModificationTestCase(unittest.TestCase):
-
     def test_single_modification(self):
         w = World()
 
@@ -69,6 +65,14 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
             connection = FixedConnection(b1, b2)
             w.add_connection(connection)
+
+        modifications = w.get_world_model_manager().model_modification_blocks[-1]
+        assert [type(m) for m in modifications.modifications] == [
+            AddKinematicStructureEntityModification,
+            AddKinematicStructureEntityModification,
+            AddConnectionModification,
+        ]
+        assert w.get_connection(b1, b2) is connection
 
     def test_ChangeDofHasHardwareInterface(self):
         w = World()

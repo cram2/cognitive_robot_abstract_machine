@@ -21,12 +21,13 @@ The plane detection uses:
 
 from __future__ import annotations
 
+# %% Imports
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
 from timeit import default_timer
 
 import numpy as np
-import open3d as o3d
+import open3d
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
@@ -50,17 +51,18 @@ def _deterministic_ransac(seed: int) -> Iterator[None]:
 
     :param seed: Seed for the random samples RANSAC draws.
     """
-    o3d.utility.random.seed(seed)
-    previous_max_threads = o3d.utility.get_max_threads()
-    o3d.utility.set_max_threads(1)
+    open3d.utility.random.seed(seed)
+    previous_max_threads = open3d.utility.get_max_threads()
+    open3d.utility.set_max_threads(1)
     try:
         yield
     finally:
-        o3d.utility.set_max_threads(previous_max_threads)
+        open3d.utility.set_max_threads(previous_max_threads)
 
 
 class PlaneAnnotator(ThreadedAnnotator):
-    """Plane detector and visualizer for point clouds.
+    """
+    Plane detector and visualizer for point clouds.
 
     This annotator:
 
@@ -95,7 +97,9 @@ class PlaneAnnotator(ThreadedAnnotator):
                 """
 
                 self.num_iterations: int = 50
-                """"""
+                """
+
+                """
 
                 self.random_seed: int | None = None
                 """
@@ -120,7 +124,8 @@ class PlaneAnnotator(ThreadedAnnotator):
         super().__init__(name, descriptor)
 
     def compute(self) -> Status:
-        """Detect and annotate dominant plane in point cloud.
+        """
+        Detect and annotate dominant plane in point cloud.
 
         The method:
 
@@ -141,13 +146,6 @@ class PlaneAnnotator(ThreadedAnnotator):
         self.rk_logger.info("Plane compute start")
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        color_image = self.get_cas().get(
-            CASViews.COLOR_IMAGE
-        )  # shape [H, W, 3], usually RGB
-        depth_image = self.get_cas().get(
-            CASViews.DEPTH_IMAGE
-        )  # shape [H, W], float or uint16
-        camera_intrinsics = self.get_cas().get(CASViews.CAMERA_INTRINSIC)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
         random_seed = self.descriptor.parameters.random_seed
@@ -180,7 +178,7 @@ class PlaneAnnotator(ThreadedAnnotator):
 
         if self.descriptor.parameters.visualize_plane_model:
             # b) Show the plane model itself by a flat mesh
-            plane_model_mesh = o3d.geometry.TriangleMesh.create_box(
+            plane_model_mesh = open3d.geometry.TriangleMesh.create_box(
                 width=1.0, height=1.0, depth=0.01
             )
             plane_model_mesh.translate(

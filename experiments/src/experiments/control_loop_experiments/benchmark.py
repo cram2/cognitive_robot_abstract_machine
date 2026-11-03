@@ -443,7 +443,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--target-frequency",
         type=float,
-        default=20.0,
+        default=ScenarioRunner.target_frequency,
         help="frequency the controller is discretized for, in hertz",
     )
     parser.add_argument(

@@ -448,7 +448,8 @@ class WorkspaceOrmInterfaces:
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
         OrmInterface("semantic_digital_twin", REPOSITORY_ROOT),
-        OrmInterface("giskardpy", REPOSITORY_ROOT, ("semantic_digital_twin",)),
+        OrmInterface("cramph", REPOSITORY_ROOT, ("semantic_digital_twin",)),
+        OrmInterface("giskardpy", REPOSITORY_ROOT, ("cramph",)),
         OrmInterface("segmind", REPOSITORY_ROOT, ("semantic_digital_twin",)),
         OrmInterface("coraplex", REPOSITORY_ROOT, ("giskardpy",)),
         OrmInterface("experiments", REPOSITORY_ROOT, ("coraplex",)),

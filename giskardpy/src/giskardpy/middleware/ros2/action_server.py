@@ -13,7 +13,7 @@ from giskardpy.data_types.exceptions import (
     MissingActionResultError,
     MissingGoalOutcomeError,
 )
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 
 
 class GoalOutcome(Enum):

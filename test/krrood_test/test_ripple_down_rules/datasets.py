@@ -78,7 +78,7 @@ def save_dataset_to_cache(dataset: ZooDataset, cache_file: str) -> None:
     for key, part in vars(dataset).items():
         part_file = cache_file.replace(".pkl", f"_{key}.pkl")
         with tempfile.NamedTemporaryFile(
-            directory=os.path.dirname(part_file), delete=False
+            dir=os.path.dirname(part_file), delete=False
         ) as temporary_file:
             pickle.dump(part, temporary_file)
         os.replace(temporary_file.name, part_file)

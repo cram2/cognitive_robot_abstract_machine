@@ -1,5 +1,8 @@
-
-from krrood.inheritance_path_length import nearest_common_ancestor, inheritance_path_length, inheritance_distance
+from krrood.inheritance_path_length import (
+    nearest_common_ancestor,
+    inheritance_path_length,
+    inheritance_distance,
+)
 
 from krrood.entity_query_language.factories import not_, set_of, type_
 import math
@@ -34,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 def semantic_annotations_on_surfaces(
-        supporting_surfaces: list[HasSupportingSurface], world: World
+    supporting_surfaces: list[HasSupportingSurface], world: World
 ) -> list[HasRootBody]:
     """
     Queries a list of Semantic annotations that are on top of a given list of other
@@ -54,9 +57,9 @@ def semantic_annotations_on_surfaces(
 
 
 def get_next_object_using_planar_distance(
-        main_body: Body,
-        supporting_surface,
-        ignore_dimension,
+    main_body: Body,
+    supporting_surface,
+    ignore_dimension,
 ) -> Entity[SemanticAnnotation]:
     """
     Queries the next object based on Euclidean distance in x and y coordinates relative
@@ -83,9 +86,9 @@ def get_next_object_using_planar_distance(
 
 
 def goal_surface_of_object(
-        object_of_interest: SemanticAnnotation,
-        supporting_surfaces: list[HasSupportingSurface],
-        threshold: int = 1,
+    object_of_interest: SemanticAnnotation,
+    supporting_surfaces: list[HasSupportingSurface],
+    threshold: int = 1,
 ) -> HasSupportingSurface | None:
     """
     Finds the most similar object to a given semantic annotation among a list of tables
@@ -107,19 +110,30 @@ def goal_surface_of_object(
     supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
     supporting_body = supporting_surface.bodies[0]
     non_supporting_table = entity(supporting_surface).where(
-        not_(Supports(supporting_body)))
+        not_(Supports(supporting_body))
+    )
 
     # Query annotations on the surfaces of the tables
-    obj = variable(SemanticAnnotation, semantic_annotations_on_surfaces(
-        supporting_surfaces, object_of_interest._world
-    ))
+    obj = variable(
+        SemanticAnnotation,
+        semantic_annotations_on_surfaces(
+            supporting_surfaces, object_of_interest._world
+        ),
+    )
 
-    query = set_of(obj, supporting_surface).where(
-        (distance := inheritance_distance(object_of_interest, type_(obj))) <= threshold,
-        SupportedBy(obj.bodies[0], supporting_body)
-    ).ordered_by(distance)
-    return next(query[supporting_surface].evaluate(), next(non_supporting_table.evaluate(), None))
-
+    query = (
+        set_of(obj, supporting_surface)
+        .where(
+            (distance := inheritance_distance(object_of_interest, type_(obj)))
+            <= threshold,
+            SupportedBy(obj.bodies[0], supporting_body),
+        )
+        .ordered_by(distance)
+    )
+    return next(
+        query[supporting_surface].evaluate(),
+        next(non_supporting_table.evaluate(), None),
+    )
 
 
 def filter_annotations_by_color(

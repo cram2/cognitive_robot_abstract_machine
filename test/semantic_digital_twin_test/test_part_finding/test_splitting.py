@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 import trimesh
 from numpy.typing import NDArray
+from PIL import Image
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -16,14 +17,18 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import CollisionDiffersFromVisualError
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
-from semantic_digital_twin.part_finding.splitting import MeshSplit, PartSplitter
+from semantic_digital_twin.part_finding.splitting import (
+    ColoredShape,
+    MeshSplit,
+    PartSplitter,
+)
 from semantic_digital_twin.pipeline.part_finding import SplitPartFromShape
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Mug,
     Pot,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Mesh, Shape
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -244,7 +249,7 @@ def test_a_part_is_split_off_a_single_body_without_annotating_it():
 
 def test_the_pieces_keep_the_color_of_the_shape():
     annotation = annotated_mug()
-    red = Color(1.0, 0.0, 0.0, 1.0)
+    red = Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0)
     annotation.root.visual.dye_shapes(red)
 
     handle = split_handle(annotation)
@@ -303,6 +308,46 @@ def test_shapes_without_a_reference_frame_are_taken_relative_to_the_body():
         shape.origin.reference_frame is annotation.root
         for shape in annotation.root.collision
     )
+
+
+def test_the_mesh_pieces_are_cut_from_copies_none_of_the_shapes(monkeypatch):
+    """
+    Copying a mesh with per-vertex colours makes trimesh convert its colours, which for
+    a scanned scene costs seconds and the memory of the whole scan.
+    """
+    body = Body(name=PrefixedName("body"))
+    source = trimesh.creation.box()
+    source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
+    shape = Mesh.from_trimesh(
+        mesh=source, origin=HomogeneousTransformationMatrix(reference_frame=body)
+    )
+    colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
+    shape.mesh
+
+    def copy(mesh: trimesh.Trimesh, **kwargs) -> trimesh.Trimesh:
+        raise AssertionError("a shape's mesh was copied")
+
+    monkeypatch.setattr(trimesh.Trimesh, "copy", copy)
+
+    assert len(colored.mesh.faces) == len(source.faces)
+
+
+def test_the_faces_of_a_textured_shape_take_the_colour_of_its_texture(tmp_path):
+    texture_file = tmp_path / "red.png"
+    Image.new("RGB", (4, 4), color=(255, 0, 0)).save(texture_file)
+    body = Body(name=PrefixedName("body"))
+    box = trimesh.creation.box()
+    corner_uv = np.tile([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], (len(box.faces), 1))
+    shape = Mesh.from_trimesh(
+        mesh=box,
+        uv=corner_uv,
+        texture_file_path=str(texture_file),
+        origin=HomogeneousTransformationMatrix(reference_frame=body),
+    )
+
+    colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
+
+    assert (colored.mesh.visual.face_colors == [255, 0, 0, 255]).all()
 
 
 # %% bodies whose collision shapes differ from their visual shapes

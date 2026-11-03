@@ -28,7 +28,6 @@ from typing_extensions import (
     Iterable,
     Iterator,
     TYPE_CHECKING,
-    get_args,
 )
 from typing_extensions import List
 
@@ -40,6 +39,7 @@ from semantic_digital_twin.collision_checking.collision_manager import Collision
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
     BulletCollisionDetector,
 )
+from krrood_spatial_math.exceptions import MissingReferenceFrameError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import (
@@ -48,17 +48,17 @@ from semantic_digital_twin.exceptions import (
     AlreadyBelongsToAWorldError,
     MissingWorldModificationContextError,
     WorldEntityWithIDNotFoundError,
-    MissingReferenceFrameError,
     MismatchingPublishChangesAttribute,
     AtomicWorldModificationNotAtomic,
     SemanticAnnotationCircularDependencyError,
-    WorldValidationError,
     WorldIsNotATreeError,
     WorldContainsOrphanedDegreeOfFreedom,
-    BrokenWorldModificationHistoryError,
+    PartiallyAppliedWorldModificationError,
     MismatchingWorld,
     InsufficientModificationHistoryError,
     InvalidRollbackVersionError,
+    WorldHasNoUniqueRootError,
+    NoControlledConnectionInChainError,
 )
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from semantic_digital_twin.spatial_computations.forward_kinematics import (
@@ -66,11 +66,8 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
 )
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -122,7 +119,7 @@ from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecompose
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.spatial_types import GenericSpatialType
+    from krrood_spatial_math.spatial_types import GenericSpatialType
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 
@@ -278,15 +275,20 @@ class WorldModelUpdateContextManager:
                 if not model_manager._active_world_model_update_context_manager_ids:
                     # discard publications buffered before the error; they must not be sent
                     model_manager.pending_publications.clear()
-                    if len(model_manager.current_model_modification_block):
-                        raise BrokenWorldModificationHistoryError(
-                            world=self.world, potential_cause=exc_val
-                        )
+                    # discard the modifications of the failed block too, so that the
+                    # next block does not record and publish them as its own
+                    failed_block = model_manager.current_model_modification_block
                     model_manager.current_model_modification_block = (
                         WorldModelModificationBlock()
                     )
                     self.world.world_is_being_modified = False
                     model_manager._current_modifications_will_be_published = None
+                    if len(failed_block) > 0:
+                        raise PartiallyAppliedWorldModificationError(
+                            world=self.world,
+                            cause=exc_val,
+                            applied_modifications=failed_block,
+                        ) from exc_val
                 raise exc_val
 
             self.world.delete_orphaned_dofs()
@@ -349,9 +351,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
         def wrapper(current_world: World, *args, **kwargs):
             if current_world._current_active_atomic_world_modification is not None:
                 raise AtomicWorldModificationNotAtomic(func, current_world)
-            if (
-                not current_world._model_manager._active_world_model_update_context_manager_ids
-            ):
+            if not current_world._model_manager._active_world_model_update_context_manager_ids:
                 raise MissingWorldModificationContextError(func)
             current_world._current_active_atomic_world_modification = func
 
@@ -753,9 +753,8 @@ class World(HasSimulatorProperties):
             for node in self.kinematic_structure_entities
             if self.kinematic_structure.in_degree(node.index) == 0
         ]
-        assert (
-            len(possible_roots) == 1
-        ), f"A World must have exactly one root. Found {len(possible_roots)} possible roots: {possible_roots}."
+        if len(possible_roots) != 1:
+            raise WorldHasNoUniqueRootError(world=self, possible_roots=possible_roots)
 
         return possible_roots[0]
 
@@ -2135,21 +2134,21 @@ class World(HasSimulatorProperties):
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
-        Computes all child entities of a given KinematicStructureEntity in the world
-        recursively.
+        Computes the entities below a given KinematicStructureEntity in the world.
 
         :param kinematic_structure_entity: The KinematicStructureEntity for which to
-            compute children.
-        :return: A list of all child KinematicStructureEntities.
+            compute descendants.
+        :return: Every descendant once, each after its parent.
         """
-        children = self.compute_child_kinematic_structure_entities(
+        descendants = []
+        for child in self.compute_child_kinematic_structure_entities(
             kinematic_structure_entity
-        )
-        for child in children:
-            children.extend(
+        ):
+            descendants.append(child)
+            descendants.extend(
                 self.compute_descendent_child_kinematic_structure_entities(child)
             )
-        return children
+        return descendants
 
     @memoize
     def compute_child_kinematic_structure_entities(
@@ -2257,9 +2256,8 @@ class World(HasSimulatorProperties):
             (conn for conn in reversed(chain) if conn.is_controlled),
             None,
         )
-        assert (
-            new_root is not None and new_tip is not None
-        ), f"no controlled connection in chain between {root} and {tip}"
+        if new_root is None or new_tip is None:
+            raise NoControlledConnectionInChainError(root=root, tip=tip)
 
         # if new_root is in the downward chain, we need to "flip" it by returning its child
         new_root_body = new_root.parent if new_root in upward_chain else new_root.child
@@ -2624,7 +2622,7 @@ class World(HasSimulatorProperties):
         Transform a given spatial object from its reference frame to a target frame.
 
         How the transformation applies is the spatial type's own business -- see
-        :meth:`~semantic_digital_twin.spatial_types.spatial_types.SpatialType.transform`
+        :meth:`~krrood_spatial_math.spatial_types.SpatialType.transform`
         -- so a type that needs more than a matrix multiplication says so itself.
 
         :param spatial_object: The spatial object to be transformed.

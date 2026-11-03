@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+# %% Imports
 import tracemalloc
 from copy import deepcopy
 from dataclasses import dataclass, fields
@@ -7,6 +9,7 @@ from uuid import UUID
 import numpy as np
 import trimesh
 
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.reasoning.predicates import (
@@ -45,7 +48,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
 )
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector, TCamera
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -148,7 +151,7 @@ def test_in_contact() -> None:
             0,
             reference_frame=b1,
         ),
-        color=Color(1.0, 0.0, 0.0),
+        color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
     )
     b1.collision = ShapeCollection([collision1])
 
@@ -158,7 +161,7 @@ def test_in_contact() -> None:
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             0.9, 0, 0.0, 0, 0, 0, reference_frame=b2
         ),
-        color=Color(0.0, 1.0, 0.0),
+        color=Color.from_rgba(red=0.0, green=1.0, blue=0.0),
     )
     b2.collision = ShapeCollection([collision2])
 
@@ -168,7 +171,7 @@ def test_in_contact() -> None:
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             1.8, 0, 0.0, 0, 0, 0, reference_frame=b3
         ),
-        color=Color(0.0, 0.0, 1.0),
+        color=Color.from_rgba(red=0.0, green=0.0, blue=1.0),
     )
     b3.collision = ShapeCollection([collision3])
 
@@ -192,7 +195,7 @@ def test_robot_in_contact(pr2_world_copy: World) -> None:
             z=0.5,
             reference_frame=body,
         ),
-        color=Color(1.0, 0.0, 0.0),
+        color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
     )
     body.collision = ShapeCollection([collision1])
 
@@ -223,7 +226,7 @@ def test_get_visible_objects(pr2_world_copy: World) -> None:
             z=1.0,
             reference_frame=body,
         ),
-        color=Color(1.0, 0.0, 0.0),
+        color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
     )
     body.collision = ShapeCollection([collision1])
 
@@ -249,10 +252,8 @@ def test_camera_view_frame_x_axis_is_the_forward_axis(pr2_world_copy: World) -> 
     camera = pr2_world_copy.get_semantic_annotations_by_type(Camera)[0]
     root_T_camera = camera.root.global_transform
 
-    root_T_view = camera.root_T_forward_view.to_np()
-    root_V_forward = (
-        root_T_camera.rotation_matrix @ camera.forward_facing_axis
-    ).to_np()
+    root_T_view = camera.world_T_forward_view.to_np()
+    root_V_forward = (root_T_camera.rotation_matrix @ camera.viewing_direction).to_np()
 
     assert np.allclose(root_T_view[:3, 0], root_V_forward.flatten()[:3], atol=1e-9)
     assert np.allclose(root_T_view[:3, 3], root_T_camera.to_np()[:3, 3], atol=1e-9)
@@ -296,9 +297,9 @@ def test_visibility_follows_camera_orientation(pr2_world_copy: World) -> None:
 
 def test_occluding_bodies(pr2_world_state_reset: World):
     world = deepcopy(pr2_world_state_reset)
-    world.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
-    )
+    world.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
@@ -345,9 +346,9 @@ def test_occluding_bodies_follows_camera_orientation(pr2_world_state_reset: Worl
     axis, so a pair off to the side is only resolved once the head is turned towards it.
     """
     world = deepcopy(pr2_world_state_reset)
-    world.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
-    )
+    world.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
@@ -485,7 +486,7 @@ def test_is_body_in_gripper(pr2_world_copy) -> None:
     box_collision = Box(
         scale=Scale(0.05, 0.01, 0.05),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=test_box),
-        color=Color(1.0, 0.0, 0.0),
+        color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
     )
     test_box.collision = ShapeCollection([box_collision])
 
@@ -754,14 +755,10 @@ def test_empty_gripper_is_not_holding_something():
 
 
 @dataclass(eq=False)
-class ReviewCamera(Camera):
+class ReviewCamera(Camera[FieldOfViewCameraModel]):
     """
     Minimal concrete Camera for predicate tests.
     """
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.root)
 
     def setup_hardware_interfaces(self):
         pass
@@ -812,7 +809,9 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight() -> None:
         camera = ReviewCamera(
             name=PrefixedName("camera", prefix="review"),
             root=camera_body,
-            field_of_view=FieldOfView(horizontal_angle=0.99, vertical_angle=0.75),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(horizontal_angle=0.99, vertical_angle=0.75)
+            ),
         )
         world.add_semantic_annotation(camera)
 

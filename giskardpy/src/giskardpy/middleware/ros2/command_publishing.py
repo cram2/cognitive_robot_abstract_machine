@@ -16,12 +16,12 @@ from dataclasses import dataclass, field
 from typing_extensions import Self, TypeVar, Generic, Union
 
 from control_msgs.msg import MultiDOFCommand
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.publisher import Publisher
 from std_msgs.msg import Float64, Float64MultiArray
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from giskardpy.middleware.ros2.ros2_interface import get_parameters
 from semantic_digital_twin.world import World
@@ -257,19 +257,18 @@ class JointVelocityCommand:
         ]
 
 
-# %% message formats of group controllers
+# %% message formats
 
 CommandMessage = TypeVar("CommandMessage")
 """
-The ROS message type a group controller consumes.
+The ROS message type a controller consumes.
 """
 
 
 @dataclass
-class GroupCommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
+class CommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
     """
-    Builds the message a joint group velocity controller consumes from the velocities of
-    the joints it commands.
+    The message format a controller consumes.
 
     Each subclass binds the message type it builds, so the type a format publishes and
     the type it packs are the same declaration.
@@ -281,6 +280,17 @@ class GroupCommandFormat(Generic[CommandMessage], SubClassSafeGeneric, ABC):
         The ROS message type published on the command topic.
         """
         return cls.get_generic_type_parameters()[0]
+
+
+# %% message formats of group controllers
+
+
+@dataclass
+class GroupCommandFormat(CommandFormat[CommandMessage], ABC):
+    """
+    Builds the message a joint group velocity controller consumes from the velocities of
+    the joints it commands.
+    """
 
     @abstractmethod
     def create_message(self, velocities: list[float]) -> CommandMessage:
@@ -317,6 +327,50 @@ class MultiDOFCommandFormat(GroupCommandFormat[MultiDOFCommand]):
     def create_message(self, velocities: list[float]) -> MultiDOFCommand:
         message = MultiDOFCommand()
         message.values = velocities
+        return message
+
+
+# %% message formats of drives
+
+
+@dataclass
+class DriveCommandFormat(CommandFormat[CommandMessage], ABC):
+    """
+    Builds the message a drive controller consumes from the twist the drive is
+    commanded.
+    """
+
+    @abstractmethod
+    def create_message(self, twist: Twist, frame_id: str) -> CommandMessage:
+        """
+        :param twist: The commanded twist.
+        :param frame_id: The frame the twist is expressed in.
+        :return: The message to publish.
+        """
+
+
+@dataclass
+class TwistFormat(DriveCommandFormat[Twist]):
+    """
+    Commands a drive controller that consumes :class:`geometry_msgs.msg.Twist`.
+    """
+
+    def create_message(self, twist: Twist, frame_id: str) -> Twist:
+        return twist
+
+
+@dataclass
+class TwistStampedFormat(DriveCommandFormat[TwistStamped]):
+    """
+    Commands a drive controller that consumes :class:`geometry_msgs.msg.TwistStamped`,
+    stamped with the current time.
+    """
+
+    def create_message(self, twist: Twist, frame_id: str) -> TwistStamped:
+        message = TwistStamped()
+        message.header.stamp = rospy.get_node().get_clock().now().to_msg()
+        message.header.frame_id = frame_id
+        message.twist = twist
         return message
 
 
@@ -512,7 +566,8 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
 @dataclass
 class DriveVelocityCommandPublisher(CommandPublisher):
     """
-    Publishes the velocity of a drive connection as a twist.
+    Publishes the velocity of a drive connection as a twist, expressed in the frame of
+    the body the drive moves.
     """
 
     world: World
@@ -540,14 +595,20 @@ class DriveVelocityCommandPublisher(CommandPublisher):
     Minimum magnitude of the commanded rotational velocity.
     """
 
+    command_format: DriveCommandFormat = field(default_factory=TwistFormat)
+    """
+    Message format the controller on ``command_topic`` consumes.
+    """
+
     velocity_reader: StateVelocityReader = field(init=False)
     """
     Reads the commanded velocities of the drivable axes, rotation last.
     """
 
-    message: Twist = field(init=False, default_factory=Twist)
+    twist: Twist = field(init=False, default_factory=Twist)
     """
-    The message reused for every publication.
+    The twist reused for every publication, which :attr:`command_format` turns into the
+    message it publishes.
     """
 
     velocity_publisher: Publisher = field(init=False)
@@ -557,7 +618,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
 
     def __post_init__(self):
         self.velocity_publisher = rospy.get_node().create_publisher(
-            Twist, self.command_topic, 10
+            self.command_format.message_type(), self.command_topic, 10
         )
         self.connection.has_hardware_interface = True
         self.velocity_reader = StateVelocityReader(
@@ -584,16 +645,26 @@ class DriveVelocityCommandPublisher(CommandPublisher):
         linear_velocities = self.minimum_linear_velocity.enforce_on_vector(
             velocities[:-1]
         )
-        self.message.linear.x = linear_velocities[0]
+        self.twist.linear.x = linear_velocities[0]
         if len(linear_velocities) > 1:
-            self.message.linear.y = linear_velocities[1]
-        self.message.angular.z = self.minimum_angular_velocity.enforce_on_scalar(
+            self.twist.linear.y = linear_velocities[1]
+        self.twist.angular.z = self.minimum_angular_velocity.enforce_on_scalar(
             velocities[-1]
         )
-        self.velocity_publisher.publish(self.message)
+        self._publish_twist()
 
     def stop(self) -> None:
-        self.message.linear.x = 0.0
-        self.message.linear.y = 0.0
-        self.message.angular.z = 0.0
-        self.velocity_publisher.publish(self.message)
+        self.twist.linear.x = 0.0
+        self.twist.linear.y = 0.0
+        self.twist.angular.z = 0.0
+        self._publish_twist()
+
+    def _publish_twist(self) -> None:
+        """
+        Publish :attr:`twist` in the format the controller consumes.
+        """
+        self.velocity_publisher.publish(
+            self.command_format.create_message(
+                self.twist, self.connection.child.name.name
+            )
+        )

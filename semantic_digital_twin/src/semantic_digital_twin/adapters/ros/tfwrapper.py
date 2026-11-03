@@ -60,6 +60,12 @@ class TFWrapper(HasROS2Node):
         except Exception as e:
             logger.warning(str(e))
 
+    def stop(self) -> None:
+        """
+        Stop listening to tf, so :attr:`tf_buffer` receives no further transforms.
+        """
+        self.tf_listener.unregister()
+
     def get_tf_roots(self) -> list[str]:
         """
         Returns a list of all tf roots in the tf tree.

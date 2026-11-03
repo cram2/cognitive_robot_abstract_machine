@@ -161,6 +161,12 @@
 - When you work in a fork, never push to the upstream repository - no branch, no tag, whatever the reason. Push only to the fork; work reaches upstream only through a pull request opened from the fork. Before any push, read the full, untruncated `git remote -v` output and confirm the target remote is the fork
 - Never comment on or modify pull requests on the upstream repository unless the user has explicitly allowed it - through existing personal notes or instructions, or by accepting when you ask
 
+# Cramph isolation
+<!-- from CramphIsolationRules in agent_rules.py -->
+- `cramph`, including its tests under `test/cramph_test`, imports only `krrood` and `semantic_digital_twin` among the workspace packages - in particular not `giskardpy`, `coraplex`, `segmind`, `physics_simulators`, `robokudo` or `experiments`
+- ROS is a soft dependency of `cramph`: only a tool that needs it, such as the statechart inspector, imports ROS packages, and nothing else in `cramph` imports that tool
+- Generic statechart behaviour (life cycles, transition conditions, ticking, composite nodes, generic monitors, plotting) belongs in `cramph`; motion-specific behaviour (QP constraints, tasks, world and robot monitors) belongs in `giskardpy`, built on top of `cramph`
+
 # Domain specific conventions
 <!-- from DomainSpecificConventionsRules in agent_rules.py -->
 - For spatial types and connections, follow `semantic_digital_twin/doc/style_guide.md`
@@ -179,3 +185,19 @@
 - `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events` and `probabilistic_model`, which `krrood`'s source already depends on
 - When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
 - Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
+
+# Pull request labels
+<!-- from PullRequestLabelsRules in agent_rules.py -->
+- Label every pull request you open with its kinds of change. Where you cannot set a label, because the repository lacks it or the pull request is opened through a link, name the labels to the user instead
+- On a pull request you do not open yourself - one you prepare for the developer to open, review, or are asked about - set no labels; suggest to its developer which labels to add and, for an `api-break`, what the rules below ask of it
+- Apply every kind-of-change label that describes a part of the change:
+  - `api-break`: the change can break code that already uses it - it removes or renames a public module, class, method, field or parameter, changes a signature incompatibly, changes the documented behaviour or return value of a public method, or changes an ORM schema or a serialized format
+  - `new-feature`: the change adds public API or user-visible behaviour without breaking existing users
+  - `bug-fix`: the change makes existing behaviour match its documented or intended contract
+  - `maintenance`: the change modifies code without changing its behaviour or API - refactoring, cleanup, dependency updates
+- Apply `api-break` whenever any part of the change breaks existing users, however small that part is
+- The workflow `.github/workflows/pr_api_break_check.yml` adds `api-break` when a public signature breaks; look for the breaks it cannot see: changed documented behaviour or return values, ORM schemas and serialized formats
+- Never set or suggest framework labels, `documentation` or `dev-tools`: the labeler sets them on every pull request from the files it changes, as `.github/labeler.yml` maps them
+- Before review is requested on an `api-break` pull request:
+  - its description states what breaks and how users migrate
+  - tell the user to discuss the break with the code owners of the affected frameworks, listed in `.github/CODEOWNERS`, or in the Cramgineers channel

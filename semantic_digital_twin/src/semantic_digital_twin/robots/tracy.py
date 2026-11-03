@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# %% Imports
 import os
 from collections import defaultdict
 from dataclasses import dataclass
@@ -32,17 +33,20 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     MountingTable,
-    Camera,
+    RobotCamera,
     EndEffector,
     Finger,
 )
+from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.robots.robotiq_85_gripper import Robotiq85Gripper
 from semantic_digital_twin.robots.ur10e_arm import UR10eArm
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+# %% Robot parts
 
 
 class TracyTopic(StrEnum):
@@ -57,6 +61,26 @@ class TracyTopic(StrEnum):
     RIGHT_ARM_JOINT_STATES = "right_arm/joint_states"
     LEFT_GRIPPER_JOINT_STATES = "left_gripper/joint_states"
     RIGHT_GRIPPER_JOINT_STATES = "right_gripper/joint_states"
+
+
+class TracyControllerManager(StrEnum):
+    """
+    The ros2_control controller managers of the Tracy, one per arm.
+    """
+
+    LEFT_ARM = "left_arm/controller_manager"
+    RIGHT_ARM = "right_arm/controller_manager"
+
+
+class TracyController(StrEnum):
+    """
+    The ros2_control controllers of the Tracy, as its controller managers name them.
+    """
+
+    FORWARD_VELOCITY = "forward_velocity_controller"
+    """
+    Commands the joint velocities of one arm; each arm's controller manager loads one.
+    """
 
 
 class TracyJoint(JointName):
@@ -91,7 +115,6 @@ class TracyJoint(JointName):
 
 @dataclass(eq=False)
 class TracyLeftGripperLeftFinger(Finger):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -121,7 +144,6 @@ class TracyLeftGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class TracyLeftGripperRightFinger(Finger):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -151,7 +173,6 @@ class TracyLeftGripperRightFinger(Finger):
 
 @dataclass(eq=False)
 class TracyRightGripperLeftFinger(Finger):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -181,7 +202,6 @@ class TracyRightGripperLeftFinger(Finger):
 
 @dataclass(eq=False)
 class TracyRightGripperRightFinger(Finger):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -213,7 +233,6 @@ class TracyRightGripperRightFinger(Finger):
 class TracyLeftGripper(
     Robotiq85Gripper[TracyLeftGripperLeftFinger, TracyLeftGripperRightFinger]
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -270,7 +289,6 @@ class TracyLeftGripper(
 class TracyRightGripper(
     Robotiq85Gripper[TracyRightGripperLeftFinger, TracyRightGripperRightFinger]
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -318,7 +336,6 @@ class TracyRightGripper(
 
 @dataclass(eq=False)
 class TracyLeftArm(UR10eArm[TracyLeftGripper]):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -352,7 +369,6 @@ class TracyLeftArm(UR10eArm[TracyLeftGripper]):
 
 @dataclass(eq=False)
 class TracyRightArm(UR10eArm[TracyRightGripper]):
-
     @classproperty
     def topic_name(cls) -> str:
         """
@@ -385,17 +401,16 @@ class TracyRightArm(UR10eArm[TracyRightGripper]):
 
 
 @dataclass(eq=False)
-class TracyCamera(Camera):
+class TracyCamera(RobotCamera[FieldOfViewCameraModel]):
+    """
+    Tracy's fixed camera rooted at its calibrated camera link.
+    """
 
     def setup_hardware_interfaces(self) -> None:
         pass
 
     def setup_joint_states(self) -> list[JointState]:
         return []
-
-    @property
-    def forward_facing_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.root)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -405,7 +420,9 @@ class TracyCamera(Camera):
             root=robot_root._world.get_body_in_branch_by_name(
                 robot_root, "camera_link"
             ),
-            field_of_view=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785),
+            camera_model=FieldOfViewCameraModel(
+                angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
+            ),
             minimal_height=0.8,
             maximal_height=1.7,
             default_camera=True,

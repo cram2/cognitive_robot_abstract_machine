@@ -31,14 +31,16 @@ class ProbabilityTable(ABC, Generic[StoredLogProbabilities]):
     The probability of every state for every node of a discrete layer, a table of shape
     (#nodes, #states).
 
-    A discrete layer answers every query through the operations of its table. A table is not changed after it was created; every operation that changes the
-    probabilities returns a new table of the same type.
+    A discrete layer answers every query through the operations of its table. A table is
+    not changed after it was created; every operation that changes the probabilities
+    returns a new table of the same type.
     """
 
     log_probabilities: StoredLogProbabilities
     """
-    The log-probabilities of the table. Every type of table declares the representation
-    it stores them in.
+    The log-probabilities of the table.
+
+    Every type of table declares the representation it stores them in.
     """
 
     # %% construction
@@ -368,8 +370,8 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
     """
     The log-probability of every state with a non-zero probability, for every node.
 
-    A state that is not stored has probability zero. A stored zero is the log-probability
-    of a state with probability one.
+    A state that is not stored has probability zero. A stored zero is the log-
+    probability of a state with probability one.
     """
 
     @classmethod

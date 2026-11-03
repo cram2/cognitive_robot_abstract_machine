@@ -28,7 +28,7 @@ then inflated by `distance_to_obstacle`, so the robot keeps that distance to the
 
 ```python
 from coraplex.locations.costmaps import OccupancyCostmap
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 occupancy = OccupancyCostmap(
     resolution=0.02,
@@ -61,7 +61,7 @@ default camera.
 
 ```python
 from coraplex.locations.costmaps import VisibilityCostmap
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 visibility = VisibilityCostmap(
     minimum_height=1.27,
@@ -85,7 +85,7 @@ Here `mean` is the number of cells along each side of the costmap and `sigma` th
 
 ```python
 from coraplex.locations.costmaps import GaussianCostmap
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 gauss = GaussianCostmap(
     mean=200,
@@ -106,7 +106,7 @@ stand close enough to the target, but not on top of it.
 
 ```python
 from coraplex.locations.costmaps import RingCostmap
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 ring = RingCostmap(
     standard_deviation=15,

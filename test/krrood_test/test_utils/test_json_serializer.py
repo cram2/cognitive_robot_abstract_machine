@@ -2,6 +2,7 @@ import datetime
 import json
 import pathlib
 import re
+import tracemalloc
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -18,6 +19,8 @@ from krrood.adapters.exceptions import (
     InvalidTypeFormatError,
     UnknownModuleError,
     ClassNotFoundError,
+    ObjectArraySerializationError,
+    StructuredArraySerializationError,
 )
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import (
@@ -403,6 +406,49 @@ def test_nparray():
     data = to_json(obj)
     result = from_json(data)
     assert np.allclose(result, obj)
+
+
+def test_an_array_keeps_its_shape_and_element_type_exactly():
+    obj = np.arange(12, dtype=np.float32).reshape(3, 4) / 7
+
+    result = from_json(to_json(obj))
+
+    assert result.dtype == obj.dtype
+    np.testing.assert_array_equal(result, obj)
+
+
+def test_an_array_without_dimensions_keeps_its_shape():
+    obj = np.array(2.5)
+
+    result = from_json(to_json(obj))
+
+    assert result.shape == obj.shape
+    assert result == obj
+
+
+def test_serializing_an_array_holds_less_than_twice_its_bytes():
+    """
+    Large arrays, such as the vertices of a mesh, are serialized whenever they are
+    synchronized, so their json must not take many times their own memory.
+    """
+    obj = np.linspace(0.0, 1.0, 100_000)
+
+    tracemalloc.start()
+    data = to_json(obj)
+    held, _ = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert held < 2 * obj.nbytes
+
+
+def test_an_array_of_python_objects_is_not_serialized():
+    with pytest.raises(ObjectArraySerializationError):
+        to_json(np.array([object(), object()]))
+
+
+def test_an_array_of_records_is_not_serialized():
+    with pytest.raises(StructuredArraySerializationError):
+        to_json(np.zeros(2, dtype=[("x", np.float64), ("count", np.int32)]))
 
 
 def test_coordinate_sparse_array_keeps_its_stored_entries():

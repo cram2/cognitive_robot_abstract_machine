@@ -28,7 +28,7 @@ np.random.seed(69)
 number_of_samples_per_component = 10000
 number_of_samples_for_evaluation = 5000
 number_of_components = 5
-min_samples_per_quantile = 10
+minimum_samples_per_quantile = 10
 
 # performance evaluation
 number_of_iterations = 100
@@ -53,7 +53,7 @@ variable = Continuous("x")
 # create models
 if not load_from_disc:
     rustworkx_model = NygaInduction(
-        variable, min_samples_per_quantile=min_samples_per_quantile
+        variable, minimum_samples_per_quantile=minimum_samples_per_quantile
     )
     rustworkx_model.fit(data)
     jax_model = CircuitRepresentations().convert(
@@ -112,7 +112,6 @@ def eval_performance(
     times_rustworkx = []
 
     for index in tqdm.trange(number_of_iterations, desc="Evaluating performance"):
-
         current_log_likelihood_jax, time_jax = timed_jax_method()
         current_log_likelihood_rustworkx, time_rustworkx = timed_rustworkx_method()
         if index >= warmup_iterations:

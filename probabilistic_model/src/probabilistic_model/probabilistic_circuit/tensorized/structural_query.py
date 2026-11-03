@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 @dataclass
 class LayerWithLogProbabilities:
     """
-    A layer that a structural query created, with the log-probability of the query
-    under each of its nodes.
+    A layer that a structural query created, with the log-probability of the query under
+    each of its nodes.
     """
 
     layer: Layer
@@ -47,8 +47,8 @@ class LogProbabilitiesOfLayers:
 
     by_layer_id: dict[int, NodeValues] = field(default_factory=dict)
     """
-    The log-probabilities of the nodes of every recorded layer, keyed by the
-    :func:`id` of the layer.
+    The log-probabilities of the nodes of every recorded layer, keyed by the :func:`id`
+    of the layer.
     """
 
     def record(self, result: LayerWithLogProbabilities) -> LayerWithLogProbabilities:

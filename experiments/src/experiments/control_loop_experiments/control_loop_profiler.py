@@ -8,11 +8,12 @@ from typing_extensions import Self, Any, Callable
 
 import numpy as np
 
-from giskardpy.executor import Executor
+from cramph.executor import StatechartExecutor
 from giskardpy.middleware.ros2.control_loop import ControlLoop
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from semantic_digital_twin.input_synchronization import WorldStateInputs
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.compiled_tick import CompiledTick
+from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller import QPController
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.exceptions import DataclassException
@@ -62,9 +63,11 @@ CONTROL_CYCLE_PHASES: tuple[PhaseDefinition, ...] = (
     PhaseDefinition(ControlLoop, "apply_world_updates", "apply_world_updates"),
     PhaseDefinition(WorldStateInputs, "synchronize", "synchronize_inputs"),
     PhaseDefinition(ControlLoop, "raise_if_canceled", "check_cancel"),
-    PhaseDefinition(Executor, "tick", "executor_tick"),
+    PhaseDefinition(StatechartExecutor, "tick", "executor_tick"),
     PhaseDefinition(CollisionManager, "compute_collisions", "compute_collisions"),
-    PhaseDefinition(MotionStatechart, "tick", "statechart_tick"),
+    PhaseDefinition(Statechart, "tick", "statechart_tick"),
+    PhaseDefinition(CompiledTick, "settle", "settle"),
+    PhaseDefinition(CompiledTick, "_take_over_latest_pass", "settle_pass"),
     PhaseDefinition(QPController, "compute_command", "qp_solve"),
     PhaseDefinition(World, "apply_control_commands", "apply_control_commands"),
     PhaseDefinition(World, "notify_state_change", "notify_state_change"),
@@ -382,7 +385,7 @@ class ControlLoopProfiler(AbstractContextManager):
 
     compile_duration: float = field(init=False, default=0.0)
     """
-    Seconds the last :meth:`giskardpy.executor.Executor.compile` took.
+    Seconds the last :meth:`cramph.executor.StatechartExecutor.compile` took.
     """
 
     _open_phases: _ThreadLocalPhaseStack = field(
@@ -466,16 +469,16 @@ class ControlLoopProfiler(AbstractContextManager):
         """
         Measure how long the controller of a goal takes to build.
         """
-        original = Executor.compile
+        original = StatechartExecutor.compile
 
-        def timed(instance: Executor, *args: Any, **kwargs: Any) -> Any:
+        def timed(instance: StatechartExecutor, *args: Any, **kwargs: Any) -> Any:
             started_at = time.perf_counter()
             try:
                 return original(instance, *args, **kwargs)
             finally:
                 self.compile_duration = time.perf_counter() - started_at
 
-        self._replace_method(Executor, "compile", original, timed)
+        self._replace_method(StatechartExecutor, "compile", original, timed)
 
     def _replace_method(
         self,

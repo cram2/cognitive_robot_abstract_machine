@@ -6,12 +6,8 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Pose,
-    RotationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix, Vector3
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -33,7 +29,7 @@ def boxed_pr2_world(simple_pr2_context):
     """
     A PR2 next to a graspable box of known extents, a meter above the world root.
     """
-    world, robot, context = simple_pr2_context
+    world, robot, extensions = simple_pr2_context
     with world.modify_world():
         box = Body(
             name=PrefixedName("approach_box"),

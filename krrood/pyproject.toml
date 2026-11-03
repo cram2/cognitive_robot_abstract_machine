@@ -39,8 +39,8 @@ dependencies = [
     "ucimlrepo>=0.0.7",
     "pdbpp",
     "pytest",
-    "probabilistic_model",
-    "random_events",
+    "probabilistic_model>=26.10.0",
+    "random_events>=26.10.0",
 ]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design."
 readme = "README.md"
@@ -94,6 +94,7 @@ krrood = "krrood.development_tools.command_line:CommandLine.main"
 Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
 "Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
 "Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -64,12 +64,12 @@ from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ActiveConnection1DOF,
@@ -1434,7 +1434,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         if name is None:
             name = PrefixedName("region")
         if color is None:
-            color = Color(0.5, 1.0, 0.5, 0.5)
+            color = Color.from_rgba(red=0.5, green=1.0, blue=0.5, opacity=0.5)
 
         shapes = boxes.as_shapes()
         shapes.dye_shapes(color)

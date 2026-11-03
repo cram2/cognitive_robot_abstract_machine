@@ -1,15 +1,16 @@
+# %% Imports
 from __future__ import annotations
 
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing_extensions import Iterator
 
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 from matplotlib import colors
 from skimage.measure import label
+from typing_extensions import Iterator
 
 from coraplex.locations.base import Location
 from krrood.entity_query_language.exceptions import NonPositiveLimitValue
@@ -17,20 +18,19 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3
+from krrood_spatial_math.spatial_types import Pose, Point3, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
-
-from coraplex.datastructures.dataclasses import Context
 
 logger = logging.getLogger("coraplex")
 
 
+# %% Costmaps
 @dataclass
 class Costmap(Location):
     """
@@ -81,6 +81,11 @@ class Costmap(Location):
     """
     The world from which this locations was created.
     """
+    seed: int | None = field(default=None, kw_only=True)
+    """
+    Seed of the sampling, so a run can be repeated; ``None`` samples afresh each time.
+    """
+
     visualization_ids: list[int] = field(default_factory=list, init=False)
 
     def close_visualization(self) -> None:
@@ -295,7 +300,7 @@ class Costmap(Location):
                     self.world.root,
                 )
 
-    def segment_map(self) -> list[np.ndarray]:
+    def segment_map(self) -> list[NDArray[np.float64]]:
         """
         Finds partitions in the locations and isolates them, a partition is a number of entries in the locations which are
         neighbours. Returns a list of numpy arrays with one partition per array.
@@ -352,7 +357,7 @@ class OccupancyCostmap(Costmap):
         )
         self.map = self._create_from_world()
 
-    def create_ray_mask_around_origin(self):
+    def create_ray_mask_around_origin(self) -> np.ndarray:
         """
         Determines the occupied space around the origin position using ray testing. A
         ray is cast from the robot's base height straight down to the ground and if it
@@ -389,7 +394,9 @@ class OccupancyCostmap(Costmap):
         free_space_mask = np.ones(len(rays))
 
         ray_tracer = RayTracer(self.world)
-        _, hit_ray_indices, hit_bodies = ray_tracer.ray_test(rays[:, 0], rays[:, 1])
+        ray_intersections = ray_tracer.ray_test(rays[:, 0], rays[:, 1])
+        hit_ray_indices = ray_intersections.ray_indices
+        hit_bodies = ray_intersections.bodies
 
         unoccupied_entities = self._floor_bodies
         if self.robot_view:
@@ -461,7 +468,7 @@ class OccupancyCostmap(Costmap):
     @classmethod
     def default_map(
         cls,
-        context: Context,
+        robot: AbstractRobot,
         target: Pose,
         *,
         resolution: float = 0.02,
@@ -471,7 +478,7 @@ class OccupancyCostmap(Costmap):
         Creates an occupancy costmap around a target, keeping the robot base's radius
         clear of obstacles.
 
-        :param context: The context to create the occupancy cost map.
+        :param robot: The robot whose base is kept clear of obstacles.
         :param target: The target pose for the occupancy cost map.
         :param resolution: Edge length of a cell, in meters.
         :param cells: Number of cells along each side of the map.
@@ -484,9 +491,9 @@ class OccupancyCostmap(Costmap):
             resolution=resolution,
             width=cells,
             height=cells,
-            world=context.world,
-            distance_to_obstacle=context.robot.mobile_base.base_radius,
-            robot_view=context.robot,
+            world=robot._world,
+            distance_to_obstacle=robot.mobile_base.base_radius,
+            robot_view=robot,
             origin=ground_pose,
         )
 
@@ -793,7 +800,6 @@ class RingCostmap(Costmap):
     @classmethod
     def from_arm_reach_distance(
         cls,
-        context: Context,
         arm: Arm,
         origin: Pose,
         reach_fraction: float,
@@ -805,7 +811,6 @@ class RingCostmap(Costmap):
         """
         Creates a ring costmap around a target the robot is to reach with one arm.
 
-        :param context: The context holding the robot and world.
         :param arm: The arm that will do the reaching.
         :param origin: The target the ring is drawn around.
         :param reach_fraction: The fraction of the arm's length the ring stands off
@@ -822,7 +827,7 @@ class RingCostmap(Costmap):
             height=cells,
             standard_deviation=standard_deviation,
             distance=arm.approximate_length() * reach_fraction,
-            world=context.world,
+            world=arm._world,
             origin=origin,
         )
 

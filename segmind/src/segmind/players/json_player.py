@@ -12,8 +12,8 @@ from trimesh import Geometry
 
 
 from segmind.players.data_player import FilePlayer, FrameData
-from semantic_digital_twin.spatial_types import RotationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import RotationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 

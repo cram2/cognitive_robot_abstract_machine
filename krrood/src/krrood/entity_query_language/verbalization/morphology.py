@@ -95,8 +95,8 @@ class AdjectivalSuffix(enum.StrEnum):
     """
     Word endings that mark an English word as adjectival.
 
-    A best-effort shape test — not a part-of-speech tagger — used only as the fallback after the
-    deterministic :func:`is_past_participle` check.
+    A best-effort shape test — not a part-of-speech tagger — used only as the fallback
+    after the deterministic :func:`is_past_participle` check.
     """
 
     IC = "ic"
@@ -152,6 +152,22 @@ def third_person_singular(lemma: str) -> str:
     """
     forms = getInflection(lemma, tag="VBZ")
     return forms[0] if forms else lemma + "s"
+
+
+def present_participle(lemma: str) -> str:
+    """
+    :param lemma: A verb in its base (lemma) form.
+    :return: The present participle (*"open"* → *"opening"*, *"close"* → *"closing"*),
+        via ``lemminflect``'s ``VBG`` inflection; falls back to ``lemma + "ing"`` for an
+        unknown word.
+
+    >>> present_participle("open")
+    'opening'
+    >>> present_participle("close")
+    'closing'
+    """
+    forms = getInflection(lemma, tag="VBG")
+    return forms[0] if forms else lemma + "ing"
 
 
 def verb_lemma(word: str) -> str:

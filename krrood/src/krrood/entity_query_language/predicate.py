@@ -34,13 +34,15 @@ if TYPE_CHECKING:
         VerbalizationFragment,
     )
 
-from krrood.entity_query_language.utils import T, merge_args_and_kwargs
+from krrood.class_diagrams.call_signature import CallSignature
+from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.variable import (
     Variable,
     InstantiatedVariable,
     Literal,
 )
 from krrood.entity_query_language.core.base_expressions import (
+    Operand,
     Selectable,
     SymbolicExpression,
 )
@@ -69,10 +71,12 @@ def symbolic_function(
     :return: The decorated function.
     """
 
+    signature = CallSignature.of(function)
+
     @wraps(function)
     def wrapper(*args, **kwargs) -> Any | None:
-        all_kwargs = merge_args_and_kwargs(function, args, kwargs)
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        all_kwargs = signature.keyword_arguments(*args, **kwargs)
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=function,
                 _kwargs_=all_kwargs,
@@ -226,10 +230,8 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """
 
     def __new__(cls, *args, **kwargs):
-        all_kwargs = merge_args_and_kwargs(
-            cls.__init__, args, kwargs, ignore_first=True
-        )
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        all_kwargs = CallSignature.of(cls).keyword_arguments(*args, **kwargs)
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=cls,
                 _kwargs_=all_kwargs,
@@ -558,12 +560,13 @@ call).
 """
 
 
-def _any_of_the_kwargs_is_a_variable(bindings: dict[str, Any]) -> bool:
+def _any_argument_is_an_operand(arguments: dict[str, Any]) -> bool:
     """
-    :param bindings: A kwarg like dict mapping strings to objects
-    :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
+    :param arguments: The arguments of a call, by parameter name.
+    :return: Whether any of *arguments* stands for an expression, such as a variable or
+        a match, so that the call has to be built as an expression instead of computed.
     """
-    return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())
+    return any(isinstance(argument, Operand) for argument in arguments.values())
 
 
 @dataclass(eq=False)

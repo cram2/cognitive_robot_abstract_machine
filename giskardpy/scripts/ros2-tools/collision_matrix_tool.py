@@ -34,7 +34,7 @@ from PyQt5.QtWidgets import (
     QScrollArea,
 )
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
     ShapeSource,
@@ -108,7 +108,7 @@ class SelfCollisionMatrixInterface:
             self.world.add_body(Body(name=PrefixedName("map")))
 
     def load_urdf(self, urdf_path: str):
-        robot_world = URDFParser.from_file(urdf_path).parse()
+        robot_world = URDFParser.from_file(urdf_path).create_world()
         self.self_collision_matrix_rule = SelfCollisionMatrixRule()
         with self.world.modify_world():
             self.world.clear()
@@ -128,9 +128,13 @@ class SelfCollisionMatrixInterface:
             for body in self.world.bodies_with_collision:
                 for shape in body.collision.shapes:
                     if body in self.self_collision_matrix_rule.allowed_collision_bodies:
-                        shape.color = Color(1.0, 0.0, 0.0, 0.25)
+                        shape.color = Color.from_rgba(
+                            red=1.0, green=0.0, blue=0.0, opacity=0.25
+                        )
                         continue
-                    shape.color = Color(1.0, 1.0, 1.0, 0.5)
+                    shape.color = Color.from_rgba(
+                        red=1.0, green=1.0, blue=1.0, opacity=0.5
+                    )
 
     @property
     def bodies(self) -> list[Body]:
@@ -326,8 +330,11 @@ class CollisionMatrixTable(QTableWidget):
         body_a = self.table_id_to_body(row)
         body_b = self.table_id_to_body(column)
         color = reason_color_map[DisableCollisionReason.Unknown]
-        color_msg = Color(
-            R=color[0] / 255.0, G=color[1] / 255.0, B=color[2] / 255.0, A=1.0
+        color_msg = Color.from_rgba(
+            red=color[0] / 255.0,
+            green=color[1] / 255.0,
+            blue=color[2] / 255.0,
+            opacity=1.0,
         )
 
         with self.self_collision_matrix_interface.world.modify_world():

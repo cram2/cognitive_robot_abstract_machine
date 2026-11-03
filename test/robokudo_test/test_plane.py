@@ -10,14 +10,15 @@ have it.
 
 from __future__ import annotations
 
+# %% Imports
 import numpy as np
-import open3d as o3d
+import open3d
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 
 # robokudo.pipeline must be imported before robokudo.annotators.outputs: importing
 # outputs first trips a circular import between it and robokudo.annotators.core.
-import robokudo.pipeline
+import robokudo.pipeline  # noqa: F401
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap, AnnotatorOutputs
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.cas import CAS, CASViews
@@ -51,15 +52,14 @@ def cas_with_a_noisy_plane() -> CAS:
             random_state.uniform(0.5, 1.0, 600),
         ]
     )
-    cloud = o3d.geometry.PointCloud()
-    cloud.points = o3d.utility.Vector3dVector(
+    cloud = open3d.geometry.PointCloud()
+    cloud.points = open3d.utility.Vector3dVector(
         np.vstack([on_the_plane, above_the_plane])
     )
     cas = CAS()
     cas.set_ref(CASViews.CLOUD, cloud)
     cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
     cas.set(CASViews.DEPTH_IMAGE, np.zeros((200, 200), dtype=np.uint16))
-    cas.set(CASViews.CAMERA_INTRINSIC, o3d.camera.PinholeCameraIntrinsic())
     return cas
 
 

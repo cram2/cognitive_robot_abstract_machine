@@ -103,10 +103,11 @@ poetry install
 
 ## Browser visualization
 
-The workspace includes [CRAMERA](cramera/README.md) for live 3D visualization,
-recorded playback, EQL questions and plan/statechart inspection. Start `cramera`
-from the activated environment, then run an existing demo with
-`cramera-live path/to/demo.py`.
+[CRAMERA](https://github.com/AICOR-Solutions/cramera) provides live 3D visualization,
+recorded playback, EQL questions and plan/statechart inspection in the browser. It
+lives in its own repository, whose `scripts/install_stack.py` installs it together with
+this workspace; with it installed, start `cramera` from the activated environment, then
+add a `LiveVisualization` to the executor of the demo you want to follow.
 
 ## To run tests
 

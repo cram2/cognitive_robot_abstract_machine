@@ -5,11 +5,17 @@ This module provides classes for describing a world with predefined objects and 
 It builds semantic_digital_twin entities into a shared World instance.
 """
 
+from __future__ import annotations
+
+from robokudo.exceptions import ObjectGeometryMissing, RegionParentMissing
+
+# %% Imports
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.robots.robot_parts import Camera
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import (
@@ -26,6 +32,8 @@ from semantic_digital_twin.world_description.world_entity import (
     SemanticAnnotation,
 )
 from typing_extensions import Any
+
+# %% Camera definitions
 
 
 @dataclass
@@ -44,7 +52,11 @@ class ObjectSpec:
     cylinder_width: float | None = None
     cylinder_height: float | None = None
     center_mesh: bool = True
-    color: Color = field(default_factory=lambda: Color(0.1, 0.2, 0.8, 1.0))
+    color: Color = field(
+        default_factory=lambda: Color.from_rgba(
+            red=0.1, green=0.2, blue=0.8, opacity=1.0
+        )
+    )
 
 
 @dataclass
@@ -61,6 +73,23 @@ class RegionSpec:
     box_scale: Scale
     parent_name: str | None = None
     color: Color = field(default_factory=Color)
+
+
+@dataclass
+class CameraPlacement:
+    """
+    Describe a standalone camera and its pose relative to a parent body.
+    """
+
+    camera: Camera
+    """
+    Camera annotation whose optical root will be attached to the parent.
+    """
+
+    parent_T_camera: HomogeneousTransformationMatrix
+    """
+    Optical-frame pose relative to the selected parent body.
+    """
 
 
 @dataclass(eq=False)
@@ -145,12 +174,7 @@ class BaseWorldDescriptor:
                         shapes = [cylinder]
                         collision = ShapeCollection([cylinder])
                     else:
-                        raise ValueError(
-                            (
-                                f"ObjectSpec {spec.name} requires mesh_path, box_scale, "
-                                "or cylinder_width+cylinder_height."
-                            )
-                        )
+                        raise ObjectGeometryMissing(object_name=spec.name)
 
                 body = Body(
                     name=PrefixedName(name=spec.name),
@@ -192,8 +216,8 @@ class BaseWorldDescriptor:
                 if spec.parent_name is not None:
                     parent_candidates = self.world.get_bodies_by_name(spec.parent_name)
                     if len(parent_candidates) == 0:
-                        raise ValueError(
-                            f"RegionSpec {spec.name} references unknown parent_name '{spec.parent_name}'."
+                        raise RegionParentMissing(
+                            region_name=spec.name, parent_name=spec.parent_name
                         )
                     parent = parent_candidates[0]
 
@@ -209,6 +233,32 @@ class BaseWorldDescriptor:
                 connections[spec.name].origin = spec.pose
 
         return connections
+
+    def build_camera(self, parent: Body, placement: CameraPlacement) -> Camera:
+        """
+        Attach and register the supplied camera at its parent-relative optical pose.
+
+        :param parent: Body to which the detached optical root is attached.
+        :param placement: Camera annotation and its optical pose relative to the parent.
+        :return: The supplied camera annotation registered in this descriptor's world.
+        """
+        camera = placement.camera
+        with self.world.modify_world():
+            connection = Connection6DoF.create_with_dofs(
+                parent=parent,
+                child=camera.root,
+                world=self.world,
+            )
+            self.world.add_connection(connection)
+            self.world.add_semantic_annotation(camera)
+
+        with self.world.modify_world():
+            connection.origin = HomogeneousTransformationMatrix(
+                data=placement.parent_T_camera,
+                reference_frame=parent,
+                child_frame=camera.root,
+            )
+        return camera
 
     def get_predefined_object_bodies(self) -> list[Body]:
         """

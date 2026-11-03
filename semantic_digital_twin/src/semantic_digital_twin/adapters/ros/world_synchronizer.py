@@ -92,6 +92,8 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     Every published message carries its position in this synchronizer's stream, and
     every applied message is remembered per publisher, so that two processes can tell
     each other what to catch up with without comparing world models they cannot compare.
+    A message that does not follow the one received from its publisher before reveals
+    that messages in between were lost, which is logged.
     """
 
     node: RosNode = field(kw_only=True)
@@ -117,6 +119,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     discovery_poll_interval: timedelta = timedelta(seconds=0.02)
     """
     How long to wait between two looks at the subscribers of the topic while connecting.
+    """
+
+    message_queue_depth: int = 1000
+    """
+    How many messages the publisher and the subscriber keep for a receiver that has not
+    taken them yet; once more are waiting, the oldest are lost.
     """
 
     publisher: Publisher | None = field(init=False, default=None)
@@ -146,6 +154,13 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     The highest position applied so far, per publisher.
     """
 
+    _received_sequence_numbers: dict[MetaData, int] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The position of the message received last, per publisher.
+    """
+
     _sequence_number_lock: threading.Lock = field(
         default_factory=threading.Lock, init=False, repr=False
     )
@@ -161,10 +176,12 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             std_msgs.msg.String,
             topic=self.topic_name,
             callback=self.subscription_callback,
-            qos_profile=10,
+            qos_profile=self.message_queue_depth,
         )
         self.publisher = self.node.create_publisher(
-            std_msgs.msg.String, topic=self.topic_name, qos_profile=10
+            std_msgs.msg.String,
+            topic=self.topic_name,
+            qos_profile=self.message_queue_depth,
         )
         self.wait_until_connected()
 
@@ -238,7 +255,34 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
             if deserialized_message.meta_data == self.meta_data:
                 return
 
+            self._notice_lost_messages(deserialized_message)
             self._subscription_callback(deserialized_message)
+
+    def _notice_lost_messages(
+        self, message: Message, warning_throttle_period: float = 1.0
+    ) -> None:
+        """
+        Warn that messages of the publisher of `message` were lost if `message` does not
+        follow the one received from it before.
+
+        Only what changed is published, so the world may differ from the publisher's in
+        what the lost messages carried.
+
+        :param message: A message just received from another synchronizer.
+        :param warning_throttle_period: The fewest seconds between two warnings.
+        """
+        publisher = message.meta_data
+        with self._sequence_number_lock:
+            last_received = self._received_sequence_numbers.get(publisher)
+            self._received_sequence_numbers[publisher] = message.sequence_number
+        if last_received is None or message.sequence_number == last_received + 1:
+            return
+        self.node.get_logger().warning(
+            f"Updates #{last_received + 1} to #{message.sequence_number - 1} of "
+            f"'{publisher.node_name}' were lost, so this world may differ from the one "
+            f"of the publisher.",
+            throttle_duration_sec=warning_throttle_period,
+        )
 
     @property
     def published_sequence_number(self) -> int:

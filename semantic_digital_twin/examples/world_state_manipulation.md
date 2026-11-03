@@ -36,7 +36,7 @@ from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale, Box, Color
 from semantic_digital_twin.world_description.world_entity import Body
@@ -109,7 +109,7 @@ with world.modify_world():
     
     # Add a visual for the new root so we can see the change of position in the visualization
     box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=new_root)
-    box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color(1., 0., 0., 1.))
+    box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1.))
     new_root.collision = [box]
     
     world.add_body(new_root)

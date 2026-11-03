@@ -14,7 +14,9 @@ MessageType = TypeVar("MessageType")
 
 
 @dataclass
-class LatestMessageSubscriber(Generic[MessageType], SubClassSafeGeneric, HasROS2Node, ABC):
+class LatestMessageSubscriber(
+    Generic[MessageType], SubClassSafeGeneric, HasROS2Node, ABC
+):
     """
     Subscribes to a topic and keeps the most recently received message.
 

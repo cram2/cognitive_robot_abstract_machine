@@ -29,6 +29,7 @@ from semantic_digital_twin.spatial_computations.forward_kinematics import (
     ForwardKinematicsManager,
 )
 from semantic_digital_twin.testing import StateChangeCounter
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import (
     ResetStateContextManager,
     WorldEntityRebinding,
@@ -45,6 +46,7 @@ ignore_classes = {
     WorldEntityRebinding,
     StateChangeCounter,
     ForwardKinematicsManager,
+    RayTracer,
     MeshFileStorage,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     SemanticDirection,
@@ -56,6 +58,7 @@ ignore_classes = {
 }
 
 
+# %% Interface generation
 def generate_orm():
     """
     Generate the ORM classes for the coraplex package.

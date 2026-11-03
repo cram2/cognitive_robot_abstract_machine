@@ -13,7 +13,7 @@ import std_msgs.msg
 from rclpy.node import Node
 from rclpy.timer import Timer
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.client_presence import (
     ClientHeartbeatPublisher,
     ClientWatchdog,
@@ -362,8 +362,10 @@ class TestHeartbeatWhileNodeIsBusy:
             assert wait_until(busy.started.is_set)
 
             assert wait_until(
-                lambda: sender.publish(heartbeat_of(client))
-                or client in presence.last_heartbeat
+                lambda: (
+                    sender.publish(heartbeat_of(client))
+                    or client in presence.last_heartbeat
+                )
             )
         finally:
             busy.release()
@@ -416,8 +418,10 @@ class TestHeartbeatWithoutItsNodeBeingSpun:
         )
         try:
             assert wait_until(
-                lambda: sender.publish(heartbeat_of(client))
-                or client in presence.last_heartbeat
+                lambda: (
+                    sender.publish(heartbeat_of(client))
+                    or client in presence.last_heartbeat
+                )
             )
         finally:
             presence.stop()

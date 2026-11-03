@@ -34,8 +34,8 @@ from semantic_digital_twin.grasping.surface_grasp import (
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.spatial_types.spatial_types import AxisAngle
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import AxisAngle
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -291,7 +291,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
         )
     return RelationalCircuitRegistry(
         RelationalProbabilisticCircuit(
-            learning_method=JointProbabilityTree(min_samples_per_leaf=20)
+            learning_method=JointProbabilityTree(minimum_samples_per_leaf=20)
         ).fit(grasps, SurfaceGrasp)
     )
 

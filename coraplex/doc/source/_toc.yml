@@ -12,13 +12,12 @@ parts:
 
   - caption: Concepts
     chapters:
-    - file: plan.md
+    - file: statechart.md
     - file: designators.md
     - file: orm_concept.md
     - file: abstract_robot.md
-    - file: process_modules.md
+    - file: motion_execution.md
     - file: locations.rst
-    - file: conditions.md
     - file: notebooks.md
   - caption: Adding a new Robot
     chapters:
@@ -32,7 +31,6 @@ parts:
 
   - caption: Examples
     chapters:
-      - file: notebooks/language
       - file: designator_example.md
         sections:
         - file: notebooks/plan
@@ -40,7 +38,7 @@ parts:
         - file: notebooks/action_designator
         - file: notebooks/object_designator
         - file: notebooks/location_designator
-        - file: notebooks/motion_designator
+        - file: notebooks/giskard_goals_in_actions
       - file: orm.md
         sections:
         - file: notebooks/orm_example
@@ -48,7 +46,6 @@ parts:
       - file: datastructures.rst
         sections:
         - file: notebooks/pose
-      - file: ros_utils.rst
 
   - caption: API
     chapters:

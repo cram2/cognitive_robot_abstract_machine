@@ -50,13 +50,13 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
         )
 
     @classmethod
-    def to_json(cls, obj: Any, **kwargs) -> dict[str, Any]:
+    def to_json(cls, instance: Any, **kwargs) -> dict[str, Any]:
         """
         Serialize a ROS 2 message into a JSON-compatible dictionary.
         """
         return {
-            JSONField.TYPE: get_full_class_name(obj.__class__),
-            "data": convert_ros_message_to_dictionary(obj),
+            JSONField.TYPE: get_full_class_name(instance.__class__),
+            "data": convert_ros_message_to_dictionary(instance),
         }
 
     @classmethod
@@ -92,15 +92,15 @@ class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
     """
 
     @classmethod
-    def to_json(cls, obj: QoSProfile, **kwargs) -> dict[str, Any]:
+    def to_json(cls, instance: QoSProfile, **kwargs) -> dict[str, Any]:
         """
         Serialize a QoSProfile into a JSON-compatible dictionary.
         """
         return {
-            JSONField.TYPE: get_full_class_name(obj.__class__),
+            JSONField.TYPE: get_full_class_name(instance.__class__),
             **{
-                field_name: to_json(getattr(obj, field_name), **kwargs)
-                for field_name in obj.__slots__
+                field_name: to_json(getattr(instance, field_name), **kwargs)
+                for field_name in instance.__slots__
             },
         }
 
@@ -127,13 +127,13 @@ class DurationJSONSerializer(ExternalClassJSONSerializer[Duration]):
     """
 
     @classmethod
-    def to_json(cls, obj: Duration, **kwargs) -> dict[str, Any]:
+    def to_json(cls, instance: Duration, **kwargs) -> dict[str, Any]:
         """
         Serialize a Duration into a JSON-compatible dictionary.
         """
         return {
-            JSONField.TYPE: get_full_class_name(obj.__class__),
-            "nanoseconds": obj.nanoseconds,
+            JSONField.TYPE: get_full_class_name(instance.__class__),
+            "nanoseconds": instance.nanoseconds,
         }
 
     @classmethod

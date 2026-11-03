@@ -6,7 +6,9 @@ carries it.
 
 from __future__ import annotations
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from typing_extensions import List, Tuple, Type
 
 from segmind.datastructures.events import (
     ContactEvent,
@@ -29,11 +31,11 @@ from segmind.detectors.spatial_relation_detector_nodes import (
 from segmind.detectors.agent_event_detector_nodes import (
     GraspDetector,
 )
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from segmind.episode_segmenter import EpisodeSegmentation
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -125,14 +127,16 @@ def _box_in_the_hand_of(world: World, gripper: EndEffector) -> Body:
 
 def _executor_for(
     world: World, detectors: list[AbstractDetector]
-) -> EpisodeSegmenterExecutor:
-    executor = EpisodeSegmenterExecutor(context=MotionStatechartContext(world=world))
-    executor.compile(SegmindStatechart().build_statechart(detectors))
+) -> StatechartExecutor:
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
+    )
+    executor.compile(DetectorStatechartBuilder(detectors).build(executor.context))
     return executor
 
 
 def _events_of(
-    executor: EpisodeSegmenterExecutor,
+    executor: StatechartExecutor,
     event_type: type[DetectionEvent],
     body: Body,
     with_object: bool = False,

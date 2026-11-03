@@ -38,13 +38,13 @@ class Open3DPointCloudJSONSerializer(
     """
 
     @classmethod
-    def to_json(cls, obj: o3d.geometry.PointCloud, **kwargs) -> dict[str, Any]:
+    def to_json(cls, instance: o3d.geometry.PointCloud, **kwargs) -> dict[str, Any]:
         """
         Convert an Open3D point cloud into a JSON-compatible payload.
         """
         return {
-            JSONField.TYPE: get_full_class_name(type(obj)),
-            "payload": encode_open3d_point_cloud_to_base64_pcd(obj),
+            JSONField.TYPE: get_full_class_name(type(instance)),
+            "payload": encode_open3d_point_cloud_to_base64_pcd(instance),
         }
 
     @classmethod
@@ -66,14 +66,14 @@ class NumpyScalarJSONSerializer(ExternalClassJSONSerializer[np.generic]):
     """
 
     @classmethod
-    def to_json(cls, obj: np.generic, **kwargs) -> dict[str, Any]:
+    def to_json(cls, instance: np.generic, **kwargs) -> dict[str, Any]:
         """
         Convert a NumPy scalar value to JSON-compatible data.
         """
         return {
-            JSONField.TYPE: get_full_class_name(type(obj)),
-            "dtype": str(obj.dtype),
-            "value": obj.item(),
+            JSONField.TYPE: get_full_class_name(type(instance)),
+            "dtype": str(instance.dtype),
+            "value": instance.item(),
         }
 
     @classmethod

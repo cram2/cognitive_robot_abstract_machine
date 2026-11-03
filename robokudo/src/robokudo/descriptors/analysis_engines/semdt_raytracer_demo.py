@@ -17,6 +17,10 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
+from robokudo.descriptors.camera_configs.config_ray_tracing import (
+    RayTracingCameraConfiguration,
+    WorldDescriptorSource,
+)
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -30,8 +34,10 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "semdt_raytracer",
-            world_descriptor_name="world_semdt_raytracer_tabletop",
+            RayTracingCameraConfiguration.registry_name,
+            source=WorldDescriptorSource(
+                descriptor_name="world_semdt_raytracer_tabletop"
+            ),
         )
         plane_desc = PlaneAnnotator.Descriptor()
         plane_desc.parameters.distance_threshold = 0.01
