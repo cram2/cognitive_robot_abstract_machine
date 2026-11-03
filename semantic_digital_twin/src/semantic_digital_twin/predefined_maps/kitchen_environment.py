@@ -87,43 +87,71 @@ class MaximumSpeed(float, Enum):
 
 # %% Wall parts
 class WindowWallPart(StrEnum):
-    """Named bodies and window bays in the predefined kitchen wall."""
+    """
+    Named bodies and window bays in the predefined kitchen wall.
+    """
 
     WALL = "north_wall"
-    """Main enclosing wall with window apertures."""
+    """
+    Main enclosing wall with window apertures.
+    """
     CHANNEL = "north_wall_cable_channel"
-    """Surface-mounted service channel near the floor."""
+    """
+    Surface-mounted service channel near the floor.
+    """
     LOWER_STRIP = "north_wall_lower_strip"
-    """Exposed surface beneath the channel."""
+    """
+    Exposed surface beneath the channel.
+    """
     FIRST_WINDOW = "north_window_0"
-    """Window bay beside the kitchen run."""
+    """
+    Window bay beside the kitchen run.
+    """
     SECOND_WINDOW = "north_window_1"
-    """Middle window bay along the wall."""
+    """
+    Middle window bay along the wall.
+    """
     THIRD_WINDOW = "north_window_2"
-    """Window bay toward the curved room corner."""
+    """
+    Window bay toward the curved room corner.
+    """
 
 
 class WindowWallResource(StrEnum):
-    """Cache categories for generated wall geometry."""
+    """
+    Cache categories for generated wall geometry.
+    """
 
     GEOMETRY = "kitchen_window_wall"
-    """Persistent generated meshes for the measured wall strips."""
+    """
+    Persistent generated meshes for the measured wall strips.
+    """
 
 
 # %% Surface measurements
 @dataclass
 class WallProfile:
-    """A face coordinate varying linearly along the wall in root coordinates."""
+    """
+    A face coordinate varying linearly along the wall in root coordinates.
+    """
 
     coordinate_at_reference: float
-    """Face coordinate at the reference position in metres."""
+    """
+    Face coordinate at the reference position in metres.
+    """
     along_wall_slope: float = 0.0
-    """Coordinate change per metre along root Y."""
+    """
+    Coordinate change per metre along root Y.
+    """
     reference_y: float = -1.0
-    """Along-wall reference position in metres."""
+    """
+    Along-wall reference position in metres.
+    """
 
     def coordinate_at(self, along_wall_y: float) -> float:
-        """Return the face coordinate at an along-wall position."""
+        """
+        Return the face coordinate at an along-wall position.
+        """
         return self.coordinate_at_reference + self.along_wall_slope * (
             along_wall_y - self.reference_y
         )
@@ -131,14 +159,22 @@ class WallProfile:
 
 @dataclass
 class WallStrip:
-    """A solid wall-mounted strip bounded by fitted front, top and bottom faces."""
+    """
+    A solid wall-mounted strip bounded by fitted front, top and bottom faces.
+    """
 
     front: WallProfile
-    """Root X coordinate of the exposed face."""
+    """
+    Root X coordinate of the exposed face.
+    """
     top: WallProfile
-    """Root Z coordinate of the top face."""
+    """
+    Root Z coordinate of the top face.
+    """
     bottom: WallProfile
-    """Root Z coordinate of the bottom face."""
+    """
+    Root Z coordinate of the bottom face.
+    """
 
     def create_in_world(
         self,
@@ -146,7 +182,9 @@ class WallStrip:
         name: WindowWallPart,
         wall: KitchenWindowWall,
     ) -> WallPanel:
-        """Add a closed collision and visual solid backed by the wall plane."""
+        """
+        Add a closed collision and visual solid backed by the wall plane.
+        """
         panel = WallPanel.create_with_new_body_in_world(name=name, world=world)
         vertices = [
             (depth_x, along_wall_y, height_z)
@@ -174,21 +212,35 @@ class WallStrip:
 # %% Window recesses
 @dataclass
 class WindowRecess:
-    """An observed window bay with a sill and a closed recessed panel."""
+    """
+    An observed window bay with a sill and a closed recessed panel.
+    """
 
     name: WindowWallPart
-    """Stable name of the window bay."""
+    """
+    Stable name of the window bay.
+    """
     start_y: float
-    """First opening edge along root Y in metres."""
+    """
+    First opening edge along root Y in metres.
+    """
     end_y: float
-    """Last opening edge along root Y in metres."""
+    """
+    Last opening edge along root Y in metres.
+    """
     sill_top: float
-    """Sill top above the registered floor in metres."""
+    """
+    Sill top above the registered floor in metres.
+    """
     opening_top: float = 2.960
-    """Upper recess boundary above the floor in metres."""
+    """
+    Upper recess boundary above the floor in metres.
+    """
 
     def add_to_wall(self, world: World, wall: Wall, model: KitchenWindowWall) -> None:
-        """Cut the window recess and add its sill and closed collision panel."""
+        """
+        Cut the window recess and add its sill and closed collision panel.
+        """
         depth = model.panel_front_x + model.backing_thickness - model.interior_x
         opening_height = self.opening_top - self.sill_top
         center_y = (self.start_y + self.end_y) / 2
@@ -232,26 +284,46 @@ class WindowRecess:
 # %% Window wall construction
 @dataclass
 class KitchenWindowWall:
-    """The lab's window wall with recessed bays and projecting lower features."""
+    """
+    The lab's window wall with recessed bays and projecting lower features.
+    """
 
     interior_x: float = 4.986
-    """Observed main room-facing wall plane in metres."""
+    """
+    Observed main room-facing wall plane in metres.
+    """
     start_y: float = -2.510
-    """Existing wall endpoint beside the kitchen run in metres."""
+    """
+    Existing wall endpoint beside the kitchen run in metres.
+    """
     end_y: float = 5.580
-    """Wall endpoint overlapping the existing curved corner in metres."""
+    """
+    Wall endpoint overlapping the existing curved corner in metres.
+    """
     height: float = 3.0
-    """Retained nominal wall height in metres."""
+    """
+    Retained nominal wall height in metres.
+    """
     panel_front_x: float = 5.129
-    """Observed window-assembly depth used for closed collision panels in metres."""
+    """
+    Observed window-assembly depth used for closed collision panels in metres.
+    """
     backing_thickness: float = 0.05
-    """Nominal wall material behind the window-assembly plane in metres."""
+    """
+    Nominal wall material behind the window-assembly plane in metres.
+    """
     panel_thickness: float = 0.01
-    """Nominal closed window-panel thickness in metres."""
+    """
+    Nominal closed window-panel thickness in metres.
+    """
     sill_front_x: float = 4.945
-    """Observed roomward sill edge in metres."""
+    """
+    Observed roomward sill edge in metres.
+    """
     sill_thickness: float = 0.02
-    """Approximate sill slab thickness in metres."""
+    """
+    Approximate sill slab thickness in metres.
+    """
     windows: tuple[WindowRecess, ...] = field(
         default_factory=lambda: (
             WindowRecess(WindowWallPart.FIRST_WINDOW, -2.370, -0.205, 0.619),
@@ -259,7 +331,9 @@ class KitchenWindowWall:
             WindowRecess(WindowWallPart.THIRD_WINDOW, 3.124, 5.300, 0.611),
         )
     )
-    """Observed window-bay boundaries and sill levels."""
+    """
+    Observed window-bay boundaries and sill levels.
+    """
     cable_channel: WallStrip = field(
         default_factory=lambda: WallStrip(
             front=WallProfile(4.92004270, -0.004738043),
@@ -267,18 +341,26 @@ class KitchenWindowWall:
             bottom=WallProfile(0.08430169, -0.002697850),
         )
     )
-    """Fitted channel faces extended along the wall."""
+    """
+    Fitted channel faces extended along the wall.
+    """
     lower_strip_front: WallProfile = field(
         default_factory=lambda: WallProfile(4.94318739, -0.004332790)
     )
-    """Observed face of the exposed strip below the channel."""
+    """
+    Observed face of the exposed strip below the channel.
+    """
     geometry_directory: Path = field(
         default_factory=lambda: create_cache_dir(WindowWallResource.GEOMETRY)
     )
-    """Persistent directory for generated collision and visual meshes."""
+    """
+    Persistent directory for generated collision and visual meshes.
+    """
 
     def create_in_world(self, world: World) -> Wall:
-        """Add the windowed wall and its fixed surface-mounted features."""
+        """
+        Add the windowed wall and its fixed surface-mounted features.
+        """
         depth = self.panel_front_x + self.backing_thickness - self.interior_x
         wall = Wall.create_with_new_body_in_world(
             name=WindowWallPart.WALL,
@@ -304,25 +386,37 @@ class KitchenWindowWall:
 # %% Sofa surface measurements
 @dataclass
 class SofaProfilePoint:
-    """A depth and floor-relative height on an upholstered side profile."""
+    """
+    A depth and floor-relative height on an upholstered side profile.
+    """
 
     depth: float
-    """Coordinate along the sofa's local depth axis."""
+    """
+    Coordinate along the sofa's local depth axis.
+    """
     height: float
-    """Height above the room floor."""
+    """
+    Height above the room floor.
+    """
 
 
 @dataclass
 class SofaProfile:
-    """A convex upholstery profile extruded across a specified width interval."""
+    """
+    A convex upholstery profile extruded across a specified width interval.
+    """
 
     points: list[SofaProfilePoint]
-    """Observed profile corners in depth and floor-relative height."""
+    """
+    Observed profile corners in depth and floor-relative height.
+    """
 
     def create_mesh(
         self, minimum_width: float, maximum_width: float, origin_height: float
     ) -> trimesh.Trimesh:
-        """Create a closed solid expressed relative to the sofa body origin."""
+        """
+        Create a closed solid expressed relative to the sofa body origin.
+        """
         vertices = [
             (point.depth, width, point.height - origin_height)
             for width in (minimum_width, maximum_width)
@@ -332,47 +426,81 @@ class SofaProfile:
 
 
 class SofaResource(StrEnum):
-    """Persistent geometry resource category for the kitchen sofa."""
+    """
+    Persistent geometry resource category for the kitchen sofa.
+    """
 
     GEOMETRY = "kitchen_sofa"
 
 
 @dataclass
 class KitchenSofa:
-    """A sofa with two seat cushions, two back cushions and solid armrests."""
+    """
+    A sofa with two seat cushions, two back cushions and solid armrests.
+    """
 
     origin_height: float = 0.34
-    """Retained sofa body origin height above the floor."""
+    """
+    Retained sofa body origin height above the floor.
+    """
     width: float = 1.68
-    """Retained outer width across the armrests."""
+    """
+    Retained outer width across the armrests.
+    """
     depth: float = 0.94
-    """Retained base depth, excluding the observed front cushion overhang."""
+    """
+    Retained base depth, excluding the observed front cushion overhang.
+    """
     base_height: float = 0.29
-    """Top of the conservative solid lower frame."""
+    """
+    Top of the conservative solid lower frame.
+    """
     back_support_front: float = 0.20
-    """Front of the conservative backing beneath the back cushions."""
+    """
+    Front of the conservative backing beneath the back cushions.
+    """
     back_support_height: float = 0.40
-    """Top of the conservative backing beneath the back cushions."""
+    """
+    Top of the conservative backing beneath the back cushions.
+    """
     arm_width: float = 0.14
-    """Width of each armrest."""
+    """
+    Width of each armrest.
+    """
     cushion_gap: float = 0.012
-    """Separation between the two seat and back cushions."""
+    """
+    Separation between the two seat and back cushions.
+    """
     seat_surface_depth: float = 0.40
-    """Depth of the semantic seating support patch."""
+    """
+    Depth of the semantic seating support patch.
+    """
     seat_surface_width_margin: float = 0.05
-    """Inset of the seating support patch from each inner arm face."""
+    """
+    Inset of the seating support patch from each inner arm face.
+    """
     seat_surface_center_depth: float = -0.12
-    """Centre of the seating support patch along the sofa depth axis."""
+    """
+    Centre of the seating support patch along the sofa depth axis.
+    """
     seat_surface_height: float = 0.435
-    """Floor-relative height of the seating support patch centre."""
+    """
+    Floor-relative height of the seating support patch centre.
+    """
     seat_surface_slope: float = 0.075
-    """Seating support height decrease per metre toward the back."""
+    """
+    Seating support height decrease per metre toward the back.
+    """
     seat_surface_thickness: float = 0.005
-    """Thickness of the virtual seating support region."""
+    """
+    Thickness of the virtual seating support region.
+    """
     geometry_directory: Path = field(
         default_factory=lambda: create_cache_dir(SofaResource.GEOMETRY)
     )
-    """Persistent directory for the sofa's generated visual and collision mesh."""
+    """
+    Persistent directory for the sofa's generated visual and collision mesh.
+    """
     seat: SofaProfile = field(
         default_factory=lambda: SofaProfile(
             [
@@ -390,7 +518,9 @@ class KitchenSofa:
             ]
         )
     )
-    """Rounded front and gently sloping upper surface of each seat cushion."""
+    """
+    Rounded front and gently sloping upper surface of each seat cushion.
+    """
     arm: SofaProfile = field(
         default_factory=lambda: SofaProfile(
             [
@@ -407,7 +537,9 @@ class KitchenSofa:
             ]
         )
     )
-    """Armrest silhouette below the adjacent island worktop."""
+    """
+    Armrest silhouette below the adjacent island worktop.
+    """
     left_back: SofaProfile = field(
         default_factory=lambda: SofaProfile(
             [
@@ -429,7 +561,9 @@ class KitchenSofa:
             ]
         )
     )
-    """Higher back cushion over the negative-width seating half."""
+    """
+    Higher back cushion over the negative-width seating half.
+    """
     right_back: SofaProfile = field(
         default_factory=lambda: SofaProfile(
             [
@@ -449,12 +583,16 @@ class KitchenSofa:
             ]
         )
     )
-    """Lower, more reclined back cushion over the positive-width seating half."""
+    """
+    Lower, more reclined back cushion over the positive-width seating half.
+    """
 
     def create_in_world(
         self, world: World, root_T_sofa: HomogeneousTransformationMatrix
     ) -> Sofa:
-        """Add a semantic sofa with a watertight upholstery envelope and seat support."""
+        """
+        Add a semantic sofa with a watertight upholstery envelope and seat support.
+        """
         sofa = Sofa.create_with_new_body_in_world(
             world=world,
             name="sofa",
@@ -525,95 +663,169 @@ class KitchenSofa:
 # %% Handle mounting measurements
 @dataclass
 class HandleRowOffsets:
-    """Vertical mounting corrections for a two-row drawer column."""
+    """
+    Vertical mounting corrections for a two-row drawer column.
+    """
 
     lower_height: float
-    """Lower drawer handle height correction."""
+    """
+    Lower drawer handle height correction.
+    """
     upper_height: float
-    """Upper drawer handle height correction."""
+    """
+    Upper drawer handle height correction.
+    """
 
 
 @dataclass
 class KitchenHandleOffsets:
-    """Reviewed transverse mounting corrections with nominal handle depth retained."""
+    """
+    Reviewed transverse mounting corrections with nominal handle depth retained.
+    """
 
     refrigerator_door_lateral: float = -0.011
-    """Vertical refrigerator pull correction along its local transverse axis."""
+    """
+    Vertical refrigerator pull correction along its local transverse axis.
+    """
     refrigerator_drawer_height: float = -0.014
-    """Refrigerator drawer handle height correction."""
+    """
+    Refrigerator drawer handle height correction.
+    """
     counter_door_height: float = -0.004
-    """First counter module door handle height correction."""
+    """
+    First counter module door handle height correction.
+    """
     counter_lower_drawer_height: float = -0.019
-    """Lower counter drawer handle height correction."""
+    """
+    Lower counter drawer handle height correction.
+    """
     counter_middle_drawer_height: float = -0.020
-    """Middle counter drawer handle height correction."""
+    """
+    Middle counter drawer handle height correction.
+    """
     counter_upper_drawer_height: float = -0.024
-    """Upper counter drawer handle height correction."""
+    """
+    Upper counter drawer handle height correction.
+    """
     oven_side_lateral: float = 0.008
-    """Both vertical oven-side pulls' local transverse correction."""
+    """
+    Both vertical oven-side pulls' local transverse correction.
+    """
     oven_cabinet_height: float = 0.002
-    """Lower oven cabinet handle height correction."""
+    """
+    Lower oven cabinet handle height correction.
+    """
     oven_drawer_height: float = 0.005
-    """Centre oven drawer handle height correction."""
+    """
+    Centre oven drawer handle height correction.
+    """
     island_window_column: HandleRowOffsets = field(
         default_factory=lambda: HandleRowOffsets(0.011, 0.012)
     )
-    """Handle height corrections for the island column nearest the window wall."""
+    """
+    Handle height corrections for the island column nearest the window wall.
+    """
     island_middle_column: HandleRowOffsets = field(
         default_factory=lambda: HandleRowOffsets(0.005, 0.011)
     )
-    """Handle height corrections for the middle island column."""
+    """
+    Handle height corrections for the middle island column.
+    """
     island_room_column: HandleRowOffsets = field(
         default_factory=lambda: HandleRowOffsets(0.005, 0.009)
     )
-    """Handle height corrections for the island column farthest from the window wall."""
+    """
+    Handle height corrections for the island column farthest from the window wall.
+    """
 
 
 # %% Measured kitchen geometry
 @dataclass
 class KitchenMeasurements:
-    """Kitchen dimensions and placements in the registered model root frame."""
+    """
+    Kitchen dimensions and placements in the registered model root frame.
+    """
 
     wall_interior_y: float = -2.480
-    """Observed interior plane behind the kitchen run in metres."""
+    """
+    Observed interior plane behind the kitchen run in metres.
+    """
     refrigerator_wall_interior_x: float = 0.0315
-    """Observed interior plane beside the refrigerator in metres."""
+    """
+    Observed interior plane beside the refrigerator in metres.
+    """
     refrigerator_return_interior_y: float = -1.4812
-    """Observed kitchen-facing plane of the short wall return in metres."""
+    """
+    Observed kitchen-facing plane of the short wall return in metres.
+    """
     refrigerator_wall_thickness: float = 0.05
-    """Nominal thickness of the refrigerator-side wall and return in metres."""
+    """
+    Nominal thickness of the refrigerator-side wall and return in metres.
+    """
     refrigerator_return_left_x: float = -0.29
-    """Nominal return endpoint toward the adjacent wall along root X in metres."""
+    """
+    Nominal return endpoint toward the adjacent wall along root X in metres.
+    """
     refrigerator_depth: float = 0.581
-    """Refrigerator corpus depth under the flush-back constraint in metres."""
+    """
+    Refrigerator corpus depth under the flush-back constraint in metres.
+    """
     counter_cabinet_depth: float = 0.586
-    """Counter corpus depth under the flush-back constraint in metres."""
+    """
+    Counter corpus depth under the flush-back constraint in metres.
+    """
     counter_worktop_depth: float = 0.590
-    """Worktop depth between the wall and observed front edge in metres."""
+    """
+    Worktop depth between the wall and observed front edge in metres.
+    """
     oven_tower_depth: float = 0.599
-    """Oven tower depth under the flush-back constraint in metres."""
+    """
+    Oven tower depth under the flush-back constraint in metres.
+    """
     oven_left_drawer_outward_offset: float = 0.010
-    """Left oven-side drawer mounting correction toward the room in metres."""
+    """
+    Left oven-side drawer mounting correction toward the room in metres.
+    """
     oven_right_drawer_outward_offset: float = 0.012
-    """Right oven-side drawer mounting correction toward the room in metres."""
+    """
+    Right oven-side drawer mounting correction toward the room in metres.
+    """
     island_center_x: float = 3.52835439
-    """Measured island corpus centre along root X in metres."""
+    """
+    Measured island corpus centre along root X in metres.
+    """
     island_center_y: float = 0.46312429
-    """Measured island corpus centre along root Y in metres."""
+    """
+    Measured island corpus centre along root Y in metres.
+    """
     island_yaw: float = np.pi / 2 + np.radians(0.3315143615)
-    """Measured island orientation about the root vertical axis in radians."""
+    """
+    Measured island orientation about the root vertical axis in radians.
+    """
     sofa_center_x: float = 3.70718969
-    """Fitted sofa centre along root X in metres."""
+    """
+    Fitted sofa centre along root X in metres.
+    """
     sofa_center_y: float = 1.23349163
-    """Fitted sofa centre along root Y under the island-clearance constraint in metres."""
+    """
+    Fitted sofa centre along root Y under the island-clearance constraint in metres.
+    """
     sofa_yaw: float = 4.719151098618833
-    """Fitted sofa orientation about the root vertical axis in radians."""
+    """
+    Fitted sofa orientation about the root vertical axis in radians.
+    """
     window_wall: KitchenWindowWall = field(default_factory=KitchenWindowWall)
-    """Observed oven-side wall recesses and surface-mounted features."""
+    """
+    Observed oven-side wall recesses and surface-mounted features.
+    """
     handle_offsets: KitchenHandleOffsets = field(default_factory=KitchenHandleOffsets)
-    """Reviewed handle mounting corrections relative to unchanged parent fronts."""
+    """
+    Reviewed handle mounting corrections relative to unchanged parent fronts.
+    """
     sofa_shape: KitchenSofa = field(default_factory=KitchenSofa)
-    """Observed seat, backrest and armrest surfaces of the sofa."""
+    """
+    Observed seat, backrest and armrest surfaces of the sofa.
+    """
 
 
 # %% Environment construction
@@ -625,7 +837,9 @@ class KitchenEnvironment(WorldSource):
     """
 
     measurements: KitchenMeasurements = field(default_factory=KitchenMeasurements)
-    """Observed kitchen geometry with the existing flush-back construction constraint."""
+    """
+    Observed kitchen geometry with the existing flush-back construction constraint.
+    """
 
     def create_world(self) -> World:
         world = World.create_with_root_body("root")
