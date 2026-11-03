@@ -29,6 +29,7 @@ from probabilistic_model.learning.jpt.variables import (
     AnnotatedVariable,
     infer_variables_from_dataframe,
 )
+from probabilistic_model.learning.nyga_induction import NygaInduction
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
@@ -138,8 +139,24 @@ def test_leaf_node_has_a_distribution_per_variable(tree, mixed_data):
     assert np.all(likelihood > 0)
 
 
+def test_leaf_node_splits_continuous_variables_with_their_split_penalty(mixed_data):
+    real = mixed_data[["real"]]
+    (annotated_variable,) = infer_variables_from_dataframe(
+        real, split_penalty_factor=0.0, minimum_samples_per_quantile=1
+    )
+    tree = JointProbabilityTree(annotated_variables=[annotated_variable])
+    data = tree.preprocess_data(real)
+    leaf_node = tree.create_leaf_node(data)
+    expected = NygaInduction(
+        annotated_variable.variable,
+        split_penalty_factor=annotated_variable.split_penalty_factor,
+        minimum_samples_per_quantile=annotated_variable.minimum_samples_per_quantile,
+    ).fit(data[:, 0])
+    assert len(leaf_node.subcircuits[0].subcircuits) == len(expected.root.subcircuits)
+
+
 def test_fit_without_an_improving_split_is_one_leaf(tree, mixed_data):
-    tree.min_impurity_improvement = 1
+    tree.minimum_impurity_improvement = 1
     tree.fit(mixed_data)
     assert len(tree.root.subcircuits) == 1
     assert tree.root.log_weighted_subcircuits[0][0] == 0.0
@@ -147,10 +164,10 @@ def test_fit_without_an_improving_split_is_one_leaf(tree, mixed_data):
 
 
 def test_fit_has_at_most_one_leaf_per_minimal_number_of_samples(tree, mixed_data):
-    tree.min_samples_per_leaf = 10
+    tree.minimum_samples_per_leaf = 10
     circuit = tree.fit(mixed_data)
     assert len(circuit.root.subcircuits) <= math.floor(
-        len(mixed_data) / tree.min_samples_leaf
+        len(mixed_data) / tree.minimum_samples_leaf
     )
     assert all(weight > -np.inf for weight, _ in circuit.root.log_weighted_subcircuits)
     assert np.all(circuit.likelihood(mixed_data.to_numpy()) > 0)
@@ -162,8 +179,8 @@ def test_preprocessing_agrees_with_the_original_implementation(tree, mixed_data)
     )
     original_tree = OldJPT(
         variables,
-        min_samples_leaf=tree.min_samples_leaf,
-        min_impurity_improvement=tree.min_impurity_improvement,
+        min_samples_leaf=tree.minimum_samples_leaf,
+        min_impurity_improvement=tree.minimum_impurity_improvement,
     )
     original = old_preprocess_data(original_tree, mixed_data).to_numpy()
     # symbolic columns are not preprocessed in order in the original implementation
@@ -171,7 +188,7 @@ def test_preprocessing_agrees_with_the_original_implementation(tree, mixed_data)
 
 
 def test_fit_has_as_many_leaves_as_the_original_implementation(tree, mixed_data):
-    tree.min_samples_per_leaf = 10
+    tree.minimum_samples_per_leaf = 10
     tree.keep_sample_indices = True
     tree.fit(mixed_data)
     variables = old_infer_from_dataframe(
@@ -179,8 +196,8 @@ def test_fit_has_as_many_leaves_as_the_original_implementation(tree, mixed_data)
     )
     original_tree = OldJPT(
         variables,
-        min_samples_leaf=tree.min_samples_leaf,
-        min_impurity_improvement=tree.min_impurity_improvement,
+        min_samples_leaf=tree.minimum_samples_leaf,
+        min_impurity_improvement=tree.minimum_impurity_improvement,
     ).learn(mixed_data, keep_samples=True)
     assert len(tree.root.subcircuits) == len(original_tree.leaves)
 
@@ -198,7 +215,7 @@ def test_variable_dependencies_to_json(tree):
 
 
 def test_serialization_round_trip(tree, mixed_data):
-    tree.min_samples_per_leaf = 10
+    tree.minimum_samples_per_leaf = 10
     tree.fit(mixed_data)
     assert from_json(to_json(tree)) == tree
 
@@ -243,7 +260,7 @@ def test_dependent_continuous_variables_are_split_apart():
             "y": np.concatenate([np.linspace(5, 6, 50), np.linspace(-5, -4, 50)]),
         }
     )
-    circuit = JointProbabilityTree(min_samples_per_leaf=10).fit(data)
+    circuit = JointProbabilityTree(minimum_samples_per_leaf=10).fit(data)
     assert len(circuit.root.subcircuits) > 1
 
 
@@ -257,12 +274,12 @@ def test_splitting_stops_once_every_leaf_is_precise_enough():
     data = pd.DataFrame({"x": x, "y": x + generator.normal(0, 1, 500)})
     variables = infer_variables_from_dataframe(data)
     for variable in variables:
-        variable.max_standard_deviation = 5
+        variable.maximum_standard_deviation = 5
 
     circuit = JointProbabilityTree(
-        min_samples_per_leaf=20, keep_sample_indices=True
+        minimum_samples_per_leaf=20, keep_sample_indices=True
     ).fit(data, variables)
-    unlimited = JointProbabilityTree(min_samples_per_leaf=20).fit(data)
+    unlimited = JointProbabilityTree(minimum_samples_per_leaf=20).fit(data)
 
     for leaf_node in circuit.root.subcircuits:
         assert data.iloc[leaf_node.sample_indices].std().max() <= 5
@@ -293,9 +310,9 @@ def breast_cancer_tree(breast_cancer_data) -> JointProbabilityTree:
     """
     tree = JointProbabilityTree(
         annotated_variables=infer_variables_from_dataframe(
-            breast_cancer_data, min_samples_per_quantile=600
+            breast_cancer_data, minimum_samples_per_quantile=600
         ),
-        min_samples_per_leaf=0.4,
+        minimum_samples_per_leaf=0.4,
     )
     tree.fit(breast_cancer_data)
     return tree
@@ -390,8 +407,8 @@ def tree_of_gaussian_samples(product_of_gaussians) -> ProbabilisticCircuit:
         product_of_gaussians.sample(1000),
         columns=[variable.name for variable in product_of_gaussians.variables],
     )
-    variables = infer_variables_from_dataframe(data, min_samples_per_quantile=20)
-    return JointProbabilityTree(variables, min_samples_per_leaf=0.9).fit(data)
+    variables = infer_variables_from_dataframe(data, minimum_samples_per_quantile=20)
+    return JointProbabilityTree(variables, minimum_samples_per_leaf=0.9).fit(data)
 
 
 @pytest.mark.parametrize(
