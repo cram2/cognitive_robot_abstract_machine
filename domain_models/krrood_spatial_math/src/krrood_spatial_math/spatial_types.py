@@ -889,12 +889,12 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :return: The rotation this matrix describes.
         """
-        return self.quaternion.axis_angle
+        return AxisAngle.from_rotation_matrix(self)
 
     @property
     def angle(self) -> sm.Scalar:
         """
-        :return: The angle of the rotation around its axis in radians, in [0, 2 pi].
+        :return: The angle of the rotation around its axis in radians, in [0, pi].
         """
         return self.axis_angle.angle
 
@@ -2359,6 +2359,63 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             axis=Vector3(x=x, y=y, z=z),
             angle=angle,
             reference_frame=quaternion.reference_frame,
+        )
+
+    @classmethod
+    def from_rotation_matrix(cls, rotation_matrix: RotationMatrix) -> AxisAngle:
+        """
+        The identity rotation has no axis of its own and is read as a rotation by zero
+        around the z-axis.
+
+        :param rotation_matrix: The rotation to describe.
+        :return: The rotation the matrix describes, with an angle in [0, pi].
+        """
+        rotation = rotation_matrix.generic_matrix[:3, :3]
+        cosine = (rotation.trace() - 1) / 2
+        # the guards keep the derivative finite where acos has none
+        angle = sm.if_greater_eq(
+            cosine,
+            1,
+            sm.Scalar(0),
+            sm.if_less_eq(cosine, -1, sm.Scalar(np.pi), sm.acos(cosine)),
+        )
+
+        # 2 sin(angle) times the axis, which vanishes at half a turn
+        scaled_axis = Vector3(
+            x=rotation[2, 1] - rotation[1, 2],
+            y=rotation[0, 2] - rotation[2, 0],
+            z=rotation[1, 0] - rotation[0, 1],
+        )
+        scaled_axis_length = scaled_axis.norm()
+        axis_within_quarter_turn = sm.if_eq_zero(
+            scaled_axis_length,
+            Vector3.Z(),
+            scaled_axis / sm.if_eq_zero(scaled_axis_length, 1, scaled_axis_length),
+        )
+
+        # (1 - cos(angle)) times the axis times its transpose, which vanishes at no
+        # turn; its column with the largest diagonal entry is the axis up to its sign
+        axis_outer_product = (rotation + rotation.T) / 2 - sm.Matrix.eye(3) * cosine
+        columns = [
+            Vector3(*(axis_outer_product[row, column] for row in range(3)))
+            for column in range(3)
+        ]
+        largest_column = sm.if_greater(
+            rotation[2, 2],
+            sm.max(rotation[0, 0], rotation[1, 1]),
+            columns[2],
+            sm.if_greater(rotation[1, 1], rotation[0, 0], columns[1], columns[0]),
+        )
+        axis_up_to_sign = largest_column / largest_column.norm()
+        axis_beyond_quarter_turn = sm.if_less(
+            axis_up_to_sign @ scaled_axis, 0, -axis_up_to_sign, axis_up_to_sign
+        )
+
+        axis = sm.if_greater_zero(
+            cosine, axis_within_quarter_turn, axis_beyond_quarter_turn
+        )
+        return cls(
+            axis=axis, angle=angle, reference_frame=rotation_matrix.reference_frame
         )
 
     @property
