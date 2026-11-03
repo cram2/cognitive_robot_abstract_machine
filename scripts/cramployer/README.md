@@ -1,7 +1,7 @@
 # cramployer
 
 **cramployer** (CRAM + deployer) prepares a Docker environment for developing and
-running the CRAM workspace, including RoboKudo. It mounts editable host source
+running the CRAM workspace. It mounts editable host source
 and supports ROS networking, NVIDIA GPUs, and GUI windows.
 
 ROS and workspace dependencies are installed inside Docker. Run `cramployer setup`
