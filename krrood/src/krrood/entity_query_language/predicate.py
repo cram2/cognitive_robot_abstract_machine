@@ -48,6 +48,7 @@ from krrood.entity_query_language.core.base_expressions import (
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
+from krrood.entity_query_language.exceptions import ResultTypeCannotBeDetermined
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
@@ -344,8 +345,14 @@ class SymbolicFunction(SymbolicCallable, ABC):
     def _bound_value_type_(cls) -> type:
         """
         The return type of :meth:`__call__`.
+
+        :raises ResultTypeCannotBeDetermined: If :meth:`__call__`'s return annotation
+            names no type.
         """
-        return InstantiatedVariable._type_built_by_(cls.__call__) or object
+        return_type = InstantiatedVariable._type_built_by_(cls.__call__)
+        if return_type is None:
+            raise ResultTypeCannotBeDetermined(cls.__call__)
+        return return_type
 
     @abstractmethod
     def __call__(self) -> Any:

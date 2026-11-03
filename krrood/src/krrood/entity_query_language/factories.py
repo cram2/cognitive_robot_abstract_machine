@@ -1191,7 +1191,7 @@ type_ = symbolic_callable_to_function(RuntimeType)
 
 
 @symbolic_function
-def type_(obj: Any):
+def type_(obj: Any) -> type:
     """
     Determines the type of the given object.
 

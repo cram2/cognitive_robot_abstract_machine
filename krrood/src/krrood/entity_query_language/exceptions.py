@@ -9,7 +9,7 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any, Callable
 
 from krrood.exceptions import DataclassException
 
@@ -1363,6 +1363,25 @@ class ResultTypeIsNotAType(DataclassException):
             "Pass the type of the built value as the result type, and a function or factory "
             "method that builds it as the factory."
         )
+
+
+@dataclass
+class ResultTypeCannotBeDetermined(DataclassException):
+    """
+    Raised when the type of the values an instantiated variable binds is neither given
+    nor named by the return annotation of the callable that builds them.
+    """
+
+    factory: Callable[..., Any]
+    """
+    The callable whose return annotation names no type.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot determine the type of the values {self.factory!r} builds: its return annotation names no type."
+
+    def suggest_correction(self) -> str:
+        return f"Annotate the return type of {self.factory!r} with the type it builds."
 
 
 @dataclass

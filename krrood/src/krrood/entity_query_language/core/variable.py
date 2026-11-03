@@ -35,6 +35,7 @@ from krrood.entity_query_language.enums import DomainSource
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.exceptions import (
     NoChildToReplace,
+    ResultTypeCannotBeDetermined,
     ResultTypeIsNotAType,
 )
 from krrood.entity_query_language.operators.set_operations import (
@@ -217,8 +218,7 @@ class InstantiatedVariable(
     The type of the values this variable binds (the value of `T`), always a type.
 
     When not given, it is the type :attr:`_factory_` builds (see
-    :meth:`~krrood.patterns.factory_and_kwargs.HasFactoryAndKwargs._type_built_by_`),
-    and :class:`object` when that names none.
+    :meth:`~krrood.patterns.factory_and_kwargs.HasFactoryAndKwargs._type_built_by_`).
     """
 
     _child_variables_: dict[str, SymbolicExpression] = field(
@@ -235,8 +235,15 @@ class InstantiatedVariable(
     """
 
     def __post_init__(self):
+        """
+        :raises ResultTypeCannotBeDetermined: If no :attr:`_type_` is given and
+            :attr:`_factory_` names no type it builds.
+        :raises ResultTypeIsNotAType: If the given :attr:`_type_` is not a type.
+        """
         if self._type_ is None:
-            self._type_ = self._type_built_by_(self._factory_) or object
+            self._type_ = self._type_built_by_(self._factory_)
+        if self._type_ is None:
+            raise ResultTypeCannotBeDetermined(self._factory_)
         if not isinstance(self._type_, type):
             raise ResultTypeIsNotAType(self._type_)
         self._update_child_variables_from_kwargs_()

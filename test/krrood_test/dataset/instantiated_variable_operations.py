@@ -123,3 +123,23 @@ class Halved(SymbolicFunction):
     @classmethod
     def _verbalization_fragment_(cls, fields):
         return Noun(fields["number"])
+
+
+@dataclass(eq=False)
+class UnannotatedHalved(SymbolicFunction):
+    """
+    An integer divided by two, rounded down, whose :meth:`__call__` has no return
+    annotation.
+    """
+
+    number: int
+    """
+    The integer that is halved.
+    """
+
+    def __call__(self):
+        return self.number // 2
+
+    @classmethod
+    def _verbalization_fragment_(cls, fields):
+        return Noun(fields["number"])

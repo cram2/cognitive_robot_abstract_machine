@@ -3,13 +3,17 @@ from __future__ import annotations
 import pytest
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable
-from krrood.entity_query_language.exceptions import ResultTypeIsNotAType
+from krrood.entity_query_language.exceptions import (
+    ResultTypeCannotBeDetermined,
+    ResultTypeIsNotAType,
+)
 from krrood.entity_query_language.factories import an, inference, variable_from
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from ...dataset.instantiated_variable_operations import (
     Halved,
     Interval,
     IsEven,
+    UnannotatedHalved,
     doubled,
     repeated,
     unannotated_doubled,
@@ -65,8 +69,9 @@ def test_symbolic_function_returning_a_generic_has_the_generic_origin_as_type():
     assert repeated(variable_from([1]))._type_ is list
 
 
-def test_unannotated_symbolic_function_has_object_as_type():
-    assert unannotated_doubled(variable_from([1]))._type_ is object
+def test_unannotated_symbolic_function_is_rejected():
+    with pytest.raises(ResultTypeCannotBeDetermined):
+        unannotated_doubled(variable_from([1]))
 
 
 def test_symbolic_function_returning_any_has_object_as_type():
@@ -94,6 +99,11 @@ def test_symbolic_function_class_type_is_the_return_type_of_its_call():
     expression = Halved(variable_from([4]))
     assert expression._type_ is int
     assert expression._factory_ is Halved
+
+
+def test_symbolic_function_class_with_unannotated_call_is_rejected():
+    with pytest.raises(ResultTypeCannotBeDetermined):
+        UnannotatedHalved(variable_from([4]))
 
 
 def test_symbolic_function_class_still_binds_its_computed_value():
