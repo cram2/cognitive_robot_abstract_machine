@@ -55,6 +55,23 @@ uv pip install -e "./robokudo[dev]"
 pip install "robokudo[dev]"
 ```
 
+#### FoundationPose pose estimation
+
+The `FoundationPoseAnnotator` (`robokudo.annotators.foundation_pose`) estimates and tracks 6D object poses with
+`TensorRTFoundationPose`, which runs on an NVIDIA GPU through the ROS package `robokudo_foundation_pose_tensorrt` of
+`cram_ros2_packages`. The ROS workspace setup builds that package without its CUDA extension; build the extension
+from the activated CRAM environment:
+
+```bash
+sudo apt install -y nvidia-cuda-toolkit g++-12
+python3 -m pip install tensorrt-cu12==10.13.3.9
+cd $OVERLAY_WS
+python3 -m colcon build --merge-install --packages-select robokudo_foundation_pose_tensorrt
+```
+
+The CAD models of the examples are in the ROS package `robokudo_cad_data`. See the README of
+`robokudo_foundation_pose_tensorrt` for the TensorRT engines and their cache.
+
 ### PyCharm setup
 
 - Install PyCharm

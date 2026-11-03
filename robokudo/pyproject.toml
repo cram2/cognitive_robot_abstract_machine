@@ -38,7 +38,8 @@ dependencies = [
     "krrood_spatial_math[casadi]",
     "transformers",
     "faiss-cpu",
-    "ultralytics"
+    "ultralytics",
+    "trimesh"
 ]
 
 [project.urls]
