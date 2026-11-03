@@ -19,7 +19,7 @@ from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Variable
-from typing_extensions import Any, Dict, List, Tuple
+from typing_extensions import Any
 
 from experiments.causal_reasoning.do_query import CauseRegion, DoQueryAnswer
 from experiments.causal_reasoning.mutagenesis.domain import (
@@ -168,7 +168,7 @@ class MutagenesisQuestion(ABC):
 
     @property
     @abstractmethod
-    def adjustment_variable_names(self) -> Tuple[str, ...]:
+    def adjustment_variable_names(self) -> tuple[str, ...]:
         """
         The names a fitted circuit gives the variables to adjust for.
         """
@@ -195,7 +195,7 @@ class MutagenesisQuestion(ABC):
         :param specified: Molecule attributes to mark or fix; the rest are left open.
         :return: The molecule query.
         """
-        parts: Dict[str, Any] = {
+        parts: dict[str, Any] = {
             "atoms": [
                 a(MutagenesisAtom)(
                     element=..., atom_type=..., charge=..., bond_count=...
@@ -206,7 +206,7 @@ class MutagenesisQuestion(ABC):
                 a(MutagenesisBond)(bond_type=...) for _ in range(self.bond_count)
             ],
         }
-        attributes: Dict[str, Any] = {
+        attributes: dict[str, Any] = {
             field.name: ...
             for field in fields(MutagenesisMolecule)
             if field.name not in parts
@@ -226,7 +226,7 @@ class CountCausesMutagenicity(MutagenesisQuestion):
     What to count.
     """
 
-    adjusted_for: Tuple[MoleculeAttribute, ...] = (MoleculeAttribute.INDICATOR_1,)
+    adjusted_for: tuple[MoleculeAttribute, ...] = (MoleculeAttribute.INDICATOR_1,)
     """
     The molecule attributes to adjust for.
     """
@@ -257,7 +257,7 @@ class CountCausesMutagenicity(MutagenesisQuestion):
         return self.count.circuit_variable_name
 
     @property
-    def adjustment_variable_names(self) -> Tuple[str, ...]:
+    def adjustment_variable_names(self) -> tuple[str, ...]:
         return tuple(attribute.circuit_variable_name for attribute in self.adjusted_for)
 
     @property
@@ -280,7 +280,7 @@ class IndicatorCausesMutagenicity(MutagenesisQuestion):
     large molecules that are mutagenic for their size?
     """
 
-    adjusted_for: Tuple[MoleculeCount, ...] = (MoleculeCount.ATOMS,)
+    adjusted_for: tuple[MoleculeCount, ...] = (MoleculeCount.ATOMS,)
     """
     The counts to adjust for.
     """
@@ -303,7 +303,7 @@ class IndicatorCausesMutagenicity(MutagenesisQuestion):
         return MoleculeAttribute.INDICATOR_1.circuit_variable_name
 
     @property
-    def adjustment_variable_names(self) -> Tuple[str, ...]:
+    def adjustment_variable_names(self) -> tuple[str, ...]:
         return tuple(count.circuit_variable_name for count in self.adjusted_for)
 
     @property
@@ -362,7 +362,7 @@ class IndicatorCausesElement(MutagenesisQuestion):
         return MoleculeAttribute.INDICATOR_1.circuit_variable_name
 
     @property
-    def adjustment_variable_names(self) -> Tuple[str, ...]:
+    def adjustment_variable_names(self) -> tuple[str, ...]:
         return ()
 
     @property
@@ -415,7 +415,7 @@ class CountCausesTerminalAtom(MutagenesisQuestion):
         return self.count.circuit_variable_name
 
     @property
-    def adjustment_variable_names(self) -> Tuple[str, ...]:
+    def adjustment_variable_names(self) -> tuple[str, ...]:
         return ()
 
     @property
@@ -430,7 +430,7 @@ class CountCausesTerminalAtom(MutagenesisQuestion):
         return query
 
 
-def question_catalogue() -> List[MutagenesisQuestion]:
+def question_catalogue() -> list[MutagenesisQuestion]:
     """
     :return: The questions asked of the dataset: each count as a cause of mutagenicity
         adjusting for the ind1 indicator, the branching atoms again adjusting for
@@ -480,7 +480,7 @@ class MutagenesisDoQuery:
     samples.
     """
 
-    def run(self, training_molecules: List[MutagenesisMolecule]) -> DoQueryAnswer:
+    def run(self, training_molecules: list[MutagenesisMolecule]) -> DoQueryAnswer:
         """
         Fit a circuit on the molecules and answer the question on it.
 
@@ -521,7 +521,7 @@ class MutagenesisDoQuery:
         )
 
     def _grounded_against(
-        self, training_molecules: List[MutagenesisMolecule]
+        self, training_molecules: list[MutagenesisMolecule]
     ) -> RelationalCausalCircuit:
         """
         Fit a circuit whose class-level branches each hold one value of the cause, and
@@ -549,7 +549,7 @@ class MutagenesisDoQuery:
 
     def _adjustment_variables(
         self, causal_circuit: RelationalCausalCircuit
-    ) -> List[Variable]:
+    ) -> list[Variable]:
         """
         :param causal_circuit: The grounded circuit to resolve against.
         :return: One variable per attribute the question adjusts for.

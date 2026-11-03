@@ -36,6 +36,7 @@ jobs:
       matrix:
         include:
           - lib: giskardpy
+          - lib: cramph
           - lib: krrood
           - lib: semantic_digital_twin
           - lib: coraplex
@@ -47,6 +48,7 @@ jobs:
           - lib: experiments
           - lib: cramera
           - lib: cramployer
+          - lib: krrood_spatial_math
           - lib: version
           - lib: cognitive_robot_abstract_machine
     uses: ./.github/workflows/ci_reusable.yml

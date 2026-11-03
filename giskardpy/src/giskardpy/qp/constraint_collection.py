@@ -3,16 +3,17 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.data_types.exceptions import (
     DuplicateNameException,
 )
-from giskardpy.motion_statechart.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValues
 from giskardpy.motion_statechart.exceptions import (
     InvalidConstraintExpressionShapeError,
 )
+from giskardpy.qp.bound_cap import BoundCap, ScalarBoundCap
 from giskardpy.qp.constraint import (
     GiskardConstraint,
     GiskardEqualityConstraint,
@@ -147,9 +148,10 @@ class ConstraintCollection:
         equality_bound: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         reference_velocity: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
+        bound_cap: BoundCap | None = None,
     ) -> None:
         """
         Add a task constraint to the motion problem.
@@ -168,6 +170,8 @@ class ConstraintCollection:
             unless you know what you are doing
         :param upper_slack_limit: how much the upper error can be violated, don't use
             unless you know what you are doing
+        :param bound_cap: how the bound is limited to what may be demanded within the
+            control horizon; caps the bound on its own if not given
         """
         if task_expression.shape != (1, 1):
             raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
@@ -182,6 +186,7 @@ class ConstraintCollection:
             name=name,
             expression=task_expression,
             bound=equality_bound,
+            bound_cap=bound_cap if bound_cap is not None else ScalarBoundCap(),
             normalization_factor=reference_velocity,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
@@ -198,7 +203,7 @@ class ConstraintCollection:
         upper_error: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
-        name: Optional[str] = None,
+        name: str | None = None,
         linear_weight: sm.ScalarData = 0,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -209,8 +214,10 @@ class ConstraintCollection:
         This should be used for most constraints. It will not strictly stick to the
         reference velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the
-            weight, will not be strictly enforced.
+        :param reference_velocity: used by Giskard to normalize the weight and to cap a
+            bound that demands motion (a positive lower or a negative upper error) to what
+            is reachable at this velocity. A bound that only permits motion is not capped.
+            Will not be strictly enforced.
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
         :param quadratic_weight:
@@ -251,7 +258,7 @@ class ConstraintCollection:
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         velocity_limit: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:
@@ -290,7 +297,7 @@ class ConstraintCollection:
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
         velocity_limit: sm.ScalarData,
-        name: Optional[str] = None,
+        name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
     ) -> None:

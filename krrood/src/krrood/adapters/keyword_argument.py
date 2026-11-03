@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Dict, Self
+from typing_extensions import Self
 
 from krrood.utils import get_full_class_name
 
@@ -25,7 +25,7 @@ class SerializationKeywordArgument:
         """
         return get_full_class_name(cls)
 
-    def create_kwargs(self) -> Dict[str, Self]:
+    def create_kwargs(self) -> dict[str, Self]:
         """
         :return: Keyword arguments carrying this object, to pass to the top-level call.
         """

@@ -11,7 +11,6 @@ import pytest
 from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous, Variable
-from typing_extensions import List, Type
 
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -41,7 +40,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
     params=[ProbabilisticCircuit, LayeredProbabilisticCircuit],
     ids=lambda circuit_type: circuit_type.__name__,
 )
-def circuit_type(request) -> Type[ProbabilisticCircuitRepresentation]:
+def circuit_type(request) -> type[ProbabilisticCircuitRepresentation]:
     """
     Every circuit type the compositions are offered by.
     """
@@ -49,7 +48,7 @@ def circuit_type(request) -> Type[ProbabilisticCircuitRepresentation]:
 
 
 def uniform_circuit(
-    circuit_type: Type[ProbabilisticCircuitRepresentation],
+    circuit_type: type[ProbabilisticCircuitRepresentation],
     variable: Continuous,
     lower: float,
     upper: float,
@@ -90,7 +89,7 @@ def event_of(**ranges: tuple) -> Event:
     ).as_composite_set()
 
 
-def variables_of(circuit: ProbabilisticCircuitRepresentation) -> List[Variable]:
+def variables_of(circuit: ProbabilisticCircuitRepresentation) -> list[Variable]:
     """
     :param circuit: A circuit.
     :return: Its variables, as a list that can be compared and read in a report.
@@ -224,7 +223,7 @@ def test_a_product_of_factors_over_one_variable_raises(circuit_type, x):
 
 
 def mixture_of_products(
-    circuit_type: Type[ProbabilisticCircuitRepresentation], x: Continuous, y: Continuous
+    circuit_type: type[ProbabilisticCircuitRepresentation], x: Continuous, y: Continuous
 ) -> ProbabilisticCircuitRepresentation:
     """
     A mixture of two products, which is a composition of both kinds at once.

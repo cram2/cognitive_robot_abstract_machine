@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from contextlib import contextmanager
 
-from typing_extensions import Iterator, List, Any, Tuple, Type
+from typing_extensions import Iterator, Any
 
 from ..datasets import (
     Species,
@@ -42,17 +42,17 @@ def isolated_expert_answers_path(source_path: str) -> Iterator[str]:
 
 
 def get_fit_scrdr(
-    cases: List[Any],
-    targets: List[Any],
+    cases: list[Any],
+    targets: list[Any],
     attribute_name: str = "species",
-    attribute_type: Type = Species,
+    attribute_type: type = Species,
     expert_answers_dir: str = "test_expert_answers",
     expert_answers_file: str = "scrdr_expert_answers_fit",
     draw_tree: bool = False,
     load_answers: bool = True,
     save_answers: bool = False,
     update_existing_rules: bool = True,
-) -> Tuple[SingleClassRDR, List[CaseQuery]]:
+) -> tuple[SingleClassRDR, list[CaseQuery]]:
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
     )
@@ -92,10 +92,10 @@ def get_fit_scrdr(
 
 
 def get_fit_mcrdr(
-    cases: List[Any],
-    targets: List[Any],
+    cases: list[Any],
+    targets: list[Any],
     attribute_name: str = "species",
-    attribute_type: Type = Species,
+    attribute_type: type = Species,
     mutually_exclusive: bool = True,
     expert_answers_dir: str = "test_expert_answers",
     expert_answers_file: str = "mcrdr_expert_answers_stop_only_fit",
@@ -142,8 +142,8 @@ def get_fit_mcrdr(
 
 
 def get_fit_grdr(
-    cases: List[Any],
-    targets: List[Any],
+    cases: list[Any],
+    targets: list[Any],
     expert_answers_dir: str = "test_expert_answers",
     expert_answers_file: str = "grdr_expert_answers_fit",
     draw_tree: bool = False,
@@ -152,7 +152,7 @@ def get_fit_grdr(
     append: bool = False,
     no_targets: bool = False,
     update_existing_rules: bool = True,
-) -> Tuple[GeneralRDR, List[dict]]:
+) -> tuple[GeneralRDR, list[dict]]:
     filename = os.path.join(
         os.path.dirname(__file__), "..", expert_answers_dir, expert_answers_file
     )

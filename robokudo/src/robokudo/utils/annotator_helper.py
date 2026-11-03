@@ -13,19 +13,20 @@ It supports:
 
 from __future__ import annotations
 
+# %% Imports
 from copy import deepcopy
 
 import cv2
 import numpy as np
-import open3d as o3d
-from typing_extensions import Callable, List, TYPE_CHECKING
+import open3d
+from typing_extensions import Callable, TYPE_CHECKING
 
 from robokudo.cas import CASViews
 from robokudo.exceptions import ColorToDepthRatioMissing
+from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
-from robokudo.utils.o3d_helper import scale_o3d_camera_intrinsics
 from robokudo.utils.transform import (
     get_transform_matrix_from_q,
     get_translation_from_transform_matrix,
@@ -95,8 +96,8 @@ def transform_pose_from_world_to_camera(
 
 
 def transform_cloud_from_camera_to_world(
-    cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
-) -> o3d.geometry.PointCloud:
+    cas: CAS, cloud: open3d.geometry.PointCloud, transform_inplace: bool = False
+) -> open3d.geometry.PointCloud:
     """
     Transform point cloud from camera to world coordinates.
 
@@ -116,8 +117,8 @@ def transform_cloud_from_camera_to_world(
 
 
 def transform_cloud_from_world_to_camera(
-    cas: CAS, cloud: o3d.geometry.PointCloud, transform_inplace: bool = False
-) -> o3d.geometry.PointCloud:
+    cas: CAS, cloud: open3d.geometry.PointCloud, transform_inplace: bool = False
+) -> open3d.geometry.PointCloud:
     """
     Transform point cloud from world to camera coordinates.
 
@@ -145,15 +146,10 @@ def get_camera_to_world_transform_matrix(cas: CAS) -> npt.NDArray:
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 camera-to-world transform matrix
-    :raises KeyError: If camera-to-world transform not in CAS
+    :raises CameraObservationMissing: If the CAS has no camera observation.
+    :raises CameraPoseMissing: If the observation has no sampled pose.
     """
-    if cas.camera_to_world_transform is None:
-        raise KeyError(
-            "Camera-to-world transform not found in CAS. "
-            "Is lookup_viewpoint in camera config set to True? "
-            "Or if reading from a database: Has the data been recorded with lookup_viewpoint set to true?"
-        )
-    return cas.camera_to_world_transform.to_np()
+    return cas.require_camera_observation().world_T_camera_or_raise().to_np()
 
 
 def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
@@ -162,16 +158,15 @@ def get_world_to_camera_transform_matrix(cas: CAS) -> npt.NDArray:
 
     :param cas: CAS containing camera-to-world transform
     :return: 4x4 world-to-camera transform matrix
-    :raises KeyError: If camera-to-world transform not in CAS
+    :raises CameraObservationMissing: If the CAS has no camera observation.
+    :raises CameraPoseMissing: If the observation has no sampled pose.
     """
-    world_to_camera_transform = np.linalg.inv(get_camera_to_world_transform_matrix(cas))
-
-    return world_to_camera_transform
+    return cas.require_camera_observation().camera_T_world.to_np()
 
 
 def draw_bounding_boxes_from_object_hypotheses(
     img: npt.NDArray,
-    object_hypotheses: List[ObjectHypothesis],
+    object_hypotheses: list[ObjectHypothesis],
     text_function: Callable[[ObjectHypothesis], str],
 ) -> None:
     """
@@ -215,13 +210,13 @@ def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
     :param annotator: Annotator whose ``camera_intrinsics`` attribute is replaced by the
         scaled intrinsics.
     """
-    color_to_depth_ratio = annotator.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
-    if not color_to_depth_ratio.is_identity:
-        annotator.camera_intrinsics = scale_o3d_camera_intrinsics(
-            annotator.camera_intrinsics,
-            color_to_depth_ratio.horizontal,
-            color_to_depth_ratio.vertical,
-        )
+    cas = annotator.get_cas()
+    color_to_depth_ratio = cas.color_to_depth_ratio
+    camera_model = cas.require_camera_observation().effective_camera_model.scaled(
+        scale_x=color_to_depth_ratio.horizontal,
+        scale_y=color_to_depth_ratio.vertical,
+    )
+    annotator.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(camera_model)
 
 
 def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
@@ -274,7 +269,7 @@ def resize_mask(annotator: BaseAnnotator, mask: npt.NDArray) -> npt.NDArray:
         # nothing to do
         return mask
 
-    color_to_depth_ratio = annotator.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
+    color_to_depth_ratio = annotator.get_cas().color_to_depth_ratio
 
     if color_to_depth_ratio is None:
         raise ColorToDepthRatioMissing(operation="resize mask")

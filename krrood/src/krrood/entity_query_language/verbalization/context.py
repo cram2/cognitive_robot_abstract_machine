@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Optional
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.verbalization.microplanning.binding_scope import (
@@ -51,7 +51,7 @@ class MicroplanningServices:
     The plan read model — each node's plan computed once and shared (lazy / memoised).
     """
 
-    performative_override: Optional[Directive] = None
+    performative_override: Directive | None = None
     """
     An explicit opening directive (``Find`` / ``Generate``) chosen by the caller —
     typically resolved from the evaluating backend (generative → ``Generate``, selective

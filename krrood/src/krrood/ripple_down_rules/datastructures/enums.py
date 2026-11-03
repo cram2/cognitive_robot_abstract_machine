@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from enum import auto, Enum
 
-from typing_extensions import List
-
 
 class InferMode(Enum):
     """
@@ -77,7 +75,7 @@ class Category(str, Enum):
         return getattr(cls, value)
 
     @classmethod
-    def from_strs(cls, values: List[str]) -> List[Category]:
+    def from_strs(cls, values: list[str]) -> list[Category]:
         return [cls.from_str(value) for value in values]
 
     @property

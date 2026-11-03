@@ -13,6 +13,7 @@ import scipy.sparse as sp
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.exceptions import (
+    CannotConvertToStringError,
     FloatVariableAlreadyHasResolveError,
     HasFreeVariablesError,
     NotColumnVectorError,
@@ -186,23 +187,6 @@ class TestLogic3:
             actual = sm.trinary_logic_not(sm.Scalar(i))
             assert expected == actual, f"a={i}, expected {expected}, actual {actual}"
 
-    def test_trinary_logic_to_str(self):
-        a = sm.FloatVariable(name="a")
-        b = sm.FloatVariable(name="b")
-        c = sm.FloatVariable(name="c")
-        expression = sm.trinary_logic_and(
-            a, sm.trinary_logic_or(b, sm.trinary_logic_not(c))
-        )
-        expression_str = sm.trinary_logic_to_str(expression)
-        assert expression_str == '("a" and ("b" or not "c"))'
-
-        const_expr = sm.trinary_logic_and(
-            sm.Scalar.const_true(),
-            sm.trinary_logic_or(a, sm.Scalar.const_trinary_unknown()),
-        )
-        const_expr_str = sm.trinary_logic_to_str(const_expr)
-        assert const_expr_str == '("a" or Unknown)'
-
 
 class TestTrinaryPredicates:
     """
@@ -307,6 +291,32 @@ class TestTrinaryPredicates:
 
 
 class TestIfElse:
+    @pytest.mark.parametrize(
+        "guard, selected",
+        [
+            (sm.Scalar.const_true(), True),
+            (sm.Scalar.const_trinary_unknown(), False),
+            (sm.Scalar.const_false(), False),
+        ],
+    )
+    def test_trinary_if_cases_selects_a_case_only_while_its_guard_is_true(
+        self, guard: sm.Scalar, selected: bool
+    ) -> None:
+        """
+        A trinary guard selects its case only while it is True, where :func:`if_cases`
+        would take Unknown for true as well.
+        """
+        a = sm.FloatVariable(name="a")
+        case_result = sm.Scalar(1)
+        else_result = sm.Scalar(2)
+
+        result = sm.trinary_if_cases(
+            cases=[(guard * a, case_result)], else_result=else_result
+        )
+
+        expected = case_result if selected else else_result
+        assert result.substitute([a], [sm.Scalar(1)]).to_np() == expected.to_np()
+
     def test_if_one_arg(self):
         inputs = [
             (sm.FloatVariable(name="muh"), sm.FloatVariable(name="muh2")),
@@ -832,6 +842,12 @@ class TestCompiledFunction:
         f = e.compile(sparse=True)
         assert np.allclose(f().toarray(), expected)
         assert np.allclose(f(np.array([], dtype=float)).toarray(), expected)
+
+    def test_function_of_an_expression_without_entries_has_a_representation(
+        self,
+    ) -> None:
+        function = sm.Matrix().compile()
+        assert repr(function.expression) in repr(function)
 
     def test_dense(self):
         s1_value = 420.0

@@ -15,21 +15,21 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from datetime import timedelta
+from functools import partial
 
 import rclpy
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from typing_extensions import List, Type
 
-from coraplex.alternative_motion_mapping import AlternativeMotion
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ExecutionType, VisualizationBackend
-from coraplex.execution_environment import (
-    ExecutionEnvironment,
-    PhysicallySimulatedRobot,
+from coraplex.plans.executors import (
+    KinematicallySimulatedPlanExecutor,
+    PhysicallySimulatedPlanExecutor,
+    PlanExecutor,
+    SimulatedPlanExecutor,
 )
-from coraplex.visualization import VisualizationSession, WorldVisualization
-from coraplex.plans.plan_node import PlanNode
+from cramph.visualization import RvizVisualization, WorldVisualization
+from cramph.context import ContextExtension, StatechartContext
+from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -45,7 +45,7 @@ WORLD_FETCH_TIMEOUT_SECONDS = 300
 """
 How long to wait for a controller to serve its world.
 
-Matches giskardpy's own client (``giskardpy/middleware/ros2/python_interface.py``), which
+Matches giskardpy's own client (``giskardpy/middleware/ros2/giskard_client_executor.py``), which
 waits this long for the same race: the world-fetcher server is still parsing the URDF and
 starting up when a shorter budget would expire.
 """
@@ -74,9 +74,10 @@ class RobotDemonstrationRosSession:
     The node that service calls and synchronizers are attached to.
     """
 
-    executor: SingleThreadedExecutor
+    executor: MultiThreadedExecutor
     """
-    Executor delivering this node's callbacks.
+    Executor delivering this node's callbacks, those of different callback groups at the
+    same time.
     """
 
     owns_context: bool
@@ -100,7 +101,7 @@ class RobotDemonstrationRosSession:
         if owns_context:
             rclpy.init()
         node = rclpy.create_node(node_name)
-        executor = SingleThreadedExecutor()
+        executor = MultiThreadedExecutor()
         executor.add_node(node)
         session = cls(node=node, executor=executor, owns_context=owns_context)
         session.spin_thread = threading.Thread(
@@ -155,7 +156,7 @@ class RobotDemonstration(ABC):
     in the physics of :meth:`build_simulation`.
     """
 
-    used_robot: Type[AbstractRobot]
+    used_robot: type[AbstractRobot]
     """
     The robot this demonstration uses.
     """
@@ -165,9 +166,10 @@ class RobotDemonstration(ABC):
     Name of the node a real run registers.
     """
 
-    execution_type: ExecutionType = ExecutionType.KINEMATICALLY_SIMULATED
+    executor_type: type[PlanExecutor] = KinematicallySimulatedPlanExecutor
     """
-    Whether the plan drives the real robot or a simulated one.
+    The executor running the plan, which decides whether it drives the real robot or a
+    simulated one.
     """
 
     collision_avoidance: bool = False
@@ -183,8 +185,8 @@ class RobotDemonstration(ABC):
 
     debug: bool = False
     """
-    Whether the plan runs in debug mode, logging debug messages and publishing every
-    copy of the world a candidate is tried in.
+    Whether the plan runs in debug mode, publishing every copy of the world a candidate
+    is tried in.
     """
 
     repetitions: int = 1
@@ -193,6 +195,12 @@ class RobotDemonstration(ABC):
 
     Repeating only makes sense for a plan that leaves the scene as it found it, such as
     one carrying an object away and back again.
+    """
+
+    simulation_time_per_action: timedelta | None = None
+    """
+    The simulated time every action a simulated run starts adds to the time it may take;
+    ``None`` keeps the budget of the executor.
     """
 
     headless: bool = False
@@ -206,11 +214,11 @@ class RobotDemonstration(ABC):
     the scene to come to rest.
     """
 
-    default_visualization_backend: VisualizationBackend = VisualizationBackend.RVIZ
-    """Renderer used unless explicitly selected through the environment."""
-
-    visualization: WorldVisualization | None = field(init=False, default=None)
-    """The visualization owned by this simulated demonstration."""
+    visualization: WorldVisualization | None = None
+    """
+    Shows every simulated run of this demonstration. Left ``None``, a simulated run is
+    shown in RViz through :attr:`ros_node`, if there is one; a real run is never shown.
+    """
 
     ros_session: RobotDemonstrationRosSession | None = field(init=False, default=None)
     """
@@ -263,16 +271,18 @@ class RobotDemonstration(ABC):
         """
 
     @abstractmethod
-    def build_context(self, world: World) -> Context:
+    def build_context_extensions(self, world: World) -> list[ContextExtension]:
         """
-        Build the plan context, resolving the robot in ``world``, in debug mode when
-        :attr:`debug` is set.
+        Build what the plan's nodes read from their context, at least the
+        :class:`~coraplex.plans.context_extensions.RobotAccess` of the robot resolved in
+        ``world``, and the :class:`~coraplex.plans.plan_transformation.PlanRewriting`
+        if the plan is to be rewritten.
         """
 
     @abstractmethod
-    def build_plan(self, context: Context) -> PlanNode:
+    def build_statechart(self, context: StatechartContext) -> Statechart:
         """
-        Build the plan this demonstration performs.
+        Build the statechart this demonstration performs, in `context`.
         """
 
     def segment_events(self, world: World) -> AbstractContextManager:
@@ -295,16 +305,6 @@ class RobotDemonstration(ABC):
             return None
         return self.ros_session.node
 
-    @property
-    def alternative_motion_mappings(self) -> List[Type[AlternativeMotion]]:
-        """
-        Every alternative motion mapping known to coraplex, for every robot.
-
-        Resolution filters by ``used_robot`` and execution type, so handing over the
-        full set is always safe and needs no per-robot selection here.
-        """
-        return AlternativeMotion.discover_all()
-
     def build_scene(self) -> World:
         """
         Build the scene: the map of :meth:`scene_specification`, populated by
@@ -312,7 +312,7 @@ class RobotDemonstration(ABC):
 
         :return: A world holding the scene and no robot.
         """
-        scene = self.scene_specification().to_domain_object()
+        scene = self.scene_specification().create_world()
         self.populate_scene(scene)
         return scene
 
@@ -355,17 +355,12 @@ class RobotDemonstration(ABC):
         :return: The world the plan is performed in.
         """
         self.ros_session = RobotDemonstrationRosSession.start(self.ros_node_name)
-        VisualizationSession.register(self.stop_visualization)
-
-        if self.execution_type is not ExecutionType.REAL:
-            world = self.build_simulated_world()
-            self.visualization = WorldVisualization.from_environment(
-                world,
-                default_backend=self.default_visualization_backend,
-                ros_node=self.ros_node,
-                collision_visualization=True,
-            ).start()
-            return world
+        if issubclass(self.executor_type, SimulatedPlanExecutor):
+            if self.visualization is None and self.ros_node is not None:
+                self.visualization = RvizVisualization(
+                    ros_node=self.ros_node, collision_visualization=True
+                )
+            return self.build_simulated_world()
         return self.fetch_real_world()
 
     def build_simulation(self, world: World) -> MujocoSim:
@@ -377,31 +372,42 @@ class RobotDemonstration(ABC):
 
     def start_simulation(self, world: World) -> None:
         """
-        Start the physics of a physically simulated run, and let it step for
-        :attr:`settling_duration`. Starts nothing for any other run.
+        Start the physics of a run of a
+        :class:`~coraplex.plans.executors.PhysicallySimulatedPlanExecutor`, and let it
+        step for :attr:`settling_duration`. Starts nothing for any other run.
 
         :param world: The world the plan is performed in.
         """
-        if self.execution_type is not ExecutionType.PHYSICALLY_SIMULATED:
+        if not issubclass(self.executor_type, PhysicallySimulatedPlanExecutor):
             return
         self.simulation = self.build_simulation(world)
         self.simulation.start_stepped_simulation()
         self.simulation.step_simulation(self.settling_duration)
 
-    def execution_environment(self) -> ExecutionEnvironment:
+    def create_executor(self, world: World) -> PlanExecutor:
         """
-        :return: The environment the plan is performed in, which is the started
-            :attr:`simulation` for a physically simulated run.
+        :param world: The world the plan is performed in.
+        :return: An executor of :attr:`executor_type`, set up the way this demonstration
+            performs its plan in :attr:`simulation`, if there is one, showing its runs
+            with :attr:`visualization`.
         """
-        if self.simulation is None:
-            return ExecutionEnvironment(
-                execution_type=self.execution_type,
-                collision_avoidance=self.collision_avoidance,
-            )
-        return PhysicallySimulatedRobot(
-            simulation=self.simulation,
+        executor_type = self.executor_type
+        if self.simulation is not None:
+            executor_type = partial(executor_type, simulation=self.simulation)
+        executor = executor_type(
+            StatechartContext.with_extensions(
+                world, self.build_context_extensions(world)
+            ),
+            ros_node=self.ros_node,
             collision_avoidance=self.collision_avoidance,
+            debug=self.debug,
+            extensions=[] if self.visualization is None else [self.visualization],
         )
+        if self.simulation_time_per_action is not None and isinstance(
+            executor, SimulatedPlanExecutor
+        ):
+            executor.simulation_time_per_action = self.simulation_time_per_action
+        return executor
 
     def run(self) -> World:
         """
@@ -413,47 +419,30 @@ class RobotDemonstration(ABC):
             world = self.acquire_world()
             self.start_simulation(world)
             for _ in range(self.repetitions):
-                context = self.build_context(world)
-                plan = self.build_plan(context)
-                if self.visualization is not None:
-                    self.visualization.attach_plan(plan)
+                executor = self.create_executor(world)
+                statechart = self.build_statechart(executor.context)
                 event_segmentation = (
                     self.segment_events(world)
                     if self.event_segmentation
                     else nullcontext()
                 )
-                with self.execution_environment(), event_segmentation:
-                    plan.perform()
+                with event_segmentation:
+                    executor.compile(statechart)
+                    executor.execute()
+                executor.close()
         finally:
             self.tear_down()
         return world
 
     def tear_down(self) -> None:
         """
-        Stop the physics, and release owned ROS resources after execution.
-
-        An explicitly selected browser viewer remains available for inspection until
-        :meth:`stop_visualization`. A borrowed ROS session is left to its owner.
+        Stop the physics, and release the ROS session if this demonstration started the
+        ROS context.
         """
         if self.simulation is not None:
             self.simulation.stop_simulation()
             self.simulation = None
-        if self.visualization is not None:
-            self.visualization.finish_execution()
-            if not self.visualization.is_rendering:
-                self.visualization = None
-            elif VisualizationSession.is_active():
-                return
         if self.ros_session is None or not self.ros_session.owns_context:
             return
         self.ros_session.stop()
         self.ros_session = None
-
-    def stop_visualization(self) -> None:
-        """Close the retained viewer and executor, preserving a borrowed ROS context."""
-        if self.visualization is not None:
-            self.visualization.stop()
-            self.visualization = None
-        if self.ros_session is not None:
-            self.ros_session.stop()
-            self.ros_session = None

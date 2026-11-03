@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field, InitVar
-from typing import Optional, List, Union, Tuple, Set as TypingSet
 from PySide6.QtWidgets import (
     QWidget,
     QHBoxLayout,
@@ -52,22 +51,22 @@ class NumericIntervalWidget(QWidget):
     The maximum value allowed for the variable.
     """
 
-    initial_values: Tuple[float, float]
+    initial_values: tuple[float, float]
     """
     The initial values for the lower and upper bounds of the interval.
     """
 
-    minimum_spin_box: Union[QDoubleSpinBox, QSpinBox]
+    minimum_spin_box: QDoubleSpinBox | QSpinBox
     """
     The spin box for the minimum interval value.
     """
 
-    maximum_spin_box: Union[QDoubleSpinBox, QSpinBox]
+    maximum_spin_box: QDoubleSpinBox | QSpinBox
     """
     The spin box for the maximum interval value.
     """
 
-    slider: Union[QDoubleRangeSlider, QRangeSlider]
+    slider: QDoubleRangeSlider | QRangeSlider
     """
     The range slider for visual adjustment of the interval.
     """
@@ -85,8 +84,8 @@ class NumericIntervalWidget(QWidget):
         variable: Variable,
         minimum_bound: float,
         maximum_bound: float,
-        initial_values: Tuple[float, float],
-        parent: Optional[QWidget] = None,
+        initial_values: tuple[float, float],
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self.variable = variable
@@ -173,7 +172,7 @@ class NumericIntervalWidget(QWidget):
         layout.addWidget(self.maximum_spin_box)
         layout.addWidget(self.remove_button)
 
-    def _on_slider_changed(self, values: Tuple[float, float]):
+    def _on_slider_changed(self, values: tuple[float, float]):
         """
         Updates the spin boxes when the slider values change.
         """
@@ -211,7 +210,7 @@ class NumericIntervalWidget(QWidget):
         self.slider.blockSignals(False)
         self.changed.emit()
 
-    def value(self) -> Tuple[float, float]:
+    def value(self) -> tuple[float, float]:
         """
         Returns the current low and high values of the interval.
         """
@@ -224,12 +223,12 @@ class VariableConstraintWidget(QFrame):
     A widget that allows selecting a variable and defining its constraints.
     """
 
-    variables: List[Variable]
+    variables: list[Variable]
     """
     The list of variables to select from.
     """
 
-    priors: Optional[VariableMap]
+    priors: VariableMap | None
     """
     The prior distributions for the variables (optional).
     """
@@ -259,7 +258,7 @@ class VariableConstraintWidget(QFrame):
     The layout for the constraint container.
     """
 
-    constraint_widget: Optional[Union[QScrollArea, QListWidget]]
+    constraint_widget: QScrollArea | QListWidget | None
     """
     The widget used for defining constraints (QScrollArea or QListWidget).
     """
@@ -284,7 +283,7 @@ class VariableConstraintWidget(QFrame):
     The scroll area for numeric intervals.
     """
 
-    interval_widgets: List[NumericIntervalWidget]
+    interval_widgets: list[NumericIntervalWidget]
     """
     The list of numeric interval widgets.
     """
@@ -301,9 +300,9 @@ class VariableConstraintWidget(QFrame):
 
     def __init__(
         self,
-        variables: List[Variable],
-        priors: Optional[VariableMap] = None,
-        parent: Optional[QWidget] = None,
+        variables: list[Variable],
+        priors: VariableMap | None = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self.variables = sorted(variables, key=lambda v: v.name)
@@ -404,7 +403,7 @@ class VariableConstraintWidget(QFrame):
 
         self.changed.emit()
 
-    def update_available_variables(self, excluded_variables: TypingSet[Variable]):
+    def update_available_variables(self, excluded_variables: set[Variable]):
         """
         Disables variables in the combo box that are in the excluded_variables set,
         except for the currently selected variable.
@@ -458,7 +457,7 @@ class VariableConstraintWidget(QFrame):
 
             self.constraint_widget = self.scroll_area
 
-            self.interval_widgets: List[NumericIntervalWidget] = []
+            self.interval_widgets: list[NumericIntervalWidget] = []
 
             # Determine bounds
             minimum, maximum = self._get_variable_bounds(variable)
@@ -501,7 +500,7 @@ class VariableConstraintWidget(QFrame):
 
         self.constraint_layout.addWidget(self.constraint_widget)
 
-    def _get_variable_bounds(self, variable: Variable) -> Tuple[float, float]:
+    def _get_variable_bounds(self, variable: Variable) -> tuple[float, float]:
         """
         Calculates the minimum and maximum bounds for the variable based on its domain
         and priors.
@@ -542,7 +541,7 @@ class VariableConstraintWidget(QFrame):
         return minimum, maximum
 
     def add_numeric_interval(
-        self, variable: Variable, values: Optional[Tuple[float, float]] = None
+        self, variable: Variable, values: tuple[float, float] | None = None
     ):
         """
         Adds a new numeric interval row.
@@ -625,7 +624,7 @@ class VariableConstraintWidget(QFrame):
                     widget.slider.setEnabled(not read_only)
                     widget.remove_button.setVisible(not read_only)
 
-    def get_constraint(self) -> Optional[Tuple[Variable, Union[Interval, Set]]]:
+    def get_constraint(self) -> tuple[Variable, Interval | Set] | None:
         variable = self.variable_combo.currentData()
         if not variable:
             return None
@@ -663,7 +662,7 @@ class VariableConstraintWidget(QFrame):
 
         return None
 
-    def set_constraint(self, variable: Variable, constraint: Union[Interval, Set]):
+    def set_constraint(self, variable: Variable, constraint: Interval | Set):
         """
         Sets the variable and its constraint programmatically.
         """

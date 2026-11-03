@@ -7,20 +7,14 @@ from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from functools import wraps
 from threading import RLock
-from typing import Any, Callable, ClassVar, Optional
+from typing_extensions import Any, Callable, ClassVar
 
 from krrood.singleton import SingletonMeta
 from segmind.datastructures.enums import PlayerStatus
 from segmind.utils import PropagatingThread
 from semantic_digital_twin.world import World
 
-
 logger = logging.getLogger(__name__)
-
-try:
-    from ripple_down_rules.user_interface.gui import RDRCaseViewer
-except ImportError:
-    RDRCaseViewer = None
 
 
 class SingletonABCMeta(SingletonMeta, ABCMeta):
@@ -39,12 +33,14 @@ class EpisodePlayer(PropagatingThread, ABC, metaclass=SingletonABCMeta):
     It provides common functionality and properties for episode players.
     """
 
-    world: Optional[World] = None
+    world: World | None = None
     """
     The world associated with the episode player.
     """
 
-    time_between_frames: Optional[datetime.timedelta] = field(default_factory=lambda: datetime.timedelta(seconds=0.01))
+    time_between_frames: datetime.timedelta | None = field(
+        default_factory=lambda: datetime.timedelta(seconds=0.01)
+    )
     """
     The time between frames of the episode player.
     """
@@ -59,17 +55,12 @@ class EpisodePlayer(PropagatingThread, ABC, metaclass=SingletonABCMeta):
     If True, the episode player will stop after it is ready.
     """
 
-    rdr_viewer: Optional[RDRCaseViewer] = None
-    """
-    The RDRCaseViewer instance.
-    """
-
     pause_resume_lock: ClassVar[RLock] = field(default=RLock(), init=False)
     """
     A lock for pausing and resuming the episode player.
     """
 
-    _ready : bool = field(default=False, init=False)
+    _ready: bool = field(default=False, init=False)
     """
     Whether the episode player is ready to start playing.
     """
@@ -153,7 +144,7 @@ class EpisodePlayer(PropagatingThread, ABC, metaclass=SingletonABCMeta):
     def _wait_to_maintain_frame_rate(
         self,
         last_processing_time: float,
-        delta_time: Optional[datetime.timedelta] = None,
+        delta_time: datetime.timedelta | None = None,
     ):
         """
         Wait to maintain the frame rate of the episode player.

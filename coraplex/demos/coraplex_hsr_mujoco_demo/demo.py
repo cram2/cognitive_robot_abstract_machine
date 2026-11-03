@@ -1,6 +1,7 @@
 """
-The HSR carries a milk carton from a counter to a table in MuJoCo. Run it from this
-folder::
+The HSR carries a milk carton from a counter to a table in MuJoCo.
+
+Run it from this folder::
 
     python demo.py
 """
@@ -13,28 +14,28 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
-from typing_extensions import Type
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ExecutionType
 from coraplex.demonstrations import RobotDemonstration
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
-from coraplex.querying.predicates import IsAmongTheClosestGraspsTo
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.executors import PhysicallySimulatedPlanExecutor, PlanExecutor
+from coraplex.querying.grasp_closeness import GraspsByCloseness
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
+from cramph.composites import Sequence
+from cramph.context import ContextExtension, StatechartContext
+from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
 )
@@ -85,11 +86,11 @@ class MilkTransportDemonstration(RobotDemonstration):
     The HSR carries the milk from the counter in front of it to the table behind it.
     """
 
-    used_robot: Type[AbstractRobot] = HSRB
+    used_robot: type[AbstractRobot] = HSRB
 
     ros_node_name: str = "hsr_milk_transport_demo"
 
-    execution_type: ExecutionType = ExecutionType.PHYSICALLY_SIMULATED
+    executor_type: type[PlanExecutor] = PhysicallySimulatedPlanExecutor
 
     floor: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
@@ -187,39 +188,37 @@ class MilkTransportDemonstration(RobotDemonstration):
             world.get_body_by_name(SceneBody.COUNTER), milk
         ).homogeneous_matrix
 
-    def build_context(self, world: World) -> Context:
-        return Context(
-            world=world,
-            robot=world.get_semantic_annotations_by_type(self.used_robot)[0],
-            ros_node=self.ros_node,
-            _debug=self.debug,
-        )
+    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+        return [RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0])]
 
-    def build_plan(self, context: Context) -> PlanNode:
+    def build_statechart(self, context: StatechartContext) -> Statechart:
         """
         Raise the torso, park the arm, take the milk from the counter, carry it to the
         table and set it down there.
         """
         world = context.world
-        hsrb = context.robot
+        hsrb = context.require_extension(RobotAccess).robot
         [milk] = world.get_semantic_annotations_by_type(Milk)
         [arm] = hsrb.all_arms
         taking_pose = self._standing_pose_facing(
             self._milk_pose_on(world.get_body_by_name(SceneBody.COUNTER), milk)
         )
         target = self._milk_pose_on(world.get_body_by_name(SceneBody.TABLE), milk)
-        return sequential(
-            [
-                MoveTorsoAction(TorsoState.HIGH),
-                ParkArmsAction(hsrb.all_arms),
-                NavigateAction(taking_pose),
-                PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
-                NavigateAction(self._standing_pose_facing(target)),
-                PlaceAction(object_designator=milk, target_location=target),
-                ParkArmsAction(hsrb.all_arms),
-            ],
-            context=context,
-        ).plan
+        statechart = Statechart(context=context)
+        statechart.add_node(
+            Sequence(
+                nodes=[
+                    MoveTorsoAction(torso_state=TorsoState.HIGH),
+                    ParkArmsAction(arms=hsrb.all_arms),
+                    NavigateAction(target_location=taking_pose),
+                    PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
+                    NavigateAction(target_location=self._standing_pose_facing(target)),
+                    PlaceAction(object_designator=milk, target_location=target),
+                    ParkArmsAction(arms=hsrb.all_arms),
+                ]
+            )
+        )
+        return statechart
 
     def build_simulation(self, world: World) -> MujocoSim:
         return MujocoSim(
@@ -275,14 +274,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         :return: The milk's grasp closest to the robot standing there, raised
             :attr:`grasp_height` above the milk's origin.
         """
-        grasps = milk.grasp_candidates()
-        [closest] = [
-            grasp
-            for grasp in grasps
-            if IsAmongTheClosestGraspsTo(
-                grasp, standing_pose, grasps, number_of_grasps=1
-            )()
-        ]
+        [closest] = GraspsByCloseness(milk, standing_pose, number_of_grasps=1)()
         milk_T_raised_grasp = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=self.grasp_height, reference_frame=milk.root

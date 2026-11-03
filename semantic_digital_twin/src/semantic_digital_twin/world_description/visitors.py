@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Tuple
+from typing_extensions import TYPE_CHECKING
 
 import rustworkx as rx
-from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.world_description.world_entity import Body, Connection
 
@@ -29,7 +28,7 @@ class CollisionBodyCollector(rx.visit.DFSVisitor):
         if isinstance(body, Body) and body.has_collision():
             self.bodies.append(body)
 
-    def tree_edge(self, args: Tuple[int, int, Connection]) -> None:
+    def tree_edge(self, args: tuple[int, int, Connection]) -> None:
         """
         Called for each tree edge during DFS traversal.
         """
@@ -47,7 +46,7 @@ class ConnectionCollector(rx.visit.DFSVisitor):
         self.world = world
         self.connections = []
 
-    def tree_edge(self, edge: Tuple[int, int, Connection]):
+    def tree_edge(self, edge: tuple[int, int, Connection]):
         """
         Called for each tree edge during DFS traversal.
         """

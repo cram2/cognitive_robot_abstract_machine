@@ -11,7 +11,6 @@ import mujoco
 import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
-from typing_extensions import List
 
 from ...pytest_environment import runs_in_continuous_integration
 
@@ -24,10 +23,8 @@ from semantic_digital_twin.datastructures.definitions import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.contact import ContactParameters
 from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint, HSRBSpringJoint
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -99,14 +96,25 @@ def _hold_the_arm_out_sideways(hsrb: HSRB) -> dict[str, float]:
 # %% the hand's states
 
 
-def test_the_open_hand_spreads_its_fingers_as_far_as_the_hand_motor_turns(hsrb):
-    hand_motor = hsrb._world.get_connection_by_name(HSRBJoint.HAND_MOTOR)
+def test_the_open_hand_turns_its_motor_and_both_springs_to_their_upper_limits(
+    hsrb,
+) -> None:
+    world = hsrb._world
+    motor_and_springs = [
+        world.get_connection_by_name(joint_name)
+        for joint_name in [
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        ]
+    ]
 
     opened = hsrb.end_effector.get_joint_state_by_type(GripperState.OPEN)
 
-    assert opened.target_values == [hand_motor.raw_dof.limits.upper.position] * len(
-        opened.connections
-    )
+    assert dict(zip(opened.connections, opened.target_values)) == {
+        connection: connection.raw_dof.limits.upper.position
+        for connection in motor_and_springs
+    }
 
 
 # %% the servos the HSRB declares
@@ -128,10 +136,14 @@ def test_every_commanded_joint_the_hand_and_the_drive_are_driven_by_one_servo(hs
     }
     hand = {
         world.get_connection_by_name(joint_name).raw_dof
-        for joint_name in [HSRBJoint.HAND_MOTOR, *HSRBSpringJoint]
+        for joint_name in [
+            HSRBJoint.HAND_MOTOR,
+            HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
+            HSRBJoint.HAND_RIGHT_SPRING_PROXIMAL,
+        ]
     }
 
-    def driven_by(servo_type: type) -> List[str]:
+    def driven_by(servo_type: type) -> list[str]:
         return sorted(
             str(degree_of_freedom.name)
             for actuator in world.actuators
@@ -289,8 +301,8 @@ def test_the_arm_comes_to_rest_held_out_sideways(hsrb):
 
 def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
     """
-    Hold the hand out level in front of the HSRB, open, and stand a carton on a
-    support between its fingers, as a front grasp finds an object on a table.
+    Hold the hand out level in front of the HSRB, open, and stand a carton on a support
+    between its fingers, as a front grasp finds an object on a table.
 
     :param carton_scale: The carton's width, depth and height.
     :return: The carton.
@@ -359,8 +371,8 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
 )
 def test_the_closed_hand_keeps_a_carton_while_the_arm_lifts_it(hsrb):
     """
-    MuJoCo's default friction cone lets a held object slide out under its own weight,
-    so the simulation resolves friction exactly, as a demo carrying objects does.
+    MuJoCo's default friction cone lets a held object slide out under its own weight, so
+    the simulation resolves friction exactly, as a demo carrying objects does.
     """
     carton = _carton_between_the_open_fingers(hsrb, Scale(0.06, 0.06, 0.2))
     lift = 0.15

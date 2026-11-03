@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Dict, Iterable, List, Self
+from typing_extensions import TYPE_CHECKING, Iterable, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleRows,
@@ -23,7 +23,7 @@ class SampleRowsOfNode:
     A node with several parents receives one chunk of rows from each of them.
     """
 
-    chunks: List[SampleRows] = field(default_factory=list)
+    chunks: list[SampleRows] = field(default_factory=list)
     """
     The chunks of rows received so far.
     """
@@ -56,7 +56,7 @@ class ForwardSampleAssignment:
     each of them before it is its own turn to route them further.
     """
 
-    rows_by_layer: Dict[int, List[SampleRowsOfNode]]
+    rows_by_layer: dict[int, list[SampleRowsOfNode]]
     """
     For every layer, keyed by its id, the rows assigned to each of its nodes so far.
     """
@@ -84,7 +84,7 @@ class ForwardSampleAssignment:
         """
         self.rows_by_layer[id(layer)][node].add(rows)
 
-    def rows_of(self, layer: Layer) -> List[SampleRowsOfNode]:
+    def rows_of(self, layer: Layer) -> list[SampleRowsOfNode]:
         """
         :param layer: The layer to read the assignment of.
         :return: The rows assigned to every node of that layer so far.

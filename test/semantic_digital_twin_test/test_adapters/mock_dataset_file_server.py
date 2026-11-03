@@ -9,7 +9,6 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 
-from typing_extensions import List
 
 # %% answering one request
 
@@ -19,7 +18,7 @@ class MockDatasetFileRequestHandler(SimpleHTTPRequestHandler):
     Serves a file, and a directory as the json listing the dataset server reads.
     """
 
-    def __init__(self, *args, requested_paths: List[str], **kwargs) -> None:
+    def __init__(self, *args, requested_paths: list[str], **kwargs) -> None:
         self.requested_paths = requested_paths
         """
         The list this handler records the path it answers in.
@@ -70,7 +69,7 @@ class MockDatasetFileServer:
     The directory tree served.
     """
 
-    requested_paths: List[str] = field(default_factory=list)
+    requested_paths: list[str] = field(default_factory=list)
     """
     Every path requested so far, in order, so a test can assert what was fetched and
     what a cache hit spared.

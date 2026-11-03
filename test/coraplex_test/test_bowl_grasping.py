@@ -6,17 +6,19 @@ import pytest
 import trimesh
 from trimesh.proximity import closest_point
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.plans.factories import sequential
+from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
+from cramph.threaded_nodes import FunctionCall
 from coraplex.robot_plans.actions.composite.transporting import TransportAction
+from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Rim
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 
 from ..conftest import SAMPLING_SEED
+from ..plan_running import context_of, robot_extensions
 
 # %% fixtures
 
@@ -57,7 +59,7 @@ def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
 
 @pytest.fixture
 def bowl() -> Bowl:
-    world = STLParser(BOWL_MESH).parse()
+    world = STLParser(BOWL_MESH).create_world()
     annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
     with world.modify_world():
         world.add_semantic_annotation(annotation)
@@ -133,7 +135,7 @@ def pr2_and_bowl(simple_pr2_context):
     A PR2 in a world with the demos' bowl standing on the counter.
     """
     world, robot, _ = simple_pr2_context
-    bowl_world = STLParser(BOWL_MESH).parse()
+    bowl_world = STLParser(BOWL_MESH).create_world()
     with world.modify_world():
         world.merge_world_at_pose(
             bowl_world,
@@ -156,17 +158,17 @@ def test_transporting_a_bowl_grasps_it_at_its_rim(pr2_and_bowl):
     the whole reason a bowl generates its own grasps.
     """
     world, robot, bowl = pr2_and_bowl
-    context = Context(world, robot, sampling_seed=SAMPLING_SEED)
-    context.evaluate_conditions = False
     transport = TransportAction.from_graspable_by_closest_grasps(
         bowl,
         Pose.from_xyz_rpy(5.0, 3.3, 0.75, reference_frame=world.root),
-        context.robot.left_arm,
-        context,
+        robot.left_arm,
+        context_of(robot_extensions(robot)),
     )
 
-    sequential([transport], context=context)
+    Sequence(nodes=[transport])
 
-    first_pick_up = next(iter(context.query_backend.evaluate(transport.pick_up)))
+    first_pick_up = next(
+        iter(EntityQueryLanguageGenerativeBackend().evaluate(transport.pick_up))
+    )
     grasp_position = first_pick_up.pick_up.grasp.grasp_pose.to_np()[:3, 3]
     assert distances_to_surface(bowl, grasp_position[None, :])[0] < GRIPPABLE_DISTANCE

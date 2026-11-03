@@ -21,11 +21,11 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import open3d as o3d
+import open3d
 import torch
 from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Any, Dict, List, Optional
+from typing_extensions import TYPE_CHECKING, Any
 from ultralytics import SAM, YOLO
 from ultralytics.utils.plotting import colors
 
@@ -39,7 +39,6 @@ from robokudo.types.scene import HumanHypothesis, ObjectHypothesis
 from robokudo.utils.annotator_helper import (
     draw_bounding_boxes_from_object_hypotheses,
     resize_mask,
-    scale_camera_intrinsics,
 )
 from robokudo.utils.comparators import RoiComparator
 from robokudo.utils.cv_helper import crop_image, get_scaled_color_image_for_depth_image
@@ -49,6 +48,7 @@ from robokudo.utils.module_loader import ModuleLoader
 from robokudo.utils.o3d_helper import get_cloud_from_rgb_depth_and_mask
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
     import numpy.typing as npt
 
 # %% detections
@@ -121,18 +121,18 @@ class YoloAnnotator(ThreadedAnnotator):
 
                 Created during setup if it does not exist.
                 """
-                self.pretrained_model: Optional[str] = None
+                self.pretrained_model: str | None = None
                 """
                 Name of a model ultralytics provides, e.g. ``yolov8m.pt``, inside
                 :attr:`models_directory`.
 
                 Takes precedence over weights inside a ROS package.
                 """
-                self.ros_package_name: Optional[str] = None
+                self.ros_package_name: str | None = None
                 """
                 Name of the ROS package holding custom weights.
                 """
-                self.weights_path: Optional[str] = None
+                self.weights_path: str | None = None
                 """
                 Path of the custom weights, relative to the ROS package.
                 """
@@ -152,7 +152,7 @@ class YoloAnnotator(ThreadedAnnotator):
                 """
                 Class name of the detections that become human hypotheses.
                 """
-                self.ignored_class_names: List[str] = []
+                self.ignored_class_names: list[str] = []
                 """
                 Classes whose detections are neither annotated nor visualized.
                 """
@@ -225,7 +225,7 @@ class YoloAnnotator(ThreadedAnnotator):
     def __init__(
         self,
         name: str = "YoloAnnotator",
-        descriptor: Optional[YoloAnnotator.Descriptor] = None,
+        descriptor: YoloAnnotator.Descriptor | None = None,
     ) -> None:
         super().__init__(name, descriptor)
 
@@ -233,22 +233,22 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         Where the YOLO model is loaded from.
         """
-        self.model: Optional[YOLO] = None
+        self.model: YOLO | None = None
         """
         The YOLO detection model, loaded during setup.
         """
-        self.class_names: Dict[int, str] = {}
+        self.class_names: dict[int, str] = {}
         """
         Name of each class the model detects, by class id, loaded during setup.
         """
-        self.segmentation_model: Optional[SAM] = None
+        self.segmentation_model: SAM | None = None
         """
         The SAM model refining the hypothesis masks in precision mode, loaded during
         setup.
         """
-        self.camera_intrinsics: Optional[o3d.camera.PinholeCameraIntrinsic] = None
+        self.camera_model: PinholeCameraModel | None = None
         """
-        Intrinsics of the camera at the resolution of the depth image.
+        Projection model at the depth image resolution.
         """
         self.roi_comparator = RoiComparator(weight=1.0)
         """
@@ -269,7 +269,7 @@ class YoloAnnotator(ThreadedAnnotator):
             )
         return super().setup(**kwargs)
 
-    def _load_class_names(self) -> Dict[int, str]:
+    def _load_class_names(self) -> dict[int, str]:
         """
         :return: Name of each class the model detects, by class id.
         """
@@ -287,8 +287,14 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
         if parameters.global_with_depth:
-            self.camera_intrinsics = self.get_cas().get_copy(CASViews.CAMERA_INTRINSIC)
-            scale_camera_intrinsics(self)
+            cas = self.get_cas()
+            color_to_depth_ratio = cas.color_to_depth_ratio
+            self.camera_model = (
+                cas.require_camera_observation().effective_camera_model.scaled(
+                    scale_x=color_to_depth_ratio.horizontal,
+                    scale_y=color_to_depth_ratio.vertical,
+                )
+            )
 
         detection_image = self._detection_image()
         existing_hypotheses = (
@@ -323,7 +329,7 @@ class YoloAnnotator(ThreadedAnnotator):
             return color_image
         return get_scaled_color_image_for_depth_image(self.get_cas(), color_image)
 
-    def _detect(self, detection_image: npt.NDArray[np.uint8]) -> List[YoloDetection]:
+    def _detect(self, detection_image: npt.NDArray[np.uint8]) -> list[YoloDetection]:
         """
         :return: The objects the model detects in the image with sufficient confidence.
         """
@@ -367,7 +373,7 @@ class YoloAnnotator(ThreadedAnnotator):
         self,
         detection: YoloDetection,
         detection_image: npt.NDArray[np.uint8],
-        existing_hypotheses: List[ObjectHypothesis],
+        existing_hypotheses: list[ObjectHypothesis],
     ) -> AnnotatedDetection:
         """
         Classify the existing hypothesis the detection overlaps, or else a new one.
@@ -393,7 +399,7 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         if not self.descriptor.parameters.global_with_depth:
             return detection.bounding_box
-        color_to_depth_ratio = self.get_cas().get(CASViews.COLOR_TO_DEPTH_RATIO)
+        color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         left, top, right, bottom = detection.bounding_box.get_corner_points()
         return Rect.from_corner_points(
             x1=left / color_to_depth_ratio.horizontal,
@@ -403,8 +409,8 @@ class YoloAnnotator(ThreadedAnnotator):
         )
 
     def _most_overlapped_hypothesis(
-        self, region: Rect, hypotheses: List[ObjectHypothesis]
-    ) -> Optional[ObjectHypothesis]:
+        self, region: Rect, hypotheses: list[ObjectHypothesis]
+    ) -> ObjectHypothesis | None:
         """
         :return: The hypothesis overlapping the region the most, if it overlaps by more
             than the configured minimum.
@@ -485,7 +491,7 @@ class YoloAnnotator(ThreadedAnnotator):
         self,
         detection_mask: npt.NDArray[np.uint8],
         detection_image: npt.NDArray[np.uint8],
-    ) -> o3d.geometry.PointCloud:
+    ) -> open3d.geometry.PointCloud:
         """
         :return: The point cloud of the depth measurements inside the detection mask.
         """
@@ -493,12 +499,12 @@ class YoloAnnotator(ThreadedAnnotator):
             rgb_image=cv2.cvtColor(detection_image, cv2.COLOR_BGR2RGB),
             depth_image=self.get_cas().get(CASViews.DEPTH_IMAGE),
             mask=detection_mask,
-            camera_intrinsics=self.camera_intrinsics,
+            camera_model=self.camera_model,
             depth_truncate=self.descriptor.parameters.depth_truncate,
             mask_true_value=self.mask_foreground,
         )
 
-    def _visualize(self, annotated_detections: List[AnnotatedDetection]) -> None:
+    def _visualize(self, annotated_detections: list[AnnotatedDetection]) -> None:
         """
         Draw the annotated hypotheses into the color image, together with their masks in
         precision mode, and output the point clouds of the new hypotheses.
@@ -517,7 +523,9 @@ class YoloAnnotator(ThreadedAnnotator):
             draw_bounding_boxes_from_object_hypotheses(
                 visualization_image,
                 [annotated.hypothesis],
-                lambda _: f"{classification.classname}, {classification.confidence:.2f}",
+                lambda _: (
+                    f"{classification.classname}, {classification.confidence:.2f}"
+                ),
             )
         self.get_annotator_output_struct().set_image(visualization_image)
         if parameters.global_with_depth:

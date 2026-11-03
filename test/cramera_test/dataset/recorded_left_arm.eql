@@ -1,1 +1,0 @@
-an(entity(arm).where(arm.side == ArmSide.LEFT))

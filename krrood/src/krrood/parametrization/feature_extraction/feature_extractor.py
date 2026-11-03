@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 import sqlalchemy
-from typing_extensions import Any, Type
+from typing_extensions import Any
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import variable
@@ -107,7 +107,7 @@ class FeatureExtractor:
         return cls(extracted_features=extracted)
 
     @staticmethod
-    def _data_access_object_class_of(instance: Any) -> Type[DataAccessObject]:
+    def _data_access_object_class_of(instance: Any) -> type[DataAccessObject]:
         """
         :param instance: A domain object.
         :return: The data access object class that describes the attributes of its type.
@@ -179,7 +179,7 @@ class FeatureExtractor:
     def _process_attributes(
         instance: Any,
         symbolic_root: Variable,
-        data_access_object_class: Type[DataAccessObject],
+        data_access_object_class: type[DataAccessObject],
         column_names: tuple[str, ...],
     ) -> list[MappedVariable]:
         """

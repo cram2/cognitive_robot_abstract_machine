@@ -1,6 +1,5 @@
 import unittest
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -56,11 +55,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Toaster,
     CoffeeMachine,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -1197,11 +1193,11 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
     both.
     """
 
-    door: Optional[Door] = field(
+    door: Door | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
-    typed_door: Optional[DoorWithType] = field(
+    typed_door: DoorWithType | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )

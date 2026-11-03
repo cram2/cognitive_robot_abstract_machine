@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from typing_extensions import List, Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
@@ -58,7 +58,7 @@ def attribute_fragment(
 
 def indexed_noun(
     step: PathStep, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-) -> List[VerbalizationFragment]:
+) -> list[VerbalizationFragment]:
     """:return: the ordinal followed by the singularized collection noun for an indexed hop — the
     *"first task"* body of *"the first task of a Worker"*, without its article or owner.
 
@@ -96,7 +96,7 @@ def _ordinal_genitive_step(
     )
 
 
-def _genitive_article(step: PathStep) -> Optional[VerbalizationFragment]:
+def _genitive_article(step: PathStep) -> VerbalizationFragment | None:
     """:return: the article introducing a genitive hop — none for a mass noun (*"the amount of
     money"*, never *"the amount of the money"*), else the definite *"the"*.
 
@@ -215,7 +215,7 @@ def subject_relative_relation(
 
 
 def coordinated_genitive(
-    attribute_fragments: List[VerbalizationFragment],
+    attribute_fragments: list[VerbalizationFragment],
     owner_fragment: VerbalizationFragment,
 ) -> VerbalizationFragment:
     """:return: *"the <a, b, and c> of <owner>"* — several attributes sharing one genitive owner,
@@ -259,7 +259,7 @@ def _extend_hop(
 
 
 def possessive_path(
-    parts: List[PathStep], root_fragment: VerbalizationFragment
+    parts: list[PathStep], root_fragment: VerbalizationFragment
 ) -> VerbalizationFragment:
     """:return: the navigation read out from the root, hop by hop (parts innermost-first) — a plain
     hop as the genitive *"the <attribute> of <owner>"*, a relational hop as the relative clause
@@ -278,7 +278,7 @@ def possessive_path(
 
 
 def chain_head_number(
-    parts: List[PathStep], subject_number: GrammaticalNumber
+    parts: list[PathStep], subject_number: GrammaticalNumber
 ) -> GrammaticalNumber:
     """:return: The grammatical number the chain's head noun is realised with once its root is
     pronominalised — *subject_number* only when a single scalar hop distributes over the subject
@@ -322,7 +322,7 @@ def _pronominal_first_hop(
 
 
 def pronominal_path(
-    parts: List[PathStep], subject_number: GrammaticalNumber
+    parts: list[PathStep], subject_number: GrammaticalNumber
 ) -> VerbalizationFragment:
     """:return: the navigation read out with the (elided) root pronominalised — *"its attribute"* /
     *"the attribute of its foo"* for plain hops, and the relative clause *"the <Type> <prep> which

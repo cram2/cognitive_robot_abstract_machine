@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from random_events.variable import Continuous, Integer, Symbolic
-from typing_extensions import Any, Dict, List, Optional, Union
+from typing_extensions import Any
 
 from probabilistic_model.learning.gaussian_mixture.covariance_type import (
     CovarianceType,
@@ -42,7 +42,7 @@ class MeasurementBlock(ABC):
         :return: The number of columns of the block.
         """
 
-    def to_stepmix(self) -> Dict[str, Any]:
+    def to_stepmix(self) -> dict[str, Any]:
         """
         :return: The block as StepMix describes it.
         """
@@ -55,7 +55,7 @@ class GaussianBlock(MeasurementBlock):
     The continuous variables, modelled by one Gaussian per component.
     """
 
-    variables: List[Continuous]
+    variables: list[Continuous]
     """
     The variables, in the order of their columns.
     """
@@ -82,7 +82,7 @@ class GaussianBlock(MeasurementBlock):
     def number_of_columns(self) -> int:
         return len(self.variables)
 
-    def to_stepmix(self) -> Dict[str, Any]:
+    def to_stepmix(self) -> dict[str, Any]:
         return super().to_stepmix() | {"reg_covar": self.covariance_regularization}
 
 
@@ -93,7 +93,7 @@ class CategoricalBlock(MeasurementBlock):
     component.
     """
 
-    variable: Union[Symbolic, Integer]
+    variable: Symbolic | Integer
     """
     The variable, whose column holds the code of each row's outcome.
     """
@@ -117,24 +117,24 @@ class Measurement:
     All columns of the data, as StepMix's ``measurement`` parameter describes them.
     """
 
-    gaussian: Optional[GaussianBlock]
+    gaussian: GaussianBlock | None
     """
     The block of the continuous columns, which lead the data, if there are any.
     """
 
-    categorical: List[CategoricalBlock]
+    categorical: list[CategoricalBlock]
     """
     One block per discrete column, in the order of the columns.
     """
 
     @property
-    def blocks(self) -> List[MeasurementBlock]:
+    def blocks(self) -> list[MeasurementBlock]:
         """
         :return: All blocks, in the order of their columns.
         """
         return ([self.gaussian] if self.gaussian else []) + self.categorical
 
-    def to_stepmix(self) -> Dict[str, Dict[str, Any]]:
+    def to_stepmix(self) -> dict[str, dict[str, Any]]:
         """
         :return: The value of StepMix's ``measurement`` parameter.
         """

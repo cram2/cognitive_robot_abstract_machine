@@ -5,10 +5,17 @@ import itertools
 import math
 import textwrap
 from dataclasses import field, dataclass
-from typing import Any, Iterable, Self, Dict, Optional, Tuple, Mapping
+from typing_extensions import (
+    TYPE_CHECKING,
+    Union,
+    Set as teSet,
+    Any,
+    Iterable,
+    Self,
+    Mapping,
+)
 
 from sortedcontainers import SortedDict, SortedValuesView, SortedSet
-from typing_extensions import List, TYPE_CHECKING, Union, Set as teSet
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from random_events.sigma_algebra import AbstractSimpleSet, AbstractCompositeSet
@@ -55,10 +62,10 @@ class VariableMap(VariableMapSuperClassType):
             raise KeyError(f"Variable {key} not found in event {self}")
         return variable[0]
 
-    def __getitem__(self, key: Union[str, Variable]):
+    def __getitem__(self, key: str | Variable):
         return super().__getitem__(self.get_variable(key))
 
-    def __setitem__(self, key: Union[str, Variable], value: Any):
+    def __setitem__(self, key: str | Variable, value: Any):
         super().__setitem__(self.get_variable(key), value)
 
     def __copy__(self):
@@ -117,7 +124,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
     def as_composite_set(self) -> Event:
         return Event.from_simple_sets(self)
 
-    def contains(self, item: Tuple) -> bool:
+    def contains(self, item: tuple) -> bool:
         for assignment, value in zip(self.assignments, item):
             if not assignment.contains(value):
                 return False
@@ -194,24 +201,24 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
             + "\n}"
         )
 
-    def variables_to_json(self) -> List:
+    def variables_to_json(self) -> list:
         return [to_json(variable) for variable in self.keys()]
 
-    def assignments_to_json(self) -> List:
+    def assignments_to_json(self) -> list:
         return [assignment.to_json() for assignment in self.values()]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "variables": self.variables_to_json(),
             "assignments": self.assignments_to_json(),
         }
 
-    def to_json_assignments_only(self) -> Dict[str, Any]:
+    def to_json_assignments_only(self) -> dict[str, Any]:
         return {**super().to_json(), "assignments": self.assignments_to_json()}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         variables = [from_json(variable) for variable in data["variables"]]
         assignments = [
             AbstractCompositeSet.from_json(assignment)
@@ -226,7 +233,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
 
     @classmethod
     def from_json_given_variables(
-        cls, data: Dict[str, Any], variables: List[Variable]
+        cls, data: dict[str, Any], variables: list[Variable]
     ) -> Self:
         assignments = [
             AbstractCompositeSet.from_json(assignment)
@@ -239,7 +246,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
             }
         )
 
-    def update_variables(self, new_variables: Dict[Variable, Variable]) -> Self:
+    def update_variables(self, new_variables: dict[Variable, Variable]) -> Self:
         """
         Construct a new simple event where the own variables are replaced with the new
         variables. If the new variables are missing mappings, the old variables are kept
@@ -303,7 +310,7 @@ class Event(AbstractCompositeSet):
     cpp_object: rl.Event = field(default_factory=lambda: rl.Event(set()))
     simple_set_example: SimpleEvent = field(init=False)
 
-    _variables: Optional[SortedSet] = field(init=False, default=None)
+    _variables: SortedSet | None = field(init=False, default=None)
     """
     Cache for the variables of the event.
     """
@@ -349,7 +356,7 @@ class Event(AbstractCompositeSet):
         return instance
 
     @property
-    def simple_sets(self) -> Tuple[SimpleEvent, ...]:
+    def simple_sets(self) -> tuple[SimpleEvent, ...]:
         return super().simple_sets
 
     @property
@@ -391,7 +398,7 @@ class Event(AbstractCompositeSet):
             simple_sets[0] if simple_sets else SimpleEvent.from_data()
         )
 
-    def fill_missing_variables(self, variables: Optional[Iterable[Variable]] = None):
+    def fill_missing_variables(self, variables: Iterable[Variable] | None = None):
         """
         Fill all simple sets with the missing variables in-place.
 
@@ -417,9 +424,7 @@ class Event(AbstractCompositeSet):
         )
         self._variables = SortedSet(all_variables)
 
-    def fill_missing_variables_pure(
-        self, variables: Optional[Iterable[Variable]] = None
-    ):
+    def fill_missing_variables_pure(self, variables: Iterable[Variable] | None = None):
         """
         Fill all simple sets with the missing variables.
 
@@ -509,7 +514,7 @@ class Event(AbstractCompositeSet):
                     result[variable] = result[variable].union_with(simple_set[variable])
         return SimpleEvent.from_data(result)
 
-    def update_variables(self, new_variables: Dict[Variable, Variable]) -> Event:
+    def update_variables(self, new_variables: dict[Variable, Variable]) -> Event:
         """
         See :func:`~random_events.product_algebra.SimpleEvent.update_variables`
         """
@@ -530,7 +535,7 @@ class Event(AbstractCompositeSet):
         self._variables = None  # Invalidate cache; new simple set may add variables
         self.fill_missing_variables()
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         variables = [to_json(variable) for variable in self.variables]
         simple_sets = [
             simple_set.to_json_assignments_only() for simple_set in self.simple_sets
@@ -542,7 +547,7 @@ class Event(AbstractCompositeSet):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         variables = [from_json(variable) for variable in data["variables"]]
         simple_sets = [
             SimpleEvent.from_json_given_variables(simple_set, variables)

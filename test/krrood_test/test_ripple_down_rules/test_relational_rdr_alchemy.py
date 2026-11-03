@@ -12,7 +12,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-from typing_extensions import List, Any, Set
+from typing_extensions import Any, Set
 
 from krrood.ripple_down_rules.datastructures.case import CaseAttribute
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
@@ -79,28 +79,28 @@ class ContainsObject(Base):
 class PhysicalObject(Base):
     id: Mapped[int] = mapped_column(primary_key=True, init=False, autoincrement=True)
     name: Mapped[str]
-    has_part_relations: Mapped[List[HasPart]] = relationship(
+    has_part_relations: Mapped[list[HasPart]] = relationship(
         init=False,
         back_populates="left",
         foreign_keys=[HasPart.left_id],
         repr=False,
         default_factory=list,
     )
-    part_of_relations: Mapped[List[HasPart]] = relationship(
+    part_of_relations: Mapped[list[HasPart]] = relationship(
         init=False,
         back_populates="right",
         foreign_keys=[HasPart.right_id],
         repr=False,
         default_factory=list,
     )
-    contains_objects_relations: Mapped[List[ContainsObject]] = relationship(
+    contains_objects_relations: Mapped[list[ContainsObject]] = relationship(
         init=False,
         back_populates="left",
         foreign_keys=[ContainsObject.left_id],
         repr=False,
         default_factory=list,
     )
-    is_contained_in_relations: Mapped[List[ContainsObject]] = relationship(
+    is_contained_in_relations: Mapped[list[ContainsObject]] = relationship(
         init=False,
         back_populates="right",
         foreign_keys=[ContainsObject.right_id],
@@ -110,19 +110,19 @@ class PhysicalObject(Base):
     type: Mapped[str] = mapped_column(init=False)
 
     @property
-    def parts(self) -> List[PhysicalObject]:
+    def parts(self) -> list[PhysicalObject]:
         return [has_part.right for has_part in self.has_part_relations]
 
     @property
-    def part_of(self) -> List[PhysicalObject]:
+    def part_of(self) -> list[PhysicalObject]:
         return [has_part.left for has_part in self.part_of_relations]
 
     @property
-    def contained_objects(self) -> List[PhysicalObject]:
+    def contained_objects(self) -> list[PhysicalObject]:
         return [cont_obj.right for cont_obj in self.contains_objects_relations]
 
     @property
-    def is_contained_in(self) -> List[PhysicalObject]:
+    def is_contained_in(self) -> list[PhysicalObject]:
         return [cont_obj.left for cont_obj in self.is_contained_in_relations]
 
     @declared_attr.directive
@@ -150,9 +150,9 @@ class RelationalRDRTestCase(TestCase):
     part_d: PhysicalObject
     part_e: PhysicalObject
     part_f: PhysicalObject
-    rob_has_parts: List[HasPart]
-    containments: List[ContainsObject]
-    target: List[PhysicalObject]
+    rob_has_parts: list[HasPart]
+    containments: list[ContainsObject]
+    target: list[PhysicalObject]
 
     @classmethod
     def setUpClass(cls):

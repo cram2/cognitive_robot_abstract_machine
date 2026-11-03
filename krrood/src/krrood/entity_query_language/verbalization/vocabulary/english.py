@@ -6,15 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 
-from typing_extensions import (
-    Callable,
-    ClassVar,
-    Dict,
-    FrozenSet,
-    List,
-    Optional,
-    Type,
-)
+from typing_extensions import Callable, ClassVar
 
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.operators.aggregators import (
@@ -70,7 +62,7 @@ class SingularExistential(PlainWord):
     """
 
     def build_phrase(
-        self, type_name: str, referent_id: Optional[uuid.UUID] = None
+        self, type_name: str, referent_id: uuid.UUID | None = None
     ) -> VerbalizationFragment:
         """
         Build *"there's a/an <type_name>"*.
@@ -252,7 +244,7 @@ class Aggregations(VocabEnum):
     MULTI_MODE = AggregationWord("all modes")
 
     @classmethod
-    def for_aggregator(cls, aggregator_type: Type[Aggregator]) -> Aggregations:
+    def for_aggregator(cls, aggregator_type: type[Aggregator]) -> Aggregations:
         """:return: The aggregation phrase that verbalizes an aggregator type.
 
         :raises UnknownAggregatorError: When the aggregator type has no phrase.
@@ -290,7 +282,7 @@ class Aggregations(VocabEnum):
         """
         return self.value.child_form or GrammaticalNumber.SINGULAR
 
-    def complement(self, child: VerbalizationFragment) -> List[VerbalizationFragment]:
+    def complement(self, child: VerbalizationFragment) -> list[VerbalizationFragment]:
         """
         :param child: The already-rendered complement, built at :attr:`child_number`.
         :return: The complement modifiers — *"of"* then the child — so the bare aggregation noun
@@ -309,7 +301,7 @@ class Aggregations(VocabEnum):
 
     def compact_complement(
         self, leaf: VerbalizationFragment
-    ) -> List[VerbalizationFragment]:
+    ) -> list[VerbalizationFragment]:
         """:return: The complement for the *compact* value form, where the leaf attaches directly to
         the aggregation noun — *"of <plural leaf>"* for a population (*"the sum of amounts"*), the
         bare singular leaf as a noun modifier otherwise (*"the maximum amount"*); empty for a
@@ -330,7 +322,7 @@ class Aggregations(VocabEnum):
 
 #: Maps each standard aggregator subtype to its lexicon phrase; consulted by
 #: :meth:`Aggregations.for_aggregator`.
-_AGGREGATOR_PHRASES: Dict[Type[Aggregator], Aggregations] = {
+_AGGREGATOR_PHRASES: dict[type[Aggregator], Aggregations] = {
     Count: Aggregations.COUNT,
     CountAll: Aggregations.COUNT_ALL,
     Sum: Aggregations.SUM,
@@ -468,7 +460,7 @@ class Prepositions(VocabEnum):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def texts(cls) -> FrozenSet[str]:
+    def texts(cls) -> frozenset[str]:
         """:return: the surface word of every preposition, for testing whether a token already reads
         as a preposition."""
         return frozenset(preposition.text for preposition in cls)
@@ -496,7 +488,7 @@ class Absence(VocabEnum):
     HAVE_NO = OperatorWord("have no")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> "Absence":
+    def for_number(cls, number: GrammaticalNumber) -> Absence:
         """:return: ``HAVE_NO`` for a plural owner, else ``HAS_NO``.
 
         >>> Absence.for_number(GrammaticalNumber.PLURAL).text
@@ -518,7 +510,7 @@ class NonExistence(VocabEnum):
     DO_NOT_EXIST = OperatorWord("do not exist")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> "NonExistence":
+    def for_number(cls, number: GrammaticalNumber) -> NonExistence:
         """:return: ``DO_NOT_EXIST`` for a plural subject, else ``DOES_NOT_EXIST``.
 
         >>> NonExistence.for_number(GrammaticalNumber.PLURAL).text
@@ -548,7 +540,7 @@ class PassiveAbsence(VocabEnum):
     HAVE_NOT_BEEN = OperatorWord("have not been")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> "PassiveAbsence":
+    def for_number(cls, number: GrammaticalNumber) -> PassiveAbsence:
         """:return: ``HAVE_NOT_BEEN`` for a plural owner, else ``HAS_NOT_BEEN``.
 
         >>> PassiveAbsence.for_number(GrammaticalNumber.PLURAL).text
@@ -633,7 +625,7 @@ class Pronouns(VocabEnum):
     THEY = PronounWord("they")
 
     @classmethod
-    def possessive(cls, number: GrammaticalNumber) -> "Pronouns":
+    def possessive(cls, number: GrammaticalNumber) -> Pronouns:
         """:return: The possessive pronoun — ``THEIR`` for a plural subject, else ``ITS``.
 
         >>> Pronouns.possessive(GrammaticalNumber.PLURAL).text
@@ -644,7 +636,7 @@ class Pronouns(VocabEnum):
         return cls.THEIR if number is GrammaticalNumber.PLURAL else cls.ITS
 
     @classmethod
-    def nominative(cls, number: GrammaticalNumber) -> "Pronouns":
+    def nominative(cls, number: GrammaticalNumber) -> Pronouns:
         """:return: The nominative (subject) pronoun — ``THEY`` for a plural subject, else ``IT``.
 
         >>> Pronouns.nominative(GrammaticalNumber.PLURAL).text
@@ -783,7 +775,7 @@ class ExistentialPhrase(VocabEnum):
         return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS
 
     def build_phrase(
-        self, type_name: str, referent_id: Optional[uuid.UUID] = None
+        self, type_name: str, referent_id: uuid.UUID | None = None
     ) -> VerbalizationFragment:
         """
         Build the existential phrase for *type_name*.
@@ -976,7 +968,7 @@ class Operators(Enum):
         return _OPERATOR_CALLABLE_MAP[function]
 
     @classmethod
-    def for_callable(cls, function) -> Optional[Operators]:
+    def for_callable(cls, function) -> Operators | None:
         """
         :param function: Any callable.
         :return: The member for *function*, or ``None`` when it has no registered mapping (so a
@@ -1008,7 +1000,7 @@ class Operators(Enum):
 
 
 #: Map Python ``operator`` callables to ``Operators`` members.
-_OPERATOR_CALLABLE_MAP: Dict[Callable, Operators] = {
+_OPERATOR_CALLABLE_MAP: dict[Callable, Operators] = {
     operator.eq: Operators.EQ,
     operator.ne: Operators.NE,
     operator.lt: Operators.LT,

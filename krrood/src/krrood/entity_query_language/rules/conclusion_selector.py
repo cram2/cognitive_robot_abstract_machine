@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Iterable, TYPE_CHECKING, Self, Optional
+from typing_extensions import Iterable, TYPE_CHECKING, Self
 
 from krrood.entity_query_language.exceptions import SelfReferentialInsertionError
 from krrood.entity_query_language.rules.conclusion import Conclusion
@@ -183,7 +183,7 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 
     def _evaluate__(
         self,
-        sources: Optional[OperationResult] = None,
+        sources: OperationResult | None = None,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the ExceptIf condition and yield the results.

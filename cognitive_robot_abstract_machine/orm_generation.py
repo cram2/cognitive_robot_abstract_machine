@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from krrood.class_diagrams.progress_report import is_progress_wanted
-from typing_extensions import Iterator, Optional
+from typing_extensions import Iterator
 
 LINE_PREFIX = "cram-orm-generator-started "
 """
@@ -45,7 +45,7 @@ class GeneratorStarted:
     """
 
     @classmethod
-    def from_line(cls, line: str) -> Optional[GeneratorStarted]:
+    def from_line(cls, line: str) -> GeneratorStarted | None:
         """
         Read a report back from a line of this run's output.
 

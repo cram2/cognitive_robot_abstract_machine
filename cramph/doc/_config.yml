@@ -1,0 +1,44 @@
+# Book settings
+# Learn more at https://jupyterbook.org/customize/config.html
+
+title: cramph
+author: AICOR Institute for Artificial Intelligence
+
+# Force re-execution of notebooks on each build.
+# See https://jupyterbook.org/content/execute.html
+execute:
+  execute_notebooks: force
+
+# Define the name of the latex output file for PDF builds
+latex:
+  latex_documents:
+    targetname: book.tex
+
+sphinx:
+  extra_extensions:
+    - myst_nb
+    - autoapi.extension
+    - sphinx.ext.autodoc
+    - sphinxcontrib.mermaid
+  config:
+    myst_heading_anchors: 3
+    autoapi_dirs:
+      - ../src
+    autoapi_options:
+      - members
+      - undoc-members
+      - show-inheritance
+      - show-module-summary
+    autoapi_add_toctree_entry: True
+
+# Information about where the book exists on the web
+repository:
+  url: https://github.com/cram2/cognitive_robot_abstract_machine
+  path_to_book: cramph/doc
+  branch: main
+
+# Add GitHub buttons to your book
+# See https://jupyterbook.org/customize/config.html#add-a-link-to-your-repository
+html:
+  use_issues_button: true
+  use_repository_button: true

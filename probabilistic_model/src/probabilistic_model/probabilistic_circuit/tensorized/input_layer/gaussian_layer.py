@@ -9,7 +9,7 @@ from random_events.interval import SimpleInterval, reals
 from random_events.variable import Variable
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import Any, List, Self, Type
+from typing_extensions import Any, Self
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -102,7 +102,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         column = np.asarray(values, dtype=float).reshape(-1, 1)
         return norm.cdf(column, loc=self.location, scale=self.scale)
 
-    def raw_moments(self, order: int) -> List[NodeValues]:
+    def raw_moments(self, order: int) -> list[NodeValues]:
         r"""
         The raw moments of order ``0`` to ``order`` of every node.
 
@@ -150,7 +150,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: List[GaussianDistribution]
+        cls, variable_index: int, distributions: list[GaussianDistribution]
     ) -> Self:
         return cls(
             variable_index,
@@ -162,7 +162,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         return self.__class__(self.variable, self.location[mask], self.scale[mask])
 
     @classmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
+    def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
             layers[0].variable,
             np.concatenate([layer.location for layer in layers]),
@@ -181,7 +181,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
 
     def type_of_layer_truncated_to_interval(
         self, interval: SimpleInterval
-    ) -> Type[Layer]:
+    ) -> type[Layer]:
         if interval.as_composite_set() == reals():
             return GaussianLayer
         return TruncatedGaussianLayer
@@ -318,7 +318,7 @@ class TruncatedGaussianLayer(
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: List[TruncatedGaussianDistribution]
+        cls, variable_index: int, distributions: list[TruncatedGaussianDistribution]
     ) -> Self:
         return cls(
             variable_index,
@@ -350,7 +350,7 @@ class TruncatedGaussianLayer(
         )
 
     @classmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
+    def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
             layers[0].variable,
             np.concatenate([layer.interval for layer in layers]),

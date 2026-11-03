@@ -1,7 +1,6 @@
 import itertools
 from dataclasses import dataclass
 from math import factorial
-from typing import Dict, List
 
 import pytest
 
@@ -1512,14 +1511,14 @@ def test_indexing_on_dict_field():
     @dataclass
     class ItemWithDictionary:
         name: str
-        attrs: Dict[str, int]
+        attrs: dict[str, int]
 
         def __hash__(self):
             return hash(self.name)
 
     @dataclass(eq=False)
     class WorldWithItems:
-        items: List[ItemWithDictionary]
+        items: list[ItemWithDictionary]
 
         def __hash__(self):
             return hash(id(self))
@@ -1547,7 +1546,7 @@ def test_indexing_2():
 
     @dataclass
     class BodyWithShapes:
-        shapes: List[ShapeWithColor]
+        shapes: list[ShapeWithColor]
 
         def __hash__(self):
             return id(self)
@@ -1593,7 +1592,7 @@ def test_presentation_example():
     class Robot:
         name: str
         battery: int
-        tasks: List[Task]
+        tasks: list[Task]
 
     robots = [
         Robot("Robot1", 100, [Task("Task1", True), Task("Task2", False)]),
