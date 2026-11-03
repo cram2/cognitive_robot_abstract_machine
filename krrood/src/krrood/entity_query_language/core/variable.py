@@ -206,18 +206,19 @@ class InstantiatedVariable(
     Predicates and symbolic functions.
     """
 
+    _factory_: Callable[..., T] = field(kw_only=True)
+    """
+    The callable that builds the values this variable binds, such as a type, a factory
+    method or a symbolic function.
+    """
+
     _type_: type[T] | None = field(default=None, kw_only=True)
     """
     The type of the values this variable binds (the value of `T`), always a type.
 
-    When not given, it is read from the return annotation of :attr:`_factory_` (see
-    :meth:`_return_type_of_`).
-    """
-
-    _factory_: Callable[..., T] | None = field(default=None, kw_only=True)
-    """
-    The callable that builds the values this variable binds, such as the type itself, a
-    factory method or a symbolic function. Defaults to :attr:`_type_`.
+    When not given, it is the type :attr:`_factory_` builds (see
+    :meth:`~krrood.patterns.factory_and_kwargs.HasFactoryAndKwargs._type_built_by_`),
+    and :class:`object` when that names none.
     """
 
     _child_variables_: dict[str, SymbolicExpression] = field(
@@ -234,34 +235,14 @@ class InstantiatedVariable(
     """
 
     def __post_init__(self):
-        if self._factory_ is None:
-            self._factory_ = self._type_
-        if self._type_ is None and self._factory_ is not None:
-            self._type_ = self._return_type_of_(self._factory_)
+        if self._type_ is None:
+            self._type_ = self._type_built_by_(self._factory_) or object
         if not isinstance(self._type_, type):
             raise ResultTypeIsNotAType(self._type_)
         self._update_child_variables_from_kwargs_()
         self._operation_children_ = tuple(self._child_variables_.values())
         # This is done here as it uses `_operation_children_`
         super().__post_init__()
-
-    @staticmethod
-    def _return_type_of_(function: Callable[..., Any]) -> type:
-        """
-        :param function: A function or method.
-        :return: The class its return annotation names, the origin of a parameterized
-            generic it names (``list`` for ``list[int]``), and :class:`object` when it has
-            no return annotation, the annotation is :data:`~typing.Any` or it names no
-            class.
-        """
-        return_annotation = get_type_hints_of_object(function).get("return")
-        if return_annotation is Any:
-            return object
-        if isclass(return_annotation):
-            return return_annotation
-        if isclass(get_origin(return_annotation)):
-            return get_origin(return_annotation)
-        return object
 
     def _update_child_variables_from_kwargs_(self):
         """

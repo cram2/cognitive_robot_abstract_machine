@@ -626,20 +626,17 @@ def add(variable: Any, value: Any) -> None:
 
 
 def inference(
-    type_: type[T],
-    factory: Callable[..., T] | None = None,
+    factory: Callable[..., T],
 ) -> Callable[..., InstantiatedVariable[T]]:
     """
-    This returns a factory function that creates a new variable of the given type and
-    takes keyword arguments for the callable that builds its values.
+    This returns a factory function that creates a new variable whose values *factory*
+    builds, and takes keyword arguments for *factory*.
 
-    :param type_: The type of the values the variable binds.
-    :param factory: The callable that builds those values, such as a factory method;
-        *type_* itself when not given.
+    :param factory: The callable that builds the values, such as a class or a factory
+        method; the variable's type is the type it builds.
     :return: The factory function for creating a new variable.
     """
     return lambda **kwargs: InstantiatedVariable(
-        _type_=type_,
         _factory_=factory,
         _kwargs_=kwargs,
     )

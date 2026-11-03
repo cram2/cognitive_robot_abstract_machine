@@ -345,7 +345,7 @@ class SymbolicFunction(SymbolicCallable, ABC):
         """
         The return type of :meth:`__call__`.
         """
-        return InstantiatedVariable._return_type_of_(cls.__call__)
+        return InstantiatedVariable._type_built_by_(cls.__call__) or object
 
     @abstractmethod
     def __call__(self) -> Any:
