@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Iterator, Iterable
 
-from semantic_digital_twin.spatial_types.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types import Pose2D
 
 
 @dataclass

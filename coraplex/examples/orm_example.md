@@ -55,7 +55,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from cramph.composites import Sequence
 
 world = setup_world()

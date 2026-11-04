@@ -13,13 +13,14 @@ from coraplex.locations.costmaps import (
     RingCostmap,
 )
 from krrood.entity_query_language.exceptions import NonPositiveLimitValue
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
     Vector3,
+    Pose,
+    Pose2D,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
 from ..sampling import SAMPLING_SEED
 
 # ---- Occupancy locations tests ----

@@ -47,14 +47,13 @@ from semantic_digital_twin.exceptions import (
     SimulationAlreadyRunningError,
     SimulationNotStartedError,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -2035,7 +2034,7 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         if not axes:
             return
         child_body_spec = builder.body_spec_of(self.connection.child)
-        child_T_connection = inverse_frame(
+        child_T_connection = HomogeneousTransformationMatrix.invert_numeric_matrix(
             self.connection.connection_T_child_expression.to_np()
         )
         for axis in axes:
@@ -4263,7 +4262,10 @@ class MujocoSynchronizer(MultiSimSynchronizer):
             Rotation.from_quat(qwxyz.tolist(), scalar_first=True).as_matrix(),
         )
         parent_T_conn = connection.parent_T_connection_expression.to_np()
-        conn_T_child = inverse_frame(parent_T_conn) @ mj_T_world
+        conn_T_child = (
+            HomogeneousTransformationMatrix.invert_numeric_matrix(parent_T_conn)
+            @ mj_T_world
+        )
         dof_xyz, dof_quat_xyzw = self._decompose_pose_matrix(conn_T_child)
 
         state[connection.x.id].position = float(dof_xyz[0])

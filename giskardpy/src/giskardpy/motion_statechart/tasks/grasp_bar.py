@@ -9,7 +9,7 @@ from giskardpy.motion_statechart.mixins import (
     HasRootLinkParameter,
     HasTipLinkParameter,
 )
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

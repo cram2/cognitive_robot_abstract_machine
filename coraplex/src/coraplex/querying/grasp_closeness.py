@@ -14,7 +14,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
-from semantic_digital_twin.spatial_types.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types import Pose2D
 
 # %% how close a grasp is to where the robot stands
 

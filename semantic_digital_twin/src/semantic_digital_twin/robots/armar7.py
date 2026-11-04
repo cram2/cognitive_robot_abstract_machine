@@ -32,7 +32,7 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -87,7 +87,6 @@ class Armar7Joint(JointName):
 
 @dataclass(eq=False)
 class Armar7LeftThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -110,7 +109,6 @@ class Armar7LeftThumb(Finger):
 
 @dataclass(eq=False)
 class Armar7LeftRingFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -133,7 +131,6 @@ class Armar7LeftRingFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7LeftPinkyFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -156,7 +153,6 @@ class Armar7LeftPinkyFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7LeftMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -179,7 +175,6 @@ class Armar7LeftMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7LeftIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -202,7 +197,6 @@ class Armar7LeftIndexFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7RightThumb(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -225,7 +219,6 @@ class Armar7RightThumb(Finger):
 
 @dataclass(eq=False)
 class Armar7RightRingFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -248,7 +241,6 @@ class Armar7RightRingFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7RightPinkyFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -271,7 +263,6 @@ class Armar7RightPinkyFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7RightMiddleFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -294,7 +285,6 @@ class Armar7RightMiddleFinger(Finger):
 
 @dataclass(eq=False)
 class Armar7RightIndexFinger(Finger):
-
     def setup_hardware_interfaces(self) -> None:
         pass
 
@@ -326,7 +316,6 @@ class Armar7LeftGripper(
         Armar7LeftIndexFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -380,7 +369,6 @@ class Armar7RightGripper(
         Armar7RightIndexFinger,
     ],
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -425,7 +413,6 @@ class Armar7RightGripper(
 
 @dataclass(eq=False)
 class Armar7LeftArm(Arm[Armar7LeftGripper]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -454,7 +441,6 @@ class Armar7LeftArm(Arm[Armar7LeftGripper]):
 
 @dataclass(eq=False)
 class Armar7RightArm(Arm[Armar7RightGripper]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -483,7 +469,6 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
 
 @dataclass(eq=False)
 class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
-
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -514,7 +499,6 @@ class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
 
 @dataclass(eq=False)
 class Armar7Neck(Neck[AzureKinectRGB]):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -539,7 +523,6 @@ class Armar7Neck(Neck[AzureKinectRGB]):
 class Armar7Torso(
     Torso, HasLeftRightArm[Armar7LeftArm, Armar7RightArm], HasNeck[Armar7Neck]
 ):
-
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
@@ -578,7 +561,6 @@ class Armar7Torso(
 
 @dataclass(eq=False)
 class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
-
     @classproperty
     def forward_axis(cls) -> Vector3:
         return Vector3.Y()

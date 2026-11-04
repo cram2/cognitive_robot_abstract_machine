@@ -78,8 +78,7 @@ from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulabi
 from giskardpy.motion_statechart.tasks.wiggle_insert import WiggleInsert
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import Point3, RotationMatrix, Vector3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,

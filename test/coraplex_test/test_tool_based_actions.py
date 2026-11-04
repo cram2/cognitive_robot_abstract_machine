@@ -31,8 +31,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Sponge,
     Whisk,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -463,7 +466,7 @@ def test_a_wipe_stalled_close_to_its_final_waypoint_is_done(
 
 @pytest.fixture(scope="module")
 def justin_world():
-    world = URDFParser.from_file(Justin.get_ros_file_path()).parse()
+    world = URDFParser.from_file(Justin.get_ros_file_path()).create_world()
     Justin.from_world(world)
     return world
 

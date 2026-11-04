@@ -6,7 +6,7 @@ import numpy as np
 from numpy._typing import NDArray
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from semantic_digital_twin.spatial_types import Point3, RotationMatrix
+from krrood_spatial_math.spatial_types import Point3, RotationMatrix
 
 
 @dataclass
@@ -99,12 +99,12 @@ class PrincipalAxes(NPMatrix3x3):
 
     def __post_init__(self):
         super().__post_init__()
-        assert np.allclose(
-            self.data.T @ self.data, np.eye(3), atol=1e-10
-        ), "Principal axes must be orthonormal"
-        assert np.isclose(
-            np.linalg.det(self.data), 1.0, atol=1e-10
-        ), "Principal axes must form a right-handed coordinate system"
+        assert np.allclose(self.data.T @ self.data, np.eye(3), atol=1e-10), (
+            "Principal axes must be orthonormal"
+        )
+        assert np.isclose(np.linalg.det(self.data), 1.0, atol=1e-10), (
+            "Principal axes must form a right-handed coordinate system"
+        )
 
     def T(self) -> Self:
         return PrincipalAxes(data=self.data.T)
@@ -138,12 +138,12 @@ class InertiaTensor(NPMatrix3x3):
         if self.data is None:
             return
         diag = np.diag(self.data)
-        assert np.all(
-            diag >= 0.0
-        ), "Diagonal elements of inertia tensor must be non-negative"
-        assert np.allclose(
-            self.data, self.data.T, atol=1e-10
-        ), "Inertia tensor must be symmetric"
+        assert np.all(diag >= 0.0), (
+            "Diagonal elements of inertia tensor must be non-negative"
+        )
+        assert np.allclose(self.data, self.data.T, atol=1e-10), (
+            "Inertia tensor must be symmetric"
+        )
 
     @classmethod
     def from_values(

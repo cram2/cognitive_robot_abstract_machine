@@ -32,7 +32,7 @@ from krrood.symbolic_math.symbolic_math import (
     Scalar,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
     Quaternion,

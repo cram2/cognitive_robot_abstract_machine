@@ -12,7 +12,7 @@ from giskardpy.motion_statechart.debug_expression_publisher import (
 from giskardpy.motion_statechart.graph_node import DebugExpression
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from giskardpy.motion_statechart.debug_expression_publisher import (
     DebugExpressionPublishing,

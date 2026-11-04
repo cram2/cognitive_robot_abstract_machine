@@ -20,12 +20,10 @@ from coraplex.robot_plans.mixins import (
     HasGraspApproachParameters,
     MovesToolCenterPoint,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
-)
-from semantic_digital_twin.spatial_types.spatial_types import (
     Pose,
     Point3,
     Pose2D,

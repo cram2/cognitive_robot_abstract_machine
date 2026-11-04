@@ -88,6 +88,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     DistanceAlongAxis,
     HoldOrientation,
     HoldPose,
+    RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.drive_tasks import (
     BaseHeading,
@@ -122,13 +123,13 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -285,7 +286,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 ],
                 WorldFixture.PR2_WORLD,
             )
-            for node_type in [HoldOrientation, HoldPose]
+            for node_type in [HoldOrientation, HoldPose, RigidCoupling]
         ],
         NodeRoundTripCase(
             CartesianPosition,

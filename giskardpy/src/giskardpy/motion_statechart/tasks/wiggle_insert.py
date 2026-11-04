@@ -21,7 +21,7 @@ from giskardpy.motion_statechart.mixins import (
     HasRootLinkParameter,
     HasTipLinkParameter,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     Point3,
     Vector3,

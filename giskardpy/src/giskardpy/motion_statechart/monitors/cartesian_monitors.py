@@ -14,13 +14,13 @@ from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.mixins import HasRootLinkParameter, HasTipLinkParameter
 from cramph.node import NodeArtifacts
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
     RotationMatrix,
     HomogeneousTransformationMatrix,
+    SpatialType,
 )
-from semantic_digital_twin.spatial_types.spatial_types import SpatialType
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

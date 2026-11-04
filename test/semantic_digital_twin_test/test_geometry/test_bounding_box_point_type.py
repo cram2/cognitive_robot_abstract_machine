@@ -7,7 +7,7 @@ from typing_extensions import get_args
 
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.spatial_types import Point2, Point3
+from krrood_spatial_math.spatial_types import Point2, Point3
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
     PointT,

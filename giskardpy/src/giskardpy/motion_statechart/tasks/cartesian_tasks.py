@@ -48,12 +48,13 @@ from krrood.symbolic_math.symbolic_math import (
     Scalar,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     RotationMatrix,
     Vector3,
+    Pose,
+    SpatialType,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, SpatialType
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -502,17 +503,21 @@ class CartesianPositionStraight(CartesianTask[Point3]):
     line towards the goal, useful for tasks requiring linear trajectories.
     """
 
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+    """
+    Cost of falling behind on the line; leaving the line costs
+    :attr:`lateral_weight_factor` times as much.
+    """
+
     _line_start_binding: ForwardKinematicsBinding = field(init=False)
     """
     Binding for the tip pose the line starts at.
     """
 
-    @classproperty
-    def LATERAL_WEIGHT_FACTOR(cls) -> float:
-        """
-        :return: How much more expensive leaving the line is than falling behind on it.
-        """
-        return 2
+    lateral_weight_factor: float = 2
+    """
+    How much more expensive leaving the line is than falling behind on it.
+    """
 
     def set_up(self) -> None:
         """
@@ -562,14 +567,12 @@ class CartesianPositionStraight(CartesianTask[Point3]):
         root_R_line = RotationMatrix.from_x_axis(root_V_line)
         line_V_travelled = root_R_line.inverse() @ (root_P_tip - root_P_line_start)
 
-        lateral_weight = (
-            DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE * self.LATERAL_WEIGHT_FACTOR
-        )
+        lateral_weight = self.weight * self.lateral_weight_factor
         artifacts.geometry.add_position_constraint(
             expression_current=line_V_travelled[0],
             expression_goal=line_length,
             reference_velocity=self.reference_velocity,
-            quadratic_weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
+            quadratic_weight=self.weight,
             name="line/progress",
         )
         artifacts.geometry.add_position_constraint(
@@ -853,6 +856,71 @@ class HoldPose(
             ),
         )
         return artifacts
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class RigidCoupling(
+    Task,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+    HasPoseReferenceVelocityParameters,
+):
+    """
+    Keeps :attr:`tip_link` at rest relative to :attr:`root_link` at every step of the
+    predicted trajectory, so that neither moves without the other.
+
+    An invariant rather than a goal: it observes nothing and is always true.
+
+    .. warning:: It adds one constraint per step of the prediction horizon for each of
+        its nine rows, which makes the optimization problem larger.
+    """
+
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+    """
+    Task priority relative to other tasks.
+    """
+
+    def build_artifacts(self) -> MotionNodeArtifacts:
+        """
+        Constrain the velocity of the position and of two axes of :attr:`tip_link`,
+        relative to :attr:`root_link`, to zero.
+        """
+        artifacts = MotionNodeArtifacts()
+        root_T_tip = self.context.world.compose_forward_kinematics_expression(
+            self.root_link, self.tip_link
+        )
+        root_R_tip = root_T_tip.rotation_matrix
+        self._keep_at_rest(
+            artifacts, root_T_tip.position, self.reference_linear_velocity, "position"
+        )
+        self._keep_at_rest(
+            artifacts, root_R_tip.x_vector(), self.reference_angular_velocity, "x_axis"
+        )
+        self._keep_at_rest(
+            artifacts, root_R_tip.y_vector(), self.reference_angular_velocity, "y_axis"
+        )
+        artifacts.observation = sm.Scalar.const_true()
+        return artifacts
+
+    def _keep_at_rest(
+        self,
+        artifacts: MotionNodeArtifacts,
+        vector: Point3 | Vector3,
+        reference_velocity: float,
+        name: str,
+    ) -> None:
+        """
+        Constrain the velocity of every coordinate of `vector` to zero at every step of
+        the predicted trajectory.
+        """
+        for index in range(3):
+            artifacts.constraints.add_velocity_eq_constraint(
+                velocity_goal=0,
+                quadratic_weight=self.weight,
+                task_expression=vector[index],
+                velocity_limit=reference_velocity,
+                name=f"{name}/{index}",
+            )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

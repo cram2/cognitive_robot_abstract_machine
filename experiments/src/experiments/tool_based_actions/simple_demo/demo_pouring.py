@@ -17,8 +17,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bowl,
     PouringCup,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
 
 from coraplex.robot_plans.actions.composite.tool_based import PouringAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction

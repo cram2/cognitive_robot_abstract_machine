@@ -22,7 +22,7 @@ from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from ..motion_control_context import create_context_with_motion_control
 
@@ -203,9 +203,7 @@ def test_differential_drive_goal_is_a_step_without_an_attempt(
                 goal := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                         MobileBase
-                    )[
-                        0
-                    ],
+                    )[0],
                     goal=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_diff_world.root
                     ),

@@ -31,7 +31,9 @@ from krrood.class_diagrams.utils import (
     behaves_like_a_built_in_type,
     common_base_class,
     get_type_hints_of_object,
+    is_union_annotation,
 )
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -165,6 +167,23 @@ class WrappedField:
         return get_origin(self.resolved_type) in self.container_types
 
     @cached_property
+    def holds_collection(self) -> bool:
+        """
+        Whether the field's value is a collection of any
+        :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union such as
+        ``Optional``, whether any member of the union is.
+        """
+        annotations = (
+            get_args(self.resolved_type)
+            if is_union_annotation(self.resolved_type)
+            else (self.resolved_type,)
+        )
+        return any(
+            get_origin(annotation) in CollectionKind.all_classes()
+            for annotation in annotations
+        )
+
+    @cached_property
     def container_type(self) -> type | None:
         if not self.is_container:
             return None
@@ -174,6 +193,17 @@ class WrappedField:
     def is_collection_of_builtins(self):
         return self.is_container and all(
             behaves_like_a_built_in_type(field_type)
+            for field_type in get_args(self.resolved_type)
+        )
+
+    @cached_property
+    def is_collection_of_types(self) -> bool:
+        """
+        :return: Whether the field holds a collection of classes, such as
+            ``list[type[X]]``.
+        """
+        return self.is_container and all(
+            field_type in (type, Type) or get_origin(field_type) is type
             for field_type in get_args(self.resolved_type)
         )
 

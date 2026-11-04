@@ -28,8 +28,8 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
 from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.spatial_types import RotationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import RotationMatrix
+from krrood_spatial_math.spatial_types import Pose
 
 logger = logging.getLogger(__name__)
 

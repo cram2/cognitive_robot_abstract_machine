@@ -24,13 +24,13 @@ from semantic_digital_twin.adapters.ros.semdt_to_ros2_converters import (
     BoxToRos2Converter,
     PoseToRos2Converter,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
     Quaternion,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Color,
@@ -194,17 +194,25 @@ def test_convert_pose(cylinder_bot_world):
 
 
 def test_no_frame_id(cylinder_bot_world):
-    SemDTToRos2Converter.convert(HomogeneousTransformationMatrix())
-    SemDTToRos2Converter.convert(Pose())
-    SemDTToRos2Converter.convert(Point3())
-    SemDTToRos2Converter.convert(Vector3())
-    SemDTToRos2Converter.convert(Quaternion())
+    transform = SemDTToRos2Converter.convert(HomogeneousTransformationMatrix())
+    assert transform.header.frame_id == ""
+    assert transform.child_frame_id == ""
+    for spatial_type in [Pose(), Point3(), Vector3(), Quaternion()]:
+        assert SemDTToRos2Converter.convert(spatial_type).header.frame_id == ""
 
-    Ros2ToSemDTConverter.convert(geometry_msgs.TransformStamped(), cylinder_bot_world)
-    Ros2ToSemDTConverter.convert(geometry_msgs.PointStamped(), cylinder_bot_world)
-    Ros2ToSemDTConverter.convert(geometry_msgs.QuaternionStamped(), cylinder_bot_world)
-    Ros2ToSemDTConverter.convert(geometry_msgs.Vector3Stamped(), cylinder_bot_world)
-    Ros2ToSemDTConverter.convert(geometry_msgs.PoseStamped(), cylinder_bot_world)
+    transformation_matrix = Ros2ToSemDTConverter.convert(
+        geometry_msgs.TransformStamped(), cylinder_bot_world
+    )
+    assert transformation_matrix.reference_frame is None
+    assert transformation_matrix.child_frame is None
+    for message in [
+        geometry_msgs.PointStamped(),
+        geometry_msgs.QuaternionStamped(),
+        geometry_msgs.Vector3Stamped(),
+        geometry_msgs.PoseStamped(),
+    ]:
+        spatial_type = Ros2ToSemDTConverter.convert(message, cylinder_bot_world)
+        assert spatial_type.reference_frame is None
 
 
 def test_convert_box_shape(cylinder_bot_world):

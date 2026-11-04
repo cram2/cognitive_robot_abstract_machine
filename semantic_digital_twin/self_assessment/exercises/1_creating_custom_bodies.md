@@ -26,7 +26,7 @@ Just execute this cell without changing anything. It imports the required classe
 ```{code-cell} ipython3
 :tags: [remove-input]
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.geometry import Box, Sphere, Scale, Color

@@ -3,13 +3,14 @@ import pytest
 import trimesh
 
 pytest.importorskip(
-    "pydrake", reason="drake is not installed - install the semantic_digital_twin 'iris' extra"
+    "pydrake",
+    reason="drake is not installed - install the semantic_digital_twin 'iris' extra",
 )
 from pydrake.geometry.optimization import HPolyhedron, VPolytope
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import PointOccupiedError
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (

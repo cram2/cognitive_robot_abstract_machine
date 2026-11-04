@@ -21,7 +21,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import GelatinBox
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
@@ -65,7 +65,7 @@ if controls_real_robot:
 
     WorldSynchronizer(_world=world, node=node)
 else:
-    world = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
+    world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
     Tracy.from_world(world)
     VizMarkerPublisher(_world=world, node=node)
 

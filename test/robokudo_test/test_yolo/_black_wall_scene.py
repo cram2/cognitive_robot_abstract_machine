@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 from krrood.ormatic.utils import classproperty
-from semantic_digital_twin.spatial_types import Point2
+from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 from robokudo.annotators.core import BaseAnnotator

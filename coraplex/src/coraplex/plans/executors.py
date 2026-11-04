@@ -64,6 +64,7 @@ from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecu
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import logic_or
+from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 
 if TYPE_CHECKING:
     from semantic_digital_twin.adapters.multi_sim import MujocoSim
@@ -491,18 +492,41 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
     """
 
     plan_adaptations: list[PlanTransformation] = field(
-        default_factory=lambda: [
-            # A servo grips only with the position error it is left with, so fingers
-            # sent no further than the object's surface touch it without holding it.
-            CloseFingersToObjectWidth(squeeze=0.005),
-            LetContactCarryTheBodies(),
-        ],
+        default_factory=lambda: [LetContactCarryTheBodies()],
         kw_only=True,
     )
+    """
+    The plan transformations adapting every plan to being performed in physics. Unless
+    one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
+    is put first that squeezes by the
+    :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.squeeze` of the
+    robot's two-finger grippers.
+    """
 
     def __post_init__(self) -> None:
         self.pacer = SteppedSimulationPacer(self.simulation)
+        if not any(
+            isinstance(adaptation, CloseFingersToObjectWidth)
+            for adaptation in self.plan_adaptations
+        ):
+            self.plan_adaptations = [
+                CloseFingersToObjectWidth(squeeze=self._squeeze_of_the_grippers()),
+                *self.plan_adaptations,
+            ]
         super().__post_init__()
+
+    def _squeeze_of_the_grippers(self) -> float:
+        """
+        :return: The squeeze the two-finger grippers of the robot in :attr:`context`
+            name, or the default one where it has none.
+        """
+        robot = self.context.require_extension(RobotAccess).robot
+        [squeeze] = {
+            arm.end_effector.squeeze
+            for arm in robot.all_arms
+            if isinstance(arm.end_effector, HasTwoFingers)
+        } or {HasTwoFingers.squeeze}
+        return squeeze
 
     def create_qp_controller_config(self) -> QPControllerConfig:
         return QPControllerConfig.create_with_physical_simulation_defaults()

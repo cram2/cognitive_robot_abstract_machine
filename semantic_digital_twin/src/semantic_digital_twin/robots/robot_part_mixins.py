@@ -29,7 +29,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose, Vector3
+from krrood_spatial_math.spatial_types import Point3, Pose, Vector3
 from semantic_digital_twin.robots.exceptions import (
     MissingEndEffectorError,
     MissingInputSourceError,
@@ -328,6 +328,16 @@ class HasTwoFingers(
         width measured or reached on the model holds on the real gripper.
         """
         return True
+
+    @classproperty
+    def squeeze(cls) -> float:
+        """
+        How far past the width of what it grasps each finger is sent in a physical
+        simulation, in metres: a servo grips only with the position error it is left
+        with, so fingers sent no further than the object's surface touch it without
+        holding it.
+        """
+        return 0.005
 
     @property
     def finger(self) -> TGenericLeftFinger | TGenericRightFinger:

@@ -19,8 +19,12 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 
 # %% the forward axes the declared robots use
@@ -30,7 +34,7 @@ def axis_components(axis: Vector3) -> tuple[float, float, float]:
     """
     The three components of ``axis``.
 
-    :class:`~semantic_digital_twin.spatial_types.spatial_types.Vector3` compares by
+    :class:`~krrood_spatial_math.spatial_types.Vector3` compares by
     identity and cannot be hashed, so an axis needs this form to be grouped or matched
     by the direction it points in.
     """

@@ -24,7 +24,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from cramph.monitors import CountNodeResets
 from cramph.nodes_for_testing import ConstFalseNode, ConstTrueNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from cramph.threaded_nodes import FunctionCall
 from ...plan_running import run_plan

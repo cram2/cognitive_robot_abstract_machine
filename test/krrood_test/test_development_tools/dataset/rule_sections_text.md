@@ -16,3 +16,4 @@
 ## Assertions
 <!-- from AssertionsRules in {source_path} -->
 - A rule about assertions
+- A rule a checker enforces (checked by `{check_command}`)

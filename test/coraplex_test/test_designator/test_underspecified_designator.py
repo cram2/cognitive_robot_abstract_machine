@@ -44,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
