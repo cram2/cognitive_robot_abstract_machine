@@ -272,6 +272,13 @@ class CallTerm(GroundTerm, HasCallArguments):
             *self.call_arguments.positional, **self.call_arguments.keyword
         )
 
+    def depends_only_on_arguments(self) -> bool:
+        """
+        :return: Whether another call with equal arguments gives the same result, which a
+            call that constructs a new object does not.
+        """
+        return not inspect.isclass(self.callee)
+
 
 @dataclass(frozen=True, eq=False)
 class BoundValueTerm(CallTerm):
@@ -283,6 +290,13 @@ class BoundValueTerm(CallTerm):
 
     callee: type[HasBoundValue]
     """The class that is applied."""
+
+    def depends_only_on_arguments(self) -> bool:
+        """
+        Unlike :meth:`CallTerm.depends_only_on_arguments`, holds for every class: the
+        bound value is what the class computes from its arguments.
+        """
+        return True
 
     def live_value(self) -> Any:
         return self.callee._bound_value_(
