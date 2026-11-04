@@ -7,6 +7,7 @@ expressions.
 
 from __future__ import annotations
 
+import collections.abc
 import operator
 import uuid
 from abc import ABC, abstractmethod
@@ -31,10 +32,9 @@ from random_events.variable import (
     variable_from_name_and_type,
 )
 
-from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.class_diagrams.utils import common_base_class, get_type_hints_of_object
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
-from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
@@ -835,18 +835,34 @@ class FlatVariable(MappedVariable[T]):
 
     def _update_type_(self) -> None:
         """
-        Update the `_type_` attribute with the element type when the child's type is a
-        parameterized collection such as ``set[X]``, else with the child's type.
+        Update the `_type_` attribute with the type of the elements that iterating the
+        child's value yields, when the child's type is a parameterized iterable, else
+        with the child's type.
+
+        A dictionary yields its key type, and a tuple whose positions have different
+        types yields their lowest common base class.
         """
         super()._update_type_()
         collection_type = get_origin(self._type_)
         element_types = get_args(self._type_)
-        if (
-            collection_type in WrappedField.container_types
-            and collection_type is not type
+        if not (
+            isclass(collection_type)
+            and issubclass(collection_type, collections.abc.Iterable)
             and element_types
         ):
+            return
+        if issubclass(collection_type, collections.abc.Mapping):
             self._type_ = element_types[0]
+            return
+        distinct_element_types = [
+            element_type
+            for element_type in dict.fromkeys(element_types)
+            if element_type is not Ellipsis
+        ]
+        if len(distinct_element_types) == 1:
+            self._type_ = distinct_element_types[0]
+            return
+        self._type_ = common_base_class(distinct_element_types)
 
     def _apply_mapping_(
         self, value: Iterable[T] | None, sources: OperationResult | None = None

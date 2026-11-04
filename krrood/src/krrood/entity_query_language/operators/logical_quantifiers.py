@@ -13,14 +13,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import Iterable, Iterator
+from typing_extensions import Iterable
 
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     Selectable,
     SymbolicExpression,
 )
-from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.evaluation_context import get_evaluation_context
 from krrood.entity_query_language.operators.core_logical_operators import (
     LogicalBinaryOperator,
@@ -109,67 +108,54 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
         scope = self._enclosing_query_()
         if scope is None:
             return ()
-        ids_outside_this_quantifier = {
-            expression._id_
-            for expression in _expressions_in_scope_(scope._children_, {self._id_})
-        }
+        inside_this_quantifier: dict[uuid.UUID, SymbolicExpression] = {}
+        ids_outside_this_quantifier = set()
+        visited_occurrences = set()
+        stack = [(child, False) for child in reversed(scope._children_)]
+        while stack:
+            expression, is_inside = stack.pop()
+            if (expression._id_, is_inside) in visited_occurrences:
+                continue
+            visited_occurrences.add((expression._id_, is_inside))
+            if expression._id_ == self._id_:
+                stack.extend([(self.condition, True), (self.variable, True)])
+                continue
+            if is_inside:
+                inside_this_quantifier.setdefault(expression._id_, expression)
+            else:
+                ids_outside_this_quantifier.add(expression._id_)
+            # A nested query is a scope of its own, so its variables are not entered.
+            if not isinstance(expression, Query):
+                stack.extend(
+                    (child, is_inside) for child in reversed(expression._children_)
+                )
         return tuple(
             expression
-            for expression in _expressions_in_scope_((self.variable, self.condition))
+            for expression_id, expression in inside_this_quantifier.items()
             if isinstance(expression, Selectable)
-            and not isinstance(expression, Literal)
-            and expression._id_ in ids_outside_this_quantifier
+            and expression_id in ids_outside_this_quantifier
         )
 
     def _enclosing_query_(self) -> Query | None:
         """
-        :return: The innermost compiled query containing this quantifier: the one being
-            evaluated when there are several, as after a query is rebuilt around the
-            same condition, else the most recently built one. None when this quantifier
-            is not inside a query.
+        :return: The innermost query containing this quantifier within the query being
+            evaluated, or within this quantifier's tree outside an evaluation. None when
+            this quantifier is not inside a query.
         """
-        enclosing_queries = []
-        # Tracked by object identity: every build of a query reuses its identifier.
-        visited_objects = set()
-        frontier = list(reversed(self._parents_))
-        while frontier:
-            expression = frontier.pop(0)
-            if id(expression) in visited_objects:
+        root = self._evaluation_root_query_
+        visited_ids = set()
+        stack = [(root, root if isinstance(root, Query) else None)]
+        while stack:
+            expression, scope = stack.pop()
+            if expression._id_ == self._id_:
+                return scope
+            if expression._id_ in visited_ids:
                 continue
-            visited_objects.add(id(expression))
+            visited_ids.add(expression._id_)
             if isinstance(expression, Query):
-                enclosing_queries.append(expression)
-            else:
-                frontier.extend(reversed(expression._parents_))
-        evaluation_context = get_evaluation_context()
-        evaluated_query = (
-            evaluation_context.outermost_query.node if evaluation_context else None
-        )
-        for query in enclosing_queries:
-            if query is evaluated_query:
-                return query
-        return enclosing_queries[0] if enclosing_queries else None
-
-
-def _expressions_in_scope_(
-    roots: Iterable[SymbolicExpression], excluded_ids: set[uuid.UUID] | None = None
-) -> Iterator[SymbolicExpression]:
-    """
-    :param roots: The expressions to start from.
-    :param excluded_ids: Identifiers of the expressions to neither yield nor enter.
-    :return: The roots and their descendants, each once. A nested query is yielded but
-        not entered, since its variables belong to its own scope.
-    """
-    visited_ids = set(excluded_ids or ())
-    stack = list(reversed(list(roots)))
-    while stack:
-        expression = stack.pop()
-        if expression._id_ in visited_ids:
-            continue
-        visited_ids.add(expression._id_)
-        yield expression
-        if not isinstance(expression, Query):
-            stack.extend(reversed(expression._children_))
+                scope = expression
+            stack.extend((child, scope) for child in reversed(expression._children_))
+        return None
 
 
 @dataclass(eq=False, repr=False)
