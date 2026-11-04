@@ -2034,8 +2034,11 @@ class World(HasSimulatorProperties):
         Copies the subgraph of the kinematic structure from the root body to a new world
         and removes it from the old world.
 
+        The moved degrees of freedom keep their state, so every joint of the branch
+        stays where it was.
+
         :param new_root: The root body of the subgraph to be copied.
-        :return: A new `World` instance containing the copied subgraph.
+        :return: A new :class:`World` instance containing the copied subgraph.
         """
         new_world = World(name=self.name)
         child_bodies = self.compute_descendent_child_kinematic_structure_entities(
@@ -2059,16 +2062,19 @@ class World(HasSimulatorProperties):
             for connection in child_body_parent_connections
             for dof in connection.dofs
         ]
+        branch_state = {
+            dof.id: self.state[dof.id].data.copy() for dof in child_body_dofs
+        }
 
         with self.modify_world(), new_world.modify_world():
             for dof in child_body_dofs:
                 self.remove_degree_of_freedom(dof)
                 new_world.add_degree_of_freedom(dof)
+                new_world.state[dof.id] = branch_state[dof.id]
 
-            # connections must be removed before the kinematic structure entities:
-            # removing a node makes rustworkx silently drop its edges, so a
-            # connection removed afterwards is recorded against entities its own
-            # history has already dropped, and can no longer be replayed
+            # connections go before their entities: removing a node makes rustworkx drop
+            # its edges, so a connection removed afterwards is recorded against entities
+            # its own history has already dropped, and can no longer be replayed
             self.remove_connection(root_connection)
             for connection in child_body_parent_connections:
                 self.remove_connection(connection)
