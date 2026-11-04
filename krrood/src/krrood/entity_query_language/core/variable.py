@@ -14,6 +14,7 @@ from functools import cached_property
 
 from typing_extensions import Any, Iterable, Union as TypingUnion, Callable, Iterator
 
+from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
@@ -240,7 +241,8 @@ class InstantiatedVariable(
 
     def _ground_term_(self, *operand_values: Any) -> CallTerm:
         return CallTerm.from_call(
-            self._type_, **dict(zip(self._child_variables_, operand_values))
+            self._type_,
+            CallArguments(keyword=dict(zip(self._child_variables_, operand_values))),
         )
 
     def _evaluate__(
@@ -264,7 +266,7 @@ class InstantiatedVariable(
                 if child._id_ in child_result.bindings
             }
             (instance,) = call_values_in_current_context(
-                CallTerm.from_call(self._type_, **arguments)
+                CallTerm.from_call(self._type_, CallArguments(keyword=arguments))
             )
 
             bindings = {self._id_: instance} | child_result.bindings

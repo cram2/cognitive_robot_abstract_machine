@@ -17,6 +17,7 @@ from probabilistic_model.causal_structure.exceptions import (
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
+    ColliderPatternInCausalGraph,
     GraphEdge,
     GraphNode,
     NodeLevel,
@@ -55,7 +56,18 @@ class Shape(Enum):
 def test_member_graphs_keep_v_structures():
     [member] = collider_with_an_undirected_child().member_graphs()
 
-    assert set(member.edges()) == {("A", "C"), ("B", "C"), ("C", "D")}
+    assert {(parent.name, child.name) for parent, child in member.edges()} == {
+        ("A", "C"),
+        ("B", "C"),
+        ("C", "D"),
+    }
+
+
+def test_unshielded_colliders_name_both_parents_in_name_order():
+    graph = collider_with_an_undirected_child()
+    assert graph.unshielded_colliders() == {
+        ColliderPatternInCausalGraph(graph.node("A"), graph.node("C"), graph.node("B"))
+    }
 
 
 def test_too_many_undirected_edges_raises():
@@ -76,18 +88,20 @@ def test_graph_without_member_graphs_raises():
 def test_an_edge_to_a_node_the_graph_lacks_raises():
     graph = confounded()
 
+    outside = GraphNode(variable=Continuous("W"), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+
     with pytest.raises(UnknownGraphNode):
-        graph.add_edge(GraphEdge.directed("X", "W"))
+        graph.add_edge(GraphEdge.directed_edge(graph.node("X"), outside))
 
 
 def test_the_edge_between_two_nodes_is_found_from_either_end():
     graph = confounded()
-    x, z = graph.node("X"), graph.node("Z")
+    cause, confounder = graph.node("X"), graph.node("Z")
 
     assert (
-        graph.edge_between(x, z)
-        == graph.edge_between(z, x)
-        == GraphEdge.directed("Z", "X")
+        graph.edge_between(cause, confounder)
+        == graph.edge_between(confounder, cause)
+        == GraphEdge.directed_edge(confounder, cause)
     )
 
 

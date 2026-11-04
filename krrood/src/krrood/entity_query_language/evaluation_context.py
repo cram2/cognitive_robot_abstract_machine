@@ -362,7 +362,7 @@ class CallAsPassed:
         :param term: The call to identify.
         :return: The call *term* makes, as its arguments were passed.
         """
-        return cls(term.function, term.call_arguments)
+        return cls(term.function, term.arguments)
 
 
 @dataclass
