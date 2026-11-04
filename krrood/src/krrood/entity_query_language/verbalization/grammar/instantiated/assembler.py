@@ -73,7 +73,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
         self.context.scope.push_constraint_frame()
-        binding_fragments, overrides = self._bindings(plan, node._type_)
+        binding_fragments, overrides = self._bindings(plan, node._factory_)
         self.context.scope.binding_overrides.update(overrides)
         deferred = self.context.scope.pop_constraint_frame()
         constraint_fragments = [

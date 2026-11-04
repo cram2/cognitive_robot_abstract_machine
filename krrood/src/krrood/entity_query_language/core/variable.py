@@ -8,12 +8,19 @@ variables that are instantiated from other expressions.
 
 from __future__ import annotations
 
-import inspect
+from inspect import isclass
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import Any, Iterable, Union as TypingUnion, Callable, Iterator
+from typing_extensions import (
+    Any,
+    Iterable,
+    Union as TypingUnion,
+    Callable,
+    Iterator,
+    get_origin,
+)
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
@@ -25,10 +32,16 @@ from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVari
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
-from krrood.entity_query_language.exceptions import NoChildToReplace
+from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.entity_query_language.exceptions import (
+    NoChildToReplace,
+    ResultTypeCannotBeDetermined,
+    ResultTypeIsNotAType,
+)
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.entity_query_language.utils import (
     T,
     is_iterable,
@@ -180,11 +193,13 @@ class Literal(Variable[T]):
 @monitored
 @dataclass(eq=False, repr=False)
 class InstantiatedVariable(
-    MultiArityExpressionThatPerformsACartesianProduct, CanHaveDomainSource[T]
+    MultiArityExpressionThatPerformsACartesianProduct,
+    CanHaveDomainSource[T],
+    HasFactoryAndKwargs[T],
 ):
     """
-    A variable which does not have an explicit domain, but creates new
-    instances using the `_type_` and `_kwargs_` that are provided.
+    A variable which does not have an explicit domain, but builds its values by
+    calling :attr:`_factory_` with the `_kwargs_` that are provided.
 
     The `_kwargs_` are variables that can be used to generate
     combinations of bindings to create instances for each combination.
@@ -192,16 +207,25 @@ class InstantiatedVariable(
     Predicates and symbolic functions.
     """
 
-    _type_: type[T] | Callable = field(kw_only=True)
+    _factory_: Callable[..., T] = field(kw_only=True)
     """
-    The result type of the variable.
+    The callable that builds the values this variable binds, such as a type, a factory
+    method or a symbolic function.
+    """
 
-    (The value of `T`)
+    _declared_factory_: Callable[..., Any] | None = field(default=None, kw_only=True)
+    """
+    The callable as the query states it: the decorated function for a
+    :func:`~krrood.entity_query_language.predicate.symbolic_function`, otherwise
+    :attr:`_factory_` when not given.
     """
 
-    _kwargs_: dict[str, Any] = field(default_factory=dict)
+    _type_: type[T] | None = field(default=None, kw_only=True)
     """
-    The properties of the variable as keyword arguments.
+    The type of the values this variable binds (the value of `T`), always a type.
+
+    When not given, it is the type :attr:`_factory_` builds (see
+    :meth:`~krrood.patterns.factory_and_kwargs.HasFactoryAndKwargs._type_built_by_`).
     """
 
     _child_variables_: dict[str, SymbolicExpression] = field(
@@ -218,6 +242,19 @@ class InstantiatedVariable(
     """
 
     def __post_init__(self):
+        """
+        :raises ResultTypeCannotBeDetermined: If no :attr:`_type_` is given and
+            :attr:`_factory_` names no type it builds.
+        :raises ResultTypeIsNotAType: If the given :attr:`_type_` is not a type.
+        """
+        if self._declared_factory_ is None:
+            self._declared_factory_ = self._factory_
+        if self._type_ is None:
+            self._type_ = self._type_built_by_(self._factory_)
+        if self._type_ is None:
+            raise ResultTypeCannotBeDetermined(self._factory_)
+        if not isinstance(self._type_, type):
+            raise ResultTypeIsNotAType(self._type_)
         self._update_child_variables_from_kwargs_()
         self._operation_children_ = tuple(self._child_variables_.values())
         # This is done here as it uses `_operation_children_`
@@ -255,10 +292,9 @@ class InstantiatedVariable(
             # class-form counterpart of a @symbolic_function being called. A plain function/type does
             # not, so it binds the direct call result.
             bind = (
-                self._type_._bound_value_
-                if inspect.isclass(self._type_)
-                and issubclass(self._type_, HasBoundValue)
-                else self._type_
+                self._factory_._bound_value_
+                if isclass(self._factory_) and issubclass(self._factory_, HasBoundValue)
+                else self._factory_
             )
             instance = bind(**arguments)
 
@@ -279,17 +315,17 @@ class InstantiatedVariable(
 
     @cached_property
     def _name_(self):
-        return self._type_.__name__
+        return self._factory_.__name__
 
     def apply_mapping_on_external_root(self, *args, **kwargs: dict[str, Any]) -> Any:
         """
-        Build an instance of this variable's type from the given arguments.
+        Build a value with this variable's factory from the given arguments.
 
-        :param args: Positional arguments for the type's constructor.
-        :param kwargs: Keyword arguments for the type's constructor.
-        :return: The constructed instance.
+        :param args: Positional arguments for the factory.
+        :param kwargs: Keyword arguments for the factory.
+        :return: The built value.
         """
-        return self._type_(*args, **kwargs)
+        return self._factory_(*args, **kwargs)
 
 
 @dataclass(eq=False, repr=False)

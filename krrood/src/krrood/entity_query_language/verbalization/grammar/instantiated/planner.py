@@ -112,10 +112,10 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         >>> InstantiatedPlanner.has_fragment(inference(Drawer)(container=connection.parent, handle=connection.child))
         False
         """
-        type_ = node._type_
+        factory = node._factory_
         return (
-            isinstance(type_, type)
-            and issubclass(type_, Verbalizable)
-            and type_._verbalization_fragment_.__func__
+            isinstance(factory, type)
+            and issubclass(factory, Verbalizable)
+            and factory._verbalization_fragment_.__func__
             is not Verbalizable._verbalization_fragment_.__func__
         )
