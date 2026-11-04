@@ -8,6 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from probabilistic_model.causal_structure.exceptions import UnknownGraphNode
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
     EdgeMark,
@@ -142,13 +143,20 @@ class CausalRelation(ClassRelation):
     What the relation shows at :attr:`second`.
     """
 
-    @property
-    def edge(self) -> GraphEdge:
+    def edge_among(self, node_of: dict[str, GraphNode]) -> GraphEdge:
         """
-        :return: The relation as an edge between the names of its variables.
+        :param node_of: The node of every variable, by the variable's name.
+        :return: The relation as an edge between the nodes of its two variables.
+        :raises UnknownGraphNode: If no node stands for one of them.
         """
+        for endpoint in (self.first, self.second):
+            if endpoint.name not in node_of:
+                raise UnknownGraphNode(endpoint.name, list(node_of))
         return GraphEdge(
-            self.first.name, self.second.name, self.mark_at_first, self.mark_at_second
+            node_of[self.first.name],
+            node_of[self.second.name],
+            self.mark_at_first,
+            self.mark_at_second,
         )
 
     def __str__(self):
@@ -202,6 +210,7 @@ class CausalRelationsOfClass:
         :return: The graph over the nodes, with one edge per relation.
         :raises UnknownGraphNode: If a relation connects a variable no node stands for.
         """
+        node_of = {node.name: node for node in nodes}
         return CausalGraph.from_edges(
-            nodes, [relation.edge for relation in self.relations]
+            nodes, [relation.edge_among(node_of) for relation in self.relations]
         )

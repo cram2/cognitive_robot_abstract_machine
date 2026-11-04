@@ -76,7 +76,7 @@ class EveryPairJoinedLearner(CausalStructureLearner):
         return CausalGraph.from_edges(
             nodes,
             [
-                GraphEdge.undirected(first.name, second.name)
+                GraphEdge.undirected(first, second)
                 for first, second in itertools.combinations(nodes, 2)
             ],
         )
@@ -174,7 +174,10 @@ def test_every_learned_edge_is_a_causal_relation_of_the_class(
         class_diagram, class_diagram.get_wrapped_class(SceneRoom)
     )
 
-    assert {relation.edge for relation in relations.relations} == set(graph.edges())
+    node_of = {node.name: node for node in graph.nodes()}
+    assert {relation.edge_among(node_of) for relation in relations.relations} == set(
+        graph.edges()
+    )
 
 
 def test_relearning_replaces_the_causal_relations_of_the_class(

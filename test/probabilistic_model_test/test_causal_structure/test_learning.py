@@ -51,9 +51,10 @@ def test_fork_with_tiers_is_recovered():
 
     graph = graph_of(season_fork(), knowledge)
 
+    season = graph.node("season")
     assert set(graph.edges()) == {
-        GraphEdge.directed("season", "ice_cream_sales"),
-        GraphEdge.directed("season", "drowning_incidents"),
+        GraphEdge.directed(season, graph.node("ice_cream_sales")),
+        GraphEdge.directed(season, graph.node("drowning_incidents")),
     }
 
 
@@ -61,7 +62,9 @@ def test_collider_is_oriented_without_tiers():
     graph = graph_of(collider())
 
     assert {
-        (edge.parent, edge.child) for edge in graph.edges() if edge.is_directed
+        (edge.parent.name, edge.child.name)
+        for edge in graph.edges()
+        if edge.is_directed
     } == {
         ("A", "C"),
         ("B", "C"),
@@ -76,10 +79,8 @@ def test_deterministic_copy_is_restored_as_child():
 
     graph = graph_of(chain_with_a_copy(), knowledge)
 
-    assert set(graph.edges()) == {
-        GraphEdge.directed("A", "B"),
-        GraphEdge.directed("B", "D"),
-    }
+    a, b, d = graph.node("A"), graph.node("B"), graph.node("D")
+    assert set(graph.edges()) == {GraphEdge.directed(a, b), GraphEdge.directed(b, d)}
 
 
 def test_knowledge_naming_an_unknown_variable_raises():
@@ -95,11 +96,16 @@ def test_learned_fork_supplies_the_confounder():
     )
     rows = season_fork()
 
-    identification = AdjustmentSelector(graph_of(rows, knowledge)).identify(
-        "ice_cream_sales", "drowning_incidents", {"season"}, rows
+    graph = graph_of(rows, knowledge)
+
+    identification = AdjustmentSelector(graph).identify(
+        graph.node("ice_cream_sales"),
+        graph.node("drowning_incidents"),
+        {graph.node("season")},
+        rows,
     )
 
-    assert identification == IdentifiedEffect(frozenset({"season"}))
+    assert identification == IdentifiedEffect(frozenset({graph.node("season")}))
 
 
 def test_continuous_columns_are_tested_after_discretization():
@@ -111,7 +117,7 @@ def test_continuous_columns_are_tested_after_discretization():
 
     graph = graph_of(rows, knowledge, Continuous)
 
-    assert {(edge.parent, edge.child) for edge in graph.edges()} == {
+    assert {(edge.parent.name, edge.child.name) for edge in graph.edges()} == {
         ("season", "ice_cream_sales"),
         ("season", "drowning_incidents"),
     }

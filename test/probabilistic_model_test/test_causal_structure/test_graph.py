@@ -55,7 +55,11 @@ class Shape(Enum):
 def test_member_graphs_keep_v_structures():
     [member] = collider_with_an_undirected_child().member_graphs()
 
-    assert set(member.edges()) == {("A", "C"), ("B", "C"), ("C", "D")}
+    assert {(parent.name, child.name) for parent, child in member.edges()} == {
+        ("A", "C"),
+        ("B", "C"),
+        ("C", "D"),
+    }
 
 
 def test_too_many_undirected_edges_raises():
@@ -76,8 +80,10 @@ def test_graph_without_member_graphs_raises():
 def test_an_edge_to_a_node_the_graph_lacks_raises():
     graph = confounded()
 
+    outside = GraphNode(variable=Continuous("W"), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+
     with pytest.raises(UnknownGraphNode):
-        graph.add_edge(GraphEdge.directed("X", "W"))
+        graph.add_edge(GraphEdge.directed(graph.node("X"), outside))
 
 
 def test_the_edge_between_two_nodes_is_found_from_either_end():
@@ -85,9 +91,7 @@ def test_the_edge_between_two_nodes_is_found_from_either_end():
     x, z = graph.node("X"), graph.node("Z")
 
     assert (
-        graph.edge_between(x, z)
-        == graph.edge_between(z, x)
-        == GraphEdge.directed("Z", "X")
+        graph.edge_between(x, z) == graph.edge_between(z, x) == GraphEdge.directed(z, x)
     )
 
 

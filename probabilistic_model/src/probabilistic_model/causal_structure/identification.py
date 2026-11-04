@@ -21,10 +21,19 @@ from probabilistic_model.causal_structure.exceptions import (
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
+    GraphNode,
     MemberGraph,
 )
 
 # %% the adjustment criterion in one graph
+
+
+def name_of(node: GraphNode) -> str:
+    """
+    :param node: A node.
+    :return: Its name, by which nodes are ordered wherever an order is needed.
+    """
+    return node.name
 
 
 class InvalidAdjustmentReason(StrEnum):
@@ -59,18 +68,18 @@ class AdjustmentCheck:
     The directed acyclic graph.
     """
 
-    cause: str
+    cause: GraphNode
     """
-    The name of the cause.
+    The cause.
     """
 
-    effect: str
+    effect: GraphNode
     """
-    The name of the effect.
+    The effect.
     """
 
     @cached_property
-    def causal_path_nodes(self) -> set[str]:
+    def causal_path_nodes(self) -> set[GraphNode]:
         """
         :return: The nodes other than the cause on a directed path from the cause to
             the effect, the effect included if there is such a path.
@@ -80,7 +89,7 @@ class AdjustmentCheck:
         )
 
     @cached_property
-    def forbidden_nodes(self) -> set[str]:
+    def forbidden_nodes(self) -> set[GraphNode]:
         """
         :return: The cause, and every node on a causal path with its descendants.
         """
@@ -104,10 +113,10 @@ class AdjustmentCheck:
         )
 
     def failure_reason(
-        self, adjustment: frozenset[str]
+        self, adjustment: frozenset[GraphNode]
     ) -> InvalidAdjustmentReason | None:
         """
-        :param adjustment: The names of the variables to adjust for.
+        :param adjustment: The nodes to adjust for.
         :return: The first condition of the adjustment criterion the set fails, or
             ``None`` if it meets them all.
         """
@@ -137,9 +146,9 @@ class IdentifiedEffect(Identification):
     The effect is identified by adjusting for one set of variables.
     """
 
-    adjustment: frozenset[str]
+    adjustment: frozenset[GraphNode]
     """
-    The names of the variables to adjust for.
+    The nodes to adjust for.
     """
 
 
@@ -150,10 +159,10 @@ class PartiallyIdentifiedEffect(Identification):
     effect is one of several, one per parent set (Maathuis, Kalisch and Bühlmann, 2009).
     """
 
-    candidate_adjustments: list[frozenset[str]]
+    candidate_adjustments: list[frozenset[GraphNode]]
     """
-    The names in each distinct parent set of the cause that does not hold the effect,
-    the smallest first.
+    Each distinct parent set of the cause that does not hold the effect, the smallest
+    first.
     """
 
     includes_member_without_causal_path: bool
@@ -232,15 +241,15 @@ class AdjustmentSelector:
 
     def identify(
         self,
-        cause: str,
-        effect: str,
-        eligible: set[str],
+        cause: GraphNode,
+        effect: GraphNode,
+        eligible: set[GraphNode],
         training_rows: pd.DataFrame | None = None,
     ) -> Identification:
         """
-        :param cause: The name of the cause.
-        :param effect: The name of the effect.
-        :param eligible: The names of the variables the model can adjust for.
+        :param cause: The cause.
+        :param effect: The effect.
+        :param eligible: The nodes the model can adjust for.
         :param training_rows: The rows the model was fitted on, whose support ranks the
             valid adjustment sets.
         :return: The best valid adjustment set; else, if the member graphs disagree on
@@ -253,7 +262,7 @@ class AdjustmentSelector:
         valid = [
             adjustment
             for adjustment in self.candidate_adjustments(
-                sorted(eligible - {cause, effect} - forbidden)
+                sorted(eligible - {cause, effect} - forbidden, key=name_of)
             )
             if all(check.failure_reason(adjustment) is None for check in checks)
         ]
@@ -264,19 +273,19 @@ class AdjustmentSelector:
                     key=lambda adjustment: (
                         self.under_supported_cells(cause, adjustment, training_rows),
                         len(adjustment),
-                        sorted(adjustment),
+                        sorted(node.name for node in adjustment),
                     ),
                 )
             )
         return self.parent_set_candidates(cause, effect, eligible, checks)
 
     def check_declared(
-        self, cause: str, effect: str, declared: frozenset[str]
+        self, cause: GraphNode, effect: GraphNode, declared: frozenset[GraphNode]
     ) -> IdentifiedEffect:
         """
-        :param cause: The name of the cause.
-        :param effect: The name of the effect.
-        :param declared: The names of the variables declared to adjust for.
+        :param cause: The cause.
+        :param effect: The effect.
+        :param declared: The nodes declared to adjust for.
         :return: The declared set, if it meets the criterion in every member graph.
         :raises InvalidAdjustmentSet: If it fails in one.
         """
@@ -286,10 +295,10 @@ class AdjustmentSelector:
                 raise InvalidAdjustmentSet(cause, effect, declared, reason, index)
         return IdentifiedEffect(declared)
 
-    def checks_for(self, cause: str, effect: str) -> list[AdjustmentCheck]:
+    def checks_for(self, cause: GraphNode, effect: GraphNode) -> list[AdjustmentCheck]:
         """
-        :param cause: The name of the cause.
-        :param effect: The name of the effect.
+        :param cause: The cause.
+        :param effect: The effect.
         :return: The adjustment criterion in every member graph.
         """
         return [
@@ -297,9 +306,11 @@ class AdjustmentSelector:
             for member in self.graph.member_graphs()
         ]
 
-    def candidate_adjustments(self, pool: list[str]) -> list[frozenset[str]]:
+    def candidate_adjustments(
+        self, pool: list[GraphNode]
+    ) -> list[frozenset[GraphNode]]:
         """
-        :param pool: The names that may be adjusted for, sorted.
+        :param pool: The nodes that may be adjusted for, sorted by name.
         :return: Every set of at most :attr:`maximum_adjustment_size` of them, the
             smallest first, sets of one size in the order of their sorted names.
         """
@@ -311,19 +322,19 @@ class AdjustmentSelector:
 
     def under_supported_cells(
         self,
-        cause: str,
-        adjustment: frozenset[str],
+        cause: GraphNode,
+        adjustment: frozenset[GraphNode],
         training_rows: pd.DataFrame | None,
     ) -> int:
         """
-        :param cause: The name of the cause.
-        :param adjustment: The names of the variables to adjust for.
+        :param cause: The cause.
+        :param adjustment: The nodes to adjust for.
         :param training_rows: The rows the model was fitted on.
         :return: How many combinations of the cause's and the set's values hold some
             training rows but fewer than :attr:`minimum_rows_per_cell`; nothing if there
             are no rows, or they lack a column for one of the variables.
         """
-        columns = [cause, *sorted(adjustment)]
+        columns = [cause.name, *sorted(node.name for node in adjustment)]
         if training_rows is None or not set(columns) <= set(training_rows.columns):
             return 0
         cell_sizes = (
@@ -335,15 +346,15 @@ class AdjustmentSelector:
 
     def parent_set_candidates(
         self,
-        cause: str,
-        effect: str,
-        eligible: set[str],
+        cause: GraphNode,
+        effect: GraphNode,
+        eligible: set[GraphNode],
         checks: list[AdjustmentCheck],
     ) -> Identification:
         """
-        :param cause: The name of the cause.
-        :param effect: The name of the effect.
-        :param eligible: The names of the variables the model can adjust for.
+        :param cause: The cause.
+        :param effect: The effect.
+        :param eligible: The nodes the model can adjust for.
         :param checks: The adjustment criterion in every member graph.
         :return: One candidate per distinct parent set of the cause if the member
             graphs disagree on it, else a refusal.
@@ -355,7 +366,7 @@ class AdjustmentSelector:
             return UnidentifiedEffect(UnidentifiedReason.NO_VALID_SET_AMONG_ELIGIBLE)
         candidates = sorted(
             (parents for parents in parent_sets if effect not in parents),
-            key=lambda parents: (len(parents), sorted(parents)),
+            key=lambda parents: (len(parents), sorted(map(name_of, parents))),
         )
         if not all(parents <= eligible for parents in candidates):
             return UnidentifiedEffect(UnidentifiedReason.PARENT_SET_NOT_ELIGIBLE)

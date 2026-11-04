@@ -115,14 +115,14 @@ class GraphEdge:
     An edge between two nodes, with what it shows at each end.
     """
 
-    first: str
+    first: GraphNode
     """
-    The name of the node at one end.
+    The node at one end.
     """
 
-    second: str
+    second: GraphNode
     """
-    The name of the node at the other end.
+    The node at the other end.
     """
 
     mark_at_first: EdgeMark
@@ -136,19 +136,19 @@ class GraphEdge:
     """
 
     @classmethod
-    def directed(cls, parent: str, child: str) -> GraphEdge:
+    def directed(cls, parent: GraphNode, child: GraphNode) -> GraphEdge:
         """
-        :param parent: The name of the cause.
-        :param child: The name of what it causes.
+        :param parent: The cause.
+        :param child: What it causes.
         :return: The edge ``parent → child``.
         """
         return cls(parent, child, EdgeMark.TAIL, EdgeMark.ARROW)
 
     @classmethod
-    def undirected(cls, first: str, second: str) -> GraphEdge:
+    def undirected(cls, first: GraphNode, second: GraphNode) -> GraphEdge:
         """
-        :param first: The name of the node at one end.
-        :param second: The name of the node at the other end.
+        :param first: The node at one end.
+        :param second: The node at the other end.
         :return: The edge ``first — second``, whose direction the data leaves open.
         """
         return cls(first, second, EdgeMark.TAIL, EdgeMark.TAIL)
@@ -171,16 +171,16 @@ class GraphEdge:
         return self.mark_at_first is self.mark_at_second is EdgeMark.TAIL
 
     @property
-    def parent(self) -> str:
+    def parent(self) -> GraphNode:
         """
-        :return: The name of the node at the tail of a directed edge.
+        :return: The node at the tail of a directed edge.
         """
         return self.first if self.mark_at_first is EdgeMark.TAIL else self.second
 
     @property
-    def child(self) -> str:
+    def child(self) -> GraphNode:
         """
-        :return: The name of the node at the arrow of a directed edge.
+        :return: The node at the arrow of a directed edge.
         """
         return self.second if self.mark_at_first is EdgeMark.TAIL else self.first
 
@@ -189,10 +189,9 @@ class GraphEdge:
 
 
 @dataclass(eq=False)
-class MemberGraph(DirectedAcyclicGraph[str]):
+class MemberGraph(DirectedAcyclicGraph[GraphNode]):
     """
-    One of the directed acyclic graphs a causal graph stands for, over the names of its
-    nodes.
+    One of the directed acyclic graphs a causal graph stands for, over its nodes.
     """
 
     def copy(self) -> MemberGraph:
@@ -202,7 +201,9 @@ class MemberGraph(DirectedAcyclicGraph[str]):
         """
         return MemberGraph(graph=self.graph.copy(), indices=dict(self.indices))
 
-    def without_edges(self, edges: Iterable[tuple[str, str]]) -> MemberGraph:
+    def without_edges(
+        self, edges: Iterable[tuple[GraphNode, GraphNode]]
+    ) -> MemberGraph:
         """
         :param edges: Edges of the graph, each as its parent and its child.
         :return: A copy of the graph without them.
@@ -258,7 +259,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :param nodes: The nodes, one per variable.
         :param edges: The edges between them, at most one between two nodes.
         :return: The graph.
-        :raises UnknownGraphNode: If an edge names a node that is not among the nodes.
+        :raises UnknownGraphNode: If an edge joins a node that is not among the nodes.
         """
         graph = cls()
         graph.add_nodes_from(nodes)
@@ -271,11 +272,10 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :param edge: An edge between two of the graph's nodes.
         :raises UnknownGraphNode: If the graph lacks one of them.
         """
-        self.graph.add_edge(
-            self.index_of(self.node(edge.first)),
-            self.index_of(self.node(edge.second)),
-            edge,
-        )
+        for node in (edge.first, edge.second):
+            if node not in self.indices:
+                raise UnknownGraphNode(node.name, self.node_names)
+        self.graph.add_edge(self.index_of(edge.first), self.index_of(edge.second), edge)
 
     def edges(self) -> list[GraphEdge]:
         """
@@ -327,7 +327,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :return: The edge between them, or ``None`` if they are not adjacent.
         """
         for edge in self.edges():
-            if {edge.first, edge.second} == {first.name, second.name}:
+            if {edge.first, edge.second} == {first, second}:
                 return edge
         return None
 
@@ -339,21 +339,23 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         """
         return self.edge_between(first, second) is not None
 
-    def unshielded_colliders(self) -> set[tuple[str, str, str]]:
+    def unshielded_colliders(self) -> set[tuple[GraphNode, GraphNode, GraphNode]]:
         """
         :return: Every ``a → c ← b`` among the directed edges with ``a`` and ``b`` not
-            adjacent, as ``(a, c, b)`` with ``a`` sorted before ``b``.
+            adjacent, as ``(a, c, b)`` with ``a``'s name sorted before ``b``'s.
         """
         directed = MemberGraph()
-        directed.add_nodes_from(self.node_names)
+        directed.add_nodes_from(self.nodes())
         directed.add_edges_from(
             (edge.parent, edge.child) for edge in self.edges() if edge.is_directed
         )
         return self.colliders_of(directed)
 
-    def colliders_of(self, directed: MemberGraph) -> set[tuple[str, str, str]]:
+    def colliders_of(
+        self, directed: MemberGraph
+    ) -> set[tuple[GraphNode, GraphNode, GraphNode]]:
         """
-        :param directed: Directed edges over the names of the graph's nodes.
+        :param directed: Directed edges over the graph's nodes.
         :return: Every collider among the directed edges whose two parents are not
             :meth:`adjacent` in this graph, as :meth:`unshielded_colliders` gives them.
         """
@@ -361,9 +363,9 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             (first, child, second)
             for child in directed.nodes()
             for first, second in itertools.combinations(
-                sorted(directed.predecessors(child)), 2
+                sorted(directed.predecessors(child), key=lambda node: node.name), 2
             )
-            if not self.adjacent(self.node(first), self.node(second))
+            if not self.adjacent(first, second)
         }
 
     def member_graphs(self) -> list[MemberGraph]:
@@ -406,7 +408,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
                 len(undirected), self.maximum_undirected_edges
             )
         directed = MemberGraph()
-        directed.add_nodes_from(self.node_names)
+        directed.add_nodes_from(self.nodes())
         directed.add_edges_from(
             (edge.parent, edge.child) for edge in self.edges() if edge.is_directed
         )

@@ -147,29 +147,32 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         copy is restored as a child of its source, and a constant column stays without
         edges.
         """
-        names = [node.name for node in nodes]
-        knowledge.check_names(names)
+        node_of = {node.name: node for node in nodes}
+        knowledge.check_names(list(node_of))
         copies = {copy.copy for copy in knowledge.deterministic_copies}
         tested = [
-            name for name in names if name not in copies and rows[name].nunique() > 1
+            node
+            for node in nodes
+            if node.name not in copies and rows[node.name].nunique() > 1
         ]
-        codes = self.discretizer.fit_transform(rows[tested])
+        tested_names = [node.name for node in tested]
+        codes = self.discretizer.fit_transform(rows[tested_names])
         graph = peter_clark(
             codes.to_numpy(dtype=np.int64),
             self.significance_level,
             self.independence_test,
             stable=True,
             show_progress=False,
-            node_names=tested,
+            node_names=tested_names,
             background_knowledge=self.to_causal_learn_knowledge(
-                knowledge.restricted_to(tested)
+                knowledge.restricted_to(tested_names)
             ),
         ).G.graph
         return CausalGraph.from_edges(
             nodes,
             self.read_adjacency_matrix(graph, tested)
             + [
-                GraphEdge.directed(copy.source, copy.copy)
+                GraphEdge.directed(node_of[copy.source], node_of[copy.copy])
                 for copy in knowledge.deterministic_copies
             ],
         )
@@ -197,16 +200,18 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         return translated
 
     @staticmethod
-    def read_adjacency_matrix(graph: np.ndarray, names: list[str]) -> list[GraphEdge]:
+    def read_adjacency_matrix(
+        graph: np.ndarray, nodes: list[GraphNode]
+    ) -> list[GraphEdge]:
         """
-        :param graph: causal-learn's adjacency matrix over the named nodes.
-        :param names: The names of its nodes, in its order.
+        :param graph: causal-learn's adjacency matrix over the nodes.
+        :param nodes: Its nodes, in its order.
         :return: Its edges.
         """
         return [
             GraphEdge(
-                first=names[first],
-                second=names[second],
+                first=nodes[first],
+                second=nodes[second],
                 mark_at_first=AdjacencyMatrixMark(graph[first, second]).mark,
                 mark_at_second=AdjacencyMatrixMark(graph[second, first]).mark,
             )
@@ -355,8 +360,8 @@ class RelationalCausalStructureLearner:
                 CausalRelation(
                     source=relations.owner,
                     target=relations.owner,
-                    first=endpoint_of[edge.first],
-                    second=endpoint_of[edge.second],
+                    first=endpoint_of[edge.first.name],
+                    second=endpoint_of[edge.second.name],
                     mark_at_first=edge.mark_at_first,
                     mark_at_second=edge.mark_at_second,
                 )
@@ -440,9 +445,8 @@ class RelationalCausalStructureLearner:
         graph = self.learner.learn(
             renamed, statistic_nodes + part_nodes, knowledge.restricted_to(names)
         )
-        part_names = {node.name for node in part_nodes}
         return [
             edge
             for edge in graph.edges()
-            if edge.first in part_names or edge.second in part_names
+            if edge.first in part_nodes or edge.second in part_nodes
         ]
