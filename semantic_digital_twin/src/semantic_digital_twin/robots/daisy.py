@@ -1,3 +1,8 @@
+"""
+The DAiSy dual-arm robot: its semantic parts, joint names, controllers and griplink
+grippers.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -9,8 +14,14 @@ from importlib.resources import files
 from pathlib import Path
 from typing_extensions import Self
 
-from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
 from krrood.ormatic.utils import classproperty
+
+# The griplink actions are only needed to command the real grippers; without ROS the
+# robot description still loads, and its griplink endpoints carry no action type.
+try:
+    from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
+except ModuleNotFoundError:
+    Flexgrip = Flexrelease = Grip = Release = None
 
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidCollisionBetweenGroups,

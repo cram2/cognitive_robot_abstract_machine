@@ -29,10 +29,11 @@ class GriplinkEndpoint:
     ROS action topic the griplink server for one gripper listens on.
     """
 
-    message_type: type
+    message_type: type | None
     """
     The griplink ROS action this endpoint's server executes (``Grip``/``Release``/
-    ``Flexgrip``/``Flexrelease``).
+    ``Flexgrip``/``Flexrelease``), or ``None`` where ``griplink_interfaces`` is not
+    installed.
     """
 
 
