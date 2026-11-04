@@ -1,9 +1,6 @@
 #!/bin/bash
 # Prints the machine a CI job runs on and how much disk, memory and CPU it has left, so a
 # job that runs out of space or behaves differently on one runner can be traced back to it.
-# Usage: show_runner_resources.sh [--host-directory-sizes]
-#   --host-directory-sizes  also measures the largest directories on the host's disk, which
-#                           takes a minute or two.
 
 set -uo pipefail
 
@@ -32,7 +29,3 @@ if ! host_is_mounted; then
 fi
 # The images, containers and build cache Docker keeps on the host.
 print_group "Docker disk usage" host_docker system df -v
-if [[ "${1:-}" == "--host-directory-sizes" ]]; then
-    print_group "Host directory sizes" bash -c \
-        'du -xh --max-depth=3 --threshold=500M "$1" 2>/dev/null | sort -h | tail -n 60' _ "$host_root"
-fi

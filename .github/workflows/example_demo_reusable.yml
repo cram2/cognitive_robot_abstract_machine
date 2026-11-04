@@ -40,7 +40,7 @@ jobs:
         run: cognitive_robot_abstract_machine/scripts/free_runner_disk.sh
 
       - name: Show runner resources
-        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh --host-directory-sizes
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Install dependencies
         env:
