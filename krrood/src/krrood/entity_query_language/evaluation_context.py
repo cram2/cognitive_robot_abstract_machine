@@ -16,7 +16,9 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ordered_set import OrderedSet
-from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING, TypeVar
+from typing_extensions import Any, Callable, Hashable, Iterator, TYPE_CHECKING, TypeVar
+
+from krrood.class_diagrams.call_arguments import CallArguments
 
 from krrood.entity_query_language.ground_term import (
     CallTerm,
@@ -337,6 +339,32 @@ class PredicateTruth:
     """
 
 
+@dataclass(frozen=True)
+class CallAsPassed:
+    """
+    A call as its arguments were passed: two calls are equal when they pass equal
+    arguments in the same places, without binding them to the callee's signature.
+    """
+
+    callee: Hashable
+    """
+    What is called.
+    """
+
+    call_arguments: CallArguments
+    """
+    The arguments as they were passed.
+    """
+
+    @classmethod
+    def of(cls, term: CallTerm) -> CallAsPassed:
+        """
+        :param term: The call to identify.
+        :return: The call *term* makes, as its arguments were passed.
+        """
+        return cls(term.function, term.call_arguments)
+
+
 @dataclass
 class CallResults:
     """
@@ -348,9 +376,12 @@ class CallResults:
         calls it has already made.
     """
 
-    values: dict[CallTerm, tuple[Any, ...]] = field(default_factory=dict)
+    values: dict[CallAsPassed, tuple[Any, ...]] = field(default_factory=dict)
     """
     The values each call that is reused has read.
+
+    A call that passes its arguments another way, such as leaving out a default, is read
+    again.
     """
 
     truths: dict[int, PredicateTruth] = field(default_factory=dict)
@@ -368,11 +399,12 @@ class CallResults:
         """
         if not term.depends_only_on_arguments():
             return tuple(term_reader.values_of(term))
-        if term in self.values:
-            return self.values[term]
+        call = CallAsPassed.of(term)
+        if call in self.values:
+            return self.values[call]
         values = tuple(term_reader.values_of(term))
         if not any(isinstance(value, Iterator) for value in values):
-            self.values[term] = values
+            self.values[call] = values
         return values
 
     def truth_of(self, predicate: Predicate, read_truth: Callable[[], bool]) -> bool:
