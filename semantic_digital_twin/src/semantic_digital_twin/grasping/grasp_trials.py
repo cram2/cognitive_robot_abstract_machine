@@ -18,7 +18,6 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGrasp,
-    any_surface_grasp,
     draw_surface_grasps,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -87,10 +86,10 @@ class GraspTrials:
     Answers the statement.
     """
 
-    grasp_pattern: Callable[[], Match[SurfaceGrasp]] = any_surface_grasp
+    grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern
     """
     Builds the pattern of the grasps asked for, such as
-    :func:`~semantic_digital_twin.grasping.surface_grasp.lifting_surface_grasp`.
+    :meth:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp.lifting_pattern`.
     """
 
     @property

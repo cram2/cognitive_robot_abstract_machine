@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass, field
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Self
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a
@@ -147,6 +147,34 @@ class SurfaceGrasp:
         )
         return GraspCandidate(graspable, root_T_grasp.pose)
 
+    @classmethod
+    def any_pattern(cls, result: Match[GraspResult] | None = None) -> Match[Self]:
+        """
+        :param result: The result the grasp is asked to have had; any result when
+            ``None``.
+        :return: A pattern of a surface grasp with every parameter left free, for a
+            statement to narrow down with ``where``.
+        """
+        return a(cls)(
+            yaw=..., height=..., depth=..., pitch=..., roll=..., result=result
+        )
+
+    @classmethod
+    def lifting_pattern(cls) -> Match[Self]:
+        """
+        :return: A pattern of a surface grasp that lifted the object, with every other
+            parameter left free. Only a model learned over tried grasps and their
+            results can answer it.
+        """
+        return cls.any_pattern(
+            result=a(GraspResult)(
+                object_raised=True,
+                motion_completed=True,
+                object_displacement=_any_twist(),
+                slip=_any_twist(),
+            )
+        )
+
     def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
         """
         :param graspable: The object to take hold of.
@@ -186,33 +214,6 @@ class SurfaceGrasp:
 
 
 # %% stating where an object may be grasped
-
-
-def any_surface_grasp(result: Match[GraspResult] | None = None) -> Match[SurfaceGrasp]:
-    """
-    :param result: The result the grasp is asked to have had; any result when ``None``.
-    :return: A pattern of a surface grasp with every parameter left free, for a
-        statement to narrow down with ``where``.
-    """
-    return a(SurfaceGrasp)(
-        yaw=..., height=..., depth=..., pitch=..., roll=..., result=result
-    )
-
-
-def lifting_surface_grasp() -> Match[SurfaceGrasp]:
-    """
-    :return: A pattern of a surface grasp that lifted the object, with every other
-        parameter left free. Only a model learned over tried grasps and their results
-        can answer it.
-    """
-    return any_surface_grasp(
-        result=a(GraspResult)(
-            object_raised=True,
-            motion_completed=True,
-            object_displacement=_any_twist(),
-            slip=_any_twist(),
-        )
-    )
 
 
 def _any_twist() -> Match[Twist]:

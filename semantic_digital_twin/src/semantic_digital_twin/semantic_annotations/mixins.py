@@ -60,7 +60,6 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from semantic_digital_twin.grasping.surface_grasp import (
     SurfaceGrasp,
-    any_surface_grasp,
     draw_surface_grasps,
 )
 from semantic_digital_twin.reasoning.predicates import SupportedBy
@@ -425,31 +424,30 @@ class HasGraspCandidates(HasRootBody, Mixin):
     def grasp_candidates(
         self,
         model_registry: ModelRegistry | None = None,
-        grasp_pattern: Callable[[], Match[SurfaceGrasp]] | None = None,
+        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern,
     ) -> list[GraspCandidate]:
         """
         The grasps this annotation offers, in no particular order: those of its
         :meth:`grasped_part` when it is grasped at one of its parts; otherwise
-        :meth:`drawn_grasp_candidates`, or the :meth:`default_grasp_candidates` while
-        neither a model nor a grasp pattern is given.
+        :meth:`drawn_grasp_candidates`, or the :meth:`default_grasp_candidates` while no
+        model is given.
 
         :param model_registry: Answers the statement of where the object may be grasped.
-        :param grasp_pattern: Builds the pattern of the grasps asked for, such as
-            :func:`~semantic_digital_twin.grasping.surface_grasp.lifting_surface_grasp`.
+        :param grasp_pattern: Builds the pattern of the grasps asked of
+            ``model_registry``, such as
+            :meth:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp.lifting_pattern`.
         """
         part = self.grasped_part()
         if part is not self:
             return part.grasp_candidates(model_registry, grasp_pattern)
-        if model_registry is None and grasp_pattern is None:
+        if model_registry is None:
             return self.default_grasp_candidates()
-        return self.drawn_grasp_candidates(
-            model_registry, grasp_pattern or any_surface_grasp
-        )
+        return self.drawn_grasp_candidates(model_registry, grasp_pattern)
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
-        :return: The grasps offered while neither a model nor a grasp pattern is given:
-            the object at its own origin, approached from evenly spaced yaws about its
+        :return: The grasps offered while no model is given: the object at its own
+            origin, approached from evenly spaced yaws about its
             z-axis, which needs no knowledge of its shape.
         """
         return [
@@ -468,7 +466,7 @@ class HasGraspCandidates(HasRootBody, Mixin):
     def drawn_grasp_candidates(
         self,
         model_registry: ModelRegistry | None = None,
-        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = any_surface_grasp,
+        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern,
     ) -> list[GraspCandidate]:
         """
         :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
@@ -511,7 +509,8 @@ class HasGraspCandidates(HasRootBody, Mixin):
         return trimesh.util.concatenate(surfaces)
 
     def surface_grasp_statement(
-        self, grasp_pattern: Callable[[], Match[SurfaceGrasp]] = any_surface_grasp
+        self,
+        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern,
     ) -> Match[SurfaceGrasp]:
         """
         :param grasp_pattern: Builds the pattern of the grasps asked for.
@@ -534,7 +533,7 @@ class HasGraspCandidates(HasRootBody, Mixin):
 class HasSurfaceGraspsByDefault(HasGraspCandidates, Mixin):
     """
     A mixin class for semantic annotations whose shape is known well enough that, while
-    neither a model nor a grasp pattern is given, their grasps are drawn uniformly from
+    no model is given, their grasps are drawn uniformly from
     :meth:`surface_grasp_statement` instead of taken at their origin.
     """
 

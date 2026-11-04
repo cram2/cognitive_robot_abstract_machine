@@ -27,9 +27,7 @@ from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa:
 from semantic_digital_twin.grasping.surface_grasp import (
     GraspResult,
     SurfaceGrasp,
-    any_surface_grasp,
     draw_surface_grasps,
-    lifting_surface_grasp,
 )
 from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
@@ -154,7 +152,7 @@ def test_a_point_above_the_object_is_not_on_its_surface(carton):
 def test_drawn_grasps_lie_where_the_statement_allows():
     sides = (0.0, math.pi)
     tolerance = 0.2
-    grasp = any_surface_grasp()
+    grasp = SurfaceGrasp.any_pattern()
     grasp.where(
         grasp.height >= 0.4,
         grasp.height < 0.6,
@@ -293,7 +291,9 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
 
 def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_model):
     grasps = draw_surface_grasps(
-        carton.surface_grasp_statement(lifting_surface_grasp), 50, learned_carton_model
+        carton.surface_grasp_statement(SurfaceGrasp.lifting_pattern),
+        50,
+        learned_carton_model,
     )
 
     assert len(grasps) == 50
@@ -306,13 +306,15 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
 
 def test_a_uniform_prior_cannot_answer_for_lifting_grasps(carton):
     with pytest.raises(UnboundedParameterError):
-        draw_surface_grasps(carton.surface_grasp_statement(lifting_surface_grasp), 1)
+        draw_surface_grasps(
+            carton.surface_grasp_statement(SurfaceGrasp.lifting_pattern), 1
+        )
 
 
 def test_an_annotation_given_a_model_draws_its_grasps_from_it(
     carton, learned_carton_model
 ):
-    grasps = carton.grasp_candidates(learned_carton_model, lifting_surface_grasp)
+    grasps = carton.grasp_candidates(learned_carton_model, SurfaceGrasp.lifting_pattern)
     lowest, highest = carton.grasp_surface().bounds
     lifting_height = lowest[2] + LIFTING_HEIGHT * (highest[2] - lowest[2])
 
@@ -324,3 +326,11 @@ def test_an_annotation_given_a_model_draws_its_grasps_from_it(
 def test_an_annotation_without_a_model_keeps_its_default_grasps(carton):
     for grasp in carton.grasp_candidates():
         assert grasp.grasp_pose.to_np()[:3, 3] == pytest.approx([0.0, 0.0, 0.0])
+
+
+def test_an_annotation_asked_explicitly_for_any_grasp_offers_its_default_grasps(carton):
+    explicitly_asked = carton.grasp_candidates(grasp_pattern=SurfaceGrasp.any_pattern)
+
+    assert [grasp.grasp_pose.to_np().tolist() for grasp in explicitly_asked] == [
+        grasp.grasp_pose.to_np().tolist() for grasp in carton.grasp_candidates()
+    ]

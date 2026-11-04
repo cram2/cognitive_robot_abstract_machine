@@ -9,7 +9,6 @@ from random_events.interval import Interval
 from semantic_digital_twin.grasping.grasp_strategies import GraspStrategy
 from semantic_digital_twin.grasping.surface_grasp import (
     SurfaceGrasp,
-    any_surface_grasp,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
@@ -37,5 +36,5 @@ def statement_by(
     :param graspable: The object grasped.
     :return: The statement of where ``strategy`` allows ``graspable`` to be grasped.
     """
-    grasp = any_surface_grasp()
+    grasp = SurfaceGrasp.any_pattern()
     return grasp.where(*strategy.conditions(grasp, graspable))
