@@ -415,12 +415,23 @@ class Match(
         """
         Resolve the match by creating the variable and conditions expressions in-place.
 
+        A nested match given a domain requires the object it describes to be in that
+        domain.
+
         :param variable: An optional pre-existing variable to use for the match; if not
             provided, a new variable will be created.
         :param parent: The parent match if this is a nested match.
         """
         parent = parent or self
         self._update_fields_(variable, parent)
+        if variable is not None and self._domain_ is not None:
+            self._conditions_.append(
+                Comparator(
+                    _resolve_domain(self._type_, self._domain_),
+                    self._variable_,
+                    operator.contains,
+                )
+            )
         for attr_name, attr_assigned_value in self._kwargs_.items():
             if isinstance(attr_assigned_value, (list, tuple)) and any(
                 isinstance(element, AbstractMatchExpression)

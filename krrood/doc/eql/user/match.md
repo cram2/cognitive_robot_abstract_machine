@@ -129,6 +129,12 @@ collection describes the whole collection. A plain value that is neither raises
 - A variable whose values are whole collections is compared to the whole collection.
 - To ask about one position, index the attribute: `playlist.courses[0] == logic`.
 
+A nested pattern ranging over a domain is satisfied only by an object in that domain, on any attribute:
+`takes_course=a(Course)().from_(core_courses)` matches the students taking some course in `core_courses`, and
+`advisor=a(Person)().from_(deans)` the students whose advisor is one of `deans`. A variable with a domain is different:
+it stays free, so `takes_course=variable(Course, domain=core_courses)` gives one result for each student and each of
+their courses in `core_courses`, which `.distinct()` reduces to one per student.
+
 An attribute declared as an optional collection, such as `Optional[set[Course]]`, is matched the same way, and an absent
 collection (`None`) counts as empty: it contains no value and no element matches a pattern. `attr=None` still compares
 the attribute to `None`.

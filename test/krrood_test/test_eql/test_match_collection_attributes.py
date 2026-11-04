@@ -15,6 +15,7 @@ The pinned semantics:
   tuple, as sets otherwise), a list of patterns matches position by position with the
   same length, and a ``type[X]`` attribute keeps equality with the class.
 * A plain value of neither the element type nor a collection is refused.
+* A nested pattern ranging over a domain is satisfied only by an object in that domain.
 
 The domain classes have names no other test module uses: the class diagram resolves a
 string annotation such as ``set[Member]`` by class name, so a same-named class imported
@@ -100,6 +101,12 @@ class WeightedItem(Symbol):
 class ItemBasket(Symbol):
     items: list[WeightedItem] = field(default_factory=list)
     label: str = ""
+
+
+@dataclass(eq=False)
+class AdvisedStudent(Symbol):
+    name: str
+    advisor: CampusMember | None = None
 
 
 @dataclass(eq=False)
@@ -545,6 +552,69 @@ def test_integer_for_a_list_of_floats_means_membership():
     readings = [SensorReadings("hit", [1.0, 2.5]), SensorReadings("miss", [2.5])]
     matches = a(SensorReadings)(values=1).from_(readings).evaluate()
     assert plain_names_of(matches) == ["hit"]
+
+
+# %% A nested pattern's domain restricts the object it describes
+
+
+def test_nested_pattern_domain_restricts_the_element():
+    """
+    A nested pattern ranging over a domain is satisfied only by an element in it.
+    """
+    (_, _, databases), students = build_university()
+    pattern = a(CampusStudent)(takes_course=a(CampusCourse)().from_([databases]))
+    assert names_of(pattern.from_(students).evaluate()) == ["Carol"]
+
+
+def test_nested_pattern_domain_and_condition_must_both_hold():
+    """
+    An element must be in the nested pattern's domain and match its conditions.
+    """
+    (_, _, databases), students = build_university()
+    pattern = a(CampusStudent)(
+        takes_course=a(CampusCourse)(name="Logic").from_([databases])
+    )
+    assert list(pattern.from_(students).evaluate()) == []
+
+
+def test_nested_pattern_domain_yields_each_owner_once():
+    """
+    An owner with two elements in the domain still appears once.
+    """
+    (logic, ai, _), students = build_university()
+    pattern = a(CampusStudent)(takes_course=a(CampusCourse)().from_([logic, ai]))
+    assert names_of(pattern.from_(students).evaluate()) == ["Alice", "Bob", "Carol"]
+
+
+def test_nested_pattern_domain_in_a_list_of_patterns_restricts_its_position():
+    """
+    A pattern with a domain inside a list of patterns restricts the element at its
+    position.
+    """
+    logic, ai = CampusCourse("Logic"), CampusCourse("AI")
+    playlists = [
+        CoursePlaylist("forward", [logic, ai]),
+        CoursePlaylist("backward", [ai, logic]),
+    ]
+    pattern = a(CoursePlaylist)(
+        courses=[a(CampusCourse)().from_([ai]), a(CampusCourse)()]
+    )
+    assert plain_names_of(pattern.from_(playlists).evaluate()) == ["backward"]
+
+
+def test_nested_pattern_domain_restricts_a_single_valued_attribute():
+    """
+    On a single-valued attribute, the related object must be in the nested pattern's
+    domain; an absent one is not.
+    """
+    dean, lecturer = CampusMember("Dean"), CampusMember("Lecturer")
+    advisees = [
+        AdvisedStudent("by dean", advisor=dean),
+        AdvisedStudent("by lecturer", advisor=lecturer),
+        AdvisedStudent("unadvised"),
+    ]
+    pattern = a(AdvisedStudent)(advisor=a(CampusMember)().from_([dean]))
+    assert plain_names_of(pattern.from_(advisees).evaluate()) == ["by dean"]
 
 
 # %% Match used inside a larger query
