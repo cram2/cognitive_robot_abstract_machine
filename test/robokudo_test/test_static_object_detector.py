@@ -18,7 +18,7 @@ from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.annotation import BoundingBox3DAnnotation, PoseAnnotation
 from robokudo.types.camera import CameraObservation
 from robokudo.types.scene import ObjectHypothesis
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point2
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

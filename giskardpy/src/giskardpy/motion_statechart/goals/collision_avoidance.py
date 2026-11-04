@@ -46,7 +46,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     ExternalCollisionVariableManager,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% shared by self and external collision avoidance

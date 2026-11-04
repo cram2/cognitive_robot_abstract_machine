@@ -32,6 +32,7 @@ from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     JSONSerializableTypeRegistry,
 )
+from krrood.class_diagrams.leaf_kind import LeafKind
 from krrood.utils import get_full_class_name
 
 
@@ -194,6 +195,11 @@ class ClassWithTuple(DataclassJSONSerializer):
 @dataclass
 class ClassWithSortedSet(DataclassJSONSerializer):
     a: SortedSet
+
+
+@dataclass
+class ClassWithFrozenSet(DataclassJSONSerializer):
+    a: frozenset
 
 
 class CustomEnum(str, Enum):
@@ -541,6 +547,34 @@ def test_dataclass_sorted_set():
     result = from_json(data)
     assert result == cls
     assert isinstance(result.a, SortedSet)
+
+
+def test_dataclass_frozen_set():
+    cls = ClassWithFrozenSet(frozenset({1, 2, 3}))
+    data = to_json(cls)
+    assert data["a"][JSONField.COLLECTION_TYPE] == get_full_class_name(frozenset)
+    assert sorted(data["a"][JSONField.ITEMS]) == [1, 2, 3]
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, frozenset)
+
+
+# %% leaf kinds
+
+
+@pytest.mark.parametrize("leaf_class", LeafKind.JSON_SCALAR.value)
+def test_json_scalar_serializes_as_itself(leaf_class):
+    value = leaf_class()
+    assert to_json(value) is value
+    assert from_json(value) is value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [1, 1.5, "text", CustomEnum.A, datetime.datetime(2026, 1, 1), True, ...],
+)
+def test_orm_scalar_covers_single_column_values(value):
+    assert isinstance(value, LeafKind.ORM_SCALAR.value)
 
 
 # %% durations

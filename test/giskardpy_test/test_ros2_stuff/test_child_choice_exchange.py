@@ -8,6 +8,7 @@ from __future__ import annotations
 from cramph.data_types import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import pytest
 from typing_extensions import Any
@@ -47,6 +48,7 @@ from giskardpy.middleware.ros2.world_updates import (
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.world import World
 
+from .test_client_presence import SteppingClock
 from .test_motion_server import PublicationProgressMimic
 from .test_world_updates import PublishingSynchronizerMimic
 
@@ -576,7 +578,7 @@ def test_the_client_does_not_wait_for_changes_published_before_the_goal(
 def test_a_client_whose_world_does_not_catch_up_reports_it(
     exchange: ClientAndRunningStatechart,
 ) -> None:
-    exchange.client_world_updates.timeout = 0.0
+    exchange.client_world_updates.timeout = timedelta(0)
     exchange.running_side_publications.publish_one_update()
 
     with pytest.raises(GiskardWorldUpdateNotReceivedError) as raised:
@@ -585,6 +587,60 @@ def test_a_client_whose_world_does_not_catch_up_reports_it(
     assert raised.value.awaited_sequence_number == (
         exchange.running_side_publications.published_sequence_number
     )
+
+
+def test_a_client_catching_up_just_behind_the_running_side_keeps_waiting(
+    exchange: ClientAndRunningStatechart,
+) -> None:
+    """
+    The running side keeps publishing while the client catches up, so each feedback can
+    name a change the client has not applied yet although none of them is lost.
+    """
+    clock = SteppingClock()
+    exchange.client_world_updates.clock = clock
+    for _ in range(3):
+        exchange.running_side_publications.publish_one_update()
+        assert exchange.let_the_client_answer() == []
+        exchange.let_the_client_catch_up()
+        clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+
+    [answer] = exchange.let_the_client_answer()
+
+    assert answer.node_index == exchange.copy.starting_first.index
+
+
+def test_a_change_that_never_reaches_the_client_is_reported_while_later_ones_follow(
+    exchange: ClientAndRunningStatechart,
+) -> None:
+    clock = SteppingClock()
+    exchange.client_world_updates.clock = clock
+    exchange.running_side_publications.publish_one_update()
+    lost_change = exchange.running_side_publications.published_sequence_number
+    exchange.let_the_client_answer()
+    clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+    exchange.running_side_publications.publish_one_update()
+    exchange.let_the_client_answer()
+    clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+    exchange.running_side_publications.publish_one_update()
+
+    with pytest.raises(GiskardWorldUpdateNotReceivedError) as raised:
+        exchange.let_the_client_answer()
+
+    assert raised.value.awaited_sequence_number == lost_change
+
+
+def test_the_client_does_not_wait_for_changes_while_it_has_nothing_to_answer(
+    exchange: ClientAndRunningStatechart,
+) -> None:
+    """
+    Only a choice reads the client's world, so a feedback repeating a request that was
+    already answered does not need it to be up to date.
+    """
+    exchange.let_the_client_answer()
+    exchange.client_world_updates.timeout = timedelta(0)
+    exchange.running_side_publications.publish_one_update()
+
+    assert exchange.let_the_client_answer() == []
 
 
 # %% a node waiting for a child is asked about again

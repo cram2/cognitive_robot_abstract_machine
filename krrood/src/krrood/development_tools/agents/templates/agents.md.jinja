@@ -5,7 +5,8 @@
 {% if section | list %}
 <!-- from {{ section.__qualname__ }} in {{ section.source_path }} -->
 {% for rule in section %}
-- {{ rule.statement }}
+- {{ rule.statement }}{% if rule.checker %} (checked by `{{ check_command }}`){% endif %}
+
 {% for detail in rule.details %}
   - {{ detail }}
 {% endfor %}

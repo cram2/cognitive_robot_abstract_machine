@@ -30,8 +30,8 @@ from robokudo.utils.annotator_helper import (
     resize_mask,
     generate_source_name,
 )
-from semantic_digital_twin.spatial_types import Point2
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

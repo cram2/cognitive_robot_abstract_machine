@@ -23,7 +23,7 @@ from typing_extensions import (
 from uuid import UUID
 
 import numpy as np
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
@@ -91,13 +91,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Agent,
     Table,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -184,7 +184,7 @@ class HasRobotParts(ABC):
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for robot_part in value:
                     if not isinstance(robot_part, HasRobotParts):
                         continue
@@ -208,7 +208,7 @@ class HasRobotParts(ABC):
             origin = get_origin(field_type)
             args = get_args(field_type)
 
-            if origin in list_like_classes and args:
+            if origin in CollectionKind.ELEMENT_SEQUENCE.value and args:
                 self._initialize_list_field(field_name, args)
 
             elif (

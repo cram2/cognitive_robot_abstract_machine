@@ -29,13 +29,13 @@ from semantic_digital_twin.robots.robot_parts import (
     RobotCamera,
     Sensor,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+    from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 # %% Camera annotations
 

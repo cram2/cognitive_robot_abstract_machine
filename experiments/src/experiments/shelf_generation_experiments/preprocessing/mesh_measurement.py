@@ -6,7 +6,7 @@ from pathlib import Path
 
 import trimesh
 
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point2
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 

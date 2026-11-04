@@ -70,8 +70,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Milk,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
 )

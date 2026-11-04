@@ -44,6 +44,7 @@ from giskardpy.motion_statechart.tasks.pointing import (
     PointingCone,
 )
 from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
     ScrewConnectionSpecification,
 )
@@ -51,11 +52,12 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
+    Drawer,
     Bottle,
     BottleCap,
 )
 from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
@@ -63,6 +65,7 @@ from semantic_digital_twin.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -1097,6 +1100,81 @@ class TestArticulateGraspedMechanism:
 
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+    def test_a_drawer_faster_than_the_arm_stays_with_the_gripper(self, pr2_world_copy):
+        """
+        A drawer that may move faster than the arm, with no acceleration or jerk limit,
+        moves only as fast as the gripper holding it.
+        """
+        world = pr2_world_copy
+        open_position = 0.4
+        world_T_drawer = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1.5, z=1, yaw=np.pi, reference_frame=world.root
+        )
+        with world.modify_world():
+            drawer = Drawer.create_with_new_body_in_world(
+                name="drawer",
+                world=world,
+                world_root_T_self=world_T_drawer,
+                parent_connection_specification=PrismaticConnectionSpecification(
+                    axis=Vector3.X(),
+                    dof_limits=DegreeOfFreedomLimits(
+                        lower=DerivativeMap(position=0.0, velocity=-10.0),
+                        upper=DerivativeMap(position=open_position, velocity=10.0),
+                    ),
+                ),
+            )
+            handle = Handle.create_with_new_body_in_world(
+                name="handle", world=world, world_root_T_self=world_T_drawer
+            )
+            drawer.add(handle)
+        tip = world.get_body_by_name("r_gripper_tool_frame")
+
+        executor = StatechartExecutor(
+            context=StatechartContext(world=world),
+            extensions=[MotionControl()],
+        )
+        statechart = Statechart(context=executor.context)
+        statechart.add_node(
+            Sequence(
+                nodes=[
+                    CartesianPose(
+                        root_link=world.root,
+                        tip_link=tip,
+                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            yaw=np.pi, reference_frame=handle.root
+                        ),
+                    ),
+                    opening := ArticulateGraspedMechanism(
+                        tip_link=tip,
+                        environment_link=handle.root,
+                        goal_joint_state=open_position,
+                    ),
+                ]
+            )
+        )
+        statechart.add_node(EndMotion.when_true(statechart.nodes[0]))
+        executor.compile(statechart=statechart)
+
+        handle_P_tip_when_grasped = None
+        largest_drift = 0.0
+        for _ in range(1_000):
+            executor.tick()
+            if executor.statechart.is_ended():
+                break
+            if opening.life_cycle_state != LifeCycleValues.RUNNING:
+                continue
+            handle_P_tip = world.compute_forward_kinematics_np(handle.root, tip)[:3, 3]
+            if handle_P_tip_when_grasped is None:
+                handle_P_tip_when_grasped = handle_P_tip
+            largest_drift = max(
+                largest_drift,
+                float(np.linalg.norm(handle_P_tip - handle_P_tip_when_grasped)),
+            )
+
+        [hold] = [node for node in opening.nodes if isinstance(node, CartesianPose)]
+        assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert largest_drift <= hold.translation_threshold
 
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03
