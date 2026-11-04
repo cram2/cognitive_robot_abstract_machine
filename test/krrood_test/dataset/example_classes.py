@@ -69,6 +69,11 @@ class KRROODBarePositionTypeWrapper(Symbol):
     position_type: type
 
 
+@dataclass
+class KRROODPositionTypesWrapper(Symbol):
+    position_types: List[Type[KRROODPosition]]
+
+
 # check that flat classes work
 @dataclass(unsafe_hash=True)
 class KRROODPosition(Symbol):
@@ -465,7 +470,6 @@ class ParentBaseMapping(AlternativeMapping[ParentBase]):
 
 @dataclass(eq=False)
 class ChildBaseMapping(ParentBaseMapping, AlternativeMapping[ChildBase]):
-
     @classmethod
     def from_domain_object(cls, obj: T):
         if not isinstance(obj, ChildMapped):

@@ -31,7 +31,7 @@ from typing_extensions import (
 )
 from typing_extensions import List
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.caching import memoize, clear_memoization_cache
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
@@ -1055,7 +1055,7 @@ class World(HasSimulatorProperties):
         for field_ in introspector.discover(semantic_annotation.__class__):
             value = getattr(semantic_annotation, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for value_ in value:
                     if not isinstance(value_, SemanticAnnotation):
                         continue

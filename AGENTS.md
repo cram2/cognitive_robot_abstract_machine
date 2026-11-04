@@ -90,15 +90,17 @@
 
 # Documentation
 <!-- from DocumentationRules in krrood/development_tools/agents/shipped_rules/documentation.py -->
-- Every class and method has meaningful, non-trivial documentation in reStructuredText. Every field has its own docstring directly below it, not a description in the class docstring
-- An override that keeps its base contract has no docstring and inherits the base one. One that changes the contract documents only the difference and references the overridden method with `:meth:`
+- Every module, class, function and field has a docstring. A field's docstring goes directly below the field, not in the class docstring. A method implementing an abstract method is exempt: the abstract method's docstring is enough (checked by `krrood check`)
+- Documentation is written in reStructuredText and is meaningful and non-trivial: it says something the name and the type hints do not
+- An implementation of an abstract method has no docstring and inherits the base one. An override of an implemented method documents only what differs from the base and references the overridden method with `:meth:`
 - A docstring states what the code does and its contract, short and to the point. It never contains:
   - how the code does it
   - the ways a caller can supply a value (for example, that it may also be given as a query instead of a concrete object)
   - the current callers or consumers ("used by X and Y") - that goes stale and reads as exhaustive
   - justification of design decisions, comparison with rejected or hypothetical designs, or review and implementation history
   - type information - the type hints carry it
-- Keep docstrings and comments short and never write walls of text. Comments are meaningful and DRY; remove comments that restate the code
+- A docstring holds at most 4 lines of prose, field lists and literal blocks aside, and a comment block at most 3 lines (checked by `krrood check`)
+- Comments are meaningful and DRY; remove comments that restate the code
 - Reference code with Sphinx roles (`:func:`, `:class:`, `:attr:`, `:meth:`), never with plain backticks, and use directives such as `.. note::` and `.. warning::` for notes and warnings
 - Never use all-caps words for emphasis in docstrings or comments; use RST emphasis (`*word*`). Genuine identifiers, acronyms and enum/constant names (`UUID`, `WHERE`, `Definiteness.DEFINITE`) are exempt
 - Always format modified Python files with ruff followed by docformatter, through the repository's pre-commit hook
@@ -117,6 +119,10 @@
 <!-- from RuleApplicationRules in krrood/development_tools/agents/shipped_rules/rule_application.py -->
 - Existing code that breaks these rules stays as it is unless a change touches it or the user asks for the cleanup. When you modify a function or class, bring that function or class in line with these rules as part of the change, and leave code the change does not otherwise modify alone. If the cleanup renames a method and so changes the API, ask the user first
 - When a rule seems wrong for the case at hand - a failing test that is itself wrong, an exception that has to be caught, a value that genuinely has to live at module level - ask the user before departing from it; never decide the exception on your own
+
+# Rule modelling
+<!-- from RuleModellingRules in krrood/development_tools/agents/shipped_rules/rule_application.py -->
+- When a script can check part of a rule, split the rule: the checkable part becomes a rule of its own that carries its checker, and the part only a person can judge stays a rule without one
 
 # Testing
 

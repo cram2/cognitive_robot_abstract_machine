@@ -23,7 +23,7 @@ from typing_extensions import (
 from uuid import UUID
 
 import numpy as np
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import (
     DataclassOnlyIntrospector,
 )
@@ -184,7 +184,7 @@ class HasRobotParts(ABC):
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for robot_part in value:
                     if not isinstance(robot_part, HasRobotParts):
                         continue
@@ -208,7 +208,7 @@ class HasRobotParts(ABC):
             origin = get_origin(field_type)
             args = get_args(field_type)
 
-            if origin in list_like_classes and args:
+            if origin in CollectionKind.ELEMENT_SEQUENCE.value and args:
                 self._initialize_list_field(field_name, args)
 
             elif (

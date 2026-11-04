@@ -52,6 +52,7 @@ dependencies = [
     "qt-material",
     "superqt",
     "krrood>=26.10.0",
+    "causal-learn",
 ]
 
 [project.urls]
