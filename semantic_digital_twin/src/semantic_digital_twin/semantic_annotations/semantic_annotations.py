@@ -46,7 +46,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasShelfLayers,
     HasGraspCandidates,
     HasRim,
-    HasSurfaceGraspsByDefault,
+    HasDrawnGraspsByDefault,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
@@ -1034,7 +1034,7 @@ class Plate(HasSupportingSurface, Tableware):
 
 
 @dataclass(eq=False)
-class Rim(HasSurfaceGraspsByDefault):
+class Rim(HasDrawnGraspsByDefault):
     """
     The upper edge of an open container's wall, which a gripper pinches from above.
     """

@@ -58,10 +58,7 @@ from semantic_digital_twin.grasping.grasp_strategies import (
     GraspStrategy,
     PinchTheTopOfAWall,
 )
-from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGrasp,
-    draw_surface_grasps,
-)
+from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
@@ -96,6 +93,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
     from semantic_digital_twin.world import World
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Drawer,
@@ -405,8 +403,8 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
 @dataclass(eq=False)
 class HasGraspCandidates(HasRootBody, Mixin):
     """
-    A mixin class for semantic annotations that state where they may be grasped, in
-    :meth:`surface_grasp_statement`, and offer grasp candidates.
+    A mixin class for semantic annotations that state where they may be grasped, by
+    their :attr:`grasp_strategy`, and offer grasp candidates.
     """
 
     grasp_candidate_count: int = field(default=12, kw_only=True)
@@ -417,14 +415,14 @@ class HasGraspCandidates(HasRootBody, Mixin):
     @classproperty
     def grasp_strategy(cls) -> GraspStrategy:
         """
-        :return: Where on its surface the annotation may be grasped.
+        :return: Where the annotation may be grasped.
         """
         return GraspFromAnySide()
 
     def grasp_candidates(
         self,
         model_registry: ModelRegistry | None = None,
-        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> list[GraspCandidate]:
         """
         The grasps this annotation offers, in no particular order: those of its
@@ -433,16 +431,17 @@ class HasGraspCandidates(HasRootBody, Mixin):
         model is given.
 
         :param model_registry: Answers the statement of where the object may be grasped.
-        :param grasp_pattern: Builds the pattern of the grasps asked of
-            ``model_registry``, such as
-            :meth:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp.lifting_pattern`.
+        :param result_pattern: Builds the pattern of the result the grasps asked of
+            ``model_registry`` are to have had, such as
+            :meth:`~semantic_digital_twin.grasping.object_relative_grasp.GraspResult.lifting_pattern`;
+            any result when ``None``.
         """
         part = self.grasped_part()
         if part is not self:
-            return part.grasp_candidates(model_registry, grasp_pattern)
+            return part.grasp_candidates(model_registry, result_pattern)
         if model_registry is None:
             return self.default_grasp_candidates()
-        return self.drawn_grasp_candidates(model_registry, grasp_pattern)
+        return self.drawn_grasp_candidates(model_registry, result_pattern)
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
@@ -466,29 +465,26 @@ class HasGraspCandidates(HasRootBody, Mixin):
     def drawn_grasp_candidates(
         self,
         model_registry: ModelRegistry | None = None,
-        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> list[GraspCandidate]:
         """
-        :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
-            uniformly from what it allows.
-        :param grasp_pattern: Builds the pattern of the grasps asked for.
-        :return: Grasps drawn from :meth:`surface_grasp_statement` that reach the
-            object's surface, at most :attr:`grasp_candidate_count` of them.
+        :param model_registry: Answers the statement of :attr:`grasp_strategy`;
+            ``None`` draws uniformly from what it allows.
+        :param result_pattern: Builds the pattern of the result the grasps are to have
+            had; any result when ``None``.
+        :return: Grasps drawn from the statement of :attr:`grasp_strategy` that lie on
+            the object, at most :attr:`grasp_candidate_count` of them.
         """
-        grasps = draw_surface_grasps(
-            self.surface_grasp_statement(grasp_pattern),
+        grasps = draw_grasps(
+            self.grasp_strategy.statement(self, result_pattern),
             self.grasp_candidate_count,
             model_registry,
         )
-        return [
-            grasp.grasp_candidate(self)
-            for grasp in grasps
-            if grasp.reaches_surface_of(self)
-        ]
+        return [grasp.grasp_candidate(self) for grasp in grasps if grasp.lies_on(self)]
 
     def grasp_surface(self) -> trimesh.Trimesh:
         """
-        :return: The surface that surface grasps are placed on, in the root body's frame:
+        :return: The surface that grasps are placed on, in the root body's frame:
             that of every body the annotation references, its parts included, each as
             what it looks like, or else what it collides as.
         :raises NoGraspGeometry: If none of the bodies has either.
@@ -508,19 +504,6 @@ class HasGraspCandidates(HasRootBody, Mixin):
             raise NoGraspGeometry(self)
         return trimesh.util.concatenate(surfaces)
 
-    def surface_grasp_statement(
-        self,
-        grasp_pattern: Callable[[], Match[SurfaceGrasp]] = SurfaceGrasp.any_pattern,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param grasp_pattern: Builds the pattern of the grasps asked for.
-        :return: The pattern narrowed to where :attr:`grasp_strategy` allows the
-            annotation to be grasped.
-        :raises NoGraspGeometry: If the annotation has no shape to measure.
-        """
-        grasp = grasp_pattern()
-        return grasp.where(*self.grasp_strategy.conditions(grasp, self))
-
     def grasped_part(self) -> HasGraspCandidates:
         """
         :return: The annotation whose surface the object is grasped at; the object
@@ -530,16 +513,16 @@ class HasGraspCandidates(HasRootBody, Mixin):
 
 
 @dataclass(eq=False)
-class HasSurfaceGraspsByDefault(HasGraspCandidates, Mixin):
+class HasDrawnGraspsByDefault(HasGraspCandidates, Mixin):
     """
     A mixin class for semantic annotations whose shape is known well enough that, while
-    no model is given, their grasps are drawn uniformly from
-    :meth:`surface_grasp_statement` instead of taken at their origin.
+    no model is given, their grasps are drawn uniformly from where their
+    :attr:`grasp_strategy` allows instead of taken at their origin.
     """
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        :return: Grasps drawn uniformly from where :attr:`grasp_strategy` allows.
         """
         return self.drawn_grasp_candidates()
 
@@ -850,7 +833,7 @@ class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
 
 
 @dataclass(eq=False)
-class HasRim(HasSurfaceGraspsByDefault, PartWholeRelationship, Mixin):
+class HasRim(HasDrawnGraspsByDefault, PartWholeRelationship, Mixin):
     """
     A mixin class for open containers that have a rim, and are grasped at it when they
     have one.

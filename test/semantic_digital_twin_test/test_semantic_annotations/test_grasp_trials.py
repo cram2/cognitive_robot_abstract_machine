@@ -11,7 +11,7 @@ import trimesh
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_trials import GraspPerformer, GraspTrials
-from semantic_digital_twin.grasping.surface_grasp import GraspResult, SurfaceGrasp
+from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
@@ -114,7 +114,7 @@ def test_drawn_grasps_lie_where_the_annotation_states(carton):
     trials = GraspTrials(
         graspable=carton, performer=RecordingPerformer(), number_of_trials=30
     )
-    allowed = allowed_intervals(carton.surface_grasp_statement())
+    allowed = allowed_intervals(carton.grasp_strategy.statement(carton))
 
     grasps = trials.drawn_grasps()
 
@@ -162,7 +162,7 @@ def test_trials_can_ask_only_for_lifting_grasps(carton):
         graspable=carton,
         performer=RecordingPerformer(),
         number_of_trials=1,
-        grasp_pattern=SurfaceGrasp.lifting_pattern,
+        result_pattern=GraspResult.lifting_pattern,
     )
 
     with pytest.raises(UnboundedParameterError):

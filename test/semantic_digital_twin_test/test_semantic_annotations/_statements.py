@@ -6,16 +6,10 @@ from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.interval import Interval
 
-from semantic_digital_twin.grasping.grasp_strategies import GraspStrategy
-from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGrasp,
-)
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-
 
 def allowed_intervals(statement: Match) -> dict[str, Interval]:
     """
-    :param statement: A statement over a surface grasp.
+    :param statement: A statement over a grasp.
     :return: For each of the grasp's parameters, by name, the smallest interval holding
         every value the statement allows it.
     """
@@ -26,15 +20,3 @@ def allowed_intervals(statement: Match) -> dict[str, Interval]:
         variable.name.rsplit(".", 1)[-1]: allowed[variable]
         for variable in allowed.variables
     }
-
-
-def statement_by(
-    strategy: GraspStrategy, graspable: HasGraspCandidates
-) -> Match[SurfaceGrasp]:
-    """
-    :param strategy: The strategy to grasp by.
-    :param graspable: The object grasped.
-    :return: The statement of where ``strategy`` allows ``graspable`` to be grasped.
-    """
-    grasp = SurfaceGrasp.any_pattern()
-    return grasp.where(*strategy.conditions(grasp, graspable))

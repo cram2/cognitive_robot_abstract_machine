@@ -22,16 +22,16 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, and_, or_
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
+from semantic_digital_twin.exceptions import GraspNotOnObjectError
 from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
-from semantic_digital_twin.grasping.surface_grasp import (
+from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
-    SurfaceGrasp,
-    draw_surface_grasps,
+    draw_grasps,
 )
+from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from ._statements import allowed_intervals, statement_by
+from ._statements import allowed_intervals
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
@@ -141,8 +141,8 @@ def test_a_rolled_grasp_closes_along_a_turned_direction(carton):
 def test_a_point_above_the_object_is_not_on_its_surface(carton):
     above = SurfaceGrasp(yaw=0.0, height=1.5, depth=0.0, pitch=0.0, roll=0.0)
 
-    assert not above.reaches_surface_of(carton)
-    with pytest.raises(SurfaceGraspNotOnSurfaceError):
+    assert not above.lies_on(carton)
+    with pytest.raises(GraspNotOnObjectError):
         above.grasp_candidate(carton)
 
 
@@ -171,7 +171,7 @@ def test_drawn_grasps_lie_where_the_statement_allows():
     )
     number_of_grasps = 60
 
-    grasps = draw_surface_grasps(grasp, number_of_grasps)
+    grasps = draw_grasps(grasp, number_of_grasps)
 
     assert len(grasps) == number_of_grasps
     nearest_side = [
@@ -185,7 +185,7 @@ def test_drawn_grasps_lie_where_the_statement_allows():
 
 
 def test_drawing_no_grasps_draws_none(carton):
-    assert draw_surface_grasps(carton.surface_grasp_statement(), 0) == []
+    assert draw_grasps(carton.grasp_strategy.statement(carton), 0) == []
 
 
 def test_every_parameter_of_a_surface_grasp_needs_bounds():
@@ -203,7 +203,7 @@ def test_every_parameter_of_a_surface_grasp_needs_bounds():
 
 
 def test_a_carton_is_grasped_up_to_half_its_narrower_side_deep(carton):
-    allowed = allowed_intervals(carton.surface_grasp_statement())
+    allowed = allowed_intervals(carton.grasp_strategy.statement(carton))
 
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
         min(CARTON_EXTENTS[:2]) / 2
@@ -218,7 +218,7 @@ def test_a_grasp_from_any_side_lies_within_the_bounds_asked(carton):
         pitch=Bounds(0.1, 0.3),
         roll=Bounds(-0.2, 0.1),
     )
-    allowed = allowed_intervals(statement_by(strategy, carton))
+    allowed = allowed_intervals(strategy.statement(carton))
     narrower_extent = min(CARTON_EXTENTS[:2])
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(
@@ -272,7 +272,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
     :return: A model learned from synthetic trials on the carton, in which the grasps
         above :data:`LIFTING_HEIGHT` lift it and the others do not.
     """
-    grasps = draw_surface_grasps(carton.surface_grasp_statement(), 300)
+    grasps = draw_grasps(carton.grasp_strategy.statement(carton), 300)
     rng = np.random.default_rng(0)
     for grasp in grasps:
         raised = grasp.height > LIFTING_HEIGHT
@@ -290,8 +290,8 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
 
 
 def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_model):
-    grasps = draw_surface_grasps(
-        carton.surface_grasp_statement(SurfaceGrasp.lifting_pattern),
+    grasps = draw_grasps(
+        carton.grasp_strategy.statement(carton, GraspResult.lifting_pattern),
         50,
         learned_carton_model,
     )
@@ -306,15 +306,15 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
 
 def test_a_uniform_prior_cannot_answer_for_lifting_grasps(carton):
     with pytest.raises(UnboundedParameterError):
-        draw_surface_grasps(
-            carton.surface_grasp_statement(SurfaceGrasp.lifting_pattern), 1
+        draw_grasps(
+            carton.grasp_strategy.statement(carton, GraspResult.lifting_pattern), 1
         )
 
 
 def test_an_annotation_given_a_model_draws_its_grasps_from_it(
     carton, learned_carton_model
 ):
-    grasps = carton.grasp_candidates(learned_carton_model, SurfaceGrasp.lifting_pattern)
+    grasps = carton.grasp_candidates(learned_carton_model, GraspResult.lifting_pattern)
     lowest, highest = carton.grasp_surface().bounds
     lifting_height = lowest[2] + LIFTING_HEIGHT * (highest[2] - lowest[2])
 
@@ -328,9 +328,13 @@ def test_an_annotation_without_a_model_keeps_its_default_grasps(carton):
         assert grasp.grasp_pose.to_np()[:3, 3] == pytest.approx([0.0, 0.0, 0.0])
 
 
-def test_an_annotation_asked_explicitly_for_any_grasp_offers_its_default_grasps(carton):
-    explicitly_asked = carton.grasp_candidates(grasp_pattern=SurfaceGrasp.any_pattern)
+def test_an_annotation_without_a_model_offers_its_default_grasps_whatever_is_asked(
+    carton,
+):
+    asked_for_lifting = carton.grasp_candidates(
+        result_pattern=GraspResult.lifting_pattern
+    )
 
-    assert [grasp.grasp_pose.to_np().tolist() for grasp in explicitly_asked] == [
-        grasp.grasp_pose.to_np().tolist() for grasp in carton.grasp_candidates()
+    assert [grasp.grasp_pose.to_np().tolist() for grasp in asked_for_lifting] == [
+        grasp.grasp_pose.to_np().tolist() for grasp in carton.default_grasp_candidates()
     ]

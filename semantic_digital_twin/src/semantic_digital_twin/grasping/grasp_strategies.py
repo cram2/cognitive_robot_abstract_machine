@@ -1,6 +1,6 @@
 """
-Where on its surface an object of a kind of shape may be grasped, reusable by every
-annotation of that shape.
+Where an object of a kind of shape may be grasped, reusable by every annotation of that
+shape.
 """
 
 from __future__ import annotations
@@ -11,25 +11,68 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Callable, Generic, TypeVar
 
 from krrood.bounds import Bounds
-from krrood.entity_query_language.factories import ConditionType, and_, or_
+from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.query.match import Match
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.exceptions import NoGraspGeometry
+from semantic_digital_twin.grasping.axial_grasp import AxialGrasp
+from semantic_digital_twin.grasping.object_relative_grasp import ObjectRelativeGrasp
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 # %% the strategy
 
+GraspT = TypeVar("GraspT", bound=ObjectRelativeGrasp)
+
 
 @dataclass
-class GraspStrategy(ABC):
+class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
     """
-    Where on its surface an object may be grasped, as conditions on a
-    :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`.
+    Where an object may be grasped, as conditions on one kind of
+    :class:`~semantic_digital_twin.grasping.object_relative_grasp.ObjectRelativeGrasp`.
+    """
+
+    def statement(
+        self,
+        graspable: HasGraspCandidates,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
+    ) -> Match[GraspT]:
+        """
+        :param graspable: The object grasped.
+        :param result_pattern: Builds the pattern of the result the grasps are to have
+            had, such as :meth:`GraspResult.lifting_pattern`; any result when ``None``.
+        :return: The statement of where this strategy allows the object to be grasped.
+        :raises NoGraspGeometry: If the object has no shape to measure.
+        """
+        grasp_type = self.get_type_of_generic_parameter(GraspT)
+        grasp = grasp_type.any_pattern(result_pattern() if result_pattern else None)
+        return grasp.where(*self.conditions(grasp, graspable))
+
+    @abstractmethod
+    def conditions(
+        self, grasp: Match[GraspT], graspable: HasGraspCandidates
+    ) -> list[ConditionType]:
+        """
+        :param grasp: The grasp of a statement.
+        :param graspable: The object grasped.
+        :return: The conditions every grasp of this strategy must satisfy.
+        :raises NoGraspGeometry: If the object has no shape to measure.
+        """
+
+
+# %% grasping an object on its surface
+
+
+@dataclass
+class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
+    """
+    Where on its surface an object may be grasped.
     """
 
     depth: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 0.5))
@@ -40,8 +83,7 @@ class GraspStrategy(ABC):
 
     yaw: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 2 * math.pi))
     """
-    The yaws to approach from, in radians off each of :meth:`central_yaws`, the upper
-    one excluded.
+    The yaws to approach from, in radians, the upper one excluded.
     """
 
     pitch: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 1.2))
@@ -59,12 +101,6 @@ class GraspStrategy(ABC):
     def conditions(
         self, grasp: Match[SurfaceGrasp], graspable: HasGraspCandidates
     ) -> list[ConditionType]:
-        """
-        :param grasp: The grasp of a statement.
-        :param graspable: The object grasped.
-        :return: The conditions every grasp of this strategy must satisfy.
-        :raises NoGraspGeometry: If the object has no shape to measure.
-        """
         surface = graspable.grasp_surface()
         heights = self.grasped_heights(surface)
         depth_unit = self.depth_unit(graspable, surface)
@@ -73,15 +109,8 @@ class GraspStrategy(ABC):
             grasp.height < heights.upper,
             grasp.depth >= self.depth.lower * depth_unit,
             grasp.depth < self.depth.upper * depth_unit,
-            or_(
-                *(
-                    and_(
-                        grasp.yaw >= central_yaw + self.yaw.lower,
-                        grasp.yaw < central_yaw + self.yaw.upper,
-                    )
-                    for central_yaw in self.central_yaws(surface)
-                )
-            ),
+            grasp.yaw >= self.yaw.lower,
+            grasp.yaw < self.yaw.upper,
             grasp.pitch >= self.pitch.lower,
             grasp.pitch < self.pitch.upper,
             grasp.roll >= self.roll.lower,
@@ -107,16 +136,9 @@ class GraspStrategy(ABC):
         :raises NoGraspGeometry: If the object has no shape to measure it on.
         """
 
-    def central_yaws(self, surface: trimesh.Trimesh) -> list[float]:
-        """
-        :param surface: The object's grasp surface, in its root body's frame.
-        :return: The yaws :attr:`yaw` is measured from, in radians.
-        """
-        return [0.0]
-
 
 @dataclass
-class GraspBetweenHeights(GraspStrategy, ABC):
+class GraspBetweenHeights(SurfaceGraspStrategy, ABC):
     """
     A strategy that grasps an object between two fixed heights.
     """
@@ -129,9 +151,6 @@ class GraspBetweenHeights(GraspStrategy, ABC):
 
     def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
         return self.height
-
-
-# %% grasping a solid object
 
 
 @dataclass
@@ -150,66 +169,66 @@ class GraspFromAnySide(GraspBetweenHeights):
         return float(min(surface.extents[:2]))
 
 
-@dataclass
-class GraspABar(GraspFromAnySide):
-    """
-    Grasp a thin, elongated part, such as a handle, from any side, closing on it up to
-    half its thickness deep.
-    """
-
-    height: Bounds[float] = field(default_factory=lambda: Bounds(0.1, 0.9))
-
-    def depth_unit(
-        self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
-    ) -> float:
-        """
-        :return: The thinnest extent of the grasp surface.
-        """
-        return float(min(surface.extents))
+# %% grasping an elongated object around its axis
 
 
 @dataclass
-class GraspAcrossTheLength(GraspBetweenHeights):
+class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
     """
-    Grasp a flat, elongated object lying on its side, such as cutlery, seen along its
-    length from either end and closing across it.
+    Where along its axis, and from which side around it, an elongated object may be
+    grasped.
     """
 
-    height: Bounds[float] = field(default_factory=lambda: Bounds(0.2, 0.8))
+    position: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 1.0))
+    """
+    Where along the axis to close the gripper, as fractions of the axis from its lower
+    end to its upper end, both included.
+    """
 
-    depth: Bounds[float] = field(default_factory=lambda: Bounds(0.2, 0.6))
+    angle: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 2 * math.pi))
+    """
+    How far the approach may be turned about the axis, in radians, both included; equal
+    bounds fix the side the object is approached from.
+    """
 
-    yaw: Bounds[float] = field(
-        default_factory=lambda: Bounds(-math.pi / 16, math.pi / 16)
-    )
+    def conditions(
+        self, grasp: Match[AxialGrasp], graspable: HasGraspCandidates
+    ) -> list[ConditionType]:
+        return [
+            grasp.position >= self.position.lower,
+            grasp.position <= self.position.upper,
+            grasp.angle >= self.angle.lower,
+            grasp.angle <= self.angle.upper,
+        ]
 
-    pitch: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 0.6))
 
-    roll: Bounds[float] = field(
-        default_factory=lambda: Bounds(3 * math.pi / 8, 5 * math.pi / 8)
-    )
+@dataclass
+class GraspABar(AxialGraspStrategy):
+    """
+    Grasp a thin, elongated part, such as a handle, around its bar, from any side and
+    away from the ends of the bar.
+    """
 
-    def depth_unit(
-        self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
-    ) -> float:
-        """
-        :return: The length of the object, its longer horizontal extent.
-        """
-        return float(max(surface.extents[:2]))
+    position: Bounds[float] = field(default_factory=lambda: Bounds(0.1, 0.9))
 
-    def central_yaws(self, surface: trimesh.Trimesh) -> list[float]:
-        """
-        :return: The yaws the object is seen from along its length, from either end.
-        """
-        length_yaw = 0.0 if surface.extents[0] >= surface.extents[1] else math.pi / 2
-        return [length_yaw, length_yaw + math.pi]
+
+@dataclass
+class GraspAcrossTheLength(AxialGraspStrategy):
+    """
+    Grasp a flat, elongated object lying on its side, such as cutlery, from above,
+    closing across its length.
+    """
+
+    position: Bounds[float] = field(default_factory=lambda: Bounds(0.2, 0.8))
+
+    angle: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 0.0))
 
 
 # %% pinching a thin wall
 
 
 @dataclass
-class PinchAWall(GraspStrategy, ABC):
+class PinchAWall(SurfaceGraspStrategy, ABC):
     """
     Pinch the thin upright wall of an object, such as an open container, from above,
     closing across the wall.
