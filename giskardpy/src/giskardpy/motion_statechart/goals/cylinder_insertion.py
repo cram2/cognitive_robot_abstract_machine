@@ -56,7 +56,7 @@ class StayOnLineTask(ConvergingTask):
 
     reference_velocity: float = 0.1
     """
-    Reference velocity for normalization in m/s.
+    Sets how fast the goal is approached, in m/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:

@@ -18,7 +18,10 @@ from giskardpy.qp.constraint import (
     GiskardInequalityConstraint,
 )
 from giskardpy.qp.dof_limits import DirectLimits
-from giskardpy.qp.exceptions import ConstraintTypeMismatchError
+from giskardpy.qp.exceptions import (
+    ConstraintTypeMismatchError,
+    MissingReferenceVelocityError,
+)
 from krrood.symbolic_math.symbolic_math import Vector, Matrix, Scalar
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
@@ -28,15 +31,16 @@ if TYPE_CHECKING:
 
 def normalize_slack_weight(
     weight: Scalar,
-    normalization_factor: float,
+    velocity_unit: sm.ScalarData,
     control_horizon: int = 1,
 ) -> Scalar:
     """
-    Scales a slack weight so constraints with different units become comparable.
+    Scales a slack weight by its constraint's velocity unit, so that constraints of
+    different units become comparable.
 
     The control horizon spreads the weight over the time steps a constraint is active.
     """
-    return weight * (1 / (sm.Scalar(normalization_factor) ** 2 * control_horizon))
+    return weight * (1 / (sm.Scalar(velocity_unit) ** 2 * control_horizon))
 
 
 @dataclass
@@ -275,6 +279,10 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         """
         Creates one slack variable per constraint, bounded by the constraint's slack
         limits, with normalized weights.
+
+        A quadratic weight is also scaled by :meth:`demand_compensation_of_constraint`,
+        so that only the weight decides how hard a constraint pulls against others, not
+        its reference velocity.
         """
         return DirectLimits(
             lower_bounds=Vector([c.lower_slack_limit for c in self.constraints]),
@@ -283,9 +291,10 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
                 [
                     normalize_slack_weight(
                         c.quadratic_weight,
-                        c.normalization_factor,
+                        c.velocity_unit,
                         self.qp_controller_config.control_horizon,
                     )
+                    * self.demand_compensation_of_constraint(c)
                     for c in self.constraints
                 ]
             ),
@@ -293,7 +302,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
                 [
                     normalize_slack_weight(
                         c.linear_weight,
-                        c.normalization_factor,
+                        c.velocity_unit,
                         self.qp_controller_config.control_horizon,
                     )
                     for c in self.constraints
@@ -302,13 +311,45 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             names=[c.name for c in self.constraints],
         )
 
+    def demand_compensation_of_constraint(
+        self, constraint: GiskardConstraint
+    ) -> Scalar:
+        """
+        The factor that makes a demand capped by the constraint's reference velocity
+        pull as hard as the same demand capped by its velocity unit would.
+
+        It is 1 for a demand within reach of the reference velocity. Beyond it, a slower
+        constraint demands less motion and its weight is raised by as much, and a faster
+        one's lowered.
+        """
+        change_at_velocity_unit = self.change_within_control_horizon(
+            constraint.velocity_unit
+        )
+        return constraint.kept_fraction_of_demand(
+            change_at_velocity_unit
+        ).safe_division(
+            constraint.kept_fraction_of_demand(
+                self.reachable_change_of_constraint(constraint)
+            ),
+            if_nan=1,
+        )
+
     def reachable_change_of_constraint(self, constraint: GiskardConstraint) -> Scalar:
         """
         The largest change of a constraint's expression that may be demanded within the
-        control horizon: its normalization factor sustained over that horizon.
+        control horizon: its reference velocity sustained over that horizon.
+        """
+        if constraint.reference_velocity is None:
+            raise MissingReferenceVelocityError(constraint_name=constraint.name)
+        return self.change_within_control_horizon(constraint.reference_velocity)
+
+    def change_within_control_horizon(self, velocity: sm.ScalarData) -> Scalar:
+        """
+        :return: How far an expression changes within the control horizon at the given
+            velocity.
         """
         return (
-            sm.Scalar(constraint.normalization_factor)
+            sm.Scalar(velocity)
             * self.qp_controller_config.control_time_step.total_seconds()
             * self.qp_controller_config.control_horizon
         )
@@ -455,7 +496,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
                 lower_slack.append(c.lower_slack_limit)
                 upper_slack.append(c.upper_slack_limit)
                 quadratic_weights.append(
-                    normalize_slack_weight(c.quadratic_weight, c.normalization_factor)
+                    normalize_slack_weight(c.quadratic_weight, c.velocity_unit)
                 )
                 linear_weights.append(c.linear_weight)
                 names.append(f"t{t:03}/{c.name}")

@@ -234,6 +234,28 @@ class MismatchedLimitLengthsError(GiskardException):
 
 
 @dataclass
+class MissingReferenceVelocityError(QPSolverException):
+    """
+    Raised when a constraint on the position of its expression has no reference velocity
+    to derive the change it may demand within the control horizon from.
+    """
+
+    constraint_name: str
+    """
+    The name of the constraint without a reference velocity.
+    """
+
+    def error_message(self) -> str:
+        return f"Constraint {self.constraint_name!r} has no reference velocity."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Set the reference velocity of every constraint on the position of its "
+            "expression."
+        )
+
+
+@dataclass
 class ConstraintTypeMismatchError(QPSolverException):
     """
     Raised when an enforcement strategy receives a constraint of the wrong type for the

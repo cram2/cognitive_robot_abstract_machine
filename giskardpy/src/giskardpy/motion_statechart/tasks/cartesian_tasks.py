@@ -15,7 +15,7 @@ from giskardpy.motion_statechart.binding_policy import (
     GoalBindingPolicy,
     ForwardKinematicsBinding,
 )
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
 from giskardpy.motion_statechart.error_signals import (
     joint_position_and_velocity_variables,
     time_derivative_from_joint_motion,
@@ -150,7 +150,7 @@ class CartesianPosition(CartesianTask):
     reference_velocity: float = field(
         default_factory=lambda: CartesianPosition.default_reference_velocity,
     )
-    """Reference velocity for normalization in m/s."""
+    """Sets how fast the goal is approached, in m/s; not strictly enforced."""
 
     @property
     def goal_reference_frame(self) -> KinematicStructureEntity:
@@ -222,7 +222,7 @@ class DistanceAlongAxis(ConvergingTask):
 
     reference_velocity: float = 0.2
     """
-    Reference velocity for normalization in m/s.
+    Sets how fast the goal is approached, in m/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -241,6 +241,7 @@ class DistanceAlongAxis(ConvergingTask):
         current_distance = (root_P_tip - root_P_reference) @ self.axis
         artifacts.constraints.add_equality_constraint(
             reference_velocity=self.reference_velocity,
+            velocity_unit=VelocityUnit.TRANSLATION,
             equality_bound=self.distance - current_distance,
             quadratic_weight=self.weight,
             task_expression=current_distance,
@@ -280,7 +281,7 @@ class CartesianPositionTrajectory(CartesianTask):
     reference_velocity: float | None = field(
         default_factory=lambda: CartesianPosition.default_reference_velocity,
     )
-    """Reference velocity for normalization in m/s."""
+    """Sets how fast the goal is approached, in m/s; not strictly enforced."""
 
     goal_reference_frame_P_current_target_point: Point3 = field(init=False, repr=False)
     """Symbolic expression representing the current target point in the goal reference frame."""
@@ -610,6 +611,7 @@ class CartesianPositionStraight(CartesianTask):
             expression_current=line_V_travelled[0],
             expression_goal=line_length,
             reference_velocity=self.reference_velocity,
+            velocity_unit=VelocityUnit.TRANSLATION,
             quadratic_weight=self.weight,
             name="line/progress",
         )
@@ -617,6 +619,7 @@ class CartesianPositionStraight(CartesianTask):
             expression_current=line_V_travelled[1],
             expression_goal=0,
             reference_velocity=self.reference_velocity,
+            velocity_unit=VelocityUnit.TRANSLATION,
             quadratic_weight=lateral_weight,
             name="line/y",
         )
@@ -624,6 +627,7 @@ class CartesianPositionStraight(CartesianTask):
             expression_current=line_V_travelled[2],
             expression_goal=0,
             reference_velocity=self.reference_velocity,
+            velocity_unit=VelocityUnit.TRANSLATION,
             quadratic_weight=lateral_weight,
             name="line/z",
         )
@@ -657,7 +661,7 @@ class CartesianOrientation(CartesianTask):
     reference_velocity: float = field(
         default_factory=lambda: CartesianOrientation.default_reference_velocity,
     )
-    """Reference angular velocity for normalization in rad/s."""
+    """Sets how fast the goal orientation is approached, in rad/s; not strictly enforced."""
 
     @property
     def goal_reference_frame(self) -> KinematicStructureEntity:
@@ -715,10 +719,10 @@ class CartesianPose(Parallel):
     """The goal pose."""
 
     reference_linear_velocity: float = CartesianPosition.default_reference_velocity
-    """Unit: m/s. This is used for normalization, for real limits use CartesianVelocityLimit."""
+    """Sets how fast the goal position is approached, in m/s; for a strict limit use :class:`CartesianPositionVelocityLimit`."""
 
     reference_angular_velocity: float = CartesianOrientation.default_reference_velocity
-    """Unit: rad/s. This is used for normalization, for real limits use CartesianVelocityLimit."""
+    """Sets how fast the goal orientation is approached, in rad/s; for a strict limit use :class:`CartesianRotationVelocityLimit`."""
 
     translation_threshold: float = 0.01
     """If the position error falls below this threshold (in meters), that half of the goal is achieved."""
@@ -799,7 +803,7 @@ class HoldOrientation(Task):
     """The link kept as it is."""
 
     reference_angular_velocity: float = CartesianOrientation.default_reference_velocity
-    """Unit: rad/s. Normalizes the rotational constraints against the others."""
+    """Sets how fast the goal orientation is approached, in rad/s; not strictly enforced."""
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
@@ -868,7 +872,7 @@ class HoldPose(HoldOrientation):
     """
 
     reference_linear_velocity: float = CartesianPosition.default_reference_velocity
-    """Unit: m/s. Normalizes the translational constraints against the others."""
+    """Sets how fast the goal position is approached, in m/s; not strictly enforced."""
 
     translation_threshold: float = 0.01
     """Unit: m. The link counts as held while it is at most this far from its pose."""
@@ -921,16 +925,6 @@ class RigidCoupling(Task):
     The link kept at rest relative to :attr:`root_link`.
     """
 
-    reference_linear_velocity: float = CartesianPosition.default_reference_velocity
-    """
-    Unit: m/s. Normalizes the translational constraints against the others.
-    """
-
-    reference_angular_velocity: float = CartesianOrientation.default_reference_velocity
-    """
-    Unit: rad/s. Normalizes the rotational constraints against the others.
-    """
-
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Task priority relative to other tasks.
@@ -947,13 +941,16 @@ class RigidCoupling(Task):
         )
         root_R_tip = root_T_tip.rotation_matrix
         self._keep_at_rest(
-            artifacts, root_T_tip.position, self.reference_linear_velocity, "position"
+            artifacts,
+            root_T_tip.position,
+            VelocityUnit.TRANSLATION,
+            "position",
         )
         self._keep_at_rest(
-            artifacts, root_R_tip.x_vector(), self.reference_angular_velocity, "x_axis"
+            artifacts, root_R_tip.x_vector(), VelocityUnit.ROTATION, "x_axis"
         )
         self._keep_at_rest(
-            artifacts, root_R_tip.y_vector(), self.reference_angular_velocity, "y_axis"
+            artifacts, root_R_tip.y_vector(), VelocityUnit.ROTATION, "y_axis"
         )
         artifacts.observation = sm.Scalar.const_true()
         return artifacts
@@ -962,7 +959,7 @@ class RigidCoupling(Task):
         self,
         artifacts: MotionNodeArtifacts,
         vector: Point3 | Vector3,
-        reference_velocity: float,
+        velocity_unit: float,
         name: str,
     ) -> None:
         """
@@ -974,7 +971,7 @@ class RigidCoupling(Task):
                 velocity_goal=0,
                 quadratic_weight=self.weight,
                 task_expression=vector[index],
-                velocity_limit=reference_velocity,
+                velocity_unit=velocity_unit,
                 name=f"{name}/{index}",
             )
 

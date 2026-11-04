@@ -68,6 +68,7 @@ class JointPositionList(ConvergingTask):
             artifacts.constraints.add_equality_constraint(
                 name=str(connection.name),
                 reference_velocity=velocity,
+                velocity_unit=connection.dof.limits.upper.velocity,
                 equality_bound=error,
                 quadratic_weight=self.weight,
                 task_expression=current,
@@ -101,7 +102,7 @@ class JointVelocityLimit(Task):
     The joint-space equivalent of
     :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`:
     enforcement is performed by adding a real inequality constraint to the optimizer
-    for each given joint, not by tuning a reference/normalization velocity.
+    for each given joint, not by tuning a reference/velocity unit.
     """
 
     connections: list[ActiveConnection1DOF]
@@ -136,7 +137,7 @@ class JointVelocityLimit(Task):
                 lower_velocity_limit=-self.max_velocity,
                 quadratic_weight=self.weight,
                 task_expression=position,
-                velocity_limit=self.max_velocity,
+                velocity_unit=connection.dof.limits.upper.velocity,
                 name=str(connection.name),
             )
             velocities.append(connection.dof.variables.velocity)

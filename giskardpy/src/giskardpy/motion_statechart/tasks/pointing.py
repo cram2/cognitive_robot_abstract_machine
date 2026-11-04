@@ -28,7 +28,7 @@ class Pointing(CartesianTask):
 
     max_velocity: float = 0.3
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     threshold: float = 0.01
@@ -105,7 +105,7 @@ class PointingCone(CartesianTask):
 
     max_velocity: float = 0.3
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     threshold: float = 0.01

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 from typing_extensions import Callable
@@ -6,6 +8,7 @@ from krrood_spatial_math.spatial_types import AxisAngle, Point3, RotationMatrix,
 
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
+from giskardpy.motion_statechart.weights import VelocityUnit
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -197,3 +200,133 @@ def test_node_artifacts_geometry_writes_into_its_constraints():
         name="goal",
     )
     assert len(artifacts.constraints.equality_constraints) == 3
+
+
+# %% weight normalization
+
+
+@pytest.fixture(
+    params=[
+        GeometricConstraintBuilder.add_point_goal_constraints,
+        GeometricConstraintBuilder.add_vector_goal_constraints,
+        GeometricConstraintBuilder.add_rotation_goal_constraints,
+        GeometricConstraintBuilder.add_yaw_goal_constraint,
+    ],
+    ids=["point", "vector", "rotation", "yaw"],
+)
+def add_goal(request: pytest.FixtureRequest) -> Callable[..., None]:
+    """
+    :return: A method of :class:`GeometricConstraintBuilder` adding the constraints of a
+        goal.
+    """
+    return request.param
+
+
+@dataclass
+class EnforcedGoal:
+    """
+    What an integral strategy makes of the constraints of a goal.
+    """
+
+    slack_weights: np.ndarray
+    """
+    The quadratic slack weight of every constraint.
+    """
+
+    capped_bounds: np.ndarray
+    """
+    The bound of every constraint, capped to what may be demanded within the control
+    horizon.
+    """
+
+    @property
+    def pull(self) -> np.ndarray:
+        """
+        How hard every constraint pulls on the joints while they are at rest, up to a
+        factor all constraints share.
+        """
+        return self.slack_weights * self.capped_bounds
+
+
+def enforced_goal(
+    add_goal: Callable[..., None], reference_velocity: float, distance: float
+) -> EnforcedGoal:
+    """
+    Builds a goal and evaluates it with an integral strategy.
+
+    :param add_goal: The method of :class:`GeometricConstraintBuilder` adding the goal's
+        constraints.
+    :param reference_velocity: The reference velocity of the goal.
+    :param distance: How far away the goal is, in meters or radians.
+    :return: The goal as the integral strategy enforces it.
+    """
+    current_and_goal = {
+        GeometricConstraintBuilder.add_point_goal_constraints: (
+            Point3(0.0, 0.0, 0.0),
+            Point3(distance, 0.0, 0.0),
+        ),
+        GeometricConstraintBuilder.add_vector_goal_constraints: (
+            Vector3.X(),
+            Vector3(np.cos(distance), np.sin(distance), 0.0),
+        ),
+        GeometricConstraintBuilder.add_rotation_goal_constraints: (
+            RotationMatrix(),
+            RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), distance)),
+        ),
+        GeometricConstraintBuilder.add_yaw_goal_constraint: (
+            RotationMatrix(),
+            RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), distance)),
+        ),
+    }
+    current, goal = current_and_goal[add_goal]
+    collection = ConstraintCollection()
+    add_goal(
+        GeometricConstraintBuilder(collection),
+        current,
+        goal,
+        reference_velocity=reference_velocity,
+        quadratic_weight=1.0,
+    )
+    strategy = IntegralStrategy(
+        degrees_of_freedom=[],
+        constraints=collection.equality_constraints,
+        qp_controller_config=controller_config(),
+    )
+    return EnforcedGoal(
+        slack_weights=strategy.create_slack_variables().quadratic_weights.to_np(),
+        capped_bounds=strategy.create_equality_bounds().to_np(),
+    )
+
+
+def test_slowing_down_a_goal_within_reach_does_not_change_its_weight(add_goal):
+    slow = enforced_goal(add_goal, reference_velocity=0.05, distance=0.005)
+    fast = enforced_goal(add_goal, reference_velocity=0.5, distance=0.005)
+
+    assert np.allclose(slow.slack_weights, fast.slack_weights)
+
+
+def test_slowing_down_a_goal_out_of_reach_does_not_change_how_hard_it_pulls(add_goal):
+    slow = enforced_goal(add_goal, reference_velocity=0.05, distance=0.5)
+    fast = enforced_goal(add_goal, reference_velocity=0.5, distance=0.5)
+
+    assert np.allclose(slow.pull, fast.pull)
+
+
+def test_a_quaternion_error_is_normalized_by_how_fast_it_changes_with_the_angle(
+    add_rotation_goal,
+):
+    collection = ConstraintCollection()
+    add_rotation_goal(
+        GeometricConstraintBuilder(collection),
+        frame_R_current=RotationMatrix(),
+        frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), 0.5)),
+        reference_velocity=ROTATION_REFERENCE_VELOCITY,
+        quadratic_weight=1.0,
+    )
+
+    expected = (
+        VelocityUnit.ROTATION * GeometricConstraintBuilder.quaternion_error_per_radian
+    )
+    assert [c.velocity_unit for c in collection.equality_constraints] == [
+        pytest.approx(expected)
+    ] * len(collection.equality_constraints)

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
+from giskardpy.motion_statechart.weights import VelocityUnit
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianOrientation,
     CartesianPosition,
@@ -90,7 +91,7 @@ class BasePosition(DrivenBaseTask):
 
     reference_velocity: float = CartesianPosition.default_reference_velocity
     """
-    Reference velocity for normalization in m/s.
+    Sets how fast the goal is approached, in m/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -109,6 +110,7 @@ class BasePosition(DrivenBaseTask):
                 expression_current=base_coordinate,
                 expression_goal=goal_coordinate,
                 reference_velocity=self.reference_velocity,
+                velocity_unit=VelocityUnit.TRANSLATION,
                 quadratic_weight=self.weight,
             )
         parent_V_base_to_goal = parent_P_goal - parent_P_base
@@ -126,7 +128,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
 
     reference_velocity: float = CartesianOrientation.default_reference_velocity
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     @abstractmethod

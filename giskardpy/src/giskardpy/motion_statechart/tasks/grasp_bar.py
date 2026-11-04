@@ -54,12 +54,12 @@ class GraspBar(ConvergingTask):
 
     reference_linear_velocity: float = 0.1
     """
-    Reference linear velocity for normalization in m/s.
+    Sets how fast the goal position is approached, in m/s; not strictly enforced.
     """
 
     reference_angular_velocity: float = 0.5
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import pytest
 from typing_extensions import ClassVar
 
 from cramph.context import StatechartContext
@@ -11,6 +12,9 @@ from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from giskardpy.qp.constraint_collection import ConstraintCollection
+from giskardpy.qp.enforcement_strategy import IntegralStrategy
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -46,9 +50,47 @@ class FarAwayFloor(Task):
         position = self.degree_of_freedom.variables.position
         artifacts.constraints.add_inequality_constraint(
             reference_velocity=self.REFERENCE_VELOCITY,
+            velocity_unit=self.degree_of_freedom.limits.upper.velocity,
             lower_error=self.FLOOR_POSITION - position,
             upper_error=float("inf"),
             quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
+            task_expression=position,
+        )
+        return artifacts
+
+
+@dataclass(eq=False, repr=False)
+class Ceiling(Task):
+    """
+    Keeps a joint below a ceiling, as a constraint that outweighs a goal.
+    """
+
+    degree_of_freedom: DegreeOfFreedom = field(kw_only=True)
+    """
+    The joint kept below the ceiling.
+    """
+
+    ceiling_position: float = field(kw_only=True)
+    """
+    Where the ceiling is.
+    """
+
+    reference_velocity: float = field(kw_only=True)
+    """
+    The reference velocity of the ceiling's constraint.
+    """
+
+    weight: float = DefaultWeights.WEIGHT_COLLISION_AVOIDANCE.value
+
+    def build_artifacts(self) -> MotionNodeArtifacts:
+        artifacts = MotionNodeArtifacts()
+        position = self.degree_of_freedom.variables.position
+        artifacts.constraints.add_inequality_constraint(
+            reference_velocity=self.reference_velocity,
+            velocity_unit=self.degree_of_freedom.limits.upper.velocity,
+            lower_error=-float("inf"),
+            upper_error=self.ceiling_position - position,
+            quadratic_weight=self.weight,
             task_expression=position,
         )
         return artifacts
@@ -103,3 +145,127 @@ def test_an_inequality_far_out_of_reach_does_not_slow_down_a_goal():
     )
 
     assert cycles_with_floor == cycles_without_floor
+
+
+# %% priorities
+
+
+def penetration_into_ceiling(
+    ceiling_reference_velocity: float = 0.2,
+    goal_reference_velocity: float = 0.2,
+    goal_above_ceiling: float = 0.6,
+    control_cycles: int = 200,
+) -> float:
+    """
+    Pushes a joint goal against a :class:`Ceiling` below it until the joint rests.
+
+    :param ceiling_reference_velocity: The reference velocity of the ceiling.
+    :param goal_reference_velocity: The reference velocity of the joint goal.
+    :param goal_above_ceiling: How far above the ceiling the joint goal is.
+    :param control_cycles: How many control cycles to run.
+    :return: How far above the ceiling the joint rests.
+    """
+    world = single_joint_world()
+    connection = next(c for c in world.connections if isinstance(c, ActiveConnection))
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    motion_statechart = Statechart(context=executor.context)
+    ceiling_position = 0.3
+    motion_statechart.add_node(
+        JointPositionList(
+            goal_state=JointState.from_mapping(
+                {connection: ceiling_position + goal_above_ceiling}
+            ),
+            max_velocity=goal_reference_velocity,
+        )
+    )
+    motion_statechart.add_node(
+        Ceiling(
+            degree_of_freedom=connection.dof,
+            ceiling_position=ceiling_position,
+            reference_velocity=ceiling_reference_velocity,
+        )
+    )
+
+    executor.compile(statechart=motion_statechart)
+    for _ in range(control_cycles):
+        executor.tick()
+    return world.state[connection.dof.id].position - ceiling_position
+
+
+def test_how_far_a_goal_pushes_into_a_constraint_does_not_depend_on_the_constraints_reference_velocity():
+    """
+    Only the weights set which of two competing constraints wins, and by how much.
+    """
+    slow_ceiling = penetration_into_ceiling(ceiling_reference_velocity=0.05)
+    fast_ceiling = penetration_into_ceiling(ceiling_reference_velocity=0.5)
+
+    assert fast_ceiling == pytest.approx(slow_ceiling)
+
+
+def test_how_far_a_goal_within_reach_pushes_into_a_constraint_does_not_depend_on_its_reference_velocity():
+    """
+    A goal close enough to demand its whole error within the control horizon pushes with
+    a force set by its weight alone.
+    """
+    slow_goal = penetration_into_ceiling(
+        goal_reference_velocity=0.05, goal_above_ceiling=0.01
+    )
+    fast_goal = penetration_into_ceiling(
+        goal_reference_velocity=0.5, goal_above_ceiling=0.01
+    )
+
+    assert fast_goal == pytest.approx(slow_goal)
+
+
+def test_how_far_a_goal_out_of_reach_pushes_into_a_constraint_does_not_depend_on_its_reference_velocity():
+    """
+    A goal too far away to demand its whole error within the control horizon still
+    pushes with a force set by its weight alone, up to a percent: a slower goal is
+    stiffer, which slightly changes the motion it plans while it pushes.
+    """
+    slow_goal = penetration_into_ceiling(goal_reference_velocity=0.05)
+    fast_goal = penetration_into_ceiling(goal_reference_velocity=0.5)
+
+    assert fast_goal == pytest.approx(slow_goal, rel=0.01)
+
+
+def pull_of_a_violated_lower_bound(reference_velocity: float) -> float:
+    """
+    Evaluates an inequality whose lower bound lies far out of reach above its joint.
+
+    :param reference_velocity: The reference velocity of the inequality.
+    :return: How hard the inequality pulls on the joint while it is at rest, up to a
+        factor every constraint shares.
+    """
+    world = single_joint_world()
+    degree_of_freedom = next(
+        c for c in world.connections if isinstance(c, ActiveConnection)
+    ).dof
+    collection = ConstraintCollection()
+    collection.add_inequality_constraint(
+        reference_velocity=reference_velocity,
+        velocity_unit=degree_of_freedom.limits.upper.velocity,
+        lower_error=5.0,
+        upper_error=float("inf"),
+        quadratic_weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
+        task_expression=degree_of_freedom.variables.position,
+    )
+    strategy = IntegralStrategy(
+        degrees_of_freedom=[],
+        constraints=collection.inequality_constraints,
+        qp_controller_config=QPControllerConfig(
+            target_frequency=20, prediction_horizon=10
+        ),
+    )
+    slack_weight = strategy.create_slack_variables().quadratic_weights.to_np()[0]
+    capped_lower_bound = strategy.create_lower_bounds().to_np()[0]
+    return slack_weight * capped_lower_bound
+
+
+def test_how_hard_a_violated_inequality_pulls_back_does_not_depend_on_its_reference_velocity():
+    slow = pull_of_a_violated_lower_bound(reference_velocity=0.05)
+    fast = pull_of_a_violated_lower_bound(reference_velocity=0.5)
+
+    assert fast == pytest.approx(slow)

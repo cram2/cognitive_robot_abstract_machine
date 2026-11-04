@@ -48,7 +48,7 @@ class AlignPlanes(ConvergingTask):
 
     reference_velocity: float = 0.5
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE

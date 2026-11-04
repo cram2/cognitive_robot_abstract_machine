@@ -35,3 +35,24 @@ class DefaultWeights(FloatEnum):
     """
     The lowest weight a constraint is given.
     """
+
+
+# %% velocity units
+
+
+class VelocityUnit(FloatEnum):
+    """
+    The speeds at which Cartesian quantities typically change. A constraint on such a
+    quantity that is violated by this speed for the whole control horizon costs its
+    weight, whatever speed the constraint itself drives at.
+    """
+
+    TRANSLATION = 0.2
+    """
+    Unit: m/s.
+    """
+
+    ROTATION = 0.4
+    """
+    Unit: rad/s.
+    """
