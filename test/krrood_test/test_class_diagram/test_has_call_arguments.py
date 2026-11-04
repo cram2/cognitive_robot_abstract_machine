@@ -24,3 +24,16 @@ def test_factory_and_kwargs_binds_its_keyword_arguments():
     pattern = HasFactoryAndKwargs(scale, _kwargs_={"value": 3.0})
     assert pattern._callee_ is scale
     assert pattern._bound_call_arguments_() == CallArguments((3.0, 2.0))
+
+
+# %% calling the callee
+
+
+def test_call_term_calls_its_callee_with_the_arguments_as_passed():
+    term = CallTerm(scale, CallArguments((3.0,), {"factor": 4.0}))
+    assert term._call_() == scale(3.0, factor=4.0)
+
+
+def test_factory_and_kwargs_calls_its_factory_with_its_keyword_arguments():
+    pattern = HasFactoryAndKwargs(scale, _kwargs_={"value": 3.0})
+    assert pattern._call_() == scale(3.0)

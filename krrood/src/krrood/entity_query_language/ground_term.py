@@ -268,9 +268,7 @@ class CallTerm(GroundTerm, HasCallArguments):
         return self._bound_call_arguments_().key_by(ensure_hashable)
 
     def live_value(self) -> Any:
-        return self.callee(
-            *self.call_arguments.positional, **self.call_arguments.keyword
-        )
+        return self._call_()
 
 
 @dataclass(frozen=True, eq=False)

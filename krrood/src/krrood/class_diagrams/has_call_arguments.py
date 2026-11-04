@@ -33,6 +33,15 @@ class HasCallArguments(ABC):
         :return: The arguments as they were passed.
         """
 
+    def _call_(self) -> Any:
+        """
+        :return: The result of calling :attr:`_callee_` with :attr:`_call_arguments_`
+            as they were passed.
+        """
+        return self._callee_(
+            *self._call_arguments_.positional, **self._call_arguments_.keyword
+        )
+
     def _bound_call_arguments_(self) -> CallArguments:
         """
         :return: The arguments :attr:`_callee_` receives, the same however they were
