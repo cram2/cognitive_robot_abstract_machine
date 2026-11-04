@@ -8,15 +8,7 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 
 import sqlalchemy
-from typing_extensions import (
-    List,
-    Dict,
-    TYPE_CHECKING,
-    Optional,
-    Set,
-    Type,
-    get_origin,
-)
+from typing_extensions import List, TYPE_CHECKING, Optional, Set, get_origin
 
 from krrood.ormatic.field_storage import FieldStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
@@ -38,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class WrappedTableNotFound(KeyError):
-    type_: Type
+    type_: type
     wrapped_field: WrappedField
 
     def __post_init__(self):
@@ -66,7 +58,7 @@ class ColumnConstructor:
     Needs to be like "Mapped[<type>]".
     """
 
-    constructor: Optional[str] = None
+    constructor: str | None = None
     """
     The constructor call for sqlalchemy of the column.
     """
@@ -120,7 +112,7 @@ class AssociationObject:
     The full primary key reference for the right table (e.g., 'TableName.primary_key').
     """
 
-    primary_key_name: Optional[str] = None
+    primary_key_name: str | None = None
     """
     The name of the primary key column, if any.
     """
@@ -148,7 +140,7 @@ class AssociationObject:
         )
 
     @property
-    def columns(self) -> List[ColumnConstructor]:
+    def columns(self) -> list[ColumnConstructor]:
         """
         :return: The foreign key column constructors for the left and right sides.
         """
@@ -166,7 +158,7 @@ class AssociationObject:
         ]
 
     @property
-    def relationships(self) -> List[ColumnConstructor]:
+    def relationships(self) -> list[ColumnConstructor]:
         """
         :return: The relationship constructors for this association table.
         """
@@ -224,7 +216,7 @@ class ExternalTable(TableLike):
     The wrapped (domain) class that this stands in for.
     """
 
-    dao_class: Type
+    dao_class: type
     """
     The ``DataAccessObject`` subclass that already maps ``wrapped_clazz`` in the
     dependency's generated interface.
@@ -247,7 +239,7 @@ class ExternalTable(TableLike):
         return f"{self.qualified_reference}.{self.primary_key_name}"
 
     @cached_property
-    def mapped_field_names(self) -> Set[str]:
+    def mapped_field_names(self) -> set[str]:
         """
         :return: Every ORM attribute name already mapped on ``dao_class``, including
             ones inherited from its own (possibly external) ancestors.
@@ -272,28 +264,28 @@ class WrappedTable(TableLike):
     Reference to the ORMatic instance that created this WrappedTable.
     """
 
-    builtin_columns: List[ColumnConstructor] = field(default_factory=list, init=False)
+    builtin_columns: list[ColumnConstructor] = field(default_factory=list, init=False)
     """
     List of columns that can be directly mapped using builtin types.
     """
 
-    custom_columns: List[ColumnConstructor] = field(default_factory=list, init=False)
+    custom_columns: list[ColumnConstructor] = field(default_factory=list, init=False)
     """
     List for custom columns that need to by fully qualified as triple of (name, type,
     constructor)
     """
 
-    foreign_keys: List[ColumnConstructor] = field(default_factory=list, init=False)
+    foreign_keys: list[ColumnConstructor] = field(default_factory=list, init=False)
     """
     List of columns that represent foreign keys as triple of (name, type, constructor)
     """
 
-    relationships: List[ColumnConstructor] = field(default_factory=list, init=False)
+    relationships: list[ColumnConstructor] = field(default_factory=list, init=False)
     """
     List of relationships that should be added to the table.
     """
 
-    mapper_args: Dict[str, str] = field(default_factory=dict, init=False)
+    mapper_args: dict[str, str] = field(default_factory=dict, init=False)
     """
     Keyword Arguments for the sqlalchemy mapper.
     """
@@ -309,7 +301,7 @@ class WrappedTable(TableLike):
     present.
     """
 
-    skip_fields: List[WrappedField] = field(default_factory=list)
+    skip_fields: list[WrappedField] = field(default_factory=list)
     """
     A list of fields that should be skipped when processing the dataclass.
     """
@@ -374,7 +366,7 @@ class WrappedTable(TableLike):
         return result
 
     @cached_property
-    def parent_table(self) -> Optional[TableLike]:
+    def parent_table(self) -> TableLike | None:
         """
         Resolve the parent DAO table for this table.
 
@@ -439,7 +431,7 @@ class WrappedTable(TableLike):
 
     # %% helper methods
 
-    def _find_direct_parent_wrapped(self) -> Optional[WrappedClass]:
+    def _find_direct_parent_wrapped(self) -> WrappedClass | None:
         """
         Return the first mapped parent ``WrappedClass`` from the MRO.
 
@@ -485,7 +477,7 @@ class WrappedTable(TableLike):
 
     def _original_wrapped_for_mapping(
         self, mapping_wrapped: WrappedClass
-    ) -> Optional[WrappedClass]:
+    ) -> WrappedClass | None:
         """
         :param mapping_wrapped: The mapping class as a ``WrappedClass``.
         :return: The original class ``WrappedClass`` for an alternative mapping.
@@ -497,7 +489,7 @@ class WrappedTable(TableLike):
 
     def _find_original_parent_wrapped(
         self, original_wrapped: WrappedClass
-    ) -> Optional[WrappedClass]:
+    ) -> WrappedClass | None:
         """
         :param original_wrapped: The original class wrapped node.
         :return: The original parent ``WrappedClass`` of the given original class.
@@ -563,7 +555,7 @@ class WrappedTable(TableLike):
             return False
 
     @cached_property
-    def fields(self) -> List[WrappedField]:
+    def fields(self) -> list[WrappedField]:
         """
         :return: The list of fields specified only in this associated dataclass that should be mapped.
         """

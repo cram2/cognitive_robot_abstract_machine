@@ -4,9 +4,9 @@ import logging
 import os
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass, field
-from typing import List
+from enum import StrEnum
 
-from typing_extensions import ClassVar, Dict, List, Optional, Tuple, Type
+from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
@@ -16,17 +16,22 @@ from semantic_digital_twin.adapters.package_resolver import (
     PathResolver,
     SearchPathFileResolver,
 )
-from semantic_digital_twin.adapters.world_model_parser import (
-    JointDescription,
-    WorldModelParser,
-)
+from semantic_digital_twin.world_source import WorldModelParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     NegativeConnectionVelocity,
     PathResolutionError,
     ParsingError,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.specifications.connections import (
+    ActiveConnection1DOFSpecification,
+    ConnectionSpecification,
+    FixedConnectionSpecification,
+    ConnectionSpecificationWithEndpoints,
+    PrismaticConnectionSpecification,
+    RevoluteConnectionSpecification,
+)
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
@@ -36,8 +41,6 @@ from semantic_digital_twin.world_description.connection_properties import JointD
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -56,9 +59,32 @@ from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body, Connection
+from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
+
+
+class SdfJointType(StrEnum):
+    """
+    The SDF joint types this parser builds a connection for.
+    """
+
+    REVOLUTE = "revolute"
+    CONTINUOUS = "continuous"
+    PRISMATIC = "prismatic"
+    FIXED = "fixed"
+
+    @property
+    def connection_specification_type(self) -> type[ConnectionSpecification]:
+        """
+        :return: The specification of the connection this joint type becomes.
+        """
+        return {
+            SdfJointType.REVOLUTE: RevoluteConnectionSpecification,
+            SdfJointType.CONTINUOUS: RevoluteConnectionSpecification,
+            SdfJointType.PRISMATIC: PrismaticConnectionSpecification,
+            SdfJointType.FIXED: FixedConnectionSpecification,
+        }[self]
 
 
 @dataclass
@@ -77,44 +103,12 @@ class GazeboParser(WorldModelParser):
         movable.
     """
 
-    connection_type_map: ClassVar[Dict[str, Type[Connection]]] = {
-        "revolute": RevoluteConnection,
-        "continuous": RevoluteConnection,
-        "prismatic": PrismaticConnection,
-        "fixed": FixedConnection,
-    }
-    """
-    Maps a joint's declared type to the connection it becomes.
-    """
-
-    world_link_name: ClassVar[str] = "world"
-    """
-    The reserved link name that refers to the simulation world rather than a model link.
-    """
-
-    truthy_values: ClassVar[Tuple[str, ...]] = ("1", "true")
-    """
-    The texts that SDF accepts for a boolean element that is set.
-    """
-
-    interpreted_elements: ClassVar[Tuple[str, ...]] = (
-        "model",
-        "include",
-        "link",
-        "joint",
-        "pose",
-        "static",
-    )
-    """
-    The child elements of a world or model that carry into the parsed world.
-    """
-
     sdf: str
     """
     The SDF document.
     """
 
-    prefix: Optional[str] = None
+    prefix: str | None = None
     """
     The prefix for every name used in this world.
     """
@@ -133,14 +127,37 @@ class GazeboParser(WorldModelParser):
     def __post_init__(self):
         self.root_element = ElementTree.fromstring(self.sdf)
 
+    @classproperty
+    def world_link_name(cls) -> str:
+        """
+        :return: The reserved link name that refers to the simulation world rather than
+            a model link.
+        """
+        return "world"
+
+    @classproperty
+    def truthy_values(cls) -> tuple[str, ...]:
+        """
+        :return: The texts that SDF accepts for a boolean element that is set.
+        """
+        return "1", "true"
+
+    @classproperty
+    def interpreted_elements(cls) -> tuple[str, ...]:
+        """
+        :return: The child elements of a world or model that carry into the parsed
+            world.
+        """
+        return "model", "include", "link", "joint", "pose", "static"
+
     # %% construction
 
     @classmethod
     def from_file(
         cls,
         file_path: str,
-        prefix: Optional[str] = None,
-        path_resolver: Optional[PathResolver] = None,
+        prefix: str | None = None,
+        path_resolver: PathResolver | None = None,
     ) -> GazeboParser:
         """
         Creates a parser for a description file.
@@ -198,9 +215,11 @@ class GazeboParser(WorldModelParser):
 
     # %% entry point
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parses the document into a world.
+        Differs from
+        :meth:`~semantic_digital_twin.world_source.WorldSource.create_world` in what
+        is created from a document without a ``world`` element.
 
         :return: The world described by a ``world`` element, or by a single ``model``
             element if the document describes one model.
@@ -282,8 +301,8 @@ class GazeboParser(WorldModelParser):
         self,
         world: World,
         include_element: ElementTree.Element,
-        instance_name: Optional[str],
-        wrapper_pose: Optional[HomogeneousTransformationMatrix] = None,
+        instance_name: str | None,
+        wrapper_pose: HomogeneousTransformationMatrix | None = None,
     ) -> None:
         """
         Resolves an ``include`` to its model file and attaches an instance of it.
@@ -403,7 +422,7 @@ class GazeboParser(WorldModelParser):
         return os.path.join(model_directory, max(candidates)[2])
 
     @staticmethod
-    def version_of(version: str) -> Tuple[int, ...]:
+    def version_of(version: str) -> tuple[int, ...]:
         """
         :param version: A dotted version such as ``1.6``.
         :return: The version as a tuple that orders like the version does.
@@ -442,8 +461,8 @@ class GazeboParser(WorldModelParser):
         }
         is_static = self.parse_boolean(element.find("static"))
 
-        joint_descriptions = [
-            self.parse_joint(joint_element, bodies, model_T_link, instance_name)
+        connection_specifications_with_endpoints = [
+            self.parse_joint(joint_element, bodies, model_T_link)
             for joint_element in joint_elements
         ]
 
@@ -453,8 +472,10 @@ class GazeboParser(WorldModelParser):
 
         with world.modify_world():
             world.add_kinematic_structure_entity(root_body)
-            for description in joint_descriptions:
-                world.add_connection(self.create_connection(world, description))
+            for (
+                connection_specification_with_endpoints
+            ) in connection_specifications_with_endpoints:
+                connection_specification_with_endpoints.connect(world)
 
             model_T_root = model_T_link[root_body.name.name]
             for link_name, body in bodies.items():
@@ -473,7 +494,7 @@ class GazeboParser(WorldModelParser):
 
     @staticmethod
     def root_body_of(
-        bodies: Dict[str, Body], child_link_names: set, instance_name: str
+        bodies: dict[str, Body], child_link_names: set, instance_name: str
     ) -> Body:
         """
         Determines the root link of a model, which is the first link no joint moves.
@@ -564,8 +585,8 @@ class GazeboParser(WorldModelParser):
         return body
 
     def parse_inertial(
-        self, element: Optional[ElementTree.Element], body: Body
-    ) -> Optional[Inertial]:
+        self, element: ElementTree.Element | None, body: Body
+    ) -> Inertial | None:
         """
         Parses an ``inertial`` element.
 
@@ -602,7 +623,7 @@ class GazeboParser(WorldModelParser):
     # %% shapes
 
     def parse_shapes(
-        self, elements: List[ElementTree.Element], body: Body
+        self, elements: list[ElementTree.Element], body: Body
     ) -> ShapeCollection:
         """
         Parses the ``visual`` or ``collision`` elements of a link.
@@ -674,7 +695,7 @@ class GazeboParser(WorldModelParser):
             supported_types=["box", "cylinder", "mesh", "sphere"],
         )
 
-    def parse_color(self, element: Optional[ElementTree.Element]) -> Color:
+    def parse_color(self, element: ElementTree.Element | None) -> Color:
         """
         Parses the diffuse color of a ``material`` element.
 
@@ -688,20 +709,18 @@ class GazeboParser(WorldModelParser):
         if diffuse is None:
             return Color()
 
-        return Color(*(float(value) for value in diffuse.split()))
+        return Color.from_rgba(*(float(value) for value in diffuse.split()))
 
     # %% joints
 
     def parse_joint(
         self,
         element: ElementTree.Element,
-        bodies: Dict[str, Body],
-        model_T_link: Dict[str, HomogeneousTransformationMatrix],
-        prefix: str,
-    ) -> JointDescription:
+        bodies: dict[str, Body],
+        model_T_link: dict[str, HomogeneousTransformationMatrix],
+    ) -> ConnectionSpecificationWithEndpoints:
         """
-        Parses a ``joint`` element into a validated description of the connection it
-        becomes.
+        Parses a ``joint`` element into the specification of the joint it states.
 
         The pose of an SDF joint is relative to its child link, so the connection is
         placed at the joint and the child is offset back to its own frame.
@@ -709,19 +728,19 @@ class GazeboParser(WorldModelParser):
         :param element: The ``joint`` element to parse.
         :param bodies: The bodies of the model, by link name.
         :param model_T_link: The poses of the links relative to the model.
-        :param prefix: The prefix of the name of the connection.
-        :return: The description of the joint.
+        :return: The specification of the joint.
         :raises UnsupportedJointType: If the joint type has no connection counterpart.
         """
         joint_name = element.get("name")
-        joint_type = element.get("type")
-        connection_type = self.connection_type_map.get(joint_type)
-        if connection_type is None:
+        declared_type = element.get("type")
+        if declared_type not in SdfJointType:
             raise UnsupportedJointType(
                 joint_name=joint_name,
-                joint_type=joint_type,
-                supported_types=list(self.connection_type_map),
+                joint_type=declared_type,
+                supported_types=list(SdfJointType),
             )
+        joint_type = SdfJointType(declared_type)
+        specification_type = joint_type.connection_specification_type
 
         parent_name = element.findtext("parent").strip()
         child_name = element.findtext("child").strip()
@@ -732,54 +751,24 @@ class GazeboParser(WorldModelParser):
             @ child_T_connection
         )
 
-        description = JointDescription(
-            name=PrefixedName(joint_name, prefix),
-            connection_type=connection_type,
+        if issubclass(specification_type, ActiveConnection1DOFSpecification):
+            specification = specification_type(
+                name=joint_name,
+                connection_T_child=child_T_connection.inverse(),
+                axis=self.parse_axis(element, joint_name, bodies[parent_name]),
+                dof_limits=self.parse_limits(element, joint_type, joint_name),
+                dynamics=self.parse_dynamics(element.find("axis/dynamics")),
+            )
+        else:
+            specification = specification_type(
+                name=joint_name, connection_T_child=child_T_connection.inverse()
+            )
+        return ConnectionSpecificationWithEndpoints(
+            connection_specification=specification,
             parent=bodies[parent_name],
             child=bodies[child_name],
             parent_T_connection=parent_T_connection,
-            connection_T_child=child_T_connection.inverse(),
         )
-        if connection_type is FixedConnection:
-            return description
-
-        description.axis = self.parse_axis(element, joint_name, bodies[parent_name])
-        description.limits = self.parse_limits(element, joint_type, joint_name)
-        description.dynamics = self.parse_dynamics(element.find("axis/dynamics"))
-        return description
-
-    def create_connection(
-        self, world: World, description: JointDescription
-    ) -> Connection:
-        """
-        Creates the connection a joint description denotes, adding its degree of freedom
-        to the world.
-
-        :param world: The world the degree of freedom is added to.
-        :param description: The description of the joint.
-        :return: The connection describing the joint.
-        """
-        if description.connection_type is FixedConnection:
-            return FixedConnection(
-                name=description.name,
-                parent=description.parent,
-                child=description.child,
-                parent_T_connection_expression=description.parent_T_connection,
-                connection_T_child_expression=description.connection_T_child,
-            )
-
-        connection = description.connection_type.create_with_dofs(
-            world=world,
-            parent=description.parent,
-            child=description.child,
-            name=description.name,
-            parent_T_connection_expression=description.parent_T_connection,
-            connection_T_child_expression=description.connection_T_child,
-            dof_limits=description.limits,
-            axis=description.axis,
-        )
-        connection.dynamics = description.dynamics
-        return connection
 
     def parse_axis(
         self, element: ElementTree.Element, joint_name: str, parent_body: Body
@@ -821,7 +810,7 @@ class GazeboParser(WorldModelParser):
         )
 
     def parse_limits(
-        self, element: ElementTree.Element, joint_type: str, joint_name: str
+        self, element: ElementTree.Element, joint_type: SdfJointType, joint_name: str
     ) -> DegreeOfFreedomLimits:
         """
         Parses the limits of a ``joint`` element.
@@ -839,7 +828,7 @@ class GazeboParser(WorldModelParser):
 
         lower_position = None
         upper_position = None
-        if joint_type != "continuous":
+        if joint_type != SdfJointType.CONTINUOUS:
             lower_position = self.parse_optional_float(limit_element, "lower")
             upper_position = self.parse_optional_float(limit_element, "upper")
 
@@ -855,7 +844,7 @@ class GazeboParser(WorldModelParser):
             maximum_speed=velocity,
         )
 
-    def parse_dynamics(self, element: Optional[ElementTree.Element]) -> JointDynamics:
+    def parse_dynamics(self, element: ElementTree.Element | None) -> JointDynamics:
         """
         Parses a ``dynamics`` element.
 
@@ -876,8 +865,8 @@ class GazeboParser(WorldModelParser):
 
     def parse_pose(
         self,
-        element: Optional[ElementTree.Element],
-        reference_frame: Optional[Body] = None,
+        element: ElementTree.Element | None,
+        reference_frame: Body | None = None,
     ) -> HomogeneousTransformationMatrix:
         """
         Parses a ``pose`` element.
@@ -910,7 +899,7 @@ class GazeboParser(WorldModelParser):
         )
 
     @staticmethod
-    def parse_vector(text: Optional[str]) -> List[float]:
+    def parse_vector(text: str | None) -> list[float]:
         """
         :param text: Whitespace separated numbers.
         :return: The numbers the text holds.
@@ -918,7 +907,7 @@ class GazeboParser(WorldModelParser):
         return [float(value) for value in (text or "").split()]
 
     @classmethod
-    def parse_boolean(cls, element: Optional[ElementTree.Element]) -> bool:
+    def parse_boolean(cls, element: ElementTree.Element | None) -> bool:
         """
         :param element: The element holding the flag.
         :return: Whether the element is present and set.
@@ -929,7 +918,7 @@ class GazeboParser(WorldModelParser):
 
     @staticmethod
     def parse_float(
-        element: Optional[ElementTree.Element], name: str, default: float
+        element: ElementTree.Element | None, name: str, default: float
     ) -> float:
         """
         :param element: The element holding the value as a child.
@@ -943,9 +932,7 @@ class GazeboParser(WorldModelParser):
         return float(text) if text is not None else default
 
     @staticmethod
-    def parse_optional_float(
-        element: ElementTree.Element, name: str
-    ) -> Optional[float]:
+    def parse_optional_float(element: ElementTree.Element, name: str) -> float | None:
         """
         :param element: The element holding the value as a child.
         :param name: The name of the child element.
@@ -961,7 +948,7 @@ class MissingRootElement(ParsingError):
     Raised when a description file contains none of the expected root elements.
     """
 
-    expected_elements: List[str] = field(kw_only=True, default_factory=list)
+    expected_elements: list[str] = field(kw_only=True, default_factory=list)
     """
     The element names that were searched for.
     """
@@ -1007,7 +994,7 @@ class UnsupportedJointType(ParsingError):
     The joint type that is not supported.
     """
 
-    supported_types: List[str] = field(kw_only=True, default_factory=list)
+    supported_types: list[str] = field(kw_only=True, default_factory=list)
     """
     The joint types that can be mapped to connections.
     """
@@ -1032,7 +1019,7 @@ class UnsupportedGeometryType(ParsingError):
     The geometry type that is not supported.
     """
 
-    supported_types: List[str] = field(kw_only=True, default_factory=list)
+    supported_types: list[str] = field(kw_only=True, default_factory=list)
     """
     The geometry types that can be mapped to shapes.
     """

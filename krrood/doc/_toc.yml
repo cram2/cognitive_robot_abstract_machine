@@ -60,6 +60,7 @@ parts:
 - caption: Miscellaneous
   chapters:
     - file: parametrizer
+    - file: development_tools
 
 - caption: References
   chapters:

@@ -5,7 +5,7 @@ Exceptions raised by the code-generation package.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import Optional, Callable
+from typing_extensions import Callable
 
 from krrood.exceptions import DataclassException
 
@@ -24,7 +24,7 @@ class FunctionMissingAnnotationsError(DataclassException):
     The callable that is missing an annotation.
     """
 
-    missing_parameter_name: Optional[str] = None
+    missing_parameter_name: str | None = None
     """
     The parameter whose annotation is missing, or ``None`` when the return annotation is
     the one missing.

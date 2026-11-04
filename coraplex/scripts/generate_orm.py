@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 
 import coraplex.locations.costmaps
-import coraplex.orm.model
 import giskardpy.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 
@@ -11,8 +10,6 @@ from krrood.ormatic.utils import classes_of_module
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the coraplex package
-# Classes that are self_mapped and explicitly_mapped are already mapped in the model.py file. Look there for more
-# information on how to map them.
 # ----------------------------------------------------------------------------------------------------------------------
 
 

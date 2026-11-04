@@ -8,7 +8,6 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 import jinja2
-from typing_extensions import List
 
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
@@ -90,7 +89,7 @@ class PartNetMobilityDatasetLoader:
             path_resolver=FileUriResolver(
                 base_directory=self.directory / str(model_id)
             ),
-        ).parse()
+        ).create_world()
         self._apply_semantics_to_world(world, model_id)
         return world
 
@@ -181,7 +180,6 @@ class PartNetMobilityDatasetLoader:
         with open(
             os.path.join(package_directory, "generated_semantic_annotations.py"), "w"
         ) as f:
-
             # Write the output to the file
             f.write(output)
 
@@ -199,7 +197,7 @@ class PartNetMobilityDatasetLoader:
         return label
 
     @property
-    def available_model_ids(self) -> List[int]:
+    def available_model_ids(self) -> list[int]:
         """
         :return: A list of all downloaded models ids.
         """

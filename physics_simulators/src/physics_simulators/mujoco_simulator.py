@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, InitVar
 from enum import StrEnum
 from threading import RLock
-from typing import Optional, List, Dict, Union, Any
+from typing_extensions import Any
 
 import mujoco
 import mujoco.viewer
@@ -323,7 +323,7 @@ class MujocoSimulator(BaseSimulator):
         )
 
     @BaseSimulator.simulator_callback
-    def get_bodies_positions(self, body_names: List[str]) -> SimulatorCallbackResult:
+    def get_bodies_positions(self, body_names: list[str]) -> SimulatorCallbackResult:
         """
         Get bodies positions by body names.
 
@@ -347,7 +347,7 @@ class MujocoSimulator(BaseSimulator):
         )
 
     @BaseSimulator.simulator_callback
-    def get_bodies_quaternions(self, body_names: List[str]) -> SimulatorCallbackResult:
+    def get_bodies_quaternions(self, body_names: list[str]) -> SimulatorCallbackResult:
         """
         Get all bodies quaternions by body names.
 
@@ -489,7 +489,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def set_bodies_positions(
-        self, bodies_positions: Dict[str, numpy.ndarray]
+        self, bodies_positions: dict[str, numpy.ndarray]
     ) -> SimulatorCallbackResult:
         """
         Set the positions of all bodies by its name and positions.
@@ -556,7 +556,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def set_bodies_quaternions(
-        self, bodies_quaternions: Dict[str, numpy.ndarray]
+        self, bodies_quaternions: dict[str, numpy.ndarray]
     ) -> SimulatorCallbackResult:
         """
         Set the quaternions of all bodies by its name and quaternions.
@@ -579,7 +579,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def get_all_joint_names(
-        self, joint_types: Optional[List[mujoco.mjtJoint]] = None
+        self, joint_types: list[mujoco.mjtJoint] | None = None
     ) -> SimulatorCallbackResult:
         """
         Get the names of all joints, filtered by types.
@@ -603,7 +603,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def get_joint(
-        self, joint_name: str, joint_types: Optional[mujoco.mjtJoint] = None
+        self, joint_name: str, joint_types: mujoco.mjtJoint | None = None
     ) -> SimulatorCallbackResult:
         """
         Get a joint by its name and type.
@@ -659,7 +659,7 @@ class MujocoSimulator(BaseSimulator):
         )
 
     @BaseSimulator.simulator_callback
-    def get_joints_values(self, joint_names: List[str]) -> SimulatorCallbackResult:
+    def get_joints_values(self, joint_names: list[str]) -> SimulatorCallbackResult:
         """
         Get values of joints by their names.
 
@@ -714,7 +714,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def set_joints_values(
-        self, joints_values: Dict[str, float]
+        self, joints_values: dict[str, float]
     ) -> SimulatorCallbackResult:
         """
         Set the values of joints by their names.
@@ -777,7 +777,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def get_actuators_lengths(
-        self, actuator_names: List[str]
+        self, actuator_names: list[str]
     ) -> SimulatorCallbackResult:
         """
         Get the lengths of actuators by their names: for an actuator driving a joint,
@@ -840,9 +840,9 @@ class MujocoSimulator(BaseSimulator):
     def attach(
         self,
         body_1_name: str,
-        body_2_name: Optional[str] = None,
-        relative_position: Optional[numpy.ndarray] = None,
-        relative_quaternion: Optional[numpy.ndarray] = None,
+        body_2_name: str | None = None,
+        relative_position: numpy.ndarray | None = None,
+        relative_quaternion: numpy.ndarray | None = None,
     ) -> SimulatorCallbackResult:
         """
         Attach body 1 to body 2 with the given relative position and quaternion.
@@ -1188,11 +1188,11 @@ class MujocoSimulator(BaseSimulator):
     @BaseSimulator.simulator_callback
     def get_contact_points(
         self,
-        body_names: List[str],
+        body_names: list[str],
         including_children: bool = True,
-        contact_style: Union[
-            SimulatorCallbackResult.OutputType, str
-        ] = SimulatorCallbackResult.OutputType.PYBULLET,
+        contact_style: (
+            SimulatorCallbackResult.OutputType | str
+        ) = SimulatorCallbackResult.OutputType.PYBULLET,
     ) -> SimulatorCallbackResult:
         """
         Get the contact points between bodies by their names.
@@ -1306,11 +1306,11 @@ class MujocoSimulator(BaseSimulator):
     @BaseSimulator.simulator_callback
     def ray_test(
         self,
-        ray_from_position: List[float],
-        ray_to_position: List[float],
-        ray_style: Union[
-            SimulatorCallbackResult.OutputType, str
-        ] = SimulatorCallbackResult.OutputType.PYBULLET,
+        ray_from_position: list[float],
+        ray_to_position: list[float],
+        ray_style: (
+            SimulatorCallbackResult.OutputType | str
+        ) = SimulatorCallbackResult.OutputType.PYBULLET,
     ) -> SimulatorCallbackResult:
         """
         Cast a ray in the scene and return intersections in a PyBullet\-style format.
@@ -1380,12 +1380,12 @@ class MujocoSimulator(BaseSimulator):
     @BaseSimulator.simulator_callback
     def ray_test_batch(
         self,
-        ray_from_position: List[float],
-        ray_to_positions: List[List[float]],
-        parent_link_name: Optional[str] = None,
-        ray_style: Union[
-            SimulatorCallbackResult.OutputType, str
-        ] = SimulatorCallbackResult.OutputType.PYBULLET,
+        ray_from_position: list[float],
+        ray_to_positions: list[list[float]],
+        parent_link_name: str | None = None,
+        ray_style: (
+            SimulatorCallbackResult.OutputType | str
+        ) = SimulatorCallbackResult.OutputType.PYBULLET,
     ) -> SimulatorCallbackResult:
         """
         Cast a batch of rays from a single origin to multiple end positions.
@@ -1480,7 +1480,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def save(
-        self, file_path: Optional[str] = None, key_name: Optional[str] = None
+        self, file_path: str | None = None, key_name: str | None = None
     ) -> SimulatorCallbackResult:
         """
         Save the current simulation state to a file or to a keyframe.
@@ -1536,7 +1536,7 @@ class MujocoSimulator(BaseSimulator):
 
     @BaseSimulator.simulator_callback
     def load(
-        self, file_path: Optional[str] = None, key_id: int = 0
+        self, file_path: str | None = None, key_id: int = 0
     ) -> SimulatorCallbackResult:
         """
         Load a simulation state from a file or from a keyframe.
@@ -1747,8 +1747,8 @@ class MujocoSimulator(BaseSimulator):
         self,
         entity_name: str,
         entity_type: str,
-        entity_properties: Dict[str, Any],
-        parent_name: Optional[str] = None,
+        entity_properties: dict[str, Any],
+        parent_name: str | None = None,
         parent_type: str = "body",
     ) -> SimulatorCallbackResult:
         """

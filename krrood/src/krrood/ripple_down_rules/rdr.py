@@ -24,18 +24,7 @@ except ImportError as e:
     plt = None
 
 from sqlalchemy.orm import DeclarativeBase as SQLTable
-from typing_extensions import (
-    List,
-    Optional,
-    Dict,
-    Type,
-    Union,
-    Any,
-    Self,
-    Tuple,
-    Callable,
-    Set,
-)
+from typing_extensions import List, Optional, Dict, Union, Any, Self, Callable, Set
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
@@ -94,27 +83,27 @@ class RippleDownRules(ABC):
     The abstract base class for the ripple down rules classifiers.
     """
 
-    fig: Optional[Figure] = None
+    fig: Figure | None = None
     """
     The figure to draw the tree on.
     """
-    expert_accepted_conclusions: Optional[List[CaseAttribute]] = None
+    expert_accepted_conclusions: list[CaseAttribute] | None = None
     """
     The conclusions that the expert has accepted, such that they are not asked again.
     """
-    _generated_python_file_name: Optional[str] = None
+    _generated_python_file_name: str | None = None
     """
     The name of the generated python file.
     """
-    name: Optional[str] = None
+    name: str | None = None
     """
     The name of the classifier.
     """
-    case_type: Optional[Type] = None
+    case_type: type | None = None
     """
     The type of the case (input) to the RDR classifier.
     """
-    case_name: Optional[str] = None
+    case_name: str | None = None
     """
     The name of the case type.
     """
@@ -122,30 +111,30 @@ class RippleDownRules(ABC):
     """
     The folder to save the metadata of the RDR classifier.
     """
-    model_name: Optional[str] = None
+    model_name: str | None = None
     """
     The name of the model. If None, the model name will be the generated python file name.
     """
-    mutually_exclusive: Optional[bool] = None
+    mutually_exclusive: bool | None = None
     """
     Whether the output of the classification of this rdr allows only one possible conclusion or not.
     """
 
     def __init__(
         self,
-        start_rule: Optional[Rule] = None,
-        save_dir: Optional[str] = None,
-        model_name: Optional[str] = None,
+        start_rule: Rule | None = None,
+        save_dir: str | None = None,
+        model_name: str | None = None,
     ):
         """
         :param start_rule: The starting rule for the classifier.
         :param save_dir: The directory to save the classifier to.
         """
-        self.model_name: Optional[str] = model_name
-        self.save_dir: Optional[str] = save_dir
-        self.start_rule: Optional[Rule] = start_rule
-        self.fig: Optional[Figure] = None
-        self.input_node: Optional[Rule] = None
+        self.model_name: str | None = model_name
+        self.save_dir: str | None = save_dir
+        self.start_rule: Rule | None = start_rule
+        self.fig: Figure | None = None
+        self.input_node: Rule | None = None
         self.update_model()
 
     def update_model(self):
@@ -212,7 +201,7 @@ class RippleDownRules(ABC):
                     only_nodes=evaluated_rules,
                 )
 
-    def get_contributing_rules(self) -> Optional[List[Rule]]:
+    def get_contributing_rules(self) -> list[Rule] | None:
         """
         Get the contributing rules of the classifier.
 
@@ -222,7 +211,7 @@ class RippleDownRules(ABC):
             return None
         return [r for r in self.get_fired_rule_tree() if r.contributed]
 
-    def get_fired_rule_tree(self) -> Optional[List[Rule]]:
+    def get_fired_rule_tree(self) -> list[Rule] | None:
         """
         Get the fired rule tree of the classifier.
 
@@ -232,7 +221,7 @@ class RippleDownRules(ABC):
             return None
         return [r for r in self.get_evaluated_rule_tree() if r.fired]
 
-    def get_evaluated_rule_tree(self) -> Optional[List[Rule]]:
+    def get_evaluated_rule_tree(self) -> list[Rule] | None:
         """
         Get the evaluated rule tree of the classifier.
 
@@ -248,9 +237,9 @@ class RippleDownRules(ABC):
 
     def save(
         self,
-        save_dir: Optional[str] = None,
-        model_name: Optional[str] = None,
-        package_name: Optional[str] = None,
+        save_dir: str | None = None,
+        model_name: str | None = None,
+        package_name: str | None = None,
     ) -> str:
         """
         Save the classifier to a file.
@@ -282,7 +271,7 @@ class RippleDownRules(ABC):
 
     @classmethod
     def load(
-        cls, load_dir: str, model_name: str, package_name: Optional[str] = None
+        cls, load_dir: str, model_name: str, package_name: str | None = None
     ) -> Self:
         """
         Load the classifier from a file.
@@ -309,8 +298,8 @@ class RippleDownRules(ABC):
     def from_python(
         cls,
         model_path: str,
-        python_file_path: Optional[str] = None,
-        parent_package_name: Optional[str] = None,
+        python_file_path: str | None = None,
+        parent_package_name: str | None = None,
     ) -> Self:
         """
         Load the RDR classifier from a generated python file.
@@ -331,7 +320,7 @@ class RippleDownRules(ABC):
         return rdr
 
     @abstractmethod
-    def _write_to_python(self, model_dir: str, package_name: Optional[str] = None):
+    def _write_to_python(self, model_dir: str, package_name: str | None = None):
         """
         Write the tree of rules as source code to a file.
 
@@ -343,8 +332,8 @@ class RippleDownRules(ABC):
 
     def fit(
         self,
-        case_queries: List[CaseQuery],
-        expert: Optional[Expert] = None,
+        case_queries: list[CaseQuery],
+        expert: Expert | None = None,
         n_iter: int = None,
         animate_tree: bool = False,
         **kwargs_for_fit_case,
@@ -406,16 +395,16 @@ class RippleDownRules(ABC):
             plt.show()
 
     def __call__(
-        self, case: Union[Case, SQLTable]
-    ) -> Union[CallableExpression, Dict[str, CallableExpression]]:
+        self, case: Case | SQLTable
+    ) -> CallableExpression | dict[str, CallableExpression]:
         return self.classify(case)
 
     def classify(
         self,
-        case: Union[Case, SQLTable],
+        case: Case | SQLTable,
         modify_case: bool = False,
-        case_query: Optional[CaseQuery] = None,
-    ) -> Optional[Union[CallableExpression, Dict[str, CallableExpression]]]:
+        case_query: CaseQuery | None = None,
+    ) -> CallableExpression | dict[str, CallableExpression] | None:
         """
         Classify a case using the RDR classifier.
 
@@ -441,10 +430,10 @@ class RippleDownRules(ABC):
     @abstractmethod
     def _classify(
         self,
-        case: Union[Case, SQLTable],
+        case: Case | SQLTable,
         modify_case: bool = False,
-        case_query: Optional[CaseQuery] = None,
-    ) -> Optional[Union[CallableExpression, Dict[str, CallableExpression]]]:
+        case_query: CaseQuery | None = None,
+    ) -> CallableExpression | dict[str, CallableExpression] | None:
         """
         Classify a case.
 
@@ -458,13 +447,13 @@ class RippleDownRules(ABC):
     def fit_case(
         self,
         case_query: CaseQuery,
-        expert: Optional[Expert] = None,
+        expert: Expert | None = None,
         update_existing_rules: bool = True,
         ask_now: Callable = lambda _: False,
         clear_expert_answers: bool = True,
-        ask_now_target: Optional[Any] = None,
+        ask_now_target: Any | None = None,
         **kwargs,
-    ) -> Union[CallableExpression, Dict[str, CallableExpression]]:
+    ) -> CallableExpression | dict[str, CallableExpression]:
         """
         Fit the classifier to a case and ask the expert for refinements or alternatives if the classification is
         incorrect by comparing the case with the target category.
@@ -529,7 +518,7 @@ class RippleDownRules(ABC):
 
     @staticmethod
     def should_i_ask_the_expert_for_a_target(
-        conclusions: Union[Any, Dict[str, Any]],
+        conclusions: Any | dict[str, Any],
         case_query: CaseQuery,
         update_existing: bool,
     ) -> bool:
@@ -562,8 +551,8 @@ class RippleDownRules(ABC):
 
     @abstractmethod
     def _fit_case(
-        self, case_query: CaseQuery, expert: Optional[Expert] = None, **kwargs
-    ) -> Union[CallableExpression, Dict[str, CallableExpression]]:
+        self, case_query: CaseQuery, expert: Expert | None = None, **kwargs
+    ) -> CallableExpression | dict[str, CallableExpression]:
         """
         Fit the RDR on a case, and ask the expert for refinements or alternatives if the classification is incorrect by
         comparing the case with the target category.
@@ -666,8 +655,8 @@ class RippleDownRules(ABC):
     def update_from_python(
         self,
         model_dir: str,
-        parent_package_name: Optional[str] = None,
-        python_file_path: Optional[str] = None,
+        parent_package_name: str | None = None,
+        python_file_path: str | None = None,
         update_rule_tree: bool = False,
     ):
         """
@@ -721,10 +710,10 @@ class TreeBuilder(ast.NodeVisitor, ABC):
     """Parses an AST of nested if-elif statements and reconstructs the tree."""
 
     def __init__(self):
-        self.root: Optional[Rule] = None
-        self.current_parent: Optional[Rule] = None
-        self.current_edge: Optional[RDREdge] = None
-        self.default_conclusion: Optional[str] = None
+        self.root: Rule | None = None
+        self.current_parent: Rule | None = None
+        self.current_edge: RDREdge | None = None
+        self.default_conclusion: str | None = None
 
     def visit_FunctionDef(self, node):
         """Finds the main function and starts parsing its body."""
@@ -793,7 +782,7 @@ class TreeBuilder(ast.NodeVisitor, ABC):
         pass
 
     @abstractmethod
-    def get_new_rule_type(self, node: ast.AST) -> Type[Rule]:
+    def get_new_rule_type(self, node: ast.AST) -> type[Rule]:
         """
         Get the new rule type to create.
         :param node: The current AST node to determine the rule type from.
@@ -830,7 +819,7 @@ class TreeBuilder(ast.NodeVisitor, ABC):
 class SingleClassTreeBuilder(TreeBuilder):
     """Parses an AST of generated SingleClassRDR classifier and reconstructs the rdr tree."""
 
-    def get_new_rule_type(self, node: ast.AST) -> Type[Rule]:
+    def get_new_rule_type(self, node: ast.AST) -> type[Rule]:
         return SingleClassRule
 
     def get_refinement_edge(self, node: ast.AST) -> RDREdge:
@@ -867,7 +856,7 @@ class MultiClassTreeBuilder(TreeBuilder):
     def visit_Return(self, node):
         pass
 
-    def get_new_rule_type(self, node: ast.AST) -> Type[Rule]:
+    def get_new_rule_type(self, node: ast.AST) -> type[Rule]:
         if self.current_edge == RDREdge.Refinement:
             return MultiClassStopRule
         elif self.current_edge == RDREdge.Filter:
@@ -890,7 +879,7 @@ class MultiClassTreeBuilder(TreeBuilder):
         return self.get_refinement_edge_from_refinement_rule(rule_type)
 
     def get_refinement_edge_from_refinement_rule(
-        self, rule_type: Type[Rule]
+        self, rule_type: type[Rule]
     ) -> RDREdge:
         """
         :param rule_type: The type of the rule to determine the refinement edge from.
@@ -903,7 +892,7 @@ class MultiClassTreeBuilder(TreeBuilder):
         else:
             return RDREdge.Filter
 
-    def get_refinement_rule_type(self, node: ast.AST) -> Type[Rule]:
+    def get_refinement_rule_type(self, node: ast.AST) -> type[Rule]:
         """
         :param node: The current AST node to determine the rule type from.
         :return: The rule type based on the node body.
@@ -943,7 +932,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
 
     @classmethod
     def read_rule_tree_from_python(
-        cls, model_path: str, python_file_path: Optional[str] = None
+        cls, model_path: str, python_file_path: str | None = None
     ) -> Rule:
         """
         :param model_path: The path to the generated python file that contains the RDR classifier function.
@@ -966,7 +955,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
 
     @classmethod
     @abstractmethod
-    def get_tree_builder_class(cls) -> Type[TreeBuilder]:
+    def get_tree_builder_class(cls) -> type[TreeBuilder]:
         """
         :return: The class that builds the rule tree from the generated python file.
         This should be either SingleClassTreeBuilder or MultiClassTreeBuilder.
@@ -974,7 +963,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         pass
 
     @property
-    def all_rules(self) -> List[Rule]:
+    def all_rules(self) -> list[Rule]:
         """
         Get all rules in the classifier.
 
@@ -991,8 +980,8 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
     def update_from_python(
         self,
         model_dir: str,
-        parent_package_name: Optional[str] = None,
-        python_file_path: Optional[str] = None,
+        parent_package_name: str | None = None,
+        python_file_path: str | None = None,
         update_rule_tree: bool = False,
     ):
         """
@@ -1093,9 +1082,9 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
     def get_and_import_model_python_modules(
         cls,
         model_dir: str,
-        python_file_path: Optional[str] = None,
-        parent_package_name: Optional[str] = None,
-    ) -> Tuple[ModuleType, ModuleType]:
+        python_file_path: str | None = None,
+        parent_package_name: str | None = None,
+    ) -> tuple[ModuleType, ModuleType]:
         """
         Get and import the python modules that contain the RDR classifier function and definitions.
 
@@ -1126,8 +1115,8 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         rule: Rule,
         file,
         parent_indent: str = "",
-        defs_file: Optional[str] = None,
-        package_name: Optional[str] = None,
+        defs_file: str | None = None,
+        package_name: str | None = None,
     ):
         """
         Write the rules as source code to a file.
@@ -1141,7 +1130,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         """
         pass
 
-    def _write_to_python(self, model_dir: str, package_name: Optional[str] = None):
+    def _write_to_python(self, model_dir: str, package_name: str | None = None):
         """
         Write the tree of rules as source code to a file.
 
@@ -1209,7 +1198,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
 
     def _get_types_to_import(
         self,
-    ) -> Tuple[Set[Union[Type, Callable]], Set[Type]]:
+    ) -> tuple[set[type | Callable], set[type]]:
         """
         :return: The types of the main and defs files of the RDR classifier that will be imported.
         """
@@ -1239,7 +1228,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         return main_types, defs_types
 
     @property
-    def _default_generated_python_file_name(self) -> Optional[str]:
+    def _default_generated_python_file_name(self) -> str | None:
         """
         :return: The default generated python file name.
         """
@@ -1252,7 +1241,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         return f"{self.generated_python_file_name}_defs"
 
     @property
-    def conclusion_type(self) -> Tuple[Type]:
+    def conclusion_type(self) -> tuple[type]:
         """
         :return: The type of the conclusion of the RDR classifier.
         """
@@ -1270,7 +1259,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
 
     @staticmethod
     @abstractmethod
-    def start_rule_type() -> Type[Rule]:
+    def start_rule_type() -> type[Rule]:
         """
         :return: The type of the starting rule of the RDR classifier.
         """
@@ -1283,21 +1272,21 @@ class SingleClassRDR(RDRWithCodeWriter):
     The output of the classification of this rdr negates all other possible outputs, there can only be one true value.
     """
 
-    def __init__(self, default_conclusion: Optional[Any] = None, **kwargs):
+    def __init__(self, default_conclusion: Any | None = None, **kwargs):
         """
         :param start_rule: The starting rule for the classifier.
         :param default_conclusion: The default conclusion for the classifier if no rules fire.
         """
         super(SingleClassRDR, self).__init__(**kwargs)
-        self.default_conclusion: Optional[Any] = default_conclusion
+        self.default_conclusion: Any | None = default_conclusion
 
     @classmethod
-    def get_tree_builder_class(cls) -> Type[TreeBuilder]:
+    def get_tree_builder_class(cls) -> type[TreeBuilder]:
         return SingleClassTreeBuilder
 
     def _fit_case(
-        self, case_query: CaseQuery, expert: Optional[Expert] = None, **kwargs
-    ) -> Union[CaseAttribute, CallableExpression, None]:
+        self, case_query: CaseQuery, expert: Expert | None = None, **kwargs
+    ) -> CaseAttribute | CallableExpression | None:
         """
         Classify a case, and ask the user for refinements or alternatives if the classification is incorrect by
         comparing the case with the target category if provided.
@@ -1336,8 +1325,8 @@ class SingleClassRDR(RDRWithCodeWriter):
         self,
         case: Case,
         modify_case: bool = False,
-        case_query: Optional[CaseQuery] = None,
-    ) -> Optional[Any]:
+        case_query: CaseQuery | None = None,
+    ) -> Any | None:
         """
         Classify a case by recursively evaluating the rules until a rule fires or the last rule is reached.
 
@@ -1365,7 +1354,7 @@ class SingleClassRDR(RDRWithCodeWriter):
         matched_rule = self.start_rule(case) if self.start_rule is not None else None
         return matched_rule if matched_rule is not None else self.start_rule
 
-    def _write_to_python(self, model_dir: str, package_name: Optional[str] = None):
+    def _write_to_python(self, model_dir: str, package_name: str | None = None):
         super()._write_to_python(model_dir, package_name=package_name)
         with open(model_dir + f"/{self.generated_python_file_name}.py", "a") as f:
             f.write(f"{' ' * 4}else:\n{' ' * 8}return {self.default_conclusion}\n")
@@ -1375,8 +1364,8 @@ class SingleClassRDR(RDRWithCodeWriter):
         rule: SingleClassRule,
         filename: str,
         parent_indent: str = "",
-        defs_file: Optional[str] = None,
-        package_name: Optional[str] = None,
+        defs_file: str | None = None,
+        package_name: str | None = None,
     ):
         """
         Write the rules as source code to a file.
@@ -1422,7 +1411,7 @@ class SingleClassRDR(RDRWithCodeWriter):
         type_names = [stringify_type_hint(t) for t in all_types]
         return f"Union[{', '.join(type_names)}]"
 
-    def _get_types_to_import(self) -> Tuple[Set[Type], Set[Type]]:
+    def _get_types_to_import(self) -> tuple[set[type], set[type]]:
         main_types, def_types = super()._get_types_to_import()
         main_types.add(type(self.default_conclusion))
         def_types.add(type(self.default_conclusion))
@@ -1432,13 +1421,13 @@ class SingleClassRDR(RDRWithCodeWriter):
         return main_types, def_types
 
     @property
-    def conclusion_type(self) -> Tuple[Type]:
+    def conclusion_type(self) -> tuple[type]:
         if self.default_conclusion is not None:
             return (type(self.default_conclusion),)
         return super().conclusion_type
 
     @staticmethod
-    def start_rule_type() -> Type[Rule]:
+    def start_rule_type() -> type[Rule]:
         """
         :return: The type of the starting rule of the RDR classifier.
         """
@@ -1452,15 +1441,15 @@ class MultiClassRDR(RDRWithCodeWriter):
     when wrong conclusions are made to stop these rules from firing again for similar cases.
     """
 
-    evaluated_rules: Optional[List[Rule]] = None
+    evaluated_rules: list[Rule] | None = None
     """
     The evaluated rules in the classifier for one case.
     """
-    conclusions: Optional[List[CaseAttribute]] = None
+    conclusions: list[CaseAttribute] | None = None
     """
     The conclusions that the case belongs to.
     """
-    stop_rule_conditions: Optional[CallableExpression] = None
+    stop_rule_conditions: CallableExpression | None = None
     """
     The conditions of the stopping rule if needed.
     """
@@ -1471,7 +1460,7 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     def __init__(
         self,
-        start_rule: Optional[MultiClassTopRule] = None,
+        start_rule: MultiClassTopRule | None = None,
         mode: MCRDRMode = MCRDRMode.StopOnly,
         **kwargs,
     ):
@@ -1483,15 +1472,15 @@ class MultiClassRDR(RDRWithCodeWriter):
         self.mode: MCRDRMode = mode
 
     @classmethod
-    def get_tree_builder_class(cls) -> Type[TreeBuilder]:
+    def get_tree_builder_class(cls) -> type[TreeBuilder]:
         return MultiClassTreeBuilder
 
     def _classify(
         self,
-        case: Union[Case, SQLTable],
+        case: Case | SQLTable,
         modify_case: bool = False,
-        case_query: Optional[CaseQuery] = None,
-    ) -> Set[Any]:
+        case_query: CaseQuery | None = None,
+    ) -> set[Any]:
         evaluated_rule = self.start_rule
         self.conclusions = []
         case_cp = copy_case(case) if not modify_case else case
@@ -1530,8 +1519,8 @@ class MultiClassRDR(RDRWithCodeWriter):
         return make_set(self.conclusions)
 
     def _fit_case(
-        self, case_query: CaseQuery, expert: Optional[Expert] = None, **kwargs
-    ) -> Set[Union[CaseAttribute, CallableExpression, None]]:
+        self, case_query: CaseQuery, expert: Expert | None = None, **kwargs
+    ) -> set[CaseAttribute | CallableExpression | None]:
         """
         Classify a case, and ask the user for stopping rules or classifying rules if the classification is incorrect
          or missing by comparing the case with the target category if provided.
@@ -1568,11 +1557,11 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     def write_rules_as_source_code_to_file(
         self,
-        rule: Union[MultiClassTopRule, MultiClassStopRule],
+        rule: MultiClassTopRule | MultiClassStopRule,
         filename: str,
         parent_indent: str = "",
-        defs_file: Optional[str] = None,
-        package_name: Optional[str] = None,
+        defs_file: str | None = None,
+        package_name: str | None = None,
     ):
         if rule == self.start_rule:
             with open(filename, "a") as file:
@@ -1628,7 +1617,7 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     def _get_types_to_import(
         self,
-    ) -> Tuple[Set[Union[Type, Callable]], Set[Type]]:
+    ) -> tuple[set[type | Callable], set[type]]:
         main_types, defs_types = super()._get_types_to_import()
         main_types.update(
             {get_an_updated_case_copy, update_case_and_conclusions_with_rule_output}
@@ -1651,7 +1640,7 @@ class MultiClassRDR(RDRWithCodeWriter):
             )
 
     @property
-    def last_top_rule(self) -> Optional[MultiClassTopRule]:
+    def last_top_rule(self) -> MultiClassTopRule | None:
         """
         Get the last top rule in the tree.
         """
@@ -1693,7 +1682,7 @@ class MultiClassRDR(RDRWithCodeWriter):
         case_query: CaseQuery,
         expert: Expert,
         evaluated_rule: MultiClassTopRule,
-        refinement_type: Type[MultiClassRefinementRule] = MultiClassStopRule,
+        refinement_type: type[MultiClassRefinementRule] = MultiClassStopRule,
     ):
         """
         Stop a conclusion by adding a stopping rule.
@@ -1730,7 +1719,7 @@ class MultiClassRDR(RDRWithCodeWriter):
             conditions = expert.ask_for_conditions(case_query)
         self.add_top_rule(case_query)
 
-    def add_conclusion(self, rule_conclusion: List[Any]) -> None:
+    def add_conclusion(self, rule_conclusion: list[Any]) -> None:
         """
         Add the conclusion of the evaluated rule to the list of conclusions.
 
@@ -1764,7 +1753,7 @@ class MultiClassRDR(RDRWithCodeWriter):
         self.start_rule.alternative = MultiClassTopRule.from_case_query(case_query)
 
     @staticmethod
-    def start_rule_type() -> Type[Rule]:
+    def start_rule_type() -> type[Rule]:
         """
         :return: The type of the starting rule of the RDR classifier.
         """
@@ -1785,9 +1774,7 @@ class GeneralRDR(RippleDownRules):
 
     def __init__(
         self,
-        category_rdr_map: Optional[
-            Dict[str, Union[SingleClassRDR, MultiClassRDR]]
-        ] = None,
+        category_rdr_map: dict[str, SingleClassRDR | MultiClassRDR] | None = None,
         **kwargs,
     ):
         """
@@ -1799,18 +1786,18 @@ class GeneralRDR(RippleDownRules):
         values like Land, Water, Air, etc., which are not mutually exclusive due to some animals living more than one
         habitat.
         """
-        self.start_rules_dict: Dict[str, Union[SingleClassRDR, MultiClassRDR]] = (
+        self.start_rules_dict: dict[str, SingleClassRDR | MultiClassRDR] = (
             category_rdr_map if category_rdr_map else {}
         )
         super(GeneralRDR, self).__init__(**kwargs)
-        self.all_figs: List[Figure] = [sr.fig for sr in self.start_rules_dict.values()]
+        self.all_figs: list[Figure] = [sr.fig for sr in self.start_rules_dict.values()]
 
     @classmethod
     def from_python(
         cls,
         model_dir: str,
-        python_file_path: Optional[str] = None,
-        parent_package_name: Optional[str] = None,
+        python_file_path: str | None = None,
+        parent_package_name: str | None = None,
     ) -> Self:
         """
         Create an instance of the class from a python file.
@@ -1833,7 +1820,7 @@ class GeneralRDR(RippleDownRules):
     @classmethod
     def get_rdr_type_from_acronym(
         cls, acronym: str
-    ) -> Type[Union[SingleClassRDR, MultiClassRDR]]:
+    ) -> type[SingleClassRDR | MultiClassRDR]:
         """
         Get the type of the ripple down rules classifier from the acronym.
 
@@ -1850,8 +1837,8 @@ class GeneralRDR(RippleDownRules):
 
     def add_rdr(
         self,
-        rdr: Union[SingleClassRDR, MultiClassRDR],
-        case_query: Optional[CaseQuery] = None,
+        rdr: SingleClassRDR | MultiClassRDR,
+        case_query: CaseQuery | None = None,
     ):
         """
         Add a ripple down rules classifier to the map of classifiers.
@@ -1863,24 +1850,24 @@ class GeneralRDR(RippleDownRules):
         self.start_rules_dict[name] = rdr
 
     @property
-    def start_rule(self) -> Optional[Union[SingleClassRule, MultiClassTopRule]]:
+    def start_rule(self) -> SingleClassRule | MultiClassTopRule | None:
         return self.start_rules[0] if self.start_rules_dict else None
 
     @start_rule.setter
-    def start_rule(self, value: Union[SingleClassRDR, MultiClassRDR]):
+    def start_rule(self, value: SingleClassRDR | MultiClassRDR):
         if value:
             self.start_rules_dict[value.attribute_name] = value
 
     @property
-    def start_rules(self) -> List[Union[SingleClassRule, MultiClassTopRule]]:
+    def start_rules(self) -> list[SingleClassRule | MultiClassTopRule]:
         return [rdr.start_rule for rdr in self.start_rules_dict.values()]
 
     def _classify(
         self,
         case: Any,
         modify_case: bool = False,
-        case_query: Optional[CaseQuery] = None,
-    ) -> Optional[Dict[str, Any]]:
+        case_query: CaseQuery | None = None,
+    ) -> dict[str, Any] | None:
         """
         Classify a case by going through all RDRs and adding the categories that are classified, and then restarting
         the classification until no more categories can be added.
@@ -1898,8 +1885,8 @@ class GeneralRDR(RippleDownRules):
         )
 
     def _fit_case(
-        self, case_query: CaseQuery, expert: Optional[Expert] = None, **kwargs
-    ) -> Dict[str, Any]:
+        self, case_query: CaseQuery, expert: Expert | None = None, **kwargs
+    ) -> dict[str, Any]:
         """
         Fit the GRDR on a case, if the target is a new type of category, a new RDR is created for it,
         else the existing RDR of that type will be fitted on the case, and then classification is done and all
@@ -1948,8 +1935,8 @@ class GeneralRDR(RippleDownRules):
     def update_from_python(
         self,
         model_dir: str,
-        parent_package_name: Optional[str] = None,
-        python_file_path: Optional[str] = None,
+        parent_package_name: str | None = None,
+        python_file_path: str | None = None,
         update_rule_tree: bool = False,
     ) -> None:
         """
@@ -1991,9 +1978,7 @@ class GeneralRDR(RippleDownRules):
                     model_dir, parent_package_name=parent_package_name
                 )
 
-    def _write_to_python(
-        self, model_dir: str, package_name: Optional[str] = None
-    ) -> None:
+    def _write_to_python(self, model_dir: str, package_name: str | None = None) -> None:
         """
         Write the tree of rules as source code to a file.
 
@@ -2027,7 +2012,7 @@ class GeneralRDR(RippleDownRules):
             )
 
     @property
-    def _default_generated_python_file_name(self) -> Optional[str]:
+    def _default_generated_python_file_name(self) -> str | None:
         """
         :return: The default generated python file name.
         """
@@ -2040,7 +2025,7 @@ class GeneralRDR(RippleDownRules):
         return f"Dict[str, Any]"
 
     def _get_imports(
-        self, file_path: Optional[str] = None, package_name: Optional[str] = None
+        self, file_path: str | None = None, package_name: str | None = None
     ) -> str:
         """
         Get the imports needed for the generated python file.

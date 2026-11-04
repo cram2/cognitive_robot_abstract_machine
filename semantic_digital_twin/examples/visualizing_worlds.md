@@ -30,7 +30,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 logging.disable(logging.CRITICAL)
 apartment = os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "apartment.urdf")
-world = URDFParser.from_file(apartment).parse()
+world = URDFParser.from_file(apartment).create_world()
 
 ```
 

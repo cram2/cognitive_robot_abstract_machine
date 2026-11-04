@@ -4,9 +4,7 @@ import ast
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Type, Tuple, Protocol
-
-from typing_extensions import Optional
+from typing_extensions import Any, Protocol
 
 
 @dataclass
@@ -75,17 +73,17 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
     Raised when the number of generic parameters does not match the number of resolved types.
     """
 
-    affected_class: Type
+    affected_class: type
     """
     The class that has the generic parameters.
     """
 
-    parameters: list[Type]
+    parameters: list[type]
     """
     The generic parameters of the class.
     """
 
-    resolved_types: Tuple[Type, ...]
+    resolved_types: tuple[type, ...]
     """
     The resolved types for the generic parameters.
     """
@@ -109,7 +107,7 @@ class UnboundGenericParameter(DataclassException):
     concrete type.
     """
 
-    affected_class: Type
+    affected_class: type
     """
     The class the parameter was read from.
     """
@@ -135,11 +133,11 @@ class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
     Raised when the current module is not given and/or not found for relative import conversion.
     """
 
-    path: Optional[str] = field(kw_only=True, default=None)
+    path: str | None = field(kw_only=True, default=None)
     """
     The path to the file that contains the relative import.
     """
-    source_code: Optional[str] = field(kw_only=True, default=None)
+    source_code: str | None = field(kw_only=True, default=None)
     """
     The source code of the file that contains the relative import.
     """
@@ -160,15 +158,15 @@ class NoSourceDataToParseImportsFrom(InputError):
     Raised when there is no source data given to parse imports from.
     """
 
-    module: Optional[types.ModuleType] = None
+    module: types.ModuleType | None = None
     """
     The module to parse imports from.
     """
-    file_path: Optional[str] = None
+    file_path: str | None = None
     """
     The file path to the module to parse imports from.
     """
-    ast_tree: Optional[ast.AST] = None
+    ast_tree: ast.AST | None = None
     """
     The AST tree to parse imports from.
     """
@@ -190,11 +188,11 @@ class NoModuleSourceProvided(InputError):
     Raised when there is no source module data given to parse imports from.
     """
 
-    imported_module_path: Optional[str] = None
+    imported_module_path: str | None = None
     """
     The file path to the module to parse imports from.
     """
-    module_name: Optional[str] = None
+    module_name: str | None = None
     """
     The module to parse imports from.
     """
@@ -315,15 +313,15 @@ class SourceDataNotProvided(InputError):
     Raised when no source data is provided.
     """
 
-    file_path: Optional[str] = None
+    file_path: str | None = None
     """
     The file path that was missing source data.
     """
-    tree: Optional[ast.AST] = None
+    tree: ast.AST | None = None
     """
     The AST tree that was missing source data.
     """
-    source_code: Optional[str] = None
+    source_code: str | None = None
     """
     The source code that was missing.
     """

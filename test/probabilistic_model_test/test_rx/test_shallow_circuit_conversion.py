@@ -18,16 +18,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 
 @pytest.fixture
-def x() -> Continuous:
-    return Continuous("x")
-
-
-@pytest.fixture
-def y() -> Continuous:
-    return Continuous("y")
-
-
-@pytest.fixture
 def mixture_weights() -> list[float]:
     return [0.3, 0.7]
 

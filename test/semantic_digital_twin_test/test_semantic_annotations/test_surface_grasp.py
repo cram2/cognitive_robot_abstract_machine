@@ -33,7 +33,7 @@ from semantic_digital_twin.grasping.surface_grasp import (
 from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals, statement_by
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Twist,
@@ -285,7 +285,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
         )
     return RelationalCircuitRegistry(
         RelationalProbabilisticCircuit(
-            learning_method=JointProbabilityTree(min_samples_per_leaf=20)
+            learning_method=JointProbabilityTree(minimum_samples_per_leaf=20)
         ).fit(grasps, SurfaceGrasp)
     )
 

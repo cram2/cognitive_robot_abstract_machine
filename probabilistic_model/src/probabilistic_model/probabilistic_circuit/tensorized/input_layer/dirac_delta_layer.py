@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 
 import numpy as np
@@ -7,7 +8,7 @@ from random_events.interval import Bound, Interval
 from random_events.product_algebra import SimpleEvent
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import List, Optional, Self, Type
+from typing_extensions import Any, Self
 
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.exceptions import ShapeMismatchError
@@ -77,7 +78,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: List[DiracDeltaDistribution]
+        cls, variable_index: int, distributions: list[DiracDeltaDistribution]
     ) -> Self:
         return cls(
             variable_index,
@@ -92,7 +93,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         )
 
     @classmethod
-    def concatenate(cls, layers: List[Self]) -> Self:
+    def concatenate(cls, layers: list[Self]) -> Self:
         return cls(
             layers[0].variable,
             np.concatenate([layer.location for layer in layers]),
@@ -133,7 +134,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
 
     def type_of_truncated_layer(
         self, assignment: Interval, singleton_allowed: bool
-    ) -> Type[Layer]:
+    ) -> type[Layer]:
         return self.__class__
 
     def contains(self, assignment: Interval) -> NodeMask:
@@ -170,7 +171,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         for the parameters and the result.
         """
         return LayerWithLogProbabilities(
-            self.__deepcopy__(), np.where(self.contains(assignment), 0.0, -np.inf)
+            copy.deepcopy(self), np.where(self.contains(assignment), 0.0, -np.inf)
         )
 
     @memoized
@@ -178,7 +179,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeValues:
         return self.contains(event[variables[self.variable]]).astype(float)
 
@@ -197,17 +198,3 @@ class DiracDeltaLayer(AbstractContinuousLayer):
 
     def apply_scaling_own(self, scaling: VariableValues):
         self.location = self.location * scaling[self.variable]
-
-    def __deepcopy__(self, memo=None) -> DiracDeltaLayer:
-        if memo is None:
-            memo = {}
-        if id(self) in memo:
-            return memo[id(self)]
-        result = self.__class__(
-            self.variable,
-            self.location.copy(),
-            self.density_cap.copy(),
-            self.tolerance,
-        )
-        memo[id(self)] = result
-        return result

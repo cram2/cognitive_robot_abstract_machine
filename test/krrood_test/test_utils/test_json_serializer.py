@@ -2,11 +2,12 @@ import datetime
 import json
 import pathlib
 import re
+import tracemalloc
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, Any, Self
+from typing_extensions import Any, Self
 
 import numpy as np
 from scipy.sparse import coo_array, csr_array
@@ -18,6 +19,8 @@ from krrood.adapters.exceptions import (
     InvalidTypeFormatError,
     UnknownModuleError,
     ClassNotFoundError,
+    ObjectArraySerializationError,
+    StructuredArraySerializationError,
 )
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import (
@@ -29,6 +32,7 @@ from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     JSONSerializableTypeRegistry,
 )
+from krrood.class_diagrams.leaf_kind import LeafKind
 from krrood.utils import get_full_class_name
 
 
@@ -147,11 +151,11 @@ class ClassThatNeedsKWARGS(SubclassJSONSerializer):
     a: int
     b: float = 0
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "a": (self.a)}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(a=(data["a"]), b=(kwargs["b"]))
 
 
@@ -160,17 +164,17 @@ class ClassThatNeedsKWARGSInList(SubclassJSONSerializer):
     a: int
     b: list[ClassThatNeedsKWARGS] = field(default_factory=list)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "a": (self.a), "b": to_json(self.b)}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(a=(data["a"]), b=from_json(data["b"], **kwargs))
 
 
 @dataclass
 class ClassWithDict(DataclassJSONSerializer):
-    a: Dict[str, int]
+    a: dict[str, int]
 
 
 @dataclass
@@ -191,6 +195,11 @@ class ClassWithTuple(DataclassJSONSerializer):
 @dataclass
 class ClassWithSortedSet(DataclassJSONSerializer):
     a: SortedSet
+
+
+@dataclass
+class ClassWithFrozenSet(DataclassJSONSerializer):
+    a: frozenset
 
 
 class CustomEnum(str, Enum):
@@ -405,6 +414,49 @@ def test_nparray():
     assert np.allclose(result, obj)
 
 
+def test_an_array_keeps_its_shape_and_element_type_exactly():
+    obj = np.arange(12, dtype=np.float32).reshape(3, 4) / 7
+
+    result = from_json(to_json(obj))
+
+    assert result.dtype == obj.dtype
+    np.testing.assert_array_equal(result, obj)
+
+
+def test_an_array_without_dimensions_keeps_its_shape():
+    obj = np.array(2.5)
+
+    result = from_json(to_json(obj))
+
+    assert result.shape == obj.shape
+    assert result == obj
+
+
+def test_serializing_an_array_holds_less_than_twice_its_bytes():
+    """
+    Large arrays, such as the vertices of a mesh, are serialized whenever they are
+    synchronized, so their json must not take many times their own memory.
+    """
+    obj = np.linspace(0.0, 1.0, 100_000)
+
+    tracemalloc.start()
+    data = to_json(obj)
+    held, _ = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert held < 2 * obj.nbytes
+
+
+def test_an_array_of_python_objects_is_not_serialized():
+    with pytest.raises(ObjectArraySerializationError):
+        to_json(np.array([object(), object()]))
+
+
+def test_an_array_of_records_is_not_serialized():
+    with pytest.raises(StructuredArraySerializationError):
+        to_json(np.zeros(2, dtype=[("x", np.float64), ("count", np.int32)]))
+
+
 def test_coordinate_sparse_array_keeps_its_stored_entries():
     # the first entry stores a zero, which is a value and not a missing entry
     obj = coo_array(
@@ -495,6 +547,34 @@ def test_dataclass_sorted_set():
     result = from_json(data)
     assert result == cls
     assert isinstance(result.a, SortedSet)
+
+
+def test_dataclass_frozen_set():
+    cls = ClassWithFrozenSet(frozenset({1, 2, 3}))
+    data = to_json(cls)
+    assert data["a"][JSONField.COLLECTION_TYPE] == get_full_class_name(frozenset)
+    assert sorted(data["a"][JSONField.ITEMS]) == [1, 2, 3]
+    result = from_json(data)
+    assert result == cls
+    assert isinstance(result.a, frozenset)
+
+
+# %% leaf kinds
+
+
+@pytest.mark.parametrize("leaf_class", LeafKind.JSON_SCALAR.value)
+def test_json_scalar_serializes_as_itself(leaf_class):
+    value = leaf_class()
+    assert to_json(value) is value
+    assert from_json(value) is value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [1, 1.5, "text", CustomEnum.A, datetime.datetime(2026, 1, 1), True, ...],
+)
+def test_orm_scalar_covers_single_column_values(value):
+    assert isinstance(value, LeafKind.ORM_SCALAR.value)
 
 
 # %% durations

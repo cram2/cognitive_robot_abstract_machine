@@ -5,7 +5,6 @@ Reading back what a statement of where an object may be grasped allows.
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.interval import Interval
-from typing_extensions import Dict
 
 from semantic_digital_twin.grasping.grasp_strategies import GraspStrategy
 from semantic_digital_twin.grasping.surface_grasp import (
@@ -15,7 +14,7 @@ from semantic_digital_twin.grasping.surface_grasp import (
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 
 
-def allowed_intervals(statement: Match) -> Dict[str, Interval]:
+def allowed_intervals(statement: Match) -> dict[str, Interval]:
     """
     :param statement: A statement over a surface grasp.
     :return: For each of the grasp's parameters, by name, the smallest interval holding

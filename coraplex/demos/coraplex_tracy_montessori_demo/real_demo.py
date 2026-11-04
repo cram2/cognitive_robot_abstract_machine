@@ -1,6 +1,7 @@
 """
-The montessori demo carried out by the real Tracy, through giskard. Run it from this
-folder::
+The montessori demo carried out by the real Tracy, through giskard.
+
+Run it from this folder::
 
     python real_demo.py
 
@@ -25,9 +26,9 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ExecutionType
-from coraplex.execution_environment import ExecutionEnvironment
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.executors import RealRobotPlanExecutor
+from cramph.context import StatechartContext
 from demo import DemoRunner, ShapeSortingPlan
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -91,17 +92,14 @@ class RealRunner(DemoRunner):
         with self.running_robot() as robot:
             self.scene.populate(robot.world)
             [tracy] = robot.world.get_semantic_annotations_by_type(Tracy)
-            context = Context(
-                world=robot.world,
-                robot=tracy,
+            executor = RealRobotPlanExecutor(
+                StatechartContext.with_extensions(robot.world, [RobotAccess(tracy)]),
                 ros_node=robot.node,
-                evaluate_conditions=False,
-            )
-            with ExecutionEnvironment(
-                execution_type=ExecutionType.REAL,
                 collision_avoidance=False,
-            ):
-                ShapeSortingPlan(scene=self.scene).build(context).perform()
+            )
+            executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+            executor.execute()
+            executor.close()
 
     @contextmanager
     def running_robot(self) -> Iterator[RunningRobot]:

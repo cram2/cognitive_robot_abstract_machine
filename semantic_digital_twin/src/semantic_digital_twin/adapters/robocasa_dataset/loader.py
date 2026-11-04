@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from typing_extensions import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Tuple
+from typing_extensions import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     import numpy
@@ -41,9 +41,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Handle,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
@@ -104,7 +102,7 @@ class RoboCasaTask:
     on the microwave."``).
     """
 
-    manipulated_objects: List[Body]
+    manipulated_objects: list[Body]
     """
     The bodies in :attr:`world` that the task requires the robot to interact with.
     """
@@ -157,7 +155,7 @@ def _parse_robosuite_mjcf(parser: MJCFParser) -> World:
         for geom in body.geoms:
             if geom.group == GeomVisibilityAndCollisionType.VISIBLE_AND_COLLIDABLE_1:
                 geom.group = GeomVisibilityAndCollisionType.ONLY_COLLIDABLE
-    return parser.parse()
+    return parser.create_world()
 
 
 def _category_from_class_name(class_name: str) -> str:
@@ -216,7 +214,7 @@ class RoboCasaDatasetLoader:
     Resolver mapping RoboCasa object category names to SemanticAnnotation subclasses.
     """
 
-    self_contained_object_groups: ClassVar[Tuple[str, ...]] = (
+    self_contained_object_groups: ClassVar[tuple[str, ...]] = (
         "objaverse",
         "lightwheel",
     )
@@ -238,7 +236,7 @@ class RoboCasaDatasetLoader:
     world because ``semantic_digital_twin`` owns the robot.
     """
 
-    robot_body_name_prefixes: ClassVar[Tuple[str, ...]] = (
+    robot_body_name_prefixes: ClassVar[tuple[str, ...]] = (
         "robot",
         "mobilebase",
         "gripper",
@@ -249,7 +247,7 @@ class RoboCasaDatasetLoader:
     used to remove the robot from a composed task scene.
     """
 
-    robot_referencing_mjcf_sections: ClassVar[Tuple[str, ...]] = (
+    robot_referencing_mjcf_sections: ClassVar[tuple[str, ...]] = (
         "actuator",
         "sensor",
         "tendon",
@@ -267,7 +265,7 @@ class RoboCasaDatasetLoader:
         self,
         layout_id: LayoutType,
         style_id: StyleType,
-        random_number_generator: Optional[numpy.random.Generator] = None,
+        random_number_generator: numpy.random.Generator | None = None,
     ) -> World:
         """
         Compose a full RoboCasa kitchen scene and parse it into a World.
@@ -400,7 +398,7 @@ class RoboCasaDatasetLoader:
         )
 
     @staticmethod
-    def _available_task_names() -> List[str]:
+    def _available_task_names() -> list[str]:
         """
         Return the names of the registered RoboCasa kitchen task environments, in sorted
         order.
@@ -415,7 +413,7 @@ class RoboCasaDatasetLoader:
         )
 
     @staticmethod
-    def _object_world_poses(environment: Any) -> Dict[str, Tuple[Any, Any]]:
+    def _object_world_poses(environment: Any) -> dict[str, tuple[Any, Any]]:
         """
         Read the world pose of each manipulated object's root body from the reset
         simulation.
@@ -429,7 +427,7 @@ class RoboCasaDatasetLoader:
             orientation)`` world pose, with the orientation as a scalar-first
             quaternion.
         """
-        object_world_poses: Dict[str, Tuple[Any, Any]] = {}
+        object_world_poses: dict[str, tuple[Any, Any]] = {}
         for robocasa_object in environment.objects.values():
             body_id = environment.sim.model.body_name2id(robocasa_object.root_body)
             object_world_poses[robocasa_object.root_body] = (
@@ -440,7 +438,7 @@ class RoboCasaDatasetLoader:
 
     @classmethod
     def _strip_robot_and_bake_object_poses(
-        cls, mjcf_document: str, object_world_poses: Dict[str, Tuple[Any, Any]]
+        cls, mjcf_document: str, object_world_poses: dict[str, tuple[Any, Any]]
     ) -> str:
         """
         Remove the robot from a composed task's MJCF document and write the sampled
@@ -492,9 +490,9 @@ class RoboCasaDatasetLoader:
     def _apply_task_object_semantics(
         self,
         world: World,
-        object_configurations: List[Dict[str, Any]],
-        objects: Dict[str, Any],
-    ) -> List[Body]:
+        object_configurations: list[dict[str, Any]],
+        objects: dict[str, Any],
+    ) -> list[Body]:
         """
         Attach a SemanticAnnotation to each manipulated object's body and collect those
         bodies.
@@ -511,7 +509,7 @@ class RoboCasaDatasetLoader:
             produced by RoboCasa's ``env.objects``.
         :return: The annotated manipulated object bodies.
         """
-        manipulated_objects: List[Body] = []
+        manipulated_objects: list[Body] = []
         for object_configuration in object_configurations:
             robocasa_object = objects.get(object_configuration["name"])
             if robocasa_object is None:
@@ -528,7 +526,7 @@ class RoboCasaDatasetLoader:
     def load_kitchen_appliance(
         self,
         category: RoboCasaKitchenApplianceCategory,
-        style_id: Optional[StyleType] = None,
+        style_id: StyleType | None = None,
     ) -> World:
         """
         Load a single RoboCasa kitchen appliance (for example a cabinet or a microwave)
@@ -554,7 +552,7 @@ class RoboCasaDatasetLoader:
     def _find_configured_appliance(
         self,
         category: RoboCasaKitchenApplianceCategory,
-        style_id: Optional[StyleType],
+        style_id: StyleType | None,
     ) -> Any:
         """
         Search the RoboCasa kitchen layouts for the first fully configured fixture whose
@@ -593,7 +591,7 @@ class RoboCasaDatasetLoader:
         raise RoboCasaApplianceNotFoundError(category)
 
     @staticmethod
-    def _kitchen_layouts() -> List[LayoutType]:
+    def _kitchen_layouts() -> list[LayoutType]:
         """
         Return the concrete RoboCasa kitchen layouts, excluding the aggregate selectors
         (such as ``ALL`` or ``TRAIN``) that do not denote a single kitchen.
@@ -645,7 +643,7 @@ class RoboCasaDatasetLoader:
         return world
 
     def _apply_kitchen_appliance_semantics(
-        self, world: World, kitchen_appliances: Dict[str, Any]
+        self, world: World, kitchen_appliances: dict[str, Any]
     ) -> None:
         """
         Attach a SemanticAnnotation to the root body of each kitchen appliance, using
@@ -671,7 +669,7 @@ class RoboCasaDatasetLoader:
         Attach a SemanticAnnotation to the root body of a loaded object.
 
         The object's own body is the first body in the world with collision geometry:
-        MJCFParser.parse() always creates an empty placeholder root body named after the
+        :meth:`~semantic_digital_twin.adapters.mjcf.MJCFParser.create_world` always creates an empty placeholder root body named after the
         MJCF worldbody, distinct from the loaded content.
 
         :param world: The world the object was parsed into.
@@ -759,7 +757,7 @@ class RoboCasaDatasetLoader:
             self._attach_sub_part_annotations(world, child_annotation, child_body)
 
     @staticmethod
-    def _find_body(world: World, name: str) -> Optional[Body]:
+    def _find_body(world: World, name: str) -> Body | None:
         """
         Look up a body by name, returning None instead of raising if it is not present.
 

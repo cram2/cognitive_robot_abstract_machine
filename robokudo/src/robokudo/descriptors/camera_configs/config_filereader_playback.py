@@ -1,6 +1,9 @@
+from __future__ import annotations
+
+# %% Imports
+from krrood.ormatic.utils import classproperty
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional, ClassVar
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import (
@@ -23,7 +26,12 @@ class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
         path. Otherwise, target_dir is appended to the ROS package path.
     """
 
-    registry_name: ClassVar[str] = "file_reader"
+    @classproperty
+    def registry_name(cls) -> str:
+        """
+        Identifier selecting this camera configuration.
+        """
+        return "file_reader"
 
     interface_type: str = "FileReader"
 
@@ -32,36 +40,30 @@ class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     File reader does not support live TF lookup; use static_camera_transform_enabled
     instead.
     """
-
     tf_from: str = "camera"
     """
     Camera frame name accepted for compatibility with transform-aware configs.
     """
-
     tf_to: str = "map"
     """
     World frame name accepted for compatibility with transform-aware configs.
     """
-
     loop: bool = True
     """
     Shall we loop after iterating over a directory?
     """
-
-    target_ros_package: Optional[str] = None
+    target_ros_package: str | None = None
     """
     Files for the FileReaderInterface should be in a ROS package If you don't want that,
     leave target_ros_package to None and define target_dir either absolute or relative
     to your executable.
     """
-
     target_dir: str = "/tmp"
     """
     If target_ros_package is None, try to load target_dir directly.
 
     Otherwise, append target_dir to target_ros_package and load the files from there.
     """
-
     color_to_depth_ratio: ColorToDepthRatio | None = field(
         default_factory=lambda: ColorToDepthRatio(horizontal=0.5, vertical=0.5)
     )
@@ -69,14 +71,8 @@ class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     Size of the recorded depth image relative to the recorded color image, or None
     without depth data.
     """
-
     filename_prefix: str = "rk_"
     """
     Define the prefix of all the files that shall be loaded into the
     FileReaderInterface.
-    """
-
-    kinect_height_fix_mode: bool = True
-    """
-    Apply kinect hack.
     """

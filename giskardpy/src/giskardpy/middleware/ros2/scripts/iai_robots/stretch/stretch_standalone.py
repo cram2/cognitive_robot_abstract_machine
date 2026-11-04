@@ -1,34 +1,33 @@
 #!/usr/bin/env python
 from datetime import timedelta
 
-from giskardpy.middleware.ros2 import rospy
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
+from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    StretchStandaloneInterface,
     WorldWithStretchConfigDiffDrive,
 )
-from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.robots.stretch import Stretch
 
 
-def main():
-    rospy.init_node("giskard")
-    robot_description = load_xacro(Stretch.get_ros_file_path())
-    giskard = Giskard(
-        world_config=WorldWithStretchConfigDiffDrive(urdf=robot_description),
-        robot_interface_config=StretchStandaloneInterface(),
-        server_config=GiskardServerConfig(
-            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
-        ),
+def create_giskard() -> Giskard:
+    """
+    Build a Giskard that simulates Stretch, described by the file its robot class
+    declares.
+    """
+    return Giskard.standalone(
+        world_config=WorldWithStretchConfigDiffDrive(),
         qp_controller_config=QPControllerConfig(
             # reproduces the braking of the former prediction_horizon=30
             target_frequency=25,
             braking_time=timedelta(seconds=1.15),
         ),
     )
-    giskard.live()
+
+
+def main() -> None:
+    """
+    Run the Giskard :func:`create_giskard` builds as a ros node until ROS shuts down.
+    """
+    Giskard.launch(create_giskard)
 
 
 if __name__ == "__main__":

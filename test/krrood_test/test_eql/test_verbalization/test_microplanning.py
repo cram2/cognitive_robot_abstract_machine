@@ -184,7 +184,7 @@ class _Outer:
     y: _Inner
 
 
-def _period() -> "object":
+def _period() -> object:
     return variable(_Period, domain=None)
 
 

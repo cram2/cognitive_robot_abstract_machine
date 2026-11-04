@@ -1,34 +1,18 @@
-"""Sensor data collection and CAS initialization.
-
-This module provides an annotator for:
-
-* Reading sensor data from multiple interfaces
-* Initializing the CAS with sensor data
-* Managing multiple collection readers
-* Handling data synchronization
-
-The module uses:
-
-* Camera interface abstraction
-* Pipeline CAS management
-* Data availability monitoring
-* Query preservation
-
-.. note::
-   This is typically the first annotator in a pipeline.
+"""
+Acquire sensor data from one camera interface and initialize the pipeline data structures.
 """
 
 from __future__ import annotations
 
-from timeit import default_timer as timer
-
+# %% Imports
+from timeit import default_timer
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
-from typing_extensions import TYPE_CHECKING, List, Optional
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.descriptors.camera_configs.components import TfComponent
+from robokudo.annotators.exceptions import InvalidCollectionReaderParent
 
 if TYPE_CHECKING:
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
@@ -36,43 +20,43 @@ if TYPE_CHECKING:
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
-    """Sensor data collection and CAS initialization.
-
-    This annotator:
-
-    * Reads sensor data from camera interfaces
-    * Initializes new CAS instances
-    * Manages multiple collection readers
-    * Monitors data availability
-    * Preserves existing queries
-
-    .. note::
-       Uses separate camera interfaces for different sensor types.
+    """
+    Acquire sensor data and share it with other annotators.
+    It is typically the first annotator in the pipeline.
     """
 
     class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for collection reader."""
+        """
+        Configuration descriptor for collection reader.
+        """
 
         def __init__(
             self,
             camera_config: BaseCameraConfig,
             camera_interface: CameraInterface,
         ) -> None:
-            """Initialize descriptor with camera configuration.
+            """
+            Initialize descriptor with camera configuration.
 
             :param camera_config: Configuration for camera interface
             :param camera_interface: Interface for reading camera data
             """
 
             class Parameters:
-                """Parameters for configuring collection reader."""
+                """
+                Parameters for configuring collection reader.
+                """
 
                 def __init__(self) -> None:
                     self.camera_config: BaseCameraConfig = camera_config
-                    """Configuration for camera interface"""
+                    """
+                    Configuration for camera interface
+                    """
 
                     self.camera_interface: CameraInterface = camera_interface
-                    """Interface for reading camera data"""
+                    """
+                    Interface for reading camera data
+                    """
 
             self.parameters = Parameters()
 
@@ -81,122 +65,45 @@ class CollectionReaderAnnotator(BaseAnnotator):
         descriptor: CollectionReaderAnnotator.Descriptor,
         name: str = "CollectionReader",
     ) -> None:
-        """Initialize the collection reader.
-
-        :param descriptor: Configuration descriptor
-        :param name: Name of this annotator instance
+        """
+        Initialize the configured camera reader and its acquisition state.
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-
-        self.collection_readers: List[CollectionReaderAnnotator.Descriptor] = [
-            descriptor
-        ]
-        self.start_timer: Optional[float] = None
+        self.start_timer: float | None = None
+        """
+        Start of the current wait for camera data.
+        """
         self.iterations_since_last_data: int = 0
+        """
+        Number of consecutive ticks waiting for camera data.
+        """
         self.iterations_since_last_data_warn_threshold: int = 40
+        """
+        Number of waiting ticks between camera availability warnings.
+        """
 
     def initialise(self) -> None:
-        """Initialize the collection reader.
-
-        Called when:
-
-        * First tick is received
-        * Status changes from non-running
-
-        Clears feedback messages for all children.
         """
-        self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
+        Clear feedback on the parent sequence's children before acquisition.
 
-        # Clear all feedback messages when Collection Reader starts over
-        assert isinstance(self.parent, Sequence)
+        :raises InvalidCollectionReaderParent: If the parent is not a sequence.
+        """
+        if not isinstance(self.parent, Sequence):
+            raise InvalidCollectionReaderParent()
         for child in self.parent.children:
             child.feedback_message = ""
 
-    def add_collection_reader(
-        self, descriptor: CollectionReaderAnnotator.Descriptor
-    ) -> None:
-        """Add another collection reader descriptor.
-
-        :param descriptor: Configuration descriptor for additional reader
-        """
-        interface_type = descriptor.parameters.camera_interface.interface_type
-        self.collection_readers.append(descriptor)
-        self.logger.debug(
-            f"added descriptor to collection readers with camera interface '{interface_type}'"
-        )
-
     def update(self) -> Status:
-        """Process sensor data and update CAS.
+        """
+        Main method that acquires sensor data and places it into the central pipeline data structures.
 
-        The method:
-
-        * Checks for new data from all readers
-        * Creates new CAS when data available
-        * Preserves existing queries
-        * Updates feedback messages
-        * Monitors data availability
-
-        :return: SUCCESS if data processed, RUNNING if waiting
+        Return failure when available data has no owning pipeline.
         """
         if self.start_timer is None:
-            self.start_timer = timer()
+            self.start_timer = default_timer()
 
-        all_crs_have_data = True
-        for collection_reader in self.collection_readers:
-            all_crs_have_data = (
-                all_crs_have_data
-                & collection_reader.parameters.camera_interface.has_new_data()
-            )
-
-        if all_crs_have_data:
-            self.iterations_since_last_data = 0
-            self.rk_logger.debug(
-                "%s.update(): All CRs have new data! Creating a new CAS."
-                % self.__class__.__name__
-            )
-            end_timer = timer()
-            time_difference = end_timer - self.start_timer
-            self.rk_logger.debug("Waited for %f seconds \n" % time_difference)
-            self.start_timer = None
-            pipeline = self.get_parent_pipeline()
-            if pipeline is None:
-                self.feedback_message = "Pipeline is not set!"
-                return Status.FAILURE
-
-            # Special case: If there is already a query present in this CAS, we need to temporarily save it and set
-            # it in the new CAS
-            query = pipeline.cas.query
-
-            # Create a fresh CAS for the pipeline
-            pipeline.create_new_cas()
-            self.rk_logger.debug(
-                f"{self.__class__.__name__}.update(): New CAS id={pipeline.cas.cas_id}"
-            )
-
-            camera_config = self.descriptor.parameters.camera_config
-            if issubclass(type(camera_config), TfComponent):
-                cas = self.get_cas()
-                cas.world_frame = camera_config.tf_to
-                cas.camera_frame = camera_config.tf_from
-
-            # Restore any existing queries
-            if query:
-                pipeline.cas.query = query
-
-            for collection_reader in self.collection_readers:
-                collection_reader.parameters.camera_interface.set_data(self.get_cas())
-
-            self.feedback_message = (
-                f"Got sensor data... Waited for {time_difference} seconds"
-            )
-            if self.parent:
-                self.rk_logger.info("Current Behavior Tree:")
-                print(unicode_tree(self.parent))
-
-            return Status.SUCCESS
-
-        else:
+        camera_interface = self.descriptor.parameters.camera_interface
+        if not camera_interface.has_new_data():
             self.iterations_since_last_data += 1
             self.feedback_message = "Waiting for incoming sensor data ..."
             if (
@@ -204,26 +111,35 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 >= self.iterations_since_last_data_warn_threshold
             ):
                 self.rk_logger.warning(
-                    f"Didn't receive sensor data since {self.iterations_since_last_data} iterations."
+                    "Didn't receive sensor data since %s iterations.",
+                    self.iterations_since_last_data,
                 )
-                for collection_reader in self.collection_readers:
-                    self.rk_logger.warning(
-                        f"  CR data available?: {collection_reader.parameters.camera_interface.has_new_data()}"
-                    )
+                self.rk_logger.warning("Camera data available?: %s", False)
                 self.iterations_since_last_data = 0
             return Status.RUNNING
 
-    def terminate(self, new_status: Status) -> None:
-        """Handle behavior termination.
+        self.iterations_since_last_data = 0
+        time_difference = default_timer() - self.start_timer
+        self.start_timer = None
+        pipeline = self.get_parent_pipeline()
+        if pipeline is None:
+            self.feedback_message = "Pipeline is not set!"
+            return Status.FAILURE
 
-        :param new_status: New status (SUCCESS, FAILURE or INVALID)
-        """
-        self.rk_logger.debug(
-            "%s.terminate()[%s->%s]"
-            % (self.__class__.__name__, self.status, new_status)
+        query = pipeline.cas.query
+        pipeline.create_new_cas()
+        if query is not None:
+            pipeline.cas.query = query
+        camera_interface.set_data(pipeline.cas)
+
+        self.feedback_message = (
+            f"Got sensor data... Waited for {time_difference} seconds"
         )
-
-
-# ROS1 TO ROS2
-# The setup method in the ROS2 version has three parameters (timeout, node, visitor)
-# n the ROS2 version, STATUS are referenced as py_trees.common.Status.RUNNING and py_trees.common.Status.SUCCESS
+        self.rk_logger.debug(
+            "New CAS id=%s after waiting %f seconds",
+            pipeline.cas.cas_id,
+            time_difference,
+        )
+        if self.parent is not None:
+            self.rk_logger.info("Current Behavior Tree:\n%s", unicode_tree(self.parent))
+        return Status.SUCCESS

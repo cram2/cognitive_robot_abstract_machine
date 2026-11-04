@@ -9,7 +9,7 @@ from collections.abc import Iterable, Iterator
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing_extensions import TYPE_CHECKING
 
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -36,7 +36,7 @@ from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentShelf,
     RelationalCircuitExperimentShelfLayer,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
     Pose,
@@ -88,7 +88,7 @@ class PreprocessedObject:
     """
     Pose of the object.
 
-    ``roll``/``pitch``/``yaw`` are in radians, as :class:`~semantic_digital_twin.spatial_types.spatial_types.Pose`
+    ``roll``/``pitch``/``yaw`` are in radians, as :class:`~krrood_spatial_math.spatial_types.Pose`
     requires -- everywhere else in this schema reasons about rotation in degrees, so it is
     converted at the boundary where a value enters or leaves this field.
     """
@@ -98,12 +98,12 @@ class PreprocessedObject:
     Identifier used to look up the PLY mesh file for this object in the dataset.
     """
 
-    description: Optional[str] = None
+    description: str | None = None
     """
     Free-text description of the object as written in the source dataset.
     """
 
-    place_guidance: Optional[str] = None
+    place_guidance: str | None = None
     """
     Free-text description of where the object is meant to be placed, as written in the
     source dataset.
@@ -642,8 +642,9 @@ class ShelfExtractor:
 
         ordered_groups = sorted(
             objects_by_label.values(),
-            key=lambda objects: sum(float(object_.pose.z) for object_ in objects)
-            / len(objects),
+            key=lambda objects: (
+                sum(float(object_.pose.z) for object_ in objects) / len(objects)
+            ),
         )
         # The shelf's recorded position is its mesh's origin, so its real base and
         # top follow from where the mesh reaches around that origin.
@@ -968,7 +969,7 @@ class Sage10kPreprocessingRun:
         )
 
     def _streamed_raw_objects(
-        self, session: Session, room_ids: Optional[list[str]] = None
+        self, session: Session, room_ids: list[str] | None = None
     ) -> Iterator[Sage10kObjectDAO]:
         """
         Walk raw objects, in chunks, with the pose relationships already loaded.
@@ -1145,15 +1146,15 @@ def main() -> None:
     sage10k_database_uri = os.environ.get("SAGE10k_DATABASE_URI")
     processed_database_uri = os.environ.get("SAGE10K_PROCESSED_DATABASE_URI")
     scenes_root = os.environ.get("SAGE10K_SCENES_ROOT")
-    assert (
-        sage10k_database_uri is not None
-    ), "Please set the SAGE10k_DATABASE_URI environment variable."
-    assert (
-        processed_database_uri is not None
-    ), "Please set the SAGE10K_PROCESSED_DATABASE_URI environment variable."
-    assert (
-        scenes_root is not None
-    ), "Please set the SAGE10K_SCENES_ROOT environment variable."
+    assert sage10k_database_uri is not None, (
+        "Please set the SAGE10k_DATABASE_URI environment variable."
+    )
+    assert processed_database_uri is not None, (
+        "Please set the SAGE10K_PROCESSED_DATABASE_URI environment variable."
+    )
+    assert scenes_root is not None, (
+        "Please set the SAGE10K_SCENES_ROOT environment variable."
+    )
 
     Sage10kPreprocessingRun(
         sage10k_database_uri=sage10k_database_uri,

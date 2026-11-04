@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from unittest.mock import PropertyMock, patch
 
 import pytest
 from random_events.interval import closed
@@ -27,7 +26,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from random_events.product_algebra import Event, SimpleEvent
-from typing_extensions import Any, List, Tuple
+from typing_extensions import Any
 
 
 @pytest.fixture
@@ -89,13 +88,13 @@ def regions(
     circuit_writing_one_range_two_ways: ProbabilisticCircuit,
     cause: Continuous,
     effect: Continuous,
-) -> Tuple[SupportRegion, ...]:
+) -> tuple[SupportRegion, ...]:
     """
     The regions the causal circuit splits that cause into.
     """
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         circuit_writing_one_range_two_ways,
-        MarginalDeterminismTreeNode.from_causal_graph([cause], [effect]),
+        MarginalDeterminismTreeNode.from_variable_order([cause]),
         [cause],
         [effect],
     )
@@ -106,7 +105,7 @@ def regions(
 
 
 def test_a_range_written_two_ways_is_one_region(
-    regions: Tuple[SupportRegion, ...],
+    regions: tuple[SupportRegion, ...],
 ) -> None:
     """
     The circuit holds two ranges of the cause, so the regions are two: the range both
@@ -116,13 +115,13 @@ def test_a_range_written_two_ways_is_one_region(
 
 
 def test_the_regions_hold_the_whole_circuit_between_them(
-    regions: Tuple[SupportRegion, ...],
+    regions: tuple[SupportRegion, ...],
 ) -> None:
     assert sum(region.probability for region in regions) == pytest.approx(1.0)
 
 
 def test_each_region_holds_the_share_of_the_circuit_its_branches_carry(
-    regions: Tuple[SupportRegion, ...],
+    regions: tuple[SupportRegion, ...],
 ) -> None:
     """
     The range both branches hold carries three quarters of the circuit and the range
@@ -149,7 +148,7 @@ class SupportListedInReverse:
     """
 
     @property
-    def simple_sets(self) -> List[SimpleEvent]:
+    def simple_sets(self) -> list[SimpleEvent]:
         """
         :return: The simple sets of the support, last one first.
         """
@@ -181,13 +180,13 @@ def two_equally_weighted_regions(
         root.add_subcircuit(branch, math.log(0.5))
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([cause], [effect]),
+        MarginalDeterminismTreeNode.from_variable_order([cause]),
         [cause],
         [effect],
     )
 
 
-def values_of(regions: List[SupportRegion], cause: Continuous) -> List[Any]:
+def values_of(regions: list[SupportRegion], cause: Continuous) -> list[Any]:
     """
     :param regions: The regions a cause was split into.
     :param cause: The cause the regions are of.
@@ -197,7 +196,9 @@ def values_of(regions: List[SupportRegion], cause: Continuous) -> List[Any]:
 
 
 def test_the_regions_come_in_the_order_of_their_values(
-    two_equally_weighted_regions: CausalCircuit, cause: Continuous
+    two_equally_weighted_regions: CausalCircuit,
+    cause: Continuous,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
     The order a support happens to list its branches in must not reach the regions: a
@@ -206,13 +207,8 @@ def test_the_regions_come_in_the_order_of_their_values(
     """
     circuit = two_equally_weighted_regions.probabilistic_circuit
     reversed_support = SupportListedInReverse(circuit.support)
-    with patch.object(
-        type(circuit), "support", new_callable=PropertyMock
-    ) as support_of_circuit:
-        support_of_circuit.return_value = reversed_support
-        regions = two_equally_weighted_regions._extract_disjoint_regions_for_variable(
-            cause
-        )
+    monkeypatch.setattr(type(circuit), "support", property(lambda _: reversed_support))
+    regions = two_equally_weighted_regions._extract_disjoint_regions_for_variable(cause)
     values = values_of(regions, cause)
     assert values == sorted(values)
 

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 
 import numpy as np
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Dict, List, Tuple
 
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.probabilistic_circuit.groundable_circuit import (
@@ -139,7 +139,7 @@ class LayeredProducts:
 
     def conditioned_copy_factors(
         self, variables: SortedSet[Variable]
-    ) -> List[ProductFactor]:
+    ) -> list[ProductFactor]:
         """
         :param variables: The variables of the circuit the layer is attached to.
         :return: A factor per conditioned copies, whose ``i``-th node is the root of
@@ -147,14 +147,14 @@ class LayeredProducts:
             stacked once.
         """
         products = self.product_indices
-        stacked_of_copies: Dict[Tuple[int, Tuple[Variable, ...]], StackedLayer] = {}
+        stacked_of_copies: dict[tuple[int, tuple[Variable, ...]], StackedLayer] = {}
         result = []
         for copies in self.products.conditioned_copies:
             key = (id(copies.circuit), tuple(copies.variables))
             if key not in stacked_of_copies:
                 stacked_of_copies[key] = self.stacked_copies(copies)
             stacked = stacked_of_copies[key]
-            layer = stacked.layer.__deepcopy__({})
+            layer = copy.deepcopy(stacked.layer)
             layer.remap_variables(self.variable_remapping(copies, variables))
             roots = stacked.nodes_of_copy(
                 products, np.zeros(len(products), dtype=np.int64)
@@ -184,7 +184,7 @@ class LayeredProducts:
             dtype=np.int64,
         )
 
-    def point_mass_factors(self, variables: SortedSet[Variable]) -> List[ProductFactor]:
+    def point_mass_factors(self, variables: SortedSet[Variable]) -> list[ProductFactor]:
         """
         :param variables: The variables of the circuit the layer is attached to.
         :return: A factor per point mass variable, whose ``i``-th node is the point mass
@@ -208,14 +208,14 @@ class LayeredProducts:
             for variable, values in self.products.point_masses.items()
         ]
 
-    def component_factors(self, variables: SortedSet[Variable]) -> List[ProductFactor]:
+    def component_factors(self, variables: SortedSet[Variable]) -> list[ProductFactor]:
         """
         :param variables: The variables of the circuit the layer is attached to.
         :return: A factor per component, multiplied only by its own product.
         """
         result = []
         for index, component in enumerate(self.products.components):
-            component = component.__deepcopy__()
+            component = copy.deepcopy(component)
             component.restore_variables(variables)
             result.append(
                 ProductFactor(

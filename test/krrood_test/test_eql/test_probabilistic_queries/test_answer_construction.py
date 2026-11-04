@@ -145,11 +145,7 @@ def test_a_variable_named_like_several_attributes_is_refused(monkeypatch):
         AttributeMatch, "name_from_variable_access_path", property(lambda _: "Die.face")
     )
     with pytest.raises(AmbiguousVariableName) as error:
-        list(
-            parameters.construct_instances_from_model_samples(
-                [variable], np.array([[1.0]])
-            )
-        )
+        list(parameters.bindings_from_model_samples([variable], np.array([[1.0]])))
     assert error.value.variable is variable
     assert len(error.value.attribute_matches) == 2
 

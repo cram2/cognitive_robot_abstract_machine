@@ -15,7 +15,7 @@ from krrood.parametrization.model_registries import (
 )
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Point3,

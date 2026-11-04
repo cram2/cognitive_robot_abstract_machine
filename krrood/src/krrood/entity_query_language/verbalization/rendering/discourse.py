@@ -4,15 +4,7 @@ import uuid
 from abc import abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import (
-    TYPE_CHECKING,
-    ClassVar,
-    Dict,
-    FrozenSet,
-    Optional,
-    Protocol,
-    runtime_checkable,
-)
+from typing_extensions import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.operators.logical_quantifiers import (
@@ -45,11 +37,11 @@ class DiscourseView(Protocol):
     focus referent is.
     """
 
-    def is_scope(self, source: Optional[FoldNode]) -> bool: ...
+    def is_scope(self, source: FoldNode | None) -> bool: ...
 
-    def focus_of(self, source: Optional[FoldNode]) -> Optional[uuid.UUID]: ...
+    def focus_of(self, source: FoldNode | None) -> uuid.UUID | None: ...
 
-    def is_selected_quantity(self, node_id: Optional[uuid.UUID]) -> bool: ...
+    def is_selected_quantity(self, node_id: uuid.UUID | None) -> bool: ...
 
 
 class DiscourseScopeRule(SpecificityRule):
@@ -80,9 +72,7 @@ class DiscourseScopeRule(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def focus(
-        cls, node: SymbolicExpression, microplan: Microplan
-    ) -> Optional[uuid.UUID]:
+    def focus(cls, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
         """:return: The id of *node*'s focus referent — the one a possessive pronoun in its body
         resolves to (``None`` when the scope has no single subject)."""
 
@@ -99,9 +89,7 @@ class QueryScope(DiscourseScopeRule):
     construct = Query
 
     @classmethod
-    def focus(
-        cls, node: SymbolicExpression, microplan: Microplan
-    ) -> Optional[uuid.UUID]:
+    def focus(cls, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
         """:return: The query's focus referent, read from its plan.
 
         >>> robot = variable(Robot, [])
@@ -114,7 +102,7 @@ class QueryScope(DiscourseScopeRule):
         return cls._focus_from_plan(microplan.plan_for(node, QueryPlanner))
 
     @staticmethod
-    def _focus_from_plan(plan: QueryPlan) -> Optional[uuid.UUID]:
+    def _focus_from_plan(plan: QueryPlan) -> uuid.UUID | None:
         """:return: The focus referent id for a query plan — the aggregation source for an
         aggregation value-subquery, else the WHERE subject, else the single common chain root (so a
         subject-less query like a ``set_of`` still pronominalises *"its …"*), else ``None``.
@@ -146,9 +134,7 @@ class QuantifierScope(DiscourseScopeRule):
     construct = QuantifiedConditional
 
     @classmethod
-    def focus(
-        cls, node: SymbolicExpression, microplan: Microplan
-    ) -> Optional[uuid.UUID]:
+    def focus(cls, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
         """:return: The bound variable's referent id — the condition's chains rooted there
         pronominalise.
 
@@ -172,13 +158,13 @@ class DiscourseModel:
     model, so neither the rules nor the coreference pass re-derive it.
     """
 
-    _focus_by_scope: Dict[uuid.UUID, Optional[uuid.UUID]]
+    _focus_by_scope: dict[uuid.UUID, uuid.UUID | None]
     """
     The focus referent id of each scope, keyed by the scope node's id (``None`` when the
     scope has no single subject, e.g. a set-of).
     """
 
-    _selected_quantities: FrozenSet[uuid.UUID] = frozenset()
+    _selected_quantities: frozenset[uuid.UUID] = frozenset()
     """
     Node ids of the quantities a query *selects* — an aggregation's measured attribute
     (the ``battery`` behind ``average(m.assigned_to.battery)``).
@@ -217,7 +203,7 @@ class DiscourseModel:
         >>> model.focus_of(existential) == robot._id_
         True
         """
-        focus: Dict[uuid.UUID, Optional[uuid.UUID]] = {}
+        focus: dict[uuid.UUID, uuid.UUID | None] = {}
         selected_quantities: set[uuid.UUID] = set()
         for node in expression._all_expressions_:
             scope_rule = DiscourseScopeRule.most_applicable(node, microplan)
@@ -230,7 +216,7 @@ class DiscourseModel:
                 selected_quantities.add(leaf._id_)
         return cls(focus, frozenset(selected_quantities))
 
-    def is_scope(self, source: Optional[FoldNode]) -> bool:
+    def is_scope(self, source: FoldNode | None) -> bool:
         """:return: ``True`` when *source* is a query node that opens a discourse scope.
 
         Only a real expression carries an ``_id_``; a synthetic coordination artifact (or ``None``)
@@ -243,7 +229,7 @@ class DiscourseModel:
             return False
         return source._id_ in self._focus_by_scope
 
-    def focus_of(self, source: Optional[FoldNode]) -> Optional[uuid.UUID]:
+    def focus_of(self, source: FoldNode | None) -> uuid.UUID | None:
         """:return: The focus referent of *source*'s scope, or ``None``.
 
         >>> EMPTY_DISCOURSE.focus_of(None) is None
@@ -253,7 +239,7 @@ class DiscourseModel:
             return None
         return self._focus_by_scope.get(source._id_)
 
-    def is_selected_quantity(self, node_id: Optional[uuid.UUID]) -> bool:
+    def is_selected_quantity(self, node_id: uuid.UUID | None) -> bool:
         """:return: ``True`` when *node_id* is a quantity the query selects (e.g. an aggregation's
         measured attribute), so its repeat mention reduces to a bare *"the <attribute>"*.
 

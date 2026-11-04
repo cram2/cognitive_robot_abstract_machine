@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Type, Any
+from typing_extensions import Any
 
-from krrood.exceptions import DataclassException, InputError
+from krrood.exceptions import InputError
+from probabilistic_model.exceptions import ProbabilisticModelException
 
 
 @dataclass
@@ -57,7 +58,7 @@ class InvalidAggregatedFieldError(InputError):
 
 
 @dataclass
-class OutOfDomainValueError(DataclassException):
+class OutOfDomainValueError(ProbabilisticModelException):
     """
     Raised when a computed aggregation statistic falls outside the training domain of
     its latent variable.
@@ -84,13 +85,13 @@ class OutOfDomainValueError(DataclassException):
 
 
 @dataclass
-class UnsupportedFeatureTypeError(DataclassException):
+class UnsupportedFeatureTypeError(ProbabilisticModelException):
     """
     Raised when a feature column has a type that cannot be preprocessed for a
     :class:`~probabilistic_model.learning.jpt.jpt.JointProbabilityTree`.
     """
 
-    feature_type: Type
+    feature_type: type
     """
     The unsupported type encountered during preprocessing.
     """

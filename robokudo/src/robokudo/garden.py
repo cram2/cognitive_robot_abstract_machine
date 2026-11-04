@@ -20,7 +20,7 @@ from py_trees.common import Duration, ParallelPolicy, OneShotPolicy
 from py_trees.composites import Parallel
 from py_trees.decorators import OneShot
 from py_trees_ros.trees import BehaviourTree
-from typing_extensions import TYPE_CHECKING, List, Optional, Type
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap
 from robokudo.vis.visualizer_manager import VisualizationManager
@@ -35,7 +35,7 @@ def grow_tree(
     node: Node,
     include_gui: bool = True,
     run_once: bool = False,
-    visualizer_types: Optional[List[Type]] = None,
+    visualizer_types: list[type] | None = None,
 ) -> BehaviourTree:
     """
     Initialize a behavior tree with all required RoboKudo data structures.

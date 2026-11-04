@@ -12,7 +12,7 @@ import enum
 
 import pandas as pd
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
-from typing_extensions import Any, List
+from typing_extensions import Any
 
 
 class ObjectClass(enum.StrEnum):
@@ -41,7 +41,7 @@ class Feature(enum.StrEnum):
     """The object's semantic-annotation class."""
 
 
-def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
+def extract_feature_dataframe(objects: list[Any]) -> pd.DataFrame:
     """Extract the mass and class of each object as a feature dataframe.
 
     The :class:`FeatureExtractor` reads the mapped attributes of each object, and its

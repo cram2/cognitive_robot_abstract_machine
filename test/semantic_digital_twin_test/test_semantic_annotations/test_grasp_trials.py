@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 import pytest
 from krrood.parametrization.exceptions import UnboundedParameterError
 import trimesh
-from typing_extensions import List
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -23,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Twist,
@@ -45,7 +44,7 @@ class RecordingPerformer(GraspPerformer):
     Lifts the object by every grasp it performs, and remembers which grasps they were.
     """
 
-    tried: List[GraspCandidate] = field(default_factory=list)
+    tried: list[GraspCandidate] = field(default_factory=list)
     """
     The grasps tried so far.
     """

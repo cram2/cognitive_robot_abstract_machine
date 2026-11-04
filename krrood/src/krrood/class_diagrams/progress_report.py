@@ -14,7 +14,6 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
-from typing_extensions import Optional
 
 LINE_PREFIX = "krrood-class-diagram-progress "
 """
@@ -66,7 +65,7 @@ class ClassDiagramProgress:
     """
 
     @classmethod
-    def from_line(cls, line: str) -> Optional[ClassDiagramProgress]:
+    def from_line(cls, line: str) -> ClassDiagramProgress | None:
         """
         Read a report back from a line of a process's output.
 

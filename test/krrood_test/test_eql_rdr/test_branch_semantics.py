@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 import pytest
-from typing_extensions import Iterable, List, Tuple
+from typing_extensions import Iterable
 
 from krrood.entity_query_language.factories import add, variable
 from krrood.entity_query_language.rdr.branch_semantics import (
@@ -53,7 +53,7 @@ class Species(Enum):
 
 def _identified_guards(
     guards: Iterable[GuardCondition],
-) -> List[Tuple[str, bool]]:
+) -> list[tuple[str, bool]]:
     """
     Render guards as ``(expression id, polarity)`` pairs for comparison.
 
@@ -95,11 +95,11 @@ class PrioritySelectorBranchSemantics(SelectorBranchSemantics[PrioritySelector])
     """
 
     @classmethod
-    def sibling_guards(cls, selector, negated, decompose) -> List[GuardCondition]:
+    def sibling_guards(cls, selector, negated, decompose) -> list[GuardCondition]:
         return decompose(selector.left, negated)
 
     @classmethod
-    def branches(cls, selector, decompose) -> List[GuardedBranch]:
+    def branches(cls, selector, decompose) -> list[GuardedBranch]:
         return [GuardedBranch(selector.right, ()), GuardedBranch(selector.left, ())]
 
 
@@ -110,11 +110,11 @@ class FirstCollidingSemantics(SelectorBranchSemantics[UnclaimedSelector]):
     """
 
     @classmethod
-    def sibling_guards(cls, selector, negated, decompose) -> List[GuardCondition]:
+    def sibling_guards(cls, selector, negated, decompose) -> list[GuardCondition]:
         raise NotImplementedError
 
     @classmethod
-    def branches(cls, selector, decompose) -> List[GuardedBranch]:
+    def branches(cls, selector, decompose) -> list[GuardedBranch]:
         raise NotImplementedError
 
 
@@ -125,11 +125,11 @@ class SecondCollidingSemantics(SelectorBranchSemantics[UnclaimedSelector]):
     """
 
     @classmethod
-    def sibling_guards(cls, selector, negated, decompose) -> List[GuardCondition]:
+    def sibling_guards(cls, selector, negated, decompose) -> list[GuardCondition]:
         raise NotImplementedError
 
     @classmethod
-    def branches(cls, selector, decompose) -> List[GuardedBranch]:
+    def branches(cls, selector, decompose) -> list[GuardedBranch]:
         raise NotImplementedError
 
 

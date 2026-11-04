@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
 import trimesh
 from scipy import ndimage
 
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Mesh, Box, Scale
 
 
@@ -600,7 +599,7 @@ class BoxDecomposer(MeshDecomposer):
     Overlap threshold at which two boards are merged into one.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> List[Box]:
+    def apply_to_mesh(self, mesh: Mesh) -> list[Box]:
         """
         Decompose a mesh into boxes.
 

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
-from coraplex.robot_plans.actions.base import ActionDescription
+
+from cramph.node import StatechartNode
+from coraplex.robot_plans.actions.base import SequentialAction
 from coraplex.robot_plans.actions.core.navigation import FaceAtAction, LookAtAction
 
 
-@dataclass
-class FaceAndLookAtAction(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class FaceAndLookAtAction(SequentialAction):
     """
     Turns the robot's base towards a target, then looks at it.
     """
@@ -24,6 +24,5 @@ class FaceAndLookAtAction(ActionDescription):
     The look at the target once the base faces it.
     """
 
-    @property
-    def _action_plan(self) -> PlanNode:
-        return sequential([self.face_at, self.look_at])
+    def create_steps(self) -> list[StatechartNode]:
+        return [self.face_at, self.look_at]

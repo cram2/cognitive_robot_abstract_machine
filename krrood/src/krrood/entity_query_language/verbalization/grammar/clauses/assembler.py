@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.query.builders import OrderedByBuilder
@@ -93,7 +92,7 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
             )
         return PhraseFragment(parts=[Keywords.GROUPED_BY.as_fragment(), groups_phrase])
 
-    def clause(self, node: Query) -> Optional[VerbalizationFragment]:
+    def clause(self, node: Query) -> VerbalizationFragment | None:
         """
         :param node: The query being rendered.
         :return: The in-query GROUP BY clause, or ``None`` when there are no group keys.
@@ -112,7 +111,7 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
         return self.realize(node, plan) if plan.has_keys else None
 
     def _keys_phrase(
-        self, variables: List[SymbolicExpression]
+        self, variables: list[SymbolicExpression]
     ) -> VerbalizationFragment:
         """
         :param variables: The group-by key expressions.
@@ -167,7 +166,7 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
             ]
         )
 
-    def clause(self, query: Query) -> Optional[VerbalizationFragment]:
+    def clause(self, query: Query) -> VerbalizationFragment | None:
         """
         :param query: The query being rendered.
         :return: The in-query ORDER BY clause, or ``None`` when the query is unordered.
@@ -204,7 +203,7 @@ class HavingAssembler(Assembler[Query, None]):
         having_fragment = self.context.child(node._having_expression_.condition)
         return PhraseFragment(parts=[Keywords.WHERE.as_fragment(), having_fragment])
 
-    def clause(self, query: Query) -> Optional[VerbalizationFragment]:
+    def clause(self, query: Query) -> VerbalizationFragment | None:
         """
         :param query: The query being rendered.
         :return: The trailing *"where <condition>"* HAVING clause, or ``None`` when there is no

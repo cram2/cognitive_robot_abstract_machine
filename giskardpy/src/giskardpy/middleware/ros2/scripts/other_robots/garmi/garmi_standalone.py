@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 import argparse
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.other_robots.garmi.configs import (
     GarmiInteractiveMarkerChain,
-    GarmiStandaloneInterface,
     WorldWithGarmiConfig,
 )
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     InteractiveMarkerNode,
 )
-from giskardpy.middleware.ros2.server_config import ExecutionMode, GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
@@ -29,12 +27,8 @@ def main() -> None:
     rospy.init_node("giskard")
     robot_description = load_xacro("package://garmi_description/urdf/garmi.urdf")
 
-    giskard = Giskard(
+    giskard = Giskard.standalone(
         world_config=WorldWithGarmiConfig(urdf=robot_description),
-        robot_interface_config=GarmiStandaloneInterface(),
-        server_config=GiskardServerConfig(
-            execution_mode=ExecutionMode.STANDALONE, debug_mode=True
-        ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )
 

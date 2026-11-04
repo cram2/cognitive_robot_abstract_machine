@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import Optional
 
 from semantic_digital_twin.adapters.part_finding.client import RemotePartLocator
 from semantic_digital_twin.pipeline.mesh_decomposition.base import MeshDecomposer
@@ -50,7 +49,7 @@ class AnnotationPartFinder:
     benchmark had at least 0.5.
     """
 
-    decomposer: Optional[MeshDecomposer] = None
+    decomposer: MeshDecomposer | None = None
     """
     Gives the parts and the rest new collision shapes, for annotations whose root body's
     collision shapes differ from its visual shapes; see

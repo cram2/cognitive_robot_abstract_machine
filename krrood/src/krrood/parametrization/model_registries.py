@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing_extensions import Dict, Type
 
 from krrood.parametrization.exceptions import (
     RelationalCircuitRegistryRequiresMatch,
@@ -107,7 +106,7 @@ class DictRegistry(ModelRegistry):
     A registry that uses a dictionary to keep all models.
     """
 
-    models: Dict[Type, ProbabilisticModel]
+    models: dict[type, ProbabilisticModel]
     """
     A dictionary that maps classes to probabilistic models.
     """
@@ -231,7 +230,7 @@ class CausalCircuitRegistry(ModelRegistry):
     :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`.
     """
 
-    circuits: Dict[Type, CausalCircuit]
+    circuits: dict[type, CausalCircuit]
     """
     A dictionary that maps classes to pre-built causal circuits.
     """

@@ -8,11 +8,10 @@ import json
 import pathlib
 import zoneinfo
 from functools import cache
-from typing import Generic
+from typing_extensions import Any, TypeVar, Generic
 
 import numpy as np
 from sqlalchemy import Dialect, TypeDecorator, types
-from typing_extensions import Any, Optional, Type, TypeVar
 
 from krrood.adapters.json_serializer import JSONData
 from krrood.ormatic.exceptions import ZoneInfoWithoutKey
@@ -46,7 +45,7 @@ class ValueType(TypeDecorator, Generic[T]):
     """
 
     @property
-    def python_type(self) -> Type[T]:
+    def python_type(self) -> type[T]:
         """
         :return: The type of the values this column holds.
         """
@@ -54,7 +53,7 @@ class ValueType(TypeDecorator, Generic[T]):
 
     @classmethod
     @cache
-    def bound_type(cls) -> Type[T]:
+    def bound_type(cls) -> type[T]:
         """
         :return: The type bound to the type parameter of this class, looked up once per
             class since it is read for every value that is loaded.
@@ -70,14 +69,12 @@ class TextValueType(ValueType[T]):
 
     impl = types.Text
 
-    def process_bind_param(self, value: Optional[T], dialect: Dialect) -> Optional[str]:
+    def process_bind_param(self, value: T | None, dialect: Dialect) -> str | None:
         if value is None:
             return None
         return str(value)
 
-    def process_result_value(
-        self, value: Optional[str], dialect: Dialect
-    ) -> Optional[T]:
+    def process_result_value(self, value: str | None, dialect: Dialect) -> T | None:
         if value is None:
             return None
         return self.python_type(value)
@@ -88,12 +85,12 @@ class NumpyScalarType(ValueType[T]):
     Column type for numpy scalars, stored as the matching Python scalar.
     """
 
-    def process_bind_param(self, value: Optional[T], dialect: Dialect) -> Any:
+    def process_bind_param(self, value: T | None, dialect: Dialect) -> Any:
         if value is None:
             return None
         return value.item()
 
-    def process_result_value(self, value: Any, dialect: Dialect) -> Optional[T]:
+    def process_result_value(self, value: Any, dialect: Dialect) -> T | None:
         if value is None:
             return None
         return self.python_type(value)
@@ -111,14 +108,12 @@ class TypeType(ValueType[type]):
     impl = types.String(256)
     cache_ok = True
 
-    def process_bind_param(
-        self, value: Optional[Type], dialect: Dialect
-    ) -> Optional[str]:
+    def process_bind_param(self, value: type | None, dialect: Dialect) -> str | None:
         if value is None:
             return None
         return module_and_class_name(value)
 
-    def process_result_value(self, value: impl, dialect: Dialect) -> Optional[Type]:
+    def process_result_value(self, value: impl, dialect: Dialect) -> type | None:
         if value is None:
             return None
         return resolve_class_from_full_name(str(value))
@@ -133,16 +128,16 @@ class PolymorphicEnumType(ValueType[enum.Enum]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Optional[enum.Enum], dialect: Dialect
-    ) -> Optional[str]:
+        self, value: enum.Enum | None, dialect: Dialect
+    ) -> str | None:
         if value is None:
             return None
         # Store as 'module.path.ClassName.MEMBER_NAME'
         return f"{value.__class__.__module__}.{value.__class__.__name__}.{value.name}"
 
     def process_result_value(
-        self, value: Optional[str], dialect: Dialect
-    ) -> Optional[enum.Enum]:
+        self, value: str | None, dialect: Dialect
+    ) -> enum.Enum | None:
         if value is None:
             return None
 
@@ -168,7 +163,7 @@ class JSONDataType(ValueType[JSONData]):
     impl = types.String
     cache_ok = True
 
-    def process_bind_param(self, value: Optional[JSONData], dialect: Dialect):
+    def process_bind_param(self, value: JSONData | None, dialect: Dialect):
         """
         Store the value as-is (already JSON-serializable).
         """
@@ -201,8 +196,8 @@ class DateTimeType(ValueType[datetime.datetime]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Optional[datetime.datetime], dialect: Dialect
-    ) -> Optional[datetime.datetime]:
+        self, value: datetime.datetime | None, dialect: Dialect
+    ) -> datetime.datetime | None:
         if value is None or value.tzinfo is None:
             return value
         return value.astimezone(datetime.timezone.utc)
@@ -217,8 +212,8 @@ class ZoneInfoType(TextValueType[zoneinfo.ZoneInfo]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Optional[zoneinfo.ZoneInfo], dialect: Dialect
-    ) -> Optional[str]:
+        self, value: zoneinfo.ZoneInfo | None, dialect: Dialect
+    ) -> str | None:
         if value is not None and value.key is None:
             raise ZoneInfoWithoutKey(value)
         return super().process_bind_param(value, dialect)
@@ -302,15 +297,15 @@ class ByteArrayType(ValueType[bytearray]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Optional[bytearray], dialect: Dialect
-    ) -> Optional[bytes]:
+        self, value: bytearray | None, dialect: Dialect
+    ) -> bytes | None:
         if value is None:
             return None
         return bytes(value)
 
     def process_result_value(
-        self, value: Optional[bytes], dialect: Dialect
-    ) -> Optional[bytearray]:
+        self, value: bytes | None, dialect: Dialect
+    ) -> bytearray | None:
         if value is None:
             return None
         return bytearray(value)
@@ -331,16 +326,16 @@ class NumpyType(ValueType[np.ndarray]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Optional[np.ndarray], dialect: Dialect
-    ) -> Optional[bytes]:
+        self, value: np.ndarray | None, dialect: Dialect
+    ) -> bytes | None:
         if value is None:
             return None
         array = np.asarray(value, dtype=np.float64)
         return array.tobytes(order="C")
 
     def process_result_value(
-        self, value: Optional[bytes], dialect: Dialect
-    ) -> Optional[np.ndarray]:
+        self, value: bytes | None, dialect: Dialect
+    ) -> np.ndarray | None:
         if value is None:
             return None
         return np.frombuffer(value, dtype=np.float64)
@@ -358,8 +353,8 @@ class NumpyArrayType(ValueType[np.ndarray]):
     cache_ok = True
 
     def process_bind_param(
-        self, value: Optional[np.ndarray], dialect: Dialect
-    ) -> Optional[bytes]:
+        self, value: np.ndarray | None, dialect: Dialect
+    ) -> bytes | None:
         if value is None:
             return None
         buffer = io.BytesIO()
@@ -367,8 +362,8 @@ class NumpyArrayType(ValueType[np.ndarray]):
         return buffer.getvalue()
 
     def process_result_value(
-        self, value: Optional[bytes], dialect: Dialect
-    ) -> Optional[np.ndarray]:
+        self, value: bytes | None, dialect: Dialect
+    ) -> np.ndarray | None:
         if value is None:
             return None
         return np.load(io.BytesIO(value), allow_pickle=False)

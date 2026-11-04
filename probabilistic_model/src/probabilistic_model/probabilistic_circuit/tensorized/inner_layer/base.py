@@ -5,19 +5,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
-from typing_extensions import (
-    Any,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Self,
-    Tuple,
-)
+from typing_extensions import Any, Iterator, Self
 
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -60,7 +53,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(SubclassJSONSerializer, ABC):
+class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -71,7 +64,7 @@ class Layer(SubclassJSONSerializer, ABC):
 
     # %% structure
 
-    child_layers: List[Layer]
+    child_layers: list[Layer]
     """
     The layers that the nodes of this layer point to.
     """
@@ -126,16 +119,16 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def all_layers(self) -> List[Layer]:
+    def all_layers(self) -> list[Layer]:
         """
         :return: Every layer of the circuit rooted here, each exactly once, and every
             layer after all of its parents.
         """
-        postorder: List[Layer] = []
+        postorder: list[Layer] = []
         self._append_in_postorder(postorder, set())
         return postorder[::-1]
 
-    def _append_in_postorder(self, result: List[Layer], visited: set):
+    def _append_in_postorder(self, result: list[Layer], visited: set):
         """
         Append the layers of the circuit rooted here to ``result``, every layer after
         all of its descendants and each exactly once.
@@ -154,7 +147,7 @@ class Layer(SubclassJSONSerializer, ABC):
             child_layer._append_in_postorder(result, visited)
         result.append(self)
 
-    def all_layers_with_depth(self, depth: int = 0) -> List[LayerWithDepth]:
+    def all_layers_with_depth(self, depth: int = 0) -> list[LayerWithDepth]:
         """
         :param depth: The depth to report for this layer.
         :return: Every layer of the circuit rooted here with its depth. Layers that are
@@ -185,8 +178,8 @@ class Layer(SubclassJSONSerializer, ABC):
         return np.zeros(self.number_of_nodes, dtype=bool)
 
     def component_supports(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> List[NodeComponentSupports]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> list[NodeComponentSupports]:
         """
         :param variables: The variables of the circuit.
         :param cache: The shared cache of the current pass.
@@ -198,7 +191,7 @@ class Layer(SubclassJSONSerializer, ABC):
 
     @abstractmethod
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Calculate the log-likelihood of every node of this layer.
@@ -211,7 +204,7 @@ class Layer(SubclassJSONSerializer, ABC):
 
     @abstractmethod
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Calculate the cumulative distribution function of every node of this layer.
@@ -227,7 +220,7 @@ class Layer(SubclassJSONSerializer, ABC):
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeValues:
         """
         Calculate the probability of a simple event for every node of this layer.
@@ -241,8 +234,8 @@ class Layer(SubclassJSONSerializer, ABC):
 
     @abstractmethod
     def support_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> List[Event]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> list[Event]:
         """
         Calculate the support of every node of this layer.
 
@@ -254,8 +247,8 @@ class Layer(SubclassJSONSerializer, ABC):
 
     @abstractmethod
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> Tuple[List[Event], NodeValues]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> tuple[list[Event], NodeValues]:
         """
         Calculate the mode of every node of this layer.
 
@@ -270,7 +263,7 @@ class Layer(SubclassJSONSerializer, ABC):
         self,
         query: MomentQuery,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeVariableValues:
         """
         Calculate the moment of every node of this layer.
@@ -346,7 +339,7 @@ class Layer(SubclassJSONSerializer, ABC):
         self,
         event: SimpleEvent,
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         """
         Truncate every node of this layer to a simple event.
@@ -365,7 +358,7 @@ class Layer(SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
     def can_truncate_in_one_batch(
-        self, events: List[SimpleEvent], query: StructuralQuery
+        self, events: list[SimpleEvent], query: StructuralQuery
     ) -> bool:
         """
         Only an input layer can change its type when it is truncated, so every other
@@ -381,9 +374,9 @@ class Layer(SubclassJSONSerializer, ABC):
     @abstractmethod
     def log_truncated_of_simple_events(
         self,
-        events: List[SimpleEvent],
+        events: list[SimpleEvent],
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         """
         Truncate this layer to several simple events at once.
@@ -410,7 +403,7 @@ class Layer(SubclassJSONSerializer, ABC):
         self,
         point: PartialPointType,
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         """
         Condition every node of this layer on a partial point.
@@ -427,7 +420,7 @@ class Layer(SubclassJSONSerializer, ABC):
 
     def required_child_nodes(
         self, alive: NodeMask, log_probabilities: LogProbabilitiesOfLayers
-    ) -> List[Tuple[Layer, NodeMask]]:
+    ) -> list[tuple[Layer, NodeMask]]:
         """
         Determine which nodes of the direct children a set of live nodes still needs.
 
@@ -440,9 +433,9 @@ class Layer(SubclassJSONSerializer, ABC):
     @abstractmethod
     def rebuild(
         self,
-        needed: Dict[int, NodeMask],
-        rebuilt: Dict[int, Optional[Layer]],
-    ) -> Optional[Layer]:
+        needed: dict[int, NodeMask],
+        rebuilt: dict[int, Layer | None],
+    ) -> Layer | None:
         """
         Create the pruned version of this layer.
 
@@ -453,7 +446,7 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def prune(self, log_probabilities: LogProbabilitiesOfLayers) -> Optional[Layer]:
+    def prune(self, log_probabilities: LogProbabilitiesOfLayers) -> Layer | None:
         """
         Remove every impossible and every unreachable node of the circuit rooted here.
 
@@ -467,7 +460,7 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         order = self.all_layers()
 
-        needed: Dict[int, NodeMask] = {
+        needed: dict[int, NodeMask] = {
             id(self): np.ones(self.number_of_nodes, dtype=bool)
         }
         for layer in order:
@@ -483,7 +476,7 @@ class Layer(SubclassJSONSerializer, ABC):
                 else:
                     needed[id(child_layer)] = mask
 
-        rebuilt: Dict[int, Optional[Layer]] = {}
+        rebuilt: dict[int, Layer | None] = {}
         for layer in reversed(order):
             rebuilt[id(layer)] = layer.rebuild(needed, rebuilt)
 
@@ -491,8 +484,8 @@ class Layer(SubclassJSONSerializer, ABC):
 
     @abstractmethod
     def marginal(
-        self, kept: VariableMask, cache: Optional[QueryCache] = None
-    ) -> Optional[Layer]:
+        self, kept: VariableMask, cache: QueryCache | None = None
+    ) -> Layer | None:
         """
         Restrict this layer to a subset of the variables.
 
@@ -504,9 +497,7 @@ class Layer(SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def remap_variables(
-        self, remap: VariableIndices, cache: Optional[QueryCache] = None
-    ):
+    def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):
         """
         Rewrite the variable indices of this layer in-place.
 
@@ -515,7 +506,7 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def simplify(self, cache: Optional[QueryCache] = None) -> Layer:
+    def simplify(self, cache: QueryCache | None = None) -> Layer:
         """
         Remove layers that have no effect on the represented distribution.
 
@@ -571,7 +562,7 @@ class Layer(SubclassJSONSerializer, ABC):
     # %% structure
 
     @abstractmethod
-    def nodes_with_child_in(self, nodes_of_layers: Dict[int, NodeMask]) -> NodeMask:
+    def nodes_with_child_in(self, nodes_of_layers: dict[int, NodeMask]) -> NodeMask:
         """
         :param nodes_of_layers: Nodes of the layers below this layer, by the id of the
             layer. Every child layer must be a key.
@@ -586,15 +577,12 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         return np.zeros(self.number_of_nodes, dtype=bool)
 
-    def mixture_components(self) -> List[Tuple[Layer, int]]:
+    def mixture_components(self) -> list[tuple[Layer, int]]:
         """
         :return: The child layer and node of every component this layer mixes, if it
             is a single sum node, otherwise nothing.
         """
         return []
-
-    def __deepcopy__(self, memo=None) -> Layer:
-        raise NotImplementedError
 
     def reset_variables(self):
         """
@@ -624,7 +612,7 @@ class Layer(SubclassJSONSerializer, ABC):
     # %% serialization
 
     @classmethod
-    def serialized_fields(cls) -> List[dataclasses.Field]:
+    def serialized_fields(cls) -> list[dataclasses.Field]:
         """
         :return: The dataclass fields that describe a layer, which are the ones its
             constructor takes. The caches a layer fills in on its own are declared with
@@ -632,7 +620,7 @@ class Layer(SubclassJSONSerializer, ABC):
         """
         return [field_ for field_ in dataclasses.fields(cls) if field_.init]
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         """
         Serialize this layer through the fields it declares.
 
@@ -652,7 +640,7 @@ class Layer(SubclassJSONSerializer, ABC):
         return result
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             **{
                 field_.name: json_serializer.from_json(data[field_.name], **kwargs)
@@ -668,14 +656,14 @@ class InnerLayer(Layer, ABC):
     Abstract base class for the layers that have child layers.
     """
 
-    child_layers: List[Layer]
+    child_layers: list[Layer]
     """
     The child layers of this layer.
 
     The list is not copied.
     """
 
-    _variables_cache: Optional[VariableIndices] = field(
+    _variables_cache: VariableIndices | None = field(
         default=None, init=False, repr=False
     )
     """
@@ -686,9 +674,7 @@ class InnerLayer(Layer, ABC):
         self._variables_cache = None
 
     @memoized
-    def remap_variables(
-        self, remap: VariableIndices, cache: Optional[QueryCache] = None
-    ):
+    def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):
         for child_layer in self.child_layers:
             child_layer.remap_variables(remap, cache=cache)
         self.reset_variables()
@@ -740,7 +726,7 @@ class InnerLayer(Layer, ABC):
         """
         return iter(self.inner_layer_edges)
 
-    def nodes_with_child_in(self, nodes_of_layers: Dict[int, NodeMask]) -> NodeMask:
+    def nodes_with_child_in(self, nodes_of_layers: dict[int, NodeMask]) -> NodeMask:
         edges = self.inner_layer_edges
         child_in = np.zeros(len(edges.nodes), dtype=bool)
         for child_layer_index, child_layer in enumerate(self.child_layers):
@@ -773,7 +759,7 @@ class LeafLayer(Layer, ABC):
     ) -> StackedLayer:
         return StackedLayer.of_leaf_layer_copies(copies)
 
-    def nodes_with_child_in(self, nodes_of_layers: Dict[int, NodeMask]) -> NodeMask:
+    def nodes_with_child_in(self, nodes_of_layers: dict[int, NodeMask]) -> NodeMask:
         return np.zeros(self.number_of_nodes, dtype=bool)
 
     @classmethod

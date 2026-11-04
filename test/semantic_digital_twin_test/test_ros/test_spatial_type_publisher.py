@@ -8,7 +8,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
     SpatialTypePublisher,
 )
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 

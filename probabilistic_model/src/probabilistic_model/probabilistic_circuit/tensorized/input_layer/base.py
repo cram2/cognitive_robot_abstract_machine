@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -9,15 +10,7 @@ from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Self,
-    Tuple,
-    Type,
-)
+from typing_extensions import Any, Self
 
 from probabilistic_model.distributions.distributions import UnivariateDistribution
 from probabilistic_model.probabilistic_model import PartialPointType
@@ -72,9 +65,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
         return np.array([self.variable], dtype=np.int64)
 
     @memoized
-    def remap_variables(
-        self, remap: VariableIndices, cache: Optional[QueryCache] = None
-    ):
+    def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):
         self.variable = int(remap[self.variable])
 
     def column_of(self, events: SampleArray) -> SampleColumn:
@@ -104,7 +95,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
     @classmethod
     @abstractmethod
     def from_distributions(
-        cls, variable_index: int, distributions: List[UnivariateDistribution]
+        cls, variable_index: int, distributions: list[UnivariateDistribution]
     ) -> Self:
         """
         Create a layer from a list of distributions of the type of this layer.
@@ -125,7 +116,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
         """
         raise NotImplementedError
 
-    def node_distributions(self, variable: Variable) -> List[UnivariateDistribution]:
+    def node_distributions(self, variable: Variable) -> list[UnivariateDistribution]:
         """
         :param variable: The variable of this layer.
         :return: Every node of this layer as a univariate distribution.
@@ -139,8 +130,8 @@ class UnivariateInputLayer(LeafLayer, ABC):
 
     @memoized
     def support_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> List[Event]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> list[Event]:
         variable = variables[self.variable]
         return [
             distribution.support for distribution in self.node_distributions(variable)
@@ -148,15 +139,15 @@ class UnivariateInputLayer(LeafLayer, ABC):
 
     @memoized
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> Tuple[List[Event], NodeValues]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> tuple[list[Event], NodeValues]:
         variable = variables[self.variable]
         modes = [
             distribution.log_mode()
             for distribution in self.node_distributions(variable)
         ]
-        return [mode for mode, _ in modes], np.array(
-            [value for _, value in modes], dtype=float
+        return [mode.event for mode in modes], np.array(
+            [mode.log_likelihood for mode in modes], dtype=float
         )
 
     @memoized
@@ -164,7 +155,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
         self,
         query: MomentQuery,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeVariableValues:
         result = np.zeros((self.number_of_nodes, query.number_of_variables))
         if not query.requested[self.variable]:
@@ -264,15 +255,15 @@ class UnivariateInputLayer(LeafLayer, ABC):
 
         :param assignment: The assignment of the variable of this layer.
         :param singleton_allowed: Whether singletons are allowed.
-        :return: The truncated layer, with as many nodes as this one, and the
-            log-probabilities of its nodes.
+        :return: The truncated layer, with as many nodes as this one, and the log-
+            probabilities of its nodes.
         """
         raise NotImplementedError
 
     @abstractmethod
     def type_of_truncated_layer(
         self, assignment: AbstractCompositeSet, singleton_allowed: bool
-    ) -> Type[Layer]:
+    ) -> type[Layer]:
         """
         :param assignment: The assignment of the variable of this layer.
         :param singleton_allowed: Whether singletons are allowed.
@@ -286,7 +277,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
         self,
         event: SimpleEvent,
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         return query.log_probabilities.record(
             self.log_truncated_of_assignment(
@@ -295,7 +286,7 @@ class UnivariateInputLayer(LeafLayer, ABC):
         )
 
     def can_truncate_in_one_batch(
-        self, events: List[SimpleEvent], query: StructuralQuery
+        self, events: list[SimpleEvent], query: StructuralQuery
     ) -> bool:
         """
         The truncations to the events are joined with :meth:`concatenate`, which needs
@@ -311,9 +302,9 @@ class UnivariateInputLayer(LeafLayer, ABC):
     @memoized
     def log_truncated_of_simple_events(
         self,
-        events: List[SimpleEvent],
+        events: list[SimpleEvent],
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         variable = query.variables[self.variable]
         truncated = [
@@ -334,8 +325,8 @@ class UnivariateInputLayer(LeafLayer, ABC):
         Condition every node of this layer on a value of its variable at once.
 
         :param value: The value.
-        :return: The conditioned layer, with as many nodes as this one, and the
-            log-likelihoods of the value under its nodes.
+        :return: The conditioned layer, with as many nodes as this one, and the log-
+            likelihoods of the value under its nodes.
         """
         raise NotImplementedError
 
@@ -344,12 +335,12 @@ class UnivariateInputLayer(LeafLayer, ABC):
         self,
         point: PartialPointType,
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         variable = query.variables[self.variable]
         if variable not in point:
             result = LayerWithLogProbabilities(
-                self.__deepcopy__(), np.zeros(self.number_of_nodes)
+                copy.deepcopy(self), np.zeros(self.number_of_nodes)
             )
         else:
             result = self.log_conditional_of_value(point[variable])
@@ -357,20 +348,20 @@ class UnivariateInputLayer(LeafLayer, ABC):
 
     def rebuild(
         self,
-        needed: Dict[int, NodeMask],
-        rebuilt: Dict[int, Optional[Layer]],
-    ) -> Optional[Layer]:
+        needed: dict[int, NodeMask],
+        rebuilt: dict[int, Layer | None],
+    ) -> Layer | None:
         alive = needed[id(self)]
         if not alive.any():
             return None
         return self.select_nodes(alive)
 
     def marginal(
-        self, kept: VariableMask, cache: Optional[QueryCache] = None
-    ) -> Optional[Layer]:
+        self, kept: VariableMask, cache: QueryCache | None = None
+    ) -> Layer | None:
         if not kept[self.variable]:
             return None
-        return self.__deepcopy__()
+        return copy.deepcopy(self)
 
 
 @dataclass(eq=False, repr=False)
@@ -381,7 +372,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.log_likelihood_of_nodes_from_column(self.column_of(events))
 
@@ -403,7 +394,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeValues:
         interval: Interval = event[variables[self.variable]]
         result = np.zeros(self.number_of_nodes)
@@ -416,7 +407,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         return self.cumulative_distribution_of_nodes_from_column(self.column_of(events))
 
