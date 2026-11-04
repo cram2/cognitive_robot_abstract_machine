@@ -689,13 +689,14 @@ class ClassDiagram:
         :return: A dictionary where the keys are source node identifiers (int), and the
             values are sets of tuples representing association keys.
         """
-        assoc_keys_by_source = {}
-        for u, v, rel in self._dependency_graph.weighted_edge_list():
-            if isinstance(rel, Association):
-                assoc_keys_by_source.setdefault(u, set()).add(
-                    rel.get_key(include_field_name)
+        association_keys_by_source = {}
+        edges = self._dependency_graph.weighted_edge_list()
+        for source_index, _, relation in edges:
+            if isinstance(relation, Association):
+                association_keys_by_source.setdefault(source_index, set()).add(
+                    relation.get_key(include_field_name)
                 )
-        return assoc_keys_by_source
+        return association_keys_by_source
 
     @memoize
     def to_subdiagram_without_inherited_associations(
@@ -710,27 +711,28 @@ class ClassDiagram:
         """
         result = copy(self)
         result._dependency_graph = self._dependency_graph.copy()
-        g = result._dependency_graph
+        dependency_graph = result._dependency_graph
 
-        assoc_keys_by_source = result.get_assoc_keys_by_source(include_field_name)
+        association_keys_by_source = result.get_assoc_keys_by_source(include_field_name)
 
         # Mark redundant descendant association edges for removal
         edges_to_remove: list[int] = []
-        for edge_index, (u, v, rel) in g.edge_index_map().items():
-            if not isinstance(rel, Association):
+        edges = dependency_graph.edge_index_map().items()
+        for edge_index, (source_index, _, relation) in edges:
+            if not isinstance(relation, Association):
                 continue
 
-            key = rel.get_key(include_field_name)
-            # Collect all keys defined by any ancestor of u
+            key = relation.get_key(include_field_name)
+            # Collect all keys defined by any ancestor of the source
             inherited_keys: set[tuple] = set()
-            for anc in result.all_ancestors(u):
-                inherited_keys |= assoc_keys_by_source.get(anc, set())
+            for ancestor_index in result.all_ancestors(source_index):
+                inherited_keys |= association_keys_by_source.get(ancestor_index, set())
 
             if key in inherited_keys:
                 edges_to_remove.append(edge_index)
 
         for edge_index in edges_to_remove:
-            g.remove_edge_from_index(edge_index)
+            dependency_graph.remove_edge_from_index(edge_index)
 
         return result
 

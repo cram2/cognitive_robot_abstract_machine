@@ -91,7 +91,7 @@ def test_an_edge_to_a_node_the_graph_lacks_raises():
     outside = GraphNode(variable=Continuous("W"), level=NodeLevel.EXAMPLE_ATTRIBUTE)
 
     with pytest.raises(UnknownGraphNode):
-        graph.add_edge(GraphEdge.directed(graph.node("X"), outside))
+        graph.add_edge(GraphEdge.directed_edge(graph.node("X"), outside))
 
 
 def test_the_edge_between_two_nodes_is_found_from_either_end():
@@ -99,7 +99,9 @@ def test_the_edge_between_two_nodes_is_found_from_either_end():
     x, z = graph.node("X"), graph.node("Z")
 
     assert (
-        graph.edge_between(x, z) == graph.edge_between(z, x) == GraphEdge.directed(z, x)
+        graph.edge_between(x, z)
+        == graph.edge_between(z, x)
+        == GraphEdge.directed_edge(z, x)
     )
 
 

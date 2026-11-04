@@ -172,7 +172,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
             nodes,
             self.read_adjacency_matrix(graph, tested)
             + [
-                GraphEdge.directed(node_of[copy.source], node_of[copy.copy])
+                GraphEdge.directed_edge(node_of[copy.source], node_of[copy.copy])
                 for copy in domain_knowledge.deterministic_copies
             ],
         )

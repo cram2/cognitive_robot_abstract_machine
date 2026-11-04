@@ -54,8 +54,8 @@ def test_fork_with_tiers_is_recovered():
 
     season = graph.node("season")
     assert set(graph.edges()) == {
-        GraphEdge.directed(season, graph.node("ice_cream_sales")),
-        GraphEdge.directed(season, graph.node("drowning_incidents")),
+        GraphEdge.directed_edge(season, graph.node("ice_cream_sales")),
+        GraphEdge.directed_edge(season, graph.node("drowning_incidents")),
     }
 
 
@@ -81,7 +81,10 @@ def test_deterministic_copy_is_restored_as_child():
     graph = graph_of(chain_with_a_copy(), knowledge)
 
     a, b, d = graph.node("A"), graph.node("B"), graph.node("D")
-    assert set(graph.edges()) == {GraphEdge.directed(a, b), GraphEdge.directed(b, d)}
+    assert set(graph.edges()) == {
+        GraphEdge.directed_edge(a, b),
+        GraphEdge.directed_edge(b, d),
+    }
 
 
 def test_knowledge_naming_an_unknown_variable_raises():

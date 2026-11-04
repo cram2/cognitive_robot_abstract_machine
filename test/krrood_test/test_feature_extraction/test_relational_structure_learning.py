@@ -76,7 +76,7 @@ class EveryPairJoinedLearner(CausalStructureLearner):
         return CausalGraph.from_edges(
             nodes,
             [
-                GraphEdge.undirected(first, second)
+                GraphEdge.undirected_edge(first, second)
                 for first, second in itertools.combinations(nodes, 2)
             ],
         )

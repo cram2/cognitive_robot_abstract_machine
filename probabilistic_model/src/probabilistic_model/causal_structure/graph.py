@@ -142,7 +142,7 @@ class GraphEdge:
     """
 
     @classmethod
-    def directed(cls, parent: GraphNode, child: GraphNode) -> GraphEdge:
+    def directed_edge(cls, parent: GraphNode, child: GraphNode) -> GraphEdge:
         """
         :param parent: The cause.
         :param child: What it causes.
@@ -151,7 +151,7 @@ class GraphEdge:
         return cls(parent, child, EdgeMark.TAIL, EdgeMark.ARROW)
 
     @classmethod
-    def undirected(cls, first: GraphNode, second: GraphNode) -> GraphEdge:
+    def undirected_edge(cls, first: GraphNode, second: GraphNode) -> GraphEdge:
         """
         :param first: The node at one end.
         :param second: The node at the other end.

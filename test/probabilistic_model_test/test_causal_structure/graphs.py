@@ -39,11 +39,11 @@ def graph_of(
     return CausalGraph.from_edges(
         node_of.values(),
         [
-            GraphEdge.directed(node_of[parent], node_of[child])
+            GraphEdge.directed_edge(node_of[parent], node_of[child])
             for parent, child in directed
         ]
         + [
-            GraphEdge.undirected(node_of[first], node_of[second])
+            GraphEdge.undirected_edge(node_of[first], node_of[second])
             for first, second in undirected
         ],
     )
