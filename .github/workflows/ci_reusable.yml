@@ -20,6 +20,14 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ inputs.repo_lowercase }}
+    env:
+      # The tests never run on a GPU, so torch (pulled in through robokudo -> ultralytics) is
+      # installed from the CPU only PyTorch index. The CUDA build from PyPI adds several GB of
+      # nvidia wheels and exhausts the runner disk ("No space left on device").
+      # unsafe-best-match lets every other package still come from PyPI, since the PyTorch index
+      # also mirrors outdated versions of common packages such as packaging.
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,9 +67,8 @@ jobs:
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
-          # --no-sources keeps the editable workspace packages from being reinstalled from their paths;
-          # the CPU-only torch index avoids downloading the CUDA libraries onto the runner disk.
-          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources --extra-index-url https://download.pytorch.org/whl/cpu
+          # --no-sources keeps the editable workspace packages from being reinstalled from their paths.
+          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources
 
       - name: Restore cache
         uses: actions/cache/restore@v4
