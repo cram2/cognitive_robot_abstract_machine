@@ -15,6 +15,7 @@ from krrood.parametrization.model_registries import (
     UniformPriorRegistry,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.grasp_strategies import GraspStrategy
 from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
     ObjectRelativeGrasp,
@@ -88,9 +89,14 @@ class GraspTrials:
 
     result_pattern: Callable[[], Match[GraspResult]] | None = None
     """
-    Builds the pattern of the result the grasps asked for are to have had, such as :meth
-    :`~semantic_digital_twin.grasping.object_relative_grasp.GraspResult.lifting_pattern`
-    ; any result when ``None``.
+    Builds the pattern of the result the grasps asked for are to have had, such as
+    :meth:`GraspResult.lifting_pattern`; any result when ``None``.
+    """
+
+    grasp_strategy: GraspStrategy | None = None
+    """
+    Where the grasps are drawn from; the :attr:`grasped_part`'s own strategy when
+    ``None``.
     """
 
     @property
@@ -103,11 +109,12 @@ class GraspTrials:
     def drawn_grasps(self) -> list[ObjectRelativeGrasp]:
         """
         :return: :attr:`number_of_trials` grasps answering the statement of where
-            :attr:`grasped_part` may be grasped.
+            :attr:`grasp_strategy` allows :attr:`grasped_part` to be grasped.
         """
         part = self.grasped_part
+        strategy = self.grasp_strategy or part.grasp_strategy
         return draw_grasps(
-            part.grasp_strategy.statement(part, self.result_pattern),
+            strategy.statement(part, self.result_pattern),
             self.number_of_trials,
             self.model_registry,
         )

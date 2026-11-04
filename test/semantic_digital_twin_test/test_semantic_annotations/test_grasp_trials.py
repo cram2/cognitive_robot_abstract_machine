@@ -5,11 +5,13 @@ Trying grasps drawn from the statement of where an object may be grasped.
 from dataclasses import dataclass, field
 
 import pytest
+from krrood.bounds import Bounds
 from krrood.parametrization.exceptions import UnboundedParameterError
 import trimesh
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.grasping.grasp_trials import GraspPerformer, GraspTrials
 from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -128,6 +130,23 @@ def test_drawn_grasps_lie_where_the_annotation_states(carton):
             (grasp.roll, allowed["roll"]),
         ):
             assert interval.contains(value)
+
+
+def test_trials_draw_grasps_where_the_strategy_they_are_given_states(carton):
+    strategy = GraspFromAnySide(depth=Bounds(0.5, 0.8))
+    trials = GraspTrials(
+        graspable=carton,
+        performer=RecordingPerformer(),
+        number_of_trials=30,
+        grasp_strategy=strategy,
+    )
+    allowed_depth = allowed_intervals(strategy.statement(carton))["depth"]
+
+    grasps = trials.drawn_grasps()
+
+    assert len(grasps) == trials.number_of_trials
+    for grasp in grasps:
+        assert allowed_depth.contains(grasp.depth)
 
 
 def test_every_tried_grasp_is_recorded_with_its_result(carton):
