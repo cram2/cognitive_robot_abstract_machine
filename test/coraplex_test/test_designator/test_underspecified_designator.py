@@ -16,7 +16,6 @@ from cramph.composites import (
     Parallel,
     Sequence,
     StatementNode,
-    ParallelStatementNode,
 )
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -37,6 +36,7 @@ from cramph.threaded_nodes import FunctionCall
 from cramph.state_history import StateHistory, StateHistoryObserver
 from coraplex.plans.underspecified import (
     ActionTrial,
+    CandidateHandOver,
     SubtreeRebuild,
     UnderspecifiedChildChooser,
 )
@@ -875,18 +875,18 @@ def test_a_trial_adapts_a_candidate_to_the_robot_as_its_executor_does(
     apartment_world_pr2_copy_with_context,
 ) -> None:
     """
-    A candidate is tried the way the robot will perform it, so the trial keeps the universal
+    A candidate is tried the way the robot will perform it, so the trial keeps the robot
     adaptations its executor was given, apart from how the base drives.
     """
     world, robot, extensions = apartment_world_pr2_copy_with_context
-    executor = simulated_executor(extensions, universal_adaptations=[])
+    executor = simulated_executor(extensions, robot_adaptations=[])
     trial = ActionTrial(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
     trial_executor = trial._trial_executor(trial._copy())
 
-    assert trial_executor.universal_adaptations == executor.universal_adaptations
+    assert trial_executor.robot_adaptations == executor.robot_adaptations
     trial.discard()
 
 
@@ -905,7 +905,7 @@ def test_a_trial_keeps_how_its_executor_drives_a_differentially_driven_base(
 
     trial_executor = trial._trial_executor(trial._copy())
 
-    assert trial_executor.universal_adaptations == executor.universal_adaptations
+    assert trial_executor.robot_adaptations == executor.robot_adaptations
     trial.discard()
 
 
@@ -1035,7 +1035,7 @@ def test_a_candidate_that_cannot_keep_its_clearance_is_discarded(
     assert plan.grounded_nodes[-1].fail_on_attempt_number is None
 
 
-# %% the statements of a parallel are grounded by one node
+# %% which statements of a parallel are grounded together
 
 
 def _slot_dof_ids(world: World) -> tuple[UUID, ...]:
@@ -1068,7 +1068,15 @@ def _prepared(
     return executor
 
 
-def test_a_parallel_of_statements_is_grounded_by_one_node(
+def _grounded_with(statement: StatementNode) -> list[StatementNode]:
+    """
+    :return: The statements grounded together with `statement` once it asks for its
+        child.
+    """
+    return UnderspecifiedChildChooser.statements_grounded_with(statement)
+
+
+def test_the_statements_of_a_parallel_are_grounded_together(
     apartment_world_pr2_copy_with_context,
 ):
     world, robot, extensions = apartment_world_pr2_copy_with_context
@@ -1076,17 +1084,17 @@ def test_a_parallel_of_statements_is_grounded_by_one_node(
     side_by_side = Parallel(
         nodes=[_statement_claiming_one_of([0, 1], slot_dof_ids) for _ in range(2)]
     )
+    first, second = side_by_side.nodes
     plan = Sequence(nodes=[side_by_side])
 
     _prepared(plan, extensions)
 
-    [grounding] = plan.nodes
-    assert isinstance(grounding, ParallelStatementNode)
-    assert grounding.parallel is side_by_side
-    assert grounding.statements == side_by_side.nodes
+    assert plan.nodes == [side_by_side]
+    assert _grounded_with(first) == [first, second]
+    assert _grounded_with(second) == [first, second]
 
 
-def test_a_top_level_parallel_of_statements_is_grounded_by_one_node(
+def test_the_statements_of_a_top_level_parallel_are_grounded_together(
     apartment_world_pr2_copy_with_context,
 ):
     world, robot, extensions = apartment_world_pr2_copy_with_context
@@ -1097,44 +1105,40 @@ def test_a_top_level_parallel_of_statements_is_grounded_by_one_node(
 
     executor = _prepared(side_by_side, extensions)
 
-    [grounding] = executor.plan_nodes
-    assert isinstance(grounding, ParallelStatementNode)
-    assert grounding.parallel is side_by_side
+    assert executor.plan_nodes == [side_by_side]
+    assert _grounded_with(side_by_side.nodes[0]) == side_by_side.nodes
 
 
-def test_a_statement_later_in_a_branch_is_not_grounded_with_the_parallel(
+def test_a_statement_later_in_a_branch_is_grounded_alone(
     apartment_world_pr2_copy_with_context,
 ):
     world, robot, extensions = apartment_world_pr2_copy_with_context
     slot_dof_ids = _slot_dof_ids(world)
-    side_by_side = Parallel(
+    branch = Sequence(
         nodes=[
-            _statement_claiming_one_of([0], slot_dof_ids),
-            Sequence(
-                nodes=[
-                    ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
-                    _statement_claiming_one_of([2], slot_dof_ids),
-                ]
-            ),
+            ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+            _statement_claiming_one_of([2], slot_dof_ids),
         ]
     )
-    statement, later = side_by_side.nodes
+    side_by_side = Parallel(
+        nodes=[_statement_claiming_one_of([0], slot_dof_ids), branch]
+    )
+    statement, _ = side_by_side.nodes
+    _, later = branch.nodes
     plan = Sequence(nodes=[side_by_side])
 
     _prepared(plan, extensions)
 
-    grounding, beside = side_by_side.nodes
-    assert grounding.statements == [statement]
-    assert beside is later
+    assert _grounded_with(statement) == [statement]
+    assert _grounded_with(later) == [later]
 
 
-def test_a_branch_without_a_statement_starting_with_it_stays_beside_the_grounded_ones(
+def test_a_branch_without_a_statement_starting_with_it_stays_in_the_parallel(
     apartment_world_pr2_copy_with_context,
 ):
     """
-    Only the branches starting with a statement wait for the statements to be grounded,
-    so the others start with the parallel, such as a node letting a gripper touch its
-    surroundings meanwhile.
+    Only the statements are grounded together, so the other branches start with the
+    parallel, such as a node letting a gripper touch its surroundings meanwhile.
     """
     world, robot, extensions = apartment_world_pr2_copy_with_context
     slot_dof_ids = _slot_dof_ids(world)
@@ -1151,59 +1155,29 @@ def test_a_branch_without_a_statement_starting_with_it_stays_beside_the_grounded
     _prepared(plan, extensions)
 
     assert plan.nodes == [side_by_side]
-    [grounding, kept] = side_by_side.nodes
-    assert isinstance(grounding, ParallelStatementNode)
-    assert kept is beside
-    assert grounding.parallel.nodes == [first, second]
-    assert grounding.statements == [first, second]
+    assert side_by_side.nodes == [first, beside, second]
+    assert _grounded_with(first) == [first, second]
 
 
-def test_a_parallel_needing_a_number_of_successes_is_grounded_as_a_whole(
+def test_the_statements_of_a_parallel_needing_a_number_of_successes_are_grounded_together(
     apartment_world_pr2_copy_with_context,
 ):
-    """
-    Its branches beside the statements are grounded with them, since the successes it
-    counts are those of its own children.
-    """
     world, robot, extensions = apartment_world_pr2_copy_with_context
     slot_dof_ids = _slot_dof_ids(world)
     side_by_side = Parallel(
         nodes=[
             _statement_claiming_one_of([0], slot_dof_ids),
             ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+            _statement_claiming_one_of([2], slot_dof_ids),
         ],
         minimum_success=1,
     )
+    first, _, second = side_by_side.nodes
     plan = Sequence(nodes=[side_by_side])
 
     _prepared(plan, extensions)
 
-    [grounding] = plan.nodes
-    assert isinstance(grounding, ParallelStatementNode)
-    assert grounding.parallel is side_by_side
-
-
-def test_a_parallel_without_statements_starting_with_it_stays_as_it_is(
-    apartment_world_pr2_copy_with_context,
-):
-    world, robot, extensions = apartment_world_pr2_copy_with_context
-    slot_dof_ids = _slot_dof_ids(world)
-    side_by_side = Parallel(
-        nodes=[
-            ClaimSlotAction(slot=0, slot_dof_ids=slot_dof_ids),
-            Sequence(
-                nodes=[
-                    ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
-                    _statement_claiming_one_of([2], slot_dof_ids),
-                ]
-            ),
-        ]
-    )
-    plan = Sequence(nodes=[side_by_side])
-
-    _prepared(plan, extensions)
-
-    assert plan.nodes == [side_by_side]
+    assert _grounded_with(first) == [first, second]
 
 
 def test_the_statements_of_a_parallel_inside_a_parallel_are_grounded_with_the_outer_one(
@@ -1217,25 +1191,66 @@ def test_the_statements_of_a_parallel_inside_a_parallel_are_grounded_with_the_ou
 
     _prepared(plan, extensions)
 
-    [grounding] = plan.nodes
-    assert grounding.parallel is outer
-    assert grounding.statements == [inner.nodes[0], outer.nodes[1]]
+    assert _grounded_with(inner.nodes[0]) == [inner.nodes[0], outer.nodes[1]]
+
+
+def test_the_statements_of_a_parallel_later_in_a_branch_are_grounded_together(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    inner = Parallel(
+        nodes=[_statement_claiming_one_of([1], slot_dof_ids) for _ in range(2)]
+    )
+    outer = Parallel(
+        nodes=[
+            _statement_claiming_one_of([0], slot_dof_ids),
+            Sequence(nodes=[ClaimSlotAction(slot=2, slot_dof_ids=slot_dof_ids), inner]),
+        ]
+    )
+    plan = Sequence(nodes=[outer])
+
+    _prepared(plan, extensions)
+
+    assert _grounded_with(inner.nodes[0]) == inner.nodes
+
+
+def test_a_statement_that_chose_is_grounded_alone_until_its_parallel_is_reset(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[_statement_claiming_one_of([0, 1], slot_dof_ids) for _ in range(2)]
+    )
+    first, second = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+    _prepared(plan, extensions)
+    for slot, statement in enumerate(side_by_side.nodes):
+        statement.choose_child_with(
+            CandidateHandOver(
+                candidate=ClaimSlotAction(slot=slot, slot_dof_ids=slot_dof_ids)
+            )
+        )
+    grounded_before_the_reset = _grounded_with(first)
+
+    for statement in side_by_side.nodes:
+        statement.on_reset()
+
+    assert grounded_before_the_reset == [first]
+    assert _grounded_with(first) == [first, second]
 
 
 # %% grounding the statements of a parallel together
 
 
-def _grounded_parallel_of(plan: Sequence) -> Parallel:
+def _statements_of(plan: Sequence) -> list[StatementNode]:
     """
-    :return: The parallel the node grounding the statements of the parallel in `plan`
-        runs, which it chose as its one child.
+    :return: The statements among the children of the one parallel `plan` runs, in
+        their order.
     """
-    [grounding] = [
-        node for node in plan.descendants if isinstance(node, ParallelStatementNode)
-    ]
-    [steps] = grounding.chosen_children
-    [parallel] = steps.nodes
-    return parallel
+    [parallel] = plan.nodes
+    return [node for node in parallel.nodes if isinstance(node, StatementNode)]
 
 
 def test_statements_side_by_side_are_grounded_together(
@@ -1260,7 +1275,7 @@ def test_statements_side_by_side_are_grounded_together(
 
     run_plan(plan, extensions)
 
-    statements = _grounded_parallel_of(plan).nodes
+    statements = _statements_of(plan)
     assert [statement.grounded_nodes[0].slot for statement in statements] == [0, 1]
     assert all(len(statement.chosen_children) == 1 for statement in statements)
 
@@ -1288,9 +1303,7 @@ def test_nodes_beside_statements_are_part_of_their_trial(
     run_plan(plan, extensions)
 
     [statement] = [
-        node
-        for node in _grounded_parallel_of(plan).nodes
-        if isinstance(node, StatementNode)
+        node for node in _statements_of(plan) if isinstance(node, StatementNode)
     ]
     assert statement.grounded_nodes[0].slot == 1
     assert len(statement.chosen_children) == 1
@@ -1321,9 +1334,7 @@ def test_a_candidate_grounding_a_statement_of_its_own_is_tried_beside_the_others
     run_plan(plan, extensions)
 
     [statement] = [
-        node
-        for node in _grounded_parallel_of(plan).nodes
-        if isinstance(node, StatementNode)
+        node for node in _statements_of(plan) if isinstance(node, StatementNode)
     ]
     assert len(statement.chosen_children) == 1
     assert world.state[slot_dof_ids[0]].position == SlotPosition.CLAIMED
@@ -1364,7 +1375,7 @@ def test_only_the_failed_statement_is_grounded_again_after_the_other_branch_succ
 
     run_plan(plan, extensions)
 
-    failed, succeeded = _grounded_parallel_of(plan).nodes
+    failed, succeeded = _statements_of(plan)
     assert [node.slot for node in failed.grounded_nodes] == [2, 3]
     assert len(succeeded.chosen_children) == 1
     trial, real = _registered_probes[succeeding_probe].calls
@@ -1403,7 +1414,7 @@ def test_a_statement_grounded_together_proposes_no_candidate_it_ran_again(
 
     run_plan(plan, extensions)
 
-    failed, _ = _grounded_parallel_of(plan).nodes
+    failed, _ = _statements_of(plan)
     assert [node.slot for node in failed.grounded_nodes] == [2, 3]
     assert [
         call.position_at_entry == SlotPosition.CLAIMED
@@ -1439,7 +1450,7 @@ def test_a_statement_grounded_again_is_tried_without_what_already_ended(
 
     run_plan(plan, extensions)
 
-    [grounded] = _grounded_parallel_of(plan).nodes
+    [grounded] = _statements_of(plan)
     assert [node.slot for node in grounded.grounded_nodes] == [2, 3]
 
 
@@ -1474,7 +1485,7 @@ def test_a_statement_grounded_again_is_tried_beside_what_still_runs(
 
     run_plan(plan, extensions)
 
-    [grounded] = _grounded_parallel_of(plan).nodes
+    [grounded] = _statements_of(plan)
     assert [node.slot for node in grounded.grounded_nodes] == [0, 2]
 
 
@@ -1632,9 +1643,7 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
         executor.execute()
 
     [parallel] = plan.nodes
-    [grounding] = [
-        node for node in parallel.nodes if isinstance(node, ParallelStatementNode)
-    ]
+    [statement] = _statements_of(plan)
     assert parallel.life_cycle_state == LifeCycleValues.FAILED
-    assert len(grounding.chosen_children) == 1
+    assert len(statement.chosen_children) == 1
     assert len(_registered_probes[statement_probe].calls) == 2

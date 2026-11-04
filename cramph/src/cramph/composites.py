@@ -1281,83 +1281,11 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         return NodeArtifacts(observation=Scalar(latest_child.last_observation))
 
 
-# %% running a child grounded from statements
-
-
-GenericNodeGroundingStatements = TypeVar(
-    "GenericNodeGroundingStatements", bound="NodeGroundingStatements"
-)
+# %% running a child grounded from a statement
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class NodeGroundingStatements(CompositeNodeChoosingItsChild, ABC):
-    """
-    Runs children grounded from underspecified `a(...)` / `an(...)` statements, each
-    statement grounded into one of its candidates when this node chooses its child.
-
-    The statements are not serialized: a process ticking the statechart elsewhere
-    receives the chosen children rather than grounding them itself.
-    """
-
-    @abstractmethod
-    def next_combination(
-        self, query_backend: QueryBackend, default_candidate_limit: int
-    ) -> dict[StatementNode, Any] | None:
-        """
-        Grounds the statements of this node into their next combination of candidates,
-        against the world as it is now.
-
-        The grounding is left suspended in between, so the next call resumes where this
-        one stopped.
-
-        :param query_backend: The backend answering the statements.
-        :param default_candidate_limit: How many candidates a statement without a limit
-            of its own yields.
-        :return: One candidate of each statement, or None once there is no combination
-            left.
-        """
-
-    @abstractmethod
-    def stop_grounding(self) -> None:
-        """
-        Releases the candidates of the statements once no further child will be asked
-        for.
-
-        The next :meth:`next_combination` grounds the statements anew.
-        """
-
-    @property
-    @abstractmethod
-    def ran_out_of_candidates(self) -> bool:
-        """
-        :return: Whether this node failed because its statements had no combination of
-            candidates left that it could run.
-        """
-
-    @property
-    @abstractmethod
-    def statement_at_candidate_limit(self) -> StatementNode | None:
-        """
-        :return: A statement of this node whose grounding stopped because it yielded as
-            many candidates as it may, or None if there is none.
-        """
-
-    def cleanup(self) -> None:
-        self.stop_grounding()
-
-    def to_json(self, **kwargs: Any) -> dict[str, Any]:
-        """
-        :return: The JSON representation of the node choosing its child that this is,
-            since the statements are not sent.
-        """
-        return {
-            **super().to_json(**kwargs),
-            JSONField.TYPE: get_full_class_name(CompositeNodeChoosingItsChild),
-        }
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class StatementNode(NodeGroundingStatements):
+class StatementNode(CompositeNodeChoosingItsChild):
     """
     Runs a node described by an underspecified `a(...)` / `an(...)` statement.
 
@@ -1369,6 +1297,9 @@ class StatementNode(NodeGroundingStatements):
     statement: Match = field(metadata=JSONMetadata(serialize=False).as_dict())
     """
     The underspecified statement the children are grounded from.
+
+    Not serialized: a process ticking the statechart elsewhere receives the chosen
+    children rather than grounding them itself.
     """
 
     candidate_limit: int | None = field(default=None, init=False, repr=False)
@@ -1430,31 +1361,18 @@ class StatementNode(NodeGroundingStatements):
         self._candidates_pulled += 1
         return candidate
 
-    def next_combination(
-        self, query_backend: QueryBackend, default_candidate_limit: int
-    ) -> dict[StatementNode, Any] | None:
-        candidate = self.next_candidate(query_backend, default_candidate_limit)
-        if candidate is None:
-            return None
-        return {self: candidate}
-
-    def ground_on_from(
-        self, source: StatementNode, read: list[Any], handed: Any
-    ) -> None:
+    def go_on_after(self, read: list[Any], taken: Any) -> None:
         """
-        Takes over the grounding of `source`, which handed this node `handed`, as if
-        this node had pulled the candidates `source` yielded: its next candidates are
-        the others of `read`, in their order, then those beyond them.
+        Lets the next candidates be the others of `read`, in their order, then those
+        beyond them, as if only `taken` had been yielded so far.
 
-        :param source: The node whose statement yielded the candidate this node runs.
-        :param read: The candidates `source` yielded so far, in their order.
-        :param handed: The candidate of `read` this node runs.
+        :param read: Candidates the statement yielded last, in their order, `taken`
+            among them.
+        :param taken: The candidate of `read` this node runs.
         """
-        others = [candidate for candidate in read if candidate is not handed]
-        self.candidate_limit = source.candidate_limit
-        self._candidates_pulled = source._candidates_pulled - len(others)
-        self._candidates = self._chained(others, source._candidates)
-        source._candidates = None
+        others = [candidate for candidate in read if candidate is not taken]
+        self._candidates_pulled -= len(others)
+        self._candidates = self._chained(others, self._candidates)
 
     @staticmethod
     def _chained(
@@ -1471,24 +1389,21 @@ class StatementNode(NodeGroundingStatements):
             yield from rest
 
     def stop_grounding(self) -> None:
+        """
+        Releases the candidates of the statement once no further child will be asked
+        for.
+
+        A suspended generator keeps every value its frame holds alive, so closing it
+        frees whatever the statement only holds to ground candidates with. The next
+        :meth:`next_candidate` grounds the statement anew.
+        """
         if self._candidates is None:
             return
-        # A suspended generator keeps every value its frame holds alive, so closing it
-        # frees whatever the statement only holds to ground candidates with.
         self._candidates.close()
         self._candidates = None
 
-    @property
-    def ran_out_of_candidates(self) -> bool:
-        return self.ran_out_of_children
-
-    @property
-    def statement_at_candidate_limit(self) -> StatementNode | None:
-        """
-        :return: This node, if the latest run through its statement stopped at
-            :attr:`candidate_limit`, otherwise None.
-        """
-        return self if self.reached_candidate_limit else None
+    def cleanup(self) -> None:
+        self.stop_grounding()
 
     @property
     def grounded_nodes(self) -> list[StatechartNode]:
@@ -1505,125 +1420,82 @@ class StatementNode(NodeGroundingStatements):
             for child in self.chosen_children
         ]
 
+    def to_json(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        :return: The JSON representation of the node choosing its child that this is,
+            since the statement is not sent.
+        """
+        return {
+            **super().to_json(**kwargs),
+            JSONField.TYPE: get_full_class_name(CompositeNodeChoosingItsChild),
+        }
+
     def __repr__(self) -> str:
         return f"{self.statement._type_.__name__}"
 
 
-# %% running a parallel whose statements are grounded together
+# %% grounding statements together
 
 
-@dataclass(eq=False, repr=False, kw_only=True)
-class ParallelStatementNode(NodeGroundingStatements):
+@dataclass
+class StatementsGroundedTogether:
     """
-    Runs a parallel whose statements are grounded together, into one combination of
-    their candidates, when this node starts, so that every branch starts with the
-    candidate that suits the others.
-
-    The chooser of the context builds the parallel the combination it settles on runs
-    in, as this node's one child per run.
+    Grounds several statements into combinations of their candidates, one candidate of
+    each, the combinations of the candidates every statement ranks first coming first,
+    see :class:`~krrood.patterns.cartesian_product.CartesianProductByRankSum`.
     """
 
-    parallel: Parallel = field(metadata=JSONMetadata(serialize=False).as_dict())
+    statements: list[StatementNode]
     """
-    The parallel as it was written, which belongs to no statechart.
-    """
-
-    statements: list[StatementNode] = field(
-        metadata=JSONMetadata(serialize=False).as_dict()
-    )
-    """
-    The statements of :attr:`parallel` that are grounded together.
+    The statements grounded together.
     """
 
-    _product: CartesianProductByRankSum | None = field(
-        default=None, init=False, repr=False
-    )
+    query_backend: QueryBackend
     """
-    The cartesian product of the candidates of :attr:`statements`, from the first pull
-    until it is exhausted or released by :meth:`stop_grounding`.
+    The backend answering the statements.
     """
 
-    _combinations: Iterator[tuple[Any, ...]] | None = field(
-        default=None, init=False, repr=False
-    )
+    default_candidate_limit: int
     """
-    The combinations still to come from :attr:`_product`.
+    How many candidates a statement without a limit of its own yields.
     """
 
-    def next_combination(
-        self, query_backend: QueryBackend, default_candidate_limit: int
-    ) -> dict[StatementNode, Any] | None:
-        """
-        Differs from :meth:`NodeGroundingStatements.next_combination` in taking the
-        combinations in the order of
-        :class:`~krrood.patterns.cartesian_product.CartesianProductByRankSum`, and in
-        having none
-        left once a child was chosen in the current run: each statement whose candidate
-        fails grounds a candidate of its own.
-        """
-        if self.latest_child is not None:
-            return None
-        if self._combinations is None:
-            self._product = CartesianProductByRankSum(
-                factors=[
-                    iter(
-                        partial(
-                            statement.next_candidate,
-                            query_backend,
-                            default_candidate_limit,
-                        ),
-                        None,
-                    )
-                    for statement in self.statements
-                ]
-            )
-            self._combinations = iter(self._product)
-        combination = next(self._combinations, None)
-        if combination is None:
-            self.stop_grounding()
-            return None
-        return dict(zip(self.statements, combination))
+    _product: CartesianProductByRankSum = field(init=False, repr=False)
+    """
+    The cartesian product of the candidates of :attr:`statements`.
+    """
 
-    def candidates_read_for(self, statement: StatementNode) -> list[Any]:
-        """
-        :param statement: One of :attr:`statements`.
-        :return: The candidates `statement` yielded for the combinations so far, in the
-            order it yielded them.
-        """
-        return self._product.read[self.statements.index(statement)]
-
-    def stop_grounding(self) -> None:
-        self._combinations = None
-        self._product = None
-        for statement in self.statements:
-            statement.stop_grounding()
-
-    def on_reset(self) -> None:
-        """
-        Differs from :meth:`CompositeNodeChoosingItsChild.on_reset` in also grounding
-        the statements anew once this node starts again.
-        """
-        super().on_reset()
-        self.stop_grounding()
-
-    @property
-    def ran_out_of_candidates(self) -> bool:
-        """
-        :return: Whether this node failed without choosing a child in its current run,
-            rather than after the parallel it chose failed.
-        """
-        return self.ran_out_of_children and self.latest_child is None
-
-    @property
-    def statement_at_candidate_limit(self) -> StatementNode | None:
-        return next(
-            (
-                statement
+    def __post_init__(self) -> None:
+        self._product = CartesianProductByRankSum(
+            factors=[
+                iter(
+                    partial(
+                        statement.next_candidate,
+                        self.query_backend,
+                        self.default_candidate_limit,
+                    ),
+                    None,
+                )
                 for statement in self.statements
-                if statement.reached_candidate_limit
-            ),
-            None,
+            ]
         )
 
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}({', '.join(map(repr, self.statements))})"
+    def __iter__(self) -> Iterator[dict[StatementNode, Any]]:
+        """
+        :return: The combinations, each holding one candidate of every statement, each
+            statement grounded against the world as it is when a combination first
+            reaches a candidate of it.
+        """
+        for combination in self._product:
+            yield dict(zip(self.statements, combination))
+
+    def take(self, combination: dict[StatementNode, Any]) -> None:
+        """
+        Lets every statement go on from the candidates read for the combinations so far
+        that `combination` does not hold, once its candidate of `combination` failed,
+        see :meth:`StatementNode.go_on_after`.
+
+        :param combination: The combination the statements run.
+        """
+        for statement, read in zip(self.statements, self._product.read):
+            statement.go_on_after(read, combination[statement])

@@ -427,8 +427,8 @@ def test_a_plan_is_adapted_after_the_transformations_it_was_given(
     pr2_apartment_context,
 ) -> None:
     """
-    The executor's universal and then plan adaptations adapt an action before the plan's
-    transformations are offered it.
+    The executor's robot adaptations and then its plan adaptations adapt an action
+    before the plan's transformations are offered it.
     """
     world, robot_view, extensions = pr2_apartment_context
     detecting = DetectBeforeGrasp()
@@ -439,7 +439,7 @@ def test_a_plan_is_adapted_after_the_transformations_it_was_given(
     rewriting = executor.context.require_extension(PlanRewriting)
 
     assert rewriting.transformations == [
-        *executor.universal_adaptations,
+        *executor.robot_adaptations,
         *executor.plan_adaptations,
         detecting,
     ]
@@ -454,7 +454,7 @@ def test_a_plan_given_no_transformations_is_still_adapted(
     rewriting = executor.context.require_extension(PlanRewriting)
 
     assert rewriting.transformations == [
-        *executor.universal_adaptations,
+        *executor.robot_adaptations,
         *executor.plan_adaptations,
     ]
 

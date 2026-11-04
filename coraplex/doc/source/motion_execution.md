@@ -112,7 +112,7 @@ executor = KinematicallySimulatedPlanExecutor(
 ## Adapting a plan to its executor
 
 Every executor offers each node of a plan to its
-{attr}`~coraplex.plans.executors.PlanExecutor.universal_adaptations`, then to its
+{attr}`~coraplex.plans.executors.PlanExecutor.robot_adaptations` (see below), then to its
 {attr}`~coraplex.plans.executors.PlanExecutor.plan_adaptations`, and then to the transformations of the plan's own
 {class}`~coraplex.plans.plan_transformation.PlanRewriting`:
 
@@ -135,7 +135,7 @@ An executor is given other adaptations as `plan_adaptations=[...]`.
 Some robots need a different implementation of a motion. Such a robot gets a
 {class}`~coraplex.plans.plan_transformation.PlanTransformation` that replaces the goal an action builds once the
 action is expanded, and that applies only to its robot type. Every executor applies these through its
-{attr}`~coraplex.plans.executors.PlanExecutor.universal_adaptations`, whichever executor it is:
+{attr}`~coraplex.plans.executors.PlanExecutor.robot_adaptations`, whichever executor it is:
 
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.DriveWithTheDifferentialDrive` drives the base of
   every robot on a differential drive with a
@@ -153,9 +153,8 @@ action is expanded, and that applies only to its robot type. Every executor appl
 A robot-specific transformation that only one way of executing needs belongs to that executor's
 {attr}`~coraplex.plans.executors.PlanExecutor.plan_adaptations` instead, such as
 {class}`~coraplex.robot_plans.robot_specific_plan_transformations.KeepStretchInFrontOfTheContainerItCloses` for a
-kinematically simulated Stretch. Besides these, the universal adaptations ground together the underspecified actions a parallel
-starts with ({class}`~coraplex.plans.underspecified.GroundTheStatementsOfAParallelTogether`). An executor is given
-other universal adaptations as `universal_adaptations=[...]`; an empty list turns them off.
+kinematically simulated Stretch. An executor is given other robot adaptations as `robot_adaptations=[...]`; an empty
+list turns them off.
 
 A transformation replaces a step of a control structure node with
 {meth}`~cramph.composites.ControlStructureNode.replace`; an action running several steps is the control structure node of those

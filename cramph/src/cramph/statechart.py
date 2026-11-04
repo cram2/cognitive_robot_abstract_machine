@@ -311,13 +311,6 @@ class Statechart(SubclassJSONSerializer):
     order.
     """
 
-    _replacements: dict[StatechartNode, StatechartNode] = field(
-        default_factory=dict, init=False, repr=False
-    )
-    """
-    The node put in the place of every node that left this statechart by being replaced.
-    """
-
     _nodes: list[StatechartNode] = field(default_factory=list, init=False, repr=False)
     """
     Cache of all nodes in index order, appended to in :meth:`add_node`.
@@ -558,7 +551,7 @@ class Statechart(SubclassJSONSerializer):
     def remove_node(self, node: StatechartNode) -> None:
         """
         Removes a node and everything below it from the statechart, and from the node it
-        is a child of, which a control structure node rewires its other children for.
+        is a child of.
 
         The nodes that stay keep their order and are numbered anew without gaps.
 
@@ -574,20 +567,10 @@ class Statechart(SubclassJSONSerializer):
             raise StatechartAlreadyCompiledError()
         removed_nodes = [node, *node.descendants]
         kept_nodes = [kept for kept in self._nodes if kept not in removed_nodes]
+        self._check_not_referenced(removed_nodes, kept_nodes)
         parent_node = node.parent_node
-        position = None
         if parent_node is not None and node in parent_node.nodes:
-            # Unlisted and rewired first, since a control structure node reads the
-            # children it lists, as a parallel deciding its failure does.
-            position = parent_node.nodes.index(node)
-            parent_node.nodes.pop(position)
-            self._rewire_after_its_children_changed(parent_node)
-        still_referenced = self._reference_to_any_of(removed_nodes, kept_nodes)
-        if still_referenced is not None:
-            if position is not None:
-                parent_node.nodes.insert(position, node)
-                self._rewire_after_its_children_changed(parent_node)
-            raise still_referenced
+            parent_node.nodes.remove(node)
         self._renumber(kept_nodes)
         self.compiler.nodes_to_rebuild = [
             rebuilt
@@ -651,45 +634,20 @@ class Statechart(SubclassJSONSerializer):
             if isinstance(replacement, CompositeNode):
                 self._expand(replacement)
             if holder is not None:
-                self._rewire_after_its_children_changed(holder)
+                holder._wire_children()
+                if holder.parent_node is not None:
+                    holder.parent_node._succeed_at_its_goal(holder)
             if not holds_node:
                 self.remove_node(node)
                 self._replaced_nodes.remove(record)
-                self._replacements[node] = replacement
-
-    def node_in_place_of(self, node: StatechartNode) -> StatechartNode:
-        """
-        :param node: A node that belongs, or belonged, to this statechart.
-        :return: `node` itself while it belongs to this statechart, else the node that
-            replaced it, followed through every later replacement.
-        """
-        while node in self._replacements:
-            node = self._replacements[node]
-        return node
 
     @staticmethod
-    def _rewire_after_its_children_changed(holder: CompositeNode) -> None:
-        """
-        Wires the children of `holder` anew, and `holder` in the node holding it, whose
-        wiring reads the children of `holder`, once a child joined or left it. A holder
-        that is no control structure node wires nothing.
-
-        :param holder: The node whose children changed.
-        """
-        if not isinstance(holder, ControlStructureNode):
-            return
-        holder._wire_children()
-        if holder.parent_node is not None:
-            holder.parent_node._succeed_at_its_goal(holder)
-
-    @staticmethod
-    def _reference_to_any_of(
+    def _check_not_referenced(
         removed_nodes: list[StatechartNode], kept_nodes: list[StatechartNode]
-    ) -> RemovedNodeStillReferencedError | None:
+    ) -> None:
         """
-        :return: The error naming the first node of `kept_nodes` that refers to a node of
-            `removed_nodes` through a condition or as a prerequisite, or None if none
-            does.
+        :raises RemovedNodeStillReferencedError: If a node of `kept_nodes` refers to a
+            node of `removed_nodes` through a condition or as a prerequisite.
         """
         for kept_node in kept_nodes:
             referenced_nodes = list(kept_node.prerequisite_nodes) + [
@@ -699,10 +657,9 @@ class Statechart(SubclassJSONSerializer):
             ]
             for referenced_node in referenced_nodes:
                 if referenced_node in removed_nodes:
-                    return RemovedNodeStillReferencedError(
+                    raise RemovedNodeStillReferencedError(
                         removed_node=referenced_node, referencing_node=kept_node
                     )
-        return None
 
     def _renumber(self, kept_nodes: list[StatechartNode]) -> None:
         """
@@ -843,10 +800,22 @@ class Statechart(SubclassJSONSerializer):
     ) -> None:
         """
         Let every node of `waiting_nodes` choose its child, compiling once for all.
+
+        A choice may hand another node its child, or let the chooser of another node
+        answer, so the nodes still waiting are asked again until a round chooses
+        nothing.
         """
         with self.modify():
-            for node in waiting_nodes:
-                node.choose_child()
+            while waiting_nodes:
+                for node in waiting_nodes:
+                    if node.is_waiting_for_a_child:
+                        node.choose_child()
+                still_waiting = [
+                    node for node in waiting_nodes if node.is_waiting_for_a_child
+                ]
+                if len(still_waiting) == len(waiting_nodes):
+                    return
+                waiting_nodes = still_waiting
 
     def get_nodes_by_type(
         self, node_type: type[GenericStatechartNode]
@@ -982,18 +951,21 @@ class Statechart(SubclassJSONSerializer):
         }
 
     def nodes_from_to_json(
-        self, first_node_index: int, **kwargs: Any
+        self, first_node_index: int, stop_node_index: int | None = None, **kwargs: Any
     ) -> dict[str, Any]:
         """
         World entities are written as references, see :meth:`to_json`.
 
         :param first_node_index: The index of the first node to write.
-        :return: The JSON representation of the nodes from `first_node_index` on and of
-            their transition conditions, which :meth:`add_nodes_from_json` adds to a
-            statechart holding the nodes before them.
+        :param stop_node_index: The index of the first node not to write, None to write
+            every node from `first_node_index` on.
+        :return: The JSON representation of the nodes from `first_node_index` up to
+            `stop_node_index` and of their transition conditions, which
+            :meth:`add_nodes_from_json` adds to a statechart holding the nodes before
+            them.
         """
         kwargs = {**kwargs, **WorldEntityReferenceWriter().create_kwargs()}
-        written_nodes = self.nodes[first_node_index:]
+        written_nodes = self.nodes[first_node_index:stop_node_index]
         return {
             StatechartJSONKey.NODES: [
                 to_json(node, **kwargs) for node in written_nodes

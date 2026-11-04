@@ -395,54 +395,6 @@ def test_replacing_a_top_level_node_of_a_compiled_statechart_is_rejected(
     assert statechart.top_level_nodes == [held]
 
 
-# %% the node running in the place of a replaced one
-
-
-def test_a_replaced_node_is_followed_to_its_replacement(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(Sequence(nodes=[replaced := _succeeding("replaced")]))
-
-    statechart.replace(replaced, replacement := _succeeding("instead"))
-
-    assert statechart.node_in_place_of(replaced) is replacement
-
-
-def test_a_replaced_top_level_node_is_followed_to_its_replacement(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(replaced := Sequence(nodes=[_succeeding("below")]))
-
-    statechart.replace(replaced, replacement := _succeeding("instead"))
-
-    assert statechart.node_in_place_of(replaced) is replacement
-
-
-def test_a_node_replaced_twice_is_followed_to_the_last_replacement(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(Sequence(nodes=[replaced := _succeeding("replaced")]))
-    statechart.replace(replaced, first_replacement := _succeeding("first"))
-
-    statechart.replace(first_replacement, last_replacement := _succeeding("last"))
-
-    assert statechart.node_in_place_of(replaced) is last_replacement
-
-
-def test_a_node_of_the_statechart_runs_in_its_own_place(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(held := _succeeding("held"))
-
-    statechart.replace(held, Sequence(nodes=[held]))
-
-    assert statechart.node_in_place_of(held) is held
-
-
 # %% the closest control structure node above a node
 
 

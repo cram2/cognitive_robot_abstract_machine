@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from cramph.composites import Parallel, Sequence
+from cramph.composites import Sequence
 from cramph.data_types import LifeCycleValues
 from cramph.exceptions import (
     RemovedNodeStillReferencedError,
@@ -167,45 +167,3 @@ def test_a_statechart_runs_after_a_node_was_removed(
     statechart_executor.tick_until_end()
 
     assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
-
-
-# %% removing a child of a parallel
-
-
-def test_a_child_of_a_parallel_can_be_removed(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    """
-    A parallel reads every child it holds, so the child leaves it before the statechart
-    checks what still refers to the removed node.
-    """
-    statechart = Statechart(context=statechart_executor.context)
-    parallel = Parallel(nodes=[removed := ConstTrueNode(), kept := ConstTrueNode()])
-    # A sequence ends the parallel once it succeeded.
-    statechart.add_node(sequence := Sequence(nodes=[parallel]))
-    statechart.add_node(EndStatechart.when_true(sequence))
-
-    statechart.remove_node(removed)
-    statechart_executor.compile(statechart)
-    statechart_executor.tick_until_end()
-
-    assert parallel.nodes == [kept]
-    assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
-
-
-def test_a_child_another_node_refers_to_stays_in_its_parallel(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(
-        parallel := Parallel(
-            nodes=[referenced := ConstTrueNode(), other := ConstTrueNode()]
-        )
-    )
-    statechart.add_node(EndStatechart.when_true(referenced))
-
-    with pytest.raises(RemovedNodeStillReferencedError):
-        statechart.remove_node(referenced)
-
-    assert parallel.nodes == [referenced, other]
-    assert referenced.belongs_to_statechart()

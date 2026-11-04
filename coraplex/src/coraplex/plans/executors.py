@@ -22,12 +22,7 @@ from coraplex.plans.failures import (
     MotionViolatedCollisionAvoidance,
 )
 from coraplex.plans.plan_transformation import PlanRewriting, PlanTransformation
-from coraplex.plans.underspecified import (
-    ActionTrial,
-    GroundTheStatementsOfAParallelTogether,
-    UnderspecifiedChildChooser,
-    ParallelStatementChildChooser,
-)
+from coraplex.plans.underspecified import UnderspecifiedChildChooser
 from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.plan_transformations import (
     CloseFingersToObjectWidth,
@@ -42,10 +37,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepTheTorsoUprightWhileUsingATool,
     MoveStretchToolCenterPointInAStraightLine,
 )
-from cramph.composites import (
-    ChildChooserAccess,
-    NodeGroundingStatements,
-)
+from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
 from cramph.exceptions import EmptyStatechartError
@@ -93,14 +85,13 @@ class PlanExecutor(Executor, ABC):
     performing it. A :class:`~coraplex.plans.context_extensions.StatementGrounding` and a
     :class:`~coraplex.plans.plan_transformation.PlanRewriting` with default values are
     added unless one is there; the executor replaces the latter with one offering every
-    node to :attr:`universal_adaptations` and :attr:`plan_adaptations` first. A context
+    node to :attr:`robot_adaptations` and :attr:`plan_adaptations` first. A context
     serves one executor. :meth:`compile` adds what a plan runs with: the collision
     avoidance of the robot of :attr:`context` if asked for, one
     :class:`~giskardpy.motion_statechart.graph_node.EndMotion` once every plan node
     succeeded or one of them ended without succeeding, and the stall detection.
     Underspecified actions are grounded while it runs, see
-    :class:`~coraplex.plans.underspecified.UnderspecifiedChildChooser` and
-    :class:`~coraplex.plans.underspecified.ParallelStatementChildChooser`.
+    :class:`~coraplex.plans.underspecified.UnderspecifiedChildChooser`.
     """
 
     supplied_context_extensions: list[ContextExtension] = field(init=False)
@@ -130,20 +121,13 @@ class PlanExecutor(Executor, ABC):
     Grounds the underspecified actions of the plan while it runs.
     """
 
-    parallel_statement_child_chooser: ParallelStatementChildChooser = field(init=False)
-    """
-    Grounds the underspecified actions that start with a parallel together while the
-    plan runs.
-    """
-
     plan_nodes: list[StatechartNode] = field(default_factory=list, init=False)
     """
     The top-level nodes of the plan compiled last.
     """
 
-    universal_adaptations: list[PlanTransformation] = field(
+    robot_adaptations: list[PlanTransformation] = field(
         default_factory=lambda: [
-            GroundTheStatementsOfAParallelTogether(),
             DriveWithTheDifferentialDrive(),
             MoveStretchToolCenterPointInAStraightLine(),
             KeepStretchFromTurningWhileMovingItsTool(),
@@ -152,9 +136,9 @@ class PlanExecutor(Executor, ABC):
         kw_only=True,
     )
     """
-    The plan transformations adapting every plan however the executor runs it - to how
-    its underspecified actions are grounded and to the robot performing each of its
-    nodes - offered every node before :attr:`plan_adaptations`.
+    The plan transformations adapting every plan to the robot performing each of its
+    nodes, however the executor runs it, offered every node before
+    :attr:`plan_adaptations`.
     """
 
     plan_adaptations: list[PlanTransformation] = field(
@@ -170,19 +154,11 @@ class PlanExecutor(Executor, ABC):
         if self.debug and self.ros_node is None:
             raise DebuggingWithoutRosNode()
         self.supplied_context_extensions = list(self.context.extensions.values())
-        trial = ActionTrial(
+        self.child_chooser = UnderspecifiedChildChooser(
             executor=self, trial_executor_type=KinematicallySimulatedPlanExecutor
         )
-        self.child_chooser = UnderspecifiedChildChooser(trial=trial)
-        self.parallel_statement_child_chooser = ParallelStatementChildChooser(
-            trial=trial
-        )
         # Raises for a context another executor runs on before anything of it changed.
-        self.context.add_extension(
-            ChildChooserAccess(
-                choosers=[self.child_chooser, self.parallel_statement_child_chooser]
-            )
-        )
+        self.context.add_extension(ChildChooserAccess(choosers=[self.child_chooser]))
         rewriting = self.context.get_extension(PlanRewriting)
         if rewriting is not None:
             self.context.extensions[type(rewriting)] = (
@@ -200,9 +176,9 @@ class PlanExecutor(Executor, ABC):
     def adaptations(self) -> list[PlanTransformation]:
         """
         :return: The transformations this executor rewrites every plan with before the
-            plan's own: :attr:`universal_adaptations`, then :attr:`plan_adaptations`.
+            plan's own: :attr:`robot_adaptations`, then :attr:`plan_adaptations`.
         """
-        return [*self.universal_adaptations, *self.plan_adaptations]
+        return [*self.robot_adaptations, *self.plan_adaptations]
 
     def default_executor_extensions(self) -> list[ExecutorExtension]:
         return []
@@ -332,9 +308,8 @@ class PlanExecutor(Executor, ABC):
         """
         :raises CandidateLimitReached: If a statement node tried as many actions
             as it may, which is why the plan failed.
-        :raises EmptyUnderspecified: If a statement node ran out of actions, or the
-            statements of a parallel ran out of combinations, to try, which is why the
-            plan failed.
+        :raises EmptyUnderspecified: If a statement node ran out of actions to
+            try, which is why the plan failed.
         :raises MotionDidNotFinish: If the plan failed for any other reason.
         """
         if not self._plan_failed():
@@ -354,19 +329,17 @@ class PlanExecutor(Executor, ABC):
 
     def _raise_if_out_of_candidates(self) -> None:
         """
-        :raises CandidateLimitReached: If a node grounding statements ran out of
-            combinations to try because one of its statements tried as many actions as
-            it may.
-        :raises EmptyUnderspecified: If a node grounding statements ran out of
-            combinations to try.
+        :raises CandidateLimitReached: If a statement node tried as many actions
+            as it may.
+        :raises EmptyUnderspecified: If a statement node ran out of actions to
+            try.
         """
-        for node in self.statechart.get_nodes_by_type(NodeGroundingStatements):
-            if not node.ran_out_of_candidates:
+        for node in self.statechart.get_nodes_by_type(StatementNode):
+            if not node.ran_out_of_children:
                 continue
-            limited = node.statement_at_candidate_limit
-            if limited is not None:
+            if node.reached_candidate_limit:
                 raise CandidateLimitReached(
-                    node=limited, candidate_limit=limited.candidate_limit
+                    node=node, candidate_limit=node.candidate_limit
                 )
             raise EmptyUnderspecified(node=node)
 

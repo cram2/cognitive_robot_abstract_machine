@@ -10,7 +10,9 @@ from cramph.composites import (
     ChildChooser,
     ChildChooserAccess,
     CompositeNodeChoosingItsChild,
+    Parallel,
     RepeatUntil,
+    Sequence,
     StoppedWhenTrue,
 )
 from cramph.data_types import LifeCycleValues, ObservationStateValues
@@ -479,6 +481,138 @@ def test_a_node_chooses_before_the_nodes_starting_beside_it_act(
         f"{choosing_node.name} chose",
         f"{sibling.name} started",
     ]
+
+
+# %% one choice handing other nodes their children
+
+
+@dataclass
+class ChooserHandingTheOthersTheirChildren(ChildChooser[CompositeNodeChoosingItsChild]):
+    """
+    Gives the first node that asks its child and hands every other node of a group the
+    child prepared for it, as a node grounding several nodes together does.
+    """
+
+    children: dict[CompositeNodeChoosingItsChild, StatechartNode]
+    """
+    The child prepared for every node of the group.
+    """
+
+    asked_nodes: list[CompositeNodeChoosingItsChild] = field(default_factory=list)
+    """
+    Every node that asked, once per question.
+    """
+
+    def choose_child(
+        self, node: CompositeNodeChoosingItsChild
+    ) -> StatechartNode | None:
+        self.asked_nodes.append(node)
+        for other, child in self.children.items():
+            if other is not node:
+                other.choose_child_with(ChooserAnsweringInTurn([child]))
+        return self.children[node]
+
+
+@dataclass
+class ChooserAnsweringOnceAnotherNodeChose(ChooserAnsweringInTurn):
+    """
+    Has no choice for a node until another node has chosen its child, as a choice made
+    after another one waits for it.
+    """
+
+    chosen_first: CompositeNodeChoosingItsChild | None = None
+    """
+    The node that has to have chosen before any other node gets an answer.
+    """
+
+    def has_choice_for(self, node: CompositeNodeChoosingItsChild) -> bool:
+        self.asked_nodes.append(node)
+        return node is self.chosen_first or self.chosen_first.latest_child is not None
+
+
+def _start_tick(statechart: Statechart, node: StatechartNode) -> int:
+    """
+    :return: The tick `node` started its current run on.
+    """
+    return statechart.state_history.get_current_run_ticks_of_node(node).start_tick
+
+
+def test_a_node_handed_its_child_by_another_choice_is_not_asked_again(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    asking = CompositeNodeChoosingItsChild(name="asking")
+    handed = CompositeNodeChoosingItsChild(name="handed")
+    chooser = ChooserHandingTheOthersTheirChildren(
+        children={
+            asking: _succeeding_child("child of asking"),
+            handed: _succeeding_child("child of handed"),
+        }
+    )
+    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart = Statechart(context=statechart_executor.context)
+    parallel = Parallel(
+        name="parallel",
+        nodes=[asking, Sequence(name="branch", nodes=[handed])],
+    )
+    root = Sequence(name="root", nodes=[parallel])
+    statechart.add_node(root)
+    statechart.add_node(EndStatechart.when_true(root))
+
+    statechart_executor.compile(statechart)
+    statechart_executor.tick_until_end(timeout=30)
+
+    assert chooser.asked_nodes == [asking]
+    assert handed.chosen_children == [chooser.children[handed]]
+    assert root.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+
+def test_a_choice_another_choice_enables_is_taken_on_the_same_tick(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    waiting = CompositeNodeChoosingItsChild(name="waiting")
+    first = CompositeNodeChoosingItsChild(name="first")
+    chooser = ChooserAnsweringOnceAnotherNodeChose(
+        children=[_succeeding_child("first child"), _succeeding_child("second child")],
+        chosen_first=first,
+    )
+    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart = Statechart(context=statechart_executor.context)
+    parallel = Parallel(name="parallel", nodes=[waiting, first])
+    root = Sequence(name="root", nodes=[parallel])
+    statechart.add_node(root)
+    statechart.add_node(EndStatechart.when_true(root))
+
+    statechart_executor.compile(statechart)
+    statechart_executor.tick_until_end(timeout=30)
+
+    assert _start_tick(statechart, waiting.latest_child) == _start_tick(
+        statechart, first.latest_child
+    )
+
+
+def test_a_node_handed_its_child_before_it_started_runs_it_once_it_starts(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    asking = CompositeNodeChoosingItsChild(name="asking")
+    later = CompositeNodeChoosingItsChild(name="later")
+    chooser = ChooserHandingTheOthersTheirChildren(
+        children={
+            asking: _succeeding_child("child of asking"),
+            later: _succeeding_child("child of later"),
+        }
+    )
+    statechart_executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    statechart = Statechart(context=statechart_executor.context)
+    sequence = Sequence(name="sequence", nodes=[asking, later])
+    statechart.add_node(sequence)
+    statechart.add_node(EndStatechart.when_true(sequence))
+
+    statechart_executor.compile(statechart)
+    statechart_executor.tick_until_end(timeout=30)
+
+    assert chooser.asked_nodes == [asking]
+    assert later.chosen_children == [chooser.children[later]]
+    assert chooser.children[later].life_cycle_state == LifeCycleValues.SUCCEEDED
 
 
 # %% choosing with the chooser of the node's kind

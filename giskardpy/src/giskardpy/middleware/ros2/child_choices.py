@@ -348,7 +348,8 @@ class ChildChoiceClient:
 
     _answered: set[ChildRequest] = field(default_factory=set, init=False, repr=False)
     """
-    Every request answered.
+    Every request answered, including those of the nodes a choice answered before they
+    asked, see :meth:`_choose`.
     """
 
     _catching_up: CatchingUpWithGiskard = field(init=False, repr=False)
@@ -363,8 +364,9 @@ class ChildChoiceClient:
         """
         :param feedback: The feedback of the running goal.
         :return: A choice for every node waiting for a child that was not answered
-            before, none while the client's world does not contain the changes the
-            feedback reports. A choice that is still pending is asked for again next
+            before, and for every node one of these choices answered too, see
+            :meth:`_choose`; none while the client's world does not contain the changes
+            the feedback reports. A choice that is still pending is asked for again next
             time.
         :raises GiskardWorldUpdateNotReceivedError: If a change the feedback reports
             does not reach the client's world within the timeout of
@@ -381,36 +383,109 @@ class ChildChoiceClient:
             return []
         messages = []
         for request in requests:
-            message = self._choose(
+            if request in self._answered:
+                continue
+            messages += self._choose(
                 request.goal_id, self.statechart.get_node_by_index(request.node_index)
             )
-            if message is None:
-                continue
-            self._answered.add(request)
-            messages.append(message)
         return messages
 
     def _choose(
         self, goal_id: int, node: CompositeNodeChoosingItsChild
-    ) -> ChildChoiceMessage | None:
+    ) -> list[ChildChoiceMessage]:
         """
-        Choose the next child of `node` on the client's copy.
+        Choose the next child of `node` on the client's copy, and note the request of
+        every node the choice answered as answered.
 
-        :return: The message telling Giskard about the choice, or ``None`` if it is
-            pending.
+        A choice may hand other nodes their child, or leave them without one, before
+        they ask, so each of them gets a message of its own, which the running side
+        takes as its answer.
+
+        :return: The messages telling Giskard about the choice: one for every node it
+            gave a child, in the order their children joined the copy, then one for
+            every node it left without a child; empty if the choice is pending.
         """
-        first_node_index = len(self.statechart.nodes)
+        choosing_nodes = self.statechart.get_nodes_by_type(
+            CompositeNodeChoosingItsChild
+        )
+        children_before = {
+            choosing_node: len(choosing_node.children)
+            for choosing_node in choosing_nodes
+        }
+        out_of_children_before = {
+            choosing_node
+            for choosing_node in choosing_nodes
+            if choosing_node.ran_out_of_children
+        }
         if not node.choose_child_with(self.child_chooser_access.chooser_for(node)):
-            return None
-        nodes = (
-            None
-            if node.ran_out_of_children
-            else self.statechart.nodes_from_to_json(first_node_index)
+            return []
+        given_a_child = sorted(
+            (
+                choosing_node
+                for choosing_node in choosing_nodes
+                if choosing_node.latest_child is not None
+                and len(choosing_node.children) > children_before[choosing_node]
+            ),
+            key=lambda choosing_node: choosing_node.latest_child.index,
         )
-        return ChildChoiceMessage(
-            goal_id=goal_id,
-            node_index=node.index,
-            first_node_index=first_node_index,
-            nodes=nodes,
-            required_position=self.required_position,
+        left_without_a_child = [
+            choosing_node
+            for choosing_node in choosing_nodes
+            if choosing_node.ran_out_of_children
+            and choosing_node not in out_of_children_before
+        ]
+        messages = self._messages_answering(
+            goal_id, given_a_child, left_without_a_child
         )
+        self._answered |= {
+            ChildRequest(
+                goal_id=goal_id,
+                node_index=answered.index,
+                child_count=children_before[answered],
+            )
+            for answered in [*given_a_child, *left_without_a_child]
+        }
+        return messages
+
+    def _messages_answering(
+        self,
+        goal_id: int,
+        given_a_child: list[CompositeNodeChoosingItsChild],
+        left_without_a_child: list[CompositeNodeChoosingItsChild],
+    ) -> list[ChildChoiceMessage]:
+        """
+        :param goal_id: The goal the nodes belong to.
+        :param given_a_child: The nodes one choice gave a child, in the order their
+            children joined the copy, each child with the nodes after it up to the next
+            one's.
+        :param left_without_a_child: The nodes the choice left without a child.
+        :return: One message for each node of `given_a_child`, then one for each of
+            `left_without_a_child`.
+        """
+        first_node_indices = [
+            *[answered.latest_child.index for answered in given_a_child],
+            len(self.statechart.nodes),
+        ]
+        return [
+            ChildChoiceMessage(
+                goal_id=goal_id,
+                node_index=answered.index,
+                first_node_index=first_node_index,
+                nodes=self.statechart.nodes_from_to_json(
+                    first_node_index, stop_node_index
+                ),
+                required_position=self.required_position,
+            )
+            for answered, first_node_index, stop_node_index in zip(
+                given_a_child, first_node_indices, first_node_indices[1:]
+            )
+        ] + [
+            ChildChoiceMessage(
+                goal_id=goal_id,
+                node_index=answered.index,
+                first_node_index=len(self.statechart.nodes),
+                nodes=None,
+                required_position=self.required_position,
+            )
+            for answered in left_without_a_child
+        ]

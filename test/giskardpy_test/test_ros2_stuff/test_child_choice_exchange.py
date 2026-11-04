@@ -800,3 +800,117 @@ def test_only_the_branch_whose_child_failed_waits_for_a_new_one() -> None:
     assert "branch 1" not in reported
     assert undecided.life_cycle_state == LifeCycleValues.FAILED
     assert chosen_again.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+
+# %% one choice handing the branches beside it their children
+
+
+@dataclass
+class ChooserGroundingTheBranchesTogether(ChooserGivingAFreshChild):
+    """
+    Gives the node starting first a parallel of choosing branches that have chosen
+    nothing yet, and the first branch that asks its child together with the child of
+    every branch beside it, the way the statements of a parallel are grounded together.
+    """
+
+    children_of_the_other_branches: list[StatechartNode] = field(
+        default_factory=lambda: [_node_succeeding_at_once("child of branch 1")]
+    )
+    """
+    The child handed to each branch after the first, in their order.
+    """
+
+    failure_monitors_of_the_other_branches: list[list[StatechartNode]] = field(
+        default_factory=lambda: [[]]
+    )
+    """
+    The failure monitors of each of :attr:`children_of_the_other_branches`.
+    """
+
+    asked_nodes: list[str] = field(default_factory=list)
+    """
+    The name of every node that asked, once per question.
+    """
+
+    def choose_child(
+        self, node: CompositeNodeChoosingItsChild
+    ) -> StatechartNode | None:
+        self.asked_nodes.append(node.name)
+        if node.name == "starting first":
+            branches = [
+                CompositeNodeChoosingItsChild(name=f"branch {position}")
+                for position in range(len(self.children_of_the_other_branches) + 1)
+            ]
+            return Sequence(nodes=[Parallel(nodes=branches)])
+        if node.name != "branch 0":
+            return super().choose_child(node)
+        _, *other_branches = node.parent_node.nodes
+        for branch, child, failure_monitors in zip(
+            other_branches,
+            self.children_of_the_other_branches,
+            self.failure_monitors_of_the_other_branches,
+        ):
+            if branch.latest_child is None:
+                branch.choose_child_with(
+                    ChooserHandingOverOneChild(
+                        child=child, failure_monitors=failure_monitors
+                    )
+                )
+        return _node_succeeding_at_once("child of branch 0")
+
+
+def test_a_branch_handed_its_child_by_another_choice_runs_it_unasked() -> None:
+    chooser = ChooserGroundingTheBranchesTogether()
+    exchange = ClientAndRunningStatechart(client_chooser=chooser)
+    exchange.start()
+
+    _run_reporting_the_waiting_nodes(exchange, ticks=10)
+
+    handed = _running_node_named(exchange, "branch 1")
+    assert [child.name for child in handed.chosen_children] == [
+        child.name for child in chooser.children_of_the_other_branches
+    ]
+    assert handed.latest_child.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert "branch 1" not in chooser.asked_nodes
+
+
+def test_a_branch_handed_its_child_starts_it_with_the_child_of_the_branch_that_asked() -> (
+    None
+):
+    exchange = ClientAndRunningStatechart(
+        client_chooser=ChooserGroundingTheBranchesTogether()
+    )
+    exchange.start()
+
+    _run_reporting_the_waiting_nodes(exchange, ticks=10)
+
+    history = exchange.running.statechart.state_history
+    start_ticks = {
+        history.get_current_run_ticks_of_node(
+            _running_node_named(exchange, f"branch {position}").latest_child
+        ).start_tick
+        for position in range(2)
+    }
+    assert len(start_ticks) == 1
+
+
+def test_only_the_handed_branch_whose_child_failed_waits_for_a_new_one() -> None:
+    chooser = ChooserGroundingTheBranchesTogether(
+        children_of_the_other_branches=[
+            NodeSucceedingOnObservingTrue(
+                name="undecided", observation=ObservationStateValues.UNKNOWN
+            )
+        ],
+        failure_monitors_of_the_other_branches=[[CountTicks(name="timeout", ticks=2)]],
+    )
+    exchange = ClientAndRunningStatechart(client_chooser=chooser)
+    exchange.start()
+
+    _run_reporting_the_waiting_nodes(exchange, ticks=15)
+
+    handed = _running_node_named(exchange, "branch 1")
+    undecided, chosen_again = handed.chosen_children
+    assert chooser.asked_nodes.count("branch 1") == 1
+    assert chooser.asked_nodes.count("branch 0") == 1
+    assert undecided.life_cycle_state == LifeCycleValues.FAILED
+    assert chosen_again.life_cycle_state == LifeCycleValues.SUCCEEDED

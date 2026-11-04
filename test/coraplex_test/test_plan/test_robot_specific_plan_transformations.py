@@ -215,7 +215,7 @@ def test_stretch_drives_every_leg_of_a_path_with_its_differential_drive(
     target = Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)
     unchanged = prepared(
         PathPlanningNavigateAction(target=target),
-        simulated_executor(extensions, universal_adaptations=[]),
+        simulated_executor(extensions, robot_adaptations=[]),
     )
 
     action = prepared(
@@ -251,7 +251,7 @@ def test_a_simulated_tiago_without_its_robot_adaptations_writes_the_odometry(
     world, robot, extensions = tiago_context
 
     action = prepared(
-        navigation_to(world), simulated_executor(extensions, universal_adaptations=[])
+        navigation_to(world), simulated_executor(extensions, robot_adaptations=[])
     )
 
     assert type(action.goal) is SetOdometry
@@ -277,7 +277,7 @@ def test_stretch_keeps_its_drive_goal_without_its_robot_adaptations(
     world, robot, extensions = stretch_apartment_context
 
     action = prepared(
-        navigation_to(world), robot_executor(extensions, universal_adaptations=[])
+        navigation_to(world), robot_executor(extensions, robot_adaptations=[])
     )
 
     assert type(action.goal) is HolonomicBaseGoal
@@ -471,7 +471,7 @@ def test_stretch_reaches_in_a_straight_line(
     world, robot, extensions = stretch_apartment_context
     unchanged = prepared(
         ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
-        build_executor(extensions, universal_adaptations=[]),
+        build_executor(extensions, robot_adaptations=[]),
     )
 
     action = prepared(
@@ -501,7 +501,7 @@ def test_stretch_lifts_in_a_straight_line(
     unchanged = lifting_goal_of(
         prepared(
             PickUpAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
-            build_executor(extensions, universal_adaptations=[]),
+            build_executor(extensions, robot_adaptations=[]),
         )
     )
 
