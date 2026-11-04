@@ -6,7 +6,6 @@ from probabilistic_model.causal_structure.learning import (
 )
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
-    TrainingTableColumn,
 )
 
 from .test_relational_probabilistic_circuit import (  # noqa: F401  # fixtures
@@ -34,17 +33,7 @@ def test_training_tables_match_the_fitted_tables(
     assert set(tables.part_rows["objects"].columns) == {
         variable.name
         for variable in template.template_distribution.class_probabilistic_circuit.variables
-    } | {TrainingTableColumn.EXAMPLE_POSITION}
-
-
-def test_training_tables_place_each_part_with_its_instance(
-    relational_probabilistic_circuit, scenario
-):
-    tables = relational_probabilistic_circuit.training_tables(list(scenario))
-
-    assert list(tables.part_rows["objects"][TrainingTableColumn.EXAMPLE_POSITION]) == [
-        position for position, room in enumerate(scenario) for _ in room.objects
-    ]
+    }
 
 
 # %% the graph learned from them

@@ -33,7 +33,6 @@ from probabilistic_model.causal_structure.graph import (
 from probabilistic_model.causal_structure.identification import AdjustmentSelector
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
-    TrainingTableColumn,
 )
 
 # %% learning from one table
@@ -335,7 +334,7 @@ class RelationalCausalStructureLearner:
         :return: The edges learned from the part's table that touch a part attribute.
         """
         statistic_nodes = [node for node in example_nodes if node.name in rows.columns]
-        renamed = rows.drop(columns=[TrainingTableColumn.EXAMPLE_POSITION]).rename(
+        renamed = rows.rename(
             columns={
                 node.name.split(f".{part}.", 1)[1]: node.name for node in part_nodes
             }

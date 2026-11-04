@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, field
-from enum import StrEnum
 
 import pandas as pd
 from typing_extensions import TYPE_CHECKING, Any, Callable, Hashable
@@ -63,18 +62,6 @@ from probabilistic_model.probabilistic_circuit.relational.template import (
 from random_events.variable import Variable
 
 
-class TrainingTableColumn(StrEnum):
-    """
-    Columns the training tables of a relational circuit add to what it is fitted on.
-    """
-
-    EXAMPLE_POSITION = "example_position"
-    """
-    In a part's table, the position, among the training instances, of the instance the
-    part belongs to.
-    """
-
-
 @dataclass
 class PartTrainingTable:
     """
@@ -111,8 +98,7 @@ class RelationalTrainingTables:
     part_rows: dict[str, pd.DataFrame]
     """
     Per exchangeable part, one row per part, carrying its instance's aggregation
-    statistics and the instance's position in
-    :attr:`TrainingTableColumn.EXAMPLE_POSITION`.
+    statistics.
     """
 
 
@@ -352,26 +338,21 @@ class RelationalProbabilisticCircuit:
         """
         :param instances: The instances the circuit was fitted on.
         :return: The tables the circuit is fitted on: one row per instance for the class
-            circuit, and one row per part for each part's template, with the position of
-            the part's instance added.
+            circuit, and one row per part for each part's template.
         :raises CircuitNotFittedError: If the circuit has not been fitted.
         """
         if self.feature_extractor is None:
             raise CircuitNotFittedError()
-        part_rows = {}
-        for exchangeable_part in self.exchangeable_distribution_templates:
-            rows = self._part_training_table(exchangeable_part, instances).rows
-            rows[TrainingTableColumn.EXAMPLE_POSITION] = [
-                position
-                for position, instance in enumerate(instances)
-                for _ in getattr(instance, exchangeable_part)
-            ]
-            part_rows[exchangeable_part] = rows
         return RelationalTrainingTables(
             example_rows=self._build_class_dataframe(
                 self.feature_extractor, instances, None
             ),
-            part_rows=part_rows,
+            part_rows={
+                exchangeable_part: self._part_training_table(
+                    exchangeable_part, instances
+                ).rows
+                for exchangeable_part in self.exchangeable_distribution_templates
+            },
         )
 
     def _fit_exchangeable_part(
