@@ -301,7 +301,7 @@ class ChildRequest:
     """
 
     @classmethod
-    def all_in(cls, feedback: dict[str, Any]) -> list[Self]:
+    def from_feedback(cls, feedback: dict[str, Any]) -> list[Self]:
         """
         :param feedback: The feedback of a running goal.
         :return: The request of every node the feedback reports as waiting for a child.
@@ -372,7 +372,7 @@ class ChildChoiceClient:
         """
         requests = [
             request
-            for request in ChildRequest.all_in(feedback)
+            for request in ChildRequest.from_feedback(feedback)
             if request not in self._answered
         ]
         if not requests:

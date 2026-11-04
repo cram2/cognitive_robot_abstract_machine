@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 from time import sleep
 from typing_extensions import Any, Callable
 
@@ -139,14 +140,14 @@ class ClientWorldUpdates:
     Publishes the changes of the client's world and receives those of Giskard.
     """
 
-    timeout: float = 30.0
+    timeout: timedelta = timedelta(seconds=30)
     """
-    Seconds to wait for one of the changes Giskard made during a goal.
+    How long to wait for one of the changes Giskard made during a goal.
     """
 
-    poll_interval: float = 0.01
+    poll_interval: timedelta = timedelta(seconds=0.01)
     """
-    Seconds between two looks at what the world caught up with.
+    The time between two looks at what the world caught up with.
     """
 
     clock: Callable[[], float] = field(default=time.monotonic, kw_only=True, repr=False)
@@ -173,7 +174,7 @@ class ClientWorldUpdates:
         """
         catching_up = CatchingUpWithGiskard(world_updates=self)
         while not catching_up.has_applied_the_changes_reported_in(result):
-            sleep(self.poll_interval)
+            sleep(self.poll_interval.total_seconds())
 
 
 @dataclass
@@ -224,10 +225,8 @@ class CatchingUpWithGiskard:
         ):
             self._awaited_position = position
             self._waiting_since = self.world_updates.clock()
-        if (
-            self.world_updates.clock() - self._waiting_since
-            >= self.world_updates.timeout
-        ):
+        waited = timedelta(seconds=self.world_updates.clock() - self._waiting_since)
+        if waited >= self.world_updates.timeout:
             raise GiskardWorldUpdateNotReceivedError(
                 awaited_sequence_number=self._awaited_position.sequence_number,
                 timeout=self.world_updates.timeout,
