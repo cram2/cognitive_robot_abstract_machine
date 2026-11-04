@@ -5,10 +5,14 @@ Statechart execution.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+
+pytest.importorskip("control_msgs")
+
 from control_msgs.action import ParallelGripperCommand
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
@@ -19,7 +23,6 @@ from cramph.data_types import ObservationStateValues
 from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
-from giskardpy.motion_statechart.context import MotionStatechartContext
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from semantic_digital_twin.world import World
@@ -29,7 +32,14 @@ from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
 )
 
 
-# %% In-process Mock Action Server
+def unique_topic(prefix: str = "robotiq/gripper_cmd") -> str:
+    """
+    Generate a unique topic name per test to prevent DDS crosstalk.
+    """
+    return f"{prefix}_{uuid.uuid4().hex[:8]}"
+
+
+# %% Mock In-Process Action Server
 
 
 @dataclass
@@ -59,8 +69,6 @@ class MockRobotiqActionServer:
         result = ParallelGripperCommand.Result()
         result.reached_goal = self.reached_goal
         result.stalled = self.stalled
-        result.position = goal_handle.request.command.position
-        result.effort = goal_handle.request.command.effort
         return result
 
     def serve(self, node: Node, topic: str) -> ActionServer:
@@ -77,13 +85,11 @@ def run_statechart_until_observed(
     task: RobotiqGripperActionServerTask,
     target_observation: ObservationStateValues,
     rclpy_node: Node,
-) -> MotionStatechartContext:
+) -> None:
     """
-    Executes the task within a compiled statechart until it evaluates to
-    target_observation.
+    Mounts task into a Statechart and executes it until target_observation is observed.
     """
-    context = StatechartContext(world=World())
-    statechart = Statechart(context=context)
+    statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(task)
 
     if target_observation == ObservationStateValues.TRUE:
@@ -98,10 +104,9 @@ def run_statechart_until_observed(
     )
     executor.compile(statechart=statechart)
     executor.tick_until_end()
-    return context
 
 
-# %% Test Cases
+# %% Tests
 
 
 @pytest.mark.parametrize(
@@ -119,7 +124,7 @@ def test_robotiq_task_observes_result(
     expected_observation: ObservationStateValues,
     rclpy_node: Node,
 ) -> None:
-    topic = "robotiq/gripper_cmd"
+    topic = unique_topic()
     mock_server = MockRobotiqActionServer(
         reached_goal=reached_goal,
         stalled=stalled,
@@ -129,37 +134,37 @@ def test_robotiq_task_observes_result(
 
     task = RobotiqGripperActionServerTask(
         action_topic=topic,
-        message_type=ParallelGripperCommand,
         target_position=0.03,
     )
 
-    ctx = run_statechart_until_observed(task, expected_observation, rclpy_node)
-    server.destroy()
-
-    assert task.on_tick(ctx) == expected_observation
+    try:
+        run_statechart_until_observed(task, expected_observation, rclpy_node)
+        assert task.on_tick() == expected_observation
+    finally:
+        server.destroy()
 
 
 def test_robotiq_task_handles_goal_rejection(rclpy_node: Node) -> None:
-    topic = "robotiq/gripper_cmd"
+    topic = unique_topic()
     mock_server = MockRobotiqActionServer(accept_goals=False)
     server = mock_server.serve(rclpy_node, topic)
 
     task = RobotiqGripperActionServerTask(
         action_topic=topic,
-        message_type=ParallelGripperCommand,
         target_position=0.0,
     )
 
-    ctx = run_statechart_until_observed(task, ObservationStateValues.FALSE, rclpy_node)
-    server.destroy()
-
-    assert task._done is True
-    assert task._goal_accepted is False
-    assert task.on_tick(ctx) == ObservationStateValues.FALSE
+    try:
+        run_statechart_until_observed(task, ObservationStateValues.FALSE, rclpy_node)
+        assert task._done is True
+        assert task._goal_accepted is False
+        assert task.on_tick() == ObservationStateValues.FALSE
+    finally:
+        server.destroy()
 
 
 def test_robotiq_task_builds_and_sends_correct_goal_message(rclpy_node: Node) -> None:
-    topic = "robotiq/gripper_cmd"
+    topic = unique_topic()
     mock_server = MockRobotiqActionServer(reached_goal=True)
     server = mock_server.serve(rclpy_node, topic)
 
@@ -169,38 +174,39 @@ def test_robotiq_task_builds_and_sends_correct_goal_message(rclpy_node: Node) ->
 
     task = RobotiqGripperActionServerTask(
         action_topic=topic,
-        message_type=ParallelGripperCommand,
         target_position=pos,
         target_velocity=vel,
         target_effort=eff,
     )
 
-    run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
-    server.destroy()
-
-    assert len(mock_server.received_goals) == 1
-    received_cmd = mock_server.received_goals[0]
-    assert received_cmd.position == [pos]
-    assert received_cmd.velocity == [vel]
-    assert received_cmd.effort == [eff]
+    try:
+        run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+        assert len(mock_server.received_goals) == 1
+        received_cmd = mock_server.received_goals[0]
+        # Convert array.array to list for comparison
+        assert list(received_cmd.position) == [pos]
+        assert list(received_cmd.velocity) == [vel]
+        assert list(received_cmd.effort) == [eff]
+    finally:
+        server.destroy()
 
 
 def test_robotiq_task_uses_default_values(rclpy_node: Node) -> None:
-    topic = "robotiq/gripper_cmd"
+    topic = unique_topic()
     mock_server = MockRobotiqActionServer(reached_goal=True)
     server = mock_server.serve(rclpy_node, topic)
 
     task = RobotiqGripperActionServerTask(
         action_topic=topic,
-        message_type=ParallelGripperCommand,
         target_position=0.07,
     )
 
-    run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
-    server.destroy()
-
-    assert len(mock_server.received_goals) == 1
-    received_cmd = mock_server.received_goals[0]
-    assert received_cmd.position == [0.07]
-    assert received_cmd.velocity == [10.0]
-    assert received_cmd.effort == [50.0]
+    try:
+        run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+        assert len(mock_server.received_goals) == 1
+        received_cmd = mock_server.received_goals[0]
+        assert list(received_cmd.position) == [0.07]
+        assert list(received_cmd.velocity) == [10.0]
+        assert list(received_cmd.effort) == [50.0]
+    finally:
+        server.destroy()

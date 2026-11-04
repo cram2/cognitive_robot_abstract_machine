@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from control_msgs.action import ParallelGripperCommand
 from geometry_msgs.msg import (
     PoseStamped as ROSPoseStamped,
     Pose as ROSPose,
@@ -17,14 +18,16 @@ except ModuleNotFoundError:
     NavigateToPose = None
 from rclpy.action import ActionClient
 from std_msgs.msg import Header
-from typing_extensions import Type, TypeVar, Generic
-from control_msgs.action import ParallelGripperCommand
+from typing_extensions import TypeVar, Generic
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.data_types import ObservationStateValues
-from giskardpy.motion_statechart.graph_node import MotionStatechartNode, NodeArtifacts
+from krrood.ormatic.utils import classproperty
+from cramph.node import EndedByOwner
+from cramph.context import ContextExtension
+from cramph.data_types import ObservationStateValues
+from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
@@ -36,8 +39,9 @@ ActionResult = TypeVar("ActionResult")
 ActionFeedback = TypeVar("ActionFeedback")
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class ActionServerTask(
+    EndedByOwner,
     MotionStatechartNode,
     ABC,
     Generic[Action, ActionGoal, ActionResult, ActionFeedback],
@@ -46,24 +50,24 @@ class ActionServerTask(
     Abstract base class for tasks that call a ROS2 action server.
     """
 
-    action_topic: str
+    action_topic: str = field(kw_only=True)
     """
     Topic name for the action server.
     """
 
-    message_type: Type[Action]
+    message_type: type[Action] = field(kw_only=True)
     """
     Fully specified goal message that can be send out.
     """
 
     _action_client: ActionClient = field(init=False)
     """
-    ROS action client, is created in `build`.
+    ROS action client, is created in `set_up`.
     """
 
-    _msg: ActionGoal = field(init=False, default=None)
+    _action_goal: ActionGoal | None = field(init=False, default=None)
     """
-    ROS message to send to the action server.
+    Goal to send to the action server.
     """
 
     _result: ActionResult = field(init=False, default=None)
@@ -71,31 +75,35 @@ class ActionServerTask(
     ROS action server result.
     """
 
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        return super().required_context_extensions + (RosContextExtension,)
+
     @abstractmethod
-    def build_msg(self, context: MotionStatechartContext):
+    def build_action_goal(self) -> None:
         """
-        Build the action server message and returns it.
+        Build the goal message this node sends to the action server.
         """
         ...
 
-    def build(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def set_up(self) -> None:
         """
-        Creates the action client.
+        Creates the action client and the message to send.
         """
-        ros_context_extension = context.require_extension(RosContextExtension)
+        super().set_up()
+        ros_context_extension = self.context.require_extension(RosContextExtension)
         self._action_client = ros_context_extension.get_or_create_action_client(
             self.message_type, self.action_topic
         )
-        self.build_msg(context)
+        self.build_action_goal()
         logger.info(f"Waiting for action server {self.action_topic}")
         self._action_client.wait_for_server()
-        return super().build(context)
 
-    def on_start(self, context: MotionStatechartContext):
+    def on_start(self) -> None:
         """
         Creates a goal and sends it to the action server asynchronously.
         """
-        future = self._action_client.send_goal_async(self._msg)
+        future = self._action_client.send_goal_async(self._action_goal)
         future.add_done_callback(self.goal_response_callback)
 
     def goal_response_callback(self, future):
@@ -120,7 +128,7 @@ class ActionServerTask(
         logger.info(f"Action server {self.action_topic} done.")
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class NavigateActionServerTask(
     ActionServerTask[
         NavigateToPose,
@@ -143,12 +151,12 @@ class NavigateActionServerTask(
     Base link of the robot, used for estimating the distance to the goal.
     """
 
-    def build_msg(self, context: MotionStatechartContext):
-        root_p_goal = context.world.transform(
-            target_frame=context.world.root, spatial_object=self.target_pose
+    def build_action_goal(self) -> None:
+        root_T_goal = self.context.world.transform(
+            target_frame=self.context.world.root, spatial_object=self.target_pose
         )
-        position = root_p_goal.position.to_np()
-        orientation = root_p_goal.quaternion.to_np()
+        position = root_T_goal.position.to_np()
+        orientation = root_T_goal.quaternion.to_np()
         pose_stamped = ROSPoseStamped(
             header=Header(frame_id="map"),
             pose=ROSPose(
@@ -161,18 +169,18 @@ class NavigateActionServerTask(
                 ),
             ),
         )
-        self._msg = NavigateToPose.Goal(pose=pose_stamped)
+        self._action_goal = NavigateToPose.Goal(pose=pose_stamped)
 
-    def build_artifacts(self, context: MotionStatechartContext) -> NodeArtifacts:
+    def build_artifacts(self) -> NodeArtifacts:
         """
         Observes whether the robot is within 1cm of the target pose.
         """
         artifacts = NodeArtifacts()
-        root_T_goal = context.world.transform(
-            target_frame=context.world.root, spatial_object=self.target_pose
+        root_T_goal = self.context.world.transform(
+            target_frame=self.context.world.root, spatial_object=self.target_pose
         )
-        root_T_current = context.world.compose_forward_kinematics_expression(
-            context.world.root, self.base_link
+        root_T_current = self.context.world.compose_forward_kinematics_expression(
+            self.context.world.root, self.base_link
         )
 
         position_error = root_T_goal.position.euclidean_distance(
@@ -198,7 +206,7 @@ class NavigateActionServerTask(
             f"Finished navigation with response status: {self._result.result.status} and result code: {self._result.error_code}"
         )
 
-    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValues:
         if self._result.result:
             return (
                 ObservationStateValues.TRUE
@@ -208,7 +216,7 @@ class NavigateActionServerTask(
         return ObservationStateValues.UNKNOWN
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class RobotiqGripperActionServerTask(
     ActionServerTask[
         ParallelGripperCommand,
@@ -222,9 +230,16 @@ class RobotiqGripperActionServerTask(
     control_msgs/ParallelGripperCommand interface.
     """
 
+    message_type: type[ParallelGripperCommand] = field(
+        default=ParallelGripperCommand, kw_only=True
+    )
+    """
+    The ROS2 action interface type.
+    """
+
     target_position: float
     """
-    Desired gripper opening width in meters (e.g., 0.0 for fully open, 0.7 for fully
+    Desired gripper opening width in meters (e.g., 0.0 for fully open, 0.085 for fully
     closed).
     """
 
@@ -242,15 +257,21 @@ class RobotiqGripperActionServerTask(
     _goal_accepted: bool = field(init=False, default=False)
     _done: bool = field(init=False, default=False)
 
-    def build_msg(self, context: MotionStatechartContext):
-        self._msg = ParallelGripperCommand.Goal()
-        self._msg.command.position = [float(self.target_position)]
-        self._msg.command.velocity = [float(self.target_velocity)]
-        self._msg.command.effort = [float(self.target_effort)]
+    def build_action_goal(self) -> None:
+        """
+        Build the ParallelGripperCommand goal message to send to the action server.
+        """
+        self._action_goal = ParallelGripperCommand.Goal()
+        self._action_goal.command.position = [float(self.target_position)]
+        self._action_goal.command.velocity = [float(self.target_velocity)]
+        self._action_goal.command.effort = [float(self.target_effort)]
         self._goal_accepted = False
         self._done = False
 
     def goal_response_callback(self, future):
+        """
+        Handles the server's response to the goal submission.
+        """
         goal_handle = future.result()
         if not goal_handle.accepted:
             logger.error("Gripper goal rejected by action server")
@@ -265,6 +286,9 @@ class RobotiqGripperActionServerTask(
         result_future.add_done_callback(self.result_callback)
 
     def result_callback(self, future):
+        """
+        Stores the action result and marks execution as done.
+        """
         super().result_callback(future)
         self._done = True
         if self._result and hasattr(self._result, "result"):
@@ -274,14 +298,17 @@ class RobotiqGripperActionServerTask(
                 f"Stalled: {self._result.result.stalled}"
             )
 
-    def on_tick(self, context: MotionStatechartContext) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValues:
+        """
+        Observes whether the gripper action succeeded (reached goal or stalled on
+        object).
+        """
         # If goal was rejected, fail immediately
         if self._done and not self._goal_accepted:
             return ObservationStateValues.FALSE
 
         # If action has completed and we have a result object
         if self._done and self._result and hasattr(self._result, "result"):
-            # Extract the ParallelGripperCommand.Result from the action response
             action_result = self._result.result
 
             # The action succeeds if the target width is reached, or if the fingers
