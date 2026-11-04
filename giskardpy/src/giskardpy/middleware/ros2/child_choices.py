@@ -16,7 +16,6 @@ published before.
 from __future__ import annotations
 
 from cramph.data_types import StatechartPayloadKey
-import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 from threading import Lock
@@ -35,6 +34,7 @@ from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.exceptions import StatechartOutOfStepError
 from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayloadKey
 from giskardpy.middleware.ros2.world_updates import (
+    CatchingUpWithGiskard,
     ClientWorldUpdates,
     IncomingWorldUpdates,
 )
@@ -279,6 +279,45 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
 # %% the client's side
 
 
+@dataclass(frozen=True)
+class ChildRequest:
+    """
+    A node of a running goal reporting that it waits for its next child.
+    """
+
+    goal_id: int
+    """
+    The goal the node belongs to.
+    """
+
+    node_index: int
+    """
+    The index of the node in the statechart of the goal.
+    """
+
+    child_count: int
+    """
+    How many children the node held when it reported, which tells its requests apart.
+    """
+
+    @classmethod
+    def all_in(cls, feedback: dict[str, Any]) -> list[Self]:
+        """
+        :param feedback: The feedback of a running goal.
+        :return: The request of every node the feedback reports as waiting for a child.
+        """
+        return [
+            cls(
+                goal_id=feedback[StatechartPayloadKey.GOAL_ID],
+                node_index=int(index),
+                child_count=child_count,
+            )
+            for index, child_count in feedback[
+                MotionStatechartPayloadKey.WAITING_FOR_CHILD
+            ].items()
+        ]
+
+
 @dataclass
 class ChildChoiceClient:
     """
@@ -307,20 +346,18 @@ class ChildChoiceClient:
     The change of the client's world every choice is made on.
     """
 
-    _answered: set[tuple[int, int, int]] = field(
-        default_factory=set, init=False, repr=False
-    )
+    _answered: set[ChildRequest] = field(default_factory=set, init=False, repr=False)
     """
-    Every request answered, as goal, node index and the number of children the node held.
+    Every request answered.
     """
 
-    _waiting_for_changes_since: float | None = field(
-        default=None, init=False, repr=False
-    )
+    _catching_up: CatchingUpWithGiskard = field(init=False, repr=False)
     """
-    The :func:`time.monotonic` time the client started waiting for its world to catch up
-    with Giskard's, or ``None`` if it is not waiting.
+    Tells whether the client's world caught up with the changes the feedback reports.
     """
+
+    def __post_init__(self) -> None:
+        self._catching_up = CatchingUpWithGiskard(world_updates=self.world_updates)
 
     def answer(self, feedback: dict[str, Any]) -> list[ChildChoiceMessage]:
         """
@@ -329,26 +366,23 @@ class ChildChoiceClient:
             before, none while the client's world does not contain the changes the
             feedback reports. A choice that is still pending is asked for again next
             time.
-        :raises GiskardWorldUpdateNotReceivedError: If the client's world does not
-            catch up within the timeout of :attr:`world_updates`.
+        :raises GiskardWorldUpdateNotReceivedError: If a change the feedback reports
+            does not reach the client's world within the timeout of
+            :attr:`world_updates` while a request waits for an answer.
         """
-        if self._waiting_for_changes_since is None:
-            self._waiting_for_changes_since = time.monotonic()
-        if not self.world_updates.has_applied_the_changes_reported_in(
-            feedback, self._waiting_for_changes_since
-        ):
+        requests = [
+            request
+            for request in ChildRequest.all_in(feedback)
+            if request not in self._answered
+        ]
+        if not requests:
             return []
-        self._waiting_for_changes_since = None
-        goal_id = feedback[StatechartPayloadKey.GOAL_ID]
+        if not self._catching_up.has_applied_the_changes_reported_in(feedback):
+            return []
         messages = []
-        for index, child_count in feedback[
-            MotionStatechartPayloadKey.WAITING_FOR_CHILD
-        ].items():
-            request = (goal_id, int(index), child_count)
-            if request in self._answered:
-                continue
+        for request in requests:
             message = self._choose(
-                goal_id, self.statechart.get_node_by_index(int(index))
+                request.goal_id, self.statechart.get_node_by_index(request.node_index)
             )
             if message is None:
                 continue
