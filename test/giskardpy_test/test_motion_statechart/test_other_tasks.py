@@ -29,6 +29,7 @@ from cramph.statechart import (
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
+    RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.feature_functions import (
@@ -1398,7 +1399,11 @@ class TestArticulateGraspedMechanism:
 
         nodes = goal.nodes
 
-        assert [type(node) for node in nodes] == [JointPositionList, CartesianPose]
+        assert [type(node) for node in nodes] == [
+            JointPositionList,
+            CartesianPose,
+            RigidCoupling,
+        ]
 
     def test_a_goal_within_the_limits_is_kept(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")
