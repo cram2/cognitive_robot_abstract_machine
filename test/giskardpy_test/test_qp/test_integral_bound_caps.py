@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
 import pytest
 from typing_extensions import ClassVar
 
@@ -39,17 +40,17 @@ class FarAwayFloor(Task):
     Where the floor is, far outside the joint's position limits.
     """
 
-    REFERENCE_VELOCITY: ClassVar[float] = 0.05
+    CRUISE_VELOCITY: ClassVar[float] = 0.05
     """
-    A reference velocity well below the joint's velocity limit, so that a cap derived
-    from it would visibly slow the joint down.
+    A cruise velocity well below the joint's velocity limit, so that a cap derived from
+    it would visibly slow the joint down.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         artifacts = MotionNodeArtifacts()
         position = self.degree_of_freedom.variables.position
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.REFERENCE_VELOCITY,
+            cruise_velocity=self.CRUISE_VELOCITY,
             velocity_unit=self.degree_of_freedom.limits.upper.velocity,
             lower_error=self.FLOOR_POSITION - position,
             upper_error=float("inf"),
@@ -75,9 +76,9 @@ class Ceiling(Task):
     Where the ceiling is.
     """
 
-    reference_velocity: float = field(kw_only=True)
+    cruise_velocity: float = field(kw_only=True)
     """
-    The reference velocity of the ceiling's constraint.
+    The cruise velocity of the ceiling's constraint.
     """
 
     weight: float = DefaultWeights.WEIGHT_COLLISION_AVOIDANCE.value
@@ -86,7 +87,7 @@ class Ceiling(Task):
         artifacts = MotionNodeArtifacts()
         position = self.degree_of_freedom.variables.position
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             velocity_unit=self.degree_of_freedom.limits.upper.velocity,
             lower_error=-float("inf"),
             upper_error=self.ceiling_position - position,
@@ -129,6 +130,79 @@ def control_cycles_to_reach_joint_goal(world: World, with_floor: bool) -> int:
     return executor.tick_count
 
 
+# %% executed speed
+
+
+@pytest.fixture(
+    params=[
+        QPControllerConfig.create_with_simulation_defaults,
+        QPControllerConfig.create_with_physical_simulation_defaults,
+    ],
+    ids=["simulation", "physical"],
+)
+def controller_preset(request: pytest.FixtureRequest) -> QPControllerConfig:
+    """
+    :return: A controller configuration preset.
+    """
+    config = request.param()
+    config.verbose = False
+    return config
+
+
+def cruise_speed_of_a_far_joint_goal(
+    cruise_velocity: float, config: QPControllerConfig
+) -> float:
+    """
+    Runs a joint goal so far away that it is never reached on a joint with a velocity
+    limit of 1 m/s.
+
+    :param cruise_velocity: The cruise velocity of the joint goal.
+    :param config: The controller configuration.
+    :return: The mean velocity of the joint over the last of three seconds.
+    """
+    world = _make_prismatic_world([_symmetric_prismatic_limits(1000, 1)])
+    connection = next(c for c in world.connections if isinstance(c, ActiveConnection))
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[MotionControl(qp_controller_config=config)],
+    )
+    motion_statechart = Statechart(context=executor.context)
+    motion_statechart.add_node(
+        JointPositionList(
+            goal_state=JointState.from_mapping({connection: 500.0}),
+            cruise_velocity=cruise_velocity,
+        )
+    )
+    executor.compile(statechart=motion_statechart)
+    control_cycles_per_second = round(1 / config.control_time_step.total_seconds())
+    velocities = []
+    for _ in range(3 * control_cycles_per_second):
+        executor.tick()
+        velocities.append(world.state[connection.dof.id].velocity)
+    return float(np.mean(velocities[-control_cycles_per_second:]))
+
+
+def test_a_far_goal_moves_at_its_cruise_velocity(controller_preset):
+    """
+    A slow goal is not held back by the jerk limit, so its executed velocity is its
+    cruise velocity up to how the jerk limit shapes the plan.
+    """
+    cruise_velocity = 0.05
+
+    speed = cruise_speed_of_a_far_joint_goal(cruise_velocity, controller_preset)
+
+    assert speed == pytest.approx(cruise_velocity, rel=0.15)
+
+
+@pytest.mark.parametrize("cruise_velocity", [0.05, 0.2, 0.5])
+def test_a_far_goal_never_moves_faster_than_its_cruise_velocity(
+    cruise_velocity, controller_preset
+):
+    speed = cruise_speed_of_a_far_joint_goal(cruise_velocity, controller_preset)
+
+    assert speed <= cruise_velocity
+
+
 # %% inequality caps
 
 
@@ -151,16 +225,16 @@ def test_an_inequality_far_out_of_reach_does_not_slow_down_a_goal():
 
 
 def penetration_into_ceiling(
-    ceiling_reference_velocity: float = 0.2,
-    goal_reference_velocity: float = 0.2,
+    ceiling_cruise_velocity: float = 0.2,
+    goal_cruise_velocity: float = 0.2,
     goal_above_ceiling: float = 0.6,
     control_cycles: int = 200,
 ) -> float:
     """
     Pushes a joint goal against a :class:`Ceiling` below it until the joint rests.
 
-    :param ceiling_reference_velocity: The reference velocity of the ceiling.
-    :param goal_reference_velocity: The reference velocity of the joint goal.
+    :param ceiling_cruise_velocity: The cruise velocity of the ceiling.
+    :param goal_cruise_velocity: The cruise velocity of the joint goal.
     :param goal_above_ceiling: How far above the ceiling the joint goal is.
     :param control_cycles: How many control cycles to run.
     :return: How far above the ceiling the joint rests.
@@ -177,14 +251,14 @@ def penetration_into_ceiling(
             goal_state=JointState.from_mapping(
                 {connection: ceiling_position + goal_above_ceiling}
             ),
-            max_velocity=goal_reference_velocity,
+            cruise_velocity=goal_cruise_velocity,
         )
     )
     motion_statechart.add_node(
         Ceiling(
             degree_of_freedom=connection.dof,
             ceiling_position=ceiling_position,
-            reference_velocity=ceiling_reference_velocity,
+            cruise_velocity=ceiling_cruise_velocity,
         )
     )
 
@@ -194,48 +268,48 @@ def penetration_into_ceiling(
     return world.state[connection.dof.id].position - ceiling_position
 
 
-def test_how_far_a_goal_pushes_into_a_constraint_does_not_depend_on_the_constraints_reference_velocity():
+def test_how_far_a_goal_pushes_into_a_constraint_does_not_depend_on_the_constraints_cruise_velocity():
     """
     Only the weights set which of two competing constraints wins, and by how much.
     """
-    slow_ceiling = penetration_into_ceiling(ceiling_reference_velocity=0.05)
-    fast_ceiling = penetration_into_ceiling(ceiling_reference_velocity=0.5)
+    slow_ceiling = penetration_into_ceiling(ceiling_cruise_velocity=0.1)
+    fast_ceiling = penetration_into_ceiling(ceiling_cruise_velocity=0.5)
 
     assert fast_ceiling == pytest.approx(slow_ceiling)
 
 
-def test_how_far_a_goal_within_reach_pushes_into_a_constraint_does_not_depend_on_its_reference_velocity():
+def test_how_far_a_goal_within_reach_pushes_into_a_constraint_does_not_depend_on_its_cruise_velocity():
     """
     A goal close enough to demand its whole error within the control horizon pushes with
     a force set by its weight alone.
     """
     slow_goal = penetration_into_ceiling(
-        goal_reference_velocity=0.05, goal_above_ceiling=0.01
+        goal_cruise_velocity=0.05, goal_above_ceiling=0.002
     )
     fast_goal = penetration_into_ceiling(
-        goal_reference_velocity=0.5, goal_above_ceiling=0.01
+        goal_cruise_velocity=0.5, goal_above_ceiling=0.002
     )
 
     assert fast_goal == pytest.approx(slow_goal)
 
 
-def test_how_far_a_goal_out_of_reach_pushes_into_a_constraint_does_not_depend_on_its_reference_velocity():
+def test_how_far_a_goal_out_of_reach_pushes_into_a_constraint_does_not_depend_on_its_cruise_velocity():
     """
     A goal too far away to demand its whole error within the control horizon still
     pushes with a force set by its weight alone, up to a percent: a slower goal is
     stiffer, which slightly changes the motion it plans while it pushes.
     """
-    slow_goal = penetration_into_ceiling(goal_reference_velocity=0.05)
-    fast_goal = penetration_into_ceiling(goal_reference_velocity=0.5)
+    slow_goal = penetration_into_ceiling(goal_cruise_velocity=0.05)
+    fast_goal = penetration_into_ceiling(goal_cruise_velocity=0.5)
 
     assert fast_goal == pytest.approx(slow_goal, rel=0.01)
 
 
-def pull_of_a_violated_lower_bound(reference_velocity: float) -> float:
+def pull_of_a_violated_lower_bound(cruise_velocity: float) -> float:
     """
     Evaluates an inequality whose lower bound lies far out of reach above its joint.
 
-    :param reference_velocity: The reference velocity of the inequality.
+    :param cruise_velocity: The cruise velocity of the inequality.
     :return: How hard the inequality pulls on the joint while it is at rest, up to a
         factor every constraint shares.
     """
@@ -245,7 +319,7 @@ def pull_of_a_violated_lower_bound(reference_velocity: float) -> float:
     ).dof
     collection = ConstraintCollection()
     collection.add_inequality_constraint(
-        reference_velocity=reference_velocity,
+        cruise_velocity=cruise_velocity,
         velocity_unit=degree_of_freedom.limits.upper.velocity,
         lower_error=5.0,
         upper_error=float("inf"),
@@ -264,8 +338,8 @@ def pull_of_a_violated_lower_bound(reference_velocity: float) -> float:
     return slack_weight * capped_lower_bound
 
 
-def test_how_hard_a_violated_inequality_pulls_back_does_not_depend_on_its_reference_velocity():
-    slow = pull_of_a_violated_lower_bound(reference_velocity=0.05)
-    fast = pull_of_a_violated_lower_bound(reference_velocity=0.5)
+def test_how_hard_a_violated_inequality_pulls_back_does_not_depend_on_its_cruise_velocity():
+    slow = pull_of_a_violated_lower_bound(cruise_velocity=0.05)
+    fast = pull_of_a_violated_lower_bound(cruise_velocity=0.5)
 
     assert fast == pytest.approx(slow)

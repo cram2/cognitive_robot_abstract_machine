@@ -7,6 +7,7 @@ import pytest
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from cramph.data_types import ObservationStateValues, LifeCycleValues
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
@@ -1758,8 +1759,8 @@ class TestCartesianTasks:
         self, pr2_world_state_reset: World, orientation_speed_ratio_tolerance: float
     ):
         """
-        The angular speed towards an orientation goal is set by its reference velocity,
-        not by how far away the goal is.
+        The angular speed towards an orientation goal is set by its cruise velocity, not
+        by how far away the goal is.
 
         Capping the half-angle rows directly makes the angular speed grow with
         1/cos(angle/2), so a goal at 150 degrees would turn more than twice as fast as
@@ -1775,6 +1776,19 @@ class TestCartesianTasks:
             )
 
         assert peak_speeds[1] <= orientation_speed_ratio_tolerance * peak_speeds[0]
+
+    def test_orientation_goal_never_turns_faster_than_its_cruise_velocity(
+        self, pr2_world_state_reset: World
+    ):
+        peak_angle_per_tick = peak_angle_per_tick_towards_roll_goal(
+            pr2_world_state_reset, np.radians(150)
+        )
+        time_step = MotionControl().qp_controller_config.control_time_step
+
+        assert (
+            peak_angle_per_tick / time_step.total_seconds()
+            <= DefaultCruiseVelocity.ROTATION
+        )
 
     def test_cartesian_position_straight_weighs_its_rows_by_its_weight(
         self, cylinder_bot_world: World

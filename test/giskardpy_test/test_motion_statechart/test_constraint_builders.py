@@ -13,9 +13,9 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
-ROTATION_REFERENCE_VELOCITY = 0.1
+ROTATION_CRUISE_VELOCITY = 0.1
 """
-Reference velocity of the rotation goals built in these tests, in rad/s.
+Cruise velocity of the rotation goals built in these tests, in rad/s.
 """
 
 
@@ -52,7 +52,7 @@ def test_point_goal_writes_three_equality_constraints():
     builder.add_point_goal_constraints(
         frame_P_current=Point3(0.0, 0.0, 0.0),
         frame_P_goal=Point3(1.0, 2.0, 3.0),
-        reference_velocity=0.1,
+        cruise_velocity=0.1,
         quadratic_weight=1.0,
         name="goal",
     )
@@ -66,7 +66,7 @@ def test_point_goal_caps_the_length_of_its_error_and_keeps_its_direction():
     GeometricConstraintBuilder(collection).add_point_goal_constraints(
         frame_P_current=Point3(0.0, 0.0, 0.0),
         frame_P_goal=Point3(*error),
-        reference_velocity=0.1,
+        cruise_velocity=0.1,
         quadratic_weight=1.0,
     )
 
@@ -82,7 +82,7 @@ def test_rotation_goal_writes_three_equality_constraints():
     builder.add_rotation_goal_constraints(
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), 0.5)),
-        reference_velocity=0.1,
+        cruise_velocity=0.1,
         quadratic_weight=1.0,
         name="goal",
     )
@@ -96,7 +96,7 @@ def test_yaw_goal_writes_one_equality_constraint():
     builder.add_yaw_goal_constraint(
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_rpy(roll=0.2, pitch=-0.1, yaw=0.5),
-        reference_velocity=0.1,
+        cruise_velocity=0.1,
         quadratic_weight=1.0,
         name="goal",
     )
@@ -135,7 +135,7 @@ def rotation_goal_bounds(
         GeometricConstraintBuilder(collection),
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), angle)),
-        reference_velocity=ROTATION_REFERENCE_VELOCITY,
+        cruise_velocity=ROTATION_CRUISE_VELOCITY,
         quadratic_weight=1.0,
     )
     uncapped = np.array(
@@ -163,21 +163,23 @@ def test_rotation_goal_caps_the_angle_it_demands(
     assert remaining_half_angle == pytest.approx(half_angle - reachable_change)
 
 
-def test_rotation_goal_demands_as_much_rotation_as_its_reference_velocity_sustains(
+def test_rotation_goal_demands_the_angle_its_cruise_velocity_executes(
     add_rotation_goal: Callable[..., None],
 ):
     """
-    Within the control horizon, the half angle may change by the reference velocity
-    sustained over the control horizon, as much as a single row of the quaternion error
-    was allowed to change before the angle was capped.
+    A far away goal demands the rotation that the robot executes at the reference
+    velocity within the control horizon.
     """
-    _, _, reachable_change = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
+    uncapped, capped, _ = rotation_goal_bounds(add_rotation_goal, np.pi / 2)
+    half_angle = np.arcsin(np.linalg.norm(uncapped))
+    remaining_half_angle = np.arcsin(np.linalg.norm(uncapped) - np.linalg.norm(capped))
     config = controller_config()
 
-    assert reachable_change == pytest.approx(
-        ROTATION_REFERENCE_VELOCITY
+    assert 2 * (half_angle - remaining_half_angle) == pytest.approx(
+        ROTATION_CRUISE_VELOCITY
         * config.control_time_step.total_seconds()
         * config.control_horizon
+        / config.executed_to_mean_velocity_ratio
     )
 
 
@@ -195,7 +197,7 @@ def test_node_artifacts_geometry_writes_into_its_constraints():
     artifacts.geometry.add_point_goal_constraints(
         frame_P_current=Point3(0.0, 0.0, 0.0),
         frame_P_goal=Point3(1.0, 2.0, 3.0),
-        reference_velocity=0.1,
+        cruise_velocity=0.1,
         quadratic_weight=1.0,
         name="goal",
     )
@@ -249,14 +251,14 @@ class EnforcedGoal:
 
 
 def enforced_goal(
-    add_goal: Callable[..., None], reference_velocity: float, distance: float
+    add_goal: Callable[..., None], cruise_velocity: float, distance: float
 ) -> EnforcedGoal:
     """
     Builds a goal and evaluates it with an integral strategy.
 
     :param add_goal: The method of :class:`GeometricConstraintBuilder` adding the goal's
         constraints.
-    :param reference_velocity: The reference velocity of the goal.
+    :param cruise_velocity: The cruise velocity of the goal.
     :param distance: How far away the goal is, in meters or radians.
     :return: The goal as the integral strategy enforces it.
     """
@@ -284,7 +286,7 @@ def enforced_goal(
         GeometricConstraintBuilder(collection),
         current,
         goal,
-        reference_velocity=reference_velocity,
+        cruise_velocity=cruise_velocity,
         quadratic_weight=1.0,
     )
     strategy = IntegralStrategy(
@@ -299,15 +301,15 @@ def enforced_goal(
 
 
 def test_slowing_down_a_goal_within_reach_does_not_change_its_weight(add_goal):
-    slow = enforced_goal(add_goal, reference_velocity=0.05, distance=0.005)
-    fast = enforced_goal(add_goal, reference_velocity=0.5, distance=0.005)
+    slow = enforced_goal(add_goal, cruise_velocity=0.05, distance=0.005)
+    fast = enforced_goal(add_goal, cruise_velocity=0.5, distance=0.005)
 
     assert np.allclose(slow.slack_weights, fast.slack_weights)
 
 
 def test_slowing_down_a_goal_out_of_reach_does_not_change_how_hard_it_pulls(add_goal):
-    slow = enforced_goal(add_goal, reference_velocity=0.05, distance=0.5)
-    fast = enforced_goal(add_goal, reference_velocity=0.5, distance=0.5)
+    slow = enforced_goal(add_goal, cruise_velocity=0.05, distance=0.5)
+    fast = enforced_goal(add_goal, cruise_velocity=0.5, distance=0.5)
 
     assert np.allclose(slow.pull, fast.pull)
 
@@ -320,7 +322,7 @@ def test_a_quaternion_error_is_normalized_by_how_fast_it_changes_with_the_angle(
         GeometricConstraintBuilder(collection),
         frame_R_current=RotationMatrix(),
         frame_R_goal=RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), 0.5)),
-        reference_velocity=ROTATION_REFERENCE_VELOCITY,
+        cruise_velocity=ROTATION_CRUISE_VELOCITY,
         quadratic_weight=1.0,
     )
 

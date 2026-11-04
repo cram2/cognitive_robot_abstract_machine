@@ -20,7 +20,7 @@ from giskardpy.qp.constraint import (
 from giskardpy.qp.dof_limits import DirectLimits
 from giskardpy.qp.exceptions import (
     ConstraintTypeMismatchError,
-    MissingReferenceVelocityError,
+    MissingCruiseVelocityError,
 )
 from krrood.symbolic_math.symbolic_math import Vector, Matrix, Scalar
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
@@ -282,7 +282,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
 
         A quadratic weight is also scaled by :meth:`demand_compensation_of_constraint`,
         so that only the weight decides how hard a constraint pulls against others, not
-        its reference velocity.
+        its cruise velocity.
         """
         return DirectLimits(
             lower_bounds=Vector([c.lower_slack_limit for c in self.constraints]),
@@ -315,10 +315,11 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         self, constraint: GiskardConstraint
     ) -> Scalar:
         """
-        The factor that makes a demand capped by the constraint's reference velocity
-        pull as hard as the same demand capped by its velocity unit would.
+        The factor that makes a demand capped by the constraint's cruise velocity pull
+        as hard as the same demand capped by its velocity unit sustained over the
+        control horizon would.
 
-        It is 1 for a demand within reach of the reference velocity. Beyond it, a slower
+        It is 1 for a demand within reach of the cruise velocity. Beyond it, a slower
         constraint demands less motion and its weight is raised by as much, and a faster
         one's lowered.
         """
@@ -337,11 +338,15 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
     def reachable_change_of_constraint(self, constraint: GiskardConstraint) -> Scalar:
         """
         The largest change of a constraint's expression that may be demanded within the
-        control horizon: its reference velocity sustained over that horizon.
+        control horizon: the change the robot executes at the constraint's reference
+        velocity, see :attr:`QPControllerConfig.executed_to_mean_velocity_ratio`.
         """
-        if constraint.reference_velocity is None:
-            raise MissingReferenceVelocityError(constraint_name=constraint.name)
-        return self.change_within_control_horizon(constraint.reference_velocity)
+        if constraint.cruise_velocity is None:
+            raise MissingCruiseVelocityError(constraint_name=constraint.name)
+        return (
+            self.change_within_control_horizon(constraint.cruise_velocity)
+            / self.qp_controller_config.executed_to_mean_velocity_ratio
+        )
 
     def change_within_control_horizon(self, velocity: sm.ScalarData) -> Scalar:
         """

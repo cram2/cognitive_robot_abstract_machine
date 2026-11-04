@@ -270,7 +270,7 @@ def test_revolute_joint(pr2_world_state_reset):
 def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     """
     JointVelocityLimit must genuinely slow down a joint's approach towards a distant
-    target, unlike a reference velocity, which is only a QP-optimization
+    target, unlike a cruise velocity, which is only a QP-optimization
     hint -- the joint's velocity must stay within max_velocity on every single tick,
     all the way until the goal is actually reached.
     """

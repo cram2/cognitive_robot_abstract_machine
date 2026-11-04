@@ -12,10 +12,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.weights import VelocityUnit
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianOrientation,
-    CartesianPosition,
-)
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -89,7 +86,7 @@ class BasePosition(DrivenBaseTask):
     Drives the base along the floor to below the position of :attr:`goal_pose`.
     """
 
-    reference_velocity: float = CartesianPosition.default_reference_velocity
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
     Sets how fast the goal is approached, in m/s; not strictly enforced.
     """
@@ -109,7 +106,7 @@ class BasePosition(DrivenBaseTask):
             artifacts.geometry.add_position_constraint(
                 expression_current=base_coordinate,
                 expression_goal=goal_coordinate,
-                reference_velocity=self.reference_velocity,
+                cruise_velocity=self.cruise_velocity,
                 velocity_unit=VelocityUnit.TRANSLATION,
                 quadratic_weight=self.weight,
             )
@@ -126,7 +123,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
     :meth:`parent_R_goal` describes does.
     """
 
-    reference_velocity: float = CartesianOrientation.default_reference_velocity
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
     Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
@@ -152,7 +149,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
         artifacts.geometry.add_yaw_goal_constraint(
             frame_R_current=parent_R_base,
             frame_R_goal=parent_R_goal,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         yaw_error = sm.shortest_angular_distance(

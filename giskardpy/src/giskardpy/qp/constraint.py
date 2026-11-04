@@ -59,7 +59,7 @@ class GiskardConstraint(ABC):
     does not depend on the speed the constraint drives at.
     """
 
-    reference_velocity: sm.ScalarData | None = None
+    cruise_velocity: sm.ScalarData | None = None
     """
     The velocity a constraint on the expression's position drives at, from which the
     change it may demand within the control horizon is derived.

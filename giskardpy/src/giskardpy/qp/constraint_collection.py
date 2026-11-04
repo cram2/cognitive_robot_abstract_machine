@@ -147,7 +147,7 @@ class ConstraintCollection:
         task_expression: sm.SymbolicScalar,
         equality_bound: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
-        reference_velocity: sm.ScalarData,
+        cruise_velocity: sm.ScalarData,
         velocity_unit: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
@@ -158,9 +158,9 @@ class ConstraintCollection:
         Add a task constraint to the motion problem.
 
         This should be used for most constraints. It will not strictly stick to the
-        reference velocity, but requires only a single constraint in the final
+        cruise velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error, will not be
+        :param cruise_velocity: used by Giskard to limit the error, will not be
             strictly enforced.
         :param velocity_unit: the speed at which task_expression typically
             changes, which scales quadratic_weight
@@ -190,7 +190,7 @@ class ConstraintCollection:
             expression=task_expression,
             bound=equality_bound,
             bound_cap=bound_cap if bound_cap is not None else ScalarBoundCap(),
-            reference_velocity=reference_velocity,
+            cruise_velocity=cruise_velocity,
             velocity_unit=velocity_unit,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
@@ -202,7 +202,7 @@ class ConstraintCollection:
 
     def add_inequality_constraint(
         self,
-        reference_velocity: sm.ScalarData,
+        cruise_velocity: sm.ScalarData,
         velocity_unit: sm.ScalarData,
         lower_error: sm.ScalarData,
         upper_error: sm.ScalarData,
@@ -217,9 +217,9 @@ class ConstraintCollection:
         Add a task constraint to the motion problem.
 
         This should be used for most constraints. It will not strictly stick to the
-        reference velocity, but requires only a single constraint in the final
+        cruise velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to cap a
+        :param cruise_velocity: used by Giskard to cap a
             bound that demands motion (a positive lower or a negative upper error) to what
             is reachable at this velocity. A bound that only permits motion is not capped.
             Will not be strictly enforced.
@@ -247,7 +247,7 @@ class ConstraintCollection:
         constraint = GiskardInequalityConstraint(
             name=name,
             expression=task_expression,
-            reference_velocity=reference_velocity,
+            cruise_velocity=cruise_velocity,
             velocity_unit=velocity_unit,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
