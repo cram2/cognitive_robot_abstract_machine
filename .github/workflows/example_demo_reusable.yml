@@ -18,7 +18,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # A runner that ran out of disk or memory stops responding instead of failing the job.
+    # Fails a job that is still running after an hour. A runner that runs out of disk or memory
+    # stops responding, and its job would otherwise only end at GitHub's six-hour limit.
     timeout-minutes: 60
     container:
       image: ${{ inputs.repo_lowercase }}
