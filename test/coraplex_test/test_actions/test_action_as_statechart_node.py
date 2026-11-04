@@ -42,6 +42,7 @@ from cramph.nodes_for_testing import (
 )
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
+from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
@@ -744,6 +745,18 @@ def test_fixating_an_object_keeps_the_gripper_where_it_is(simple_pr2_context) ->
     assert holding.goal_pose.reference_frame is tool_frame
     [rule] = action.temporary_collision_rules
     assert rule.end_effector is end_effector
+
+
+def test_fixating_an_object_holds_the_gripper_against_collision_avoidance(
+    simple_pr2_context,
+) -> None:
+    world, robot, extensions = simple_pr2_context
+    action = FixateObjectAction(end_effector=robot.left_arm.end_effector)
+
+    _expanded(action, extensions)
+
+    [holding] = action.nodes
+    assert holding.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
 
 
 def test_an_action_lets_nothing_touch_unless_it_says_so(simple_pr2_context) -> None:

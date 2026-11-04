@@ -18,6 +18,7 @@ from coraplex.robot_plans.mixins import (
     ReachTuningParameters,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.weights import DefaultWeights
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -332,5 +333,7 @@ class FixateObjectAction(ParallelAction):
                 root_link=self.world.root,
                 tip_link=tool_frame,
                 goal_pose=Pose(reference_frame=tool_frame),
+                # Holding on has to matter more than keeping clear of what is held.
+                weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             )
         ]
