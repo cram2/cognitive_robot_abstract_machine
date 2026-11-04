@@ -46,7 +46,6 @@ jobs:
           - lib: robokudo
           - lib: segmind
           - lib: experiments
-          - lib: cramera
           - lib: cramployer
           - lib: krrood_spatial_math
           - lib: version

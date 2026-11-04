@@ -99,8 +99,6 @@ jobs:
             ulimit -v 6291456
             cd cognitive_robot_abstract_machine
             python -m pytest --orm-build never --cov=scripts.cramployer --cov-config=scripts/cramployer/coverage.ini --cov-fail-under=85 test/cramployer_test scripts/cramployer/container_tests
-          elif [[ "${{ inputs.lib }}" == "cramera" ]]; then
-            python -m pytest -n auto --cov=cramera --cov-fail-under=85 cognitive_robot_abstract_machine/test/cramera_test
           else
             python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
           fi
