@@ -18,11 +18,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A runner that ran out of disk or memory stops responding instead of failing the job.
+    timeout-minutes: 60
     container:
       image: ${{ inputs.repo_lowercase }}
-      # The host's root, read-only, so show_runner_resources.sh can measure the disk the job
-      # shares with everything the runner image installs.
-      options: --volume /:/host:ro
+      # The host's root, so free_runner_disk.sh can delete what the runner image installs and
+      # show_runner_resources.sh can measure the disk the job shares with it. Writable, since
+      # the runner's machine is discarded after the job.
+      options: --volume /:/host
     env:
       # The CPU only torch build, as in ci_reusable.yml: the CUDA build exhausts the runner disk.
       UV_INDEX: https://download.pytorch.org/whl/cpu
@@ -32,6 +35,9 @@ jobs:
         with:
           path: cognitive_robot_abstract_machine
           submodules: recursive
+
+      - name: Free disk space
+        run: cognitive_robot_abstract_machine/scripts/free_runner_disk.sh
 
       - name: Show runner resources
         run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh --host-directory-sizes

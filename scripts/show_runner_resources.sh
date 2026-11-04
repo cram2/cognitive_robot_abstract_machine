@@ -7,20 +7,10 @@
 
 set -uo pipefail
 
-# Where the CI workflows mount the host's root into the job's container.
-host_root=/host
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/runner_host.sh"
 
 # Where the CI image keeps its environments and caches, and where the job writes.
 measured_directories=(/opt/ros/cram-env /opt/ros/.uv_cache /opt/ros/overlay_ws /github/home /__w /tmp /usr /var)
-
-# Prints the output of a command as a collapsible group of the job log.
-print_group() {
-    local title="$1"
-    shift
-    echo "::group::$title"
-    "$@" 2>&1
-    echo "::endgroup::"
-}
 
 print_group "Operating system" bash -c 'uname -a; cat /etc/os-release'
 # The runners differ in CPU model, which can change the rounding of numeric results.
@@ -33,15 +23,12 @@ print_group "Disk space" df -h
 print_group "Inodes" df -ih
 print_group "Directory sizes" bash -c 'du -xsh "$@" 2>/dev/null | sort -h' _ "${measured_directories[@]}"
 
-if [[ ! -d "$host_root/usr" ]]; then
+if ! host_is_mounted; then
     echo "The host's root is not mounted at $host_root; skipping the host's disk usage."
     exit 0
 fi
-# The images, containers and build cache Docker keeps on the host, read through the socket
-# the runner mounts into the container. The host's Docker client runs with the host's own C
-# library, which can be newer than the one in the image.
-print_group "Docker disk usage" "$host_root/lib64/ld-linux-x86-64.so.2" \
-    --library-path "$host_root/lib/x86_64-linux-gnu" "$host_root/usr/bin/docker" system df -v
+# The images, containers and build cache Docker keeps on the host.
+print_group "Docker disk usage" host_docker system df -v
 if [[ "${1:-}" == "--host-directory-sizes" ]]; then
     print_group "Host directory sizes" bash -c \
         'du -xh --max-depth=3 --threshold=500M "$1" 2>/dev/null | sort -h | tail -n 60' _ "$host_root"
