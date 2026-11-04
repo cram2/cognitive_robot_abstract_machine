@@ -92,6 +92,12 @@ class GraphNode:
         """
         return self.variable.name
 
+    def __lt__(self, other: GraphNode) -> bool:
+        """
+        Order nodes by name, wherever an order is needed.
+        """
+        return self.name < other.name
+
     def variable_of_part(self, index: int) -> Variable:
         """
         :param index: The position of one part in the collection.
@@ -186,6 +192,28 @@ class GraphEdge:
 
 
 # %% the directed acyclic graphs a causal graph stands for
+
+
+@dataclass(frozen=True)
+class Collider:
+    """
+    Two nodes that both cause a third: ``first_parent → child ← second_parent``.
+    """
+
+    first_parent: GraphNode
+    """
+    The parent whose name sorts first.
+    """
+
+    child: GraphNode
+    """
+    The node both parents cause.
+    """
+
+    second_parent: GraphNode
+    """
+    The other parent.
+    """
 
 
 @dataclass(eq=False)
@@ -339,10 +367,10 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         """
         return self.edge_between(first, second) is not None
 
-    def unshielded_colliders(self) -> set[tuple[GraphNode, GraphNode, GraphNode]]:
+    def unshielded_colliders(self) -> set[Collider]:
         """
-        :return: Every ``a → c ← b`` among the directed edges with ``a`` and ``b`` not
-            adjacent, as ``(a, c, b)`` with ``a``'s name sorted before ``b``'s.
+        :return: Every collider among the directed edges whose two parents are not
+            adjacent.
         """
         directed = MemberGraph()
         directed.add_nodes_from(self.nodes())
@@ -351,21 +379,19 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         )
         return self.colliders_of(directed)
 
-    def colliders_of(
-        self, directed: MemberGraph
-    ) -> set[tuple[GraphNode, GraphNode, GraphNode]]:
+    def colliders_of(self, directed: MemberGraph) -> set[Collider]:
         """
         :param directed: Directed edges over the graph's nodes.
         :return: Every collider among the directed edges whose two parents are not
-            :meth:`adjacent` in this graph, as :meth:`unshielded_colliders` gives them.
+            :meth:`adjacent` in this graph.
         """
         return {
-            (first, child, second)
+            Collider(first_parent, child, second_parent)
             for child in directed.nodes()
-            for first, second in itertools.combinations(
-                sorted(directed.predecessors(child), key=lambda node: node.name), 2
+            for first_parent, second_parent in itertools.combinations(
+                sorted(directed.predecessors(child)), 2
             )
-            if not self.adjacent(first, second)
+            if not self.adjacent(first_parent, second_parent)
         }
 
     def member_graphs(self) -> list[MemberGraph]:

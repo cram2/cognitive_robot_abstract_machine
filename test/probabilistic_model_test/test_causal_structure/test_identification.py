@@ -10,6 +10,7 @@ from probabilistic_model.causal_structure.graph import (
 )
 from probabilistic_model.causal_structure.identification import (
     AdjustmentCheck,
+    AdjustmentSet,
     AdjustmentSelector,
     IdentifiedEffect,
     InvalidAdjustmentReason,
@@ -43,6 +44,15 @@ def nodes_of(graph: CausalGraph, names: set[str]) -> frozenset[GraphNode]:
     return frozenset(graph.node(name) for name in names)
 
 
+def adjustment_of(graph: CausalGraph, names: set[str]) -> AdjustmentSet:
+    """
+    :param graph: A graph.
+    :param names: The names of some of its nodes.
+    :return: The set adjusting for those nodes.
+    """
+    return AdjustmentSet(nodes_of(graph, names))
+
+
 def identify(
     graph: CausalGraph,
     eligible: set[str],
@@ -73,7 +83,7 @@ def failure_of(
     """
     [member] = graph.member_graphs()
     return AdjustmentCheck(member, graph.node("X"), graph.node("Y")).failure_reason(
-        nodes_of(graph, adjustment)
+        adjustment_of(graph, adjustment)
     )
 
 
@@ -126,13 +136,13 @@ def test_adjustment_criterion(
 def test_confounder_is_the_adjustment_set():
     graph = confounded()
 
-    assert identify(graph, {"Z"}) == IdentifiedEffect(nodes_of(graph, {"Z"}))
+    assert identify(graph, {"Z"}) == IdentifiedEffect(adjustment_of(graph, {"Z"}))
 
 
 def test_proxied_confounder_is_chosen_over_its_proxy():
     graph = proxied_confounder()
 
-    assert identify(graph, {"N", "E"}) == IdentifiedEffect(nodes_of(graph, {"N"}))
+    assert identify(graph, {"N", "E"}) == IdentifiedEffect(adjustment_of(graph, {"N"}))
 
 
 def test_support_ranking_prefers_populated_cells():
@@ -153,7 +163,9 @@ def test_support_ranking_prefers_populated_cells():
 
     graph = two_step_back_door()
 
-    assert identify(graph, {"A", "B"}, rows) == IdentifiedEffect(nodes_of(graph, {"B"}))
+    assert identify(graph, {"A", "B"}, rows) == IdentifiedEffect(
+        adjustment_of(graph, {"B"})
+    )
 
 
 # %% an equivalence class that does not settle the effect
@@ -163,14 +175,14 @@ def test_undirected_edge_gives_partial_identification():
     graph = undirected_parent()
 
     assert identify(graph, {"A"}) == PartiallyIdentifiedEffect(
-        candidate_adjustments=[frozenset(), nodes_of(graph, {"A"})],
+        candidate_adjustments=[AdjustmentSet(), adjustment_of(graph, {"A"})],
         includes_member_without_causal_path=False,
     )
 
 
 def test_effect_may_be_parent_of_cause():
     assert identify(undirected_cause_and_effect(), set()) == PartiallyIdentifiedEffect(
-        candidate_adjustments=[frozenset()],
+        candidate_adjustments=[AdjustmentSet()],
         includes_member_without_causal_path=True,
     )
 
@@ -191,7 +203,7 @@ def test_declared_mediator_is_refused():
 
     with pytest.raises(InvalidAdjustmentSet) as refusal:
         AdjustmentSelector(graph).check_declared(
-            graph.node("X"), graph.node("Y"), nodes_of(graph, {"M"})
+            graph.node("X"), graph.node("Y"), adjustment_of(graph, {"M"})
         )
 
     assert refusal.value.reason is InvalidAdjustmentReason.CONTAINS_FORBIDDEN_NODE
@@ -201,7 +213,20 @@ def test_declared_confounder_is_accepted():
     graph = confounded()
 
     identification = AdjustmentSelector(graph).check_declared(
-        graph.node("X"), graph.node("Y"), nodes_of(graph, {"Z"})
+        graph.node("X"), graph.node("Y"), adjustment_of(graph, {"Z"})
     )
 
-    assert identification == IdentifiedEffect(nodes_of(graph, {"Z"}))
+    assert identification == IdentifiedEffect(adjustment_of(graph, {"Z"}))
+
+
+# %% ordering adjustment sets
+
+
+def test_smaller_adjustment_sets_come_first_then_by_their_names():
+    graph = confounded()
+    by_size_then_name = [
+        AdjustmentSet(),
+        adjustment_of(graph, {"Y"}),
+        adjustment_of(graph, {"X", "Z"}),
+    ]
+    assert sorted(reversed(by_size_then_name)) == by_size_then_name

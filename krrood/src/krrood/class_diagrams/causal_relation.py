@@ -23,7 +23,11 @@ from krrood.class_diagrams.class_diagram import (
     WrappedClass,
 )
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.entity_query_language.core.mapped_variable import Attribute, MappedVariable
+from krrood.entity_query_language.core.mapped_variable import (
+    Attribute,
+    Call,
+    MappedVariable,
+)
 
 # %% what a causal relation connects
 
@@ -93,9 +97,9 @@ class StatisticEndpoint(CausalEndpoint):
     of every part in one of its collections.
     """
 
-    statistic: MappedVariable
+    statistic: Call
     """
-    The symbolic call of the statistic.
+    The symbolic call of the statistic method.
     """
 
     collection: WrappedField | None = None

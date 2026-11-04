@@ -11,6 +11,7 @@ from typing_extensions import TYPE_CHECKING
 if TYPE_CHECKING:
     from probabilistic_model.causal_structure.graph import GraphNode
     from probabilistic_model.causal_structure.identification import (
+        AdjustmentSet,
         InvalidAdjustmentReason,
     )
 
@@ -157,7 +158,7 @@ class InvalidAdjustmentSet(ProbabilisticModelException):
     The effect.
     """
 
-    declared: frozenset[GraphNode]
+    declared: AdjustmentSet
     """
     The declared adjustment set.
     """
@@ -174,7 +175,7 @@ class InvalidAdjustmentSet(ProbabilisticModelException):
 
     def error_message(self) -> str:
         return (
-            f"Adjusting for {sorted(node.name for node in self.declared)} does not "
+            f"Adjusting for {self.declared.names} does not "
             f"identify the effect of '{self.cause.name}' on '{self.effect.name}': "
             f"{self.reason} in member graph "
             f"{self.member_index}."

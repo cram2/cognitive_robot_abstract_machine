@@ -651,9 +651,10 @@ class ClassDiagram:
         Build parent map from inheritance edges: child_idx -> set(parent_idx)
         """
         parent_map: dict[int, set[int]] = {}
-        for u, v, rel in self._dependency_graph.weighted_edge_list():
-            if isinstance(rel, Inheritance):
-                parent_map.setdefault(v, set()).add(u)
+        edges = self._dependency_graph.weighted_edge_list()
+        for parent_index, child_index, relation in edges:
+            if isinstance(relation, Inheritance):
+                parent_map.setdefault(child_index, set()).add(parent_index)
         return parent_map
 
     def all_ancestors(self, node_idx: int) -> set[int]:

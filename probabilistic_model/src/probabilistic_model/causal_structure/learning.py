@@ -102,12 +102,12 @@ class CausalStructureLearner(ABC):
         self,
         rows: pd.DataFrame,
         nodes: list[GraphNode],
-        knowledge: DomainCausalKnowledge,
+        domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         """
         :param rows: The table, one column per node, named by the node.
         :param nodes: The nodes to learn the graph over.
-        :param knowledge: What is known about the structure in advance.
+        :param domain_knowledge: What is known about the structure in advance.
         :return: The learned graph over the nodes.
         """
 
@@ -140,7 +140,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         self,
         rows: pd.DataFrame,
         nodes: list[GraphNode],
-        knowledge: DomainCausalKnowledge,
+        domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         """
         Deterministic copies and columns that never vary are left out of the tests; a
@@ -148,8 +148,8 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         edges.
         """
         node_of = {node.name: node for node in nodes}
-        knowledge.check_names(list(node_of))
-        copies = {copy.copy for copy in knowledge.deterministic_copies}
+        domain_knowledge.check_names(list(node_of))
+        copies = {copy.copy for copy in domain_knowledge.deterministic_copies}
         tested = [
             node
             for node in nodes
@@ -165,7 +165,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
             show_progress=False,
             node_names=tested_names,
             background_knowledge=self.to_causal_learn_knowledge(
-                knowledge.restricted_to(tested_names)
+                domain_knowledge.restricted_to(tested_names)
             ),
         ).G.graph
         return CausalGraph.from_edges(
@@ -173,27 +173,27 @@ class PeterClarkStructureLearner(CausalStructureLearner):
             self.read_adjacency_matrix(graph, tested)
             + [
                 GraphEdge.directed(node_of[copy.source], node_of[copy.copy])
-                for copy in knowledge.deterministic_copies
+                for copy in domain_knowledge.deterministic_copies
             ],
         )
 
     @staticmethod
     def to_causal_learn_knowledge(
-        knowledge: DomainCausalKnowledge,
+        domain_knowledge: DomainCausalKnowledge,
     ) -> CausalLearnKnowledge:
         """
-        :param knowledge: Knowledge about the tested variables.
+        :param domain_knowledge: Domain knowledge about the tested variables.
         :return: The same knowledge as causal-learn takes it.
         """
         translated = CausalLearnKnowledge()
-        for tier, names in enumerate(knowledge.tiers):
+        for tier, names in enumerate(domain_knowledge.tiers):
             for name in names:
                 translated.add_node_to_tier(CausalLearnNode(name), tier)
-        for edge in knowledge.required_edges:
+        for edge in domain_knowledge.required_edges:
             translated.add_required_by_node(
                 CausalLearnNode(edge.parent), CausalLearnNode(edge.child)
             )
-        for edge in knowledge.forbidden_edges:
+        for edge in domain_knowledge.forbidden_edges:
             translated.add_forbidden_by_node(
                 CausalLearnNode(edge.parent), CausalLearnNode(edge.child)
             )
@@ -288,16 +288,16 @@ class RelationalCausalStructureLearner:
         self,
         circuit: RelationalProbabilisticCircuit,
         instances: list[Any],
-        knowledge: DomainCausalKnowledge | None = None,
+        domain_knowledge: DomainCausalKnowledge | None = None,
     ) -> LearnedCausalStructure:
         """
         :param circuit: A fitted relational circuit.
         :param instances: The instances it was fitted on.
-        :param knowledge: What is known about the structure in advance, naming part
+        :param domain_knowledge: What is known about the structure in advance, naming part
             attributes by their template node.
         :return: The structure learned from the circuit's training tables.
         """
-        knowledge = knowledge or DomainCausalKnowledge()
+        domain_knowledge = domain_knowledge or DomainCausalKnowledge()
         tables = circuit.training_tables(instances)
         statistic_names = {
             variable.name
@@ -319,14 +319,14 @@ class RelationalCausalStructureLearner:
         example_graph = self.learner.learn(
             tables.example_rows,
             example_nodes,
-            knowledge.restricted_to(example_names),
+            domain_knowledge.restricted_to(example_names),
         )
         nodes, edges = list(example_nodes), example_graph.edges()
         for part, rows in tables.part_rows.items():
             part_nodes = self.create_part_nodes(circuit, part)
             nodes += part_nodes
             edges += self.learn_part_edges(
-                part, rows, part_nodes, example_nodes, knowledge
+                part, rows, part_nodes, example_nodes, domain_knowledge
             )
         return LearnedCausalStructure(
             relations=self.record_in_class_diagram(circuit, edges),
@@ -425,14 +425,14 @@ class RelationalCausalStructureLearner:
         rows: pd.DataFrame,
         part_nodes: list[GraphNode],
         example_nodes: list[GraphNode],
-        knowledge: DomainCausalKnowledge,
+        domain_knowledge: DomainCausalKnowledge,
     ) -> list[GraphEdge]:
         """
         :param part: An exchangeable part.
         :param rows: Its training table.
         :param part_nodes: The template nodes of its attributes.
         :param example_nodes: The nodes of the class table.
-        :param knowledge: What is known about the structure in advance.
+        :param domain_knowledge: What is known about the structure in advance.
         :return: The edges learned from the part's table that touch a part attribute.
         """
         statistic_nodes = [node for node in example_nodes if node.name in rows.columns]
@@ -443,7 +443,7 @@ class RelationalCausalStructureLearner:
         )
         names = [node.name for node in statistic_nodes + part_nodes]
         graph = self.learner.learn(
-            renamed, statistic_nodes + part_nodes, knowledge.restricted_to(names)
+            renamed, statistic_nodes + part_nodes, domain_knowledge.restricted_to(names)
         )
         return [
             edge

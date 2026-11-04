@@ -17,6 +17,7 @@ from probabilistic_model.causal_structure.exceptions import (
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
+    Collider,
     GraphEdge,
     GraphNode,
     NodeLevel,
@@ -59,6 +60,13 @@ def test_member_graphs_keep_v_structures():
         ("A", "C"),
         ("B", "C"),
         ("C", "D"),
+    }
+
+
+def test_unshielded_colliders_name_both_parents_in_name_order():
+    graph = collider_with_an_undirected_child()
+    assert graph.unshielded_colliders() == {
+        Collider(graph.node("A"), graph.node("C"), graph.node("B"))
     }
 
 

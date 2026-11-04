@@ -15,6 +15,7 @@ from probabilistic_model.causal_structure.graph import (
 )
 from probabilistic_model.causal_structure.identification import (
     AdjustmentSelector,
+    AdjustmentSet,
     IdentifiedEffect,
 )
 from probabilistic_model.causal_structure.learning import PeterClarkStructureLearner
@@ -105,7 +106,9 @@ def test_learned_fork_supplies_the_confounder():
         rows,
     )
 
-    assert identification == IdentifiedEffect(frozenset({graph.node("season")}))
+    assert identification == IdentifiedEffect(
+        AdjustmentSet(frozenset({graph.node("season")}))
+    )
 
 
 def test_continuous_columns_are_tested_after_discretization():
