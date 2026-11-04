@@ -309,12 +309,12 @@ class GraspSelection(Enum):
 
 
 @dataclass
-class GarmiHackathonDemonstration(RobotDemonstration):
+class GarmiCleanUpDemonstration(RobotDemonstration):
     """
     GARMI puts a milk carton from the kitchen counter into a drawer.
     """
 
-    ros_node_name: str = "garmi_hackathon_demo_node"
+    ros_node_name: str = "garmi_clean_up_demo_node"
 
     grasp_selection: GraspSelection = GraspSelection.GIVEN
     """
@@ -672,7 +672,7 @@ def main(
         drives the real robot or simulates it.
     :param grasp_selection: How the grasps on the milk and the handle come about.
     """
-    GarmiHackathonDemonstration(
+    GarmiCleanUpDemonstration(
         used_robot=Garmi,
         executor_type=executor_type,
         collision_avoidance=True,

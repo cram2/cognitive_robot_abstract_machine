@@ -4,7 +4,7 @@ import traceback
 
 def main() -> None:
     """
-    Run the garmi hackathon demo with every grasp selection, and exit non-zero with a
+    Run the GARMI clean-up demo with every grasp selection, and exit non-zero with a
     traceback on failure.
     """
     try:
