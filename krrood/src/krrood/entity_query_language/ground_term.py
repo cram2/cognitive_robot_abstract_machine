@@ -28,6 +28,7 @@ from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.class_diagrams.has_call_arguments import HasCallArguments
 from krrood.entity_query_language.core.bound_value import HasBoundValue
+from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import ensure_hashable
 
@@ -319,7 +320,7 @@ class GroundTermExpression(Generic[GroundTermType], SubClassSafeGeneric):
 # %% reading ground terms
 
 
-class TermReader(ABC):
+class TermReader(Interface):
     """Reads the value of a ground term during an evaluation."""
 
     @abstractmethod
