@@ -18,8 +18,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Fails a job that is still running after an hour. A runner that runs out of disk or memory
+    # stops responding, and its job would otherwise only end at GitHub's six-hour limit.
+    timeout-minutes: 60
     container:
       image: ${{ inputs.repo_lowercase }}
+      # The host's root, so free_runner_disk.sh can delete what the runner image installs and
+      # show_runner_resources.sh can measure the disk the job shares with it. Writable, since
+      # the runner's machine is discarded after the job.
+      options: --volume /:/host
     env:
       # The CPU only torch build, as in ci_reusable.yml: the CUDA build exhausts the runner disk.
       UV_INDEX: https://download.pytorch.org/whl/cpu
@@ -29,6 +36,12 @@ jobs:
         with:
           path: cognitive_robot_abstract_machine
           submodules: recursive
+
+      - name: Free disk space
+        run: cognitive_robot_abstract_machine/scripts/free_runner_disk.sh
+
+      - name: Show runner resources
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Install dependencies
         env:
@@ -76,3 +89,8 @@ jobs:
           export QT_QPA_PLATFORM=offscreen
           export LIBGL_ALWAYS_SOFTWARE=1
           ./${{inputs.script}}
+
+      - name: Show runner resources after the job
+        # Runs after a failure too, so a job that ran out of disk shows what filled it.
+        if: always()
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
