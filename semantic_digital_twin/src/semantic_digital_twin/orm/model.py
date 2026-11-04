@@ -22,6 +22,7 @@ from krrood_spatial_math.spatial_types import (
     Pose2D,
     AxisAngle,
     SpatialType,
+    Twist,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
@@ -183,6 +184,32 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
         return [Vector3]
+
+
+@dataclass(eq=False)
+class TwistMapping(AlternativeMapping[Twist]):
+    translation: Vector3
+    rotation: AxisAngle
+    reference_frame: KinematicStructureEntity | None
+
+    @classmethod
+    def from_domain_object(cls, obj: Twist):
+        return cls(
+            translation=obj.translation,
+            rotation=obj.rotation,
+            reference_frame=obj.reference_frame,
+        )
+
+    def to_domain_object(self) -> Twist:
+        return Twist(
+            translation=self.translation,
+            rotation=self.rotation,
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        return [Vector3, AxisAngle]
 
 
 @dataclass(eq=False)
