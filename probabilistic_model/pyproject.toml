@@ -36,7 +36,7 @@ dependencies = [
     "N2G",
     "python-igraph",
     "rustworkx>=0.16.0",
-    "scikit-learn>=1.6.1",
+    "scikit-learn>=1.7",
     "stepmix>=3.0.0",
     "jax>=0.6.0",
     "jaxtyping>=0.3.2",
@@ -52,6 +52,7 @@ dependencies = [
     "qt-material",
     "superqt",
     "krrood>=26.10.0",
+    "causal-learn",
 ]
 
 [project.urls]

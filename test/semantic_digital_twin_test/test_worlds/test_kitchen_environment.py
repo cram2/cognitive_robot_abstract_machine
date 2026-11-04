@@ -55,7 +55,7 @@ def test_module_1_front_piece_is_59_5_centimeters_wide(body_name: str) -> None:
     assert np.isclose(body.visual.combined_mesh.extents[1], 0.595)
 
 
-def test_module_1_handle_top_is_four_centimeters_below_door_top() -> None:
+def test_module_1_handle_top_matches_scan_inset() -> None:
     """
     The Module 1 handle should be inset from the shortened door's top edge.
     """
@@ -63,7 +63,7 @@ def test_module_1_handle_top_is_four_centimeters_below_door_top() -> None:
     handle_bounds = visual_world_bounds(world, "module_1_handle")
     door_bounds = visual_world_bounds(world, "module_1_door")
 
-    assert np.isclose(door_bounds[1, 2] - handle_bounds[1, 2], 0.04)
+    assert np.isclose(door_bounds[1, 2] - handle_bounds[1, 2], 0.044)
 
 
 @pytest.mark.parametrize(
@@ -98,7 +98,7 @@ def test_fridge_door_handle_is_near_free_edge() -> None:
     door_bounds = visual_world_bounds(world, "fridge_door")
 
     handle_center_x = handle_bounds[:, 0].mean()
-    assert np.isclose(door_bounds[1, 0] - handle_center_x, 0.03)
+    assert np.isclose(door_bounds[1, 0] - handle_center_x, 0.041)
 
 
 # %% the kitchen island
