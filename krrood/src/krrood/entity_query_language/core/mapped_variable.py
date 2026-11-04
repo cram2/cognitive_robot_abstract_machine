@@ -331,7 +331,10 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         :return: The retrieved or created MappedVariable instance.
         """
         cache_item = MappedVariableCacheItem(
-            type_, CallSignature.of(type_).bind(self, *args, **kwargs)
+            type_,
+            CallSignature.from_callable(type_).bind(
+                CallArguments((self, *args), kwargs)
+            ),
         )
         if cache_item in self._known_mapped_variables_:
             return self._known_mapped_variables_[cache_item]

@@ -46,13 +46,6 @@ class CallArguments:
         """
         return self.key_by(self.hashable_form)
 
-    def pass_to(self, callee: Callable[..., Any]) -> Any:
-        """
-        :param callee: What is called.
-        :return: The result of calling *callee* with these arguments.
-        """
-        return callee(*self.positional, **self.keyword)
-
     def key_by(self, value_form: Callable[[Any], Hashable]) -> tuple[Hashable, ...]:
         """
         :param value_form: What one argument is compared by.

@@ -283,12 +283,14 @@ class CallTerm(GroundTerm):
         Passing an argument by position or by name, or leaving out one that has a
         default, gives the same arguments.
         """
-        return self.arguments.pass_to(CallSignature.of(self.callee).bind).key_by(
-            ensure_hashable
+        return (
+            CallSignature.from_callable(self.callee)
+            .bind(self.arguments)
+            .key_by(ensure_hashable)
         )
 
     def live_value(self) -> Any:
-        return self.arguments.pass_to(self.callee)
+        return self.callee(*self.arguments.positional, **self.arguments.keyword)
 
 
 @dataclass(frozen=True, eq=False)
@@ -306,7 +308,7 @@ class BoundValueTerm(CallTerm):
 
     def live_value(self) -> Any:
         return self.callee._bound_value_(
-            **self.arguments.pass_to(CallSignature.of(self.callee).keyword_arguments)
+            **CallSignature.from_callable(self.callee).bind_by_name(self.arguments)
         )
 
 
