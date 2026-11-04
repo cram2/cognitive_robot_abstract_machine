@@ -116,9 +116,18 @@ a(Student)(takes_course=a(Course)(is_taught_by=a(Person)(is_dean_of=an(Organizat
 ```
 
 Nested patterns through several collection-valued attributes, as in the last query, mean "some element, whose
-attribute has some element, ...". Giving a whole collection still compares the whole collection
-(`takes_course={logic, ai}` matches only a student taking exactly these two courses), and so does a variable whose
-values are whole collections. A list of patterns still matches the elements position by position.
+attribute has some element, ...".
+
+Which reading applies is decided by the declared types: a value of the element type describes one element, and a
+collection describes the whole collection. A plain value that is neither raises
+{py:class}`~krrood.entity_query_language.exceptions.ValueFitsNeitherElementNorCollection`.
+
+- A set is compared as a set: `takes_course={logic, ai}` matches only a student taking exactly these two courses.
+- A list or tuple is compared by order, length and duplicates: on a `list[Course]` attribute, `courses=[logic, ai]`
+  does not match `[ai, logic]`, `[logic, ai, databases]` or `[logic, logic, ai]`.
+- A list of patterns matches the elements position by position, and the attribute must hold as many elements.
+- A variable whose values are whole collections is compared to the whole collection.
+- To ask about one position, index the attribute: `playlist.courses[0] == logic`.
 
 An attribute declared as an optional collection, such as `Optional[set[Course]]`, is matched the same way, and an absent
 collection (`None`) counts as empty: it contains no value and no element matches a pattern. `attr=None` still compares

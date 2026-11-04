@@ -1209,6 +1209,39 @@ class UnboundPatternVariable(UsageError):
 
 
 @dataclass
+class ValueFitsNeitherElementNorCollection(UsageError):
+    """
+    Raised when a pattern gives a collection-valued attribute a plain value that is
+    neither of the collection's element type nor a collection, so it describes neither
+    one element nor the whole collection.
+    """
+
+    attribute_match: AttributeMatch
+    """
+    The attribute match assigning the value.
+    """
+
+    element_type: type
+    """
+    The declared type of the collection's elements.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.attribute_match}' holds elements of type "
+            f"{self.element_type.__name__}, but was given "
+            f"{self.attribute_match.assigned_value!r}, which is neither such an "
+            f"element nor a collection."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Give one {self.element_type.__name__} to require it as an element, or a "
+            f"collection to compare the whole collection."
+        )
+
+
+@dataclass
 class NoAttributeWithAccessPathName(UsageError):
     """
     Raised when a match's pattern assigns a variable to no attribute whose access path

@@ -13,6 +13,7 @@ fields are reachable directly as symbolic attributes.
 
 from __future__ import annotations
 
+import numbers
 import operator
 import uuid
 from abc import ABC, abstractmethod
@@ -66,6 +67,7 @@ from krrood.entity_query_language.exceptions import (
     PositionalArgumentsInMatchPattern,
     NoAttributeWithAccessPathName,
     UnboundPatternVariable,
+    ValueFitsNeitherElementNorCollection,
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
@@ -73,7 +75,7 @@ from krrood.entity_query_language.operators.core_logical_operators import (
     chained_logic,
 )
 from krrood.entity_query_language.operators.logical_quantifiers import Exists
-from krrood.entity_query_language.predicate import HasType
+from krrood.entity_query_language.predicate import HasType, length
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.utils import T
@@ -482,7 +484,8 @@ class Match(
     def _resolve_list_like_value(self, key: str, value: list | tuple, parent: Match):
         """
         Resolves list-like values by iterating over their elements and creating
-        attribute matches for the parent match variable.
+        attribute matches for the parent match variable; the attribute must hold as many
+        elements as the value.
 
         :param key: The attribute name being processed.
         :param value: The list or tuple containing elements to be resolved.
@@ -496,6 +499,7 @@ class Match(
                 assigned_value=element,
                 index_access=index,
             )
+        self._conditions_.append(length(getattr(self._variable_, key)) == len(value))
 
     def _update_fields_(
         self,
@@ -988,25 +992,41 @@ class AttributeMatch(AbstractMatchExpression[T]):
     def _states_an_element_of_the_attribute_(self) -> bool:
         """
         :return: Whether the attribute holds a collection and the assigned value stands
-            for one of its elements: a pattern, a plain value that is not itself a
-            collection or ``...``, or a symbolic value whose type is the element type. An
-            indexed attribute names one element already.
+            for one of its elements: a pattern, or a plain or symbolic value of the
+            element type, any number standing for a number. An indexed attribute names
+            one element already.
+        :raises ValueFitsNeitherElementNorCollection: If a plain value is neither of the
+            element type nor a collection.
         """
         if self.index_access is not None or not self._attribute_holds_a_collection_:
             return False
         value = self.assigned_value
         if isinstance(value, AbstractMatchExpression):
             return True
+        element_type = get_origin(self._collection_element_type_) or (
+            self._collection_element_type_
+        )
+        # An element type that is no class, or ``Any``, cannot be checked against.
+        element_type_is_known = isclass(element_type) and element_type is not Any
         if isinstance(value, SymbolicExpression):
-            element_type = self._collection_element_type_
             return (
                 isclass(value._type_)
-                and isclass(element_type)
+                and element_type_is_known
                 and issubclass(value._type_, element_type)
             )
-        return value is not None and not isinstance(
-            value, (list, tuple, set, frozenset, type(Ellipsis))
-        )
+        if value is None or value is Ellipsis:
+            return False
+        is_a_collection = isinstance(value, (list, tuple, set, frozenset))
+        if not element_type_is_known:
+            return not is_a_collection
+        if isinstance(value, element_type) or (
+            issubclass(element_type, numbers.Number)
+            and isinstance(value, numbers.Number)
+        ):
+            return True
+        if is_a_collection:
+            return False
+        raise ValueFitsNeitherElementNorCollection(self, element_type)
 
     @property
     def _attribute_holds_a_collection_(self) -> bool:

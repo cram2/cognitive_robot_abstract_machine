@@ -18,7 +18,8 @@ EQL supports all standard Python comparison operators and adds powerful membersh
 ## Standard Comparisons
 
 You can use the following operators directly on symbolic attributes:
-- **Equality**: `==` and `!=`
+- **Equality**: `==` and `!=`. Two lists or tuples are equal when they hold the same elements in the same order;
+  any other two collections, such as a set and a list, are compared as sets.
 - **Ordering**: `<`, `<=`, `>`, `>=`
 
 ```python

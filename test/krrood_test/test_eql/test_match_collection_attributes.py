@@ -11,8 +11,10 @@ The pinned semantics:
   appears once however many elements match, and an owner with an empty collection never
   matches.
 * A single-valued attribute keeps equality, a collection literal or a symbolic value of a
-  collection type keeps whole-collection equality, a list of patterns keeps positional
-  matching, and a ``type[X]`` attribute keeps equality with the class.
+  collection type keeps whole-collection equality (by order and length for a list or
+  tuple, as sets otherwise), a list of patterns matches position by position with the
+  same length, and a ``type[X]`` attribute keeps equality with the class.
+* A plain value of neither the element type nor a collection is refused.
 
 The domain classes have names no other test module uses: the class diagram resolves a
 string annotation such as ``set[Member]`` by class name, so a same-named class imported
@@ -23,9 +25,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import pytest
 from typing_extensions import Iterable, List
 
 from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
+from krrood.entity_query_language.exceptions import (
+    ValueFitsNeitherElementNorCollection,
+)
 from krrood.entity_query_language.factories import (
     a,
     an,
@@ -94,6 +100,18 @@ class WeightedItem(Symbol):
 class ItemBasket(Symbol):
     items: list[WeightedItem] = field(default_factory=list)
     label: str = ""
+
+
+@dataclass(eq=False)
+class CoordinateRoute(Symbol):
+    name: str
+    points: list[tuple[int, int]] = field(default_factory=list)
+
+
+@dataclass(eq=False)
+class SensorReadings(Symbol):
+    name: str
+    values: list[float] = field(default_factory=list)
 
 
 def names_of(students: Iterable[CampusStudent]) -> List[str]:
@@ -428,6 +446,105 @@ def test_type_attribute_keeps_equality_with_a_class():
     ]
     pattern = a(CourseRegistration)(kind=SeminarCourse)
     assert plain_names_of(pattern.from_(registrations).evaluate()) == ["seminar"]
+
+
+# %% Whole lists and tuples compare by order, length and duplicates
+
+
+def test_list_literal_respects_order():
+    """
+    A list literal matches only the list with the same elements in the same order.
+    """
+    logic, ai = CampusCourse("Logic"), CampusCourse("AI")
+    playlists = [
+        CoursePlaylist("forward", [logic, ai]),
+        CoursePlaylist("backward", [ai, logic]),
+    ]
+    matches = a(CoursePlaylist)(courses=[logic, ai]).from_(playlists).evaluate()
+    assert plain_names_of(matches) == ["forward"]
+
+
+def test_list_literal_respects_duplicates():
+    """
+    A list literal does not match a list repeating one of its elements.
+    """
+    entries = [TaggedEntry("repeated", ["red", "red"]), TaggedEntry("single", ["red"])]
+    matches = a(TaggedEntry)(tags=["red"]).from_(entries).evaluate()
+    assert plain_names_of(matches) == ["single"]
+
+
+def test_tuple_literal_respects_order():
+    """
+    A tuple literal matches only the tuple with the same elements in the same order.
+    """
+    entries = [
+        TaggedEntry("forward", labels=("x", "y")),
+        TaggedEntry("backward", labels=("y", "x")),
+    ]
+    matches = a(TaggedEntry)(labels=("x", "y")).from_(entries).evaluate()
+    assert plain_names_of(matches) == ["forward"]
+
+
+def test_list_of_patterns_requires_the_same_length():
+    """
+    A list of patterns does not match a longer list that starts with matching elements.
+    """
+    logic, ai, databases = (
+        CampusCourse("Logic"),
+        CampusCourse("AI"),
+        CampusCourse("Databases"),
+    )
+    playlists = [
+        CoursePlaylist("exact", [logic, ai]),
+        CoursePlaylist("longer", [logic, ai, databases]),
+    ]
+    pattern = a(CoursePlaylist)(
+        courses=[a(CampusCourse)(name="Logic"), a(CampusCourse)(name="AI")]
+    )
+    assert plain_names_of(pattern.from_(playlists).evaluate()) == ["exact"]
+
+
+def test_set_literal_ignores_the_order_it_is_written_in():
+    """
+    A set attribute compared to a list literal is compared as a set.
+    """
+    (logic, _, databases), students = build_university()
+    pattern = a(CampusStudent)(takes_course=[databases, logic])
+    assert names_of(pattern.from_(students).evaluate()) == ["Carol"]
+
+
+# %% Values that fit neither an element nor the whole collection
+
+
+def test_tuple_element_of_a_list_of_tuples_means_membership():
+    """
+    A tuple given for a list of tuples has the element type, so it must be in the list.
+    """
+    routes = [
+        CoordinateRoute("through", [(0, 0), (1, 2)]),
+        CoordinateRoute("around", [(0, 0), (3, 4)]),
+    ]
+    matches = a(CoordinateRoute)(points=(1, 2)).from_(routes).evaluate()
+    assert plain_names_of(matches) == ["through"]
+
+
+def test_value_of_neither_the_element_nor_the_collection_type_raises():
+    """
+    A value that is neither an element nor a collection has no reading, so the pattern
+    is refused instead of silently matching nothing.
+    """
+    _, students = build_university()
+    with pytest.raises(ValueFitsNeitherElementNorCollection):
+        list(a(CampusStudent)(takes_course=5).from_(students).evaluate())
+
+
+def test_integer_for_a_list_of_floats_means_membership():
+    """
+    An integer stands for a number in a list of floats, as Python's numbers allow.
+    """
+    readings = [SensorReadings("hit", [1.0, 2.5]), SensorReadings("miss", [2.5])]
+    matches = a(SensorReadings)(values=1).from_(readings).evaluate()
+    assert plain_names_of(matches) == ["hit"]
 
 
 # %% Match used inside a larger query
