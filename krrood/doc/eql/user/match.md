@@ -146,7 +146,7 @@ wrapped in the attribute's collection type, so `items=an(Item)(...)` on a `list[
 A nested pattern ranging over a domain is not constructed: the generated object takes an object of that domain that
 satisfies the nested pattern, so `book=a(Book)(weight=5.0).from_(library)` generates one object per book of weight
 5.0 in `library`, holding that very book. Such a book already has all its attributes, so leaving one open with
-`...` in its pattern raises `GenerativeBackendCannotFillInADomainObject`. A nested pattern without a domain is always
+`...` or `cause` in its pattern raises `GenerativeBackendCannotFillInADomainObject`. A nested pattern without a domain is always
 constructed, never taken from existing objects; use `.from_()` to reuse them.
 
 ## Full Example: Finding Connected Parts

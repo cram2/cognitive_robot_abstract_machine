@@ -172,9 +172,8 @@ class GenerativeBackend(QueryBackend, ABC):
             raise GenerativeBackendQueryIsNotUnderspecifiedVariable(expression)
         for attribute_match in expression._generated_attribute_matches_:
             pattern = attribute_match.assigned_value
-            if (
-                attribute_match._chooses_from_a_domain_
-                and pattern._has_ellipsis_attributes_
+            if attribute_match._chooses_from_a_domain_ and (
+                pattern._has_ellipsis_attributes_ or pattern._has_cause_attributes_
             ):
                 raise GenerativeBackendCannotFillInADomainObject(pattern)
         yield from self._evaluate(expression)

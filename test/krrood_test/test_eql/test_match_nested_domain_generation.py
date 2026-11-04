@@ -21,7 +21,7 @@ from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeB
 from krrood.entity_query_language.exceptions import (
     GenerativeBackendCannotFillInADomainObject,
 )
-from krrood.entity_query_language.factories import a, variable_from
+from krrood.entity_query_language.factories import a, cause, variable_from
 from krrood.symbol_graph.symbol_graph import Symbol
 
 # %% Domain
@@ -168,13 +168,13 @@ def test_nested_pattern_without_a_domain_constructs_a_new_object():
 
 @pytest.mark.parametrize(
     "nested_pattern",
-    [a(ShelfBook)(weight=...), a(ShelfBook)(cover=...)],
-    ids=["value", "enum"],
+    [a(ShelfBook)(weight=...), a(ShelfBook)(cover=...), a(ShelfBook)(cover=cause)],
+    ids=["value", "enum", "cause"],
 )
-def test_ellipsis_in_a_nested_pattern_with_a_domain_raises(nested_pattern):
+def test_attribute_left_open_in_a_nested_pattern_with_a_domain_raises(nested_pattern):
     """
-    An object taken from the domain already has every attribute, so ``...`` in its
-    pattern is rejected rather than read as a condition no object meets.
+    An object taken from the domain already has every attribute, so ``...`` or ``cause``
+    in its pattern is rejected rather than read as a condition no object meets.
     """
     light, heavy = light_and_heavy_books()
     pattern = a(BookStand)(book=nested_pattern.from_([light, heavy]))

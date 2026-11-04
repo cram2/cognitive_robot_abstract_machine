@@ -978,18 +978,19 @@ class SelectiveBackendCannotResolveEllipsisMatch(DataclassException):
 class GenerativeBackendCannotFillInADomainObject(DataclassException):
     """
     Raised when a generative backend evaluates a match whose nested pattern with a
-    domain leaves an attribute as ``...``: the object is taken from the domain as it is.
+    domain leaves an attribute as ``...`` or marks it with ``cause``: the object is taken
+    from the domain as it is.
     """
 
     pattern: Match
     """
-    The nested pattern with a domain that has an Ellipsis attribute.
+    The nested pattern with a domain that leaves an attribute to fill in.
     """
 
     def error_message(self) -> str:
         return (
             f"{self.pattern} takes an existing object from its domain, so a generative "
-            f"backend cannot fill in its attribute left as ``...``."
+            f"backend cannot fill in its attribute left as ``...`` or marked with ``cause``."
         )
 
     def suggest_correction(self) -> str:
