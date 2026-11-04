@@ -147,3 +147,28 @@ class ArgumentsPassableOnlyByPosition(DataclassException):
             "Let these parameters take their arguments by name: remove the '/' marker "
             "or replace '*args' by named parameters."
         )
+
+
+@dataclass
+class FieldIsUnMappedInClassDiagram(DataclassException):
+    """
+    Raised when a class in the class diagram has no field of a given name.
+    """
+
+    class_: type
+    """
+    The class that has no such field.
+    """
+
+    field_name: str
+    """
+    The name of the field it does not have.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Class {self.class_} has no field {self.field_name!r} in the class diagram"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name a field the class declares, or add the class that declares it to the class diagram."

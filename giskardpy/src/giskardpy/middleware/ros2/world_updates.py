@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 from time import sleep
-from typing_extensions import Any
+from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json
 from semantic_digital_twin.adapters.ros.messages import StreamPosition
@@ -139,14 +140,19 @@ class ClientWorldUpdates:
     Publishes the changes of the client's world and receives those of Giskard.
     """
 
-    timeout: float = 30.0
+    timeout: timedelta = timedelta(seconds=30)
     """
-    Seconds to wait for the changes Giskard made during a goal.
+    How long to wait for one of the changes Giskard made during a goal.
     """
 
-    poll_interval: float = 0.01
+    poll_interval: timedelta = timedelta(seconds=0.01)
     """
-    Seconds between two looks at what the world caught up with.
+    The time between two looks at what the world caught up with.
+    """
+
+    clock: Callable[[], float] = field(default=time.monotonic, kw_only=True, repr=False)
+    """
+    Reads the time the waiting is measured with.
     """
 
     def required_position(self) -> StreamPosition | None:
@@ -166,31 +172,63 @@ class ClientWorldUpdates:
         :raises GiskardWorldUpdateNotReceivedError: If they do not arrive within
             ``timeout``.
         """
-        waiting_since = time.monotonic()
-        while not self.has_applied_the_changes_reported_in(result, waiting_since):
-            sleep(self.poll_interval)
+        catching_up = CatchingUpWithGiskard(world_updates=self)
+        while not catching_up.has_applied_the_changes_reported_in(result):
+            sleep(self.poll_interval.total_seconds())
 
-    def has_applied_the_changes_reported_in(
-        self, report: dict[str, Any], waiting_since: float
-    ) -> bool:
+
+@dataclass
+class CatchingUpWithGiskard:
+    """
+    The world of a client catching up with the changes Giskard reports to have published
+    while executing a goal.
+
+    Giskard keeps publishing while the client catches up, so a report can name a later
+    change than the one before. The client counts as cut off only when one reported
+    change does not reach its world within :attr:`ClientWorldUpdates.timeout`.
+    """
+
+    world_updates: ClientWorldUpdates
+    """
+    The world that catches up.
+    """
+
+    _awaited_position: StreamPosition | None = field(default=None, init=False)
+    """
+    The earliest reported change the world has not applied yet, or ``None`` if it
+    applied every reported change.
+    """
+
+    _waiting_since: float = field(default=0.0, init=False)
+    """
+    The time, on the clock of :attr:`world_updates`, at which :attr:`_awaited_position`
+    was reported.
+    """
+
+    def has_applied_the_changes_reported_in(self, report: dict[str, Any]) -> bool:
         """
         :param report: A feedback or the result of a goal.
-        :param waiting_since: The :func:`time.monotonic` time this world started waiting
-            for the changes.
         :return: Whether the changes Giskard reports to have published while executing
-            the goal reached this world.
-        :raises GiskardWorldUpdateNotReceivedError: If they did not, and ``timeout``
-            passed since `waiting_since`.
+            the goal reached the world.
+        :raises GiskardWorldUpdateNotReceivedError: If a reported change did not reach
+            the world within the timeout.
         """
         published_position = report.get(MotionStatechartPayloadKey.PUBLISHED_POSITION)
-        if published_position is None:
+        synchronizer = self.world_updates.world_synchronizer
+        if published_position is None or synchronizer.has_applied(
+            position := from_json(published_position)
+        ):
+            self._awaited_position = None
             return True
-        position = from_json(published_position)
-        if self.world_synchronizer.has_applied(position):
-            return True
-        if time.monotonic() - waiting_since >= self.timeout:
+        if self._awaited_position is None or synchronizer.has_applied(
+            self._awaited_position
+        ):
+            self._awaited_position = position
+            self._waiting_since = self.world_updates.clock()
+        waited = timedelta(seconds=self.world_updates.clock() - self._waiting_since)
+        if waited >= self.world_updates.timeout:
             raise GiskardWorldUpdateNotReceivedError(
-                awaited_sequence_number=position.sequence_number,
-                timeout=self.timeout,
+                awaited_sequence_number=self._awaited_position.sequence_number,
+                timeout=self.world_updates.timeout,
             )
         return False

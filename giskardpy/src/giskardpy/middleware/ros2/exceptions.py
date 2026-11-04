@@ -5,6 +5,7 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
@@ -303,15 +304,15 @@ class GiskardWorldUpdateNotReceivedError(ExecutionException):
     The position in Giskard's stream that was waited for.
     """
 
-    timeout: float
+    timeout: timedelta
     """
-    Seconds that were spent waiting.
+    The time that was spent waiting.
     """
 
     def error_message(self) -> str:
         return (
             f"Update #{self.awaited_sequence_number} of Giskard did not arrive within "
-            f"{self.timeout}s."
+            f"{self.timeout.total_seconds()}s."
         )
 
     def suggest_correction(self) -> str:
