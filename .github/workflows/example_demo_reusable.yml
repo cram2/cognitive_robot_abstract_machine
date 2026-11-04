@@ -30,6 +30,9 @@ jobs:
           path: cognitive_robot_abstract_machine
           submodules: recursive
 
+      - name: Show runner resources
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
+
       - name: Install dependencies
         env:
           # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
@@ -76,3 +79,8 @@ jobs:
           export QT_QPA_PLATFORM=offscreen
           export LIBGL_ALWAYS_SOFTWARE=1
           ./${{inputs.script}}
+
+      - name: Show runner resources after the job
+        # Runs after a failure too, so a job that ran out of disk shows what filled it.
+        if: always()
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh

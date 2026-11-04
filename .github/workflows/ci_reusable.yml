@@ -34,6 +34,9 @@ jobs:
           path: cognitive_robot_abstract_machine
           submodules: recursive
 
+      - name: Show runner resources
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
+
       - name: Install dependencies
         env:
           # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
@@ -95,11 +98,6 @@ jobs:
           bazel build //test:test_all
           bazel test //test:test_all
 
-      # The runners differ in CPU model, which can change the rounding of numeric results;
-      # the log records which one ran, to trace a failure that only one runner shows.
-      - name: Show CPU
-        run: lscpu
-
       - name: Check the generated rules in AGENTS.md
         # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
         # edit or a forgotten regeneration fails here.
@@ -125,6 +123,11 @@ jobs:
             export MUJOCO_GL=egl
           fi
           python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+
+      - name: Show runner resources after the job
+        # Runs after a failure too, so a job that ran out of disk shows what filled it.
+        if: always()
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Save cache
         uses: actions/cache/save@v4
