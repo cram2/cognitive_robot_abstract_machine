@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ inputs.repo_lowercase }}
+      # The host's root, read-only, so show_runner_resources.sh can measure the disk the job
+      # shares with everything the runner image installs.
+      options: --volume /:/host:ro
     env:
       # The CPU only torch build, as in ci_reusable.yml: the CUDA build exhausts the runner disk.
       UV_INDEX: https://download.pytorch.org/whl/cpu
@@ -31,7 +34,7 @@ jobs:
           submodules: recursive
 
       - name: Show runner resources
-        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh --host-directory-sizes
 
       - name: Install dependencies
         env:
