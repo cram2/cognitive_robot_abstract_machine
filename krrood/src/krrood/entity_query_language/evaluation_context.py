@@ -16,12 +16,10 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ordered_set import OrderedSet
-from typing_extensions import Any, Callable, Hashable, Iterator, TYPE_CHECKING, TypeVar
-
-from krrood.class_diagrams.call_arguments import CallArguments
+from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING, TypeVar
 
 from krrood.entity_query_language.ground_term import (
-    CallTerm,
+    CallResults,
     GroundTerm,
     LiveTermReader,
     TermReader,
@@ -32,7 +30,6 @@ if TYPE_CHECKING:
         OperationResult,
         SymbolicExpression,
     )
-    from krrood.entity_query_language.predicate import Predicate
 
 _evaluation_context_var: ContextVar[EvaluationContext | None] = ContextVar(
     "_evaluation_context", default=None
@@ -72,35 +69,6 @@ def values_in_current_context(term: GroundTerm) -> Iterator[Any]:
     if evaluation_context is None:
         return term.live_values()
     return evaluation_context.term_reader.values_of(term)
-
-
-def call_values_in_current_context(term: CallTerm) -> Iterator[Any]:
-    """
-    :param term: The call to read.
-    :return: The value of *term* as :func:`values_in_current_context` reads it, reused
-        from an equal call made earlier in the same evaluation where
-        :class:`CallResults` reuses one.
-    """
-    evaluation_context = get_evaluation_context()
-    if evaluation_context is None:
-        return term.live_values()
-    return iter(
-        evaluation_context.call_results.values_of(term, evaluation_context.term_reader)
-    )
-
-
-def truth_in_current_context(
-    predicate: Predicate, read_truth: Callable[[], bool]
-) -> bool:
-    """
-    :param predicate: The predicate instance whose truth is read.
-    :param read_truth: Reads the truth of *predicate*.
-    :return: The truth of *predicate*, read once per evaluation.
-    """
-    evaluation_context = get_evaluation_context()
-    if evaluation_context is None:
-        return read_truth()
-    return evaluation_context.call_results.truth_of(predicate, read_truth)
 
 
 class EvaluationObserver(ABC):
@@ -321,103 +289,6 @@ class SubqueryResultCache:
         return self._streams[query_id]
 
 
-@dataclass(frozen=True)
-class PredicateTruth:
-    """
-    The truth an evaluation read for one predicate instance.
-    """
-
-    predicate: Predicate
-    """
-    The predicate instance, held for as long as its truth is, so its identity stays its
-    own.
-    """
-
-    truth: bool
-    """
-    Whether *predicate* holds.
-    """
-
-
-@dataclass(frozen=True)
-class CallAsPassed:
-    """
-    A call as its arguments were passed: two calls are equal when they pass equal
-    arguments in the same places, without binding them to the callee's signature.
-    """
-
-    callee: Hashable
-    """
-    What is called.
-    """
-
-    call_arguments: CallArguments
-    """
-    The arguments as they were passed.
-    """
-
-    @classmethod
-    def of(cls, term: CallTerm) -> CallAsPassed:
-        """
-        :param term: The call to identify.
-        :return: The call *term* makes, as its arguments were passed.
-        """
-        return cls(term.function, term.arguments)
-
-
-@dataclass
-class CallResults:
-    """
-    The results of the calls one evaluation has made, so the evaluation calls each
-    predicate and symbolic function once per distinct arguments, and the truth of each
-    predicate instance it has read.
-
-    .. warning:: A live object that changes while the evaluation runs is not seen by the
-        calls it has already made.
-    """
-
-    values: dict[CallAsPassed, tuple[Any, ...]] = field(default_factory=dict)
-    """
-    The values each call that is reused has read.
-
-    A call that passes its arguments another way, such as leaving out a default, is read
-    again.
-    """
-
-    truths: dict[int, PredicateTruth] = field(default_factory=dict)
-    """
-    The truth of each predicate instance that has been read, by the instance's identity.
-    """
-
-    def values_of(self, term: CallTerm, term_reader: TermReader) -> tuple[Any, ...]:
-        """
-        :param term: The call to read.
-        :param term_reader: What reads the value of *term* when no equal call has.
-        :return: The value of *term*. A call that does not
-            :meth:`~krrood.entity_query_language.ground_term.CallTerm.depends_only_on_arguments`,
-            or whose result is an iterator its reader consumes, is never reused.
-        """
-        if not term.depends_only_on_arguments():
-            return tuple(term_reader.values_of(term))
-        call = CallAsPassed.of(term)
-        if call in self.values:
-            return self.values[call]
-        values = tuple(term_reader.values_of(term))
-        if not any(isinstance(value, Iterator) for value in values):
-            self.values[call] = values
-        return values
-
-    def truth_of(self, predicate: Predicate, read_truth: Callable[[], bool]) -> bool:
-        """
-        :param predicate: The predicate instance whose truth is read.
-        :param read_truth: Reads the truth of *predicate* when it has not been read.
-        :return: The truth of *predicate*.
-        """
-        if id(predicate) not in self.truths:
-            self.truths[id(predicate)] = PredicateTruth(predicate, read_truth())
-        return self.truths[id(predicate)].truth
-
-
 @dataclass
 class EvaluationContext:
     """
@@ -492,15 +363,12 @@ class EvaluationContext:
     Caches each nested subquery's result stream for the current evaluation pass.
     """
 
-    term_reader: TermReader = field(default_factory=LiveTermReader)
+    term_reader: TermReader = field(
+        default_factory=lambda: CallResults(LiveTermReader())
+    )
     """
     Reads the value of every attribute, index, call and symbolic function application
-    the evaluation reaches.
-    """
-
-    call_results: CallResults = field(default_factory=CallResults)
-    """
-    The results of the calls the evaluation has made, read with :attr:`term_reader`.
+    the evaluation reaches, reusing the result of a call made earlier in the evaluation.
     """
 
     has_running_evaluation: bool = field(default=False, init=False)
@@ -538,11 +406,11 @@ class EvaluationContext:
             with, or ``None`` to read them as the current evaluation context does.
         :param results: The results of an evaluation that has not started yet.
         :return: The same results. The evaluation, and every evaluation it starts, reads
-            ground terms with *term_reader*.
+            ground terms with *term_reader* and reuses each other's call results.
         """
         if term_reader is None:
             return results
-        return cls(term_reader=term_reader).iterate_as_current(results)
+        return cls(term_reader=CallResults(term_reader)).iterate_as_current(results)
 
     def iterate_as_current(self, results: Iterator[ResultType]) -> Iterator[ResultType]:
         """

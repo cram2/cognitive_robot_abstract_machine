@@ -377,3 +377,42 @@ class LiveTermReader(TermReader):
 
     def values_of(self, term: GroundTerm) -> Iterator[Any]:
         return term.live_values()
+
+
+@dataclass
+class CallResults(TermReader):
+    """
+    Reads ground terms with another reader, reusing the value a call read for every
+    later call that passes equal arguments the same way.
+
+    .. warning:: A live object that changes while the calls are being read is not seen
+        by the calls already made.
+    """
+
+    term_reader: TermReader
+    """
+    Reads every ground term whose value is not reused.
+    """
+
+    values: dict[Hashable, dict[CallArguments, tuple[Any, ...]]] = field(
+        default_factory=dict
+    )
+    """
+    The values read for each callee, by the arguments as they were passed. A call that
+    passes its arguments another way, such as leaving out a default, is read again.
+    """
+
+    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+        """
+        A call that does not :meth:`CallTerm.depends_only_on_arguments`, or whose value
+        is an iterator its reader consumes, is never reused.
+        """
+        if not isinstance(term, CallTerm) or not term.depends_only_on_arguments():
+            return self.term_reader.values_of(term)
+        values_by_arguments = self.values.setdefault(term.function, {})
+        if term.arguments not in values_by_arguments:
+            values = tuple(self.term_reader.values_of(term))
+            if any(isinstance(value, Iterator) for value in values):
+                return iter(values)
+            values_by_arguments[term.arguments] = values
+        return iter(values_by_arguments[term.arguments])

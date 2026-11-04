@@ -36,7 +36,8 @@ if TYPE_CHECKING:
 
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
-from krrood.entity_query_language.evaluation_context import truth_in_current_context
+from krrood.entity_query_language.evaluation_context import values_in_current_context
+from krrood.entity_query_language.ground_term import CallTerm
 from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.variable import (
     Variable,
@@ -313,7 +314,10 @@ class Predicate(SymbolicCallable, ABC):
         """
         Bool casting a predicate evaluates it, once per evaluation of a query.
         """
-        return truth_in_current_context(self, lambda: bool(self.__call__()))
+        (truth,) = values_in_current_context(
+            CallTerm.from_call(self.__call__, CallArguments())
+        )
+        return bool(truth)
 
 
 @dataclass(eq=False)

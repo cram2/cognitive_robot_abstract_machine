@@ -247,8 +247,7 @@ def create_default_evaluation_context() -> EvaluationContext:
         :class:`SatisfiedConditionTracker`, and :class:`InferenceRecorder` observers
         attached. It reads ground terms with the current context's
         :attr:`~EvaluationContext.term_reader`, so an evaluation started from inside
-        another one reads the same values and reuses the same
-        :attr:`~EvaluationContext.call_results`.
+        another one reads the same values.
     """
     evaluation_context = EvaluationContext(
         observers=[
@@ -260,5 +259,4 @@ def create_default_evaluation_context() -> EvaluationContext:
     current_context = get_evaluation_context()
     if current_context is not None:
         evaluation_context.term_reader = current_context.term_reader
-        evaluation_context.call_results = current_context.call_results
     return evaluation_context
