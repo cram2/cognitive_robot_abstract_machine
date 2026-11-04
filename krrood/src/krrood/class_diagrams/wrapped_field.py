@@ -197,6 +197,17 @@ class WrappedField:
         )
 
     @cached_property
+    def is_collection_of_types(self) -> bool:
+        """
+        :return: Whether the field holds a collection of classes, such as
+            ``list[type[X]]``.
+        """
+        return self.is_container and all(
+            field_type in (type, Type) or get_origin(field_type) is type
+            for field_type in get_args(self.resolved_type)
+        )
+
+    @cached_property
     def is_optional(self):
         """
         :return: Whether the field holds an optional value.
