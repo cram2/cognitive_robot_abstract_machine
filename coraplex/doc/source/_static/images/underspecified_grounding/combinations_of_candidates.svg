@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1044 346" role="img" aria-label="Combinations are tried in order of lowest rank sum; the third, open rank 1 with milk pick-up rank 0, passes its trial and is built as a Sequence holding the grouped branches, in which both grouped statements were handed their candidates and the later statements still wait to ground.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1044 346" role="img" aria-label="Combinations are tried in order of lowest rank sum; the third, open rank 1 with milk pick-up rank 0, passes its trial. The statement that asked first runs its candidate and hands the other statement of the parallel its own, in place; the later statements still wait to ground.">
 <style>
 .background { fill: #ffffff; }
 .box { fill: #ffffff; stroke: #98a5ac; stroke-width: 1.2; }
@@ -74,34 +74,31 @@ text { fill: #17212a; }
         <path class="flow-bad" d="M 740 60 C 740 30, 610 30, 610 58" marker-end="url(#f3-arrow-bad)"/>
         <text class="lab-bad" x="675" y="24" text-anchor="middle">fails: next combination</text>
         <rect class="wait" x="330" y="60" width="152" height="52" rx="6"/>
-        <text class="tn" x="406" y="82" text-anchor="middle">ParallelStatementNode</text>
-        <text class="s" x="406" y="100" text-anchor="middle">waits: robot held once</text>
+        <text class="tn" x="406" y="82" text-anchor="middle">first statement asks</text>
+        <text class="s" x="406" y="100" text-anchor="middle">grounds all of them</text>
         <rect class="box" x="510" y="60" width="152" height="52" rx="6"/>
-        <text class="tn" x="586" y="82" text-anchor="middle">next_combination()</text>
+        <text class="tn" x="586" y="82" text-anchor="middle">next combination</text>
         <text class="s" x="586" y="100" text-anchor="middle">one candidate per statement</text>
         <rect class="trialbox" x="690" y="60" width="152" height="52" rx="6"/>
         <text class="tn" x="766" y="82" text-anchor="middle">trial, world copy</text>
         <text class="s" x="766" y="100" text-anchor="middle">remainder around it</text>
         <rect class="box" x="870" y="60" width="152" height="52" rx="6"/>
-        <text class="tn" x="946" y="82" text-anchor="middle">build, real world</text>
-        <text class="s" x="946" y="100" text-anchor="middle">candidates handed over</text>
+        <text class="tn" x="946" y="82" text-anchor="middle">hand over</text>
+        <text class="s" x="946" y="100" text-anchor="middle">each its own candidate</text>
         <line class="flow" x1="482" y1="86" x2="508" y2="86" marker-end="url(#f3-arrow)"/>
         <line class="flow" x1="662" y1="86" x2="688" y2="86" marker-end="url(#f3-arrow)"/>
         <line class="flow" x1="842" y1="86" x2="868" y2="86" marker-end="url(#f3-arrow)"/>
         <text class="lab-bad" x="586" y="134" text-anchor="middle">none left: EmptyUnderspecified</text>
 
-        <path class="flow" d="M 946 112 V 132 H 817 V 148" marker-end="url(#f3-arrow)"/>
-        <text class="lab" x="884" y="166">one child, one message</text>
-        <line class="edge" x1="817" y1="180" x2="817" y2="200"/>
+        <path class="flow" d="M 946 112 V 132 H 817 V 198" marker-end="url(#f3-arrow)"/>
+        <text class="lab" x="826" y="166">in place, one message each</text>
         <line class="edge" x1="817" y1="230" x2="711" y2="250"/>
         <line class="edge" x1="817" y1="230" x2="923" y2="250"/>
         <line class="edge" x1="711" y1="276" x2="658" y2="296"/>
         <line class="edge" x1="711" y1="276" x2="764" y2="296"/>
         <line class="edge" x1="923" y1="276" x2="870" y2="296"/>
         <line class="edge" x1="923" y1="276" x2="976" y2="296"/>
-        <rect class="box" x="757" y="150" width="120" height="30" rx="6"/>
-        <text class="t" x="817" y="169" text-anchor="middle">Sequence</text>
-        <rect class="box" x="762" y="200" width="110" height="30" rx="6"/>
+                <rect class="box" x="762" y="200" width="110" height="30" rx="6"/>
         <text class="t" x="817" y="219" text-anchor="middle">Parallel</text>
         <text class="s" x="752" y="219" text-anchor="end">branches start on one tick</text>
         <rect class="box" x="666" y="250" width="90" height="26" rx="6"/>
@@ -110,7 +107,7 @@ text { fill: #17212a; }
         <text class="t" x="923" y="267" text-anchor="middle">Sequence</text>
         <rect class="start" x="608" y="296" width="100" height="42" rx="6"/>
         <text class="tn" x="658" y="313" text-anchor="middle">OpenAction</text>
-        <text class="s" x="658" y="329" text-anchor="middle">rank 1, handed over</text>
+        <text class="s" x="658" y="329" text-anchor="middle">rank 1, asked first</text>
         <rect class="later" x="714" y="296" width="100" height="42" rx="6"/>
         <text class="tn" x="764" y="313" text-anchor="middle">a(PickUp…)</text>
         <text class="s" x="764" y="329" text-anchor="middle">grounds later</text>
