@@ -32,6 +32,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.exceptions import (
+    GenerativeBackendCannotFillInADomainObject,
     SelectiveBackendCannotResolveEllipsisMatch,
 )
 from krrood.entity_query_language.factories import (
@@ -541,6 +542,21 @@ def test_probabilistic_backend_takes_a_nested_pattern_object_from_its_domain() -
     assert {id(pose.position) for pose in poses} <= {
         id(position) for position in positions
     }
+
+
+def test_probabilistic_backend_rejects_ellipsis_in_a_nested_pattern_with_a_domain() -> (
+    None
+):
+    """
+    An object taken from the domain has no attribute left for the model to sample.
+    """
+    positions = [KRROODPosition(1, 0, 0), KRROODPosition(2, 0, 0)]
+    query = a(KRROODPose)(
+        position=a(KRROODPosition)(x=...).from_(positions), orientation=UPRIGHT
+    )
+
+    with pytest.raises(GenerativeBackendCannotFillInADomainObject):
+        list(query.evaluate(backend=ProbabilisticBackend()))
 
 
 # %% generation constructs instances from bindings rather than writing into the pattern

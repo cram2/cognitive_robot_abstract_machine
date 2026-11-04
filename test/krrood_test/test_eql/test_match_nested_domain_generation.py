@@ -10,20 +10,36 @@ another module could otherwise take its place.
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
+
+import pytest
 
 from typing_extensions import List
 
 from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
+from krrood.entity_query_language.exceptions import (
+    GenerativeBackendCannotFillInADomainObject,
+)
 from krrood.entity_query_language.factories import a, variable_from
 from krrood.symbol_graph.symbol_graph import Symbol
 
 # %% Domain
 
 
+class CoverColour(enum.Enum):
+    """
+    The colour of a book's cover.
+    """
+
+    RED = 1
+    BLUE = 2
+
+
 @dataclass(eq=False)
 class ShelfBook(Symbol):
     weight: float
+    cover: CoverColour = CoverColour.RED
 
 
 @dataclass(eq=False)
@@ -132,3 +148,35 @@ def test_other_attributes_are_still_generated():
         ("a", heavy),
         ("b", heavy),
     ]
+
+
+# %% A nested pattern without a domain constructs its object
+
+
+def test_nested_pattern_without_a_domain_constructs_a_new_object():
+    """
+    A nested pattern with no domain does not take an existing object, even one that
+    satisfies it.
+    """
+    _, heavy = light_and_heavy_books()
+    [stand] = generate(a(BookStand)(book=a(ShelfBook)(weight=variable_from([5.0]))))
+    assert (stand.book is heavy, stand.book.weight) == (False, 5.0)
+
+
+# %% An object of the domain has no attribute left to fill in
+
+
+@pytest.mark.parametrize(
+    "nested_pattern",
+    [a(ShelfBook)(weight=...), a(ShelfBook)(cover=...)],
+    ids=["value", "enum"],
+)
+def test_ellipsis_in_a_nested_pattern_with_a_domain_raises(nested_pattern):
+    """
+    An object taken from the domain already has every attribute, so ``...`` in its
+    pattern is rejected rather than read as a condition no object meets.
+    """
+    light, heavy = light_and_heavy_books()
+    pattern = a(BookStand)(book=nested_pattern.from_([light, heavy]))
+    with pytest.raises(GenerativeBackendCannotFillInADomainObject):
+        generate(pattern)
