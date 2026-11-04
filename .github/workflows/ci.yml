@@ -29,26 +29,37 @@ jobs:
         run: |
           echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
 
+  changes:
+    # a pull request tests only the libraries its changes can affect; every other event,
+    # a push to main included, tests all of them, so a dependency the selection misses
+    # still fails on main
+    runs-on: ubuntu-latest
+    outputs:
+      libs: ${{ steps.select.outputs.libs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: select
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # HEAD^1 is the base side of the pull request's merge commit; without rename
+            # detection a moved file lists both its old and its new path
+            libs=$(git diff --name-only --no-renames HEAD^1 HEAD | python scripts/affected_ci_libraries.py)
+          else
+            libs=$(python scripts/affected_ci_libraries.py --all)
+          fi
+          echo "libs=$libs" >> "$GITHUB_OUTPUT"
+
   test_each_lib:
-    needs: [to-lowercase]
+    needs: [to-lowercase, changes]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - lib: giskardpy
-          - lib: cramph
-          - lib: krrood
-          - lib: semantic_digital_twin
-          - lib: coraplex
-          - lib: random_events
-          - lib: probabilistic_model
-          - lib: physics_simulators
-          - lib: robokudo
-          - lib: segmind
-          - lib: experiments
-          - lib: krrood_spatial_math
-          - lib: version
-          - lib: cognitive_robot_abstract_machine
+        lib: ${{ fromJSON(needs.changes.outputs.libs) }}
     uses: ./.github/workflows/ci_reusable.yml
     with:
       lib: ${{ matrix.lib }}
@@ -67,5 +78,18 @@ jobs:
             echo "These generated ORM interface files must not be tracked:"
             echo "$tracked"
             echo "Untrack them with 'git rm --cached', and build them locally with scripts/regenerate_all_orm.py."
+            exit 1
+          fi
+
+  ci_result:
+    # the one check branch protection can require, since a library a pull request does
+    # not test never reports a check of its own
+    needs: [to-lowercase, changes, test_each_lib, check_generated_orm_interfaces_are_untracked]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" == "true" ]]; then
+            echo "A job this result depends on failed, was cancelled or was skipped."
             exit 1
           fi

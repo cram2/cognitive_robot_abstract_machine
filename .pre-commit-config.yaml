@@ -9,7 +9,7 @@ repos:
         entry: krrood format
         language: system
         types: [python]
-        exclude: (?x)^(.*/ormatic_interface\.py|test/krrood_test/test_development_tools/dataset/.*)$
+        exclude: (?x)^(.*/ormatic_interface\.py|test/krrood_test/test_development_tools/dataset/.*|test/cognitive_robot_abstract_machine_test/dataset/affected_ci_libraries/.*)$
       - id: krrood-agents-md
         name: Update the rules in AGENTS.md
         entry: krrood agents-md
