@@ -381,29 +381,12 @@ class Statechart(SubclassJSONSerializer):
             for transition_kind in TransitionKind:
                 node_copy.set_condition(
                     transition_kind,
-                    statechart_copy._copy_condition(
-                        node.get_condition(transition_kind)
+                    DerivedConditionVariable.reading_counterparts(
+                        node.get_condition(transition_kind),
+                        lambda read: statechart_copy.get_node_by_index(read.index),
                     ),
                 )
         return statechart_copy
-
-    def _copy_condition(self, condition: sm.Scalar) -> sm.Scalar:
-        """
-        :param condition: A condition of the chart this chart is a structural copy of.
-        :return: The same condition, reading the nodes of this chart with the same index.
-        """
-        variables: list[DerivedConditionVariable] = condition.free_variables()
-        if not variables:
-            return condition
-        return sm.Scalar(condition).substitute(
-            variables,
-            [
-                variable.for_node(
-                    self.get_node_by_index(variable.statechart_node.index)
-                )
-                for variable in variables
-            ],
-        )
 
     @property
     def nodes(self) -> list[StatechartNode]:

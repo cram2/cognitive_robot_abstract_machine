@@ -5,7 +5,7 @@ import logging
 import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
-from dataclasses import MISSING, field, dataclass
+from dataclasses import MISSING, field, dataclass, fields
 
 from typing_extensions import (
     Any,
@@ -556,6 +556,32 @@ class DerivedConditionVariable(ConditionVariable, ABC):
         return expression.substitute(
             variables, [variable.expression() for variable in variables]
         )
+
+    @classmethod
+    def reading_counterparts(
+        cls,
+        condition: Scalar,
+        counterpart_of: Callable[[StatechartNode], StatechartNode | None],
+    ) -> Scalar:
+        """
+        :param condition: A transition condition.
+        :param counterpart_of: The node standing in for a node `condition` reads, or
+            None if no node does.
+        :return: `condition` reading the counterpart of every node it reads, and the
+            current value of every test on a node without one.
+        """
+        variables: list[DerivedConditionVariable] = condition.free_variables()
+        if not variables:
+            return condition
+        replacements = []
+        for variable in variables:
+            counterpart = counterpart_of(variable.statechart_node)
+            replacements.append(
+                Scalar(float(variable.resolve()))
+                if counterpart is None
+                else variable.for_node(counterpart)
+            )
+        return Scalar(condition).substitute(variables, replacements)
 
 
 @dataclass(repr=False, eq=False, init=False)
@@ -2020,11 +2046,74 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return f"{self.name}#{self.index}"
 
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        .. note:: A node holding other nodes among its constructor arguments overrides
+            this to hold them built anew.
+
+        :param rebuild: Builds the nodes this node holds anew and rebinds what it refers
+            to.
+        :return: A node of no statechart constructed like this one, or None if it
+            cannot be without a node `rebuild` leaves out.
+        """
+        return self._rebuilt_holding(rebuild)
+
+    def _rebuilt_holding(self, rebuild: NodeRebuild, **held_nodes: Any) -> Self:
+        """
+        :param rebuild: Rebinds what this node refers to.
+        :param held_nodes: Every constructor argument of this node that holds nodes,
+            built anew.
+        :return: A node of no statechart constructed like this one, holding
+            `held_nodes`, with every other constructor argument rebound by `rebuild`.
+        """
+        arguments = {
+            # a field known only by its name can only be read with getattr
+            constructor_field.name: getattr(self, constructor_field.name)
+            for constructor_field in fields(self)
+            if constructor_field.init and constructor_field.name not in held_nodes
+        }
+        return type(self)(**rebuild.rebound(arguments), **held_nodes)
+
     def __repr__(self) -> str:
         return self.unique_name
 
 
 GenericStatechartNode = TypeVar("GenericStatechartNode", bound=StatechartNode)
+
+
+# %% building nodes anew
+
+
+@dataclass
+class NodeRebuild(ABC):
+    """
+    Builds nodes of a statechart anew, as nodes of no statechart, from the arguments
+    they were constructed with, see :meth:`StatechartNode.rebuilt_by`.
+    """
+
+    @abstractmethod
+    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+        """
+        :param node: A node a node being built anew holds or refers to.
+        :return: `node` built anew, or None if it is left out.
+        """
+
+    @abstractmethod
+    def rebuilt_children(
+        self, owner: StatechartNode, children: list[StatechartNode]
+    ) -> list[StatechartNode]:
+        """
+        :param owner: The node holding `children`.
+        :param children: The nodes `owner` holds, in their order.
+        :return: `children` built anew, without those left out.
+        """
+
+    @abstractmethod
+    def rebound(self, value: Any) -> Any:
+        """
+        :param value: A node of no statechart, or anything it was constructed with.
+        :return: `value` referring to what the nodes built anew refer to.
+        """
 
 
 # %% how a node ends

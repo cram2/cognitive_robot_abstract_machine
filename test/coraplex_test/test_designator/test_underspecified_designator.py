@@ -1647,3 +1647,29 @@ def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running
     assert parallel.life_cycle_state == LifeCycleValues.FAILED
     assert len(statement.chosen_children) == 1
     assert len(_registered_probes[statement_probe].calls) == 2
+
+
+# %% a trial keeps the conditions of the plan
+
+
+def test_a_trial_keeps_a_start_condition_wired_to_a_node_beside_it(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the statement starts only once the statement failed, which it
+    does not, so the statement's trial does not start it either.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    fallback_probe = register_probe()
+    statement = StatementNode(statement=_statement_claiming_one_of([0], slot_dof_ids))
+    fallback = RecordingAction(
+        probe_key=fallback_probe, dof_id=world.degrees_of_freedom[5].id
+    )
+    fallback.start_condition = statement.is_failed
+    plan = Sequence(nodes=[Parallel(nodes=[statement, fallback], minimum_success=1)])
+
+    run_plan(plan, extensions)
+
+    assert statement.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert _registered_probes[fallback_probe].calls == []

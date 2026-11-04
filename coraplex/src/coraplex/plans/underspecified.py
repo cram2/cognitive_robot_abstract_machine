@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 
 from typing_extensions import (
     TYPE_CHECKING,
@@ -23,7 +23,6 @@ from cramph.context import StatechartContext
 from cramph.composites import (
     ChildChooser,
     CompositeNodeChoosingItsChild,
-    ControlStructureNode,
     ControlStructureNodeRunningItsChildrenInTurn,
     GenericChoosingNode,
     Parallel,
@@ -33,7 +32,8 @@ from cramph.composites import (
 )
 from cramph.executor import ExecutorExtension
 from cramph.exceptions import ExecutionFailure
-from cramph.node import StatechartNode
+from cramph.data_types import TransitionKind
+from cramph.node import DerivedConditionVariable, NodeRebuild, StatechartNode
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 
@@ -122,15 +122,16 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
 
 
 @dataclass
-class SubtreeRebuild:
+class SubtreeRebuild(NodeRebuild):
     """
     Rebuilds a node of a plan and everything below it onto a world to be tried, putting
     candidates in for its statements.
 
-    Every node is built anew from the fields it is constructed with, an action from its
-    parameters, see :meth:`~coraplex.robot_plans.actions.base.Action.rebound_to`, a
-    statement as the candidate it is put in for, and any other node choosing its child
-    as the child it runs now.
+    Every node is built anew from the arguments it is constructed with, see
+    :meth:`~cramph.node.StatechartNode.rebuilt_by`, an action from its parameters, see
+    :meth:`~coraplex.robot_plans.actions.base.Action.rebound_to`, a statement as the
+    candidate it is put in for, and any other node choosing its child as the child it
+    runs now.
     """
 
     root: StatechartNode
@@ -226,11 +227,37 @@ class SubtreeRebuild:
         self._world = world
         self._rebuilt = {}
         self._cut = False
-        return self._rebuild_node(self.root)
+        return self.rebuilt(self.root)
 
-    def _rebuild_node(self, node: StatechartNode) -> StatechartNode | None:
+    def carry_over_conditions(self) -> None:
         """
-        :return: `node` rebuilt onto :attr:`_world`, or None if it is left out.
+        Gives every node rebuilt by the latest :meth:`build_for_trial` as a node of its
+        own kind the transition conditions of the node it was rebuilt from, once it
+        joined a statechart: reading the nodes rebuilt from those they read, and the
+        current state of those left out. The rebuilt :attr:`root` keeps the conditions
+        of what holds it, and a statement or another node choosing its child, which
+        is rebuilt as something else, keeps those it was given there.
+        """
+        counterparts = {
+            node: rebuilt
+            for node, rebuilt in self._rebuilt.items()
+            if rebuilt is not None
+        }
+        for node, rebuilt in counterparts.items():
+            if node is self.root or isinstance(node, CompositeNodeChoosingItsChild):
+                continue
+            for transition_kind in TransitionKind:
+                rebuilt.set_condition(
+                    transition_kind,
+                    DerivedConditionVariable.reading_counterparts(
+                        node.get_condition(transition_kind), counterparts.get
+                    ),
+                )
+
+    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+        """
+        :return: `node` rebuilt onto :attr:`_world`, or None if it is left out, if a
+            branch is cut at it, or if it cannot be rebuilt without what is left out.
         """
         if node not in self._rebuilt:
             self._rebuilt[node] = self._rebuild_anew(node)
@@ -238,8 +265,7 @@ class SubtreeRebuild:
 
     def _rebuild_anew(self, node: StatechartNode) -> StatechartNode | None:
         """
-        :return: `node` rebuilt onto :attr:`_world`, or None if it is left out, if a branch is
-            cut at it, or if it is a control structure node left with no child.
+        :return: `node` rebuilt onto :attr:`_world`, see :meth:`rebuilt`.
         """
         if node in self.left_out:
             return None
@@ -249,16 +275,7 @@ class SubtreeRebuild:
             return self._rebuild_running_child(node)
         if isinstance(node, Action):
             return node.rebound_to(self._world)
-        arguments = {
-            constructor_field.name: self._rebuild_value(
-                node, getattr(node, constructor_field.name)
-            )
-            for constructor_field in fields(node)
-            if constructor_field.init
-        }
-        if isinstance(node, ControlStructureNode) and not arguments["nodes"]:
-            return None
-        return type(node)(**arguments)
+        return node.rebuilt_by(self)
 
     def _rebuild_statement(self, statement: StatementNode) -> StatechartNode | None:
         """
@@ -280,39 +297,26 @@ class SubtreeRebuild:
         """
         latest_child = node.latest_child
         if latest_child is not None and not latest_child.life_cycle_state.is_terminal:
-            return self._rebuild_node(latest_child)
+            return self.rebuilt(latest_child)
         self._cut = True
         return None
 
-    def _rebuild_value(self, owner: StatechartNode, value: Any) -> Any:
-        """
-        :param owner: The node `value` is a constructor argument of.
-        :return: `value` referring to :attr:`_world`, the nodes in it rebuilt.
-        """
-        if isinstance(value, StatechartNode):
-            return self._rebuild_node(value)
-        if isinstance(value, list) and any(
-            isinstance(element, StatechartNode) for element in value
-        ):
-            return self._rebuild_children(owner, value)
-        return self._world.rebind_world_entities(value)
-
-    def _rebuild_children(
+    def rebuilt_children(
         self,
         owner: StatechartNode,
         children: list[StatechartNode],
     ) -> list[StatechartNode]:
         """
-        :param owner: The node holding `children`.
-        :return: `children` rebuilt, leaving out those left out, and, if `owner` runs
-            its children in turn, every child after the first one a branch was cut in.
+        Differs from :meth:`~cramph.node.NodeRebuild.rebuilt_children` in also leaving
+        out, if `owner` runs its children in turn, every child after the first one a
+        branch was cut in.
         """
         cut_before = self._cut
         cut_in_children = False
         rebuilt_children = []
         for child in children:
             self._cut = False
-            rebuilt = self._rebuild_node(child)
+            rebuilt = self.rebuilt(child)
             if rebuilt is not None:
                 rebuilt_children.append(rebuilt)
             cut_in_children = cut_in_children or self._cut
@@ -322,6 +326,12 @@ class SubtreeRebuild:
                 break
         self._cut = cut_before or cut_in_children
         return rebuilt_children
+
+    def rebound(self, value: Any) -> Any:
+        """
+        :return: `value` referring to :attr:`_world`.
+        """
+        return self._world.rebind_world_entities(value)
 
     def __str__(self) -> str:
         candidates = " beside ".join(map(str, self.candidates.values()))
@@ -427,6 +437,7 @@ class ActionTrial:
                 statechart = Statechart(context=executor.context)
                 # A parallel is ended by what holds it.
                 statechart.add_node(Sequence(nodes=[rebuild.build_for_trial(world)]))
+                rebuild.carry_over_conditions()
                 executor.compile(statechart)
                 executor.execute()
                 return True
