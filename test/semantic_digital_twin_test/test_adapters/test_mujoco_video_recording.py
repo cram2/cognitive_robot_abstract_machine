@@ -9,10 +9,12 @@ tests follow the same CI-only gating as ``test_multi_sim.py``.
 
 import os
 
+import mujoco
 import numpy as np
 import pytest
 
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.adapters.mujoco_video_recording import (
     MujocoVideoRecorder,
     RecordedVideo,
@@ -26,7 +28,12 @@ from semantic_digital_twin.exceptions import (
     VideoRecordingNotStartedError,
 )
 from semantic_digital_twin.testing import ray_test_world
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
+from semantic_digital_twin.world_description.world_entity import Body
 
 only_run_test_in_CI = os.environ.get("CI", "false").lower() == "false"
 requires_mujoco_ci = pytest.mark.skipif(
@@ -41,7 +48,7 @@ requires_mujoco_ci = pytest.mark.skipif(
 def test_overview_camera_pose_applies_distance_floor_for_a_degenerate_box():
     point_bounds = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
 
-    position = MujocoCamera.overview_pose(point_bounds).to_position().to_np()[:3]
+    position = MujocoCamera.overview_pose(point_bounds).position.to_np()[:3]
 
     assert np.linalg.norm(position - np.array([1.0, 1.0, 1.0])) == pytest.approx(1.5)
 
@@ -50,8 +57,8 @@ def test_overview_camera_pose_scales_with_the_bounding_diagonal():
     small_bounds = np.array([[-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]])
     large_bounds = np.array([[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]])
 
-    small_position = MujocoCamera.overview_pose(small_bounds).to_position().to_np()[:3]
-    large_position = MujocoCamera.overview_pose(large_bounds).to_position().to_np()[:3]
+    small_position = MujocoCamera.overview_pose(small_bounds).position.to_np()[:3]
+    large_position = MujocoCamera.overview_pose(large_bounds).position.to_np()[:3]
 
     small_distance = np.linalg.norm(small_position)
     large_distance = np.linalg.norm(large_position)
@@ -62,11 +69,11 @@ def test_overview_camera_pose_looks_at_the_bounding_box_center():
     bounds = np.array([[-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]])
 
     pose = MujocoCamera.overview_pose(bounds)
-    position = pose.to_position().to_np()[:3]
+    position = pose.position.to_np()[:3]
 
     from scipy.spatial.transform import Rotation
 
-    rotation_matrix = Rotation.from_quat(pose.to_quaternion().to_np()).as_matrix()
+    rotation_matrix = Rotation.from_quat(pose.quaternion.to_np()).as_matrix()
     view_direction = rotation_matrix @ np.array([0.0, 0.0, -1.0])
     expected_direction = -position / np.linalg.norm(position)
     assert np.allclose(view_direction, expected_direction, atol=1e-6)
@@ -115,9 +122,9 @@ def test_stop_without_start_raises(ray_test_world):
 def test_default_camera_is_resolved_at_construction_not_at_start(ray_test_world):
     """
     The default overview camera is attached as soon as the recorder is constructed, not
-    lazily on start(): a caller that never starts the recorder still gets a fully resolved
-    camera, and a world without any geometry to frame fails fast at construction instead of
-    only once start() is later called.
+    lazily on start(): a caller that never starts the recorder still gets a fully
+    resolved camera, and a world without any geometry to frame fails fast at
+    construction instead of only once start() is later called.
     """
     world, *_ = ray_test_world
     recorder = MujocoVideoRecorder(world=world)
@@ -264,3 +271,74 @@ def test_recording_the_same_world_twice_does_not_accumulate_cameras(ray_test_wor
         assert second_recorder.captured_frame_count == 1
     finally:
         second_recorder.stop()
+
+
+# %% renderer reuse
+
+
+@pytest.fixture
+def created_renderers(monkeypatch) -> list[mujoco.Renderer]:
+    """
+    Every :class:`mujoco.Renderer` created while the test runs, in order of creation.
+    """
+    renderers = []
+    renderer_class = mujoco.Renderer
+
+    def create_renderer(*arguments, **keyword_arguments) -> mujoco.Renderer:
+        renderer = renderer_class(*arguments, **keyword_arguments)
+        renderers.append(renderer)
+        return renderer
+
+    monkeypatch.setattr(mujoco, "Renderer", create_renderer)
+    return renderers
+
+
+@requires_mujoco_ci
+def test_a_recording_renders_all_its_frames_with_one_renderer(
+    ray_test_world, created_renderers
+):
+    world, *_ = ray_test_world
+    recorder = MujocoVideoRecorder(world=world, frames_per_second=10)
+
+    recorder.start()
+    try:
+        recorder.advance_simulation(duration=0.5)
+    finally:
+        recorded_video = recorder.stop()
+
+    assert len(recorded_video.frames) > 1
+    assert len(created_renderers) == 1
+
+
+@requires_mujoco_ci
+def test_a_body_added_while_recording_is_rendered_with_a_new_renderer(
+    ray_test_world, created_renderers
+):
+    world, *_ = ray_test_world
+    recorder = MujocoVideoRecorder(world=world, frames_per_second=10)
+    added_body = Body(
+        name=PrefixedName("added_while_recording", prefix="test"),
+        collision=ShapeCollection(
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    scale=Scale(0.1, 0.1, 0.1),
+                )
+            ]
+        ),
+    )
+
+    recorder.start()
+    try:
+        with world.modify_world():
+            world.add_kinematic_structure_entity(added_body)
+            world.add_connection(
+                Connection6DoF.create_with_dofs(
+                    parent=world.root, child=added_body, world=world
+                )
+            )
+        recorder.advance_simulation(duration=0.5)
+    finally:
+        recorder.stop()
+
+    assert len(created_renderers) == 2

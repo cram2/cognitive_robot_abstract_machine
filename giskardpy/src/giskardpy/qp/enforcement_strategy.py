@@ -7,17 +7,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing_extensions import Callable, TYPE_CHECKING
 
 import numpy as np
-from typing_extensions import Callable
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.qp.constraint import (
     GiskardConstraint,
     GiskardEqualityConstraint,
     GiskardInequalityConstraint,
-    LargeNumber,
 )
 from giskardpy.qp.dof_limits import DirectLimits
 from giskardpy.qp.exceptions import ConstraintTypeMismatchError
@@ -158,26 +156,50 @@ class ExpressionEnforcementStrategy(EnforcementStrategy, ABC):
         the getter.
         """
 
+    def lower_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
+        """
+        The lower bound this strategy enforces for an inequality constraint.
+        """
+        return constraint.lower_bound
+
+    def upper_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
+        """
+        The upper bound this strategy enforces for an inequality constraint.
+        """
+        return constraint.upper_bound
+
+    def equality_bound_of_constraint(
+        self, constraint: GiskardEqualityConstraint
+    ) -> Scalar:
+        """
+        The bound this strategy enforces for an equality constraint.
+        """
+        return constraint.bound
+
     def create_lower_bounds(self) -> Vector:
         """
         Builds the lower bounds of the inequality constraints.
         """
         self._require_constraint_type(GiskardInequalityConstraint)
-        return self.create_bounds(lambda c: c.lower_bound)
+        return self.create_bounds(self.lower_bound_of_constraint)
 
     def create_upper_bounds(self) -> Vector:
         """
         Builds the upper bounds of the inequality constraints.
         """
         self._require_constraint_type(GiskardInequalityConstraint)
-        return self.create_bounds(lambda c: c.upper_bound)
+        return self.create_bounds(self.upper_bound_of_constraint)
 
     def create_equality_bounds(self) -> Vector:
         """
         Builds the bounds of the equality constraints.
         """
         self._require_constraint_type(GiskardEqualityConstraint)
-        return self.create_bounds(lambda c: c.bound)
+        return self.create_bounds(self.equality_bound_of_constraint)
 
     def _require_constraint_type(self, expected: type[GiskardConstraint]) -> None:
         """
@@ -229,7 +251,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
@@ -244,19 +266,19 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             return sm.Matrix()
         return sm.Matrix.diag(
             [
-                self.qp_controller_config.model_predictive_control_time_step
+                self.qp_controller_config.control_time_step.total_seconds()
                 for _ in self.constraints
             ]
         )
 
     def create_slack_variables(self) -> DirectLimits:
         """
-        Creates one slack variable per constraint with normalized weights.
+        Creates one slack variable per constraint, bounded by the constraint's slack
+        limits, with normalized weights.
         """
-        number_of_slack_variables = len(self.constraints)
         return DirectLimits(
-            lower_bounds=Vector([-LargeNumber] * number_of_slack_variables),
-            upper_bounds=Vector([LargeNumber] * number_of_slack_variables),
+            lower_bounds=Vector([c.lower_slack_limit for c in self.constraints]),
+            upper_bounds=Vector([c.upper_slack_limit for c in self.constraints]),
             quadratic_weights=Vector(
                 [
                     normalize_slack_weight(
@@ -280,53 +302,59 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
             names=[c.name for c in self.constraints],
         )
 
-    def _apply_cap(
-        self,
-        value: Scalar,
-        dt: float,
-        normalization_number: float,
-        control_horizon: int,
-    ) -> Scalar:
+    def reachable_change_of_constraint(self, constraint: GiskardConstraint) -> Scalar:
         """
-        Clamps a bound to the largest change reachable within the control horizon.
+        The largest change of a constraint's expression that may be demanded within the
+        control horizon: its normalization factor sustained over that horizon.
         """
-        return sm.limit(
-            value,
-            -normalization_number * dt * control_horizon,
-            normalization_number * dt * control_horizon,
+        return (
+            sm.Scalar(constraint.normalization_factor)
+            * self.qp_controller_config.control_time_step.total_seconds()
+            * self.qp_controller_config.control_horizon
         )
 
-    def capped_bound(
-        self,
-        equality_bound: Scalar,
-        dt: float,
-        normalization_number: float,
-        control_horizon: int,
+    def lower_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
     ) -> Scalar:
         """
-        Returns the bound capped to what is reachable within the control horizon.
+        A positive lower bound demands motion, so it is capped to the reachable change.
+
+        A negative one only permits motion and is kept, however far away it is.
         """
-        return self._apply_cap(
-            equality_bound, dt, normalization_number, control_horizon
+        return sm.min(
+            constraint.lower_bound, self.reachable_change_of_constraint(constraint)
+        )
+
+    def upper_bound_of_constraint(
+        self, constraint: GiskardInequalityConstraint
+    ) -> Scalar:
+        """
+        A negative upper bound demands motion, so it is capped to the reachable change.
+
+        A positive one only permits motion and is kept, however far away it is.
+        """
+        return sm.max(
+            constraint.upper_bound, -self.reachable_change_of_constraint(constraint)
+        )
+
+    def equality_bound_of_constraint(
+        self, constraint: GiskardEqualityConstraint
+    ) -> Scalar:
+        """
+        An equality bound always demands motion, so it is capped to the reachable change
+        by the constraint's own bound cap.
+        """
+        return constraint.bound_cap.cap_bound(
+            constraint.bound, self.reachable_change_of_constraint(constraint)
         )
 
     def create_bounds(
         self, bounds_getter: Callable[[GiskardConstraint], Scalar]
     ) -> Vector:
         """
-        Builds the capped bounds, one per constraint.
+        Builds the bounds, one per constraint.
         """
-        return Vector(
-            [
-                self.capped_bound(
-                    bounds_getter(c),
-                    self.qp_controller_config.model_predictive_control_time_step,
-                    c.normalization_factor,
-                    self.qp_controller_config.control_horizon,
-                )
-                for c in self.constraints
-            ]
-        )
+        return Vector([bounds_getter(c) for c in self.constraints])
 
     def create_names(self) -> list[str]:
         """
@@ -380,7 +408,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             sm.Vector([c.expression for c in self.constraints]).jacobian(
                 variables=self.position_variables
             )
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         missing_variables = self.qp_controller_config.max_derivative - 1
         eye = sm.Matrix.eye(self.qp_controller_config.prediction_horizon)[
@@ -409,7 +437,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         )
         return (
             sm.Matrix.eye(num_slack_variables)
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
 
     def create_slack_variables(self) -> DirectLimits:
@@ -450,7 +478,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             for c in self.constraints:
                 bounds.append(
                     bounds_getter(c)
-                    * self.qp_controller_config.model_predictive_control_time_step
+                    * self.qp_controller_config.control_time_step.total_seconds()
                 )
         return Vector(bounds)
 
@@ -596,7 +624,7 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         res[: self.number_of_free_variables] = (
             -self.velocity_variables
             - self.acceleration_variables
-            * self.qp_controller_config.model_predictive_control_time_step
+            * self.qp_controller_config.control_time_step.total_seconds()
         )
         res[self.number_of_free_variables : self.number_of_free_variables * 2] = (
             self.velocity_variables

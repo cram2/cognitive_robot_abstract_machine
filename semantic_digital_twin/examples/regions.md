@@ -30,7 +30,7 @@ First, let's create a simple table with one leg.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection, Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -104,14 +104,14 @@ print(world.regions)
 We can now see that if we move the table, we also move the region.
 
 ```{code-cell} ipython3
-print(table_surface.global_pose.to_position().to_np()[:3])
+print(table_surface.global_pose.position.to_np()[:3])
 
 with world.modify_world():
     root_to_leg.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=2.0, reference_frame=table_leg
     )
 
-print(table_surface.global_pose.to_position().to_np()[:3])
+print(table_surface.global_pose.position.to_np()[:3])
 ```
 
 Note that Regions are a relatively new concept that may change in the future.

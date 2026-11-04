@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import inspect
 from functools import lru_cache
-from typing import Type, Optional, Any, TYPE_CHECKING
-from typing_extensions import get_origin
+from typing_extensions import get_origin, Any, TYPE_CHECKING
 
 
 from krrood.ormatic.exceptions import NoGenericError, NoDAOFoundError
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
 
-def _same_domain_class(candidate: Type, original_clazz: Type) -> bool:
+def _same_domain_class(candidate: type, original_clazz: type) -> bool:
     """
     Whether *candidate* is the domain class a DAO subclass was mapped against, allowing
     for one of the two to have been loaded as a process's entry point.
@@ -54,9 +53,7 @@ def _same_domain_class(candidate: Type, original_clazz: Type) -> bool:
 
 
 @lru_cache(maxsize=None)
-def _get_clazz_by_original_clazz(
-    base_clazz: Type, original_clazz: Type
-) -> Optional[Type]:
+def _get_clazz_by_original_clazz(base_clazz: type, original_clazz: type) -> type | None:
     """
     Find a subclass that maps to a specific domain class.
 
@@ -73,7 +70,7 @@ def _get_clazz_by_original_clazz(
     return None
 
 
-def _maps_parametrization_of(dao_clazz: Type, generic_clazz: Type) -> bool:
+def _maps_parametrization_of(dao_clazz: type, generic_clazz: type) -> bool:
     """
     Check whether a DAO class maps a parametrization of a bare generic class.
 
@@ -91,8 +88,8 @@ def _maps_parametrization_of(dao_clazz: Type, generic_clazz: Type) -> bool:
 
 @lru_cache(maxsize=None)
 def _get_concrete_generic_subclass(
-    base_dao: Type[DataAccessObject], original_clazz: Type
-) -> Optional[Type[DataAccessObject]]:
+    base_dao: type[DataAccessObject], original_clazz: type
+) -> type[DataAccessObject] | None:
     """
     Find the unique concrete DAO subclass for a bare generic domain class.
 
@@ -132,9 +129,9 @@ def _get_concrete_generic_subclass(
 
 
 @lru_cache(maxsize=None)
-def get_dao_class(
-    original_clazz: Type, expected_type: Optional[Type] = None
-) -> Optional[Type[DataAccessObject]]:
+def get_data_access_object_class(
+    original_clazz: type, expected_type: type | None = None
+) -> type[DataAccessObject] | None:
     """
     Retrieve the DAO class for a domain class.
 
@@ -185,14 +182,14 @@ def clear_dao_lookup_caches() -> None:
     """
     _get_clazz_by_original_clazz.cache_clear()
     _get_concrete_generic_subclass.cache_clear()
-    get_dao_class.cache_clear()
+    get_data_access_object_class.cache_clear()
     get_alternative_mapping.cache_clear()
 
 
 @lru_cache(maxsize=None)
 def get_alternative_mapping(
-    original_clazz: Type,
-) -> Optional[Type[AlternativeMapping]]:
+    original_clazz: type,
+) -> type[AlternativeMapping] | None:
     """
     Retrieve the alternative mapping for a domain class.
 
@@ -207,7 +204,7 @@ def get_alternative_mapping(
 
 
 def to_dao(
-    source_object: Any, state: Optional[ToDataAccessObjectState] = None
+    source_object: Any, state: ToDataAccessObjectState | None = None
 ) -> DataAccessObject:
     """
     Convert an object to its corresponding DAO.
@@ -218,7 +215,7 @@ def to_dao(
     """
     from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 
-    dao_clazz = get_dao_class(type(source_object))
+    dao_clazz = get_data_access_object_class(type(source_object))
     if dao_clazz is None:
         raise NoDAOFoundError(source_object)
     state = state or ToDataAccessObjectState()

@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from enum import Enum
 from unittest import skip
 
-from typing_extensions import List
 
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.experts import Human
@@ -51,8 +50,8 @@ class Molecule:
     lumo: float
     mutagenic: bool
 
-    atoms: List[Atom]
-    bonds: List[Bond]
+    atoms: list[Atom]
+    bonds: list[Bond]
 
     def __hash__(self):
         return id(self)

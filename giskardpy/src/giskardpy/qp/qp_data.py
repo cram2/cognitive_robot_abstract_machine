@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
+from numpy.typing import NDArray
 import scipy.sparse as sp
 from scipy.sparse import issparse
 from typing_extensions import Self
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -51,6 +55,7 @@ class QPDataExplicit(QPData):
     """
     The diagonal of the QP's Hessian matrix.
     """
+
     linear_weights: np.ndarray
     """
     The linear part of the QP's objective function.
@@ -60,6 +65,7 @@ class QPDataExplicit(QPData):
     """
     Lower bounds for x.
     """
+
     box_upper_constraints: np.ndarray
     """
     Upper bounds for x.
@@ -69,6 +75,7 @@ class QPDataExplicit(QPData):
     """
     Equality constraints matrix.
     """
+
     equality_bounds: np.ndarray
     """
     Constraints for the equality matrix multiplied with x.
@@ -78,6 +85,7 @@ class QPDataExplicit(QPData):
     """
     Inequality constraints matrix.
     """
+
     inequality_lower_bounds: np.ndarray
     """
     Lower bounds for the inequality matrix multiplied with x.
@@ -101,6 +109,24 @@ class QPDataExplicit(QPData):
         Converts the sparse inequality matrix into a dense array.
         """
         return self.inequality_matrix.toarray()
+
+    @property
+    def hessian(self) -> sp.csc_matrix:
+        """
+        The QP's Hessian matrix, a sparse diagonal matrix of the quadratic weights.
+
+        .. note:: Built directly in CSC form, which is faster than
+            :func:`scipy.sparse.diags`.
+        """
+        number_of_variables = len(self.quadratic_weights)
+        return sp.csc_matrix(
+            (
+                self.quadratic_weights,
+                np.arange(number_of_variables),
+                np.arange(number_of_variables + 1),
+            ),
+            shape=(number_of_variables, number_of_variables),
+        )
 
     def to_two_sided_inequality(self) -> QPDataTwoSidedInequality:
         """
@@ -145,12 +171,10 @@ class QPDataExplicit(QPData):
         bA_part = slack_part[self.num_equality_slack_variables :]
 
         bE_filter = np.ones(self.equality_matrix.shape[0], dtype=bool)
-        bE_filter.fill(True)
         if len(bE_part) > 0:
             bE_filter[-len(bE_part) :] = bE_part
 
         bA_filter = np.ones(self.inequality_matrix.shape[0], dtype=bool)
-        bA_filter.fill(True)
         if len(bA_part) > 0:
             bA_filter[-len(bA_part) :] = bA_part
 
@@ -163,11 +187,11 @@ class QPDataExplicit(QPData):
             box_upper_constraints=self.box_upper_constraints[
                 zero_quadratic_weight_filter
             ],
-            equality_matrix=self._filter_eq_matrix(
+            equality_matrix=self._submatrix(
                 self.equality_matrix, bE_filter, zero_quadratic_weight_filter
             ),
             equality_bounds=self.equality_bounds[bE_filter],
-            inequality_matrix=self._filter_neq_matrix(
+            inequality_matrix=self._submatrix(
                 self.inequality_matrix, bA_filter, zero_quadratic_weight_filter
             ),
             inequality_lower_bounds=self.inequality_lower_bounds[bA_filter],
@@ -176,33 +200,137 @@ class QPDataExplicit(QPData):
             num_inequality_slack_variables=self.num_inequality_slack_variables,
         )
 
-    def _filter_eq_matrix(
-        self,
-        eq_matrix: sp.csc_matrix,
-        bE_filter: np.ndarray,
-        zero_quadratic_weight_filter: np.ndarray,
-    ) -> sp.csc_matrix:
+    def without_variables(self, removed_variables: NDArray[np.bool_]) -> QPDataExplicit:
         """
-        Filters the equality matrix by removing specified rows and columns associated
-        with inactive motion statechart nodes.
+        :param removed_variables: Which variables to leave out, one flag per variable.
+        :return: This problem without the flagged variables and without the
+            constraints that have no coefficient left once they are gone.
         """
-        if len(eq_matrix.shape) > 1 and eq_matrix.shape[0] * eq_matrix.shape[1] > 0:
-            return eq_matrix[bE_filter, :][:, zero_quadratic_weight_filter]
-        return eq_matrix
+        kept_variables = ~removed_variables
+        kept_equalities = self._rows_keeping_coefficients(
+            self.equality_matrix, kept_variables
+        )
+        kept_inequalities = self._rows_keeping_coefficients(
+            self.inequality_matrix, kept_variables
+        )
+        return QPDataExplicit(
+            quadratic_weights=self.quadratic_weights[kept_variables],
+            linear_weights=self.linear_weights[kept_variables],
+            box_lower_constraints=self.box_lower_constraints[kept_variables],
+            box_upper_constraints=self.box_upper_constraints[kept_variables],
+            equality_matrix=self._submatrix(
+                self.equality_matrix, kept_equalities, kept_variables
+            ),
+            equality_bounds=self.equality_bounds[kept_equalities],
+            inequality_matrix=self._submatrix(
+                self.inequality_matrix, kept_inequalities, kept_variables
+            ),
+            inequality_lower_bounds=self.inequality_lower_bounds[kept_inequalities],
+            inequality_upper_bounds=self.inequality_upper_bounds[kept_inequalities],
+            num_equality_slack_variables=self.num_equality_slack_variables,
+            num_inequality_slack_variables=self.num_inequality_slack_variables,
+        )
 
-    def _filter_neq_matrix(
-        self,
-        neq_matrix: sp.csc_matrix,
-        bA_filter: np.ndarray,
-        zero_quadratic_weight_filter: np.ndarray,
+    def variables_without_coefficients(
+        self, number_of_variables: int, number_of_ignored_equalities: int
+    ) -> NDArray[np.bool_]:
+        """
+        :param number_of_variables: How many variables are checked, from the first on.
+        :param number_of_ignored_equalities: How many equalities, from the first on, are
+            not checked.
+        :return: Which of the checked variables have a coefficient of zero in every
+            checked equality and in every inequality, one flag per variable.
+        """
+        with_coefficients = self._columns_with_coefficients(
+            self.equality_matrix, number_of_ignored_equalities, number_of_variables
+        ) | self._columns_with_coefficients(
+            self.inequality_matrix, 0, number_of_variables
+        )
+        return ~with_coefficients
+
+    @classmethod
+    def _columns_with_coefficients(
+        cls, matrix: sp.csc_matrix, first_row: int, number_of_columns: int
+    ) -> NDArray[np.bool_]:
+        """
+        :param matrix: A constraint matrix.
+        :param first_row: The first row of `matrix` that is checked.
+        :param number_of_columns: How many columns of `matrix` are checked, from the
+            first on.
+        :return: Which of the checked columns have a nonzero value in a checked row, one
+            flag per column.
+        """
+        with_coefficients = np.zeros(number_of_columns, dtype=bool)
+        # A matrix without rows does not necessarily have a column per variable.
+        if matrix.shape[0] == 0:
+            return with_coefficients
+        entries_in_checked_columns = matrix.indptr[number_of_columns]
+        coefficients = (matrix.data[:entries_in_checked_columns] != 0) & (
+            matrix.indices[:entries_in_checked_columns] >= first_row
+        )
+        column_of_entry = cls._column_of_each_entry(matrix)
+        with_coefficients[
+            column_of_entry[:entries_in_checked_columns][coefficients]
+        ] = True
+        return with_coefficients
+
+    @classmethod
+    def _rows_keeping_coefficients(
+        cls, matrix: sp.csc_matrix, kept_variables: np.ndarray
+    ) -> np.ndarray:
+        """
+        :param matrix: A constraint matrix.
+        :param kept_variables: Which columns of `matrix` are kept, one flag per column.
+        :return: Which rows do not lose all of their entries with the columns that are
+            not kept, one flag per row.
+        """
+        if matrix.shape[0] == 0:
+            return np.ones(0, dtype=bool)
+        kept_entries = kept_variables[cls._column_of_each_entry(matrix)]
+        had_entries = np.bincount(matrix.indices, minlength=matrix.shape[0]) > 0
+        has_entries = (
+            np.bincount(matrix.indices[kept_entries], minlength=matrix.shape[0]) > 0
+        )
+        return has_entries | ~had_entries
+
+    @classmethod
+    def _submatrix(
+        cls, matrix: sp.csc_matrix, kept_rows: np.ndarray, kept_columns: np.ndarray
     ) -> sp.csc_matrix:
         """
-        Filters the inequality matrix by removing specified rows and columns associated
-        with inactive motion statechart nodes.
+        :param matrix: A constraint matrix.
+        :param kept_rows: Which rows of `matrix` are kept, one flag per row.
+        :param kept_columns: Which columns of `matrix` are kept, one flag per column.
+        :return: `matrix` with only the kept rows and columns, or `matrix` itself if it
+            has no rows or columns.
         """
-        if len(neq_matrix.shape) > 1 and neq_matrix.shape[0] * neq_matrix.shape[1] > 0:
-            return neq_matrix[:, zero_quadratic_weight_filter][bA_filter, :]
-        return neq_matrix
+        if matrix.shape[0] * matrix.shape[1] == 0:
+            return matrix
+        column_of_entry = cls._column_of_each_entry(matrix)
+        kept_entries = kept_columns[column_of_entry] & kept_rows[matrix.indices]
+        new_row_of_row = np.cumsum(kept_rows) - 1
+        new_column_of_column = np.cumsum(kept_columns) - 1
+        number_of_kept_columns = int(new_column_of_column[-1]) + 1
+        entries_per_kept_column = np.bincount(
+            new_column_of_column[column_of_entry[kept_entries]],
+            minlength=number_of_kept_columns,
+        )
+        return sp.csc_matrix(
+            (
+                matrix.data[kept_entries],
+                new_row_of_row[matrix.indices[kept_entries]],
+                np.concatenate(([0], np.cumsum(entries_per_kept_column))),
+            ),
+            shape=(int(new_row_of_row[-1]) + 1, number_of_kept_columns),
+        )
+
+    @staticmethod
+    def _column_of_each_entry(matrix: sp.csc_matrix) -> np.ndarray:
+        """
+        :param matrix: A matrix in compressed sparse column format.
+        :return: The column of every stored entry of `matrix`, in storage order.
+        """
+        return np.repeat(np.arange(matrix.shape[1]), np.diff(matrix.indptr))
 
     def pretty_print_problem(self):
         """
@@ -251,28 +379,30 @@ class QPDataExplicit(QPData):
         """
         Analyzes the QP problem data for numerical issues and poor posing.
 
-        Prints statistics and warnings for potentially ill-posed problems.
+        Logs statistics and warnings for potentially ill-posed problems.
         """
-        print("--- QP Well-Posedness Analysis ---")
+        logger.info("--- QP Well-Posedness Analysis ---")
         self._analyze_hessian()
         self._analyze_constraints()
-        print("----------------------------------")
+        logger.info("----------------------------------")
 
     def _analyze_hessian(self):
         """
         Checks the condition number of the Hessian.
         """
         if self.quadratic_weights is not None:
-            max_weight = np.max(np.abs(self.quadratic_weights))
-            min_weight = np.min(
-                np.abs(self.quadratic_weights)[np.abs(self.quadratic_weights) > 0]
-            )
+            weights = np.abs(self.quadratic_weights)
+            if not np.any(weights > 0):
+                logger.warning("  Weight Matrix is all zero.")
+                return
+            max_weight = np.max(weights)
+            min_weight = np.min(weights[weights > 0])
             condition_number = max_weight / min_weight
-            print(f"  Weight Matrix max singular value: {max_weight}")
-            print(f"  Weight Matrix min singular value: {min_weight}")
-            print(f"  Weight Matrix Condition Number: {condition_number}")
+            logger.info(f"  Weight Matrix max singular value: {max_weight}")
+            logger.info(f"  Weight Matrix min singular value: {min_weight}")
+            logger.info(f"  Weight Matrix Condition Number: {condition_number}")
             if condition_number > 1_000:
-                print("  Warning: Weight Matrix is poorly conditioned.")
+                logger.warning("  Weight Matrix is poorly conditioned.")
 
     def _analyze_constraints(self):
         """
@@ -292,25 +422,25 @@ class QPDataExplicit(QPData):
         ):
             violations = self.box_lower_constraints > self.box_upper_constraints
             if np.any(violations):
-                print(
-                    f"  WARNING: Box constraints are infeasible for indices {np.where(violations)[0]}."
+                logger.warning(
+                    f"  Box constraints are infeasible for indices {np.where(violations)[0]}."
                 )
 
     def _check_matrix_condition(self, matrix: sp.csc_matrix | np.ndarray, name: str):
         if issparse(matrix):
             matrix = matrix.toarray()
         if matrix.shape[0] * matrix.shape[1] == 0:
-            print(f"  {name} is empty.")
+            logger.info(f"  {name} is empty.")
             return
         singular_value_decomposition = np.linalg.svd(matrix, compute_uv=False)
         condition_number = (
             singular_value_decomposition[0] / singular_value_decomposition[-1]
         )
-        print(f"  {name} max singular value: {singular_value_decomposition[0]}")
-        print(f"  {name} min singular value: {singular_value_decomposition[-1]}")
-        print(f"  {name} Condition Number: {condition_number}")
+        logger.info(f"  {name} max singular value: {singular_value_decomposition[0]}")
+        logger.info(f"  {name} min singular value: {singular_value_decomposition[-1]}")
+        logger.info(f"  {name} Condition Number: {condition_number}")
         if condition_number > 1_000:
-            print(f"        WARNING: this is very large.")
+            logger.warning(f"  {name} Condition Number is very large.")
 
 
 @dataclass(eq=False)

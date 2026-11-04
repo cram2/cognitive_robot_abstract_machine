@@ -2,7 +2,7 @@ import inspect
 from dataclasses import is_dataclass, fields
 from types import NoneType
 
-from typing_extensions import Optional, Any, Type, TypeVar
+from typing_extensions import Any, TypeVar
 
 from krrood import logger
 
@@ -23,7 +23,7 @@ from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 
-def get_method_return_type(owner_class: Type, method_name: str) -> Optional[Type]:
+def get_method_return_type(owner_class: type, method_name: str) -> type | None:
     """
     :param owner_class: The class that owns the method.
     :param method_name: The name of the method.
@@ -42,7 +42,7 @@ def get_method_return_type(owner_class: Type, method_name: str) -> Optional[Type
         return None
 
 
-def get_field_type_endpoint(owner_class: Type, field_name: str) -> Optional[Type]:
+def get_field_type_endpoint(owner_class: type, field_name: str) -> type | None:
     """
     :param owner_class: The class of that owns the field.
     :param field_name: The name of the field.
@@ -83,7 +83,7 @@ def get_field_type_endpoint(owner_class: Type, field_name: str) -> Optional[Type
         return None
 
 
-def get_wrapped_field(owner_class: Type, field_name: str) -> Optional[WrappedField]:
+def get_wrapped_field(owner_class: type, field_name: str) -> WrappedField | None:
     """
     :param owner_class: The class of that owns the field.
     :param field_name: The name of the field.
@@ -103,7 +103,7 @@ def get_wrapped_field(owner_class: Type, field_name: str) -> Optional[WrappedFie
         )
 
 
-def get_dataclass_field(owner_class: Type, field_name: str) -> Optional[Any]:
+def get_dataclass_field(owner_class: type, field_name: str) -> Any | None:
     """
     :param owner_class: The class of that owns the field.
     :param field_name: The name of the field.
@@ -117,7 +117,7 @@ def get_dataclass_field(owner_class: Type, field_name: str) -> Optional[Any]:
     )
 
 
-def get_wrapped_class(owner_class: Type) -> Optional[WrappedClass]:
+def get_wrapped_class(owner_class: type) -> WrappedClass | None:
     """
     :return: The wrapped owner class of the class from the symbol graph if it exists, otherwise create a new
     wrapped class instance for it.

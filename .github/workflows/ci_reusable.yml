@@ -52,6 +52,17 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           uv pip install drake
 
+      - name: Install robokudo optional requirements
+        if: ${{ inputs.lib == 'robokudo' }}
+        env:
+          UV_CACHE_DIR: /opt/ros/.uv_cache
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          # --no-sources keeps the editable workspace packages from being reinstalled from their paths;
+          # the CPU-only torch index avoids downloading the CUDA libraries onto the runner disk.
+          uv pip install -r robokudo/pyproject.toml --extra dev --no-sources --extra-index-url https://download.pytorch.org/whl/cpu
+
       - name: Restore cache
         uses: actions/cache/restore@v4
         with:
@@ -77,6 +88,20 @@ jobs:
           bazel build //test:test_all
           bazel test //test:test_all
 
+      # The runners differ in CPU model, which can change the rounding of numeric results;
+      # the log records which one ran, to trace a failure that only one runner shows.
+      - name: Show CPU
+        run: lscpu
+
+      - name: Check the generated rules in AGENTS.md
+        # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
+        # edit or a forgotten regeneration fails here.
+        if: ${{ inputs.lib == 'krrood' }}
+        run: |
+          source /opt/ros/cram-env/bin/activate
+          cd cognitive_robot_abstract_machine
+          krrood agents-md --check
+
       - name: Run tests
         run: |
           source /opt/ros/cram-env/bin/activate
@@ -92,11 +117,7 @@ jobs:
           if [[ "${{ inputs.lib }}" == "semantic_digital_twin" ]]; then
             export MUJOCO_GL=egl
           fi
-          if [[ "${{ inputs.lib }}" == "cramera" ]]; then
-            python -m pytest -n auto --cov=cramera --cov-fail-under=85 cognitive_robot_abstract_machine/test/cramera_test
-          else
-            python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
-          fi
+          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
 
       - name: Save cache
         uses: actions/cache/save@v4

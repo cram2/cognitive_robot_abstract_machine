@@ -1,18 +1,22 @@
+import copy
 import enum
+import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from types import NoneType
-from typing import Iterable, TypeVar
+from typing_extensions import ClassVar, Iterable, Iterator, TypeVar
 
 import random_events.variable
 from random_events.product_algebra import Event
 from sqlalchemy.orm import sessionmaker
-from typing_extensions import ClassVar, Dict, List, Optional
 
 from krrood import logger
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (
+    Bindings,
+    OperationResult,
+    ProbabilisticOperationResult,
     Selectable,
     SymbolicExpression,
 )
@@ -25,7 +29,6 @@ from krrood.entity_query_language.operators.probabilistic_queries import (
     ProbabilisticQuery,
 )
 from krrood.entity_query_language.operators.aggregators import Average
-from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     BackendCannotEvaluateCause,
@@ -57,6 +60,7 @@ try:
         UnderspecifiedParameters,
         SelectedAttributesParameters,
     )
+    from probabilistic_model.probabilistic_model import ProbabilisticModel
 except ImportError as e:
     logger.debug(f"Couldn't import probabilistic model needed classes: {e}")
     CausalCircuit = NoneType
@@ -66,6 +70,7 @@ except ImportError as e:
     FullyFactorizedRegistry = NoneType
     SelectedAttributesParameters = NoneType
     UnderspecifiedParameters = NoneType
+    ProbabilisticModel = NoneType
 
 T = TypeVar("T")
 
@@ -78,7 +83,7 @@ class QueryBackend(ABC):
     Query backends are objects that answer queries by different means.
     """
 
-    opening_directive: ClassVar[Optional[Directive]] = None
+    opening_directive: ClassVar[Directive | None] = None
     """
     The opening verb a verbalization uses when this backend evaluates the expression
     (``None`` keeps the query-type default).
@@ -132,7 +137,7 @@ class SelectiveBackend(QueryBackend, ABC):
     These can take any query as input.
     """
 
-    opening_directive: ClassVar[Optional[Directive]] = Directive.FIND
+    opening_directive: ClassVar[Directive | None] = Directive.FIND
     """
     Selecting from existing data reads as *"Find …"*.
     """
@@ -156,7 +161,7 @@ class GenerativeBackend(QueryBackend, ABC):
     {py:class}`~krrood.entity_query_language.query.match.Match` is the only way to do so.
     """
 
-    opening_directive: ClassVar[Optional[Directive]] = Directive.GENERATE
+    opening_directive: ClassVar[Directive | None] = Directive.GENERATE
     """
     Generating new elements reads as *"Generate …"*.
     """
@@ -212,16 +217,18 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
         self._warn_or_raise_on_unresolved_cause_(expression)
-        variables: Dict[str, Variable] = {}
+        enumerated_variables: dict[uuid.UUID, Selectable] = {}
         for attribute_match in expression._matches_with_variables_:
             self._check_attribute_match_is_suitable_for_generation(attribute_match)
-            variables[attribute_match.name_from_variable_access_path] = (
+            enumerated_variables[attribute_match.assigned_variable._id_] = (
                 self._convert_attribute_match_to_variable(attribute_match)
             )
 
-        satisfying = expression._select_satisfying_(
-            self._generate_raw_results(expression, variables)
+        instances = (
+            expression._construct_instance_from_bindings_(bindings)
+            for bindings in self._enumerate_bindings(enumerated_variables)
         )
+        satisfying = expression._select_satisfying_(instances)
         yield from satisfying._quantify_(
             expression._quantifier_type_
         )._evaluate_natively_()
@@ -271,23 +278,21 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
             [attribute_match.assigned_value],
         )
 
-    def _generate_raw_results(
-        self, expression: Match[T], variables: Dict[str, Variable]
-    ) -> Iterable[T]:
+    @staticmethod
+    def _enumerate_bindings(
+        enumerated_variables: dict[uuid.UUID, Selectable],
+    ) -> Iterator[Bindings]:
         """
-        Construct instances from the given match and enumerable variables.
-
-        :param expression: The match expression to construct instances from.
-        :param variables: The variables to enumerate, keyed by access- path name.
-        :return: A generator yielding an instance per variable combination.
+        :param enumerated_variables: The variable whose values each pattern variable
+            takes, keyed by the identifier of that pattern variable.
+        :return: The bindings of the pattern variables, one per combination of the
+            enumerated values.
         """
-        all_combinations = set_of(*variables.values())
-        for combination in all_combinations._evaluate_natively_():
-            for variable_name, value in zip(variables, combination.values()):
-                mapped_variable = expression._get_mapped_variable_by_name(variable_name)
-                mapped_variable._value_ = value
-            expression._update_kwargs_from_literal_values()
-            yield expression.construct_instance()
+        for combination in set_of(*enumerated_variables.values())._evaluate_natively_():
+            yield {
+                pattern_variable_id: combination[enumerated_variable]
+                for pattern_variable_id, enumerated_variable in enumerated_variables.items()
+            }
 
 
 @dataclass
@@ -325,7 +330,7 @@ class ProbabilisticBackend(GenerativeBackend):
         yield from super().evaluate(expression)
 
     @staticmethod
-    def _bare_average_selection(expression: Evaluable) -> Optional[Average]:
+    def _bare_average_selection(expression: Evaluable) -> Average | None:
         """
         :param expression: The expression being evaluated.
         :return: The :class:`~krrood.entity_query_language.operators.aggregators.Average`
@@ -376,10 +381,81 @@ class ProbabilisticBackend(GenerativeBackend):
         return model.expectation((random_event_variable,))[random_event_variable]
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
+        # create new objects with the values from the samples, and reject those
+        # contradicting a value the model does not cover, such as a property's
+        instances = (
+            expression._construct_instance_from_bindings_(row.bindings)
+            for row in self.sample_bindings(expression)
+        )
+        yield from expression._select_satisfying_(instances)._evaluate_natively_()
 
-        # generate parameters from example instance values
+    def sample_bindings(
+        self, expression: Match[T]
+    ) -> Iterator[ProbabilisticOperationResult]:
+        """
+        Sample values for the variables of a match's pattern from the model the match
+        resolves to.
+
+        :param expression: The match whose pattern variables to sample.
+        :return: The bindings of the pattern variables, one row per sample, each with
+            its log-likelihood under the model, most likely first.
+        :raises NoSolutionFound: If the match's conditions leave the model no solution.
+        """
         parameters = UnderspecifiedParameters(expression)
+        model = self._resolve_model_to_sample(parameters, expression)
+        number_of_samples = (
+            expression._get_expression_()._limit_ or self.number_of_samples
+        )
 
+        samples = model.sample(number_of_samples)
+        log_likelihoods = model.log_likelihood(samples)
+        most_likely_first = log_likelihoods.argsort()[::-1]
+        for bindings, log_likelihood in zip(
+            parameters.bindings_from_model_samples(
+                model.variables, samples[most_likely_first]
+            ),
+            log_likelihoods[most_likely_first],
+        ):
+            yield ProbabilisticOperationResult(
+                role_taker=OperationResult(bindings),
+                log_likelihood=float(log_likelihood),
+            )
+
+    def compute_log_likelihood(
+        self, expression: Match[T], bindings: Bindings
+    ) -> ProbabilisticOperationResult:
+        """
+        Compute the log-likelihood of values for the variables of a match's pattern
+        under the model :meth:`sample_bindings` samples them from.
+
+        :param expression: The match whose pattern variables the bindings bind.
+        :param bindings: The values of the pattern's variables, keyed by the identifier
+            of the variable assigned to each attribute.
+        :return: The bindings with their log-likelihood.
+        :raises NoSolutionFound: If the match's conditions leave the model no solution.
+        :raises ValueOutsideVariableDomain: If a value the bindings give is outside the
+            domain of a variable of the model.
+        """
+        parameters = UnderspecifiedParameters(expression)
+        model = self._resolve_model_to_sample(parameters, expression)
+        [log_likelihood] = model.log_likelihood(
+            parameters.model_sample_from_bindings(model.variables, bindings)
+        )
+        return ProbabilisticOperationResult(
+            role_taker=OperationResult(bindings),
+            log_likelihood=float(log_likelihood),
+        )
+
+    def _resolve_model_to_sample(
+        self, parameters: UnderspecifiedParameters, expression: Match[T]
+    ) -> ProbabilisticModel:
+        """
+        :param parameters: The parameters extracted from *expression*.
+        :param expression: The match being evaluated.
+        :return: The model of the match's class, conditioned and truncated on the
+            match, and narrowed to the region of its primary cause if it searches one.
+        :raises NoSolutionFound: If the match's conditions leave the model no solution.
+        """
         model = self.model_registry.get_model(parameters)
 
         if parameters.search_cause_variables:
@@ -407,28 +483,12 @@ class ProbabilisticBackend(GenerativeBackend):
             # krrood-variable-assignment truncations -- see
             # UnderspecifiedParameters.resolve_conditioned_and_truncated_model, which
             # Distribution._resolve_ also reuses to answer a distribution(...) query
-            # with exactly this same sequence, without the sampling step below.
+            # with exactly this same sequence, without the sampling step.
             truncated = parameters.resolve_conditioned_and_truncated_model(model)
 
         if truncated is None:
             raise NoSolutionFound(expression._get_expression_())
-
-        number_of_samples = (
-            expression._get_expression_()._limit_ or self.number_of_samples
-        )
-
-        # sample and sort by log likelihood
-        samples = truncated.sample(number_of_samples)
-        log_likelihoods = truncated.log_likelihood(samples)
-        samples = samples[log_likelihoods.argsort()[::-1]]
-
-        # create new objects with the values from the samples, and reject those
-        # contradicting a value the model does not cover, such as a property's
-        instances = (
-            parameters.construct_instance_from_model_sample(truncated.variables, sample)
-            for sample in samples
-        )
-        yield from expression._select_satisfying_(instances)._evaluate_natively_()
+        return truncated
 
     @staticmethod
     def _resolve_cause_and_effect_variables(
@@ -468,9 +528,9 @@ class ProbabilisticBackend(GenerativeBackend):
     def _resolve_primary_intervention(
         cls,
         model: CausalCircuit,
-        cause_variables: List[random_events.variable.Variable],
+        cause_variables: list[random_events.variable.Variable],
         effect_variable: random_events.variable.Variable,
-        effect_truncation_event: Optional[Event],
+        effect_truncation_event: Event | None,
         expression: Match[T],
         confounder_variables: Iterable[random_events.variable.Variable] = (),
     ) -> ScoredIntervention:
@@ -513,11 +573,11 @@ class ProbabilisticBackend(GenerativeBackend):
     def _score_all_interventions(
         cls,
         model: CausalCircuit,
-        cause_variables: List[random_events.variable.Variable],
+        cause_variables: list[random_events.variable.Variable],
         effect_variable: random_events.variable.Variable,
-        effect_truncation_event: Optional[Event],
+        effect_truncation_event: Event | None,
         confounder_variables: Iterable[random_events.variable.Variable] = (),
-    ) -> List[ScoredIntervention]:
+    ) -> list[ScoredIntervention]:
         """
         Score every candidate cause variable independently for the region whose
         intervention best explains the effect.
@@ -559,7 +619,7 @@ class ProbabilisticBackend(GenerativeBackend):
         )
         return scored_interventions
 
-    def rank_causes(self, expression: Match[T]) -> List[ScoredIntervention]:
+    def rank_causes(self, expression: Match[T]) -> list[ScoredIntervention]:
         """
         Rank every ``cause`` candidate in *expression* by how well its intervention
         explains the declared effect.
@@ -608,9 +668,9 @@ class ProbabilisticBackend(GenerativeBackend):
         model: CausalCircuit,
         cause_variable: random_events.variable.Variable,
         effect_variable: random_events.variable.Variable,
-        effect_truncation_event: Optional[Event],
+        effect_truncation_event: Event | None,
         confounder_variables: Iterable[random_events.variable.Variable] = (),
-    ) -> Optional[ScoredIntervention]:
+    ) -> ScoredIntervention | None:
         """
         Compute ``cause_variable``'s best-region search result and score it by how
         *reliably* that region produces the effect: ``P(effect | do(cause_variable in
@@ -653,14 +713,11 @@ class ProbabilisticBackend(GenerativeBackend):
         # `.truncated()` fills in missing variables *in place* on the event it is
         # given, so reusing the same event object across several `.truncated()` calls
         # (each on a differently-shaped circuit) would leak one call's variables into
-        # the next -- pass a fresh copy each time. `Event` defines its own
-        # no-argument `__deepcopy__`, incompatible with the `copy` module's
-        # memo-passing convention, so it is called directly rather than through
-        # `copy.deepcopy`.
+        # the next -- pass a fresh copy each time.
         if effect_truncation_event:
-            effect_truncated, _ = interventional.truncated(
-                effect_truncation_event.__deepcopy__()
-            )
+            effect_truncated = interventional.truncated(
+                copy.deepcopy(effect_truncation_event)
+            ).distribution
         else:
             effect_truncated = interventional
         if effect_truncated is None:
@@ -670,20 +727,19 @@ class ProbabilisticBackend(GenerativeBackend):
         if best_region is None:
             return None
 
-        region_only, region_prior_probability = interventional.truncated(
+        region = interventional.truncated(
             best_region.fill_missing_variables_pure(interventional.variables)
         )
-        if region_only is None or region_prior_probability <= 0.0:
+        if region.distribution is None or region.probability <= 0.0:
             return None
 
-        if effect_truncation_event:
-            narrowed, effect_given_region_probability = region_only.truncated(
-                effect_truncation_event.__deepcopy__()
-            )
-        else:
-            narrowed, effect_given_region_probability = region_only, 1.0
-        if narrowed is None or effect_given_region_probability <= 0.0:
+        if not effect_truncation_event:
+            return ScoredIntervention(cause_variable, 1.0, region.distribution)
+
+        narrowed = region.distribution.truncated(copy.deepcopy(effect_truncation_event))
+        if narrowed.distribution is None or narrowed.probability <= 0.0:
+
             return None
         return ScoredIntervention(
-            cause_variable, float(effect_given_region_probability), narrowed
+            cause_variable, float(narrowed.probability), narrowed.distribution
         )

@@ -13,14 +13,12 @@ from ...pytest_environment import runs_in_continuous_integration
 
 from semantic_digital_twin.adapters.multi_sim import MujocoBuilder, MujocoSim
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.api import RobotSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.utils import tracy_installed
 from semantic_digital_twin.world import World
@@ -93,17 +91,20 @@ def test_every_arm_and_gripper_degree_of_freedom_is_driven_by_one_servo(
     """
     world = mounted_tracy._world
     shoulder = world.get_connection_by_name(TracyJoint.LEFT_SHOULDER_PAN)
-    expected_shoulder = mounted_tracy.left_arm.servos_by_joint["shoulder_pan_joint"]
+    shoulder_drive = mounted_tracy.left_arm.drive_of_each_joint[
+        TracyJoint.LEFT_SHOULDER_PAN
+    ]
     [shoulder_servo] = [
         actuator for actuator in world.actuators if shoulder.raw_dof in actuator.dofs
     ]
     assert isinstance(shoulder_servo, PositionServo)
-    assert shoulder_servo.gains == expected_shoulder.gains
-    assert shoulder.dynamics == expected_shoulder.dynamics
+    assert shoulder_servo.gains == shoulder_drive.gains
+    assert shoulder.dynamics.armature == shoulder_drive.armature
+    assert shoulder.dynamics.damping == shoulder_drive.joint_damping
 
     servoed_degrees_of_freedom = {
         connection.raw_dof
-        for arm in mounted_tracy.get_arms()
+        for arm in mounted_tracy.all_arms
         for connection in arm.active_connections + arm.end_effector.active_connections
     }
     driven_degrees_of_freedom = [
@@ -128,7 +129,7 @@ def test_the_grippers_keep_the_descriptions_own_velocity_limit(mounted_tracy):
     world = mounted_tracy._world
     knuckle = world.get_connection_by_name(TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE)
     wrist = world.get_connection_by_name(TracyJoint.LEFT_WRIST_3)
-    description = URDFParser.from_file(Tracy.get_ros_file_path()).parse()
+    description = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
     described_knuckle_velocity = description.get_connection_by_name(
         TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE
     ).raw_dof.limits.upper.velocity
@@ -148,7 +149,7 @@ def test_the_servoed_parts_carry_their_weight_and_the_links_pass_through_each_ot
     Pairs the description itself lists as adjacent, such as the table and the arm bases
     mounted on it, stay excluded.
     """
-    for arm in mounted_tracy.get_arms():
+    for arm in mounted_tracy.all_arms:
         for body in arm.bodies + arm.end_effector.bodies:
             assert body.get_simulator_property_of_type(GravityCompensation) == (
                 GravityCompensation(fraction=1.0)
@@ -179,7 +180,7 @@ def test_the_servos_hold_the_parked_arms_up(mounted_tracy):
     weight between one control cycle and the next.
     """
     world = mounted_tracy._world
-    for arm in mounted_tracy.get_arms():
+    for arm in mounted_tracy.all_arms:
         arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
     world.notify_state_change()
     tool_frame = mounted_tracy.left_arm.end_effector.tool_frame

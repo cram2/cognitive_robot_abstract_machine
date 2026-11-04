@@ -24,7 +24,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Shelf,
     ShelfLayer,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Scale
@@ -148,10 +148,10 @@ def test_service_callback_with_multiple_modifications(rclpy_node):
 
 def test_world_fetching(rclpy_node):
     world = create_dummy_world()
-    world.get_body_by_name("body_2").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            1, 1, 1, reference_frame=world.get_body_by_name("body_1")
-        )
+    world.get_body_by_name(
+        "body_2"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        1, 1, 1, reference_frame=world.get_body_by_name("body_1")
     )
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
 
@@ -264,9 +264,9 @@ def test_pr2_semantic_annotation(rclpy_node, pr2_world_state_reset):
 
     fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
 
-    assert set(map(lambda x: x.id, fetched_pr2.get_end_effectors())) == set(
-        map(lambda x: x.id, pr2.get_end_effectors())
-    )
+    assert set(
+        map(lambda end_effector: end_effector.id, fetched_pr2.all_end_effectors)
+    ) == set(map(lambda end_effector: end_effector.id, pr2.all_end_effectors))
 
     assert [sa.name for sa in pr2_world_state_reset.semantic_annotations] == [
         sa.name for sa in pr2_world_copy.semantic_annotations

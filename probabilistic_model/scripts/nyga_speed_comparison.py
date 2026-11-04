@@ -6,8 +6,9 @@ from random_events.variable import Continuous
 
 from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.nyga_induction import NygaInduction
+from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    ProbabilisticCircuit,
+    DifferentiableLayeredCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as NXProbabilisticCircuit,
@@ -27,7 +28,7 @@ np.random.seed(69)
 number_of_samples_per_component = 10000
 number_of_samples_for_evaluation = 5000
 number_of_components = 5
-min_samples_per_quantile = 10
+minimum_samples_per_quantile = 10
 
 # performance evaluation
 number_of_iterations = 100
@@ -52,10 +53,12 @@ variable = Continuous("x")
 # create models
 if not load_from_disc:
     rustworkx_model = NygaInduction(
-        variable, min_samples_per_quantile=min_samples_per_quantile
+        variable, minimum_samples_per_quantile=minimum_samples_per_quantile
     )
     rustworkx_model.fit(data)
-    jax_model = ProbabilisticCircuit.from_rustworkx(rustworkx_model, True)
+    jax_model = CircuitRepresentations().convert(
+        rustworkx_model, DifferentiableLayeredCircuit
+    )
     if save_to_disc:
         with open(rustworkx_path, "w") as f:
             f.write(json.dumps(rustworkx_model.to_json()))
@@ -65,7 +68,7 @@ else:
     with open(rustworkx_path, "r") as f:
         rustworkx_model = NXProbabilisticCircuit.from_json(json.loads(f.read()))
     with open(jax_model_path, "r") as f:
-        jax_model = ProbabilisticCircuit.from_json(json.loads(f.read()))
+        jax_model = DifferentiableLayeredCircuit.from_json(json.loads(f.read()))
 
 
 print("Number of edges:", len(list(rustworkx_model.edges)))
@@ -109,7 +112,6 @@ def eval_performance(
     times_rustworkx = []
 
     for index in tqdm.trange(number_of_iterations, desc="Evaluating performance"):
-
         current_log_likelihood_jax, time_jax = timed_jax_method()
         current_log_likelihood_rustworkx, time_rustworkx = timed_rustworkx_method()
         if index >= warmup_iterations:

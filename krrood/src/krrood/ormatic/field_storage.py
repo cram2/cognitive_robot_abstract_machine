@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from inspect import isclass
 from types import NoneType
 
-from typing_extensions import TYPE_CHECKING, ClassVar, Type
+from typing_extensions import TYPE_CHECKING, ClassVar
 
 from krrood.adapters.json_serializer import JSONSerializableTypeRegistry
 from krrood.class_diagrams.wrapped_field import WrappedField
@@ -91,7 +91,7 @@ class FieldToStore:
     The ORMatic instance that stores the field.
     """
 
-    sqlalchemy_builtins: ClassVar[tuple[Type, ...]] = (
+    sqlalchemy_builtins: ClassVar[tuple[type, ...]] = (
         int,
         float,
         str,
@@ -109,7 +109,7 @@ class FieldToStore:
         )
 
     @property
-    def type_endpoint(self) -> Type:
+    def type_endpoint(self) -> type:
         """
         :return: The type the field ultimately points to.
         """
@@ -122,25 +122,25 @@ class FieldToStore:
         """
         return self.type_endpoint in self.sqlalchemy_builtins
 
-    def is_mapped(self, clazz: Type) -> bool:
+    def is_mapped(self, clazz: type) -> bool:
         """
         :return: True if a table maps the class.
         """
         return clazz in self.ormatic.mapped_classes
 
-    def has_type_mapping(self, clazz: Type) -> bool:
+    def has_type_mapping(self, clazz: type) -> bool:
         """
         :return: True if the type mappings give a column type for the class.
         """
         return clazz in self.ormatic.type_mappings
 
-    def has_json_serializer(self, clazz: Type) -> bool:
+    def has_json_serializer(self, clazz: type) -> bool:
         """
         :return: True if a JSON serializer is registered for the class hierarchy.
         """
         return JSONSerializableTypeRegistry().has_type_specific_serializer(clazz)
 
-    def is_stored_as_a_value(self, clazz: Type) -> bool:
+    def is_stored_as_a_value(self, clazz: type) -> bool:
         """
         Whether values of the class are stored whole in their owner's row, so a free type
         parameter of the class leaves nothing undecided about how to store them.
@@ -336,8 +336,9 @@ class CustomTypeRule(FieldStorageRule):
 
 class JSONRule(FieldStorageRule):
     """
-    Values that krrood's JSON serializer writes: collections of builtins or of mapped
-    types, and values or collections of a type with a JSON serializer of its own.
+    Values that krrood's JSON serializer writes: collections of builtins, of classes or
+    of mapped types, and values or collections of a type with a JSON serializer of its
+    own.
     """
 
     storage = FieldStorage.JSON
@@ -352,6 +353,7 @@ class JSONRule(FieldStorageRule):
         if field_to_store.wrapped_field.is_container:
             return (
                 field_to_store.wrapped_field.is_collection_of_builtins
+                or field_to_store.wrapped_field.is_collection_of_types
                 or field_to_store.has_type_mapping(type_endpoint)
                 or field_to_store.has_json_serializer(type_endpoint)
             )

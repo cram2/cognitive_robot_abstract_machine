@@ -33,16 +33,20 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.api import (
-    BodySpecification,
+from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
-    RobotSpecification,
-    SemanticAnnotationWithRootSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Milk
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import PrismaticConnection
 from semantic_digital_twin.world_description.geometry import Scale
@@ -168,7 +172,7 @@ Your goal:
   specification (root `BodySpecification.box("milk", Scale(0.1, 0.1, 0.2))`) and a plain
   `BodySpecification.box("cup", Scale(0.07, 0.07, 0.1))`
 - Store it in a variable named `scene_specification`
-- Materialize it twice with `to_domain_object` into variables named `first_world` and `second_world`
+- Materialize it twice with `create_world` into variables named `first_world` and `second_world`
 
 ```{code-cell} ipython3
 :tags: [exercise]
@@ -177,8 +181,8 @@ Your goal:
 #     table_urdf,
 #     objects=[...],
 # )
-# first_world = scene_specification.to_domain_object()
-# second_world = scene_specification.to_domain_object()
+# first_world = scene_specification.create_world()
+# second_world = scene_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -194,8 +198,8 @@ scene_specification = WorldSpecification.from_urdf(
         BodySpecification.box("cup", Scale(0.07, 0.07, 0.1)),
     ],
 )
-first_world = scene_specification.to_domain_object()
-second_world = scene_specification.to_domain_object()
+first_world = scene_specification.create_world()
+second_world = scene_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -222,7 +226,7 @@ Your goal:
 #     table_urdf,
 #     robots=[RobotSpecification(semantic_annotation_type=..., world_T_odom=...)],
 # )
-# robot_world = robot_specification.to_domain_object()
+# robot_world = robot_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -236,7 +240,7 @@ robot_specification = WorldSpecification.from_urdf(
         )
     ],
 )
-robot_world = robot_specification.to_domain_object()
+robot_world = robot_specification.create_world()
 ```
 
 ```{code-cell} ipython3
@@ -245,5 +249,5 @@ if len(robot_world.get_semantic_annotations_by_type(PR2)) != 1: raise ExerciseVe
 odom_body = robot_world.get_body_by_name("odom")
 if odom_body.parent_connection.parent is not robot_world.root: raise ExerciseVerificationFailed("odom hangs off the world root.")
 root_T_odom = robot_world.compute_forward_kinematics(robot_world.root, odom_body)
-if not abs(root_T_odom.to_position().to_np()[0] - 1.0) < 1e-6: raise ExerciseVerificationFailed("The localization pose should apply.")
+if not abs(root_T_odom.position.to_np()[0] - 1.0) < 1e-6: raise ExerciseVerificationFailed("The localization pose should apply.")
 ```

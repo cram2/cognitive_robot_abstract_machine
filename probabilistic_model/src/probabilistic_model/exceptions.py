@@ -1,18 +1,48 @@
 from __future__ import annotations
+from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Callable, List, Type, TYPE_CHECKING
+from typing_extensions import Any, Callable, TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 from random_events.variable import Variable
 
 if TYPE_CHECKING:
-    from random_events.product_algebra import Event
+    from random_events.product_algebra import Event, SimpleEvent
 
     from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 @dataclass
-class IntractableError(DataclassException):
+class ProbabilisticModelException(DataclassException, ABC):
+    """
+    Raised when a probabilistic model, or a query of one, is in an illegal state.
+    """
+
+
+@dataclass
+class UnboundedEventError(ProbabilisticModelException):
+    """
+    Raised when a uniform measure is asked for over an event that does not bound one of
+    its continuous variables from below and above.
+    """
+
+    variable: Variable
+    """
+    The variable without bounds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The event does not bound '{self.variable.name}' from below and above, so "
+            f"no uniform measure over it exists."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Bound '{self.variable.name}' from below and above in the event."
+
+
+@dataclass
+class IntractableError(ProbabilisticModelException):
     """
     Exception raised when an inference is intractable for a model.
 
@@ -29,7 +59,7 @@ class IntractableError(DataclassException):
 
 
 @dataclass
-class UndefinedOperationError(DataclassException):
+class UndefinedOperationError(ProbabilisticModelException):
     """
     Exception raised when an operation is not defined for a model.
 
@@ -46,7 +76,7 @@ class UndefinedOperationError(DataclassException):
 
 
 @dataclass
-class ProbabilisticCircuitRequiredError(DataclassException):
+class ProbabilisticCircuitRequiredError(ProbabilisticModelException):
     """
     Exception raised when a distribution is asked for something whose answer only a
     probabilistic circuit can represent.
@@ -93,7 +123,7 @@ class EventIsNotABoxError(ProbabilisticCircuitRequiredError):
 
 
 @dataclass
-class ShapeMismatchError(DataclassException, ValueError):
+class ShapeMismatchError(ProbabilisticModelException, ValueError):
     """
     Exception raised when the shape of two objects does not match.
     """
@@ -116,7 +146,7 @@ class ShapeMismatchError(DataclassException, ValueError):
 
 
 @dataclass
-class VariableNotInDistributionError(DataclassException):
+class VariableNotInDistributionError(ProbabilisticModelException):
     """
     Exception raised when a variable is named that a distribution is not over.
 
@@ -129,7 +159,7 @@ class VariableNotInDistributionError(DataclassException):
     The variable that was named.
     """
 
-    variables: List[Variable]
+    variables: list[Variable]
     """
     The variables the distribution is over.
     """
@@ -145,12 +175,12 @@ class VariableNotInDistributionError(DataclassException):
 
 
 @dataclass
-class NonContinuousVariableError(DataclassException, ValueError):
+class NonContinuousVariableError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a model that only fits continuous variables is given others.
     """
 
-    variables: List[Variable]
+    variables: list[Variable]
     """
     The variables that are not continuous.
     """
@@ -166,13 +196,13 @@ class NonContinuousVariableError(DataclassException, ValueError):
 
 
 @dataclass
-class NoClosedFormError(DataclassException, NotImplementedError):
+class NoClosedFormError(ProbabilisticModelException, NotImplementedError):
     """
     Exception raised when a query has no answer that the model or layer that was asked
     can represent in closed form.
     """
 
-    asked_type: Type
+    asked_type: type
     """
     The type of the model or layer that was asked.
     """
@@ -190,7 +220,7 @@ class NoClosedFormError(DataclassException, NotImplementedError):
 
 
 @dataclass
-class InvalidMomentOrderError(DataclassException, ValueError):
+class InvalidMomentOrderError(ProbabilisticModelException, ValueError):
     """
     Exception raised when a moment is asked for an order that is not a whole number or
     is negative.
@@ -206,3 +236,122 @@ class InvalidMomentOrderError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Ask for an order that is a whole number and not negative."
+
+
+@dataclass
+class EventMixesPointsAndIntervalsError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when an event is to be measured uniformly while one of its
+    continuous variables takes points and intervals at once.
+
+    A point has no width, so there is no weight that puts it in proportion to an
+    interval.
+    """
+
+    event: SimpleEvent
+    """
+    The event whose variable mixes them.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A continuous variable of {self.event} takes points and intervals at "
+            f"once."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Make every continuous variable either points only or intervals only."
+
+
+@dataclass
+class MixtureOverDifferentVariablesError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when a mixture is built of components that are not over the same
+    variables.
+
+    A mixture is only smooth if every component models the same variables, so a query
+    over a mixture of differing components has no well-defined answer.
+    """
+
+    variables_per_component: list[list[Variable]]
+    """
+    The variables of every component, in the order the components were given.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A mixture needs components over the same variables, received "
+            f"{[[str(variable) for variable in variables] for variables in self.variables_per_component]}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Marginalize every component to the variables the mixture is over."
+
+
+@dataclass
+class ProductOverSharedVariablesError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when a product is built of factors that share a variable.
+
+    A product is only decomposable if its factors are over disjoint variables, so a
+    shared variable would be counted twice.
+    """
+
+    shared_variables: list[Variable]
+    """
+    The variables that more than one factor is over.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A product needs factors over disjoint variables, but "
+            f"{[str(variable) for variable in self.shared_variables]} "
+            "appear in more than one factor."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Marginalize the factors to disjoint sets of variables."
+
+
+@dataclass
+class EmptyCompositionError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when a mixture or a product is built of no components at all.
+    """
+
+    composition: Callable
+    """
+    The method that was called.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.composition.__name__} needs at least one component."
+
+    def suggest_correction(self) -> str:
+        return "Leave the composition out instead of building it of nothing."
+
+
+@dataclass
+class NumberOfWeightsMismatchError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when a mixture does not get exactly one weight per component.
+    """
+
+    number_of_weights: int
+    """
+    The number of weights given.
+    """
+
+    number_of_components: int
+    """
+    The number of components to mix.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Got {self.number_of_weights} weights for "
+            f"{self.number_of_components} components."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Pass exactly one weight per component."

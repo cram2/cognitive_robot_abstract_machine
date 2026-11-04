@@ -4,12 +4,16 @@ This is the camera config for a openCV camera without depth information.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+# %% Imports
+from krrood.ormatic.utils import classproperty
+from dataclasses import dataclass, field
 
 import cv2
-from typing_extensions import TYPE_CHECKING, Optional, Dict, Any, Tuple, Union, ClassVar
+from sensor_msgs.msg import CameraInfo
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.types.cv import ColorToDepthRatio
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -29,11 +33,16 @@ class OpenCVCameraConfig(BaseCameraConfig):
         between 0 and 4, and there cannot be any gaps in the sequence numbering.
     """
 
-    registry_name: ClassVar[str] = "opencv"
+    @classproperty
+    def registry_name(cls) -> str:
+        """
+        Identifier selecting this camera configuration.
+        """
+        return "opencv"
 
     interface_type: str = "OpenCV"
 
-    device: Union[int, str] = 0
+    device: int | str = 0
     """
     Input source identifier (camera index, file path, or URL).
 
@@ -45,58 +54,53 @@ class OpenCVCameraConfig(BaseCameraConfig):
                   Note: First image needs number between 0 and 4 and the following numbers cannot contain any gaps.
               URL of video/camera stream or image
     """
-
     api_preference: int = cv2.CAP_ANY
     """
     Preferred OpenCV capture API backend.
     """
-
     device_driver_flag: int = 0
     """
     Flag argument to use when retrieving/reading the frames.
     """
-
     normalize_rgb: bool = True
     """
     Normalize/stabilise rgb image contrast/brightness.
     """
-
     loop_mode: int = -1
-    """Loop after iterating over all frames of the video file
+    """
+    Loop after iterating over all frames of the video file
     > 0: number of repetitions before to stop
     = 0: never loop
     < 0: infinite loop
-    
+
     ... note::
         Only works with a file as source
     """
 
-    depth: Optional[npt.NDArray] = None
+    depth: npt.NDArray | None = None
     """
     Static depth image, which is used as depth image for all rgb images.
     """
-
     update_global_with_depth_parameter: bool = True
     """
     Flag to update global depth parameters.
     """
-
-    camera_info: Dict[str, Any] = None
+    camera_info: CameraInfo | None = None
     """
-    Camera config as dict.
+    Calibration matching the configured capture resolution.
     """
-
+    camera_frame: str = "opencv_optical_frame"
+    """
+    Optical frame used when :attr:`camera_info` declares no frame.
+    """
     camera_intrinsic = None
     """
     Camera intrinsic parameters.
     """
-
-    color2depth_ratio: Tuple[float, float] = (1.0, 1.0)
+    color_to_depth_ratio: ColorToDepthRatio = field(default_factory=ColorToDepthRatio)
     """
-    If the resolution of the depth image differs from the color image, we need to define
-    the factor for (x, y).
+    Size of the depth image relative to the color image.
     """
-
     viewpoint_camera_to_world = None
     """
     Camera to world transformation.

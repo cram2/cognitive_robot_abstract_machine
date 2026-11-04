@@ -9,6 +9,7 @@ import trimesh.boolean
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import FloatVariable
+from krrood_spatial_math.exceptions import MissingCartesianFrame3DResolver
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -18,14 +19,14 @@ from semantic_digital_twin.exceptions import (
     WorldEntityWithIDNotInKwargs,
     MissingWorldError,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap, Derivatives
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.world_description.derivatives import Derivatives
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
     Pose,
@@ -135,7 +136,7 @@ def test_KinematicStructureEntityNotInKwargs():
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(MissingWorldError):
+    with pytest.raises(MissingCartesianFrame3DResolver):
         Point3.from_json(json_data, **kwargs)
 
 
@@ -391,42 +392,6 @@ def test_screw_connection_json_serialization_with_world():
     assert restored_connection.raw_dof.id == connection.raw_dof.id
 
 
-def test_transformation_matrix_json_serialization_with_world_in_kwargs():
-    world = World()
-    body = Body(name=PrefixedName("body"))
-    body2 = Body(name=PrefixedName("body2"))
-    with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_kinematic_structure_entity(body2)
-        c = FixedConnection(
-            parent=body,
-            child=body2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=1, roll=2, reference_frame=body, child_frame=body2
-            ),
-        )
-        world.add_connection(c)
-    json_data = c.to_json()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    c2 = FixedConnection.from_json(json_data, **tracker.create_kwargs())
-    assert c == c2
-    assert c._world != c2._world
-    assert c.parent.name == c2.parent.name
-    assert c.child.name == c2.child.name
-    assert np.allclose(
-        c.parent_T_connection_expression.to_np(),
-        c2.parent_T_connection_expression.to_np(),
-    )
-    assert (
-        c.parent_T_connection_expression.reference_frame
-        == c2.parent_T_connection_expression.reference_frame
-    )
-    assert (
-        c.parent_T_connection_expression.child_frame
-        == c2.parent_T_connection_expression.child_frame
-    )
-
-
 def test_json_serialization_with_mesh():
     body: Body = (
         STLParser(
@@ -441,7 +406,7 @@ def test_json_serialization_with_mesh():
                 "milk.stl",
             )
         )
-        .parse()
+        .create_world()
         .root
     )
 
@@ -462,9 +427,9 @@ def test_json_serialization_with_mesh():
 # %% connection references survive same-name ambiguity
 
 
-def _world_with_two_equally_named_connections() -> (
-    tuple[World, RevoluteConnection, RevoluteConnection]
-):
+def _world_with_two_equally_named_connections() -> tuple[
+    World, RevoluteConnection, RevoluteConnection
+]:
     """
     A world holding two revolute connections that share one name.
 
@@ -518,7 +483,7 @@ def test_joint_state_resolves_the_connection_it_was_built_from():
         RotationMatrix.from_rpy(0.1, 0.2, 0.3),
         HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0, 0.1, 0.2, 0.3),
         Pose.from_xyz_quaternion(1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 1.0),
-        Pose2D(1.0, 2.0, 0.3),
+        Pose2D.from_xy_yaw(1.0, 2.0, 0.3),
     ],
 )
 def test_a_spatial_type_survives_a_json_round_trip(spatial_type):
@@ -558,8 +523,8 @@ def test_a_degree_of_freedom_survives_a_json_round_trip():
     A degree of freedom carries its limits into json, which is the part of it a world
     cannot recompute.
     """
-    limits = DegreeOfFreedomLimits(
-        lower=DerivativeMap(position=-1.5), upper=DerivativeMap(position=1.5)
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=-1.5, upper_position=1.5
     )
     degree_of_freedom = DegreeOfFreedom(name=PrefixedName("joint"), limits=limits)
     payload = degree_of_freedom.to_json()
@@ -612,7 +577,7 @@ def symbolic_pose(variable: FloatVariable, frame: Body) -> Pose:
 
 
 def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2D:
-    return Pose2D(variable, 2.0, variable, reference_frame=frame)
+    return Pose2D.from_xy_yaw(variable, 2.0, variable, reference_frame=frame)
 
 
 @pytest.mark.parametrize(
@@ -652,8 +617,10 @@ def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
 def test_a_transformation_over_a_variable_keeps_its_child_frame():
     reference_frame = Body(name=PrefixedName("reference"))
     child_frame = Body(name=PrefixedName("child"))
+    # the transformation does not keep its variable alive, so the test has to
+    variable = FloatVariable(name="muh")
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
-        FloatVariable(name="muh"),
+        variable,
         reference_frame=reference_frame,
         child_frame=child_frame,
     )

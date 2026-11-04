@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing_extensions import Callable, List, Any, Optional, Type
+from typing_extensions import Callable, Any
 import operator
 
 import sqlalchemy.inspection
@@ -46,7 +46,7 @@ from krrood.entity_query_language.operators.aggregators import (
 
 from krrood.entity_query_language.operators.conditionals import CaseWhen
 from krrood.exceptions import DataclassException
-from krrood.ormatic.data_access_objects.helper import get_dao_class
+from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from krrood.ormatic.exceptions import (
     NoDAOFoundForTypeError,
     NoDAOFoundForSelectionError,
@@ -107,7 +107,7 @@ class UnsupportedQuantifierError(EQLTranslationError, TypeError):
     Raised when an EQL result quantifier cannot be evaluated.
     """
 
-    quantifier_type: Type[ResultQuantifier]
+    quantifier_type: type[ResultQuantifier]
     """
     The result-quantifier kind that has no evaluation strategy.
     """
@@ -160,13 +160,13 @@ class DAOAttributeResolutionError(AttributeResolutionError):
     The attribute name that could not be resolved on the DAO class.
     """
 
-    def mapped_column_names(self) -> List[str]:
+    def mapped_column_names(self) -> list[str]:
         """
         :return: The names of all columns mapped on the DAO class.
         """
         return sorted(sqlalchemy.inspection.inspect(self.dao_class).columns.keys())
 
-    def mapped_relationship_names(self) -> List[str]:
+    def mapped_relationship_names(self) -> list[str]:
         """
         :return: The names of all relationships mapped on the DAO class.
         """
@@ -241,7 +241,7 @@ class EmptyAttributeChainError(AttributeResolutionError):
     The DAO class the empty chain started from.
     """
 
-    attribute_names: List[str]
+    attribute_names: list[str]
     """
     The (empty) list of attribute names collected from the chain.
     """
@@ -259,7 +259,7 @@ class VariableTypeExtractor:
     Extracts underlying Variable and its python type from a leaf-like node.
     """
 
-    def extract(self, node: Any) -> tuple[Optional[Variable], Optional[type]]:
+    def extract(self, node: Any) -> tuple[Variable | None, type | None]:
         """
         Extract variable and type from a node.
 
@@ -298,7 +298,7 @@ class AttributeChainResolver:
         var, _ = extractor.extract(node)
         return var or node
 
-    def extract_base_dao(self, attribute: Attribute) -> Optional[type]:
+    def extract_base_dao(self, attribute: Attribute) -> type | None:
         """
         Extract the base DAO class from an attribute chain.
 
@@ -310,7 +310,9 @@ class AttributeChainResolver:
         while isinstance(node, Attribute):
             node = node._child_
         _, node_type = extractor.extract(node)
-        return get_dao_class(node_type) if node_type is not None else None
+        return (
+            get_data_access_object_class(node_type) if node_type is not None else None
+        )
 
 
 @dataclass
@@ -480,7 +482,7 @@ class DomainValueExtractor:
         if isinstance(variable, Literal):
             return sample
 
-        dao_class = get_dao_class(type(sample))
+        dao_class = get_data_access_object_class(type(sample))
         if dao_class is None:
             return sample
 
@@ -577,11 +579,11 @@ class EQLTranslator:
     eql_query: Query
     session: Session
 
-    sql_query: Optional[Select] = None
+    sql_query: Select | None = None
     join_manager: JoinManager = field(default_factory=JoinManager)
 
     @property
-    def quantifier_type(self) -> Type[ResultQuantifier]:
+    def quantifier_type(self) -> type[ResultQuantifier]:
         """
         :return: The result-quantifier kind (``An`` / ``The``) requested by the query.
         """
@@ -609,7 +611,7 @@ class EQLTranslator:
         :param domain_type: The domain type whose DAO is required.
         :raises NoDAOFoundForTypeError: When the type has no associated DAO.
         """
-        dao_class = get_dao_class(domain_type)
+        dao_class = get_data_access_object_class(domain_type)
         if dao_class is None:
             raise NoDAOFoundForTypeError(domain_type)
         return dao_class
@@ -715,7 +717,7 @@ class EQLTranslator:
 
         self._apply_clauses()
 
-    def _extract_dao_from_expression(self, expression: Any) -> Optional[type]:
+    def _extract_dao_from_expression(self, expression: Any) -> type | None:
         """
         Extract the base DAO class from an expression node.
 
@@ -731,7 +733,7 @@ class EQLTranslator:
                 return self._extract_dao_from_expression(expression._child_)
         return None
 
-    def _extract_dao_from_where_clause(self) -> Optional[type]:
+    def _extract_dao_from_where_clause(self) -> type | None:
         """
         Extract a base DAO class by scanning the WHERE clause for variable types.
 
@@ -744,7 +746,7 @@ class EQLTranslator:
             return None
         return self._find_dao_in_expression(self.eql_query._where_expression_)
 
-    def _find_dao_in_expression(self, expression: Any) -> Optional[type]:
+    def _find_dao_in_expression(self, expression: Any) -> type | None:
         """
         Recursively walk an EQL expression tree to find the first DAO-bearing variable.
 
@@ -754,7 +756,7 @@ class EQLTranslator:
         if isinstance(expression, Attribute):
             return AttributeChainResolver().extract_base_dao(expression)
         if isinstance(expression, Variable) and not isinstance(expression, Literal):
-            dao = get_dao_class(expression._type_)
+            dao = get_data_access_object_class(expression._type_)
             if dao is not None:
                 return dao
         for child_attr in (
@@ -818,7 +820,7 @@ class EQLTranslator:
         if self.eql_query._distinct_on:
             self.sql_query = self.sql_query.distinct()
 
-    def evaluate(self) -> List[Any]:
+    def evaluate(self) -> list[Any]:
         """
         Evaluate the translated SQL query.
 
@@ -841,7 +843,7 @@ class EQLTranslator:
 
         raise UnsupportedQuantifierError(self.quantifier_type)
 
-    def _evaluate_set_of(self) -> List[Any]:
+    def _evaluate_set_of(self) -> list[Any]:
         """
         Evaluate a set_of() query.
 
@@ -878,7 +880,7 @@ class EQLTranslator:
         """
         yield from self.evaluate()
 
-    def translate_query(self, query: SymbolicExpression) -> Optional[Any]:
+    def translate_query(self, query: SymbolicExpression) -> Any | None:
         """
         Translate an EQL query expression to SQL.
 
@@ -922,7 +924,7 @@ class EQLTranslator:
 
         return case((compiled_condition, compiled_then), else_=compiled_else)
 
-    def translate_and(self, query: AND) -> Optional[Any]:
+    def translate_and(self, query: AND) -> Any | None:
         """
         Translate an eql.AND query into an sql.AND.
 
@@ -932,7 +934,7 @@ class EQLTranslator:
         parts = self._collect_logical_parts(query)
         return self._combine_logical_parts(parts, and_)
 
-    def translate_or(self, query: OR) -> Optional[Any]:
+    def translate_or(self, query: OR) -> Any | None:
         """
         Translate an eql.OR query into an sql.OR.
 
@@ -942,7 +944,7 @@ class EQLTranslator:
         parts = self._collect_logical_parts(query)
         return self._combine_logical_parts(parts, or_)
 
-    def _collect_logical_parts(self, query: Any) -> List[Any]:
+    def _collect_logical_parts(self, query: Any) -> list[Any]:
         """
         Collect parts from a binary logical expression.
 
@@ -967,7 +969,7 @@ class EQLTranslator:
 
         return parts
 
-    def _combine_logical_parts(self, parts: List[Any], combiner: Any) -> Optional[Any]:
+    def _combine_logical_parts(self, parts: list[Any], combiner: Any) -> Any | None:
         """
         Combine logical parts using a combiner function.
 
@@ -981,7 +983,7 @@ class EQLTranslator:
             return parts[0]
         return combiner(*parts)
 
-    def translate_comparator(self, query: Comparator) -> Optional[Any]:
+    def translate_comparator(self, query: Comparator) -> Any | None:
         """
         Translate an eql.Comparator query into a SQLAlchemy expression.
 
@@ -1033,7 +1035,7 @@ class EQLTranslator:
 
         return is_equality and (both_attributes or variable_and_attribute)
 
-    def _handle_attribute_equality_join(self, query: Comparator) -> Optional[bool]:
+    def _handle_attribute_equality_join(self, query: Comparator) -> bool | None:
         """
         Handle an attribute equality join.
 
@@ -1056,7 +1058,7 @@ class EQLTranslator:
 
         if attribute_side is not None:
             attribute_dao = resolver.extract_base_dao(attribute_side)
-            variable_dao = get_dao_class(variable_side._type_)
+            variable_dao = get_data_access_object_class(variable_side._type_)
 
             if attribute_dao is None or variable_dao is None:
                 return None
@@ -1198,7 +1200,7 @@ class EQLTranslator:
             return extractor.extract_from_literal(operand)
 
         if isinstance(operand, Variable):
-            variable_dao = get_dao_class(operand._type_)
+            variable_dao = get_data_access_object_class(operand._type_)
             if variable_dao is not None:
                 return variable_dao.database_id
             extractor = DomainValueExtractor(self.session)
@@ -1259,7 +1261,7 @@ class EQLTranslator:
 
         return self._walk_attribute_chain(current_dao, attribute_names)
 
-    def _collect_attribute_chain(self, query: Attribute) -> List[str]:
+    def _collect_attribute_chain(self, query: Attribute) -> list[str]:
         """
         Collect attribute names from the chain.
 
@@ -1273,7 +1275,7 @@ class EQLTranslator:
             node = node._child_
         return list(reversed(names))
 
-    def _extract_base_class(self, query: Attribute) -> Optional[type]:
+    def _extract_base_class(self, query: Attribute) -> type | None:
         """
         Extract the base class from an attribute chain.
 
@@ -1293,7 +1295,7 @@ class EQLTranslator:
 
         return base_class
 
-    def _walk_attribute_chain(self, current_dao: type, names: List[str]) -> Any:
+    def _walk_attribute_chain(self, current_dao: type, names: list[str]) -> Any:
         """
         Walk the attribute chain and return the final column.
 
@@ -1390,7 +1392,7 @@ class EQLTranslator:
             sub_query = sub_query.where(sub_where)
         return sqlalchemy_exists(sub_query)
 
-    def _translate_exists_condition(self, condition: Any) -> Optional[Any]:
+    def _translate_exists_condition(self, condition: Any) -> Any | None:
         """
         Translate a condition expression for use inside an EXISTS subquery.
 
@@ -1425,7 +1427,7 @@ class EQLTranslator:
             return sa_not(inner) if inner is not None else None
         return None
 
-    def _extract_logical_children(self, node: Any) -> List[Any]:
+    def _extract_logical_children(self, node: Any) -> list[Any]:
         """
         Extract child conditions from an AND/OR node.
 
@@ -1440,7 +1442,7 @@ class EQLTranslator:
 
 
 def eql_to_sql(
-    query: Query, session: Session, as_common_table_expression: Optional[str] = None
+    query: Query, session: Session, as_common_table_expression: str | None = None
 ) -> Union[EQLTranslator, Any]:
     """
     Translate an EQL query to SQL.

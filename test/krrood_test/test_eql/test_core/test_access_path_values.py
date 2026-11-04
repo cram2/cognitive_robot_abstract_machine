@@ -2,8 +2,8 @@
 :meth:`MappedVariable.apply_mapping_on_external_root` follows a chain from a value
 outside query evaluation, which is how features are read off an instance.
 
-These tests pin what it does when a step along the way maps one value to several, and
-when a step maps it to none.
+These tests pin what it does when a step along the way maps one value to several, when a
+step maps it to none, and when it meets a pattern standing for an instance.
 """
 
 import pytest
@@ -13,9 +13,9 @@ from krrood.entity_query_language.exceptions import (
     NoValueAlongAccessPath,
     ReadOnlyMapping,
 )
-from krrood.entity_query_language.factories import flat_variable, variable
+from krrood.entity_query_language.factories import a, flat_variable, variable
 
-from ...dataset.semantic_world_like_classes import Cabinet
+from ...dataset.semantic_world_like_classes import Cabinet, Container, Drawer, Handle
 
 # %% following a chain of one-to-one mappings
 
@@ -143,6 +143,65 @@ def test_a_step_that_reaches_no_value_is_reported_the_same_from_inside_a_generat
 
     with pytest.raises(NoValueAlongAccessPath):
         list(following_it())
+
+
+# %% a pattern along the chain
+
+
+def test_chain_through_a_pattern_reaches_the_value_it_states():
+    """
+    A pattern stands for the instance it describes, so a step on it reaches the value
+    the pattern states for that attribute.
+    """
+    handle = Handle(name="Handle1")
+    cabinet = Cabinet(
+        container=Container(name="Container1"),
+        drawers=[a(Drawer)(handle=handle, container=Container(name="Container2"))],
+    )
+    chain = variable(Cabinet, domain=[cabinet]).drawers[0].handle
+
+    assert chain.apply_mapping_on_external_root(cabinet) is handle
+
+
+def test_chain_through_a_pattern_stating_a_pattern_reaches_the_inner_stated_value():
+    """
+    A pattern stated inside a pattern stands for its instance too, so the chain keeps
+    reading stated values until it reaches the end.
+    """
+    handle_name = "Handle1"
+    cabinet = Cabinet(
+        container=Container(name="Container1"),
+        drawers=[a(Drawer)(handle=a(Handle)(name=handle_name))],
+    )
+    chain = variable(Cabinet, domain=[cabinet]).drawers[0].handle.name
+
+    assert chain.apply_mapping_on_external_root(cabinet) is handle_name
+
+
+def test_chain_written_on_a_pattern_reaches_the_value_it_states():
+    """
+    A pattern reads like the instance it describes, so a chain written on the pattern
+    itself, applied back to it, reaches the values it states.
+    """
+    handle_name = "Handle1"
+    drawer = a(Drawer)(handle=a(Handle)(name=handle_name))
+
+    assert drawer.handle.name.apply_mapping_on_external_root(drawer) is handle_name
+
+
+def test_chain_through_a_pattern_that_does_not_state_the_attribute_reaches_no_value():
+    """
+    A pattern that leaves an attribute unstated gives the chain no value to follow,
+    which is reported like any other step that reaches nothing.
+    """
+    cabinet = Cabinet(
+        container=Container(name="Container1"),
+        drawers=[a(Drawer)(container=Container(name="Container2"))],
+    )
+    chain = variable(Cabinet, domain=[cabinet]).drawers[0].handle
+
+    with pytest.raises(NoValueAlongAccessPath):
+        chain.apply_mapping_on_external_root(cabinet)
 
 
 # %% writing through a chain

@@ -87,16 +87,20 @@ def test_from_directory_parses_frames_and_poses(tmp_path):
     assert len(frame_one.object_poses) == 2
     assert frame_one.object_poses[0].object_id == 1
     # cam_t_m2c is in millimeters; camera_T_object's translation is already in meters.
-    translation = frame_one.object_poses[0].camera_T_object.to_position()
+    translation = frame_one.object_poses[0].camera_T_object.position
     np.testing.assert_allclose(
         [float(translation.x), float(translation.y), float(translation.z)],
         [1.0, 2.0, 3.0],
     )
     frame_two = scene.frame("2")
     assert frame_two.camera.camera_T_world is not None
-    world_translation = frame_two.camera.camera_T_world.to_position()
+    world_translation = frame_two.camera.camera_T_world.position
     np.testing.assert_allclose(
-        [float(world_translation.x), float(world_translation.y), float(world_translation.z)],
+        [
+            float(world_translation.x),
+            float(world_translation.y),
+            float(world_translation.z),
+        ],
         [0.5, 0.0, 0.0],
     )
     # frame "1" has no world-to-camera transform in the fixture.
@@ -137,7 +141,7 @@ def test_create_world_places_objects_relative_to_camera(tmp_path):
     assert len({b.name.name for b in object_bodies}) == 2
 
     def position_of(body):
-        p = body.global_pose.to_position()
+        p = body.global_pose.position
         return round(float(p.x), 3), round(float(p.y), 3), round(float(p.z), 3)
 
     positions = {position_of(b) for b in object_bodies}
@@ -167,7 +171,7 @@ def test_create_world_with_world_frame_positions_camera(tmp_path):
 
     # cam_R_w2c is identity and cam_t_w2c is [0.5, 0, 0] m, i.e. camera_T_map has that
     # translation; the camera's pose in the map frame is therefore its inverse: [-0.5,0,0].
-    p = camera_body.global_pose.to_position()
+    p = camera_body.global_pose.position
     np.testing.assert_allclose(
         [float(p.x), float(p.y), float(p.z)], [-0.5, 0.0, 0.0], atol=1e-9
     )

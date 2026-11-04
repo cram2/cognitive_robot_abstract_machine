@@ -38,11 +38,12 @@ dependencies = [
     "sqlalchemy",
     "embreex",  # Hardware acceleration for trimesh raycasting
     "rtree",  # For spatial indexing in trimesh
-    "random_events",
+    "xxhash",  # Fast hashing for trimesh, which hashes meshes to check its caches
+    "random_events>=26.10.0",
     "plotly",
     "daqp",
     "pathlib",
-    "probabilistic_model",
+    "probabilistic_model>=26.10.0",
     "python-fcl",
     "manifold3d",
     "polytope",
@@ -60,19 +61,27 @@ dependencies = [
     "imageio",
     "imageio-ffmpeg",
     "psutil~=5.9.0",
-    "giskardpy",
-    "krrood",
-    "physics_simulators",
+    "giskardpy>=26.10.0",
+    "krrood>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
+    "physics_simulators>=26.10.0",
 ]
 license = "LGPL-3.0-only"
 
 [project.urls]
 "Source" = 'https://github.com/cram2/semantic_digital_twin'
 "Bug Tracker" = 'https://github.com/cram2/semantic_digital_twin/issues'
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)
 include = ["semantic_digital_twin*"]
+
+[tool.setuptools.package-data]
+"semantic_digital_twin.part_finding" = ["prompts/*.jinja"]
+
+[project.scripts]
+semantic-digital-twin-part-finding-server = "semantic_digital_twin.adapters.part_finding.command_line:PartFindingCommandLine.run"
 
 [tool.setuptools.dynamic]
 version = {attr = "semantic_digital_twin._version.__version__"}
@@ -81,6 +90,7 @@ version = {attr = "semantic_digital_twin._version.__version__"}
 workspace = [
     "giskardpy",
     "krrood",
+    "krrood_spatial_math",
     "physics_simulators",
     "probabilistic_model",
     "random_events",
@@ -92,6 +102,15 @@ gui = [
 ]
 iris = [
     "drake",
+]
+vision = [
+    # Install torch for your GPU's CUDA version first, see doc/part_finding.md
+    "torch",
+    "torchvision",
+    "transformers>=4.57.1",
+    "accelerate",
+    "bitsandbytes",
+    "pillow",
 ]
 datasets = [
     "py7zr",

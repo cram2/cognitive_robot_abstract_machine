@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, fields, field
 from pathlib import Path
-from typing import List, Set, Type, Optional, Tuple
+from typing_extensions import Optional, Tuple
 
 import jinja2
 
@@ -19,7 +19,7 @@ class DataclassRenderer:
     .. note:: Fields are not rendered yet.
     """
 
-    type_: Type
+    type_: type
     """
     The dataclass to render.
     """
@@ -55,12 +55,12 @@ class ModuleRenderer:
     python module.
     """
 
-    classes: List[DataclassRenderer] = field(default_factory=list)
+    classes: list[DataclassRenderer] = field(default_factory=list)
     """
     Classes that should be rendered.
     """
 
-    imports: Set[str] = field(default_factory=set)
+    imports: set[str] = field(default_factory=set)
     """
     Imports collected from all classes.
     """
@@ -70,7 +70,7 @@ class ModuleRenderer:
             self.imports.update(clazz.imports)
 
     @classmethod
-    def from_dataclasses(cls, classes: List[Type]):
+    def from_dataclasses(cls, classes: list[type]):
         dataclass_descriptions = [DataclassRenderer(clazz) for clazz in classes]
         result = cls(classes=dataclass_descriptions)
         result._update_imports()

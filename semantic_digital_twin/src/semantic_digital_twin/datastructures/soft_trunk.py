@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import (
@@ -17,17 +17,13 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.soft_connections import (
     PiecewiseConstantCurvatureConnection,
     CosseratRodConnection,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Quaternion,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -106,6 +102,14 @@ class SoftEndEffector(EndEffector):
     """
     Concrete implementation of EndEffector for soft robots.
     """
+
+    @property
+    def approach_axis(self) -> Vector3:
+        return Vector3.X(reference_frame=self.tool_frame)
+
+    @property
+    def closing_axis(self) -> Vector3:
+        return Vector3.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(cls, robot_root):
@@ -220,9 +224,8 @@ class SoftTrunk(SemanticAnnotation):
             )
 
             prev_body = root_body
-            limits = DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=-10.0, velocity=-10.0),
-                upper=DerivativeMap(position=10.0, velocity=10.0),
+            limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
             )
 
             for section_index, section in enumerate(sections):
@@ -251,7 +254,9 @@ class SoftTrunk(SemanticAnnotation):
                         ),
                         width=section.radius * 2,
                         height=segment_length,
-                        color=Color(0.0, color_val, 1.0 - color_val, 1.0),
+                        color=Color.from_rgba(
+                            red=0.0, green=color_val, blue=1.0 - color_val, opacity=1.0
+                        ),
                     )
 
                     curr_body = Body(
@@ -277,7 +282,6 @@ class SoftTrunk(SemanticAnnotation):
                 name=PrefixedName("effector", prefix),
                 root=prev_body,
                 tool_frame=prev_body,
-                front_facing_orientation=Quaternion(w=1.0),
                 _world=world,
             )
             arm = SoftArm(
@@ -327,13 +331,11 @@ class SoftTrunk(SemanticAnnotation):
             )
 
             prev_body = root_body
-            strain_limits = DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=-10.0, velocity=-10.0),
-                upper=DerivativeMap(position=10.0, velocity=10.0),
+            strain_limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
             )
-            extension_limits = DegreeOfFreedomLimits(
-                lower=DerivativeMap(position=0.1, velocity=-10.0),
-                upper=DerivativeMap(position=3.0, velocity=10.0),
+            extension_limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.1, upper_position=3.0, maximum_speed=10.0
             )
 
             for section_index, section in enumerate(sections):
@@ -378,7 +380,9 @@ class SoftTrunk(SemanticAnnotation):
                         ),
                         width=section.radius * 2,
                         height=segment_length,
-                        color=Color(color_val, 0.2, 1.0 - color_val, 1.0),
+                        color=Color.from_rgba(
+                            red=color_val, green=0.2, blue=1.0 - color_val, opacity=1.0
+                        ),
                     )
 
                     curr_body = Body(
@@ -406,7 +410,6 @@ class SoftTrunk(SemanticAnnotation):
                 name=PrefixedName("effector", prefix),
                 root=prev_body,
                 tool_frame=prev_body,
-                front_facing_orientation=Quaternion(w=1.0),
                 _world=world,
             )
             arm = SoftArm(

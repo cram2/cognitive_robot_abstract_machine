@@ -19,10 +19,8 @@ from semantic_digital_twin.exceptions import (
     PointOccupiedError,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from semantic_digital_twin.spatial_types import Point2, Point3, Pose
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import Point2, Point3, Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -421,11 +419,11 @@ def test_from_world_with_rotated_box():
     for bounding_box in graph_of_convex_sets.graph.nodes():
         bounding_box_T_world: Pose = world.transform(
             bounding_box.as_shape().origin, world.root
-        ).to_pose()
+        ).pose
 
         assert bounding_box_T_world.roll == 0
         assert bounding_box_T_world.pitch == 0
-        assert allclose(bounding_box_T_world.yaw, rotated_box_body_pose.to_pose().yaw)
+        assert allclose(bounding_box_T_world.yaw, rotated_box_body_pose.pose.yaw)
 
 
 def test_path_from_to_prefers_shorter_distance_over_fewer_hops():
@@ -525,7 +523,7 @@ def test_path_from_to_scales_to_a_real_apartment_scene():
 
     It now runs a single-source Dijkstra search instead.
     """
-    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).parse()
+    world = MJCFParser(os.path.join(MJCF_DIR, "iai_apartment.xml")).create_world()
     search_space = BoundingBoxCollection(
         [
             VolumetricBoundingBox(

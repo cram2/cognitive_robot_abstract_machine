@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import zoneinfo
 from dataclasses import dataclass
-from typing_extensions import Type, Any, List, TYPE_CHECKING
+from typing_extensions import Any, TYPE_CHECKING
 
 from sqlalchemy.orm import RelationshipProperty
 
@@ -26,7 +26,7 @@ class NoGenericError(DataclassException, TypeError):
     with it.
     """
 
-    clazz: Type
+    clazz: type
 
     def error_message(self) -> str:
         return f"Cannot determine original class for {self.clazz}."
@@ -63,6 +63,28 @@ class NoDAOFoundError(DataclassException, TypeError):
 
 
 @dataclass
+class QueryCannotBePersisted(DataclassException, TypeError):
+    """
+    Raised when an object that is to be stored holds an entity query language query in
+    place of a value.
+
+    A query describes the objects that would satisfy it rather than one of them, so
+    there is nothing to store until it is answered.
+    """
+
+    query: Any
+    """
+    The query that was to be stored.
+    """
+
+    def error_message(self) -> str:
+        return f"The query {self.query} cannot be stored."
+
+    def suggest_correction(self) -> str:
+        return "Store the objects the query was answered with instead of the query."
+
+
+@dataclass
 class NoDAOFoundForTypeError(NoDAOFoundError):
     """
     Raised when no DAO class is found for a domain *type* rather than for a concrete
@@ -91,7 +113,7 @@ class NoDAOFoundForSelectionError(NoDAOFoundError):
 @dataclass
 class NoDAOFoundDuringParsingError(NoDAOFoundError):
 
-    dao: Type
+    dao: type
     """
     The DAO class that tried to convert the cls to a DAO if any.
     """
@@ -153,7 +175,7 @@ class UnsupportedColumnType(DataclassException, TypeError):
     sqlalchemy type.
     """
 
-    column_type: Type
+    column_type: type
 
     def error_message(self) -> str:
         return f"Column type: {self.column_type} is neither a builtin sqlalchemy type nor does it exist in the dict of type_mappings."
@@ -190,7 +212,7 @@ class ConversionOrderCycle(DataclassException, ValueError):
     because the orders they ask for form a cycle.
     """
 
-    cycle: List[ConversionOrderConstraint]
+    cycle: list[ConversionOrderConstraint]
     """
     The constraints that close the cycle, each one putting its earlier mapping type
     before its later one.

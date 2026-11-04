@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<robot name="material_colored_links">
+  <material name="countertop">
+    <color rgba="0.85 0.51 0.16 1"/>
+  </material>
+  <link name="named_mesh_link">
+    <visual>
+      <geometry><mesh filename="stl/milk.stl"/></geometry>
+      <material name="countertop"/>
+    </visual>
+  </link>
+  <link name="inline_mesh_link">
+    <visual>
+      <geometry><mesh filename="stl/milk.stl"/></geometry>
+      <material name="red">
+        <color rgba="0.8 0 0 1"/>
+      </material>
+    </visual>
+  </link>
+  <link name="uncolored_mesh_link">
+    <visual>
+      <geometry><mesh filename="stl/milk.stl"/></geometry>
+    </visual>
+  </link>
+  <link name="painted_mesh_link">
+    <visual>
+      <geometry><mesh filename="collada/unitless_cube.dae"/></geometry>
+      <material name="countertop"/>
+    </visual>
+  </link>
+  <link name="inline_box_link">
+    <visual>
+      <geometry><box size="0.1 0.1 0.1"/></geometry>
+      <material name="green">
+        <color rgba="0 0.6 0 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="named_to_inline" type="fixed">
+    <parent link="named_mesh_link"/>
+    <child link="inline_mesh_link"/>
+  </joint>
+  <joint name="named_to_uncolored" type="fixed">
+    <parent link="named_mesh_link"/>
+    <child link="uncolored_mesh_link"/>
+  </joint>
+  <joint name="named_to_painted" type="fixed">
+    <parent link="named_mesh_link"/>
+    <child link="painted_mesh_link"/>
+  </joint>
+  <joint name="named_to_box" type="fixed">
+    <parent link="named_mesh_link"/>
+    <child link="inline_box_link"/>
+  </joint>
+</robot>

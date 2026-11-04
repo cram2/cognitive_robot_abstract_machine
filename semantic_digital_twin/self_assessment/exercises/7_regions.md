@@ -33,7 +33,7 @@ from pathlib import Path
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection, Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body, Region
@@ -63,12 +63,12 @@ Your goal:
 # with world.modify_world():
 #     world.add_kinematic_structure_entity(surface_region)
 #     world.add_connection(FixedConnection(parent=top, child=surface_region))
-# before_pos = surface_region.global_pose.to_position().to_np()[:3]
+# before_pos = surface_region.global_pose.position.to_np()[:3]
 ```
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-world = URDFParser.from_file(table_urdf).parse()
+world = URDFParser.from_file(table_urdf).create_world()
 # Find the table surface body named "top"
 top = [b for b in world.bodies if b.name.name == "top"][0]
 # Create a thin region at the table surface and attach it to the body "top"
@@ -79,7 +79,7 @@ with world.modify_world():
     world.add_kinematic_structure_entity(surface_region)
     world.add_connection(FixedConnection(parent=top, child=surface_region))
 # Remember the initial pose
-before_pos = surface_region.global_pose.to_position().to_np()[:3]
+before_pos = surface_region.global_pose.position.to_np()[:3]
 ```
 
 ## 2. Move the table and check the region
@@ -110,6 +110,6 @@ with world.modify_world():
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-after_pos = surface_region.global_pose.to_position().to_np()[:3]
+after_pos = surface_region.global_pose.position.to_np()[:3]
 if not (before_pos != after_pos).any(): raise ExerciseVerificationFailed("The region pose should change when the table moves.")
 ```

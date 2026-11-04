@@ -127,7 +127,7 @@ def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
 
 
 def distribution_of(
-    match: Match, *, marginalize_for: Tuple[Attribute, ...] = ()
+    match: Match, *, marginalize_for: tuple[Attribute, ...] = ()
 ) -> Distribution:
     """
     Request the distribution a match's conditions describe -- the probabilistic
@@ -158,11 +158,15 @@ def distribution_of(
     return Distribution(match=match, marginalize_for=marginalize_for)
 
 
-def probability_of(condition: ConditionType) -> Probability:
+def probability_of(
+    condition: ConditionType, evidence: ConditionType | None = None
+) -> Probability:
     """
-    Request the probability of a condition, e.g. ``probability_of(x.A > 5)`` for
-    ``x = variable(MyClass)``. The condition may be any expression a ``.where(...)``
-    condition already accepts.
+    Request the probability of a condition, optionally given evidence, e.g.
+    ``probability_of(x.A > 5)`` or ``probability_of(x.A > 5, x.B < 2)`` for
+    ``x = variable(MyClass)``. Condition and evidence may be any expression a
+    ``.where(...)`` condition already accepts; several conditions are joined
+    explicitly with :py:func:`and_`.
 
     Like :py:func:`distribution_of`, this never resolves to rows: it must be evaluated
     with a
@@ -174,20 +178,22 @@ def probability_of(condition: ConditionType) -> Probability:
     already recognizes a bare ``average(...)`` selection and answers it in closed form.
 
     :param condition: The condition to compute the probability of.
+    :param evidence: The condition to condition the probability on, or ``None`` for
+        the unconditional probability.
     :return: Probability descriptor.
     """
     # Local import: avoids a circular import through operators/probabilistic_queries.py.
     from krrood.entity_query_language.operators.probabilistic_queries import Probability
 
-    return Probability(condition=condition)
+    return Probability(condition=condition, evidence=evidence)
 
 
 # %% Variable Declaration
 
 
 def variable(
-    type_: Type[T],
-    domain: Optional[DomainType] = None,
+    type_: type[T],
+    domain: DomainType | None = None,
 ) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -212,8 +218,8 @@ def variable(
 
 
 def deduced_variable(
-    type_: Optional[Type[T]] = None,
-) -> Union[Type[T], ExternallySetVariable[T]]:
+    type_: type[T] | None = None,
+) -> Union[type[T], ExternallySetVariable[T]]:
     """
     Create a variable that is inferred through deductive reasoning.
 
@@ -374,11 +380,11 @@ def exists(
 
 
 def _quantify_or_build_match(
-    arg: Union[T, Query, Type[T], Callable[..., T]],
-    quantifier_type: Type[ResultQuantifier],
-    quantification: Optional[ResultQuantificationConstraint] = None,
+    arg: Union[T, Query, type[T], Callable[..., T]],
+    quantifier_type: type[ResultQuantifier],
+    quantification: ResultQuantificationConstraint | None = None,
     *,
-    target_type: Optional[Type[T]] = None,
+    target_type: type[T] | None = None,
 ) -> Union[T, Query, Match[T]]:
     """
     Shared implementation for :py:func:`an` and :py:func:`the`.
@@ -438,7 +444,7 @@ overload.
 
 @overload
 def an(
-    entity_: Type[T],
+    entity_: type[T],
     quantification: None = ...,
     *,
     target_type: None = ...,
@@ -448,7 +454,7 @@ def an(
 @overload
 def an(
     entity_: TSymbolicExpression,
-    quantification: Optional[ResultQuantificationConstraint] = ...,
+    quantification: ResultQuantificationConstraint | None = ...,
     *,
     target_type: None = ...,
 ) -> TSymbolicExpression: ...
@@ -459,14 +465,14 @@ def an(
     entity_: Callable[..., T],
     quantification: None = ...,
     *,
-    target_type: Type[T] = ...,
+    target_type: type[T] = ...,
 ) -> Union[T, Match[T]]: ...
 
 
 @overload
 def an(
     entity_: T,
-    quantification: Optional[ResultQuantificationConstraint] = ...,
+    quantification: ResultQuantificationConstraint | None = ...,
     *,
     target_type: None = ...,
 ) -> T: ...
@@ -499,7 +505,7 @@ def an(
 
 @overload
 def a(
-    entity_: Type[T],
+    entity_: type[T],
     quantification: None = ...,
     *,
     target_type: None = ...,
@@ -509,7 +515,7 @@ def a(
 @overload
 def a(
     entity_: TSymbolicExpression,
-    quantification: Optional[ResultQuantificationConstraint] = ...,
+    quantification: ResultQuantificationConstraint | None = ...,
     *,
     target_type: None = ...,
 ) -> TSymbolicExpression: ...
@@ -520,14 +526,14 @@ def a(
     entity_: Callable[..., T],
     quantification: None = ...,
     *,
-    target_type: Type[T] = ...,
+    target_type: type[T] = ...,
 ) -> Union[T, Match[T]]: ...
 
 
 @overload
 def a(
     entity_: T,
-    quantification: Optional[ResultQuantificationConstraint] = ...,
+    quantification: ResultQuantificationConstraint | None = ...,
     *,
     target_type: None = ...,
 ) -> T: ...
@@ -556,7 +562,7 @@ def a(
 
 @overload
 def the(
-    entity_: Type[T],
+    entity_: type[T],
     *,
     target_type: None = ...,
 ) -> Union[T, Match[T]]: ...
@@ -574,7 +580,7 @@ def the(
 def the(
     entity_: Callable[..., T],
     *,
-    target_type: Type[T] = ...,
+    target_type: type[T] = ...,
 ) -> Union[T, Match[T]]: ...
 
 
@@ -620,7 +626,7 @@ def add(variable: Any, value: Any) -> None:
 
 
 def inference(
-    type_: Type[T],
+    type_: type[T],
 ) -> Union[Callable[[], Union[T, InstantiatedVariable[T]]]]:
     """
     This returns a factory function that creates a new variable of the given type and
@@ -681,7 +687,7 @@ def next_rule(*conditions: ConditionType) -> SymbolicExpression:
 def case_when(
     condition: SymbolicExpression,
     then_value: SymbolicExpression,
-    else_value: Optional[SymbolicExpression] = None,
+    else_value: SymbolicExpression | None = None,
 ) -> CaseWhen:
     """
     Create a CASE WHEN ... THEN ... ELSE ... END expression.
@@ -706,8 +712,8 @@ def case_when(
 
 def max(
     variable: Selectable[T],
-    key: Optional[Callable] = None,
-    default: Optional[T] = None,
+    key: Callable | None = None,
+    default: T | None = None,
     distinct: bool = False,
 ) -> Union[T, Max[T]]:
     """
@@ -726,7 +732,7 @@ def max(
 
 def mode(
     variable: Selectable[T],
-    default: Optional[T] = None,
+    default: T | None = None,
 ) -> Union[T, Mode[T]]:
     """
     Calculate and return the first mode from the variable values.
@@ -746,7 +752,7 @@ def mode(
 
 def multimode(
     variable: Selectable[T],
-    default: Optional[T] = None,
+    default: T | None = None,
 ) -> Union[T, MultiMode[T]]:
     """
     Calculate and return all mode values from the variable values.
@@ -762,8 +768,8 @@ def multimode(
 
 def min(
     variable: Selectable[T],
-    key: Optional[Callable] = None,
-    default: Optional[T] = None,
+    key: Callable | None = None,
+    default: T | None = None,
     distinct: bool = False,
 ) -> Union[T, Min[T]]:
     """
@@ -782,8 +788,8 @@ def min(
 
 def sum(
     variable: Union[T, Selectable[T]],
-    key: Optional[Callable] = None,
-    default: Optional[T] = None,
+    key: Callable | None = None,
+    default: T | None = None,
     distinct: bool = False,
 ) -> Union[T, Sum]:
     """
@@ -802,8 +808,8 @@ def sum(
 
 def average(
     variable: Union[Selectable[T], Any],
-    key: Optional[Callable] = None,
-    default: Optional[T] = None,
+    key: Callable | None = None,
+    default: T | None = None,
     distinct: bool = False,
 ) -> Union[T, Average]:
     """
@@ -881,7 +887,7 @@ def distinct(
             raise UnsupportedExpressionTypeForDistinct(type(expression))
 
 
-def get_false_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
+def get_false_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
     """
     :param statement: The condition whose statements are checked.
     :return: The statements of the condition that held for none of the values they were
@@ -898,7 +904,7 @@ def get_false_statements(statement: SymbolicExpression) -> List[SymbolicExpressi
     return list(never_held.values())
 
 
-def get_true_statements(statement: SymbolicExpression) -> List[SymbolicExpression]:
+def get_true_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
     """
     :param statement: The condition whose statements are checked.
     :return: The statements of the condition that held for at least one of the values
@@ -987,7 +993,7 @@ class NodeType(SymbolicFunction):
     The node whose type is read.
     """
 
-    def __call__(self) -> Optional[Type]:
+    def __call__(self) -> type | None:
         return getattr(self.node, "_type_", None)
 
     @classmethod
@@ -1039,7 +1045,7 @@ class AttributeOwnerClass(SymbolicFunction):
     The attribute whose owner class is read.
     """
 
-    def __call__(self) -> Type:
+    def __call__(self) -> type:
         return self.node._owner_class_
 
     @classmethod
@@ -1091,7 +1097,7 @@ class IsSubclass(Predicate):
     The candidate subclass.
     """
 
-    parent_or_parents: Type | Tuple[Type, ...]
+    parent_or_parents: Type | tuple[Type, ...]
     """
     The class or tuple of classes checked against.
     """
@@ -1168,7 +1174,7 @@ class RuntimeType(SymbolicFunction):
     The object whose runtime class is read.
     """
 
-    def __call__(self) -> Type:
+    def __call__(self) -> type:
         return self.object.__class__
 
     @classmethod

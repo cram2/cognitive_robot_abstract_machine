@@ -34,13 +34,15 @@ if TYPE_CHECKING:
         VerbalizationFragment,
     )
 
-from krrood.entity_query_language.utils import T, merge_args_and_kwargs
+from krrood.class_diagrams.call_signature import CallSignature
+from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.variable import (
     Variable,
     InstantiatedVariable,
     Literal,
 )
 from krrood.entity_query_language.core.base_expressions import (
+    Operand,
     Selectable,
     SymbolicExpression,
 )
@@ -56,7 +58,7 @@ from krrood.symbol_graph.symbol_graph import Symbol
 
 def symbolic_function(
     function: Callable[..., T],
-) -> Union[Callable[..., Variable[T]], T]:
+) -> Callable[..., Variable[T]] | T:
     """
     Function decorator that constructs a symbolic expression representing the function
     call when inside a symbolic_rule context.
@@ -69,10 +71,12 @@ def symbolic_function(
     :return: The decorated function.
     """
 
+    signature = CallSignature.of(function)
+
     @wraps(function)
-    def wrapper(*args, **kwargs) -> Optional[Any]:
-        all_kwargs = merge_args_and_kwargs(function, args, kwargs)
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+    def wrapper(*args, **kwargs) -> Any | None:
+        all_kwargs = signature.keyword_arguments(*args, **kwargs)
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=function,
                 _kwargs_=all_kwargs,
@@ -83,7 +87,7 @@ def symbolic_function(
 
 
 def symbolic_callable_to_function(
-    symbolic_callable: Type[SymbolicCallable],
+    symbolic_callable: type[SymbolicCallable],
 ) -> Callable[..., Any]:
     """:return: a function that calls *symbolic_callable* -- the class-form counterpart of the
     :func:`symbolic_function` decorator.
@@ -142,12 +146,12 @@ class RenderedFields(Mapping):
     — without the author choosing between them.
     """
 
-    fragments: "Mapping[str, VerbalizationFragment]"
+    fragments: Mapping[str, VerbalizationFragment]
     """
     The rendered fragment for each field, keyed by field name.
     """
 
-    raw: "Mapping[str, SymbolicExpression]"
+    raw: Mapping[str, SymbolicExpression]
     """
     The raw child expression for each field, keyed by field name.
     """
@@ -226,10 +230,8 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """
 
     def __new__(cls, *args, **kwargs):
-        all_kwargs = merge_args_and_kwargs(
-            cls.__init__, args, kwargs, ignore_first=True
-        )
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        all_kwargs = CallSignature.of(cls).keyword_arguments(*args, **kwargs)
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=cls,
                 _kwargs_=all_kwargs,
@@ -276,7 +278,7 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
         """
 
     @classmethod
-    def _example_operand_values_(cls) -> Dict[str, Any]:
+    def _example_operand_values_(cls) -> dict[str, Any]:
         """
         A literal example value for each field that is never bound to a symbolic operand
         in real usage -- only ever a literal (e.g. ``HasType.types_``, since
@@ -455,7 +457,7 @@ class HasType(Triple[Any, Type]):
     The variable whose type is being checked.
     """
 
-    types_: Type
+    types_: type
     """
     The type or tuple of types against which the `variable` is validated.
     """
@@ -499,7 +501,7 @@ class HasType(Triple[Any, Type]):
         )
 
     @classmethod
-    def _example_operand_values_(cls) -> Dict[str, Any]:
+    def _example_operand_values_(cls) -> dict[str, Any]:
         return {"types_": int}
 
 
@@ -515,13 +517,13 @@ class HasTypes(HasType):
     comparison explicitly disabled.
     """
 
-    types_: Tuple[Type, ...]
+    types_: tuple[type, ...]
     """
     A tuple containing Type objects that are associated with this instance.
     """
 
     @classmethod
-    def _example_operand_values_(cls) -> Dict[str, Any]:
+    def _example_operand_values_(cls) -> dict[str, Any]:
         return {"types_": (int, str)}
 
 
@@ -558,12 +560,13 @@ call).
 """
 
 
-def _any_of_the_kwargs_is_a_variable(bindings: Dict[str, Any]) -> bool:
+def _any_argument_is_an_operand(arguments: dict[str, Any]) -> bool:
     """
-    :param bindings: A kwarg like dict mapping strings to objects
-    :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
+    :param arguments: The arguments of a call, by parameter name.
+    :return: Whether any of *arguments* stands for an expression, such as a variable or
+        a match, so that the call has to be built as an expression instead of computed.
     """
-    return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())
+    return any(isinstance(argument, Operand) for argument in arguments.values())
 
 
 @dataclass(eq=False)

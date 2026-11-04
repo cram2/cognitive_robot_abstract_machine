@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
 
-from typing_extensions import Iterable, Iterator, List, Optional, Set, Tuple
+from typing_extensions import Iterable, Iterator
 
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
@@ -84,7 +84,7 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
         :return: The results of the quantifier under these bindings.
         """
 
-    def _outer_visible_variables_(self) -> Tuple[Selectable, ...]:
+    def _outer_visible_variables_(self) -> tuple[Selectable, ...]:
         """
         :return: The outer-visible variables of this quantifier in the query being
             evaluated. The quantified variable is one of them when it also occurs
@@ -101,7 +101,7 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
             )
         return tuple(reference() for reference in cache[self._id_])
 
-    def _compute_outer_visible_variables_(self) -> Tuple[Selectable, ...]:
+    def _compute_outer_visible_variables_(self) -> tuple[Selectable, ...]:
         """
         :return: The variables of this quantifier that also occur in its enclosing
             query outside this quantifier.
@@ -121,7 +121,7 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
             and expression._id_ in ids_outside_this_quantifier
         )
 
-    def _enclosing_query_(self) -> Optional[Query]:
+    def _enclosing_query_(self) -> Query | None:
         """
         :return: The innermost compiled query containing this quantifier: the one being
             evaluated when there are several, as after a query is rebuilt around the
@@ -152,7 +152,7 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
 
 
 def _expressions_in_scope_(
-    roots: Iterable[SymbolicExpression], excluded_ids: Optional[Set[uuid.UUID]] = None
+    roots: Iterable[SymbolicExpression], excluded_ids: set[uuid.UUID] | None = None
 ) -> Iterator[SymbolicExpression]:
     """
     :param roots: The expressions to start from.
@@ -183,7 +183,7 @@ class ForAll(QuantifiedConditional):
     """
 
     @cached_property
-    def condition_unique_variable_ids(self) -> List[uuid.UUID]:
+    def condition_unique_variable_ids(self) -> list[uuid.UUID]:
         return [
             v._id_
             for v in self.condition._unique_variables_.difference(

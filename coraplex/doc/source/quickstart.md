@@ -39,9 +39,9 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").parse()
-milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").parse()
-pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").parse()
+apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").create_world()
+milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").create_world()
+pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 
 ```{note}
@@ -94,7 +94,7 @@ You can now open RViz2 and add a Marker display subscribing to the topic "/semwo
 
 Now that we have set up the environment, we can write our first plan. A plan in CoraPlex is a structured sequence of actions
 which the robot will execute to achieve a specific goal. For more details on how plans work in CoraPlex, refer to the
-{ref}`plan_header`.
+{ref}`statechart_header`.
 
 The plan will consist of the following steps:
 
@@ -108,18 +108,22 @@ The plan will consist of the following steps:
 ```python
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.plans.factories import sequential
+from coraplex.plans.context_extensions import RobotAccess
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
+from cramph.composites import Sequence
+from cramph.statechart import Statechart
 
-context = Context(world, PR2.from_world(world))
+pr2 = PR2.from_world(world)
+executor = KinematicallySimulatedPlanExecutor(
+    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+)
 milk_body = world.get_body_by_name("milk.stl")
 
 # The pick-up is told what it is grasping, so annotate the parsed mesh as milk.
@@ -127,46 +131,44 @@ with world.modify_world():
     milk = Milk(root=milk_body)
     world.add_semantic_annotation(milk)
 
-plan = sequential(
-    [
-        ParkArmsAction(Arms.BOTH),
-        MoveTorsoAction(TorsoState.HIGH),
-        NavigateAction(Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)),
+plan = Sequence(
+    nodes=[
+        ParkArmsAction(arms=pr2.all_arms),
+        MoveTorsoAction(torso_state=TorsoState.HIGH),
+        NavigateAction(
+            target_location=Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)
+        ),
         PickUpAction(
+            grasp=milk.grasp_candidates()[0],
+            arm=pr2.right_arm,
+        ),
+        NavigateAction(
+            target_location=Pose.from_xyz_rpy(4.0, 4.0, 0.0, reference_frame=world.root)
+        ),
+        PlaceAction(
             object_designator=milk,
-            arm=Arms.RIGHT,
-            grasp_description=GraspDescription(
-                ApproachDirection.FRONT,
-                VerticalAlignment.NoAlignment,
-                context.robot.right_arm.end_effector,
+            target_location=Pose.from_xyz_rpy(
+                4.2, 4.0, 1.0, reference_frame=world.root
             ),
         ),
-        NavigateAction(Pose.from_xyz_rpy(4.0, 4.0, 0.0, reference_frame=world.root)),
-        PlaceAction(
-            object_designator=milk_body,
-            target_location=Pose.from_xyz_rpy(4.2, 4.0, 1.0, reference_frame=world.root),
-            arm=Arms.RIGHT,
-        ),
-    ],
-    context=context,
-).plan
+    ]
+)
+statechart = Statechart(context=executor.context)
+statechart.add_node(plan)
 ```
 
 What did we just do here?
-We first created a context which holds the world as well as the semantic description of the PR2 robot in that world.
-This context is used by the plan to determine in which world and by which robot the plan should be executed.
+We first created an executor, which runs the plan in the world, by the PR2 its context extensions name. A
+`KinematicallySimulatedPlanExecutor` runs it in simulation; a `RealRobotPlanExecutor` would send it to the real robot.
 Next, we retrieved the milk bottle body from the world to use it in the pick-up and place actions.
-Finally, we built a plan from the {func}`~coraplex.plans.factories.sequential` factory, meaning all actions will be
-executed one after another in the order they are defined. The factory returns a node whose `.plan` attribute is the
-runnable plan.
+Finally, we built a plan as a {class}`~cramph.composites.Sequence`, meaning all actions will be executed one after
+another in the order they are defined, and put it into a statechart of the executor's context.
 
-To execute the plan, we need to determine if it should be run in simulation or on a real robot and then call perform.
+To execute the plan, the executor compiles the statechart and executes it.
 
 ```python
-from coraplex.execution_environment import simulated_robot
-
-with simulated_robot:
-    plan.perform()
+executor.compile(statechart)
+executor.execute()
 ```
 
 Congratulations!🎉 You have just written and executed your first plan in CoraPlex.

@@ -27,7 +27,7 @@ from typing_extensions import Iterable
 import numpy as np
 from geometry_msgs.msg import Pose
 from scipy.spatial.transform import Rotation
-from typing_extensions import TYPE_CHECKING, Tuple, List, Union
+from typing_extensions import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -115,7 +115,7 @@ def get_transform_matrix_from_translation(translation: npt.NDArray) -> npt.NDArr
     return T
 
 
-def quaternion_about_axis(angle: float, axis: Tuple[int, int, int]) -> npt.NDArray:
+def quaternion_about_axis(angle: float, axis: tuple[int, int, int]) -> npt.NDArray:
     """
     Create a 4x4 transformation matrix for rotation around an axis.
 
@@ -129,7 +129,7 @@ def quaternion_about_axis(angle: float, axis: Tuple[int, int, int]) -> npt.NDArr
 
 
 def get_transform_matrix_for_rotation_around_axis(
-    angle: float, axis: Tuple[int, int, int]
+    angle: float, axis: tuple[int, int, int]
 ) -> npt.NDArray:
     """
     Create 4x4 transformation matrix for rotation around arbitrary axis.
@@ -143,8 +143,8 @@ def get_transform_matrix_for_rotation_around_axis(
 
 
 def get_transform_matrix_from_q(
-    quaternion: Union[npt.NDArray, List[float], Tuple[float, float, float, float]],
-    translation: Union[npt.NDArray, List[float], Tuple[float, float, float]],
+    quaternion: npt.NDArray | list[float] | tuple[float, float, float, float],
+    translation: npt.NDArray | list[float] | tuple[float, float, float],
 ) -> npt.NDArray:
     """
     Create a 4x4 transformation matrix from quaternion and translation.
@@ -271,7 +271,7 @@ def get_transform_from_plane_equation(plane_equation: npt.NDArray) -> npt.NDArra
 
 
 def construct_rotation_matrix(
-    pose_orientation: npt.NDArray, axis_order: Tuple[int, int, int]
+    pose_orientation: npt.NDArray, axis_order: tuple[int, int, int]
 ) -> npt.NDArray:
     """
     Construct rotation matrix with reordered axes.

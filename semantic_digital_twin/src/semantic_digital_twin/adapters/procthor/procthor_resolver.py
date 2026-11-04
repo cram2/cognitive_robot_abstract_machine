@@ -3,9 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from dataclasses import field
-from typing import Optional, Type
 
-from typing_extensions import List
 
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
@@ -19,9 +17,9 @@ class ProcthorResolver:
     Central resolver that deterministically maps a ProcTHOR name to exactly one class.
     """
 
-    classes: List[Type[HasRootBody]] = field(default_factory=list)
+    classes: list[type[HasRootBody]] = field(default_factory=list)
 
-    def resolve(self, name: str) -> Optional[Type[SemanticAnnotation]]:
+    def resolve(self, name: str) -> type[SemanticAnnotation] | None:
         """
         Resolve a given name to a class based on the number of matching tokens with the
         class name tokens or synonyms. The method preprocesses the name by removing

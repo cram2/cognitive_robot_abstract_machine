@@ -16,7 +16,7 @@ import gc
 import weakref
 
 from dataclasses import dataclass, field
-from typing_extensions import Iterator, List
+from typing_extensions import Iterator
 
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.factories import an, entity, variable
@@ -41,7 +41,7 @@ class FrameBuildingLazyDomain:
     """
 
     value_count: int
-    built_object_references: List[weakref.ReferenceType] = field(default_factory=list)
+    built_object_references: list[weakref.ReferenceType] = field(default_factory=list)
     """
     Weak references to every heavy object built, so tests can observe their collection.
     """

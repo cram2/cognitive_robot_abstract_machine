@@ -64,7 +64,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.region_extraction import (
     PlacementSamplerRegionReader,
 )
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 ALL_LAYOUTS_AND_STYLES = -3
 """
@@ -213,7 +213,7 @@ class PlacementRegionAttacher:
         :return: The attached region's summary statistics.
         """
         region_data.attach_to(world)
-        world_position = region_data.world_T_sampler.to_position()
+        world_position = region_data.world_T_sampler.position
         return AttachedPlacementRegion(
             task=region_data.name.prefix,
             object_name=region_data.name.name,

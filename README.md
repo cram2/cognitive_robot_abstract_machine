@@ -103,10 +103,11 @@ poetry install
 
 ## Browser visualization
 
-The workspace includes [CRAMERA](cramera/README.md) for live 3D visualization,
-recorded playback, EQL questions and plan/statechart inspection. Start `cramera`
-from the activated environment, then run an existing demo with
-`cramera-live path/to/demo.py`.
+[CRAMERA](https://github.com/AICOR-Solutions/cramera) provides live 3D visualization,
+recorded playback, EQL questions and plan/statechart inspection in the browser. It
+lives in its own repository, whose `scripts/install_stack.py` installs it together with
+this workspace; with it installed, start `cramera` from the activated environment, then
+add a `LiveVisualization` to the executor of the demo you want to follow.
 
 ## To run tests
 
@@ -126,62 +127,9 @@ e.g. `pytest test/coraplex_test`
 
 ## Developer / Agent Tooling
 
-`.claude/` holds tooling for AI coding agents (Claude Code) working in this
-repository - hooks that run automatically each session, and skills invoked
-on demand (`/<skill-name>`). Each is documented where it lives; the links
-below are a starting point, not a duplicate of that documentation.
+`.claude/` holds configuration for AI coding agents (Claude Code) working in
+this repository.
 
-**New here? Start with [`.claude/SETUP.md`](.claude/SETUP.md)** - the one-time
-setup in three steps, including what to change in your fork, your GitHub
-access and your Claude environment.
-[`.claude/hooks/README.md`](.claude/hooks/README.md) is the reference behind
-it: what the setup configures, and everything it unlocks (personal notes,
-per-PR progress tracking, multi-PR plan dashboards).
-
-- **[`.claude/hooks/`](.claude/hooks/README.md)** - a `SessionStart` hook
-  that carries a contributor's own personal workflow notes, per-PR
-  plan/progress tracking, and multi-PR plan manifests across sessions via a
-  personal (gitignored, never-merged) branch, with zero required
-  configuration.
-- **[`.claude/skills/plan-dashboard/`](.claude/skills/plan-dashboard/SKILL.md)** -
-  publishes a live status dashboard for a multi-PR/multi-session
-  initiative, cross-checked against live GitHub PR/CI/review state so a
-  plan's manually-tracked status can never silently drift from reality. See
-  [`example-walkthrough.md`](.claude/skills/plan-dashboard/example-walkthrough.md)
-  for a short, worked example - idea to dashboard, with screenshots.
-- **[`.claude/skills/plan-create/`](.claude/skills/plan-create/SKILL.md)** -
-  bootstraps a new multi-PR/multi-session plan (or migrates an existing
-  freeform roadmap doc into one), validated against the same schema
-  `plan-dashboard` reads.
-- **[`.claude/skills/plan-item-kickoff/`](.claude/skills/plan-item-kickoff/SKILL.md)** -
-  gathers everything available about one tracked plan item (its manifest
-  entry, roadmap history, dependency chain's live state, sibling-item
-  patterns) and proposes an implementation plan via plan mode, without
-  writing any code. The "Start now" button on a not-started item's
-  dashboard card copies the invoking command for this skill.
-- **[`.claude/skills/plan-item-resolve/`](.claude/skills/plan-item-resolve/SKILL.md)** -
-  gathers everything available about one already-underway item (its
-  branch/PR state, CI, review comments, tracking-issue discussion, recorded
-  blockers) and proposes a plan to resolve whatever is stalling it, via plan
-  mode, without writing any code. The "Resolve"/"Resume"/"Reconsider" button
-  on a blocked/in-progress/deferred item's dashboard card copies the
-  invoking command for this skill.
-- **[`.claude/skills/add-plan-item/`](.claude/skills/add-plan-item/SKILL.md)** -
-  decides where a newly described piece of work belongs - folded into an
-  unlanded item, a new item in an existing plan, a plan of its own, or
-  tracked nowhere - by running the shared scope check in
-  [`scope-decision.md`](.claude/skills/add-plan-item/scope-decision.md)
-  against live branch and PR state, then proposes the outcome via plan mode.
-- **[`.claude/skills/stacked-pr-maintenance/`](.claude/skills/stacked-pr-maintenance/SKILL.md)** -
-  runs one maintenance pass over a stacked-PR fork-staging workflow: reparents any pull
-  request whose base has landed, closes what has landed by fast-forwarding, restacks
-  branches whose parent moved, and builds the promotion link for every approved,
-  unblocked branch. Deliberately never writes code - a conflict it cannot merge cleanly,
-  or a red check, is reported to the branch's owner and skipped. Invoke it by hand when
-  the stack needs a pass, or register it as a scheduled Routine using the template in
-  [`routine-prompt.md`](.claude/skills/stacked-pr-maintenance/routine-prompt.md). The
-  workflow it maintains, and the read-only tool it computes with, are described in
-  [`.claude/stack/README.md`](.claude/stack/README.md).
 - **[`.claude/skills/local-code-review/`](.claude/skills/local-code-review/SKILL.md)** -
   reviews the current branch against upstream `main` for bugs and
   `AGENTS.md` adherence, then hands back an approval-gated plan to fix every
@@ -241,7 +189,7 @@ Example:
 
 4. 📐 Adhere to Code Style and Principles
 
-    - Code Formatting: We use Black, which is fully PEP 8 compliant. All code must be automatically formatted with Black before submission.
+    - Code Formatting: We use ruff, which is fully PEP 8 compliant, followed by docformatter for docstrings. The `krrood-format` pre-commit hook formats every modified file before submission.
 
     - SOLID Principles: Read and understand the SOLID principles for writing robust, maintainable, and scalable software. This article is a great resource: https://realpython.com/solid-principles-python/
 
@@ -300,7 +248,7 @@ PR Checklist Summary
 
     [ ] AI (Copilot/PyCharm) has reviewed the code.
 
-    [ ] Black has formatted the code (PEP 8 compliant).
+    [ ] The pre-commit hooks have formatted the code (PEP 8 compliant).
 
     [ ] New features/logic have tests (Beyoncé Rule).
 

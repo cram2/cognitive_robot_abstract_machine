@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 
 import numpy as np
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Dict, Iterable, List, Optional, Self, Tuple, Type
+from typing_extensions import Any, Iterable, Self
 
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.distributions import (
     IntegerDistribution,
     SymbolicDistribution,
@@ -16,13 +18,20 @@ from probabilistic_model.distributions.distributions import (
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    DenseEdgeValues,
+    NodeMask,
     SampleArray,
     SampleValues,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Layer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
+    InnerLayerEdges,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
     ProductLayer,
 )
@@ -30,7 +39,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
     SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
-    InputLayer,
+    UnivariateInputLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
@@ -42,6 +51,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_l
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
     ProbabilityTable,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_products import (
+    LayeredProducts,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
@@ -55,21 +67,64 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
     LayerWithLogProbabilities,
     StructuralQuery,
 )
+from probabilistic_model.query_results import LogConditioning, LogMode, LogTruncation
 from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
     SymbolicEncoding,
+)
+from probabilistic_model.probabilistic_circuit.groundable_circuit import (
+    GroundableCircuit,
+    ProductsOfCopies,
+)
+from probabilistic_model.probabilistic_circuit.probabilistic_circuit_representation import (
+    MixtureOverVariable,
+    ProbabilisticCircuitRepresentation,
+    UnnormalizedMixture,
 )
 from probabilistic_model.probabilistic_model import (
     CenterType,
     MomentType,
     OrderType,
     PartialPointType,
-    ProbabilisticModel,
 )
 from probabilistic_model.utils import logsumexp
 
 
+@dataclass
+class LayerNode:
+    """
+    One node of a layer.
+    """
+
+    layer: Layer
+    """
+    The layer.
+    """
+
+    node: int
+    """
+    The index of the node in the layer.
+    """
+
+    def as_circuit(self, variables: SortedSet[Variable]) -> LayeredProbabilisticCircuit:
+        """
+        :param variables: The variables the layers refer to.
+        :return: The circuit rooted at the node, sharing its layers.
+        """
+        root = SumLayer.from_edges(
+            [self.layer],
+            InnerLayerEdges(
+                np.zeros(1, dtype=np.int64),
+                np.zeros(1, dtype=np.int64),
+                np.array([self.node], dtype=np.int64),
+            ),
+            np.zeros(1),
+            1,
+        )
+        return LayeredProbabilisticCircuit(SortedSet(variables), root)
+
+
 @dataclass(eq=False)
-class LayeredProbabilisticCircuit(ProbabilisticModel):
+class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcopyMixin):
     """
     A probabilistic circuit whose units are grouped into layers of numpy arrays.
 
@@ -82,7 +137,9 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
     variables: SortedSet
     """
-    The variables of the circuit. The layers refer to them by their index here.
+    The variables of the circuit.
+
+    The layers refer to them by their index here.
     """
 
     root: Layer
@@ -91,7 +148,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
     """
 
     @property
-    def variable_to_index_map(self) -> Dict[Variable, int]:
+    def variable_to_index_map(self) -> dict[Variable, int]:
         """
         :return: A map from every variable of the circuit to its column index.
         """
@@ -112,11 +169,18 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         return self.root.number_of_parameters
 
     @property
-    def layers(self) -> List[Layer]:
+    def layers(self) -> list[Layer]:
         """
         :return: Every layer of the circuit, parents before children.
         """
         return self.root.all_layers()
+
+    def reset_scopes(self):
+        """
+        Drop the cached scope of every layer, after layers got new child layers.
+        """
+        for layer in self.layers:
+            layer.reset_variables()
 
     def validate(self):
         """
@@ -133,7 +197,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
     # %% symbolic values
 
     @property
-    def symbolic_encodings(self) -> Dict[int, SymbolicEncoding]:
+    def symbolic_encodings(self) -> dict[int, SymbolicEncoding]:
         """
         :return: The encoding of every symbolic variable, keyed by its column.
         """
@@ -186,7 +250,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         }
 
     def store_discrete_probabilities_as(
-        self, table_type: Type[ProbabilityTable]
+        self, table_type: type[ProbabilityTable]
     ) -> Self:
         """
         Store the probabilities of every discrete layer in a table of the given type, in
@@ -219,11 +283,11 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
     def support(self) -> Event:
         return self.root.support_of_nodes(self.variables)[0]
 
-    def log_mode(self, check_determinism: bool = True) -> Tuple[Event, float]:
+    def log_mode(self, check_determinism: bool = True) -> LogMode:
         if check_determinism and not self.is_deterministic():
             raise IntractableError(self)
         modes, values = self.root.log_mode_of_nodes(self.variables)
-        return modes[0], float(values[0])
+        return LogMode(modes[0], float(values[0]))
 
     def sample(self, amount: int) -> SampleArray:
         order = self.root.all_layers()
@@ -266,13 +330,13 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Self], float]:
-        result = self.__deepcopy__()
+    ) -> LogTruncation[Self]:
+        result = copy.deepcopy(self)
         return result.log_truncated_in_place(event, singleton_allowed)
 
     def log_truncated_in_place(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Self], float]:
+    ) -> LogTruncation[Self]:
         """
         Truncate this circuit to an event in place.
 
@@ -282,10 +346,10 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         :param event: The event to truncate to.
         :param singleton_allowed: Whether singletons are allowed in the event.
-        :return: This circuit and the log-probability of the event, or ``(None, -inf)``.
+        :return: This circuit and the log-probability of the event.
         """
         if event.is_empty():
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         event.fill_missing_variables(set(self.variables))
 
@@ -296,42 +360,44 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         simple_events = list(event.simple_sets)
         if self.can_truncate_in_one_batch(simple_events, singleton_allowed):
-            root, total_log_probability = self.truncated_root_of_simple_events(
+            truncation = self.truncated_root_of_simple_events(
                 simple_events, singleton_allowed
             )
-            if root is None:
-                return None, -np.inf
-            self.root = root
-            return self, total_log_probability
+            if truncation.distribution is None:
+                return LogTruncation.impossible()
+            self.root = truncation.distribution
+            return LogTruncation(self, truncation.log_probability)
 
         # no copy per simple set: a structural pass never writes into the layers it was
         # given, it builds new ones, so all the truncations can read the same circuit
-        truncated = []
-        for simple_event in event.simple_sets:
-            root, log_probability = self.truncated_root_of_simple_event(
-                simple_event, singleton_allowed
-            )
-            if root is not None and log_probability > -np.inf:
-                truncated.append((root, log_probability))
+        truncations = [
+            self.truncated_root_of_simple_event(simple_event, singleton_allowed)
+            for simple_event in event.simple_sets
+        ]
+        truncations = [
+            truncation
+            for truncation in truncations
+            if truncation.distribution is not None
+        ]
 
-        if not truncated:
-            return None, -np.inf
+        if not truncations:
+            return LogTruncation.impossible()
+
+        log_probabilities = [truncation.log_probability for truncation in truncations]
 
         # the simple sets of an event are disjoint, so P(E) = sum_k P(E_k)
-        total_log_probability = float(
-            logsumexp(np.array([log_probability for _, log_probability in truncated]))
-        )
+        total_log_probability = float(logsumexp(np.array(log_probabilities)))
 
         self.root = SumLayer.mixture_of(
-            [root for root, _ in truncated],
-            [log_probability for _, log_probability in truncated],
+            [truncation.distribution for truncation in truncations], log_probabilities
         )
+
         self.root.normalize()
-        return self, total_log_probability
+        return LogTruncation(self, total_log_probability)
 
     def truncated_root_of_simple_event(
         self, event: SimpleEvent, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Layer], float]:
+    ) -> LogTruncation[Layer]:
         """
         Build the root of this circuit truncated to a simple event.
 
@@ -341,8 +407,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         :param event: The simple event to truncate to.
         :param singleton_allowed: Whether singletons are allowed in the event.
-        :return: The new root layer and the log-probability of the event, or
-            ``(None, -inf)`` if the event is impossible.
+        :return: The new root layer and the log-probability of the event.
         """
         query = StructuralQuery(self.variables, singleton_allowed)
         truncated = self.root.log_truncated_of_simple_event(
@@ -351,18 +416,18 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         log_probability = float(truncated.log_probabilities[0])
         if log_probability == -np.inf:
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         pruned = truncated.layer.prune(query.log_probabilities)
         if pruned is None:
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         root = pruned.simplify()
         root.normalize()
-        return root, log_probability
+        return LogTruncation(root, log_probability)
 
     def can_truncate_in_one_batch(
-        self, events: List[SimpleEvent], singleton_allowed: bool = False
+        self, events: list[SimpleEvent], singleton_allowed: bool = False
     ) -> bool:
         """
         :param events: The simple events to truncate to.
@@ -376,8 +441,8 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         )
 
     def truncated_root_of_simple_events(
-        self, events: List[SimpleEvent], singleton_allowed: bool = False
-    ) -> Tuple[Optional[Layer], float]:
+        self, events: list[SimpleEvent], singleton_allowed: bool = False
+    ) -> LogTruncation[Layer]:
         """
         Build the root of this circuit truncated to several simple events in one pass.
 
@@ -392,8 +457,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         :param events: The simple events to truncate to.
         :param singleton_allowed: Whether singletons are allowed in the events.
-        :return: The new root and the log-probability of the union of the events, or
-            ``(None, -inf)`` if the events are impossible.
+        :return: The new root and the log-probability of the union of the events.
         """
         query = StructuralQuery(self.variables, singleton_allowed)
         replicated = self.root.log_truncated_of_simple_events(
@@ -404,7 +468,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         # the simple sets of an event are disjoint, so P(E) = sum_k P(E_k)
         total_log_probability = float(logsumexp(node_log_probabilities))
         if total_log_probability == -np.inf:
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         # mix the copy of the root that belongs to each event by the probability of that
         # event, which turns the replicated root into the single root of the result
@@ -426,38 +490,36 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         pruned = mixture.prune(query.log_probabilities)
         if pruned is None:
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         root = pruned.simplify()
         root.normalize()
-        return root, total_log_probability
+        return LogTruncation(root, total_log_probability)
 
     def log_truncated_of_simple_event_in_place(
         self, event: SimpleEvent, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Self], float]:
+    ) -> LogTruncation[Self]:
         """
         Truncate this circuit to a simple event in place.
 
         :param event: The simple event to truncate to.
         :param singleton_allowed: Whether singletons are allowed in the event.
-        :return: This circuit and the log-probability of the event, or ``(None, -inf)``.
+        :return: This circuit and the log-probability of the event.
         """
-        root, log_probability = self.truncated_root_of_simple_event(
-            event, singleton_allowed
-        )
-        if root is None:
-            return None, -np.inf
+        truncation = self.truncated_root_of_simple_event(event, singleton_allowed)
+        if truncation.distribution is None:
+            return LogTruncation.impossible()
 
-        self.root = root
-        return self, log_probability
+        self.root = truncation.distribution
+        return LogTruncation(self, truncation.log_probability)
 
-    def log_conditional(self, point: PartialPointType) -> Tuple[Optional[Self], float]:
-        result = self.__deepcopy__()
+    def log_conditional(self, point: PartialPointType) -> LogConditioning[Self]:
+        result = copy.deepcopy(self)
         return result.log_conditional_in_place(point)
 
     def log_conditional_in_place(
         self, point: PartialPointType
-    ) -> Tuple[Optional[Self], float]:
+    ) -> LogConditioning[Self]:
         """
         Condition this circuit on a partial point in place.
 
@@ -465,7 +527,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         reattached as Dirac layers under a new product root.
 
         :param point: The partial point.
-        :return: This circuit and the log-density at the point, or ``(None, -inf)``.
+        :return: This circuit and the log-density at the point.
         """
         query = StructuralQuery(self.variables)
         conditioned = self.root.log_conditional_of_point(
@@ -474,57 +536,60 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
 
         log_probability = float(conditioned.log_probabilities[0])
         if log_probability == -np.inf:
-            return None, -np.inf
+            return LogConditioning.impossible()
 
         pruned = conditioned.layer.prune(query.log_probabilities)
         if pruned is None:
-            return None, -np.inf
+            return LogConditioning.impossible()
 
         self.root = pruned
 
         original_variables = self.variables
         remaining = [variable for variable in self.variables if variable not in point]
 
-        children: List[Layer] = []
+        children: list[Layer] = []
         if remaining:
             if self.marginal_in_place(remaining) is None:
-                return None, -np.inf
+                return LogConditioning.impossible()
             self.restore_variables(original_variables)
             children.append(self.root)
 
         for variable, value in point.items():
             children.append(
-                self.point_mass_layer(
-                    original_variables.index(variable), make_dirac(variable, value)
+                self.point_masses_layer(
+                    original_variables.index(variable), [make_dirac(variable, value)]
                 )
             )
 
         self.root = ProductLayer.product_of(children).simplify()
         self.root.normalize()
-        return self, log_probability
+        return LogConditioning(self, log_probability)
 
     @staticmethod
-    def point_mass_layer(
-        variable_index: int, distribution: UnivariateDistribution
-    ) -> InputLayer:
+    def point_masses_layer(
+        variable_index: int, distributions: list[UnivariateDistribution]
+    ) -> UnivariateInputLayer:
         """
-        The layer that a conditioned variable is reattached with.
+        The layer of several point masses on one variable, such as the one a conditioned
+        variable is reattached with.
 
         For a discrete variable this is a discrete layer, since a Dirac delta layer can
-        neither hold the symbolic or integer distribution that
+        neither hold the symbolic or integer distributions that
         :func:`~probabilistic_model.distributions.helper.make_dirac` creates for it nor
         answer a set of symbols as an event.
 
-        :param variable_index: The index of the variable of the distribution.
-        :param distribution: A distribution that puts all of its mass on one value, as
-            :func:`~probabilistic_model.distributions.helper.make_dirac` creates it.
-        :return: The input layer with one node that holds the distribution.
+        :param variable_index: The index of the variable of the distributions.
+        :param distributions: Distributions of one type that each put all of their mass
+            on one value, as :func:`~probabilistic_model.distributions.helper.make_dirac`
+            creates them.
+        :return: The input layer with one node per distribution.
         """
-        if isinstance(distribution, SymbolicDistribution):
-            return SymbolicLayer.from_distributions(variable_index, [distribution])
-        if isinstance(distribution, IntegerDistribution):
-            return IntegerLayer.from_distributions(variable_index, [distribution])
-        return DiracDeltaLayer.from_distributions(variable_index, [distribution])
+        first = distributions[0]
+        if isinstance(first, SymbolicDistribution):
+            return SymbolicLayer.from_distributions(variable_index, distributions)
+        if isinstance(first, IntegerDistribution):
+            return IntegerLayer.from_distributions(variable_index, distributions)
+        return DiracDeltaLayer.from_distributions(variable_index, distributions)
 
     def restore_variables(self, variables: SortedSet):
         """
@@ -539,15 +604,33 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
         self.root.remap_variables(remap)
         self.variables = variables
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
-        result = self.__deepcopy__()
+    def marginal(self, variables: Iterable[Variable]) -> Self | None:
+        result = copy.deepcopy(self)
         if result.marginal_in_place(variables) is None:
             return None
         return result
 
-    def marginal_in_place(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal_in_place(self, variables: Iterable[Variable]) -> Self | None:
         """
         Restrict this circuit to a subset of its variables in place.
+
+        :param variables: The variables to keep.
+        :return: This circuit, or ``None`` if it models none of the variables.
+        """
+        if self.restrict_to_variables_in_place(variables) is None:
+            return None
+        return self.simplify()
+
+    def restrict_to_variables(self, variables: Iterable[Variable]) -> Self | None:
+        result = copy.deepcopy(self)
+        return result.restrict_to_variables_in_place(variables)
+
+    def restrict_to_variables_in_place(
+        self, variables: Iterable[Variable]
+    ) -> Self | None:
+        """
+        Restrict this circuit to a subset of its variables in place, without
+        :meth:`simplify`'s removal of the identity layers.
 
         :param variables: The variables to keep.
         :return: This circuit, or ``None`` if it models none of the variables.
@@ -571,7 +654,7 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
             remap[self.variables.index(variable)] = new_index
         new_root.remap_variables(remap)
 
-        self.root = new_root.simplify()
+        self.root = new_root
         self.variables = kept_variables
         return self
 
@@ -633,20 +716,217 @@ class LayeredProbabilisticCircuit(ProbabilisticModel):
             )
         )
 
-    def apply_translation(self, translation: Dict[Variable, float]):
+    def apply_translation(self, translation: dict[Variable, float]):
         values = np.zeros(len(self.variables))
         for variable, value in translation.items():
             values[self.variables.index(variable)] = value
         self.root.apply_translation(values)
 
-    def apply_scaling(self, scaling: Dict[Variable, float]):
+    def apply_scaling(self, scaling: dict[Variable, float]):
         values = np.ones(len(self.variables))
         for variable, value in scaling.items():
             values[self.variables.index(variable)] = value
         self.root.apply_scaling(values)
 
-    def __deepcopy__(self, memo=None) -> Self:
-        return self.__class__(SortedSet(self.variables), self.root.__deepcopy__({}))
+    # %% reading the mixtures
 
-    def __copy__(self) -> Self:
-        return self.__deepcopy__()
+    def unnormalized_mixtures(
+        self, tolerance: float = 1e-6
+    ) -> list[UnnormalizedMixture[LayerNode]]:
+        return [
+            report
+            for layer in self.layers
+            for report in self._unnormalized_mixtures_of_layer(layer, tolerance)
+        ]
+
+    def _unnormalized_mixtures_of_layer(
+        self, layer: Layer, tolerance: float
+    ) -> list[UnnormalizedMixture[LayerNode]]:
+        """
+        :param layer: The layer to read.
+        :param tolerance: How far a mixture's logarithmic weights may sum from zero.
+        :return: One report per node of the layer that mixes and is not normalized.
+        """
+        mixing = layer.nodes_with_components()
+        if not mixing.any():
+            return []
+        log_weight_sums = layer.log_normalization_constants
+        return [
+            UnnormalizedMixture(
+                LayerNode(layer, int(node)), float(log_weight_sums[node])
+            )
+            for node in np.flatnonzero(mixing & (np.abs(log_weight_sums) >= tolerance))
+        ]
+
+    def mixtures_over(
+        self, variables: SortedSet[Variable]
+    ) -> list[MixtureOverVariable[LayerNode]]:
+        cache = QueryCache()
+        return [
+            report
+            for layer in reversed(self.layers)
+            for report in self._mixtures_of_layer_over(layer, variables, cache)
+        ]
+
+    def _mixtures_of_layer_over(
+        self, layer: Layer, variables: SortedSet[Variable], cache: QueryCache
+    ) -> list[MixtureOverVariable[LayerNode]]:
+        """
+        :param layer: The layer to read.
+        :param variables: The variables to read it through.
+        :param cache: The shared cache of the current pass.
+        :return: One report per mixing node and variable the layer models, or nothing
+            if it models none of them.
+        """
+        modelled = self._variables_of_layer(layer, variables)
+        if not modelled:
+            return []
+        return [
+            MixtureOverVariable(
+                LayerNode(layer, mixing.node),
+                variable,
+                [support.marginal([variable]) for support in mixing.supports],
+            )
+            for mixing in layer.component_supports(self.variables, cache=cache)
+            if mixing.mixes()
+            for variable in modelled
+        ]
+
+    def _variables_of_layer(
+        self, layer: Layer, variables: SortedSet[Variable]
+    ) -> list[Variable]:
+        """
+        :param layer: The layer to ask about.
+        :param variables: The variables of interest.
+        :return: Those of them the layer models.
+        """
+        return [
+            variable
+            for variable in variables
+            if variable in self.variables
+            and self.variables.index(variable) in layer.variables
+        ]
+
+    # %% composition
+
+    @classmethod
+    def mixture_of(cls, components: list[Self], log_weights: Iterable[float]) -> Self:
+        log_weights = list(log_weights)
+        ProbabilisticCircuitRepresentation.validate_mixture(components, log_weights)
+        copies = [copy.deepcopy(component) for component in components]
+        root = SumLayer.mixture_of([copy.root for copy in copies], log_weights)
+        root.normalize_own()
+        return cls(SortedSet(components[0].variables), root)
+
+    @classmethod
+    def product_of(cls, factors: list[Self]) -> Self:
+        ProbabilisticCircuitRepresentation.validate_product(factors)
+        variables = SortedSet()
+        for factor in factors:
+            variables |= factor.variables
+        copies = []
+        for factor in factors:
+            factor_copy = copy.deepcopy(factor)
+            factor_copy.restore_variables(variables)
+            copies.append(factor_copy)
+        return cls(
+            variables,
+            ProductLayer.product_of([factor_copy.root for factor_copy in copies]),
+        )
+
+    # %% operations on nodes
+
+    def condition_on_point_in_place(self, point: PartialPointType) -> bool:
+        point = {
+            variable: value
+            for variable, value in point.items()
+            if variable in self.variables
+        }
+        if not point:
+            return True
+        query = StructuralQuery(self.variables)
+        conditioned = self.root.log_conditional_of_point(
+            self.encoded_point(point), query, cache=QueryCache()
+        )
+        if conditioned.log_probabilities[0] == -np.inf:
+            return False
+        self.root = conditioned.layer.prune(query.log_probabilities)
+        self.normalize()
+        return True
+
+    def lowest_product_nodes_over(
+        self, variables: SortedSet[Variable]
+    ) -> list[LayerNode]:
+        variable_indices = [self.variables.index(variable) for variable in variables]
+        result = []
+        found_at_or_below: dict[int, NodeMask] = {}
+        # children before parents
+        for layer in reversed(self.layers):
+            below = layer.nodes_with_child_in(found_at_or_below)
+            found = layer.products_over(variable_indices) & ~below
+            result.extend(LayerNode(layer, int(node)) for node in np.flatnonzero(found))
+            found_at_or_below[id(layer)] = below | found
+        return result
+
+    def subcircuit_at(self, node: LayerNode) -> Self:
+        return node.as_circuit(self.variables)
+
+    def remove_variables_in_place(
+        self, variables: SortedSet[Variable], nodes: list[LayerNode]
+    ) -> list[LayerNode]:
+        kept = np.array([variable not in variables for variable in self.variables])
+        cache = QueryCache()
+        self.root = self.root.marginal(kept, cache=cache)
+        return [
+            LayerNode(cache.result_of(ProductLayer.marginal, node.layer), node.node)
+            for node in nodes
+        ]
+
+    def root_mixture_components(self) -> list[Self]:
+        return [
+            LayerNode(layer, node).as_circuit(self.variables)
+            for layer, node in self.root.mixture_components()
+        ]
+
+    def multiply_nodes_by_mixtures(
+        self,
+        nodes: list[LayerNode],
+        products: ProductsOfCopies,
+        log_weights: DenseEdgeValues | None,
+    ):
+        layered_products = LayeredProducts(products)
+        variables = SortedSet(self.variables) | layered_products.variables
+        self.restore_variables(variables)
+        product_layer = layered_products.product_layer(variables)
+        number_of_nodes = len(nodes)
+        if log_weights is None:
+            attached = product_layer
+            child_nodes = np.zeros(number_of_nodes, dtype=np.int64)
+        else:
+            used = np.isfinite(log_weights)
+            mixing_nodes, product_indices = np.nonzero(used)
+            attached = SumLayer.from_edges(
+                [product_layer],
+                InnerLayerEdges(
+                    mixing_nodes,
+                    np.zeros(len(mixing_nodes), dtype=np.int64),
+                    product_indices,
+                ),
+                log_weights[used],
+                number_of_nodes,
+            )
+            attached.normalize_own()
+            child_nodes = np.arange(number_of_nodes)
+
+        nodes_per_layer: dict[int, tuple[ProductLayer, list[int], list[int]]] = {}
+        for index, node in enumerate(nodes):
+            layer, layer_nodes, children = nodes_per_layer.setdefault(
+                id(node.layer), (node.layer, [], [])
+            )
+            layer_nodes.append(node.node)
+            children.append(child_nodes[index])
+        for layer, layer_nodes, children in nodes_per_layer.values():
+            layer.attach_child_layer(
+                attached, np.array(layer_nodes), np.array(children)
+            )
+        self.reset_scopes()

@@ -5,17 +5,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import combinations
 from itertools import product
-from typing import Dict, Any
+from typing_extensions import TYPE_CHECKING, Self, Callable, ClassVar, Any
 
 import numpy as np
 from lxml import etree
-from typing_extensions import (
-    List,
-    TYPE_CHECKING,
-    Self,
-    Callable,
-    ClassVar,
-)
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -32,8 +25,15 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
-    from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-    from semantic_digital_twin.world_description.world_entity import Body
+    from semantic_digital_twin.robots.robot_parts import (
+        AbstractRobot,
+        EndEffector,
+        KinematicChain,
+    )
+    from semantic_digital_twin.world_description.world_entity import (
+        Body,
+        KinematicStructureEntity,
+    )
 
 
 @dataclass
@@ -127,11 +127,11 @@ class AvoidCollisionBetweenGroups(AvoidCollisionRule):
     Adds collision checks between all pairs of bodies in the given groups to the collision matrix.
     """
 
-    body_group_a: List[Body] = field(default_factory=list)
+    body_group_a: list[Body] = field(default_factory=list)
     """
     List of bodies that should not collide with bodies in `body_group_b`.
     """
-    body_group_b: List[Body] = field(default_factory=list)
+    body_group_b: list[Body] = field(default_factory=list)
     """
     List of bodies that should not collide with bodies in `body_group_a`.
     """
@@ -179,7 +179,15 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
     A subset of bodies managed by the rule. 
     All of them must belong to `robot`.
     If None, all robot bodies are used.
+
+    Bodies without collision geometry are dropped, since no distance is ever kept to
+    one.
     """
+
+    def __post_init__(self):
+        if self.body_subset is None:
+            return
+        self.body_subset = {body for body in self.body_subset if body.has_collision()}
 
     def _update(self, world: World):
         robot_bodies = set(self.robot.bodies_with_collision)
@@ -199,19 +207,24 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
             for body_a, body_b in product(robot_bodies, external_bodies)
         }
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
-            "buffer_zone_distance": self.buffer_zone_distance,
-            "violated_distance": self.violated_distance,
             "robot": to_json(self.robot.id, **kwargs),
             "body_subset": to_json(
-                {b.id for b in self.body_subset} if self.body_subset else None, **kwargs
+                (
+                    {body.id for body in self.body_subset}
+                    if self.body_subset is not None
+                    else None
+                ),
+                **kwargs,
             ),
+            "buffer_zone_distance": to_json(self.buffer_zone_distance, **kwargs),
+            "violated_distance": to_json(self.violated_distance, **kwargs),
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         robot = tracker.get(from_json(data["robot"], **kwargs))
         body_subset_ids = from_json(data["body_subset"], **kwargs)
@@ -219,10 +232,10 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
         if body_subset_ids is not None:
             body_subset = {tracker.get(body_id) for body_id in body_subset_ids}
         return cls(
-            buffer_zone_distance=data["buffer_zone_distance"],
-            violated_distance=data["violated_distance"],
             robot=robot,
             body_subset=body_subset,
+            buffer_zone_distance=from_json(data["buffer_zone_distance"], **kwargs),
+            violated_distance=from_json(data["violated_distance"], **kwargs),
         )
 
 
@@ -276,11 +289,11 @@ class AllowCollisionBetweenGroups(AllowCollisionRule):
     Allows collision checks between two groups of bodies.
     """
 
-    body_group_a: List[Body] = field(default_factory=list)
+    body_group_a: list[Body] = field(default_factory=list)
     """
     The first group of bodies.
     """
-    body_group_b: List[Body] = field(default_factory=list)
+    body_group_b: list[Body] = field(default_factory=list)
     """
     The second group of bodies.
     """
@@ -335,7 +348,7 @@ class AllowCollisionBetweenEndEffectorsAndHeldBodies(AllowCollisionRule):
         self.allowed_collision_pairs = {
             CollisionCheck.create_for_bodies_with_collision(held_body, body)
             for robot in world.get_semantic_annotations_by_type(AbstractRobot)
-            for end_effector in robot.get_end_effectors()
+            for end_effector in robot.all_end_effectors
             for held_body in end_effector.held_bodies
             for body in end_effector.bodies_with_collision
             if body != held_body
@@ -636,6 +649,46 @@ class AllowNeverInCollision(AllowCollisionRule):
 
 
 @dataclass
+class AllowCollisionBetweenFingers(AllowCollisionRule):
+    """
+    Allows collisions between the fingers of every gripper of a robot, which touch each
+    other whenever the gripper closes on nothing.
+
+    Sampling configurations cannot find these pairs: the fingers touch only near the
+    closed state, so they are neither always, never, nor by default in collision.
+    """
+
+    robot: AbstractRobot = field(kw_only=True)
+    """
+    The robot whose grippers' fingers may touch.
+    """
+
+    def _update(self, world: World):
+        # robot_part_mixins imports the robot parts, which import the world
+        from semantic_digital_twin.robots.robot_part_mixins import HasFingers
+
+        self.allowed_collision_pairs = {
+            CollisionCheck.create_for_bodies_with_collision(body_a, body_b)
+            for end_effector in self.robot.all_end_effectors
+            if isinstance(end_effector, HasFingers)
+            for finger_a, finger_b in combinations(end_effector.fingers, 2)
+            for body_a in self._finger_bodies(finger_a)
+            for body_b in self._finger_bodies(finger_b)
+        }
+
+    @staticmethod
+    def _finger_bodies(finger: KinematicChain) -> list[Body]:
+        """
+        :param finger: A finger of a gripper.
+        :return: Its bodies with collision geometry, without the one it is mounted on,
+            which every finger of the gripper shares.
+        """
+        return [
+            body for body in finger.bodies_with_collision if body is not finger.root
+        ]
+
+
+@dataclass
 class AllowCollisionForAdjacentPairs(AllowCollisionRule):
     """
     Allow collision between body pairs of the whole world model that are connected by a chain that has no controllable connection.
@@ -643,20 +696,41 @@ class AllowCollisionForAdjacentPairs(AllowCollisionRule):
     """
 
     def _update(self, world: World):
-        for body_a, body_b in combinations(world.bodies_with_collision, 2):
-            if self._no_controlled_connection_between_bodies(world, body_a, body_b):
+        bodies_with_collision = world.bodies_with_collision
+        bodies_by_highest_uncontrolled_ancestor = defaultdict(list)
+        for body in bodies_with_collision:
+            bodies_by_highest_uncontrolled_ancestor[
+                self._highest_ancestor_reached_without_controlled_connection(body)
+            ].append(body)
+        for bodies in bodies_by_highest_uncontrolled_ancestor.values():
+            for body_a, body_b in combinations(bodies, 2):
                 self.allowed_collision_pairs.add(
                     CollisionCheck.create_for_bodies_with_collision(body_a, body_b)
                 )
+        bodies_with_collision = set(bodies_with_collision)
+        for body in bodies_with_collision:
+            parent = body.parent_kinematic_structure_entity
+            if parent in bodies_with_collision:
+                self.allowed_collision_pairs.add(
+                    CollisionCheck.create_for_bodies_with_collision(parent, body)
+                )
 
-    def _no_controlled_connection_between_bodies(
-        self, world: World, body_a: Body, body_b: Body
-    ) -> bool:
-        return (
-            not world.is_controlled_connection_in_chain(body_a, body_b)
-            or body_a == body_b.parent_kinematic_structure_entity
-            or body_b == body_a.parent_kinematic_structure_entity
-        )
+    @staticmethod
+    def _highest_ancestor_reached_without_controlled_connection(
+        body: Body,
+    ) -> KinematicStructureEntity:
+        """
+        :param body: The body to start from.
+        :return: The highest ancestor of `body`, or `body` itself, that no controlled
+            connection separates from `body`. Two bodies are connected by a chain
+            without a controlled connection exactly if they share this ancestor.
+        """
+        ancestor = body
+        parent_connection = ancestor.parent_connection
+        while parent_connection is not None and not parent_connection.is_controlled:
+            ancestor = parent_connection.parent
+            parent_connection = ancestor.parent_connection
+        return ancestor
 
 
 @dataclass
@@ -747,7 +821,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             )
         return self
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "allowed_body_ids": to_json(
@@ -757,7 +831,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
         allowed_body_ids = from_json(data["allowed_body_ids"], **kwargs)
         allowed_bodies = {tracker.get(_id) for _id in allowed_body_ids}
@@ -787,8 +861,8 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         Computes a self-collision matrix for the given robot by applying various rules.
 
         This method systematically identifies body pairs that should be allowed to collide by
-        checking for adjacent links, default collisions, always-in-collision pairs, and
-        never-in-collision pairs.
+        checking for adjacent links, the fingers of a gripper, default collisions,
+        always-in-collision pairs, and never-in-collision pairs.
 
         :param robot: The robot for which to compute the matrix.
         :param distance_threshold_zero: Threshold for default collision check.
@@ -817,6 +891,12 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
 
         # %%
         rule = AllowCollisionForAdjacentPairs()
+        rule.update(robot._world)
+        rule.apply_to_collision_matrix(collision_matrix)
+        self.allowed_collision_pairs.update(rule.allowed_collision_pairs)
+
+        # %%
+        rule = AllowCollisionBetweenFingers(robot=robot)
         rule.update(robot._world)
         rule.apply_to_collision_matrix(collision_matrix)
         self.allowed_collision_pairs.update(rule.allowed_collision_pairs)

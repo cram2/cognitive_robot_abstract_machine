@@ -1,25 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 
 from typing_extensions import TYPE_CHECKING
 
-from krrood.exceptions import DataclassException
-from coraplex.datastructures.enums import Arms
-from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from giskardpy.motion_statechart.exceptions import (
+    CollisionViolatedError,
+    NoProgressError,
+)
+from cramph.exceptions import ExecutionFailure
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
-    from coraplex.validation.goal_validator import MultiJointPositionGoalValidator
-    from coraplex.language import LanguageNode
-    from semantic_digital_twin.datastructures.definitions import StaticJointState
+    from cramph.node import StatechartNode
 
 
 @dataclass
-class PlanFailure(DataclassException):
+class PlanFailure(ExecutionFailure):
     """
     Base class for all exceptions that are related to plan errors.
+
     Can also be raised directly as a generic plan failure.
     """
 
@@ -30,107 +33,137 @@ class PlanFailure(DataclassException):
         return ""
 
 
+# %% what a plan can recover from
+
+
+@dataclass
+class MotionMadeNoProgress(PlanFailure):
+    """
+    Raised when a motion stopped approaching its goal.
+
+    The chart cancels itself with a
+    :class:`~giskardpy.motion_statechart.exceptions.NoProgressError`, which says this
+    attempt did not work rather than that the plan cannot go on. Wrapping it where it
+    crosses into a plan is what lets a plan choose an alternative by catching
+    :class:`PlanFailure` alone.
+    """
+
+    no_progress: NoProgressError
+    """
+    The stall the motion reported, which names the tasks that stopped converging.
+    """
+
+    def error_message(self) -> str:
+        return self.no_progress.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.no_progress.suggest_correction()
+
+
+@dataclass
+class MotionExceededSimulationTimeLimit(PlanFailure):
+    """
+    Raised when a simulated plan ran for longer than the actions it started are allowed
+    to take together.
+
+    The chart's stall monitor ends a motion that stopped approaching its goal, but one
+    that keeps creeping towards it, or that is held and so never counts as stalled,
+    would tick forever without this limit.
+    """
+
+    time_limit: timedelta
+    """
+    The simulated time the plan was allowed.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The plan did not end within {self.time_limit.total_seconds()} s of "
+            f"simulated time."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that every goal of the plan can be reached and that nothing holds "
+            "the chart, or raise SimulatedPlanExecutor.simulation_time_per_action for "
+            "actions that are meant to take this long."
+        )
+
+
+@dataclass
+class MotionViolatedCollisionAvoidance(PlanFailure):
+    """
+    Raised when a motion brought bodies closer to each other than collision avoidance
+    allows.
+
+    Like :class:`MotionMadeNoProgress`, this says the attempt did not work from where it
+    started rather than that the plan cannot go on, so a plan can try another candidate
+    by catching :class:`PlanFailure` alone.
+    """
+
+    violation: CollisionViolatedError
+    """
+    The violation the motion reported, which names the body pairs that came too close.
+    """
+
+    def error_message(self) -> str:
+        return self.violation.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.violation.suggest_correction()
+
+
 @dataclass
 class EmptyUnderspecified(PlanFailure):
     """
-    Raised when a plan is empty.
+    Raised when an underspecified statement yields no action that succeeds.
     """
 
-
-@dataclass
-class AllChildrenFailed(PlanFailure):
+    node: StatechartNode
     """
-    Thrown when all children of a plan node failed.
-    """
-
-    language_node: LanguageNode
-    """
-    The language node where all children failed.
+    The node whose statement ran out of actions.
     """
 
     def error_message(self) -> str:
-        return f"All children of {self.language_node} failed"
+        return f"{self.node} ran out of actions to try."
 
     def suggest_correction(self) -> str:
-        return ""
+        return "Widen the domains of the statement, or check why its actions fail."
 
 
 @dataclass
-class RepetitionsExhausted(PlanFailure):
+class CandidateLimitReached(EmptyUnderspecified):
     """
-    Thrown when a repeating plan node ran out of attempts.
-    """
-
-    language_node: LanguageNode
-    """
-    The repeating node whose children never succeeded.
+    Raised when an underspecified step has tried as many candidates as it may without
+    one of them succeeding.
     """
 
-    maximum_repetitions: int
+    candidate_limit: int
     """
-    How many attempts were allowed.
+    How many candidates it was allowed to try.
     """
 
     def error_message(self) -> str:
         return (
-            f"{self.language_node} attempted its children {self.maximum_repetitions} "
-            f"times without succeeding."
+            f"{self.node} tried {self.candidate_limit} candidates without one of them "
+            f"succeeding."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Allow more repetitions, or check whether the children can succeed at all "
-            "from the state each attempt starts in."
-        )
-
-
-@dataclass
-class PlanCancelled(PlanFailure):
-    """
-    Thrown when a monitor cancelled the plan it was watching.
-    """
-
-    language_node: LanguageNode
-    """
-    The node whose monitor cancelled the plan.
-    """
-
-    def error_message(self) -> str:
-        return f"The monitor of {self.language_node} cancelled the plan."
-
-    def suggest_correction(self) -> str:
-        return (
-            "The world is no longer in the state the rest of the plan assumed, so plan "
-            "again from the state the robot is in now."
+            "Allow more candidates, through the step's own limit or the context's "
+            "candidates_to_try, or check whether any candidate can succeed at all."
         )
 
 
 @dataclass
 class RobotInCollision(PlanFailure):
-    """Thrown when the robot is in collision with the environment."""
+    """
+    Thrown when the robot is in collision with the environment.
+    """
 
     def error_message(self) -> str:
         return "The robot is in collision with the environment."
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class ConfigurationNotReached(PlanFailure):
-    """"""
-
-    goal_validator: MultiJointPositionGoalValidator
-    """
-    The goal validator that was used to check if the goal was reached.
-    """
-    configuration_type: StaticJointState
-    """
-    The configuration type that should be reached.
-    """
-
-    def error_message(self) -> str:
-        return f"Configuration type: {self.configuration_type.name} not reached"
 
     def suggest_correction(self) -> str:
         return ""
@@ -169,7 +202,7 @@ class BodyUnfetchable(PlanFailure):
     The body that cannot be fetched.
     """
 
-    arm: Arms
+    arm: Arm
     """
     The arm from which the body cannot be fetched.
     """
@@ -184,7 +217,7 @@ class BodyUnfetchable(PlanFailure):
 @dataclass
 class EndEffectorDidNotReachTarget(PlanFailure):
     """
-    Raised when an end effector did not reach its target during a motion
+    Raised when an end effector did not reach its target during a motion.
     """
 
     end_effector: EndEffector

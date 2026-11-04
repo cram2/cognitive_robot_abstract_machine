@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from typing_extensions import FrozenSet
-
 
 class Countability(StrEnum):
     """Whether a noun denotes discrete instances (countable) or an undifferentiated mass."""
@@ -16,7 +14,7 @@ class Countability(StrEnum):
     *"money"*, not *"a money"* / *"the money"* when first mentioned generically."""
 
 
-_UNCOUNTABLE_NOUNS: FrozenSet[str] = frozenset(
+_UNCOUNTABLE_NOUNS: frozenset[str] = frozenset(
     {
         # Materials and substances
         "water",
@@ -217,7 +215,7 @@ deliberately excluded so they keep their article."""
 class NounCountability:
     """Classifies a noun as countable or uncountable against a curated mass-noun lexicon."""
 
-    uncountable_nouns: FrozenSet[str] = _UNCOUNTABLE_NOUNS
+    uncountable_nouns: frozenset[str] = _UNCOUNTABLE_NOUNS
     """The mass-noun lexicon consulted; overridable so a domain may extend it."""
 
     def classify(self, noun: str) -> Countability:

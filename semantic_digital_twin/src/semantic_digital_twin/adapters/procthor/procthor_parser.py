@@ -4,14 +4,20 @@ import math
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, Tuple, Union, Set, Optional, List, Any, Self
+from typing_extensions import assert_never, Any, Self
 
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
-from typing_extensions import assert_never
 
+from semantic_digital_twin.adapters.procthor.exceptions import (
+    ProcthorDoorWallNotFound,
+    UnpairedProcthorWalls,
+)
+from semantic_digital_twin.specifications.connections import (
+    RevoluteConnectionSpecification,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 
@@ -25,7 +31,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Handle,
     Door,
-    Hinge,
     DoubleDoor,
     Wall,
     Kitchen,
@@ -33,7 +38,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bathroom,
     LivingRoom,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
@@ -42,6 +47,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_source import WorldSource
 
 
 @dataclass
@@ -204,9 +210,9 @@ class ProcthorDoor:
         self,
         semantic_handle_position: SemanticPositionDescription,
         world: World,
-        name: Optional[str] = None,
-        scale: Optional[Scale] = None,
-        world_T_door: Optional[HomogeneousTransformationMatrix] = None,
+        name: str | None = None,
+        scale: Scale | None = None,
+        world_T_door: HomogeneousTransformationMatrix | None = None,
     ) -> Door:
         """
         Parses the parameters according to the single door assumptions, and returns a single door factory.
@@ -240,21 +246,10 @@ class ProcthorDoor:
             )
             door.add(handle)
 
-        with world.modify_world():
-            world_T_hinge = door.calculate_world_T_hinge_based_on_handle(Vector3.Z())
-            hinge = Hinge.create_with_new_body_in_world(
-                name=f"{name}_hinge",
-                world=world,
-                world_root_T_self=world_T_hinge,
-                parent_connection_specification=Hinge.parent_connection_specification(
-                    axis=Vector3.Z()
-                ),
-            )
-
-            door.add(hinge)
+        door.mount_on_movable_joint(RevoluteConnectionSpecification(axis=Vector3.Z()))
         return door
 
-    def add_to_world(self, world: World) -> Union[Door, DoubleDoor]:
+    def add_to_world(self, world: World) -> Door | DoubleDoor:
         """
         Returns a Factory for the door, either a DoorFactory or a DoubleDoorFactory,
         depending on its name. If the door's name contains "double", it is treated as a double door.
@@ -285,12 +280,12 @@ class ProcthorWall:
     the wall polygon.
     """
 
-    wall_dicts: List[dict] = field(default_factory=list)
+    wall_dicts: list[dict] = field(default_factory=list)
     """
     List of dictionaries, where each dictionary represents one wall polygon in procthor
     """
 
-    door_dicts: List[dict] = field(default_factory=list)
+    door_dicts: list[dict] = field(default_factory=list)
     """
     List of dictionaries, where each dictionary represents one door hole in the wall polygon
     """
@@ -305,17 +300,17 @@ class ProcthorWall:
     Name of the wall, constructed from the corners of the wall polygon and the room numbers associated with the wall.
     """
 
-    x_coords: List[float] = field(init=False)
+    x_coords: list[float] = field(init=False)
     """
     List of unique X-coordinates of the wall polygon, extracted in order from the wall dictionary. 
     """
 
-    y_coords: List[float] = field(init=False)
+    y_coords: list[float] = field(init=False)
     """
     List of unique Y-coordinates of the wall polygon, extracted in order from the wall dictionary.
     """
 
-    z_coords: List[float] = field(init=False)
+    z_coords: list[float] = field(init=False)
     """
     List of unique Z-coordinates of the wall polygon, extracted in order from the wall dictionary.
     """
@@ -451,7 +446,7 @@ class ProcthorRoom:
     Name of the room, constructed from the room type and room ID.
     """
 
-    centered_polytope: List[Point3] = field(init=False)
+    centered_polytope: list[Point3] = field(init=False)
     """
     Polytope representing the room's floor polygon, centered around its local 0, 0, 0 coordinate
     """
@@ -557,7 +552,7 @@ class ProcthorObject:
             unity_to_semantic_digital_twin_transform(world_T_obj)
         )
 
-    def get_world(self) -> Optional[World]:
+    def get_world(self) -> World | None:
         """
         Returns a World instance with this object at its root, importing it from the database using its assetId.
         If the object has children, they are imported recursively and connected to the parent object.
@@ -573,7 +568,6 @@ class ProcthorObject:
             return None
 
         with body_world.modify_world():
-
             for child in self.object_dict.get("children", {}):
                 child_object = ProcthorObject(child, self.session)
                 world_T_child = child_object.world_T_obj
@@ -627,7 +621,7 @@ def unity_to_semantic_digital_twin_transform(
 
 
 @dataclass
-class ProcTHORParser:
+class ProcTHORParser(WorldSource):
     """
     Parses a Procthor JSON file into a semantic digital twin World.
     """
@@ -636,28 +630,26 @@ class ProcTHORParser:
     """
     The name of the world that is extracted from the house."""
 
-    house: Dict[str, Any]
+    house: dict[str, Any]
     """
     The house as JSON.
     """
 
-    session: Optional[Session] = field(default=None)
+    session: Session | None = field(default=None)
     """
     SQLAlchemy session to interact with the database to import objects.
     """
 
     @classmethod
-    def from_file(cls, file_path: str, session: Optional[Session] = None) -> Self:
+    def from_file(cls, file_path: str, session: Session | None = None) -> Self:
         return cls(
             name=Path(file_path).stem, house=json.load(open(file_path)), session=session
         )
 
-    def parse(self) -> World:
+    def create_world(self) -> World:
         """
-        Parses a JSON file from procthor into a world.
-        Room floor areas are constructed from the supplied polygons
-        Walls and doors are constructed from the supplied polygons
-        Objects are imported from the database
+        :return: A world holding the house's rooms, walls and doors, and its objects if
+            :attr:`session` is given to import them from.
         """
 
         house_name = self.name
@@ -678,7 +670,7 @@ class ProcTHORParser:
         return world
 
     @staticmethod
-    def import_rooms(world: World, rooms: List[Dict]):
+    def import_rooms(world: World, rooms: list[dict]):
         """
         Imports rooms from the Procthor JSON file into ProcthorRoom instances.
 
@@ -689,7 +681,7 @@ class ProcTHORParser:
             procthor_room = ProcthorRoom(room_dict=room)
             procthor_room.add_to_world(world)
 
-    def import_objects(self, world: World, objects: List[Dict]):
+    def import_objects(self, world: World, objects: list[dict]):
         """
         Imports objects from the Procthor JSON file into ProcthorObject instances.
 
@@ -709,7 +701,7 @@ class ProcTHORParser:
             world.merge_world(obj_world, obj_connection)
 
     def import_walls_and_doors(
-        self, world: World, walls: List[Dict], doors: List[Dict]
+        self, world: World, walls: list[dict], doors: list[dict]
     ):
         """
         Imports walls from the Procthor JSON file into ProcthorWall instances.
@@ -725,21 +717,19 @@ class ProcTHORParser:
 
     @staticmethod
     def _build_procthor_wall_from_polygon(
-        walls: List[Dict],
-    ) -> List[ProcthorWall]:
+        walls: list[dict],
+    ) -> list[ProcthorWall]:
         """
         Groups walls by their polygon and creates ProcthorWall instances for each group.
 
         :param walls: List of walls without doors
 
         :return: List of ProcthorWall instances, each representing a pair of walls with the same polygon.
-        :raises AssertionError: If the number of walls is not even, as we assume that walls are always paired.
+        :raises UnpairedProcthorWalls: If the number of walls is not even.
         """
 
-        assert len(walls) % 2 == 0, (
-            f"Expected an even number of walls, but found {len(walls)}. "
-            f"We assumed that this is never the case, this case may need to be handled now."
-        )
+        if len(walls) % 2 != 0:
+            raise UnpairedProcthorWalls(wall_count=len(walls))
 
         def _polygon_key(poly):
             return frozenset((p["x"], p["y"], p["z"]) for p in poly)
@@ -757,8 +747,8 @@ class ProcTHORParser:
 
     @staticmethod
     def _build_procthor_wall_from_door(
-        walls: List[Dict], doors: List[Dict]
-    ) -> Tuple[List[ProcthorWall], Set[str]]:
+        walls: list[dict], doors: list[dict]
+    ) -> tuple[list[ProcthorWall], set[str]]:
         """
         Builds ProcthorWall instances from the provided walls and doors, associating each door with its corresponding walls.
 
@@ -766,7 +756,7 @@ class ProcTHORParser:
         :param doors: List of door dictionaries
 
         :returns: Tuple containing a list of ProcthorWall instances and a set of used wall IDs.
-        :raises AssertionError: If a door does not have exactly two walls associated with it.
+        :raises ProcthorDoorWallNotFound: If a door refers to a wall that is not given.
         """
         walls_by_id = {wall["id"]: wall for wall in walls}
         used_wall_ids = set()
@@ -776,13 +766,10 @@ class ProcTHORParser:
             wall_ids = [door.get("wall0"), door.get("wall1")]
             found_walls = []
             for wall_id in wall_ids:
-                wall = walls_by_id[wall_id]
-                found_walls.append(wall)
+                if wall_id not in walls_by_id:
+                    raise ProcthorDoorWallNotFound(door_id=door["id"], wall_id=wall_id)
+                found_walls.append(walls_by_id[wall_id])
                 used_wall_ids.add(wall_id)
-
-            assert (
-                len(found_walls) == 2
-            ), f"Door {door['id']} should have two walls, but found {len(found_walls)}."
 
             procthor_walls.append(
                 ProcthorWall(door_dicts=[door], wall_dicts=found_walls)
@@ -791,8 +778,8 @@ class ProcTHORParser:
         return procthor_walls, used_wall_ids
 
     def _build_procthor_walls(
-        self, walls: List[Dict], doors: List[Dict]
-    ) -> List[ProcthorWall]:
+        self, walls: list[dict], doors: list[dict]
+    ) -> list[ProcthorWall]:
         """
         Builds ProcthorWall instances from the provided walls and doors.
 
@@ -813,7 +800,7 @@ class ProcTHORParser:
         return procthor_walls
 
 
-def get_world_by_asset_id(session: Session, asset_id: str) -> Optional[World]:
+def get_world_by_asset_id(session: Session, asset_id: str) -> World | None:
     """
     Queries the database for a WorldMapping with the given asset_id provided by the procthor file.
     """

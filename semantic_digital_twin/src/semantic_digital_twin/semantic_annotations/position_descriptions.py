@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from enum import Enum, IntEnum
 from functools import reduce
-from typing import List, Tuple
 
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     uniform_measure_of_simple_event,
@@ -75,12 +74,12 @@ class SemanticPositionDescription:
     sample aa 2d pose from the resulting event
     """
 
-    horizontal_direction_chain: List[HorizontalSemanticDirection]
+    horizontal_direction_chain: list[HorizontalSemanticDirection]
     """
     Describes the sequence of zooms in the horizontal direction (Y axis).
     """
 
-    vertical_direction_chain: List[VerticalSemanticDirection]
+    vertical_direction_chain: list[VerticalSemanticDirection]
     """
     Describes the sequence of zooms in the vertical direction (Z axis).
     """
@@ -145,7 +144,7 @@ class SemanticPositionDescription:
 
         return SimpleEvent.from_data({axis: current_interval})
 
-    def sample_point_from_event(self, event: Event) -> Tuple[float, float]:
+    def sample_point_from_event(self, event: Event) -> tuple[float, float]:
         """
         Sample a 2D point from the given event by applying the zooms defined in the
         semantic position description.

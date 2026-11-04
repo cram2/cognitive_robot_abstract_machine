@@ -1,7 +1,6 @@
 import itertools
 from dataclasses import dataclass
 from math import factorial
-from typing import Dict, List
 
 import pytest
 
@@ -759,6 +758,21 @@ def test_predicate_taking_one_variable_attribute_twice():
     assert query.tolist() == []
 
 
+def test_predicate_taking_one_variable_attribute_twice_keeps_what_satisfies_it():
+    """
+    An attribute filling two arguments of a predicate is compared with itself, so a
+    predicate every value satisfies against itself keeps every candidate.
+    """
+    values = [0.0, 1.0, 2.0]
+    positions = [KRROODPosition(x, x, 0.0) for x in values]
+    position = variable(KRROODPosition, positions)
+    query = entity(position).where(
+        IsGreaterThanByMargin(position.x, position.x, margin=-1.0)
+    )
+
+    assert query.tolist() == positions
+
+
 def test_predicate_argument_left_out_takes_its_default():
     """
     A predicate argument the query does not pass takes the predicate's default.
@@ -1497,14 +1511,14 @@ def test_indexing_on_dict_field():
     @dataclass
     class ItemWithDictionary:
         name: str
-        attrs: Dict[str, int]
+        attrs: dict[str, int]
 
         def __hash__(self):
             return hash(self.name)
 
     @dataclass(eq=False)
     class WorldWithItems:
-        items: List[ItemWithDictionary]
+        items: list[ItemWithDictionary]
 
         def __hash__(self):
             return hash(id(self))
@@ -1532,7 +1546,7 @@ def test_indexing_2():
 
     @dataclass
     class BodyWithShapes:
-        shapes: List[ShapeWithColor]
+        shapes: list[ShapeWithColor]
 
         def __hash__(self):
             return id(self)
@@ -1578,7 +1592,7 @@ def test_presentation_example():
     class Robot:
         name: str
         battery: int
-        tasks: List[Task]
+        tasks: list[Task]
 
     robots = [
         Robot("Robot1", 100, [Task("Task1", True), Task("Task2", False)]),

@@ -32,39 +32,37 @@ Detectors are the logic units responsible for identifying events. They process t
 
 ### StateCharts
 
-The `SegmindStatechart` orchestrates multiple detectors. It acts as a container that ticks all registered detectors against a shared `SegmindContext`.
+Detectors are ordinary nodes of a cramph `Statechart`, ticked against a shared `SegmindContext`. `DetectorStatechartBuilder` builds such a statechart from a list of detectors.
 
 
 
 ## Example Usage
 
-The following example demonstrates how to set up a `SegmindStatechart` to detect events in a simulation world.
+The following example demonstrates how to set up a statechart of detectors to detect events in a simulation world.
 
 ```python
+from cramph.context import StatechartContext
 from segmind.detectors.base import SegmindContext
-from segmind.event_logger import EventLogger
-from segmind.statecharts.segmind_statechart import SegmindStatechart
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
+from cramph.executor import StatechartExecutor
+from segmind.episode_segmenter import EpisodeSegmentation
 
-# 1. Setup Context and Logger
-logger = EventLogger()
-context = SegmindContext(world=your_simulation_world, logger=logger)
+# 1. Setup Context and Executor; EpisodeSegmentation adds the SegmindContext with its event logger
+context = StatechartContext(world=your_simulation_world)
+executor = StatechartExecutor(context=context, extensions=[EpisodeSegmentation()])
+logger = context.require_extension(SegmindContext).logger
 
-# 2. Build Statechart
-statechart_factory = SegmindStatechart()
-statechart = statechart_factory.build_statechart(context)
-
-# 3. Initialize Executor
-executor = EpisodeSegmenterExecutor(context=context)
+# 2. Build and compile the Statechart
+statechart = DetectorStatechartBuilder().build(executor.context)
 executor.compile(statechart)
 
-# 4. Simulation Loop
+# 3. Simulation Loop
 while simulation_running:
     # Update your world state here
     # ...
     executor.tick()
 
-# 5. Retrieve detected events
+# 4. Retrieve detected events
 for event in logger.get_events():
     print(f"Detected {type(event).__name__} at {event.timestamp}")
 ```

@@ -11,8 +11,9 @@ from random_events.variable import Continuous
 
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
+from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
-    ProbabilisticCircuit,
+    DifferentiableLayeredCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as NXProbabilisticCircuit,
@@ -89,7 +90,9 @@ if not load_from_disc:
     result.normalize()
 
     rustworkx_model = result.probabilistic_circuit
-    jax_model = ProbabilisticCircuit.from_rustworkx(rustworkx_model, True)
+    jax_model = CircuitRepresentations().convert(
+        rustworkx_model, DifferentiableLayeredCircuit
+    )
 
     if save_to_disc:
         with open(rustworkx_model_path, "w") as f:
@@ -100,7 +103,7 @@ else:
     with open(rustworkx_model_path, "r") as f:
         rustworkx_model = NXProbabilisticCircuit.from_json(json.loads(f.read()))
     with open(jax_model_path, "r") as f:
-        jax_model = ProbabilisticCircuit.from_json(json.loads(f.read()))
+        jax_model = DifferentiableLayeredCircuit.from_json(json.loads(f.read()))
 
 # nx_model.plot_structure()
 # plt.show()
@@ -151,7 +154,7 @@ figure = px.line(
 figure.show()
 
 jax_model.root = root
-rustworkx_model = jax_model.to_rustworkx(True)
+rustworkx_model = CircuitRepresentations().convert(jax_model, NXProbabilisticCircuit)
 figure = go.Figure(rustworkx_model.plot(), rustworkx_model.plotly_layout())
 figure.update_layout(title="Fitted model guess")
 figure.show()

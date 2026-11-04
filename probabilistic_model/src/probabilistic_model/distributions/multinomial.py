@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Self, Any, Iterable, List, Optional, Tuple, Dict
+from typing_extensions import Self, Any, Iterable
 
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     SymbolicDistribution,
@@ -14,23 +15,24 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     leaf,
 )
 from probabilistic_model.probabilistic_model import ProbabilisticModel
+from probabilistic_model.query_results import LogConditioning, LogMode, LogTruncation
 from probabilistic_model.utils import MissingDict
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Symbolic, Variable
 
 
 @dataclass
-class MultinomialDistribution(ProbabilisticModel):
+class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
     """
     A multinomial distribution over symbolic random variables.
     """
 
-    distribution_variables: Tuple[Symbolic, ...]
+    distribution_variables: tuple[Symbolic, ...]
     """
     The variables of the distribution.
     """
 
-    probabilities: Optional[npt.NDArray] = field(default=None)
+    probabilities: npt.NDArray | None = field(default=None)
     """
     The probability mass function.
 
@@ -50,7 +52,7 @@ class MultinomialDistribution(ProbabilisticModel):
             raise ShapeMismatchError(self.variables, self.probabilities.shape)
 
     @property
-    def variables(self) -> Tuple[Symbolic, ...]:
+    def variables(self) -> tuple[Symbolic, ...]:
         return tuple(self.distribution_variables)
 
     @property
@@ -76,7 +78,7 @@ class MultinomialDistribution(ProbabilisticModel):
         result.normalize()
         return result
 
-    def log_mode(self) -> Tuple[Event, float]:
+    def log_mode(self) -> LogMode:
         likelihood = np.max(self.probabilities)
         indices_of_maximum = np.transpose(
             np.asarray(self.probabilities == likelihood).nonzero()
@@ -101,38 +103,13 @@ class MultinomialDistribution(ProbabilisticModel):
             else:
                 mode |= current_mode
 
-        return mode, np.log(likelihood)
+        return LogMode(mode, np.log(likelihood))
 
-    def log_conditional(
-        self, point: Dict[Variable, Any]
-    ) -> Tuple[Optional[Self], float]:
+    def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         event = SimpleEvent.from_data(point)
         event.fill_missing_variables(self.variables)
-        return self.log_truncated(event.as_composite_set())
-
-    def __copy__(self) -> Self:
-        """
-        :return: a shallow copy of the distribution.
-        """
-        return MultinomialDistribution(self.variables, self.probabilities)
-
-    def __deepcopy__(self, memo=None) -> Self:
-        """
-        :param memo: A dictionary that is used to keep track of objects that have already been copied.
-        :return: a deep copy of the distribution.
-        """
-        if memo is None:
-            memo = {}
-        id_self = id(self)
-        if id_self in memo:
-            return memo[id_self]
-        import copy
-
-        variables = copy.deepcopy(self.variables, memo)
-        probabilities = copy.deepcopy(self.probabilities, memo)
-        result = MultinomialDistribution(variables, probabilities)
-        memo[id_self] = result
-        return result
+        truncation = self.log_truncated(event.as_composite_set())
+        return LogConditioning(truncation.distribution, truncation.log_probability)
 
     def __eq__(self, other: Self) -> bool:
         """
@@ -153,7 +130,7 @@ class MultinomialDistribution(ProbabilisticModel):
             self.probabilities
         )
 
-    def to_tabulate(self) -> List[List[str]]:
+    def to_tabulate(self) -> list[list[str]]:
         """
         :return: a pretty table of the distribution.
         """
@@ -182,7 +159,7 @@ class MultinomialDistribution(ProbabilisticModel):
 
     def log_truncated(
         self, event: Event, singleton_allowed: bool = False
-    ) -> Tuple[Optional[Self], float]:
+    ) -> LogTruncation[Self]:
         probabilities = np.zeros_like(self.probabilities)
 
         for simple_event in event.simple_sets:
@@ -190,13 +167,13 @@ class MultinomialDistribution(ProbabilisticModel):
 
         sum_of_probabilities = probabilities.sum()
         if sum_of_probabilities == 0:
-            return None, -np.inf
+            return LogTruncation.impossible()
 
         result = MultinomialDistribution(self.variables, probabilities)
         result.normalize()
-        return result, np.log(sum_of_probabilities)
+        return LogTruncation(result, np.log(sum_of_probabilities))
 
-    def indices_from_simple_event(self, event: SimpleEvent) -> Tuple[List[int], ...]:
+    def indices_from_simple_event(self, event: SimpleEvent) -> tuple[list[int], ...]:
         """
         Calculate the indices that can be used to access the underlying probability
         array from a simple event.
@@ -281,7 +258,7 @@ class MultinomialDistribution(ProbabilisticModel):
 
         return result
 
-    def encode_full_evidence_event(self, event: Iterable) -> List[int]:
+    def encode_full_evidence_event(self, event: Iterable) -> list[int]:
         """
         Encode a full evidence event into a list of integers.
 

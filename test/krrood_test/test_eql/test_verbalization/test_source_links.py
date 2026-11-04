@@ -18,7 +18,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing_extensions import Optional
 from unittest.mock import patch
 
 import pytest
@@ -79,7 +78,7 @@ class _ConstantResolver:
     def __init__(self, url: str = "http://example.com/source") -> None:
         self._url = url
 
-    def resolve(self, ref: SourceReference) -> Optional[str]:
+    def resolve(self, ref: SourceReference) -> str | None:
         return self._url
 
 
@@ -88,7 +87,7 @@ class _NoneResolver:
     Stub resolver that always returns None (no link available).
     """
 
-    def resolve(self, ref: SourceReference) -> Optional[str]:
+    def resolve(self, ref: SourceReference) -> str | None:
         return None
 
 

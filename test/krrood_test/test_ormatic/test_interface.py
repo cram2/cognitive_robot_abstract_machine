@@ -9,7 +9,7 @@ from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.from_dao import FromDataAccessObjectState
 from krrood.ormatic.data_access_objects.helper import (
     to_dao,
-    get_dao_class,
+    get_data_access_object_class,
 )
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import NoDAOFoundError, UncallableFunction
@@ -219,6 +219,17 @@ def test_position_type_wrapper(session, database):
 
     result = session.scalars(select(KRROODPositionTypeWrapperDAO)).one()
     assert result == dao
+
+
+def test_a_collection_of_classes_survives_a_round_trip(session, database):
+    wrapper = KRROODPositionTypesWrapper([KRROODPosition, KRROODPosition4D])
+    session.add(to_dao(wrapper))
+    session.commit()
+    session.expunge_all()
+
+    result = session.scalars(select(KRROODPositionTypesWrapperDAO)).one()
+
+    assert result.from_dao().position_types == wrapper.position_types
 
 
 def test_positions(session, database):
@@ -712,7 +723,7 @@ def test_persons(session, database):
 
 
 def test_underspecified_types():
-    dao_class = get_dao_class(UnderspecifiedTypesContainer)
+    dao_class = get_data_access_object_class(UnderspecifiedTypesContainer)
     assert dao_class is not None
     inst = inspect(dao_class)
     column_names = [c_attr.key for c_attr in inst.mapper.column_attrs]
@@ -920,6 +931,17 @@ def test_path_custom_type(session, database):
     assert reconstructed == path
 
 
+def test_duration_keeps_sub_second_resolution(session, database):
+    duration = DurationAssociation(timedelta(seconds=3, microseconds=12500))
+
+    dao = to_dao(duration)
+    session.add(dao)
+    session.commit()
+
+    queried = session.scalars(select(DurationAssociationDAO)).one()
+    assert queried.from_dao() == duration
+
+
 def test_selectin_loading_preloads_relationships(session, database):
     """
     Relationship attributes are loaded eagerly (the generated relationships use
@@ -991,9 +1013,9 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
         sa_event.remove(engine, "after_cursor_execute", _count)
 
     # from_dao() must issue no queries at all in either case.
-    assert (
-        queries_without == 0
-    ), f"Expected 0 queries without selectin_loading but got {queries_without}"
-    assert (
-        queries_with == 0
-    ), f"Expected 0 queries with selectin_loading but got {queries_with}"
+    assert queries_without == 0, (
+        f"Expected 0 queries without selectin_loading but got {queries_without}"
+    )
+    assert queries_with == 0, (
+        f"Expected 0 queries with selectin_loading but got {queries_with}"
+    )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing_extensions import Any, Type, Optional, TYPE_CHECKING
+from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.entity_query_language.cache_data import InstanceFilteredDomain
 from krrood.entity_query_language.core.variable import Literal
@@ -19,9 +19,7 @@ def unwrap_if_literal(value: Any) -> Any:
     return value._value_ if isinstance(value, Literal) else value
 
 
-def _resolve_domain(
-    type_: Type[T], domain: Optional[DomainType]
-) -> Optional[DomainType]:
+def _resolve_domain(type_: type[T], domain: DomainType | None) -> DomainType | None:
     """
     Resolve a variable's domain: what :func:`variable` and
     :meth:`~krrood.entity_query_language.query.match.Match._create_or_update_variable_`

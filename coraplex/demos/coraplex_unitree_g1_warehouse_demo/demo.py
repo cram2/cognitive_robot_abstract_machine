@@ -9,31 +9,36 @@ the world and its meshes are read from its share directory.
 from __future__ import annotations
 
 import numpy as np
+from rclpy.node import Node
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.execution_environment import simulated_robot
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan import Plan
-from coraplex.robot_plans import MoveJointsMotion
+from giskardpy.motion_statechart.tasks.joint_tasks import (
+    JointPositionList,
+    JointState,
+)
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
-from coraplex.testing import start_visualization
-from coraplex.view_manager import ViewManager
-from krrood.entity_query_language.factories import an, entity, variable
-from semantic_digital_twin.api import (
+from coraplex.demonstrations import RobotDemonstrationRosSession
+from coraplex.testing import selected_visualizations
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
-    RobotSpecification,
-    WorldSpecification,
 )
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.context import StatechartContext
+from cramph.executor import ExecutorExtension
+from cramph.statechart import Statechart
+from cramph.composites import Sequence
 
 # %% where everything stands in the warehouse
 
@@ -94,25 +99,36 @@ def build_world() -> World:
         robots=[
             RobotSpecification(
                 semantic_annotation_type=UnitreeG1,
-                world_T_odom=ROBOT_START_POSE.to_homogeneous_matrix(),
+                world_T_odom=ROBOT_START_POSE.homogeneous_matrix,
             )
         ],
         objects=[
             BodySpecification.box(
                 "parcel",
                 PARCEL_SCALE,
-                color=Color(0.85, 0.45, 0.1),
-                parent_T_self=PICK_POSE.to_homogeneous_matrix(),
+                color=Color.from_rgba(red=0.85, green=0.45, blue=0.1),
+                parent_T_self=PICK_POSE.homogeneous_matrix,
             )
         ],
-    ).to_domain_object()
+    ).create_world()
     # The parcel stands in for any graspable object; the plan only needs an annotation
     # to name it by, not a particular kind of object.
     with world.modify_world():
-        world.add_semantic_annotation(
-            HasRootBody(root=world.get_body_by_name("parcel"))
-        )
+        world.add_semantic_annotation(Parcel(root=world.get_body_by_name("parcel")))
     return world
+
+
+def straighten_torso(robot: AbstractRobot) -> JointPositionList:
+    """
+    :param robot: The robot whose torso is straightened.
+    :return: The goal driving every torso joint back to zero, so the robot carries the
+        parcel upright while it drives.
+    """
+    return JointPositionList(
+        goal_state=JointState.from_mapping(
+            {connection: 0.0 for connection in robot.torso.active_connections}
+        )
+    )
 
 
 def standing_pose_in_front_of(pose: Pose, world: World) -> Pose:
@@ -131,114 +147,57 @@ def standing_pose_in_front_of(pose: Pose, world: World) -> Pose:
     )
 
 
-def build_plan(world: World, robot: UnitreeG1) -> Plan:
+def build_statechart(
+    context: StatechartContext, source: Pose, destination: Pose, turn: float
+) -> Statechart:
     """
-    :param world: The world the plan acts in.
-    :param robot: The robot carrying out the plan.
-    :return: The plan transporting the parcel from one pallet stack to the other.
+    :param context: The context the plan runs in, holding the robot carrying it out.
+    :param source: Where the parcel stands when the plan starts.
+    :param destination: Where the parcel is to be put down.
+    :param turn: The yaw the robot turns by on the spot before it walks to the
+        destination, so it does not walk through the pallet stack it took the parcel
+        from.
+    :return: The statechart carrying the parcel from one pallet stack to the other.
     """
-    parcel = world.get_body_by_name("parcel")
-    parcel_annotation = an(
-        entity(
-            semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
-            )
-        ).where(semantic_annotation.root == parcel)
-    ).first()
-    grasp = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.LEFT, robot),
+    world = context.world
+    robot = context.require_extension(RobotAccess).robot
+    parcel = world.get_semantic_annotations_by_type(Parcel)[0]
+    statechart = Statechart(context=context)
+    statechart.add_node(
+        Sequence(
+            nodes=[
+                ParkArmsAction(arms=robot.all_arms),
+                NavigateAction(
+                    target_location=standing_pose_in_front_of(source, world)
+                ),
+                PickUpAction(
+                    grasp=GraspCandidate.from_body_origin(parcel),
+                    arm=robot.torso.left_arm,
+                ),
+                ParkArmsAction(arms=robot.all_arms),
+                straighten_torso(robot),
+                NavigateAction(
+                    target_location=Pose.from_xyz_rpy(
+                        yaw=turn, reference_frame=robot.root
+                    )
+                ),
+                NavigateAction(
+                    target_location=standing_pose_in_front_of(destination, world)
+                ),
+                PlaceAction(
+                    object_designator=parcel,
+                    target_location=Pose(
+                        destination.position,
+                        destination.quaternion,
+                        reference_frame=world.root,
+                    ),
+                ),
+                ParkArmsAction(arms=robot.all_arms),
+                straighten_torso(robot),
+            ]
+        )
     )
-    context = Context(world=world, robot=robot, evaluate_conditions=False)
-    place_pose = Pose(
-        PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
-    )
-    pick_pose = Pose(
-        PICK_POSE.to_position(), PICK_POSE.to_quaternion(), reference_frame=world.root
-    )
-
-    return sequential(
-        [
-            # %% bring to place pose
-            ParkArmsAction(Arms.BOTH),
-            NavigateAction(standing_pose_in_front_of(PICK_POSE, world)),
-            PickUpAction(parcel_annotation, Arms.LEFT, grasp),
-            ParkArmsAction(Arms.BOTH),
-            MoveJointsMotion(
-                names=[
-                    connection.name for connection in robot.torso.active_connections
-                ],
-                positions=[0.0] * len(robot.torso.active_connections),
-            ),
-            NavigateAction(Pose.from_xyz_rpy(yaw=-1.57, reference_frame=robot.root)),
-            NavigateAction(standing_pose_in_front_of(PLACE_POSE, world)),
-            PlaceAction(parcel, place_pose, Arms.LEFT),
-            ParkArmsAction(Arms.BOTH),
-            MoveJointsMotion(
-                names=[
-                    connection.name for connection in robot.torso.active_connections
-                ],
-                positions=[0.0] * len(robot.torso.active_connections),
-            ),
-        ],
-        context=context,
-    ).plan
-
-
-def build_plan2(world: World, robot: UnitreeG1) -> Plan:
-    """
-    :param world: The world the plan acts in.
-    :param robot: The robot carrying out the plan.
-    :return: The plan transporting the parcel from one pallet stack to the other.
-    """
-    parcel = world.get_body_by_name("parcel")
-    parcel_annotation = an(
-        entity(
-            semantic_annotation := variable(
-                HasRootBody, domain=world.semantic_annotations
-            )
-        ).where(semantic_annotation.root == parcel)
-    ).first()
-    grasp = GraspDescription(
-        ApproachDirection.FRONT,
-        VerticalAlignment.NoAlignment,
-        ViewManager.get_end_effector_view(Arms.LEFT, robot),
-    )
-    context = Context(world=world, robot=robot, evaluate_conditions=False)
-    place_pose = Pose(
-        PLACE_POSE.to_position(), PLACE_POSE.to_quaternion(), reference_frame=world.root
-    )
-    pick_pose = Pose(
-        PICK_POSE.to_position(), PICK_POSE.to_quaternion(), reference_frame=world.root
-    )
-
-    return sequential(
-        [
-            # %% bring to place pose
-            ParkArmsAction(Arms.BOTH),
-            NavigateAction(standing_pose_in_front_of(PLACE_POSE, world)),
-            PickUpAction(parcel_annotation, Arms.LEFT, grasp),
-            ParkArmsAction(Arms.BOTH),
-            MoveJointsMotion(
-                names=[
-                    connection.name for connection in robot.torso.active_connections
-                ],
-                positions=[0.0] * len(robot.torso.active_connections),
-            ),
-            NavigateAction(Pose.from_xyz_rpy(yaw=1.57, reference_frame=robot.root)),
-            NavigateAction(standing_pose_in_front_of(PICK_POSE, world)),
-            PlaceAction(parcel, pick_pose, Arms.LEFT),
-            ParkArmsAction(Arms.BOTH),
-            MoveJointsMotion(
-                names=[
-                    connection.name for connection in robot.torso.active_connections
-                ],
-                positions=[0.0] * len(robot.torso.active_connections),
-            ),
-        ],
-        context=context,
-    ).plan
+    return statechart
 
 
 def lowest_collision_point_of(robot: UnitreeG1, world: World) -> float:
@@ -258,6 +217,29 @@ def lowest_collision_point_of(robot: UnitreeG1, world: World) -> float:
 
 # %% running the demo
 
+
+def run(
+    source: Pose,
+    destination: Pose,
+    turn: float,
+    world: World,
+    robot: UnitreeG1,
+    ros_node: Node,
+    visualizations: list[ExecutorExtension],
+) -> None:
+    """
+    Carry the parcel from `source` to `destination` with `robot` in `world`, simulated,
+    see :func:`build_statechart`, showing it with `visualizations`.
+    """
+    executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(world, [RobotAccess(robot)]),
+        ros_node=ros_node,
+        extensions=visualizations,
+    )
+    executor.compile(build_statechart(executor.context, source, destination, turn))
+    executor.execute()
+
+
 world = build_world()
 robot = world.get_semantic_annotations_by_type(UnitreeG1)[0]
 
@@ -265,15 +247,16 @@ robot = world.get_semantic_annotations_by_type(UnitreeG1)[0]
 # sink into it or hover above it.
 assert abs(lowest_collision_point_of(robot, world)) < 1e-3
 
-start_visualization(world)
-
-with simulated_robot:
+with RobotDemonstrationRosSession.start("warehouse_demo") as ros_session:
+    visualizations = selected_visualizations(ros_session.node)
     for _ in range(10):
-        build_plan(world, robot).perform()
-        build_plan2(world, robot).perform()
-    build_plan(world, robot).perform()
+        run(
+            PICK_POSE, PLACE_POSE, -1.57, world, robot, ros_session.node, visualizations
+        )
+        run(PLACE_POSE, PICK_POSE, 1.57, world, robot, ros_session.node, visualizations)
+    run(PICK_POSE, PLACE_POSE, -1.57, world, robot, ros_session.node, visualizations)
 
 parcel_position = world.get_body_by_name("parcel").global_pose
-print(f"parcel delivered to {np.round(parcel_position.to_position(), 3)}")
-print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.to_position(), 3)}")
+print(f"parcel delivered to {np.round(parcel_position.position, 3)}")
+print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.position, 3)}")
 assert np.allclose(parcel_position, PLACE_POSE, atol=0.05)

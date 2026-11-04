@@ -207,7 +207,7 @@ We can construct such a thing by invoking the `truncated` method with the corres
 
 ```{code-cell} ipython3
 event = SimpleEvent.from_data({sepal_length: closed(6, 7)}).as_composite_set()
-distribution, probability = distribution.truncated(event)
+distribution = distribution.truncated(event).distribution
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
 ```
@@ -322,7 +322,7 @@ However, the mode is more accurately described as the set of points with the hig
 
 ```{code-cell} ipython3
 condition = closed(-float("inf"), -1) | closed(1, float("inf"))
-distribution, _ = distribution.truncated(SimpleEvent.from_data({distribution.variables[0]: condition}).as_composite_set())
+distribution = distribution.truncated(SimpleEvent.from_data({distribution.variables[0]: condition}).as_composite_set()).distribution
 go.Figure(distribution.plot(), distribution.plotly_layout()).show()
 ```
 
@@ -501,7 +501,8 @@ Hence, we need to condition our probability distribution on the free space of th
 We can do this by invoking the `truncated` method of the distribution object.
 
 ```{code-cell} ipython3
-distribution, _ = p_xy.truncated(free_space)
+distribution = p_xy.truncated(free_space).distribution
+
 fig = go.Figure(distribution.plot(number_of_samples=500), distribution.plotly_layout())
 fig.show()
 ```

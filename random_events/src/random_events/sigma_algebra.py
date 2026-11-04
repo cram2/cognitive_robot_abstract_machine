@@ -1,10 +1,10 @@
 from __future__ import annotations
+import copy
 import math
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field, InitVar
-from typing import Tuple, Dict, Any, Optional
+from typing_extensions import Self, Iterable, Any
 import random_events_lib as rl
-from typing_extensions import Self, Iterable
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.utils import CPPWrapper
@@ -126,7 +126,11 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """
+        :param memo: The objects already copied during this deep copy, by their id.
+        :return: An equal set that shares no mutable state with this one.
+        """
         raise NotImplementedError
 
 
@@ -152,7 +156,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     Fields that are python only are read from this instance when reading from cpp.
     """
 
-    _simple_sets_cache: Optional[tuple] = field(
+    _simple_sets_cache: tuple | None = field(
         default=None, init=False, repr=False, compare=False
     )
     """
@@ -164,7 +168,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
 
     @classmethod
     @abstractmethod
-    def from_simple_sets(cls, *simple_sets: Tuple[AbstractSimpleSet, ...]) -> Self:
+    def from_simple_sets(cls, *simple_sets: tuple[AbstractSimpleSet, ...]) -> Self:
         """
         Create a composite set from simple sets.
 
@@ -346,14 +350,14 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         """
         return self.cpp_object < other.cpp_object
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             **super().to_json(),
             "simple_sets": [simple_set.to_json() for simple_set in self.simple_sets],
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_simple_sets(
             *[
                 AbstractSimpleSet.from_json(simple_set)
@@ -361,11 +365,15 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
             ]
         )
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
+        """
+        :param memo: The objects already copied during this deep copy, by their id.
+        :return: An equal set that shares no mutable state with this one.
+        """
         return self.__class__.from_simple_sets(
-            *[ss.__deepcopy__() for ss in self.simple_sets]
+            *[copy.deepcopy(simple_set, memo) for simple_set in self.simple_sets]
         )
 
 
 # Type definitions
-SimpleSetContainer = Tuple[AbstractSimpleSet, ...]
+SimpleSetContainer = tuple[AbstractSimpleSet, ...]

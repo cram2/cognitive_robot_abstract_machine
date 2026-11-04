@@ -42,6 +42,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowAlwaysInCollision,
     AllowNeverInCollision,
     AllowCollisionForAdjacentPairs,
+    AllowCollisionBetweenFingers,
 )
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
     ExternalCollisionVariableManager,
@@ -342,6 +343,40 @@ class TestCollisionRules:
             for body in end_effector.bodies_with_collision
             if body != held_body
         }
+
+    def test_the_fingers_of_a_gripper_may_touch_each_other(self, pr2_world_copy):
+        """
+        A gripper's finger tips may touch each other, but not the palm they are mounted
+        on, nor the fingers of the other gripper.
+        """
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        rule = AllowCollisionBetweenFingers(robot=pr2)
+        rule.update(pr2_world_copy)
+
+        def check(name_a: str, name_b: str) -> CollisionCheck:
+            return CollisionCheck.create_for_bodies_with_collision(
+                pr2_world_copy.get_body_by_name(name_a),
+                pr2_world_copy.get_body_by_name(name_b),
+            )
+
+        allowed = rule.allowed_collision_pairs
+        assert (
+            check("r_gripper_l_finger_tip_link", "r_gripper_r_finger_tip_link")
+            in allowed
+        )
+        assert (
+            check("l_gripper_l_finger_tip_link", "l_gripper_r_finger_tip_link")
+            in allowed
+        )
+        assert (
+            check("r_gripper_l_finger_tip_link", "l_gripper_r_finger_tip_link")
+            not in allowed
+        )
+        palms = {
+            pr2_world_copy.get_body_by_name(name)
+            for name in ("r_gripper_palm_link", "l_gripper_palm_link")
+        }
+        assert not any({c.body_a, c.body_b} & palms for c in allowed)
 
     def test_AvoidExternalCollisions_with_attached_body(self, pr2_apartment_world):
         pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
@@ -1274,12 +1309,50 @@ class TestCollisionRuleEquality:
 
         assert copied_rule == rule
 
-    def test_rules_with_different_distances_are_not_equal(self, cylinder_bot_world):
+    def test_a_subset_of_bodies_without_collision_stays_empty_through_json(
+        self, cylinder_bot_world
+    ):
+        """
+        A subset of bodies none of which can collide covers no bodies at all, which is
+        not the same as no subset, covering every body of the robot.
+        """
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        with cylinder_bot_world.modify_world():
+            without_collision = Body(name=PrefixedName("no_collision"))
+            cylinder_bot_world.add_connection(
+                FixedConnection(parent=robot.root, child=without_collision)
+            )
+        rule = AvoidExternalCollisions(robot=robot, body_subset={without_collision})
+        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+
+        copied_rule = from_json(to_json(rule), **tracker.create_kwargs())
+
+        assert rule.body_subset == set()
+        assert copied_rule.body_subset == set()
+
+    @pytest.mark.parametrize(
+        "create_rule",
+        [
+            pytest.param(
+                lambda robot, buffer_zone_distance: AvoidSelfCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                ),
+                id="avoid_self",
+            ),
+            pytest.param(
+                lambda robot, buffer_zone_distance: AvoidExternalCollisions(
+                    robot=robot, buffer_zone_distance=buffer_zone_distance
+                ),
+                id="external",
+            ),
+        ],
+    )
+    def test_rules_with_different_distances_are_not_equal(
+        self, cylinder_bot_world, create_rule
+    ):
         robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
 
-        assert AvoidSelfCollisions(
-            robot=robot, buffer_zone_distance=0.3
-        ) != AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.2)
+        assert create_rule(robot, 0.3) != create_rule(robot, 0.2)
 
 
 # %% a rule listed again after another rule

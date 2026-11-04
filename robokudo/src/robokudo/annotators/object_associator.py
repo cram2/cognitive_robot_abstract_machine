@@ -1,5 +1,4 @@
 from py_trees.common import Status
-from typing_extensions import List, Set, Optional
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.types.annotation import (
@@ -23,7 +22,7 @@ class ObjectAssociator(BaseAnnotator):
         super().__init__(name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.tracked_objects: List[ObjectHypothesis] = []
+        self.tracked_objects: list[ObjectHypothesis] = []
 
         self.obj_comparator = (
             ObjectHypothesisComparator(self.get_cas)
@@ -35,7 +34,7 @@ class ObjectAssociator(BaseAnnotator):
         )
 
     def update(self) -> Status:
-        new_ohs: List[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
+        new_ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
             ObjectHypothesis
         )
 
@@ -44,10 +43,10 @@ class ObjectAssociator(BaseAnnotator):
                 self.tracked_objects.append(new_oh)
             return Status.SUCCESS
 
-        matched_new_ids: Set[int] = set()
+        matched_new_ids: set[int] = set()
 
         for new_oh in new_ohs:
-            best_match_id: Optional[int] = None
+            best_match_id: int | None = None
             best_similarity = 0.0
 
             for oh_id, prev_oh in enumerate(self.tracked_objects):

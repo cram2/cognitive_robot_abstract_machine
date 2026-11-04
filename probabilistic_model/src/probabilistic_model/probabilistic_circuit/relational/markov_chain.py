@@ -20,10 +20,14 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
     SumUnit,
+    Unit,
 )
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
+    from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
+        RelationalProbabilisticCircuit,
+    )
 
 
 @dataclass
@@ -32,7 +36,7 @@ class MarkovChainDistributionTemplate(RelationalDistributionTemplate):
     A fitted distribution template for one sequential (Markov chain) relation.
 
     Grounds one ``RelationalProbabilisticCircuit`` per position in a sequence, the
-    same way :class:`~probabilistic_model.probabilistic_circuit.relational.rspn.ExchangeableDistributionTemplate`
+    same way :class:`~probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit.ExchangeableDistributionTemplate`
     grounds one per exchangeable child, and chains the grounded copies into a
     hidden Markov model instead of combining them under a product.
 
@@ -96,9 +100,7 @@ class MarkovChainDistributionTemplate(RelationalDistributionTemplate):
         ]
 
         if len(roots[0].subcircuits) != self._state_count:
-            raise ShapeMismatchError(
-                (len(roots[0].subcircuits),), (self._state_count,)
-            )
+            raise ShapeMismatchError((len(roots[0].subcircuits),), (self._state_count,))
 
         # Read every position's emission branches once, up front, since the chain
         # built below mutates the circuit -- if it re-read a position's branches
@@ -111,6 +113,44 @@ class MarkovChainDistributionTemplate(RelationalDistributionTemplate):
         result.remove_unreachable_nodes(roots[0])
         result.simplify()
         return result
+
+    @staticmethod
+    def _ground_and_rename_part(
+        template_distribution: RelationalProbabilisticCircuit,
+        part: Match,
+        index: int,
+        excluded_variables: list,
+    ) -> ProbabilisticCircuit:
+        """
+        Ground one part and rename its variables under its namespace prefix.
+
+        :param template_distribution: The fitted circuit grounded once per part.
+        :param part: The query part being grounded.
+        :param index: Position of the part in its parent list; used as fallback prefix
+            when ``part`` does not carry a symbolic variable.
+        :param excluded_variables: Variables left unrenamed, e.g. latent variables
+            shared with a parent circuit.
+        :return: A self-contained circuit ready to be mounted into a parent circuit.
+        """
+        part_circuit = template_distribution.ground(part)
+        prefix = MarkovChainDistributionTemplate._prefix_for_part(part, index)
+        part_circuit.rename_variables_with_prefix(prefix, excluded_variables)
+        return part_circuit
+
+    @staticmethod
+    def _mount_part(
+        result: ProbabilisticCircuit, part_circuit: ProbabilisticCircuit
+    ) -> Unit:
+        """
+        Mount an already-grounded, already-renamed part circuit into ``result``.
+
+        :param result: The circuit ``part_circuit`` is mounted into.
+        :param part_circuit: A self-contained circuit for one grounded part.
+        :return: The root of the mounted part, owned by ``result``.
+        """
+        part_root_index = part_circuit.root.index
+        node_index_map = result.mount(part_circuit.root)
+        return node_index_map[part_root_index]
 
     def _ground_and_mount_part(
         self, result: ProbabilisticCircuit, index: int, part: Match
@@ -194,7 +234,11 @@ class MarkovChainDistributionTemplate(RelationalDistributionTemplate):
         """
         return [
             self._joint_of_emission_and_transition(
-                result, position, state, next_continuation_given_state, emission_given_state
+                result,
+                position,
+                state,
+                next_continuation_given_state,
+                emission_given_state,
             )
             for state in range(self._state_count)
         ]

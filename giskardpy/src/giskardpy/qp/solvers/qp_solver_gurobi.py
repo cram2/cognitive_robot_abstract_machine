@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from typing import Tuple, Dict
 
 import gurobipy
 import numpy as np
@@ -11,7 +10,6 @@ from gurobipy import GRB
 from giskardpy.qp.exceptions import SolverReturnedFailureError, InfeasibleException
 from giskardpy.qp.qp_data import QPDataExplicit
 from giskardpy.qp.solvers.qp_solver import QPSolver
-from giskardpy.utils.math import fast_sparse_diagonal
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +67,7 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
         for name in dir(gurobipy.GRB.status)
         if "__" not in name
     }
-    _times: Dict[Tuple[int, int, int], list] = defaultdict(list)
+    _times: dict[tuple[int, int, int], list] = defaultdict(list)
 
     def init(self, qp_data: QPDataExplicit):
         self.qpProblem = gurobipy.Model("qp")
@@ -78,7 +76,7 @@ class QPSolverGurobi(QPSolver[QPDataExplicit]):
             lb=qp_data.box_lower_constraints,
             ub=qp_data.box_upper_constraints,
         )
-        H = fast_sparse_diagonal(qp_data.quadratic_weights)
+        H = qp_data.hessian
         self.qpProblem.setMObjective(
             Q=H,
             c=qp_data.linear_weights,

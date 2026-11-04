@@ -1,25 +1,24 @@
+from cramph.composites import StatementNode
 from dataclasses import dataclass
+
 
 import rustworkx
 
 from krrood.entity_query_language.factories import a, an, variable
-from coraplex.datastructures.enums import Arms, ApproachDirection, VerticalAlignment
-from coraplex.datastructures.grasp import GraspDescription
-from coraplex.plans.factories import sequential
-from coraplex.plans.plan_node import PlanNode
-from coraplex.robot_plans.actions.base import ActionDescription
+from coraplex.robot_plans.actions.base import SequentialAction
+from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
-from semantic_digital_twin.spatial_types import Point2, Pose2D, Pose
+from krrood_spatial_math.spatial_types import Point2, Pose2D, Pose
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
     PlanarGraphOfBoundingBoxes,
 )
 
 
-@dataclass
-class Sage10kOpenDoor(ActionDescription):
+@dataclass(eq=False, repr=False, kw_only=True)
+class Sage10kOpenDoor(SequentialAction):
     """
     Open a door.
 
@@ -30,10 +29,9 @@ class Sage10kOpenDoor(ActionDescription):
 
     door: Door
 
-    @property
-    def _action_plan(self) -> PlanNode:
+    def create_steps(self) -> list[StatechartNode]:
         """
-        Build the plan for reaching the handle and opening the door.
+        Build the steps for reaching the handle and opening the door.
 
         A navigation map is created around the door handle and used to constrain an
         underspecified reach action, which is sequenced with an opening action.
@@ -42,7 +40,7 @@ class Sage10kOpenDoor(ActionDescription):
             target=self.door.handle.root
         )
 
-        arm = Arms.LEFT
+        arm = self.robot.all_arms[0]
 
         min_p = self.door.handle.root.collision.min_point
         max_p = self.door.handle.root.collision.max_point
@@ -69,16 +67,13 @@ class Sage10kOpenDoor(ActionDescription):
 
         reach_query = a(MoveToReach)(
             target_pose_offset_robot=a(Pose2D)(
-                x=..., y=..., yaw=..., reference_frame=None
+                position=a(Point2)(x=..., y=..., reference_frame=None),
+                yaw=...,
+                reference_frame=None,
             ),
             hip_rotation=0.0,
-            target_pose_end_effector=pre_grasp_pose,
-            grasp_description=a(GraspDescription)(
-                approach_direction=ApproachDirection.FRONT,
-                vertical_alignment=VerticalAlignment.NoAlignment,
-                end_effector=variable(EndEffector, self.world.semantic_annotations),
-                rotate_gripper=False,
-            ),
+            reference_T_grasp=pre_grasp_pose,
+            end_effector=variable(EndEffector, self.world.semantic_annotations),
         )
 
         # constrain_to_free_space attaches the condition to the underlying Entity,
@@ -88,11 +83,11 @@ class Sage10kOpenDoor(ActionDescription):
         # -- appended directly rather than via Match.where(), since that would re-add
         # it to the Entity a second time.
         free_space_condition = gcs.constrain_to_free_space(
-            reach_query.target_pose_offset_robot
+            reach_query.target_pose_offset_robot.position
         )
         reach_query._where_conditions_.append(free_space_condition)
-        reach_action = reach_query
+        reach_action = StatementNode(statement=reach_query)
 
-        open_action = OpenAction(object_designator=self.door.handle.root, arm=arm)
+        open_action = OpenAction.from_handle(self.door.handle, arm)
 
-        return sequential([reach_action, open_action])
+        return [reach_action, open_action]

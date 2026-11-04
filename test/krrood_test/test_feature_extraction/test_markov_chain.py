@@ -12,7 +12,7 @@ from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.relational.markov_chain import (
     MarkovChainDistributionTemplate,
 )
-from probabilistic_model.probabilistic_circuit.relational.rspn import (
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -41,7 +41,7 @@ def type_variable() -> Symbolic:
 @pytest.fixture
 def dirac_hidden_state_template(type_variable):
     """
-    A ``RelationalProbabilisticCircuit(SceneObject)`` whose class circuit is a
+    A ``RelationalProbabilisticCircuit`` of ``SceneObject`` whose class circuit is a
     2-state hidden Markov emission model built by hand: one state always emits
     ``CHAIR``, the other always emits ``TABLE``. The dirac emissions make the
     "type" observed at each grounded position reveal the hidden state exactly,
@@ -57,7 +57,7 @@ def dirac_hidden_state_template(type_variable):
     root.add_subcircuit(
         leaf(make_dirac(type_variable, SceneObjectType.TABLE), circuit), np.log(0.5)
     )
-    template_distribution = RelationalProbabilisticCircuit(SceneObject)
+    template_distribution = RelationalProbabilisticCircuit()
     template_distribution.class_probabilistic_circuit = circuit
     return template_distribution
 
@@ -200,7 +200,10 @@ def test_ground_three_parts_is_valid(markov_chain_template):
 
 
 def test_ground_three_parts_matches_forward_algorithm(
-    markov_chain_template, starting_probabilities, transition_probabilities, type_by_state
+    markov_chain_template,
+    starting_probabilities,
+    transition_probabilities,
+    type_by_state,
 ):
     """
     With dirac emissions, the observed "type" sequence reveals the hidden state sequence
@@ -238,7 +241,10 @@ def test_ground_three_parts_matches_forward_algorithm(
 
 
 def test_ground_position_probability_matches_forward_marginal(
-    markov_chain_template, starting_probabilities, transition_probabilities, type_by_state
+    markov_chain_template,
+    starting_probabilities,
+    transition_probabilities,
+    type_by_state,
 ):
     """
     Each position's "type" probability, with the other positions left.

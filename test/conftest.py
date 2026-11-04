@@ -3,33 +3,29 @@ import threading
 import time
 from copy import deepcopy
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import numpy as np
 import pytest
-from xdist import get_xdist_worker_id, is_xdist_controller, is_xdist_worker
 
-from semantic_digital_twin.api import (
+from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     ActiveConnection1DOFSpecification,
+    PrismaticConnectionSpecification,
 )
-from semantic_digital_twin.predetermined_maps.building_floor import BuildingFloor
+from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from semantic_digital_twin.callbacks.callback import Callback
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasRootKinematicStructureEntity,
 )
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 
+from .dataset.robots_on_a_drive import RobotOnADifferentialDrive, RobotOnAnOmniDrive
 from .living_worlds import (
-    LeakedWorldsAcrossWorkersError,
     LivingWorlds,
-    WorkerTally,
-    WorldTallyLedger,
 )
 from .orm_interface_build import ORM_BUILD_OPTION, OrmBuild
 from .pytest_environment import PytestEnvironmentVariable
@@ -39,14 +35,16 @@ try:
 except ImportError:
     Garmi = None
 
-try:
-    from coraplex.datastructures.dataclasses import Context
-except ModuleNotFoundError:
-    # ROS dependencies.
-    Context = None
+from .sampling import SAMPLING_SEED
 
 try:
-    from giskardpy.middleware.ros2 import rospy
+    from .plan_running import robot_extensions
+except ModuleNotFoundError:
+    # ROS dependencies.
+    robot_extensions = None
+
+try:
+    from semantic_digital_twin.adapters.ros import rospy
 except ModuleNotFoundError:
     # ROS dependencies.
     rospy = None
@@ -54,13 +52,12 @@ from semantic_digital_twin.adapters.package_resolver import PathResolver
 from semantic_digital_twin.collision_checking.collision_matrix import (
     MaxAvoidedCollisionsOverride,
 )
-from typing_extensions import Iterator, List, Type, TypeVar
+from typing_extensions import Iterator, TypeVar
 
 CallbackT = TypeVar("CallbackT", bound=Callback)
 """
 The kind of publisher a test started.
 """
-
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
@@ -71,7 +68,7 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
-from semantic_digital_twin.predetermined_maps.apartment_environment import (
+from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -86,7 +83,6 @@ from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.mmp_dresden import MMPDresden
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
-
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Table,
@@ -99,20 +95,17 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Handle,
     Elevator,
-    Slider,
     Door,
-    Hinge,
     Floor,
     GroundFloor,
     FirstFloor,
     Level,
     SemanticEnvironmentAnnotation,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
-    Pose,
 )
 from semantic_digital_twin.utils import (
     rclpy_installed,
@@ -139,59 +132,47 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
 )
-
 ###############################
 ### Fixture Usage Guide #######
 ###############################
 
 """
-This file composes the Pytest fixtures for all tests in the monorepo. 
+This file composes the Pytest fixtures for all tests in the monorepo.
+
 Some basic facts about fixtures:
- * conftest.py and test directories inherit the fixtures from contests from upper directories 
- * Fixtures can be scoped, possible values are: function, class, module, package, session 
- * Fixtures can use other fixtures 
+ * conftest.py and test directories inherit the fixtures from contests from upper directories
+ * Fixtures can be scoped, possible values are: function, class, module, package, session
+ * Fixtures can use other fixtures
     * This only works the requesting fixture is scoped less or equal the the requested fixture (function requesting session works)
- * The return/yield value of fixtures is being cached. 
+ * The return/yield value of fixtures is being cached.
     * In case of worlds this is important since always the same world is returned by a session scoped fixture
 
 General Remarks:
     * Apparently generating the robot semantic view takes some time so it should be done in the session scoped setup
 
-The structure of fixtures in this conftest: 
-    * World setup fixtures: 
+The structure of fixtures in this conftest:
+    * World setup fixtures:
         These setup a world and return it, they are scoped for a whole session
-         THEY SHOULD NOT BE USED DIRECTLY! 
-         This is the case since the returned world will always be the same and changing the state or model of it will 
+         THEY SHOULD NOT BE USED DIRECTLY!
+         This is the case since the returned world will always be the same and changing the state or model of it will
          cause side effects in other tests. They can only be used if the test does not change the state or model
-    * Merging setup fixtures: 
-        These combine one or more different worlds from other fixtures. 
-        THEY SHOULD NOT BE USED DIRECTLY 
-        for the same reason as the world setup fixtures. 
+    * Merging setup fixtures:
+        These combine one or more different worlds from other fixtures.
+        THEY SHOULD NOT BE USED DIRECTLY
+        for the same reason as the world setup fixtures.
     * State reset fixture:
-        This fixtures are scoped for functions and reset the state between tests runs. 
+        This fixtures are scoped for functions and reset the state between tests runs.
         THEY CAN BE USED FOR TESTS THAT ONLY CHANGE THE STATE
-        Since resetting the state between test runs is easy this is the most common fixture for tests 
-    * Model changing fixtures: 
-        This fixtures are scoped for functions, they are a copy of the world from the world setup and are discarded 
-        after the test since there is no good method to reset the model after a test has changed it. 
-
+        Since resetting the state between test runs is easy this is the most common fixture for tests
+    * Model changing fixtures:
+        This fixtures are scoped for functions, they are a copy of the world from the world setup and are discarded
+        after the test since there is no good method to reset the model after a test has changed it.
 """
-
 
 LIVING_WORLDS = pytest.StashKey[LivingWorlds]()
 """
 Where a run keeps the record of which test created each world.
 """
-
-
-def world_tally_ledger(config: pytest.Config) -> WorldTallyLedger:
-    """
-    :param config: The run's configuration.
-    :return: The ledger every process of this run shares to combine their tallies.
-    """
-    return WorldTallyLedger(
-        directory=Path(config.rootpath) / WorldTallyLedger.DIRECTORY_NAME
-    )
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -229,12 +210,6 @@ def pytest_configure(config: pytest.Config) -> None:
     if worker:
         worker_num = int(worker.removeprefix("gw"))
         os.environ["ROS_DOMAIN_ID"] = str(100 + worker_num)
-    else:
-        # The one process not split off as an xdist worker: either the controller of a
-        # distributed run, which never runs a test itself, or the whole run when it is
-        # not distributed at all. Either way, exactly one process reaches here, before
-        # any process has written a tally for this run.
-        world_tally_ledger(config).clear()
 
     living_worlds = LivingWorlds(world_type=World)
     living_worlds.watch()
@@ -246,47 +221,6 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     Attribute the worlds created from now on to the test that is about to run.
     """
     item.config.stash[LIVING_WORLDS].current_test = item.nodeid
-
-
-def pytest_sessionfinish(session: pytest.Session) -> None:
-    """
-    Write this process's final world tally where every process of the run can read it
-    back, and once every process has, enforce a limit on their combined total.
-
-    ..note:: An xdist worker only writes its tally, since the combined limit needs
-        every worker's tally to be meaningful. The controller of a distributed run
-        never ran a test, so it only enforces the combined limit, once every worker
-        has written its own. A run that was not distributed at all does both: it is
-        the only process, so its own tally already is the combined total.
-
-    ..note:: The limit is enforced here rather than in a fixture, since there is no
-        fixture left to tear down once the session is finishing. Raising the
-        combined-limit error would still fail the run, but as an uncaught exception
-        during hook teardown, reported as an internal error rather than a clean
-        test-run failure - so it is caught here and turned into a terminal message
-        plus a failing exit status instead.
-    """
-    ledger = world_tally_ledger(session.config)
-
-    if not is_xdist_controller(session):
-        living_worlds = session.config.stash[LIVING_WORLDS]
-        ledger.record(
-            WorkerTally(
-                worker=get_xdist_worker_id(session),
-                left_behind=living_worlds.collect_surviving_worlds(),
-            )
-        )
-
-    if is_xdist_worker(session):
-        return
-
-    try:
-        ledger.enforce_combined_limit()
-    except LeakedWorldsAcrossWorkersError as error:
-        terminal_reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if terminal_reporter is not None:
-            terminal_reporter.write_line(str(error), red=True)
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
 @pytest.fixture(scope="session")
@@ -328,8 +262,27 @@ def check_for_leaked_worlds(request: pytest.FixtureRequest) -> Iterator[None]:
 
 
 @pytest.fixture()
+def mini_world() -> World:
+    """
+    A world of two bodies joined by a revolute connection about the z axis.
+    """
+    world = World()
+    with world.modify_world():
+        body = Body(name=PrefixedName("root"))
+        body2 = Body(name=PrefixedName("tip"))
+        connection = RevoluteConnection.create_with_dofs(
+            world=world, parent=body, child=body2, axis=Vector3.Z()
+        )
+        world.add_connection(connection)
+    return world
+
+
+@pytest.fixture()
 def world_with_two_bodies() -> tuple[World, Body, Body]:
-    """A fresh world with an unconnected parent and child body, ready to receive a connection."""
+    """
+    A fresh world with an unconnected parent and child body, ready to receive a
+    connection.
+    """
     world = World()
     parent = Body(name=PrefixedName("parent"))
     child = Body(name=PrefixedName("child"))
@@ -345,7 +298,7 @@ def cylinder_bot_world():
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
         )
         robot_world.add_body(robot)
-        MinimalRobot.from_world(robot_world)
+        RobotOnAnOmniDrive.from_world(robot_world)
     world = World()
     with world.modify_world():
         body = Body(
@@ -513,7 +466,7 @@ def supported_abstract_robots():
         UnitreeG1,
         MMPDresden,
         DAiSy,
-        # Garmi, We dont have the ROS Package yet
+        Garmi,
     ]
 
 
@@ -526,7 +479,7 @@ def cylinder_bot_diff_world():
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
         )
         robot_world.add_body(robot)
-        MinimalRobot.from_world(robot_world)
+        RobotOnADifferentialDrive.from_world(robot_world)
     world = World()
     with world.modify_world():
         body = Body(
@@ -555,7 +508,7 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    robot_semantic_annotation: Type[AbstractRobot],
+    robot_semantic_annotation: type[AbstractRobot],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
     robot_localization_pose: HomogeneousTransformationMatrix | None = None,
@@ -568,8 +521,11 @@ def world_with_urdf_factory(
     urdf_parser = URDFParser.from_file(
         file_path=robot_semantic_annotation.get_ros_file_path(),
         path_resolver=urdf_path_resolver,
+        use_visual_as_collision_backup=(
+            robot_semantic_annotation.uses_visual_as_collision_backup
+        ),
     )
-    world_with_urdf = urdf_parser.parse()
+    world_with_urdf = urdf_parser.create_world()
     if robot_semantic_annotation is not None:
         robot_semantic_annotation.from_world(world_with_urdf)
 
@@ -617,9 +573,7 @@ def _hsr_world_setup():
 
 @pytest.fixture(scope="function")
 def hsr_world_copy(_hsr_world_setup):
-    result = deepcopy(_hsr_world_setup)
-    HSRB.from_world(result)
-    return result
+    return deepcopy(_hsr_world_setup)
 
 
 @pytest.fixture(scope="session")
@@ -637,7 +591,7 @@ def tracy_world():
     if not tracy_installed():
         pytest.skip("Tracy not installed")
     tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
-    world_with_tracy = tracy_parser.parse()
+    world_with_tracy = tracy_parser.create_world()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
 
@@ -647,10 +601,20 @@ def daisy_world():
     if not daisy_installed():
         pytest.skip("DAiSy not installed")
     daisy = "package://iai_daisy_description/robots/daisy.urdf.xacro"
-    daisy_parser = URDFParser.from_file(file_path=daisy)
-    world_with_daisy = daisy_parser.parse()
-    DAiSy.from_world(world_with_daisy)
+    try:
+        daisy_parser = URDFParser.from_file(file_path=daisy)
+        world_with_daisy = daisy_parser.create_world()
+        DAiSy.from_world(world_with_daisy)
+    except Exception:
+        pytest.skip(
+            "DAiSy URDF could not be parsed (missing dependency or body mismatch)"
+        )
     return world_with_daisy
+
+
+@pytest.fixture(scope="function")
+def daisy_world_copy(daisy_world):
+    return deepcopy(daisy_world)
 
 
 @pytest.fixture(scope="session")
@@ -679,7 +643,7 @@ def _apartment_world_setup():
             "worlds",
             "apartment.urdf",
         )
-    ).parse()
+    ).create_world()
     milk_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -689,7 +653,7 @@ def _apartment_world_setup():
             "objects",
             "milk.stl",
         )
-    ).parse()
+    ).create_world()
     cereal_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -699,7 +663,7 @@ def _apartment_world_setup():
             "objects",
             "breakfast_cereal.stl",
         )
-    ).parse()
+    ).create_world()
     spoon_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -709,7 +673,7 @@ def _apartment_world_setup():
             "objects",
             "spoon.stl",
         )
-    ).parse()
+    ).create_world()
 
     apartment_world.merge_world_at_pose(
         milk_world,
@@ -788,67 +752,33 @@ def _elevator_world_setup():
             Elevator.get_default_root_kinematic_structure_entity_specification(
                 scale=Scale(2, 2, 2), wall_thickness=0.05
             ),
-        ).spawn(world)
-
-        vertical_drive = Slider.get_annotation_specification(
-            f"{name.name}_drive",
-            Slider.get_default_root_kinematic_structure_entity_specification(),
-            parent_connection_specification=Slider.parent_connection_specification(
+            parent_connection_specification=PrismaticConnectionSpecification(
                 axis=Vector3.Z(),
-                dof_limits=DegreeOfFreedomLimits(
-                    lower=DerivativeMap(velocity=-1.0),
-                    upper=DerivativeMap(velocity=1.0),
+                dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    maximum_speed=1.0
                 ),
             ),
         ).spawn(world)
-        elevator.add(vertical_drive)
 
         door_scale = Scale(wall_thickness, scale.y / 2, scale.z)
-        door1 = Door.create_with_new_body_in_world(
-            name=f"{name.name}_door0",
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(-scale.x / 2, -scale.y / 4, 0),
-                reference_frame=world.root,
-            ),
-            scale=door_scale,
-        )
-        door2 = Door.create_with_new_body_in_world(
-            name=f"{name.name}_door1",
-            world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(-scale.x / 2, scale.y / 4, 0),
-                reference_frame=world.root,
-            ),
-            scale=door_scale,
-        )
-
-        elevator.add(door1)
-        elevator.add(door2)
-
         door_travel = door_scale.y
-        door_slider_configs = (
-            (
-                door1,
-                DerivativeMap(position=0.0),
-                DerivativeMap(position=door_travel),
-            ),
-            (
-                door2,
-                DerivativeMap(position=0.0),
-                DerivativeMap(position=door_travel),
-            ),
-        )
-        for i, (current_door, lower, upper) in enumerate(door_slider_configs):
-            door_slider = Slider.get_annotation_specification(
-                f"{name.name}_door{i}_drive",
-                Slider.get_default_root_kinematic_structure_entity_specification(),
-                parent_connection_specification=Slider.parent_connection_specification(
-                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
-                    dof_limits=DegreeOfFreedomLimits(lower=lower, upper=upper),
+        for i, door_y in enumerate((-scale.y / 4, scale.y / 4)):
+            door = Door.create_with_new_body_in_world(
+                name=f"{name.name}_door{i}",
+                world=world,
+                world_root_T_self=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                    Point3(-scale.x / 2, door_y, 0),
+                    reference_frame=world.root,
                 ),
-            ).spawn(world)
-            current_door.add(door_slider)
+                parent_connection_specification=PrismaticConnectionSpecification(
+                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
+                    dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                        lower_position=0.0, upper_position=door_travel
+                    ),
+                ),
+                scale=door_scale,
+            )
+            elevator.add(door)
 
         world.add_semantic_annotation(elevator)
     return world
@@ -868,10 +798,7 @@ def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_set
     return (
         result,
         result.get_semantic_annotations_by_type(AbstractRobot)[0],
-        Context(
-            result,
-            result.get_semantic_annotations_by_type(AbstractRobot)[0],
-        ),
+        robot_extensions(result.get_semantic_annotations_by_type(AbstractRobot)[0]),
     )
 
 
@@ -975,7 +902,7 @@ def _simple_apartment_setup():
             "objects",
             "milk.stl",
         )
-    ).parse()
+    ).create_world()
     world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
@@ -994,7 +921,7 @@ def kitchen_world():
         "kitchen-small.urdf",
     )
     parser = URDFParser.from_file(file_path=path)
-    world = parser.parse()
+    world = parser.create_world()
     world.validate()
     return world
 
@@ -1027,7 +954,7 @@ def multi_story_building(_elevator_world_setup):
         ),
     )
 
-    def add_level(level_type: Type[Level], name: str, center_height: float) -> None:
+    def add_level(level_type: type[Level], name: str, center_height: float) -> None:
         """
         Add a region spanning one storey and annotate it as that level.
 
@@ -1074,7 +1001,7 @@ def apartment_environment_world(apartment_meshes):
     """
     A world holding nothing but the apartment of :class:`ApartmentEnvironment`.
     """
-    return ApartmentEnvironment().get_world()
+    return ApartmentEnvironment().create_world()
 
 
 @pytest.fixture(scope="session")
@@ -1088,9 +1015,9 @@ def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     apartment_copy = deepcopy(_apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
-    pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
-    )
+    pr2_copy.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     return pr2_copy
 
 
@@ -1100,7 +1027,11 @@ def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
     pr2_copy = deepcopy(_pr2_world_setup)
     pr2_copy.merge_world(apartment_world)
     robot_view = pr2_copy.get_semantic_annotations_by_type(PR2)[0]
-    return pr2_copy, robot_view, Context(pr2_copy, robot_view)
+    return (
+        pr2_copy,
+        robot_view,
+        robot_extensions(robot_view),
+    )
 
 
 @pytest.fixture(scope="session")
@@ -1113,7 +1044,11 @@ def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
         hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
     )
 
-    return apartment_copy, robot_view, Context(apartment_copy, robot_view)
+    return (
+        apartment_copy,
+        robot_view,
+        robot_extensions(robot_view),
+    )
 
 
 @pytest.fixture(scope="session")
@@ -1172,7 +1107,7 @@ class RosPublishers:
     on a world outliving the test publishes on a node that is already destroyed.
     """
 
-    started: List[Callback] = field(default_factory=list)
+    started: list[Callback] = field(default_factory=list)
     """
     The publishers started so far, in the order they were started.
     """
@@ -1229,7 +1164,9 @@ def init_rospy():
 @pytest.fixture(scope="function")
 def rclpy_node():
     """
-    You can use this fixture if you want to use the marker visualizer of semDT and need a ros node.
+    You can use this fixture if you want to use the marker visualizer of semDT and need
+    a ros node.
+
     ..warning::
         This fixture can not be used in multiple tests at once
     """

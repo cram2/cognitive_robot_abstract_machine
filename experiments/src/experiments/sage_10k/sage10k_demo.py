@@ -25,7 +25,9 @@ from rclpy.executors import SingleThreadedExecutor
 
 from experiments.sage_10k.demos import Sage10kAbstractDemoHSRB
 from krrood.utils import recursive_subclasses
-from coraplex.execution_environment import simulated_robot
+from cramph.context import StatechartContext
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
@@ -55,8 +57,13 @@ def run_demo(demo: Sage10kAbstractDemoHSRB):
 
     viz_marker_publisher = VizMarkerPublisher(_world=demo.world, node=node)
 
-    with simulated_robot:
-        demo.plan.perform()
+    plan_executor = KinematicallySimulatedPlanExecutor(
+        StatechartContext.with_extensions(demo.world, demo.context_extensions)
+    )
+    statechart = Statechart(context=plan_executor.context)
+    statechart.add_node(demo.plan)
+    plan_executor.compile(statechart)
+    plan_executor.execute()
 
     viz_marker_publisher.stop()
     del demo

@@ -21,7 +21,7 @@ from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.file_writer import FileWriter
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
-from robokudo.annotators.outputs import ClearAnnotatorOutputs
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,

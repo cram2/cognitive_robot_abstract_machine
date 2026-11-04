@@ -27,17 +27,18 @@ dependencies = [
     "pydot>=1.4.2",
     "scipy>=1.8.0",
     "pymongo",
-    "numba==0.61.2",
+    "numba>=0.61.2",
     "pyyaml",
     "transforms3d",
     "opencv-python>=4.11.0.86",
     "matplotlib>=3.0",
     "setuptools",
-    "pooch",
-    "krrood",
-    "semantic_digital_twin",
+    "krrood>=26.10.0",
+    "semantic_digital_twin>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
     "transformers",
-    "faiss-cpu"
+    "faiss-cpu",
+    "ultralytics"
 ]
 
 [project.urls]
@@ -54,10 +55,13 @@ version = {attr = "robokudo._version.__version__"}
 [dependency-groups]
 workspace = [
     "krrood",
+    "krrood_spatial_math",
     "semantic_digital_twin",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0,<8.0.0",
+    "torch",
+    "ultralytics",
 ]

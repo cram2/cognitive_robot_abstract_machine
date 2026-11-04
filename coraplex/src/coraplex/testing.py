@@ -9,21 +9,18 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List
+from typing_extensions import Callable
 
 import numpy as np
 import pytest
 
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -31,9 +28,12 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
-from coraplex.datastructures.enums import Arms, VisualizationBackend
-from coraplex.view_manager import ViewManager
-from coraplex.visualization import WorldVisualization
+from cramph.visualization import RvizVisualization
+from cramph.executor import ExecutorExtension
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
 
 logger = logging.getLogger(__name__)
 
@@ -50,35 +50,32 @@ except ImportError:
     )
 
 
-def start_visualization(world: World) -> WorldVisualization:
+def selected_visualizations(ros_node: Node | None) -> list[ExecutorExtension]:
     """
-    Start the selected renderer, defaulting to native RViz when available.
+    :param ros_node: The ROS node RViz publishes through.
+    :return: An RViz visualization when ROS is available and `ros_node` is given, as
+        executor extensions; empty when headless.
 
-    :param world: The world to visualize.
-    :return: The renderer owner, accepting optional plan observers.
+    .. note::
+        Add the same visualizations to every executor of one demo. Each call returns a
+        new one.
     """
-    default_backend = (
-        VisualizationBackend.RVIZ
-        if VizMarkerPublisher is not None
-        else VisualizationBackend.NONE
-    )
-    return WorldVisualization.from_environment(world, default_backend).start()
+    if VizMarkerPublisher is None or ros_node is None:
+        return []
+    return [RvizVisualization(ros_node=ros_node)]
 
 
-def attach_tool(
-    world: World, robot: AbstractRobot, arm: Arms, tool_world: World, mount: dict
-) -> Body:
+def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
     """
     Rigidly attach a tool mesh to the arm's tool frame.
 
     :param world: The world the robot lives in.
-    :param robot: The robot holding the tool.
     :param arm: The arm the tool is mounted on.
     :param tool_world: The world containing the parsed tool mesh.
     :param mount: Keyword arguments describing the mount transform.
     :return: The tool's root body inside ``world``.
     """
-    tool_frame = ViewManager.get_end_effector_view(arm, robot).tool_frame
+    tool_frame = arm.end_effector.tool_frame
     connection = FixedConnection(
         parent=tool_frame,
         child=tool_world.root,
@@ -96,7 +93,7 @@ def setup_world() -> World:
 
     pr2_sem_world = URDFParser.from_file(
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    ).parse()
+    ).create_world()
     apartment_world = URDFParser.from_file(
         os.path.join(
             os.path.dirname(__file__),
@@ -106,12 +103,12 @@ def setup_world() -> World:
             "worlds",
             "apartment.urdf",
         )
-    ).parse()
+    ).create_world()
     milk_world = STLParser(
         os.path.join(
             os.path.dirname(__file__), "..", "..", "resources", "objects", "milk.stl"
         )
-    ).parse()
+    ).create_world()
     cereal_world = STLParser(
         os.path.join(
             os.path.dirname(__file__),
@@ -121,7 +118,7 @@ def setup_world() -> World:
             "objects",
             "breakfast_cereal.stl",
         )
-    ).parse()
+    ).create_world()
     # apartment_world.merge_world(pr2_sem_world)
     apartment_world.merge_world(milk_world)
     apartment_world.merge_world(cereal_world)
@@ -137,10 +134,10 @@ def setup_world() -> World:
             1.5, 2.5, 0, reference_frame=apartment_root
         )
 
-    apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.0345, reference_frame=apartment_world.root
-        )
+    apartment_world.get_body_by_name(
+        "milk.stl"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2.37, 2, 1.0345, reference_frame=apartment_world.root
     )
     apartment_world.get_body_by_name(
         "breakfast_cereal.stl"
@@ -210,7 +207,7 @@ def _make_sine_scan_poses(
     x0 = anchor.x
     y0 = anchor.y
     z0 = anchor.z
-    q = anchor.to_quaternion()
+    q = anchor.quaternion
 
     y_min = y0 - 0.5 * y_span
     y_max = y0 + 0.5 * y_span
@@ -274,7 +271,7 @@ class StandaloneProcess:
     node to look from.
     """
 
-    arguments: List[str] = field(default_factory=list)
+    arguments: list[str] = field(default_factory=list)
     """
     Command-line arguments passed to the script.
     """

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from random_events.variable import Symbolic
-from typing_extensions import Any, Tuple
+from typing_extensions import Any
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleColumn,
@@ -30,7 +30,7 @@ class SymbolicEncoding:
     """
 
     @functools.cached_property
-    def elements(self) -> Tuple[Any, ...]:
+    def elements(self) -> tuple[Any, ...]:
         """
         :return: The domain elements of the variable, in the order that defines their
             positions.
@@ -68,7 +68,14 @@ class SymbolicEncoding:
 
     def index_of_element(self, element: Any) -> int:
         """
-        :param element: A domain element, or its hash.
+        :param element: A domain element.
         :return: The position of the element in the domain, or ``-1``.
         """
-        return int(self.indices_of_hashes(np.array([hash(element)], dtype=float))[0])
+        return self.index_of_hash(hash(element))
+
+    def index_of_hash(self, hash_value: int) -> int:
+        """
+        :param hash_value: The hash of a domain element.
+        :return: The position of the element in the domain, or ``-1``.
+        """
+        return int(self.indices_of_hashes(np.array([hash_value], dtype=float))[0])

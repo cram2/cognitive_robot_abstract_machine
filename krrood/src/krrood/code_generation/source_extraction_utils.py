@@ -15,7 +15,6 @@ import types
 from collections import defaultdict
 from dataclasses import dataclass, field
 from importlib.util import resolve_name
-from typing import Dict, List, Optional, Set, Tuple, Type
 
 from krrood.exceptions import (
     ModuleNotFoundForConvertingImportsToAbsolute,
@@ -57,7 +56,7 @@ class ExtractedDefinition:
     The name of the extracted definition.
     """
 
-    lines: List[str]
+    lines: list[str]
     """
     The lines of source code the definition occupies, in file order.
     """
@@ -81,7 +80,7 @@ class ExtractedSource:
     The definitions extracted from a piece of Python source code.
     """
 
-    definitions: List[ExtractedDefinition] = field(default_factory=list)
+    definitions: list[ExtractedDefinition] = field(default_factory=list)
     """
     The extracted definitions, in the order they appear in the source.
     """
@@ -105,13 +104,13 @@ class ExtractedSource:
 
 
 def extract_imports_from(
-    module: Optional[types.ModuleType] = None,
-    file_path: Optional[str] = None,
-    source: Optional[str] = None,
-    ast_tree: Optional[ast.AST] = None,
-    exclude_libraries: Optional[List[str]] = None,
+    module: types.ModuleType | None = None,
+    file_path: str | None = None,
+    source: str | None = None,
+    ast_tree: ast.AST | None = None,
+    exclude_libraries: list[str] | None = None,
     convert_relative_to_absolute: bool = False,
-) -> List[str]:
+) -> list[str]:
     """
     Extract import statements from a module, source, file path, or AST.
 
@@ -135,12 +134,12 @@ def extract_imports_from(
 
 
 def _resolve_import_tree(
-    module: Optional[types.ModuleType],
-    file_path: Optional[str],
-    source: Optional[str],
-    ast_tree: Optional[ast.AST],
+    module: types.ModuleType | None,
+    file_path: str | None,
+    source: str | None,
+    ast_tree: ast.AST | None,
     convert_relative_to_absolute: bool,
-) -> Tuple[ast.AST, Optional[str]]:
+) -> tuple[ast.AST, str | None]:
     """
     Resolve the AST to walk and the enclosing module name for relative-import
     conversion.
@@ -177,10 +176,10 @@ def _resolve_import_tree(
 
 def _collect_imports_from_tree(
     tree: ast.AST,
-    exclude_libraries: List[str],
+    exclude_libraries: list[str],
     convert_relative_to_absolute: bool,
-    current_module_name: Optional[str],
-) -> Tuple[Set[str], Dict[str, Set[str]]]:
+    current_module_name: str | None,
+) -> tuple[set[str], dict[str, set[str]]]:
     """
     Walk *tree* and collect plain (``import x``) and ``from``-imports separately.
 
@@ -193,8 +192,8 @@ def _collect_imports_from_tree(
     :returns: The plain-imported module names, and a mapping of ``from``-module name to
         the names imported from it.
     """
-    import_modules: Set[str] = set()
-    from_imports: Dict[str, Set[str]] = defaultdict(set)
+    import_modules: set[str] = set()
+    from_imports: dict[str, set[str]] = defaultdict(set)
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -211,7 +210,7 @@ def _collect_imports_from_tree(
 
 
 def _collect_plain_import(
-    node: ast.Import, exclude_libraries: List[str], import_modules: Set[str]
+    node: ast.Import, exclude_libraries: list[str], import_modules: set[str]
 ) -> None:
     """
     Add the module names of an ``import x`` statement to *import_modules*.
@@ -232,10 +231,10 @@ def _collect_plain_import(
 
 def _collect_from_import(
     node: ast.ImportFrom,
-    exclude_libraries: List[str],
+    exclude_libraries: list[str],
     convert_relative_to_absolute: bool,
-    current_module_name: Optional[str],
-    from_imports: Dict[str, Set[str]],
+    current_module_name: str | None,
+    from_imports: dict[str, set[str]],
 ) -> None:
     """
     Add the names of a ``from x import y`` statement to *from_imports*, keyed by module.
@@ -263,8 +262,8 @@ def _collect_from_import(
 
 
 def _format_import_lines(
-    import_modules: Set[str], from_imports: Dict[str, Set[str]]
-) -> List[str]:
+    import_modules: set[str], from_imports: dict[str, set[str]]
+) -> list[str]:
     """
     Render collected import data as sorted ``import``/``from ... import`` line
     strings.
@@ -273,7 +272,7 @@ def _format_import_lines(
     :param from_imports: The ``from``-module name to imported-names mapping.
     :returns: A sorted list of import-line strings.
     """
-    result: Set[str] = set()
+    result: set[str] = set()
     for module_name in sorted(import_modules):
         result.add(f"import {module_name}")
     for module_name, names in sorted(from_imports.items()):
@@ -287,9 +286,9 @@ def _format_import_lines(
 
 
 def extract_function_source(
-    names: List[str],
-    file_path: Optional[str] = None,
-    source: Optional[str] = None,
+    names: list[str],
+    file_path: str | None = None,
+    source: str | None = None,
     include_signature: bool = True,
 ) -> ExtractedSource:
     """
@@ -311,9 +310,9 @@ def extract_function_source(
 
 
 def extract_class_source(
-    names: List[str],
-    file_path: Optional[str] = None,
-    source: Optional[str] = None,
+    names: list[str],
+    file_path: str | None = None,
+    source: str | None = None,
     include_signature: bool = True,
 ) -> ExtractedSource:
     """
@@ -335,10 +334,10 @@ def extract_class_source(
 
 
 def _extract_definitions(
-    definition_type: Type[ast.AST],
-    names: List[str],
-    file_path: Optional[str],
-    source: Optional[str],
+    definition_type: type[ast.AST],
+    names: list[str],
+    file_path: str | None,
+    source: str | None,
     include_signature: bool,
 ) -> ExtractedSource:
     """

@@ -9,16 +9,17 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from typing_extensions import List, Optional, Self, Sequence, Type
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from typing_extensions import Self, Sequence
 
 from segmind.detector_selection import DetectorSelection
 from segmind.detectors.atomic_event_detectors_nodes import MotionDetector
 from segmind.detectors.base import AbstractDetector, SegmindContext
-from segmind.episode_segmenter import EpisodeSegmenterExecutor
+from segmind.episode_segmenter import EpisodeSegmentation
 from segmind.event_logger import EventLogger
 from segmind.exceptions import NoSemanticAnnotationToWatch
-from segmind.statecharts.segmind_statechart import SegmindStatechart
+from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -38,8 +39,9 @@ class Segmind:
     what it wants detected, and keeps the rest to its plan.
 
     A tick holds the world's lock, so it never reads the world while another thread is
-    in the middle of changing it. After each tick the world is left to other threads for
-    at least as long as the tick held it, so a plan changing the world keeps going while
+    in the middle of changing it. Ticks begin :attr:`tick_period` apart, so the share of
+    the run spent watching falls as ticks get cheaper, and every tick is followed by a
+    pause at least as long as the tick, so a plan changing the world keeps going while
     it is watched.
     """
 
@@ -48,9 +50,17 @@ class Segmind:
     The world the run takes place in.
     """
 
-    detectors: List[AbstractDetector]
+    detectors: list[AbstractDetector]
     """
     The detectors ticked.
+    """
+
+    tick_period: float = field(kw_only=True, default=0.5)
+    """
+    The time, in seconds, from the start of one tick to the start of the next.
+
+    A tick that takes longer than half of it is followed by a pause as long as the tick
+    took instead, so watching never holds the world for more than half the run.
     """
 
     pause_between_ticks: float = field(kw_only=True, default=0.01)
@@ -58,7 +68,7 @@ class Segmind:
     The least time, in seconds, the world is left to other threads after a tick.
     """
 
-    executor: EpisodeSegmenterExecutor = field(init=False)
+    executor: StatechartExecutor = field(init=False)
     """
     Compiles and ticks the detectors.
     """
@@ -68,23 +78,26 @@ class Segmind:
     Set when the detectors are to stop being ticked.
     """
 
-    thread: Optional[threading.Thread] = field(init=False, default=None)
+    thread: threading.Thread | None = field(init=False, default=None)
     """
     The thread the detectors are ticked on, once started.
     """
 
     def __post_init__(self) -> None:
-        self.executor = EpisodeSegmenterExecutor(
-            context=MotionStatechartContext(world=self.world)
+        self.executor = StatechartExecutor(
+            context=StatechartContext(world=self.world),
+            extensions=[EpisodeSegmentation()],
         )
-        self.executor.compile(SegmindStatechart().build_statechart(self.detectors))
+        self.executor.compile(
+            DetectorStatechartBuilder(self.detectors).build(self.executor.context)
+        )
 
     @classmethod
     def create_for_bodies(
         cls,
         world: World,
         bodies: Sequence[Body],
-        detector_types: Sequence[Type[AbstractDetector]] = (),
+        detector_types: Sequence[type[AbstractDetector]] = (),
     ) -> Self:
         """
         SegMind detecting what happens to ``bodies``.
@@ -101,7 +114,7 @@ class Segmind:
             if detector_types
             else DetectorSelection.of_every_kind()
         )
-        detectors: List[AbstractDetector] = [
+        detectors: list[AbstractDetector] = [
             detector
             for detector_type in selection.detector_types
             for detector in detector_type.create_for_run(
@@ -114,8 +127,8 @@ class Segmind:
     def create_for_semantic_annotation_types(
         cls,
         world: World,
-        semantic_annotation_types: Sequence[Type[SemanticAnnotation]],
-        detector_types: Sequence[Type[AbstractDetector]] = (),
+        semantic_annotation_types: Sequence[type[SemanticAnnotation]],
+        detector_types: Sequence[type[AbstractDetector]] = (),
     ) -> Self:
         """
         SegMind watching the bodies of every semantic annotation of the types a run
@@ -141,7 +154,7 @@ class Segmind:
         return cls.create_for_bodies(world, list(dict.fromkeys(bodies)), detector_types)
 
     @property
-    def watched_bodies(self) -> List[Body]:
+    def watched_bodies(self) -> list[Body]:
         """
         The bodies the detectors watch, each named once, in the order they are ticked.
         """
@@ -154,7 +167,7 @@ class Segmind:
         )
 
     @property
-    def detector_names(self) -> List[str]:
+    def detector_names(self) -> list[str]:
         """
         The kinds of detector ticked, each named once, in the order they are ticked.
         """
@@ -222,7 +235,9 @@ class Segmind:
             started = time.monotonic()
             self.tick()
             held_for = time.monotonic() - started
-            self.stopping.wait(max(self.pause_between_ticks, held_for))
+            self.stopping.wait(
+                max(self.tick_period - held_for, held_for, self.pause_between_ticks)
+            )
         for _ in range(self.ticks_to_see_the_world_at_rest):
             self.tick()
 

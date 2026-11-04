@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# %% Imports
 from robokudo.world import world_instance
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -245,8 +246,6 @@ def main() -> None:
 
     # If you have a custom version of `setup_with_descendants`, call it:
     setup_with_descendants_rk(ae_root)
-
-    viz = VizMarkerPublisher(_world=world_instance(), node=node1)
 
     try:
         # 9. Start ticking the Behavior Tree
