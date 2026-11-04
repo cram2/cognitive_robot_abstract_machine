@@ -84,7 +84,7 @@ else in the same query, whether selected (like `student` above) or used by anoth
 range over each student's own courses. A variable that occurs only inside the quantifier, including inside the
 quantified variable's own domain expression, is local to the quantifier and is quantified together with it: in
 `for_all(cabinets.container, ...)`, where `cabinets` appears nowhere else, the condition must hold for the containers of
-all cabinets. Over an empty collection, or an absent one (`None`), `for_all` is true and `exists` is false.
+all cabinets. Over an empty collection, `for_all` is true and `exists` is false.
 
 `exists` only filters the outer bindings. Each one appears in the results at most once, however many values of the
 quantified variable satisfy the condition, and the local variables never appear in the results. If you need those

@@ -8,7 +8,6 @@ symbolic expressions, including equality, ordering, and membership-style checks.
 from __future__ import annotations
 
 import operator
-from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
 
@@ -31,9 +30,6 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     """
     A symbolic equality check that can be used to compare symbolic variables using a
     provided comparison operation.
-
-    Under ``==`` and ``!=``, two lists or tuples are equal when they hold the same
-    elements in the same order; any other two collections are equal as sets.
     """
 
     left: Selectable
@@ -87,12 +83,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             and is_iterable(left_value)
             and is_iterable(right_value)
         ):
-            # Two sequences compare by order, length and duplicates; any other pair of
-            # collections compares as sets.
-            if isinstance(left_value, Sequence) and isinstance(right_value, Sequence):
-                left_value, right_value = tuple(left_value), tuple(right_value)
-            else:
-                left_value, right_value = make_set(left_value), make_set(right_value)
+            left_value = make_set(left_value)
+            right_value = make_set(right_value)
         comparison_result = self.operation(left_value, right_value)
         bindings = copy(child_result.bindings)
         bindings[self._id_] = comparison_result

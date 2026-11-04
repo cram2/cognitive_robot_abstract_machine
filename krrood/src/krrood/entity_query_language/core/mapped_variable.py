@@ -865,11 +865,9 @@ class FlatVariable(MappedVariable[T]):
         self._type_ = common_base_class(distinct_element_types)
 
     def _apply_mapping_(
-        self, value: Iterable[T] | None, sources: OperationResult | None = None
+        self, value: Iterable[T], sources: OperationResult | None = None
     ) -> Iterable[T]:
-        # An absent collection, such as an optional one left as None, has no elements.
-        if value is not None:
-            yield from value
+        yield from value
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
         # Not routed through the mapped-variable cache: a flattening is an iteration

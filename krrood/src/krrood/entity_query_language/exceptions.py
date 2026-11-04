@@ -975,32 +975,6 @@ class SelectiveBackendCannotResolveEllipsisMatch(DataclassException):
 
 
 @dataclass
-class GenerativeBackendCannotFillInADomainObject(DataclassException):
-    """
-    Raised when a generative backend evaluates a match whose nested pattern with a
-    domain leaves an attribute as ``...`` or marks it with ``cause``: the object is taken
-    from the domain as it is.
-    """
-
-    pattern: Match
-    """
-    The nested pattern with a domain that leaves an attribute to fill in.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{self.pattern} takes an existing object from its domain, so a generative "
-            f"backend cannot fill in its attribute left as ``...`` or marked with ``cause``."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "State a value or a condition for the attribute, or remove the domain so "
-            "that the object is constructed."
-        )
-
-
-@dataclass
 class BackendCannotEvaluateCause(DataclassException):
     """
     Raised when a match with a :class:`~krrood.entity_query_language.operators.causal.Cause`
@@ -1231,39 +1205,6 @@ class UnboundPatternVariable(UsageError):
         return (
             "Bind every variable of the pattern, keyed by the identifier of the "
             "variable assigned to its attribute."
-        )
-
-
-@dataclass
-class ValueFitsNeitherElementNorCollection(UsageError):
-    """
-    Raised when a pattern gives a collection-valued attribute a plain value that is
-    neither of the collection's element type nor a collection, so it describes neither
-    one element nor the whole collection.
-    """
-
-    attribute_match: AttributeMatch
-    """
-    The attribute match assigning the value.
-    """
-
-    element_type: type
-    """
-    The declared type of the collection's elements.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.attribute_match}' holds elements of type "
-            f"{self.element_type.__name__}, but was given "
-            f"{self.attribute_match.assigned_value!r}, which is neither such an "
-            f"element nor a collection."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            f"Give one {self.element_type.__name__} to require it as an element, or a "
-            f"collection to compare the whole collection."
         )
 
 

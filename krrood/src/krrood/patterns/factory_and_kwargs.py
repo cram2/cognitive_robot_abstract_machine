@@ -47,19 +47,10 @@ class HasFactoryAndKwargs(Generic[T]):
                     for element in value
                 )
             else:
-                constructed_kwargs[key] = self._constructor_argument_for_(
-                    key, self._recurse_construct_instance_and_get_value(value)
+                constructed_kwargs[key] = (
+                    self._recurse_construct_instance_and_get_value(value)
                 )
         return self._factory_(**constructed_kwargs)
-
-    def _constructor_argument_for_(self, keyword: str, value: Any) -> Any:
-        """
-        :param keyword: A keyword argument of the factory.
-        :param value: The value constructed for it from :attr:`_kwargs_`.
-        :return: The argument to pass to the factory for *keyword*; *value* itself
-            unless a host of this mixin adapts it.
-        """
-        return value
 
     @property
     def _factory_keyword_arguments_(self) -> dict[str, Any]:
