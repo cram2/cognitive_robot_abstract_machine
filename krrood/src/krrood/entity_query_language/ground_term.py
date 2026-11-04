@@ -24,7 +24,7 @@ from typing_extensions import (
     TypeVar,
 )
 
-from krrood.entity_query_language.call_arguments import CallArguments
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import ensure_hashable
@@ -285,9 +285,11 @@ class CallTerm(GroundTerm):
         Passing an argument by position or by name, or leaving out one that has a
         default, gives the same arguments.
         """
-        return CallArguments.bound_to(
-            self.callee, self.arguments, self.keyword_arguments
-        ).key_by(ensure_hashable)
+        return (
+            CallSignature.of(self.callee)
+            .bind(*self.arguments, **self.keyword_arguments)
+            .key_by(ensure_hashable)
+        )
 
     def live_value(self) -> Any:
         return self.callee(*self.arguments, **self.keyword_arguments)
@@ -307,10 +309,11 @@ class BoundValueTerm(CallTerm):
     """
 
     def live_value(self) -> Any:
-        bound_arguments = CallArguments.signature_of(self.callee).bind(
-            *self.arguments, **self.keyword_arguments
+        return self.callee._bound_value_(
+            **CallSignature.of(self.callee).keyword_arguments(
+                *self.arguments, **self.keyword_arguments
+            )
         )
-        return self.callee._bound_value_(**bound_arguments.arguments)
 
 
 # %% expressions that read ground terms

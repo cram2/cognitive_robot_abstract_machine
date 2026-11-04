@@ -4,13 +4,11 @@ The arguments of one call, compared as a call compares them.
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass, field
 from functools import cached_property
 
 from typing_extensions import Any, Callable, Hashable, Mapping
 
-from krrood.patterns.caching import memoize
 from krrood.utils import ensure_hashable, is_hashable
 
 # %% call arguments
@@ -39,38 +37,6 @@ class CallArguments:
     """
     The arguments passed by name.
     """
-
-    @classmethod
-    def bound_to(
-        cls,
-        callee: Callable[..., Any],
-        positional: tuple[Any, ...],
-        keyword: Mapping[str, Any],
-    ) -> CallArguments:
-        """
-        :param callee: The function or class the arguments are passed to.
-        :param positional: The arguments passed by position.
-        :param keyword: The arguments passed by name.
-        :return: The arguments *callee* receives, the same however they were passed and
-            including the defaults that were left out.
-        """
-        signature = (
-            cls.signature_of(callee)
-            if is_hashable(callee)
-            else inspect.signature(callee)
-        )
-        bound_arguments = signature.bind(*positional, **keyword)
-        bound_arguments.apply_defaults()
-        return cls(bound_arguments.args, bound_arguments.kwargs)
-
-    @classmethod
-    @memoize
-    def signature_of(cls, callee: Callable[..., Any]) -> inspect.Signature:
-        """
-        :param callee: A function or class that can be hashed.
-        :return: The signature of *callee*.
-        """
-        return inspect.signature(callee)
 
     @cached_property
     def hashable_key(self) -> tuple[Hashable, ...]:

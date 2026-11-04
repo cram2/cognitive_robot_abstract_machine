@@ -32,7 +32,8 @@ from random_events.variable import (
 )
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
-from krrood.entity_query_language.call_arguments import CallArguments
+from krrood.class_diagrams.call_arguments import CallArguments
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
@@ -328,7 +329,7 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         :return: The retrieved or created MappedVariable instance.
         """
         cache_item = MappedVariableCacheItem(
-            type_, CallArguments.bound_to(type_, (self, *args), kwargs)
+            type_, CallSignature.of(type_).bind(self, *args, **kwargs)
         )
         if cache_item in self._known_mapped_variables_:
             return self._known_mapped_variables_[cache_item]
