@@ -109,57 +109,6 @@ def rclpy_installed() -> bool:
         return False
 
 
-def tracy_installed() -> bool:
-    """
-    :return: Whether the Tracy description is installed as a ROS package, which it
-        never is without ROS.
-    """
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "iai_tracy_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, LookupError, ValueError):
-        return False
-
-
-def daisy_installed() -> bool:
-    """
-    :return: Whether the DAiSy description is installed as a ROS package, which it
-        never is without ROS.
-    """
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "iai_daisy_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, LookupError, ValueError):
-        return False
-
-
-def hsrb_installed() -> bool:
-    """
-    :return: Whether the HSR description is installed as a ROS package, which it
-        never is without ROS.
-    """
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "hsr_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, LookupError, ValueError):
-        return False
-
-
 def type_string_to_type(type_string: str) -> type:
     """
     Convert a string representation of a type to the actual type.

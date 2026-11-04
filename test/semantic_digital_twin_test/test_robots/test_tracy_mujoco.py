@@ -20,7 +20,6 @@ from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
-from semantic_digital_twin.utils import tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -29,7 +28,8 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 pytestmark = pytest.mark.skipif(
-    not tracy_installed(), reason="iai_tracy_description is not installed"
+    not Tracy.is_description_installed(),
+    reason="iai_tracy_description is not installed",
 )
 
 
