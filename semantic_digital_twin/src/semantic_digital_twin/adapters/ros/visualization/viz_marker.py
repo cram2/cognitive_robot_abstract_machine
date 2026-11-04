@@ -10,8 +10,6 @@ from rclpy.qos import QoSProfile, DurabilityPolicy
 from visualization_msgs.msg import MarkerArray
 
 from semantic_digital_twin.adapters.ros.msg_converter import SemDTToRos2Converter
-
-# Declares the shape converters that SemDTToRos2Converter.convert dispatches to.
 import semantic_digital_twin.adapters.ros.semdt_to_ros2_converters  # noqa: F401
 from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames

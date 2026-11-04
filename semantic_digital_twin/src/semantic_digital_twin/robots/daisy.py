@@ -16,8 +16,6 @@ from typing_extensions import Self
 
 from krrood.ormatic.utils import classproperty
 
-# The griplink actions are only needed to command the real grippers; without ROS the
-# robot description still loads, and its griplink endpoints carry no action type.
 try:
     from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
 except ModuleNotFoundError:
