@@ -11,13 +11,10 @@ import os
 import sys
 from dataclasses import dataclass, field
 from enum import StrEnum
-from importlib.abc import MetaPathFinder
-from importlib.machinery import ModuleSpec, PathFinder
 from pathlib import Path
-from types import ModuleType
 
 import pytest
-from typing_extensions import Self, Sequence
+from typing_extensions import Self
 
 # %% hiding ROS
 
@@ -34,55 +31,37 @@ class RosEnvironmentVariable(StrEnum):
 
 
 @dataclass
-class RosImportBlocker(MetaPathFinder):
+class RosInstallation:
     """
-    Makes every module installed under a ROS install prefix unimportable, as if ROS were
-    not installed.
+    A sourced ROS installation and the workspaces sourced on top of it.
     """
 
     install_prefixes: list[Path] = field(default_factory=list)
     """
-    The directories whose modules cannot be imported.
+    The directories the installation and its workspaces are installed in.
     """
 
     @classmethod
     def from_environment(cls) -> Self:
         """
-        :return: A blocker for the install prefixes of the sourced ROS installation, which
-            blocks nothing where no ROS installation is sourced.
+        :return: The installation the environment has sourced, which has no install
+            prefixes where no ROS installation is sourced.
         """
         prefixes = os.environ.get(RosEnvironmentVariable.INSTALL_PREFIXES, "")
         return cls([Path(prefix) for prefix in prefixes.split(os.pathsep) if prefix])
 
-    def find_spec(
-        self,
-        fullname: str,
-        path: Sequence[str] | None,
-        target: ModuleType | None = None,
-    ) -> ModuleSpec | None:
+    def hide_from(self, module_search_path: list[str]) -> None:
         """
-        :return: Nothing, leaving the module to the finders after this one.
-        :raises ModuleNotFoundError: If the module is installed under a ROS install
-            prefix.
+        Removes every directory of this installation from the module search path, so
+        neither its modules nor the pytest plugins it registers can be found.
         """
-        specification = PathFinder.find_spec(fullname, path)
-        if specification is None:
-            return None
-        locations = [
-            Path(location)
-            for location in [
-                specification.origin,
-                *(specification.submodule_search_locations or []),
-            ]
-            if location is not None
+        module_search_path[:] = [
+            entry
+            for entry in module_search_path
+            if not any(
+                Path(entry).is_relative_to(prefix) for prefix in self.install_prefixes
+            )
         ]
-        if any(
-            location.is_relative_to(prefix)
-            for location in locations
-            for prefix in self.install_prefixes
-        ):
-            raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
-        return None
 
 
 # %% collection
@@ -92,7 +71,7 @@ def main() -> None:
     """
     Collects the tests beside this script with ROS hidden.
     """
-    sys.meta_path.insert(0, RosImportBlocker.from_environment())
+    RosInstallation.from_environment().hide_from(sys.path)
     sys.exit(pytest.main(["--collect-only", "--quiet", str(Path(__file__).parent)]))
 
 
