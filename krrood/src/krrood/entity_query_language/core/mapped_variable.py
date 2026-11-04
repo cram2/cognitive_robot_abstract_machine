@@ -181,7 +181,9 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
         return self._symbolic_expression_._get_mapped_variable_(indexing, key)
 
     def __call__(self, *args, **kwargs) -> Call[T]:
-        return self._symbolic_expression_._get_mapped_variable_(Call, args, kwargs)
+        return self._symbolic_expression_._get_mapped_variable_(
+            Call, CallArguments(args, kwargs)
+        )
 
     def __eq__(self, other) -> Comparator:
         return Comparator(self._symbolic_expression_, other, operator.eq)
@@ -774,23 +776,16 @@ class Call(SingleValueMapping[T, CallTerm]):
     A variable created through a function call operation on its child variable.
     """
 
-    _args_: tuple[Any, ...] = field(default_factory=tuple)
+    _arguments_: CallArguments = field(default_factory=CallArguments)
     """
-    The arguments to call the method with.
-    """
-
-    _kwargs_: dict[str, Any] = field(default_factory=dict)
-    """
-    The keyword arguments to call the method with.
+    The arguments the called value is called with.
     """
 
     def _ground_term_(self, callee: Callable[..., Any]) -> CallTerm:
-        return CallTerm.from_call(callee, *self._args_, **self._kwargs_)
+        return CallTerm.from_call(callee, self._arguments_)
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
-        return child._get_mapped_variable_(
-            Call, _args_=self._args_, _kwargs_=self._kwargs_
-        )
+        return child._get_mapped_variable_(Call, self._arguments_)
 
     @property
     def _name_(self):

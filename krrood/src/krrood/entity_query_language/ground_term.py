@@ -26,7 +26,6 @@ from typing_extensions import (
 
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
-from krrood.class_diagrams.has_call_arguments import HasCallArguments
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -40,15 +39,20 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class FunctionKey:
-    """What identifies the function of a ground term, independently of its
-    arguments."""
+    """
+    What identifies the function of a ground term, independently of its arguments.
+    """
 
     term_type: type[GroundTerm]
-    """The class of the ground term, which tells apart an attribute, an index
-    and a call of the same function."""
+    """
+    The class of the ground term, which tells apart an attribute, an index and a call of
+    the same function.
+    """
 
     function: Hashable
-    """What the ground term applies to its arguments."""
+    """
+    What the ground term applies to its arguments.
+    """
 
 
 @dataclass(frozen=True, eq=False)
@@ -139,13 +143,19 @@ class GroundTerm(ABC):
 
 @dataclass(frozen=True, eq=False)
 class AttributeTerm(GroundTerm):
-    """One attribute of an instance."""
+    """
+    One attribute of an instance.
+    """
 
     instance: Any
-    """The instance whose attribute this is."""
+    """
+    The instance whose attribute this is.
+    """
 
     attribute_name: str
-    """The name of the attribute."""
+    """
+    The name of the attribute.
+    """
 
     @property
     def function(self) -> str:
@@ -180,13 +190,19 @@ class AttributeTerm(GroundTerm):
 
 @dataclass(frozen=True, eq=False)
 class IndexTerm(GroundTerm):
-    """The element a container stores under a key."""
+    """
+    The element a container stores under a key.
+    """
 
     container: Any
-    """The container that stores the element."""
+    """
+    The container that stores the element.
+    """
 
     key: Any
-    """The key the element is stored under."""
+    """
+    The key the element is stored under.
+    """
 
     @property
     def function(self) -> Callable[[Any, Any], Any]:
@@ -197,13 +213,17 @@ class IndexTerm(GroundTerm):
         return ensure_hashable(self.container), ensure_hashable(self.key)
 
     def setting_runs_code(self) -> bool:
-        """Setting runs code where the container's class defines its own item
-        assignment instead of inheriting a builtin one."""
+        """
+        Setting runs code where the container's class defines its own item assignment
+        instead of inheriting a builtin one.
+        """
         return not isinstance(type(self.container).__setitem__, WrapperDescriptorType)
 
     def has_live_value(self) -> bool:
-        """A container that is neither a mapping nor a sequence is assumed to
-        store every key."""
+        """
+        A container that is neither a mapping nor a sequence is assumed to store every
+        key.
+        """
         if isinstance(self.container, Mapping):
             return self.key in self.container
         if isinstance(self.container, Sequence) and isinstance(self.key, int):
@@ -215,8 +235,9 @@ class IndexTerm(GroundTerm):
 
 
 @dataclass(frozen=True, eq=False)
-class CallTerm(GroundTerm, HasCallArguments):
-    """The result of calling a function, method or class.
+class CallTerm(GroundTerm):
+    """
+    The result of calling a function, method or class.
 
     A bound method is its function called with the receiver first, and a function
     decorated with :func:`~krrood.entity_query_language.predicate.symbolic_function` is
@@ -224,38 +245,33 @@ class CallTerm(GroundTerm, HasCallArguments):
     """
 
     callee: Callable[..., Any]
-    """What is called."""
+    """
+    What is called.
+    """
 
-    call_arguments: CallArguments = field(default_factory=CallArguments)
-    """The arguments of the call."""
+    arguments: CallArguments = field(default_factory=CallArguments)
+    """
+    The arguments of the call, as they were passed.
+    """
 
     @classmethod
     def from_call(
-        cls, callee: Callable[..., Any], *arguments: Any, **keyword_arguments: Any
+        cls, callee: Callable[..., Any], arguments: CallArguments
     ) -> CallTerm:
         """
         :param callee: A function, a bound method, a class, or a function decorated
             with :func:`~krrood.entity_query_language.predicate.symbolic_function`.
-        :param arguments: The positional arguments of the call.
-        :param keyword_arguments: The keyword arguments of the call.
-        :return: The result of calling *callee* with the given arguments, as queries
-            reach it.
+        :param arguments: The arguments of the call.
+        :return: The result of calling *callee* with *arguments*, as queries reach it.
         """
         if inspect.ismethod(callee):
-            arguments = (callee.__self__, *arguments)
+            arguments = CallArguments(
+                (callee.__self__, *arguments.positional), arguments.keyword
+            )
             callee = callee.__func__
-        call_arguments = CallArguments(arguments, keyword_arguments)
         if inspect.isclass(callee) and issubclass(callee, HasBoundValue):
-            return BoundValueTerm(callee, call_arguments)
-        return CallTerm(inspect.unwrap(callee), call_arguments)
-
-    @property
-    def _callee_(self) -> Callable[..., Any]:
-        return self.callee
-
-    @property
-    def _call_arguments_(self) -> CallArguments:
-        return self.call_arguments
+            return BoundValueTerm(callee, arguments)
+        return CallTerm(inspect.unwrap(callee), arguments)
 
     @property
     def function(self) -> Hashable:
@@ -263,12 +279,16 @@ class CallTerm(GroundTerm, HasCallArguments):
 
     @property
     def normalized_arguments(self) -> tuple[Hashable, ...]:
-        """Passing an argument by position or by name, or leaving out one that
-        has a default, gives the same arguments."""
-        return self._bound_call_arguments_().key_by(ensure_hashable)
+        """
+        Passing an argument by position or by name, or leaving out one that has a
+        default, gives the same arguments.
+        """
+        return self.arguments.pass_to(CallSignature.of(self.callee).bind).key_by(
+            ensure_hashable
+        )
 
     def live_value(self) -> Any:
-        return self._call_()
+        return self.arguments.pass_to(self.callee)
 
 
 @dataclass(frozen=True, eq=False)
@@ -280,13 +300,13 @@ class BoundValueTerm(CallTerm):
     """
 
     callee: type[HasBoundValue]
-    """The class that is applied."""
+    """
+    The class that is applied.
+    """
 
     def live_value(self) -> Any:
         return self.callee._bound_value_(
-            **CallSignature.of(self.callee).keyword_arguments(
-                *self.call_arguments.positional, **self.call_arguments.keyword
-            )
+            **self.arguments.pass_to(CallSignature.of(self.callee).keyword_arguments)
         )
 
 
@@ -296,8 +316,10 @@ GroundTermType = TypeVar("GroundTermType", bound=GroundTerm)
 
 
 class GroundTermExpression(Generic[GroundTermType], SubClassSafeGeneric):
-    """An expression whose value, for each binding of its operands, is the
-    value of one ground term of the bound type."""
+    """
+    An expression whose value, for each binding of its operands, is the value of one
+    ground term of the bound type.
+    """
 
     @property
     @abstractmethod
@@ -319,7 +341,9 @@ class GroundTermExpression(Generic[GroundTermType], SubClassSafeGeneric):
 
 
 class TermReader(Interface):
-    """Reads the value of a ground term during an evaluation."""
+    """
+    Reads the value of a ground term during an evaluation.
+    """
 
     @abstractmethod
     def values_of(self, term: GroundTerm) -> Iterator[Any]:
@@ -331,7 +355,9 @@ class TermReader(Interface):
 
 @dataclass
 class LiveTermReader(TermReader):
-    """Reads the value a ground term currently has on the live objects."""
+    """
+    Reads the value a ground term currently has on the live objects.
+    """
 
     def values_of(self, term: GroundTerm) -> Iterator[Any]:
         return term.live_values()

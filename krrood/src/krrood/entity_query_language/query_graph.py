@@ -203,9 +203,10 @@ class QueryGraph:
             case Call():
                 expression: Call
                 args = [
-                    QueryGraph.get_expression_name(arg) for arg in expression._args_
+                    QueryGraph.get_expression_name(arg)
+                    for arg in expression._arguments_.positional
                 ]
-                kwargs = [f"{k}={v}" for k, v in expression._kwargs_.items()]
+                kwargs = [f"{k}={v}" for k, v in expression._arguments_.keyword.items()]
                 args_and_kwargs = args + kwargs
                 return f"({','.join(args_and_kwargs)})"
             case Query():
