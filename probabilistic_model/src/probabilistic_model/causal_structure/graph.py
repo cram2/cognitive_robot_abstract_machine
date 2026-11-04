@@ -195,7 +195,7 @@ class GraphEdge:
 
 
 @dataclass(frozen=True)
-class Collider:
+class ColliderPatternInCausalGraph:
     """
     Two nodes that both cause a third: ``first_parent → child ← second_parent``.
     """
@@ -367,7 +367,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         """
         return self.edge_between(first, second) is not None
 
-    def unshielded_colliders(self) -> set[Collider]:
+    def unshielded_colliders(self) -> set[ColliderPatternInCausalGraph]:
         """
         :return: Every collider among the directed edges whose two parents are not
             adjacent.
@@ -379,14 +379,14 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         )
         return self.colliders_of(directed)
 
-    def colliders_of(self, directed: MemberGraph) -> set[Collider]:
+    def colliders_of(self, directed: MemberGraph) -> set[ColliderPatternInCausalGraph]:
         """
         :param directed: Directed edges over the graph's nodes.
         :return: Every collider among the directed edges whose two parents are not
             :meth:`adjacent` in this graph.
         """
         return {
-            Collider(first_parent, child, second_parent)
+            ColliderPatternInCausalGraph(first_parent, child, second_parent)
             for child in directed.nodes()
             for first_parent, second_parent in itertools.combinations(
                 sorted(directed.predecessors(child)), 2
