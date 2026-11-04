@@ -30,7 +30,7 @@ def diagram() -> ClassDiagram:
 def test_every_association_between_two_classes_is_keyed(diagram):
     aggregator = diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
 
-    assert diagram.get_assoc_keys_by_source(include_field_name=True)[
+    assert diagram.get_association_keys_by_source(include_field_name=True)[
         aggregator.index
     ] == {
         association.get_key(include_field_name=True)

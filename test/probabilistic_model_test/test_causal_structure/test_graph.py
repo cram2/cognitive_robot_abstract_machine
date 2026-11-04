@@ -96,12 +96,12 @@ def test_an_edge_to_a_node_the_graph_lacks_raises():
 
 def test_the_edge_between_two_nodes_is_found_from_either_end():
     graph = confounded()
-    x, z = graph.node("X"), graph.node("Z")
+    cause, confounder = graph.node("X"), graph.node("Z")
 
     assert (
-        graph.edge_between(x, z)
-        == graph.edge_between(z, x)
-        == GraphEdge.directed_edge(z, x)
+        graph.edge_between(cause, confounder)
+        == graph.edge_between(confounder, cause)
+        == GraphEdge.directed_edge(confounder, cause)
     )
 
 

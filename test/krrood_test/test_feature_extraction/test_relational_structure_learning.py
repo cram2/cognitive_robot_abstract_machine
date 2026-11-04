@@ -71,7 +71,7 @@ class EveryPairJoinedLearner(CausalStructureLearner):
         self,
         rows: pd.DataFrame,
         nodes: list[GraphNode],
-        knowledge: DomainCausalKnowledge,
+        domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         return CausalGraph.from_edges(
             nodes,

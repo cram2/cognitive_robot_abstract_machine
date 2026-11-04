@@ -657,23 +657,26 @@ class ClassDiagram:
                 parent_map.setdefault(child_index, set()).add(parent_index)
         return parent_map
 
-    def all_ancestors(self, node_idx: int) -> set[int]:
-        """DFS to compute all ancestors for each node index"""
+    def all_ancestors(self, node_index: int) -> set[int]:
+        """
+        :param node_index: The index of a class in the dependency graph.
+        :return: The indices of every class it inherits from, directly or indirectly.
+        """
         parent_map = self.parent_map
-        parents = parent_map.get(node_idx, set())
+        parents = parent_map.get(node_index, set())
         if not parents:
             return set()
         stack = list(parents)
         seen: set[int] = set(parents)
         while stack:
-            cur = stack.pop()
-            for p in parent_map.get(cur, set()):
-                if p not in seen:
-                    seen.add(p)
-                    stack.append(p)
+            current = stack.pop()
+            for parent in parent_map.get(current, set()):
+                if parent not in seen:
+                    seen.add(parent)
+                    stack.append(parent)
         return seen
 
-    def get_assoc_keys_by_source(
+    def get_association_keys_by_source(
         self, include_field_name: bool = False
     ) -> dict[int, set[tuple]]:
         """
@@ -713,7 +716,9 @@ class ClassDiagram:
         result._dependency_graph = self._dependency_graph.copy()
         dependency_graph = result._dependency_graph
 
-        association_keys_by_source = result.get_assoc_keys_by_source(include_field_name)
+        association_keys_by_source = result.get_association_keys_by_source(
+            include_field_name
+        )
 
         # Mark redundant descendant association edges for removal
         edges_to_remove: list[int] = []
