@@ -1,6 +1,4 @@
-"""
-States that assign values to fluents without changing live objects.
-"""
+"""States that assign values to ground terms without changing live objects."""
 
 from __future__ import annotations
 
@@ -23,13 +21,13 @@ from krrood.planning.fact import Fact
 @dataclass(frozen=True)
 class State(TermReader):
     """
-    A valuation of fluents that differs from the live objects only where it assigns a
+    A valuation of ground terms that differs from the live objects only where it assigns a
     value.
 
-    A fluent is a :class:`~krrood.entity_query_language.ground_term.GroundTerm`: an
+    A ground term (:class:`~krrood.entity_query_language.ground_term.GroundTerm`) is an
     attribute of an instance, an indexed element, or the result of a call, a symbolic
     function or a predicate for concrete arguments. A query evaluated with this state
-    reads the assigned value of every assigned fluent, and the live value of every
+    reads the assigned value of every assigned ground term, and the live value of every
     other. The live objects are never changed.
 
     >>> from dataclasses import dataclass
@@ -44,19 +42,18 @@ class State(TermReader):
     >>> box.color
     'red'
 
-    .. note:: An unassigned derived fluent follows the state only where its value comes
+    .. note:: An unassigned derived ground term follows the state only where its value comes
         from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
         arguments, as in ``is_table(block.support)``. A Python body that reads an
         attribute directly, such as ``self.block.support``, reads the live value.
 
-    .. warning:: An assigned fluent keeps its value even where it is derived from other
-        fluents, so assigning a predicate overrides what it would compute from the
-        fluents it reads, also after those change.
+    .. warning:: An assigned ground term keeps its value even where it is derived from other
+        ground terms, so assigning a predicate overrides what it would compute from the
+        ground terms it reads, also after those change.
     """
 
     assignments: dict[GroundTerm, Any] = field(default_factory=dict)
-    """
-    The value of every fluent this state changes.
+    """The value of every ground term this state changes.
 
     Never mutated; a changed state is a new :class:`State`.
     """
@@ -68,17 +65,17 @@ class State(TermReader):
     def assigned_functions(self) -> frozenset[FunctionKey]:
         """
         :return: The :attr:`~krrood.entity_query_language.ground_term.GroundTerm.function_key`
-            of every fluent this state assigns.
+            of every ground term this state assigns.
         """
         return frozenset(term.function_key for term in self.assignments)
 
     def with_facts(self, *facts: SymbolicExpression) -> State:
         """
-        :param facts: Conditions that each fix the value of fluents, as
+        :param facts: Conditions that each fix the value of ground terms, as
             :meth:`~krrood.planning.fact.Fact.from_condition` reads them. A fact whose
-            expression has variables fixes the fluent for every binding of them.
+            expression has variables fixes the ground term for every binding of them.
         :return: A new state that assigns the values *facts* state on top of this
-            state's own assignments, a later value winning where two assign a fluent.
+            state's own assignments, a later value winning where two assign a ground term.
         """
         assignments = dict(self.assignments)
         for fact in facts:

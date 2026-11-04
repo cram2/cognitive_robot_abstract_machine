@@ -1,8 +1,7 @@
-"""
-Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
+"""Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
 
-A query reads the values the state's facts give fluents - attributes, indexed elements,
-calls, symbolic functions and predicates - and live values for every other fluent.
+A query reads the values the state's facts give ground terms - attributes, indexed elements,
+calls, symbolic functions and predicates - and live values for every other ground term.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from krrood.planning.exceptions import (
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
     FactValueIsNotConstant,
-    MissingFluent,
+    MissingGroundTerm,
 )
 from krrood.planning.state import State
 
@@ -53,10 +52,8 @@ from ..dataset.blocks_world import (
 
 @dataclass
 class TwoTowers:
-    """
-    A blocksworld with block ``c`` on block ``a``, blocks ``a`` and ``b`` on the table,
-    and a shelf holding ``a`` and ``b`` in its slots.
-    """
+    """A blocksworld with block ``c`` on block ``a``, blocks ``a`` and ``b`` on
+    the table, and a shelf holding ``a`` and ``b`` in its slots."""
 
     table: Table
     """
@@ -64,9 +61,7 @@ class TwoTowers:
     """
 
     a: Block
-    """
-    The bottom block of the first tower.
-    """
+    """The bottom block of the first tower."""
 
     b: Block
     """
@@ -74,9 +69,7 @@ class TwoTowers:
     """
 
     c: Block
-    """
-    The top block of the first tower.
-    """
+    """The top block of the first tower."""
 
     shelf: Shelf
     """
@@ -132,7 +125,7 @@ def test_query_under_state_reads_assigned_value(two_towers):
     assert result == [two_towers.b]
 
 
-def test_unassigned_fluents_keep_their_live_values(two_towers):
+def test_unassigned_ground_terms_keep_their_live_values(two_towers):
     result = blocks_on(two_towers.blocks, two_towers.table, two_towers.b_on_c)
 
     assert result == [two_towers.a]
@@ -150,7 +143,7 @@ def test_query_outside_state_reads_live_values(two_towers):
     assert blocks_on(two_towers.blocks, two_towers.c) == []
 
 
-# %% fluents of every kind
+# %% ground terms of every kind
 
 
 def test_query_reads_assigned_indexed_element(two_towers):
@@ -161,7 +154,7 @@ def test_query_reads_assigned_indexed_element(two_towers):
     assert result == [two_towers.c]
 
 
-def test_index_by_expression_reads_the_same_fluent_as_index_by_value(two_towers):
+def test_index_by_expression_reads_the_same_ground_term_as_index_by_value(two_towers):
     state = State().with_facts(literal(two_towers.shelf).slots[0] == two_towers.c)
     slot = variable(int, [0, 1])
 
@@ -221,7 +214,9 @@ def test_query_reads_assigned_symbolic_function_class(two_towers):
 # %% facts about every binding of a variable
 
 
-def test_fact_about_a_variable_assigns_the_fluent_of_each_of_its_values(two_towers):
+def test_fact_about_a_variable_assigns_the_ground_term_of_each_of_its_values(
+    two_towers,
+):
     state = State().with_facts(
         variable(Block, [two_towers.a, two_towers.b]).support == two_towers.c
     )
@@ -231,7 +226,7 @@ def test_fact_about_a_variable_assigns_the_fluent_of_each_of_its_values(two_towe
     assert result == [two_towers.a, two_towers.b]
 
 
-def test_fact_about_a_match_assigns_only_the_fluents_of_its_matches(two_towers):
+def test_fact_about_a_match_assigns_only_the_ground_terms_of_its_matches(two_towers):
     state = State().with_facts(
         a(Block)(support=two_towers.table).from_(two_towers.blocks).support
         == two_towers.c
@@ -258,17 +253,17 @@ def test_fact_with_an_expression_index_assigns_every_element_it_reaches(two_towe
 
 
 def test_assigning_an_attribute_the_instance_lacks_is_rejected(two_towers):
-    with pytest.raises(MissingFluent):
+    with pytest.raises(MissingGroundTerm):
         State().with_facts(literal(two_towers.table).support == two_towers.a)
 
 
 def test_assigning_an_element_the_container_lacks_is_rejected(two_towers):
-    with pytest.raises(MissingFluent):
+    with pytest.raises(MissingGroundTerm):
         State().with_facts(literal(two_towers.shelf).slots[5] == two_towers.c)
 
 
 @pytest.mark.parametrize(
-    "fluent",
+    "ground_term",
     [
         lambda: literal(AttributeSetThroughProperty()).is_lit,
         lambda: literal(AttributesSetThroughSetattr()).status,
@@ -276,13 +271,13 @@ def test_assigning_an_element_the_container_lacks_is_rejected(two_towers):
     ],
     ids=["property setter", "__setattr__", "__setitem__"],
 )
-def test_assigning_a_fluent_whose_setting_runs_code_is_rejected(fluent):
+def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term):
     with pytest.raises(AssignmentBypassesSetter):
-        State().with_facts(fluent() == True)
+        State().with_facts(ground_term() == True)
 
 
 @pytest.mark.parametrize(
-    "fluent",
+    "ground_term",
     [
         lambda: literal(SlottedAttributes(1.0)).coordinate,
         lambda: literal(FrozenAttributes(1.0)).coordinate,
@@ -290,8 +285,8 @@ def test_assigning_a_fluent_whose_setting_runs_code_is_rejected(fluent):
     ],
     ids=["slot", "frozen dataclass", "read-only property"],
 )
-def test_assigning_a_fluent_that_is_only_stored_is_accepted(fluent):
-    expression = fluent()
+def test_assigning_a_ground_term_that_is_only_stored_is_accepted(ground_term):
+    expression = ground_term()
     state = State().with_facts(expression == 5.0)
 
     assert expression.tolist(state=state) == [5.0]
@@ -314,10 +309,10 @@ def test_a_fact_cannot_take_its_value_from_an_expression(two_towers):
         )
 
 
-# %% one fluent, written in several ways
+# %% one ground term, written in several ways
 
 
-def test_call_names_one_fluent_however_its_arguments_are_passed(two_towers):
+def test_call_names_one_ground_term_however_its_arguments_are_passed(two_towers):
     block = literal(two_towers.a)
     positional = State().with_facts(block.rests_on(two_towers.table) == False)
     by_name = State().with_facts(block.rests_on(support=two_towers.table) == False)
@@ -328,7 +323,7 @@ def test_call_names_one_fluent_however_its_arguments_are_passed(two_towers):
     assert positional == by_name == with_default
 
 
-def test_different_arguments_name_different_fluents(two_towers):
+def test_different_arguments_name_different_ground_terms(two_towers):
     block = literal(two_towers.a)
 
     assert State().with_facts(
@@ -349,7 +344,7 @@ def test_assignment_by_keyword_is_read_by_a_positional_call(two_towers):
     assert result == [two_towers.b]
 
 
-def test_fluent_reached_through_another_object_is_the_same_fluent(two_towers):
+def test_ground_term_reached_through_another_object_is_the_same_ground_term(two_towers):
     direct = State().with_facts(
         literal(two_towers.a).rests_on(two_towers.table) == False
     )
@@ -366,11 +361,9 @@ def test_fluent_reached_through_another_object_is_the_same_fluent(two_towers):
 # %% how arguments are compared
 
 
-def test_fluents_identify_unhashable_instances_by_identity(two_towers):
-    """
-    Two blocks that compare equal are still different objects, so assigning a fluent of
-    one never assigns the other.
-    """
+def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
+    """Two blocks that compare equal are still different objects, so assigning
+    a ground term of one never assigns the other."""
     first = Block("d", two_towers.table)
     second = Block("d", two_towers.table)
     state = State().with_facts(literal(first).support == two_towers.c)
@@ -380,11 +373,10 @@ def test_fluents_identify_unhashable_instances_by_identity(two_towers):
     assert result == [second]
 
 
-def test_fluents_identify_list_arguments_by_identity(two_towers):
-    """
-    Two lists with the same elements are still different objects, so assigning a fluent
-    called with one never assigns the fluent called with the other.
-    """
+def test_ground_terms_identify_list_arguments_by_identity(two_towers):
+    """Two lists with the same elements are still different objects, so
+    assigning a ground term called with one never assigns the ground term
+    called with the other."""
     first = [two_towers.b]
     second = [two_towers.b]
     state = State().with_facts(tallest_tower(literal(first)) == 7)
@@ -396,7 +388,7 @@ def test_fluents_identify_list_arguments_by_identity(two_towers):
     assert heights == [[7], [tallest_tower(second)]]
 
 
-def test_fluents_compare_hashable_arguments_by_value(two_towers):
+def test_ground_terms_compare_hashable_arguments_by_value(two_towers):
     key = 1
     equal_key = int("1")
     slots = literal(two_towers.shelf).slots
@@ -406,7 +398,7 @@ def test_fluents_compare_hashable_arguments_by_value(two_towers):
     )
 
 
-# %% fluents read through other fluents
+# %% ground terms read through other ground terms
 
 
 def test_attribute_of_an_assigned_attribute_reads_the_new_value(two_towers):
@@ -428,10 +420,8 @@ def test_symbolic_function_receives_assigned_attribute_as_argument(two_towers):
 
 
 def test_python_body_reads_live_values_it_does_not_receive_as_arguments(two_towers):
-    """
-    :class:`IsOn` reads ``self.block.support`` in Python, so it sees ``b`` on the table
-    although the state puts ``b`` on ``c``.
-    """
+    """:class:`IsOn` reads ``self.block.support`` in Python, so it sees ``b``
+    on the table although the state puts ``b`` on ``c``."""
     result = (
         (block := a(Block).from_(two_towers.blocks))
         .where(IsOn(block, two_towers.c))
@@ -457,12 +447,12 @@ def test_index_into_an_assigned_collection_reads_its_new_elements(two_towers):
     assert result == [two_towers.c]
 
 
-# %% assigned derived fluents
+# %% assigned derived ground terms
 
 
 def test_assigned_predicate_overrides_what_it_derives(two_towers):
-    """
-    An assigned fluent is not recomputed, even where it is derived from other fluents:
+    """An assigned ground term is not recomputed, even where it is derived from
+    other ground terms:
 
     ``c`` rests on ``a``, yet the state says it rests on the table.
     """
@@ -506,10 +496,8 @@ def test_results_read_the_state_wherever_they_are_consumed(two_towers):
 
 
 def test_state_reaches_only_the_evaluation_it_is_given_to(two_towers):
-    """
-    A query evaluated while an evaluation under a state is part way through reads the
-    live values.
-    """
+    """A query evaluated while an evaluation under a state is part way through
+    reads the live values."""
     supports = (
         a(Block)
         .from_([two_towers.b, two_towers.c])
@@ -528,10 +516,8 @@ def test_state_reaches_only_the_evaluation_it_is_given_to(two_towers):
 
 
 def test_query_started_during_another_evaluation_reads_state(two_towers):
-    """
-    A query started from inside a running evaluation, here by a symbolic function, reads
-    the same state as the evaluation that started it.
-    """
+    """A query started from inside a running evaluation, here by a symbolic
+    function, reads the same state as the evaluation that started it."""
 
     @symbolic_function
     def is_covered(candidate: Block) -> bool:
