@@ -525,6 +525,24 @@ def test_probabilistic_backend_grounds_a_keyword_bound_to_values_created_on_ever
     )
 
 
+def test_probabilistic_backend_takes_a_nested_pattern_object_from_its_domain() -> None:
+    """
+    A keyword given a nested pattern ranging over a domain takes its sampled values only
+    from that domain, rather than constructing new objects.
+    """
+    positions = [KRROODPosition(1, 0, 0), KRROODPosition(2, 0, 0)]
+    query = a(KRROODPose)(
+        position=a(KRROODPosition)().from_(positions), orientation=UPRIGHT
+    )
+
+    poses = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert poses
+    assert {id(pose.position) for pose in poses} <= {
+        id(position) for position in positions
+    }
+
+
 # %% generation constructs instances from bindings rather than writing into the pattern
 
 

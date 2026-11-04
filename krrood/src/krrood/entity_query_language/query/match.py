@@ -227,10 +227,27 @@ class AbstractMatchExpression(MatchAssignedValue, Generic[T], ABC):
         """
         self.resolve()
         for expression in self._descendants_:
-            if isinstance(expression.assigned_variable, Variable) or isinstance(
-                expression.assigned_value, CanBehaveLikeAVariable
-            ):
+            if expression._assigns_a_variable_:
                 yield expression
+
+    @property
+    def _generated_attribute_matches_(self) -> Iterator[AttributeMatch]:
+        """
+        :return: The attribute matches whose values a generative backend chooses: those
+            of :attr:`_matches_with_variables_`, except that a nested pattern given a
+            domain is one choice among that domain's objects, its own attributes being
+            conditions on the chosen object.
+        """
+        self.resolve()
+        queue = deque(self._children_)
+        while queue:
+            attribute_match = queue.popleft()
+            if attribute_match._chooses_from_a_domain_:
+                yield attribute_match
+                continue
+            if attribute_match._assigns_a_variable_:
+                yield attribute_match
+            queue.extend(attribute_match._children_)
 
 
 @dataclass(eq=False)
@@ -577,14 +594,25 @@ class Match(
 
         :param instances: Instances constructed from this match's pattern.
         :return: The query selecting the instances that have every value the pattern
-            states for an attribute its factory does not take, and satisfy every
-            ``where`` condition.
+            states for an attribute its factory does not take, hold objects of a nested
+            pattern's domain that satisfy that pattern, and satisfy every ``where``
+            condition.
         """
         from krrood.entity_query_language.factories import entity
 
         self._variable_._update_domain_(instances)
         selection = entity(self._variable_)
-        conditions = [*self._conditions_on_stated_values_, *self._where_conditions_]
+        conditions_on_chosen_objects = [
+            condition
+            for attribute_match in self._generated_attribute_matches_
+            if attribute_match._chooses_from_a_domain_
+            for condition in attribute_match._conditions_
+        ]
+        conditions = [
+            *self._conditions_on_stated_values_,
+            *conditions_on_chosen_objects,
+            *self._where_conditions_,
+        ]
         if conditions:
             selection = selection.where(*conditions)
         return selection
@@ -1116,7 +1144,37 @@ class AttributeMatch(AbstractMatchExpression[T]):
                 _type_=self._type_,
                 _value_=self.assigned_value,
             )
+        if self._chooses_from_a_domain_:
+            chosen_type = self.assigned_value._type_
+            return Variable(
+                _type_=chosen_type,
+                _domain_=_resolve_domain(chosen_type, self.assigned_value._domain_),
+            )
         return self.assigned_value._as_assigned_variable_(self._type_)
+
+    @property
+    def _chooses_from_a_domain_(self) -> bool:
+        """
+        :return: Whether the attribute is assigned a nested pattern given a domain, so
+            a generated object takes an object of that domain satisfying the pattern.
+        """
+        return (
+            isinstance(self.assigned_value, Match)
+            and self.assigned_value._domain_ is not None
+        )
+
+    @property
+    def _assigns_a_variable_(self) -> bool:
+        """
+        :return: Whether the pattern assigns the attribute a variable, or an expression
+            derived from one, such as its attribute or its flattened values; a nested
+            pattern given a domain does not count.
+        """
+        if self._chooses_from_a_domain_:
+            return False
+        return isinstance(self.assigned_variable, Variable) or isinstance(
+            self.assigned_value, CanBehaveLikeAVariable
+        )
 
     @cached_property
     def attribute(self) -> Attribute:
@@ -1167,12 +1225,12 @@ class AttributeMatch(AbstractMatchExpression[T]):
         :param bindings: The values of the pattern's variables, keyed by the identifier
             of the variable assigned to each attribute.
         :return: The value this attribute takes under the bindings: an instance
-            constructed from them for a nested match, otherwise the value of the
-            assigned variable evaluated under them.
+            constructed from them for a nested match without a domain, otherwise the
+            value of the assigned variable evaluated under them.
         :raises UnboundPatternVariable: If the bindings do not bind the assigned
             variable and it states no value of its own.
         """
-        if isinstance(self.assigned_value, Match):
+        if isinstance(self.assigned_value, Match) and not self._chooses_from_a_domain_:
             return self.assigned_value._construct_instance_from_bindings_(bindings)
         if (
             not isinstance(self.assigned_variable, Literal)

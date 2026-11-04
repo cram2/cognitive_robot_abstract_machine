@@ -61,12 +61,14 @@ class ModelQueryParameters(ABC):
     """
     Shared interface between EQL constructs and ``ProbabilisticModel``: whatever a
     :class:`~krrood.parametrization.model_registries.ModelRegistry` needs to resolve a
-    model, regardless of which EQL construct is asking. Three constructs each build
-    their own parameters this way -- :class:`UnderspecifiedParameters` for a ``Match``
-    (``distribution_of(...)`` too, which wraps one), :class:`SelectedAttributesParameters`
-    for a bare attribute selection (``average(...)``), and :class:`ConditionParameters`
-    for a bare condition (``probability_of(...)``) -- so a registry can type against
-    this one interface instead of a union of the three.
+    model, regardless of which EQL construct is asking.
+
+    Three constructs each build their own parameters this way --
+    :class:`UnderspecifiedParameters` for a ``Match`` (``distribution_of(...)`` too,
+    which wraps one), :class:`SelectedAttributesParameters` for a bare attribute
+    selection (``average(...)``), and :class:`ConditionParameters` for a bare condition
+    (``probability_of(...)``) -- so a registry can type against this one interface
+    instead of a union of the three.
     """
 
     @property
@@ -129,8 +131,8 @@ class ModelQueryParameters(ABC):
 @dataclass
 class DomainObjectFeature:
     """
-    A feature of the objects a pattern variable ranges over, which a probabilistic
-    model represents as a variable of its own.
+    A feature of the objects a pattern variable ranges over, which a probabilistic model
+    represents as a variable of its own.
     """
 
     attribute_match: AttributeMatch
@@ -145,8 +147,7 @@ class DomainObjectFeature:
 
     values_by_object_hash: dict[int, Any] = field(default_factory=dict)
     """
-    The value of the feature for every object in the domain, keyed by the object's
-    hash.
+    The value of the feature for every object in the domain, keyed by the object's hash.
     """
 
     def value_of(self, domain_object: Any) -> Any:
@@ -306,8 +307,8 @@ class UnderspecifiedParameters(ModelQueryParameters):
         init=False, default_factory=dict
     )
     """
-    The features of the objects a pattern variable ranges over, keyed by the name of
-    the model variable each feature is represented by.
+    The features of the objects a pattern variable ranges over, keyed by the name of the
+    model variable each feature is represented by.
     """
 
     def __post_init__(self):
@@ -325,8 +326,9 @@ class UnderspecifiedParameters(ModelQueryParameters):
     def _extract_effect_variables_from_causes_effect_conditions(self) -> None:
         """
         Populate :attr:`effect_variables_from_causes_effect` by walking the where
-        conditions for :class:`~krrood.entity_query_language.operators.causal.CausesEffect`
-        nodes and reading the variable(s) their wrapped comparator(s) compare.
+        conditions for
+        :class:`~krrood.entity_query_language.operators.causal.CausesEffect` nodes and
+        reading the variable(s) their wrapped comparator(s) compare.
         """
         root = self._random_event_compiler.conditions_root
         if root is None:
@@ -347,7 +349,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
         """
         result = {v.name: v for v in self._random_event_compiler.variables.values()}
 
-        for attribute_match in self.statement._matches_with_variables_:
+        for attribute_match in self.statement._generated_attribute_matches_:
             if attribute_match.assigned_value is None:
                 continue
 
@@ -400,7 +402,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
         (e.g. ``z=variable(int, domain=[1, 2, 3])``), if any.
 
         :param model: The model to truncate.
-        :return: ``model`` unchanged if there are no such constraints, the truncated
+        :return:``model`` unchanged if there are no such constraints, the truncated
             model otherwise, or ``None`` if truncating leaves no solution.
         """
         if not self.truncation_assignments_from_krrood_variables:
@@ -489,8 +491,8 @@ class UnderspecifiedParameters(ModelQueryParameters):
         self, attribute_match: AttributeMatch
     ) -> tuple[str, type | None]:
         """
-        Resolve the qualified name and type a ``cause``/``confounder``-marked
-        attribute match ranges over.
+        Resolve the qualified name and type a ``cause``/``confounder``-marked attribute
+        match ranges over.
 
         A marked keyword usually names a literal field, whose access path already
         gives the right qualified name and whose type
@@ -645,7 +647,8 @@ class UnderspecifiedParameters(ModelQueryParameters):
         """
         Extract variables from a single non-primitive literal value.
 
-        Runs feature extraction on ``value`` and registers a conditioning assignment for every discovered feature.
+        Runs feature extraction on ``value`` and registers a conditioning assignment for
+        every discovered feature.
 
         :param value: The non-primitive literal to decompose.
         :param name_prefix: Attribute access path used to namespace the feature names
@@ -684,12 +687,12 @@ class UnderspecifiedParameters(ModelQueryParameters):
         type_ = self._process_attribute_match_type(
             attribute_match.assigned_variable._type_
         )
-        if attribute_match.assigned_value in self._symbolic_expression_event_cache:
+        if attribute_match.assigned_variable in self._symbolic_expression_event_cache:
             return self._symbolic_expression_event_cache[
-                attribute_match.assigned_value
+                attribute_match.assigned_variable
             ][1]
 
-        domain_objects = self._domain_objects_of(attribute_match.assigned_value)
+        domain_objects = self._domain_objects_of(attribute_match.assigned_variable)
 
         if not domain_objects:
             raise EmptyVariableDomain(attribute_match._variable_)
@@ -752,9 +755,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
 
         for feature in extractor.features:
             feature_name = feature.get_clean_name_from_mapped_variable()
-            name = (
-                f"{attribute_match.name_from_variable_access_path}." f"{feature_name}"
-            )
+            name = f"{attribute_match.name_from_variable_access_path}.{feature_name}"
             re_variable = variable_from_name_and_type(name=name, type_=feature._type_)
             result[re_variable.name] = re_variable
             self._domain_object_features[re_variable.name] = DomainObjectFeature(
@@ -784,7 +785,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
 
         resulting_event = Event.from_simple_sets(*simple_events)
         self.truncation_assignments_from_krrood_variables.append(resulting_event)
-        self._symbolic_expression_event_cache[attribute_match.assigned_value] = (
+        self._symbolic_expression_event_cache[attribute_match.assigned_variable] = (
             resulting_event,
             result,
         )
@@ -799,7 +800,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
             to.
         """
         attribute_matches_by_name: dict[str, list[AttributeMatch]] = {}
-        for attribute_match in self.statement._matches_with_variables_:
+        for attribute_match in self.statement._generated_attribute_matches_:
             attribute_matches_by_name.setdefault(
                 attribute_match.name_from_variable_access_path, []
             ).append(attribute_match)
@@ -833,8 +834,8 @@ class UnderspecifiedParameters(ModelQueryParameters):
         """
         Bind the statement's pattern variables to every sample of a probabilistic model.
 
-        :param variables: The variables of the model, in the order of the columns of
-            the samples.
+        :param variables: The variables of the model, in the order of the columns of the
+            samples.
         :param samples: Samples of the model.
         :return: The value of every sampled variable of the pattern, keyed by the
             identifier of the variable assigned to its attribute, one row per sample in
@@ -970,9 +971,10 @@ class UnderspecifiedParameters(ModelQueryParameters):
         :return: Whether the attribute is assigned a variable ranging over a domain of
             objects, whose values a model samples as keys of that domain.
         """
-        return isinstance(
-            attribute_match.assigned_value, SymbolicExpression
-        ) and not isinstance(attribute_match.assigned_value, Literal)
+        return attribute_match._chooses_from_a_domain_ or (
+            isinstance(attribute_match.assigned_value, SymbolicExpression)
+            and not isinstance(attribute_match.assigned_value, Literal)
+        )
 
     @classmethod
     def _value_to_model_sample(
@@ -986,8 +988,8 @@ class UnderspecifiedParameters(ModelQueryParameters):
 
         :param variable_: A variable of a probabilistic model.
         :param value: A value of the attribute the variable corresponds to.
-        :param attribute_match: The attribute match the variable corresponds to, if
-            the statement has one.
+        :param attribute_match: The attribute match the variable corresponds to, if the
+            statement has one.
         :return: The value the model samples for the variable to stand for the given
             value.
         :raises ValueOutsideVariableDomain: If the value is outside the domain of a
@@ -1054,7 +1056,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
             domain_values_by_hash = {
                 hash(domain_value): domain_value
                 for domain_value in self._domain_objects_of(
-                    attribute_match.assigned_value
+                    attribute_match.assigned_variable
                 )
             }
             return self._by_sample_value(
@@ -1118,8 +1120,8 @@ class UnderspecifiedParameters(ModelQueryParameters):
 @dataclass
 class SelectedAttributesParameters(ModelQueryParameters):
     """
-    A class that extracts all necessary information from a bare selection of
-    attributes and binds it together.
+    A class that extracts all necessary information from a bare selection of attributes
+    and binds it together.
 
     This serves the same role as :class:`UnderspecifiedParameters` does for
     :class:`~krrood.entity_query_language.query.match.Match` -- glue between
@@ -1161,11 +1163,11 @@ class SelectedAttributesParameters(ModelQueryParameters):
 @dataclass
 class ConditionParameters(ModelQueryParameters):
     """
-    A class that extracts all necessary information from a condition expression given
-    to {py:class}`~krrood.entity_query_language.operators.probabilistic_queries.Probability`
-    (``probability_of(...)``) and binds it together, reusing the same
-    :class:`~krrood.parametrization.random_events_translator.WhereExpressionToRandomEventTranslator`
-    a ``Match``'s ``where`` conditions are already translated with.
+    A class that extracts all necessary information from a condition expression given to
+    {py:class}`~krrood.entity_query_language.operators.probabilistic_queries.Probability
+    ` (``probability_of(...)``) and binds it together, reusing the same :class:`~krrood.
+    parametrization.random_events_translator.WhereExpressionToRandomEventTranslator` a
+    ``Match``'s ``where`` conditions are already translated with.
     """
 
     condition: ConditionType
