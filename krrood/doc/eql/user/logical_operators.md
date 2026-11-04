@@ -66,21 +66,21 @@ it holds for **at least one** value of `x`. The values of `x` may depend on anot
 collection attribute with `flat_variable`:
 
 ```python
-s = variable(Student, domain=students)
-course = flat_variable(s.takes_course)
+student = variable(Student, domain=students)
+course = flat_variable(student.takes_course)
 
 # Students none of whose courses is "Databases"
-query = an(entity(s).where(for_all(course, course.name != "Databases")))
+query = an(entity(student).where(for_all(course, course.name != "Databases")))
 
 # Students taking at least one "Logic" course
-query = an(entity(s).where(exists(course, course.name == "Logic")))
+query = an(entity(student).where(exists(course, course.name == "Logic")))
 
 # Students taking no "Logic" course
-query = an(entity(s).where(not_(exists(course, course.name == "Logic"))))
+query = an(entity(student).where(not_(exists(course, course.name == "Logic"))))
 ```
 
 A quantifier is evaluated once for each binding of its **outer-visible** variables: those that also occur somewhere
-else in the same query, whether selected (like `s` above) or used by another condition. So the three queries above
+else in the same query, whether selected (like `student` above) or used by another condition. So the three queries above
 range over each student's own courses. A variable that occurs only inside the quantifier, including inside the
 quantified variable's own domain expression, is local to the quantifier and is quantified together with it: in
 `for_all(cabinets.container, ...)`, where `cabinets` appears nowhere else, the condition must hold for the containers of
@@ -90,6 +90,14 @@ all cabinets. Over an empty collection, or an absent one (`None`), `for_all` is 
 quantified variable satisfy the condition, and the local variables never appear in the results. If you need those
 values, write the condition without `exists` (a join) instead. `not_(exists(...))` keeps the outer bindings for which no
 value satisfies the condition, including those whose collection is empty.
+
+```python
+# One row per student taking a "Logic" course
+query = an(entity(student).where(exists(course, course.name == "Logic")))
+
+# One row per (student, course) pair whose course is "Logic": a join, so the course is in the results
+query = set_of(student, course).where(course.name == "Logic")
+```
 
 ## Full Example: Complex Logic
 

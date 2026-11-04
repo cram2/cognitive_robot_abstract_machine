@@ -88,7 +88,7 @@ def item_pattern(crate_class):
         labelled "x".
     """
     return a(crate_class)(
-        items=an(CrateItem)(weight=variable_from([1.0, 2.0])), label="x"
+        items=a(CrateItem)(weight=variable_from([1.0, 2.0])), label="x"
     )
 
 
@@ -209,7 +209,7 @@ def test_element_value_for_an_optional_set_attribute_is_wrapped_in_a_set():
     generated attribute, is held in a set.
     """
     existing = CrateItem(5.0)
-    pattern = a(OptionalSetCrate)(items=existing, label=variable_from(["x", "y"]))
+    pattern = an(OptionalSetCrate)(items=existing, label=variable_from(["x", "y"]))
     crates = generate(pattern)
     assert [crate.items for crate in crates] == [{existing}, {existing}]
 
@@ -241,7 +241,7 @@ def test_single_valued_attribute_receives_the_built_element_itself():
     A pattern for a single-valued attribute constructs the bare item, not a collection.
     """
     pattern = a(SingleItemCrate)(
-        item=an(CrateItem)(weight=variable_from([1.0, 2.0])), label="x"
+        item=a(CrateItem)(weight=variable_from([1.0, 2.0])), label="x"
     )
     crates = generate(pattern)
     assert all(type(crate.item) is CrateItem for crate in crates)

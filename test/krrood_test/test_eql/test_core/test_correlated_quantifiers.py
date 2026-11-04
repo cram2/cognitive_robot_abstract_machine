@@ -24,6 +24,7 @@ import pytest
 from krrood.entity_query_language.factories import (
     alternative,
     an,
+    contains,
     deduced_variable,
     entity,
     exists,
@@ -79,6 +80,7 @@ class University:
     The finite domain shared by the correlated quantifier tests.
     """
 
+    turing: Academic
     logic: QuantifiedCourse
     artificial_intelligence: QuantifiedCourse
     databases: QuantifiedCourse
@@ -100,14 +102,14 @@ def university() -> University:
         Student(role_taker=Academic("Carol"), takes_course={logic, databases}),
         Student(role_taker=Academic("Dave"), takes_course=set()),
     ]
-    return University(logic, artificial_intelligence, databases, students)
+    return University(turing, logic, artificial_intelligence, databases, students)
 
 
 def student_names(results) -> list[str]:
     """
     :return: The sorted names of the students in *results*, keeping duplicates.
     """
-    return sorted(student.role_taker.name for student in results)
+    return sorted(student.name for student in results)
 
 
 def correlated(university: University):
@@ -259,7 +261,7 @@ def test_exists_inside_or_keeps_witnessed_and_alternative_students(university):
         entity(student).where(
             or_(
                 exists(course, course.name == "Databases"),
-                student.role_taker.name == "Bob",
+                student.name == "Bob",
             )
         )
     )
@@ -275,7 +277,7 @@ def test_for_all_inside_or_keeps_satisfied_and_alternative_students(university):
         entity(student).where(
             or_(
                 for_all(course, course.name != "Databases"),
-                student.role_taker.name == "Carol",
+                student.name == "Carol",
             )
         )
     )
@@ -351,18 +353,18 @@ def test_for_all_courses_have_only_turing_or_minsky_teachers(university):
 def test_for_all_over_an_independent_variable_holds_globally(university):
     """
     A quantified variable whose domain does not depend on the student is evaluated once;
-    a body true for every course keeps every student.
+    every course of the domain being taught by Turing keeps every student.
     """
     student = variable(Student, domain=university.students)
     course = variable(
         QuantifiedCourse,
-        domain=[
-            university.logic,
-            university.artificial_intelligence,
-            university.databases,
-        ],
+        domain=[university.logic, university.artificial_intelligence],
     )
-    query = an(entity(student).where(for_all(course, course.name != "Nope")))
+    query = an(
+        entity(student).where(
+            for_all(course, contains(course.taught_by, university.turing))
+        )
+    )
     assert student_names(query.evaluate()) == ["Alice", "Bob", "Carol", "Dave"]
 
 
@@ -401,7 +403,7 @@ def test_exists_over_an_independent_variable_without_witness_is_empty(university
     """
     student = variable(Student, domain=university.students)
     course = variable(QuantifiedCourse, domain=[university.logic])
-    query = an(entity(student).where(exists(course, course.name == "Nope")))
+    query = an(entity(student).where(exists(course, course.name == "Databases")))
     assert student_names(query.evaluate()) == []
 
 
@@ -549,10 +551,7 @@ def test_correlated_exists_with_a_selected_variable_inside_the_body(university):
     query = set_of(student, selected_course).where(
         exists(course, course == selected_course)
     )
-    pairs = {
-        (row[student].role_taker.name, row[selected_course].name)
-        for row in query.evaluate()
-    }
+    pairs = {(row[student].name, row[selected_course].name) for row in query.evaluate()}
     assert pairs == {
         ("Alice", "Logic"),
         ("Alice", "AI"),
@@ -566,7 +565,7 @@ def test_correlated_exists_with_a_selected_variable_inside_the_body(university):
 
 
 def flag_pairs(results) -> set[tuple[str, str]]:
-    return {(flag.student.role_taker.name, flag.reason) for flag in results}
+    return {(flag.student.name, flag.reason) for flag in results}
 
 
 def test_correlated_exists_in_an_inference_rule_condition(university):
@@ -578,7 +577,7 @@ def test_correlated_exists_in_an_inference_rule_condition(university):
     flags = deduced_variable(StudentFlag)
     query = an(
         entity(flags).where(
-            student.role_taker.name != "Nobody", exists(course, course.name == "Logic")
+            student.name != "Nobody", exists(course, course.name == "Logic")
         )
     )
     with query:
@@ -593,7 +592,7 @@ def test_correlated_exists_in_a_refinement_condition(university):
     """
     student, course = correlated(university)
     flags = deduced_variable(StudentFlag)
-    query = an(entity(flags).where(student.role_taker.name != "Nobody"))
+    query = an(entity(flags).where(student.name != "Nobody"))
     with query:
         Add(flags, inference(StudentFlag)(student=student, reason="base"))
         with refinement(exists(course, course.name == "Databases")):
@@ -613,7 +612,7 @@ def test_correlated_for_all_in_an_alternative_condition(university):
     """
     student, course = correlated(university)
     flags = deduced_variable(StudentFlag)
-    query = an(entity(flags).where(student.role_taker.name == "Bob"))
+    query = an(entity(flags).where(student.name == "Bob"))
     with query:
         Add(flags, inference(StudentFlag)(student=student, reason="base"))
         with alternative(for_all(course, course.name != "AI")):

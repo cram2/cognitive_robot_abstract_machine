@@ -101,18 +101,18 @@ value or a nested pattern given for it describes **one element** of the collecti
 
 - `attr=value` matches when `value` is in the collection. The same holds for a variable whose type is the element type,
   such as `takes_course=variable(Course, ...)`.
-- `attr=an(Type)(...)` matches when **some** element of the collection matches the nested pattern. Each object appears
+- `attr=a(Type)(...)` matches when **some** element of the collection matches the nested pattern. Each object appears
   in the results once, however many of its elements match, and an object whose collection is empty does not match.
 
 ```python
 # Students taking the 'Logic' course
-an(Student)(takes_course=logic).from_(students)
+a(Student)(takes_course=logic).from_(students)
 
 # Students taking some course named 'Databases'
-an(Student)(takes_course=an(Course)(name="Databases")).from_(students)
+a(Student)(takes_course=a(Course)(name="Databases")).from_(students)
 
 # Students taking some course taught by someone who is the dean of some organization
-an(Student)(takes_course=an(Course)(is_taught_by=an(Person)(is_dean_of=an(Organization)())))
+a(Student)(takes_course=a(Course)(is_taught_by=a(Person)(is_dean_of=an(Organization)())))
 ```
 
 Nested patterns through several collection-valued attributes, as in the last query, mean "some element, whose

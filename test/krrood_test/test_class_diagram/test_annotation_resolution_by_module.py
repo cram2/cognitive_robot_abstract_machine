@@ -21,7 +21,7 @@ import pytest
 
 from typing_extensions import Iterable, List, Optional
 
-from krrood.entity_query_language.factories import an
+from krrood.entity_query_language.factories import a
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -192,8 +192,8 @@ def test_two_level_match_over_test_local_classes_returns_the_right_rows():
     who is dean of some organization finds exactly the courses with a dean among their
     teachers: Logic and Databases.
     """
-    pattern = an(ResolutionCourse)(
-        is_taught_by=an(Person)(is_dean_of=an(ResolutionOrganization)())
+    pattern = a(ResolutionCourse)(
+        is_taught_by=a(Person)(is_dean_of=a(ResolutionOrganization)())
     )
     assert names_of(pattern.from_(build_courses()).evaluate()) == [
         "Databases",
@@ -205,7 +205,7 @@ def test_one_level_match_over_test_local_classes_returns_the_right_rows():
     """
     Matching courses taught by some person finds every taught course and not the orphan.
     """
-    pattern = an(ResolutionCourse)(is_taught_by=an(Person)())
+    pattern = a(ResolutionCourse)(is_taught_by=a(Person)())
     assert names_of(pattern.from_(build_courses()).evaluate()) == [
         "AI",
         "Databases",
