@@ -12,6 +12,9 @@ source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/runner_host.sh"
 # Where the CI image keeps its environments and caches, and where the job writes.
 measured_directories=(/opt/ros/cram-env /opt/ros/.uv_cache /opt/ros/overlay_ws /github/home /__w /tmp /usr /var)
 
+if [[ -f "$background_deletion_log" ]]; then
+    print_group "Deletions in the background" cat "$background_deletion_log"
+fi
 print_group "Operating system" bash -c 'uname -a; cat /etc/os-release'
 # The runners differ in CPU model, which can change the rounding of numeric results.
 print_group "CPU" lscpu

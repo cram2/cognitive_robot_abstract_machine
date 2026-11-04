@@ -5,6 +5,9 @@
 # Where the CI workflows mount the host's root into the job's container.
 host_root=/host
 
+# Where free_runner_disk.sh logs the deletions it leaves running in the background.
+background_deletion_log=/tmp/free_runner_disk_in_background.log
+
 # Prints the output of a command as a collapsible group of the job log.
 print_group() {
     local title="$1"
