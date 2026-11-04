@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 import trimesh
 
+from krrood.bounds import Bounds
 from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import (
     RelationalCircuitRegistry,
@@ -213,33 +214,33 @@ def test_a_carton_is_grasped_up_to_half_its_narrower_side_deep(carton):
 
 def test_a_grasp_from_any_side_lies_within_the_bounds_asked(carton):
     strategy = GraspFromAnySide(
-        minimal_height=0.3,
-        maximal_height=0.7,
-        minimal_depth=0.1,
-        maximal_depth=0.4,
-        maximal_pitch=0.3,
-        maximal_roll=0.2,
+        height=Bounds(0.3, 0.7),
+        depth=Bounds(0.1, 0.4),
+        yaw=Bounds(0.5, 1.5),
+        pitch=Bounds(0.1, 0.3),
+        roll=Bounds(-0.2, 0.1),
     )
     allowed = allowed_intervals(statement_by(strategy, carton))
     narrower_extent = min(CARTON_EXTENTS[:2])
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(
-        strategy.minimal_height
+        strategy.height.lower
     )
     assert allowed["height"].simple_sets[-1].upper == pytest.approx(
-        strategy.maximal_height
+        strategy.height.upper
     )
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        strategy.minimal_depth * narrower_extent
+        strategy.depth.lower * narrower_extent
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        strategy.maximal_depth * narrower_extent
+        strategy.depth.upper * narrower_extent
     )
-    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(
-        strategy.maximal_pitch
-    )
-    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-strategy.maximal_roll)
-    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(strategy.maximal_roll)
+    assert allowed["yaw"].simple_sets[0].lower == pytest.approx(strategy.yaw.lower)
+    assert allowed["yaw"].simple_sets[-1].upper == pytest.approx(strategy.yaw.upper)
+    assert allowed["pitch"].simple_sets[0].lower == pytest.approx(strategy.pitch.lower)
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(strategy.pitch.upper)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(strategy.roll.lower)
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(strategy.roll.upper)
 
 
 # %% asking a learned model for lifting grasps

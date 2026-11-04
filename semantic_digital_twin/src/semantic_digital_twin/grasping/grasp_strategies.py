@@ -7,16 +7,15 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import trimesh
-from random_events.interval import Bound, SimpleInterval
 from typing_extensions import TYPE_CHECKING
 
+from krrood.bounds import Bounds
 from krrood.entity_query_language.factories import ConditionType, and_, or_
 from krrood.entity_query_language.query.match import Match
-from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.exceptions import NoGraspGeometry
 from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 
@@ -33,32 +32,29 @@ class GraspStrategy(ABC):
     :class:`~semantic_digital_twin.grasping.surface_grasp.SurfaceGrasp`.
     """
 
-    minimal_depth: float = 0.0
+    depth: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 0.5))
     """
-    The least depth to close the fingers at, as a fraction of :meth:`depth_unit`.
-    """
-
-    maximal_depth: float = 0.5
-    """
-    The depth to close the fingers short of, as a fraction of :meth:`depth_unit`.
+    The depths to close the fingers at, as fractions of :meth:`depth_unit`, the upper
+    one excluded.
     """
 
-    maximal_pitch: float = 1.2
+    yaw: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 2 * math.pi))
     """
-    How far the approach may tilt off vertical, in radians.
-    """
-
-    maximal_roll: float = math.pi / 4
-    """
-    How far the fingers may turn off :attr:`central_roll`, either way, in radians.
+    The yaws to approach from, in radians off each of :meth:`central_yaws`, the upper
+    one excluded.
     """
 
-    @classproperty
-    def central_roll(cls) -> float:
-        """
-        :return: The roll the fingers close at when they are not turned, in radians.
-        """
-        return 0.0
+    pitch: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 1.2))
+    """
+    How far the approach may tilt off vertical, in radians, the upper bound excluded.
+    """
+
+    roll: Bounds[float] = field(
+        default_factory=lambda: Bounds(-math.pi / 4, math.pi / 4)
+    )
+    """
+    The rolls to close the fingers at, in radians, the upper one excluded.
+    """
 
     def conditions(
         self, grasp: Match[SurfaceGrasp], graspable: HasGraspCandidates
@@ -66,7 +62,7 @@ class GraspStrategy(ABC):
         """
         :param grasp: The grasp of a statement.
         :param graspable: The object grasped.
-        :return: The conditions that the grasp lies where this strategy allows.
+        :return: The conditions every grasp of this strategy must satisfy.
         :raises NoGraspGeometry: If the object has no shape to measure.
         """
         surface = graspable.grasp_surface()
@@ -75,21 +71,29 @@ class GraspStrategy(ABC):
         return [
             grasp.height >= heights.lower,
             grasp.height < heights.upper,
-            grasp.depth >= self.minimal_depth * depth_unit,
-            grasp.depth < self.maximal_depth * depth_unit,
-            *self.yaw_conditions(grasp, surface),
-            grasp.pitch >= 0.0,
-            grasp.pitch < self.maximal_pitch,
-            grasp.roll >= self.central_roll - self.maximal_roll,
-            grasp.roll < self.central_roll + self.maximal_roll,
+            grasp.depth >= self.depth.lower * depth_unit,
+            grasp.depth < self.depth.upper * depth_unit,
+            or_(
+                *(
+                    and_(
+                        grasp.yaw >= central_yaw + self.yaw.lower,
+                        grasp.yaw < central_yaw + self.yaw.upper,
+                    )
+                    for central_yaw in self.central_yaws(surface)
+                )
+            ),
+            grasp.pitch >= self.pitch.lower,
+            grasp.pitch < self.pitch.upper,
+            grasp.roll >= self.roll.lower,
+            grasp.roll < self.roll.upper,
         ]
 
     @abstractmethod
-    def grasped_heights(self, surface: trimesh.Trimesh) -> SimpleInterval:
+    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
         """
         :param surface: The object's grasp surface, in its root body's frame.
         :return: The heights the object may be grasped at, as fractions of the grasp
-            surface's bounding box from its bottom to its top.
+            surface's bounding box from its bottom to its top, the upper one excluded.
         """
 
     @abstractmethod
@@ -103,16 +107,12 @@ class GraspStrategy(ABC):
         :raises NoGraspGeometry: If the object has no shape to measure it on.
         """
 
-    def yaw_conditions(
-        self, grasp: Match[SurfaceGrasp], surface: trimesh.Trimesh
-    ) -> list[ConditionType]:
+    def central_yaws(self, surface: trimesh.Trimesh) -> list[float]:
         """
-        :param grasp: The grasp of a statement.
         :param surface: The object's grasp surface, in its root body's frame.
-        :return: The conditions on the yaw the object may be grasped from; by default
-            every yaw.
+        :return: The yaws :attr:`yaw` is measured from, in radians.
         """
-        return [grasp.yaw >= 0.0, grasp.yaw < 2 * math.pi]
+        return [0.0]
 
 
 @dataclass
@@ -121,21 +121,14 @@ class GraspBetweenHeights(GraspStrategy, ABC):
     A strategy that grasps an object between two fixed heights.
     """
 
-    minimal_height: float = 0.05
+    height: Bounds[float] = field(default_factory=lambda: Bounds(0.05, 0.95))
     """
-    The minimal height to grasp at, as a fraction of the grasp surface's bounding box
-    from its bottom to its top.
-    """
-
-    maximal_height: float = 0.95
-    """
-    The height to grasp below, as such a fraction.
+    The heights to grasp at, as fractions of the grasp surface's bounding box from its
+    bottom to its top, the upper one excluded.
     """
 
-    def grasped_heights(self, surface: trimesh.Trimesh) -> SimpleInterval:
-        return SimpleInterval.from_data(
-            self.minimal_height, self.maximal_height, Bound.CLOSED, Bound.OPEN
-        )
+    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+        return self.height
 
 
 # %% grasping a solid object
@@ -164,9 +157,7 @@ class GraspABar(GraspFromAnySide):
     half its thickness deep.
     """
 
-    minimal_height: float = 0.1
-
-    maximal_height: float = 0.9
+    height: Bounds[float] = field(default_factory=lambda: Bounds(0.1, 0.9))
 
     def depth_unit(
         self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
@@ -184,29 +175,19 @@ class GraspAcrossTheLength(GraspBetweenHeights):
     length from either end and closing across it.
     """
 
-    minimal_height: float = 0.2
+    height: Bounds[float] = field(default_factory=lambda: Bounds(0.2, 0.8))
 
-    maximal_height: float = 0.8
+    depth: Bounds[float] = field(default_factory=lambda: Bounds(0.2, 0.6))
 
-    minimal_depth: float = 0.2
+    yaw: Bounds[float] = field(
+        default_factory=lambda: Bounds(-math.pi / 16, math.pi / 16)
+    )
 
-    maximal_depth: float = 0.6
+    pitch: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 0.6))
 
-    maximal_pitch: float = 0.6
-
-    maximal_roll: float = math.pi / 8
-
-    yaw_tolerance: float = math.pi / 16
-    """
-    How far off its length the object may be seen from, either way, in radians.
-    """
-
-    @classproperty
-    def central_roll(cls) -> float:
-        """
-        :return: A quarter turn, closing across the length.
-        """
-        return math.pi / 2
+    roll: Bounds[float] = field(
+        default_factory=lambda: Bounds(3 * math.pi / 8, 5 * math.pi / 8)
+    )
 
     def depth_unit(
         self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
@@ -216,24 +197,12 @@ class GraspAcrossTheLength(GraspBetweenHeights):
         """
         return float(max(surface.extents[:2]))
 
-    def yaw_conditions(
-        self, grasp: Match[SurfaceGrasp], surface: trimesh.Trimesh
-    ) -> list[ConditionType]:
+    def central_yaws(self, surface: trimesh.Trimesh) -> list[float]:
         """
-        :return: The conditions that the object is seen from either end of its length.
+        :return: The yaws the object is seen from along its length, from either end.
         """
         length_yaw = 0.0 if surface.extents[0] >= surface.extents[1] else math.pi / 2
-        return [
-            or_(
-                *(
-                    and_(
-                        grasp.yaw >= end_yaw - self.yaw_tolerance,
-                        grasp.yaw < end_yaw + self.yaw_tolerance,
-                    )
-                    for end_yaw in (length_yaw, length_yaw + math.pi)
-                )
-            )
-        ]
+        return [length_yaw, length_yaw + math.pi]
 
 
 # %% pinching a thin wall
@@ -246,13 +215,13 @@ class PinchAWall(GraspStrategy, ABC):
     closing across the wall.
     """
 
-    minimal_depth: float = 0.25
+    depth: Bounds[float] = field(default_factory=lambda: Bounds(0.25, 0.75))
 
-    maximal_depth: float = 0.75
+    pitch: Bounds[float] = field(default_factory=lambda: Bounds(0.0, 0.5))
 
-    maximal_pitch: float = 0.5
-
-    maximal_roll: float = math.pi / 8
+    roll: Bounds[float] = field(
+        default_factory=lambda: Bounds(-math.pi / 8, math.pi / 8)
+    )
 
     number_of_directions: int = 12
     """
@@ -274,7 +243,8 @@ class PinchAWall(GraspStrategy, ABC):
         directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
         lowest, highest = surface.bounds
         middle = (lowest + highest) / 2
-        middle[2] = lowest[2] + self.grasped_heights(surface).center() * (
+        heights = self.grasped_heights(surface)
+        middle[2] = lowest[2] + (heights.lower + heights.upper) / 2 * (
             highest[2] - lowest[2]
         )
         # Embree reports only the inner wall here, so the exact intersector is used.
@@ -303,9 +273,7 @@ class PinchARim(PinchAWall, GraspBetweenHeights):
     rim itself.
     """
 
-    minimal_height: float = 0.25
-
-    maximal_height: float = 0.75
+    height: Bounds[float] = field(default_factory=lambda: Bounds(0.25, 0.75))
 
 
 @dataclass
@@ -320,25 +288,17 @@ class PinchTheTopOfAWall(PinchAWall):
     How far below the container's highest point its rim reaches, in meters.
     """
 
-    minimal_rim_fraction: float = 0.25
+    rim_fraction: Bounds[float] = field(default_factory=lambda: Bounds(0.25, 0.75))
     """
-    How far below the highest point to pinch at least, as a fraction of
-    :attr:`rim_depth`.
-    """
-
-    maximal_rim_fraction: float = 0.75
-    """
-    How far below the highest point to pinch at most, as such a fraction.
+    How far below the highest point to pinch, as fractions of :attr:`rim_depth`.
     """
 
-    def grasped_heights(self, surface: trimesh.Trimesh) -> SimpleInterval:
+    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
         """
         :return: The heights between the two fractions of the top :attr:`rim_depth`.
         """
-        rim_fraction = self.rim_depth / float(surface.extents[2])
-        return SimpleInterval.from_data(
-            1 - self.maximal_rim_fraction * rim_fraction,
-            1 - self.minimal_rim_fraction * rim_fraction,
-            Bound.CLOSED,
-            Bound.OPEN,
+        rim_depth_fraction = self.rim_depth / float(surface.extents[2])
+        return Bounds(
+            1 - self.rim_fraction.upper * rim_depth_fraction,
+            1 - self.rim_fraction.lower * rim_depth_fraction,
         )
