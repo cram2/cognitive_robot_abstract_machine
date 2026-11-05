@@ -14,7 +14,17 @@ from copy import copy
 from dataclasses import dataclass, field
 from functools import cached_property, wraps
 
-from typing_extensions import Iterable, Any, TYPE_CHECKING, Callable, Self, Iterator
+from typing_extensions import (
+    Iterable,
+    Any,
+    TYPE_CHECKING,
+    Callable,
+    Concatenate,
+    ParamSpec,
+    Self,
+    Iterator,
+    TypeVar,
+)
 
 from krrood.entity_query_language.core.mapped_variable import (
     CanBehaveLikeAVariable,
@@ -140,14 +150,36 @@ class CachedResultStream:
             index += 1
 
 
-def modifies_query_structure(modifier):
+ModifierParameters = ParamSpec("ModifierParameters")
+"""
+The parameters of a query modifier after the query itself.
+"""
+
+ModifiedQuery = TypeVar("ModifiedQuery", bound="Query")
+"""
+The query a modifier changes.
+"""
+
+ModifierResult = TypeVar("ModifierResult")
+"""
+The value a query modifier returns.
+"""
+
+
+def modifies_query_structure(
+    modifier: Callable[Concatenate[ModifiedQuery, ModifierParameters], ModifierResult],
+) -> Callable[Concatenate[ModifiedQuery, ModifierParameters], ModifierResult]:
     """
     Mark a query modifier so the query is flagged dirty once the modifier has updated its builders,
     causing the next :meth:`build` to recompile the product.
     """
 
     @wraps(modifier)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(
+        self: ModifiedQuery,
+        *args: ModifierParameters.args,
+        **kwargs: ModifierParameters.kwargs,
+    ) -> ModifierResult:
         result = modifier(self, *args, **kwargs)
         self._mark_dirty_()
         return result

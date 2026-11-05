@@ -45,5 +45,5 @@ class Microplan:
         """
         key = (id(node), planner)
         if key not in self._cache:
-            self._cache[key] = planner(node).plan()
+            self._cache[key] = planner(node=node).plan()
         return self._cache[key]

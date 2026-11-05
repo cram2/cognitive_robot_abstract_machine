@@ -255,7 +255,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         )
         satisfying = expression._select_satisfying_(instances=instances)
         yield from satisfying._quantify_(
-            expression._quantifier_type_
+            quantifier_type=expression._quantifier_type_
         )._evaluate_natively_()
 
     @staticmethod

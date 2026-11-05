@@ -628,7 +628,7 @@ class Pronouns(VocabEnum):
     def possessive(cls, *, number: GrammaticalNumber) -> Pronouns:
         """:return: The possessive pronoun — ``THEIR`` for a plural subject, else ``ITS``.
 
-        >>> Pronouns.possessive(GrammaticalNumber.PLURAL).text
+        >>> Pronouns.possessive(number=GrammaticalNumber.PLURAL).text
         'their'
         >>> Pronouns.possessive(GrammaticalNumber.SINGULAR).text
         'its'

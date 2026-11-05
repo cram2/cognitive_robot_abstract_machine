@@ -163,7 +163,7 @@ def chained_logic(
         if prev_operation is None:
             prev_operation = condition
             continue
-        prev_operation = operator(prev_operation, condition)
+        prev_operation = operator(left=prev_operation, right=condition)
     if not isinstance(prev_operation, SymbolicExpression):
         prev_operation = Literal(_value_=True)
     return prev_operation
@@ -175,7 +175,7 @@ def flatten_operands(
     """
     Recursively flatten a homogeneous binary chain into a flat operand list.
 
-    ``flatten_operands(AND(AND(a, b), c), AND)`` yields ``[a, b, c]``.  A node that is
+    ``flatten_operands(AND(left=AND(left=a, right=b), right=c), AND)`` yields ``[a, b, c]``.  A node that is
     not an instance of *operator_type* is returned as a single-element list.
 
     :param expr: Root of the expression tree to flatten.

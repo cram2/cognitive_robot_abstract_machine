@@ -558,9 +558,9 @@ class DataAccessObject(HasGeneric[T]):
         result = cls()
 
         if register:
-            state.register(source_object=source_object, dao_instance=result)
+            state.register(source=source_object, target=result)
             if id(source_object) != id(resolved_source):
-                state.register(source_object=resolved_source, dao_instance=result)
+                state.register(source=resolved_source, target=result)
 
         # Phase 3: Queueing & Processing
         is_entry_call = len(state.work_items) == 0
@@ -663,7 +663,7 @@ class DataAccessObject(HasGeneric[T]):
 
         # Restore the object in the memo dictionary
         if temp_dao is not None:
-            state.register(source_object=source_object, dao_instance=temp_dao)
+            state.register(source=source_object, target=temp_dao)
 
         partition = _get_alternative_partition_plan(type(self), alternative_base)
 
@@ -826,14 +826,14 @@ class DataAccessObject(HasGeneric[T]):
             dao_clazz=dao_clazz, source_object=source_object
         )
         if isinstance(mapped_object, dao_clazz):
-            state.register(source_object=source_object, dao_instance=mapped_object)
+            state.register(source=source_object, target=mapped_object)
             return mapped_object
 
         # Create new DAO instance
         result = dao_clazz()
-        state.register(source_object=source_object, dao_instance=result)
+        state.register(source=source_object, target=result)
         if id(source_object) != id(mapped_object):
-            state.register(source_object=mapped_object, dao_instance=result)
+            state.register(source=mapped_object, target=result)
 
         # Queue for filling
         alternative_base = get_dao_schema(dao_clazz).alternative_base

@@ -419,7 +419,7 @@ def _quantify_or_build_match(
         arg = SymbolicExpression._as_operand_(value=arg)
         if not isinstance(arg, Query):
             arg = entity(arg)
-        return arg._quantify_(quantifier_type, quantification_constraint=quantification)
+        return arg._quantify_(quantifier_type=quantifier_type, quantification_constraint=quantification)
 
     match_ = Match(_factory_=arg, _declared_type_=target_type)
     match_._quantifier_type_ = quantifier_type

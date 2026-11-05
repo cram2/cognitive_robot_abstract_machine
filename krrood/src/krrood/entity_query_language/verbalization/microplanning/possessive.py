@@ -338,7 +338,7 @@ def pronominal_path(
     >>> flatten_fragment_to_plain_text(pronominal_path([], GrammaticalNumber.SINGULAR))
     'its'
     """
-    possessive_pronoun = Pronouns.possessive(subject_number).as_fragment()
+    possessive_pronoun = Pronouns.possessive(number=subject_number).as_fragment()
     if not parts:
         return possessive_pronoun
     nominative_pronoun = Pronouns.nominative(number=subject_number).as_fragment()

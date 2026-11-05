@@ -138,26 +138,23 @@ class AbstractMatchExpression(MatchAssignedValue, Generic[T], ABC):
         """
         return self._variable_
 
-    def resolve(self, *args, **kwargs) -> Self:
+    def resolve(self, **kwargs: Any) -> Self:
         """
         Resolve the match by creating the variable and conditions expressions.
         """
         if self._resolved_:
             return self
-        self._resolve(*args, **kwargs)
+        self._resolve(**kwargs)
         self._resolved_ = True
         return self
 
     @abstractmethod
-    def _resolve(self, *args, **kwargs):
+    def _resolve(self, **kwargs: Any) -> None:
         """
         This method serves as an abstract definition to be implemented by subclasses,
         aimed at handling specific resolution logic for the derived class.
 
-        The method is designed to be flexible in accepting any number and type of input
-        parameters through positional (*args) and keyword (**kwargs) arguments.
-        Subclasses must extend this method to provide concrete implementations tailored
-        to their unique behaviors and requirements.
+        Subclasses take the arguments of :meth:`resolve` as keywords.
         """
         ...
 
@@ -380,7 +377,7 @@ class Match(
         entity_ = entity(self._variable_)
         if self._conditions_:
             entity_ = entity_.where(*self._conditions_)
-        entity_._quantify_(self._quantifier_type_)
+        entity_._quantify_(quantifier_type=self._quantifier_type_)
         self._expression = entity_
         return entity_
 
@@ -892,7 +889,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
             self._conditions_.append(self.attribute == self.assigned_variable)
             return
 
-        self.assigned_value.resolve(self.attribute, self)
+        self.assigned_value.resolve(variable=self.attribute, parent=self)
 
         if self.is_type_filter_needed:
             self._conditions_.append(
