@@ -241,7 +241,7 @@ def test_sum_grouped_by(handles_and_containers_world):
 
     query = a(
         set_of(
-            total_characters := eql.sum(length(drawer.handle.name)),
+            total_characters := eql.sum(length(iterable=drawer.handle.name)),
             cabinet,
         ).grouped_by(cabinet)
     )
@@ -724,7 +724,7 @@ def test_nearest_object_type():
 
     @symbolic_function
     def symbolic_distance(type1: type, type2: type) -> int | None:
-        return inheritance_path_length(type1, type2)
+        return inheritance_path_length(child_class=type1, parent_class=type2)
 
     @symbolic_function
     def eql_mro(object_: Any) -> tuple[type]:

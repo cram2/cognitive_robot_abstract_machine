@@ -116,9 +116,9 @@ def test_migrated_length_reads_as_a_noun_phrase_and_keeps_its_value():
     (*"the length of ..."*) and still computes the length.
     """
     assert issubclass(Length, SymbolicFunction)
-    assert length([1, 2, 3]) == 3
+    assert length(iterable=[1, 2, 3]) == 3
     assert (
-        verbalize_expression(a(set_of(length(variable(list, [])))))
+        verbalize_expression(a(set_of(length(iterable=variable(list, [])))))
         == "Find the length of a list"
     )
 
