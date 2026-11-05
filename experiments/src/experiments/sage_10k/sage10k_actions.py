@@ -9,7 +9,7 @@ from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
-from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
 from krrood_spatial_math.spatial_types import Point2, Pose2D, Pose
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
@@ -73,7 +73,7 @@ class Sage10kOpenDoor(SequentialAction):
             ),
             hip_rotation=0.0,
             reference_T_grasp=pre_grasp_pose,
-            end_effector=variable(EndEffector, self.world.semantic_annotations),
+            arm=variable(Arm, self.world.semantic_annotations),
         )
 
         # constrain_to_free_space attaches the condition to the underlying Entity,

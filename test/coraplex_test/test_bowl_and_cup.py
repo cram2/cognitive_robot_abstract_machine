@@ -240,12 +240,12 @@ def transport_plan(kitchen: KitchenWithFilledDrawer) -> Sequence:
                         root_link=kitchen.world.root, tip_link=robot.mobile_base.root
                     ),
                     PlaceAction(
-                        object_designator=kitchen.bowl,
-                        target_location=kitchen.world_T_bowl_goal,
+                        arm=robot.left_arm,
+                        target_pose=kitchen.world_T_bowl_goal,
                     ),
                     PlaceAction(
-                        object_designator=kitchen.cup,
-                        target_location=kitchen.world_T_cup_goal,
+                        arm=robot.right_arm,
+                        target_pose=kitchen.world_T_cup_goal,
                     ),
                 ]
             ),

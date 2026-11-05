@@ -34,7 +34,6 @@ from semantic_digital_twin.datastructures.robots.gripper_configuration import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm, Camera, EndEffector
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -71,18 +70,6 @@ class HasArmParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasEndEffectorParameter(DesignatorParameterMixin):
-    """
-    Mixin for actions that act through a specific end effector.
-    """
-
-    end_effector: EndEffector
-    """
-    The end effector the action uses.
-    """
-
-
-@dataclass(kw_only=True, eq=False)
 class HasCameraParameter(DesignatorParameterMixin):
     """
     Mixin for actions that point a camera.
@@ -107,19 +94,6 @@ class HasGraspCandidateParameter(DesignatorParameterMixin):
 
     One of the object's own
     :meth:`~semantic_digital_twin.semantic_annotations.mixins.CanBeGrasped.grasp_candidates`.
-    """
-
-
-@dataclass(kw_only=True, eq=False)
-class HasGraspableObjectParameter(DesignatorParameterMixin):
-    """
-    Mixin for actions that act on a single graspable object.
-    """
-
-    object_designator: CanBeGrasped
-    """
-    The annotation of the object the action acts on; its :attr:`root` body is used
-    where the underlying kinematic body is required.
     """
 
 
@@ -152,26 +126,14 @@ class HasNavigationTargetParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasPlacementTargetParameter(DesignatorParameterMixin):
-    """
-    Mixin for actions that move an object to a destination pose.
-    """
-
-    target_location: Pose
-    """
-    The pose the object is moved to.
-    """
-
-
-@dataclass(kw_only=True, eq=False)
 class HasTargetPoseParameter(DesignatorParameterMixin):
     """
-    Mixin for actions that drive an end effector to a target pose.
+    Mixin for actions that bring something an arm moves to a pose.
     """
 
     target_pose: Pose
     """
-    The pose the end effector reaches.
+    The pose the action brings what it moves to.
     """
 
 

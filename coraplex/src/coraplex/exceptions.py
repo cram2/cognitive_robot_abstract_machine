@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from coraplex.robot_plans.actions.base import Action
     from cramph.node import StatechartNode
     from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-    from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
     from semantic_digital_twin.world_description.world_entity import (
+        Body,
         SemanticAnnotation,
     )
 
@@ -233,20 +233,50 @@ class MotionDidNotFinish(PlanFailure):
 @dataclass
 class ObjectIsNotHeld(DataclassException):
     """
-    Raised when a place is asked for an object that no arm holds and no pick-up before
-    it is going to take.
+    Raised when a place is asked of an arm that holds nothing and that no pick-up before
+    it is going to fill.
     """
 
-    object_designator: CanBeGrasped
+    arm: Arm
     """
-    The object that was to be placed.
+    The arm that was to place something.
     """
 
     def error_message(self) -> str:
-        return f"no arm holds {self.object_designator.name} to place it."
+        return f"{self.arm.name} holds nothing to place."
 
     def suggest_correction(self) -> str:
-        return "place the object after a pick-up of it."
+        return "place with an arm after a pick-up with that arm."
+
+
+@dataclass
+class HeldBodyIsNotGraspable(DataclassException):
+    """
+    Raised when a place is asked of an arm holding a body that no annotation offering
+    grasps has as its root, which leaves no grasp to run backwards.
+    """
+
+    arm: Arm
+    """
+    The arm that was to place the body.
+    """
+
+    held_body: Body
+    """
+    The body the arm holds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.arm.name} holds {self.held_body.name}, which no graspable "
+            f"annotation has as its root."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "add an annotation that can be grasped for the held body to the world "
+            "before placing it."
+        )
 
 
 @dataclass

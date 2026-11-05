@@ -189,12 +189,15 @@ def test_actions_with_the_same_parameters_are_different_nodes() -> None:
 def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     pr2_apartment_context,
 ) -> None:
+    """
+    The pick-up to the left of a place in a sequence is the one preceding it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
     statechart = Statechart(context=simulated_executor(extensions).context)
 
@@ -206,12 +209,16 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
 def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pause around the place makes the pick-up a sibling of its parent, which still
+    counts as preceding it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
     paused_place = PausedUntilTrue(monitor=ConstTrueNode(), monitored_node=place)
     statechart = Statechart(context=simulated_executor(extensions).context)
@@ -221,15 +228,18 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     assert statechart.get_preceding_node_by_type(place, PickUpAction) is pick_up
 
 
-def test_a_place_after_several_pick_ups_uses_the_arm_that_picked_its_object(
+def test_a_place_after_several_pick_ups_moves_only_the_arm_it_is_given(
     pr2_apartment_context,
 ) -> None:
+    """
+    A later pick-up with the other arm does not draw the place to that arm.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     spoon = world.get_semantic_annotations_by_type(Spoon)[0]
     place_milk = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
     statechart = Statechart(context=simulated_executor(extensions).context)
 
@@ -251,15 +261,19 @@ def test_a_place_after_several_pick_ups_uses_the_arm_that_picked_its_object(
     assert moved_tool_frames == {robot.left_arm.end_effector.tool_frame}
 
 
-def test_a_place_after_an_earlier_place_uses_the_arm_that_picked_its_object(
+def test_a_place_after_an_earlier_place_moves_only_the_arm_it_is_given(
     pr2_apartment_context,
 ) -> None:
+    """
+    A whole pick-up and place with the other arm beforehand leaves this place on its own
+    arm.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     spoon = world.get_semantic_annotations_by_type(Spoon)[0]
     place_spoon = PlaceAction(
-        object_designator=spoon,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.right_arm,
+        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
     statechart = Statechart(context=simulated_executor(extensions).context)
 
@@ -268,8 +282,8 @@ def test_a_place_after_an_earlier_place_uses_the_arm_that_picked_its_object(
             nodes=[
                 PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
                 PlaceAction(
-                    object_designator=milk,
-                    target_location=Pose.from_xyz_rpy(
+                    arm=robot.left_arm,
+                    target_pose=Pose.from_xyz_rpy(
                         0.8, -1.5, 0.7, reference_frame=world.root
                     ),
                 ),

@@ -33,17 +33,12 @@ from coraplex.robot_plans.actions.core.misc import MoveToReach
 from cramph.composites import StatementNode
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
-from random_events.interval import closed
-from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.robot_parts import (
-    EndEffector,
-    AbstractRobot,
-)
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.robots.pr2 import PR2
 from krrood_spatial_math.spatial_types import Point2, Point3, Pose, Pose2D
 from semantic_digital_twin.world import World
@@ -229,8 +224,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
                 reference_frame=None,
             ),
             hip_rotation=...,
-            end_effector=variable(EndEffector, world.semantic_annotations),
-            approach_clearance=...,
+            arm=variable(Arm, world.semantic_annotations),
         )
 
         move_to_reach.limit(limit)
@@ -270,21 +264,11 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             underspecified_action.target_pose_offset_robot.position.y
         )
         hip_rotation = parameters.variable_of(underspecified_action.hip_rotation)
-        approach_clearance = parameters.variable_of(
-            underspecified_action.approach_clearance
-        )
 
         distribution = fully_factorized(
-            means={approach_clearance: 0.05},
             variances={robot_x: 0.5, robot_y: 0.5, hip_rotation: 0.1},
             variables=parameters.variables.values(),
         )
-
-        hip_rotation_condition = SimpleEvent.from_data(
-            {approach_clearance: closed(0.0, 0.4)}
-        )
-        hip_rotation_condition.fill_missing_variables(distribution.variables)
-        distribution.log_truncated_of_simple_event_in_place(hip_rotation_condition)
 
         return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
 

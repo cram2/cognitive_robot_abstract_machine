@@ -1,3 +1,7 @@
+"""
+Actions that detect objects around the robot and bring it within reach of a target.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -15,11 +19,7 @@ from coraplex.robot_plans.actions.base import SequentialAction
 from coraplex.robot_plans.actions.core.exceptions import DetectionTargetMissing
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
-from coraplex.robot_plans.mixins import (
-    HasEndEffectorParameter,
-    HasGraspApproachParameters,
-    MovesToolCenterPoint,
-)
+from coraplex.robot_plans.mixins import HasArmParameter, MovesToolCenterPoint
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
@@ -151,16 +151,16 @@ class DetectAction(SequentialAction):
 class MoveToReach(
     MovesToolCenterPoint,
     SequentialAction,
-    HasEndEffectorParameter,
-    HasGraspApproachParameters,
+    HasArmParameter,
 ):
     """
-    Let the robot move to a position facing the target and reach with a end_effector.
+    Let the robot move to a position facing the target and reach with the end effector of
+    :attr:`arm`.
     """
 
     target_pose_offset_robot: Pose2D
     """
-    The pose where the robot should stand with regard to the end_effector target pose.
+    The pose where the robot should stand with regard to the end effector target pose.
 
     2D since z-axis is not relevant.
     """
@@ -179,10 +179,10 @@ class MoveToReach(
         return [
             NavigateAction(target_location=self.standing_pose),
             MoveManipulatorAction(
-                target_pose=self.end_effector.tool_frame_goal_for_grasp(
+                target_pose=self.arm.end_effector.tool_frame_goal_for_grasp(
                     self.reference_T_grasp
                 ),
-                end_effector=self.end_effector,
+                arm=self.arm,
                 allow_gripper_collision=False,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,

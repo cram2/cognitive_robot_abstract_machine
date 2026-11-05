@@ -82,7 +82,7 @@ The grounded designator is carried out. If it fails (e.g., object moved, pose bl
 
 An action designator that takes hold of an object takes one of the grasps that annotation offers 
 (`annotation.grasp_candidates()`) as its `grasp` argument, and the grasp names the object it is on; 
-one that releases an object it already holds, such as placing, takes the annotation itself as its `object_designator` argument.
+one that releases an object it already holds, such as placing, takes the `arm` holding it, which is enough to tell what it holds.
 
 ## How designators fit into a plan
 

@@ -611,7 +611,7 @@ def test_stretch_holds_the_orientation_of_its_base_only_once_it_drove_there(
                 x=0.7, y=-1.3, z=0.9, reference_frame=world.root
             ),
             hip_rotation=0.0,
-            end_effector=robot.all_arms[0].end_effector,
+            arm=robot.all_arms[0],
         ),
         simulated_executor(extensions),
     )

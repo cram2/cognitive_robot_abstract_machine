@@ -291,6 +291,10 @@ def place_position(robot_setup) -> Point3:
 
 
 def test_place_multi(stationary_block_context, place_position):
+    """
+    On every stationary robot, the box is no longer attached to the tool frame once it
+    is placed.
+    """
     world, view, extensions = stationary_block_context
 
     left_arm = left_or_only_arm(view)
@@ -303,8 +307,8 @@ def test_place_multi(stationary_block_context, place_position):
                 grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
             ),
             PlaceAction(
-                object_designator=graspable_annotation(world, box_body),
-                target_location=Pose(place_position, reference_frame=world.root),
+                arm=left_or_only_arm(view),
+                target_pose=Pose(place_position, reference_frame=world.root),
             ),
         ]
     )
@@ -468,8 +472,8 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
-                object_designator=graspable_annotation(world, box),
-                target_location=Pose(target, reference_frame=world.root),
+                arm=arm,
+                target_pose=Pose(target, reference_frame=world.root),
             ),
         ]
     )

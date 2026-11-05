@@ -120,7 +120,7 @@ def complex_plan(pr2_apartment_context):
             target_location=Pose.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
-            object_designator=milk,
+            arm=robot_view.left_arm,
         ),
     )
 

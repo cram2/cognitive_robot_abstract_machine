@@ -185,8 +185,8 @@ def build_statechart(
                     target_location=standing_pose_in_front_of(destination, world)
                 ),
                 PlaceAction(
-                    object_designator=parcel,
-                    target_location=Pose(
+                    arm=robot.torso.left_arm,
+                    target_pose=Pose(
                         destination.position,
                         destination.quaternion,
                         reference_frame=world.root,

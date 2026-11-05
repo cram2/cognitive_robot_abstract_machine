@@ -199,6 +199,9 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self):
+        """
+        :return: The plan that opens the main entrance, picks up the object of interest and puts it down at :attr:`place_pose`.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -240,7 +243,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
                 ParkArmsAction(arms=self.robot.all_arms),
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
-                    object_designator=object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
             ]
@@ -365,6 +368,9 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self):
+        """
+        :return: The plan that opens the main entrance, picks up :attr:`book_to_pick` and puts it down in front of where the robot then stands.
+        """
         target_pose = Pose.from_xyz_rpy(
             x=5.48, y=7.46, z=0.8, yaw=-np.pi / 2, reference_frame=self.world.root
         )
@@ -379,7 +385,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
                 x=5.48, y=6.96, reference_frame=self.world.root
             ),
             target_location=target_pose,
-            object_designator=self.book_to_pick,
+            arm=self.arm,
         )
 
         return Sequence(nodes=[open_door, mpu, mpp])
@@ -502,6 +508,9 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self) -> StatechartNode:
+        """
+        :return: The plan that opens the main entrance, picks up :attr:`target_to_pick` and puts it down, with the arm parked in between.
+        """
         mpu = MoveAndPickUpAction.from_standing_position(
             standing_position=self.pickup_navigation_pose,
             grasp=self.target_to_pick.grasp_candidates()[0],
@@ -518,7 +527,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
                 x=0.605, y=2.115, yaw=-1.5708, reference_frame=self.world.root
             ),
             target_location=place_target_pose,
-            object_designator=self.target_to_pick,
+            arm=self.arm,
         )
 
         return Sequence(
@@ -610,10 +619,17 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
+    """
+    Moves an object from one place to another in the southwestern store scene.
+    """
+
     scene_url = Sage10kActionableScenes.SOUTHWESTERN_STORE
 
     @property
     def plan(self):
+        """
+        :return: The plan that opens the main entrance, picks up :attr:`object_of_interest` and puts it down at :attr:`place_pose`.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -639,7 +655,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
                 ),
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
-                    object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
@@ -725,10 +741,17 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
+    """
+    Moves an object from one place to another in the brutalist store scene.
+    """
+
     scene_url = Sage10kActionableScenes.BRUTALIST_STORE
 
     @property
     def plan(self):
+        """
+        :return: The plan that opens the main entrance, picks up :attr:`object_of_interest` and puts it down at :attr:`place_pose`.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -749,7 +772,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
                 ParkArmsAction(arms=self.robot.all_arms),
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
-                    object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
                 NavigateAction(
@@ -822,10 +845,17 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
+    """
+    Moves an object from one place to another in the American buffet restaurant scene.
+    """
+
     scene_url = Sage10kActionableScenes.AMERICAN_BUFFET_RESTAURANT
 
     @property
     def plan(self):
+        """
+        :return: The plan that opens the main entrance, picks up :attr:`object_of_interest` and puts it down at :attr:`place_pose`.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
         navigate = Pose2D.from_xy_yaw(x=5.14, y=2.85, reference_frame=self.world.root)
@@ -843,7 +873,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
                 NavigateAction(target_location=navigate),
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
-                    object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
             ]

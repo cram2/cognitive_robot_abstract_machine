@@ -5,6 +5,7 @@ import pytest
 from coraplex.robot_plans import mixins
 from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.core.container import OpenAction
+from coraplex.robot_plans.actions.core.misc import MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
     DrivesBase,
     NavigateAction,
@@ -14,19 +15,19 @@ from coraplex.robot_plans.actions.core.pick_up import GraspingAction, PickUpActi
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import (
     MoveFingersToWidthAction,
+    MoveManipulatorAction,
     ParkArmsAction,
     SetGripperAction,
 )
 from coraplex.robot_plans.mixins import (
     DesignatorParameterMixin,
     HasArmParameter,
-    HasGraspableObjectParameter,
     HasGraspApproachParameters,
     HasGraspCandidateParameter,
     HasGripperConfigurationParameter,
     HasNavigationTargetParameter,
     HasPlaceTuningParameters,
-    HasPlacementTargetParameter,
+    HasTargetPoseParameter,
     MovesToolCenterPoint,
 )
 from giskardpy.motion_statechart.goals.base_pose_goals import DrivenBaseGoal
@@ -122,6 +123,25 @@ def test_open_action_takes_hold_of_its_handle_by_a_grasp():
     }
 
 
+@pytest.mark.parametrize(
+    "action_type", [MoveManipulatorAction, MoveToReach, PlaceAction]
+)
+def test_an_action_moving_a_tool_center_point_takes_an_arm(action_type: type):
+    """
+    Each of them moves the tool center point of the arm it is given, rather than taking
+    an end effector or working out an arm of its own.
+    """
+    assert issubclass(action_type, HasArmParameter)
+
+
+def test_move_to_reach_takes_no_approach_it_would_not_use():
+    """
+    It moves straight to the tool frame goal of its grasp frame, which neither a
+    clearance nor a retreat distance shapes.
+    """
+    assert not issubclass(MoveToReach, HasGraspApproachParameters)
+
+
 def test_set_gripper_action_takes_the_configuration_it_reaches():
     assert parameter_mixins(SetGripperAction) == {HasGripperConfigurationParameter}
 
@@ -136,14 +156,8 @@ def test_inherited_parameters_keep_their_declared_types():
     """
     types = field_types(PlaceAction)
 
-    assert (
-        types["object_designator"]
-        is HasGraspableObjectParameter.__annotations__["object_designator"]
-    )
-    assert (
-        types["target_location"]
-        is HasPlacementTargetParameter.__annotations__["target_location"]
-    )
+    assert types["arm"] is HasArmParameter.__annotations__["arm"]
+    assert types["target_pose"] is HasTargetPoseParameter.__annotations__["target_pose"]
     assert (
         types["placing_linear_velocity"]
         == HasPlaceTuningParameters.__annotations__["placing_linear_velocity"]

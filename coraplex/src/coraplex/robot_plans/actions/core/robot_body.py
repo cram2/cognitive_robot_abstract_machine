@@ -21,7 +21,6 @@ from coraplex.robot_plans.actions.base import (
 from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpening
 from coraplex.robot_plans.mixins import (
     HasArmParameter,
-    HasEndEffectorParameter,
     HasGripperCollisionParameter,
     HasGripperConfigurationParameter,
     HasTargetPoseParameter,
@@ -209,27 +208,27 @@ class FollowToolCenterPointPathAction(
 class MoveManipulatorAction(
     MovesToolCenterPoint,
     GoalAction,
-    HasEndEffectorParameter,
+    HasArmParameter,
     HasTargetPoseParameter,
     HasGripperCollisionParameter,
 ):
     """
-    Move the end_effector to a specific pose.
+    Move the end effector of :attr:`arm` to :attr:`target_pose`.
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
         """
-        :return: An allowance for :attr:`end_effector` to touch its surroundings if
-            :attr:`allow_gripper_collision`, none otherwise.
+        :return: An allowance for the end effector of :attr:`arm` to touch its
+            surroundings if :attr:`allow_gripper_collision`, none otherwise.
         """
         if not self.allow_gripper_collision:
             return []
-        return [AllowCollisionForEndEffector(end_effector=self.end_effector)]
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
 
     def create_goal(self) -> StatechartNode:
         goal = CartesianPose(
             root_link=self.controlled_root,
-            tip_link=self.end_effector.tool_frame,
+            tip_link=self.arm.end_effector.tool_frame,
             goal=self.target_pose,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,

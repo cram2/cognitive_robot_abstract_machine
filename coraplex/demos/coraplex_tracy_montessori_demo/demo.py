@@ -450,11 +450,12 @@ class ShapeSortingPlan:
         actions = [ParkArmsAction(arms=robot.all_arms)]
         for piece, hole in self.scene.holes_of_pieces.items():
             [grasp] = piece.grasp_candidates()
-            actions.append(PickUpAction(grasp=grasp, arm=self.scene.sorting_arm(robot)))
+            arm = self.scene.sorting_arm(robot)
+            actions.append(PickUpAction(grasp=grasp, arm=arm))
             actions.append(
                 PlaceAction(
-                    object_designator=piece,
-                    target_location=self.release_pose_over(hole, context.world),
+                    arm=arm,
+                    target_pose=self.release_pose_over(hole, context.world),
                 )
             )
         actions.append(ParkArmsAction(arms=robot.all_arms))

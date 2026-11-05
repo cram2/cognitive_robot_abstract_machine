@@ -209,8 +209,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 PlaceAction(
-                    object_designator=cereal,
-                    target_location=Pose.from_xyz_rpy(
+                    arm=arm,
+                    target_pose=Pose.from_xyz_rpy(
                         x=0.1,
                         z=0.56,
                         yaw=np.pi,
@@ -261,8 +261,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(PlaceAction)(
-                        object_designator=cereal,
-                        target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
+                        arm=arm,
+                        target_pose=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                     )
                 ),
                 ParkArmsAction(arms=robot.all_arms),

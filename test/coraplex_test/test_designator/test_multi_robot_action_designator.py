@@ -91,7 +91,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm, EndEffector
 from ..conftest import (
     grasp_point_of,
     left_or_only_arm,
@@ -587,6 +587,9 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
 
 
 def test_place_multi(multiple_robot_apartment_context):
+    """
+    On every robot, the milk is no longer attached to the tool frame once it is placed.
+    """
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
@@ -609,8 +612,8 @@ def test_place_multi(multiple_robot_apartment_context):
                 arm=left_or_only_arm(view),
             ),
             PlaceAction(
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-                target_location=Pose(
+                arm=left_or_only_arm(view),
+                target_pose=Pose(
                     Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root
                 ),
             ),
@@ -781,6 +784,9 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
 
 
 def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
+    """
+    On every robot, standing off the grasp and reaching it runs through.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     # a Stretch keeps its heading while it reaches, so it stands behind the grasp,
     # where its arm already points along the approach
@@ -795,7 +801,7 @@ def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
             x=0.7, y=-1.3, z=0.9, reference_frame=world.root
         ),
         hip_rotation=0.0,
-        end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+        arm=world.get_semantic_annotations_by_type(Arm)[0],
     )
 
     plan = move_to_reach
@@ -1369,19 +1375,19 @@ def test_moving_the_manipulator_relaxes_collisions_only_when_allowed(
     The gripper is only let through its surroundings when the caller asks.
     """
     _, robot, extensions = multiple_robot_apartment_context
-    end_effector = left_or_only_arm(robot).end_effector
+    arm = left_or_only_arm(robot)
     allowed = MoveManipulatorAction(
-        target_pose=Pose(), end_effector=end_effector, allow_gripper_collision=True
+        target_pose=Pose(), arm=arm, allow_gripper_collision=True
     )
     forbidden = MoveManipulatorAction(
-        target_pose=Pose(), end_effector=end_effector, allow_gripper_collision=False
+        target_pose=Pose(), arm=arm, allow_gripper_collision=False
     )
 
     expand(allowed, extensions)
     expand(forbidden, extensions)
 
     [rule] = allowed.temporary_collision_rules
-    assert rule.end_effector is end_effector
+    assert rule.end_effector is arm.end_effector
     assert forbidden.temporary_collision_rules == []
     assert nodes_of_type(allowed, UpdateTemporaryCollisionRules) == []
     assert len(nodes_of_type(forbidden, CartesianPose)) == 1
@@ -1399,7 +1405,7 @@ def test_moving_the_manipulator_hands_what_accompanies_it_to_its_pose(
         robot.mobile_base.full_body_controlled = False
     action = MoveManipulatorAction(
         target_pose=Pose(),
-        end_effector=left_or_only_arm(robot).end_effector,
+        arm=left_or_only_arm(robot),
         allow_gripper_collision=True,
     )
 
@@ -1424,7 +1430,7 @@ def test_a_pose_of_the_tool_center_point_holds_what_accompanies_it(
     arm = left_or_only_arm(robot)
     action = MoveManipulatorAction(
         target_pose=Pose(),
-        end_effector=arm.end_effector,
+        arm=arm,
         allow_gripper_collision=False,
     )
     expand(action, extensions)
@@ -1509,7 +1515,7 @@ def arm_and_look_actions(robot: AbstractRobot) -> list[Action]:
     return [
         MoveManipulatorAction(
             target_pose=Pose(),
-            end_effector=arm.end_effector,
+            arm=arm,
             allow_gripper_collision=False,
         ),
         FollowToolCenterPointPathAction(
@@ -1697,10 +1703,8 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
                 grasp=milk.grasp_candidates()[0], arm=right_or_only_arm(robot)
             ),
             PlaceAction(
-                object_designator=milk,
-                target_location=Pose.from_xyz_rpy(
-                    1, 1, 0.8, reference_frame=world.root
-                ),
+                arm=right_or_only_arm(robot),
+                target_pose=Pose.from_xyz_rpy(1, 1, 0.8, reference_frame=world.root),
             ),
         ]
     )
@@ -1936,15 +1940,19 @@ def test_a_cup_picked_up_by_a_statement_ends_upright(
 def test_a_placing_carries_its_object_to_where_it_stands(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    The carry is the first of the steps, before the robot turns towards the target and
+    places.
+    """
     _, robot, extensions = multiple_robot_apartment_context
-    cup = cup_held_tilted(robot)
+    cup_held_tilted(robot)
     target = Pose.from_xyz_rpy(x=0.8, z=0.8, reference_frame=robot.root)
     move_and_place = MoveAndPlaceAction(
         carry=CarryAction(navigate=drive_ahead(robot)),
         face_and_look_at=FaceAndLookAtAction(
             face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
         ),
-        place=PlaceAction(object_designator=cup, target_location=target),
+        place=PlaceAction(arm=left_or_only_arm(robot), target_pose=target),
     )
 
     expand(move_and_place, extensions)
@@ -1996,8 +2004,8 @@ class CupForEachArm:
         """
         return [
             PlaceAction(
-                object_designator=pick_up.grasp.graspable,
-                target_location=self.world.transform(
+                arm=pick_up.arm,
+                target_pose=self.world.transform(
                     Pose.from_xyz_rpy(
                         y=sideways_distance,
                         reference_frame=pick_up.grasp.graspable.root,
@@ -2070,6 +2078,9 @@ def test_a_gripper_closes_at_its_grasp_although_the_other_arm_is_moving(
 def test_a_gripper_opens_at_its_place_target_although_the_other_arm_is_moving(
     cup_for_each_arm: CupForEachArm,
 ) -> None:
+    """
+    Two places running in parallel each leave their own cup at their own target.
+    """
     # One after the other, so that both cups sit in their grippers at their grasps.
     run_plan(
         Sequence(nodes=cup_for_each_arm.pick_ups),
@@ -2079,10 +2090,10 @@ def test_a_gripper_opens_at_its_place_target_although_the_other_arm_is_moving(
 
     run_plan(Parallel(nodes=places), cup_for_each_arm.context_extensions)
 
-    for place in places:
+    for place, pick_up in zip(places, cup_for_each_arm.pick_ups):
         np.testing.assert_allclose(
-            place.object_designator.root.global_pose.position.to_np()[:3],
-            place.target_location.position.to_np()[:3],
+            pick_up.grasp.graspable.root.global_pose.position.to_np()[:3],
+            place.target_pose.position.to_np()[:3],
             atol=2 * place.position_threshold,
         )
 

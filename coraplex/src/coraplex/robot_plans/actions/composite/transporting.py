@@ -97,9 +97,7 @@ class TransportAction(SequentialAction):
                     face_at=a(FaceAtAction)(target=target_location),
                     look_at=a(LookAtAction)(target=target_location),
                 ),
-                place=a(PlaceAction)(
-                    object_designator=graspable, target_location=target_location
-                ),
+                place=a(PlaceAction)(arm=arm, target_pose=target_location),
             ),
         )
 
@@ -164,12 +162,12 @@ class MoveAndPlaceAction(SequentialAction):
         cls,
         standing_position: Pose2D,
         target_location: Pose,
-        object_designator: CanBeGrasped,
+        arm: Arm,
     ) -> Self:
         """
         :param standing_position: Where the robot stands while placing.
         :param target_location: Where to put the object down.
-        :param object_designator: The object to put down.
+        :param arm: The arm that holds the object.
         :return: The step placing the object from `standing_position`.
         """
         return cls(
@@ -180,9 +178,7 @@ class MoveAndPlaceAction(SequentialAction):
                 face_at=FaceAtAction(target=target_location),
                 look_at=LookAtAction(target=target_location),
             ),
-            place=PlaceAction(
-                object_designator=object_designator, target_location=target_location
-            ),
+            place=PlaceAction(arm=arm, target_pose=target_location),
         )
 
     def create_steps(self) -> list[StatechartNode]:
