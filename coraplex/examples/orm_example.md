@@ -99,6 +99,7 @@ description = TransportAction(
             2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root
         ),
         object_designator=milk,
+        arm=pr2_view.left_arm,
     ),
 )
 plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])
