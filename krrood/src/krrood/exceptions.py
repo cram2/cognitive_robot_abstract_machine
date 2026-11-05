@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import KW_ONLY, dataclass, field
 from typing_extensions import Any, Protocol
 
+from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
+
 
 @dataclass
 class CanBehaveLikeDataclassException(Protocol):
@@ -30,50 +32,30 @@ class CanBehaveLikeDataclassException(Protocol):
 
 
 @dataclass
-class ExceptionChainLink(ABC):
+class ExceptionChainLink(DataclassFieldDescriptor, ABC):
     """
-    A link from an exception to another one in its chain, exposed as a dataclass field so
-    that it can be given at construction and is persisted and serialized with the
-    exception.
+    A link from an exception to another one in its chain, as a dataclass field so that
+    it can be given at construction and is persisted and serialized with the exception.
+
+    .. note:: Writing the cause also suppresses the context in tracebacks, which is why
+        writing the value a link already has must do nothing.
     """
 
     @abstractmethod
-    def read(self, exception: BaseException) -> BaseException | None:
+    def read(self, instance: BaseException) -> BaseException | None:
         """
-        :param exception: The exception the link starts at.
+        :param instance: The exception the link starts at.
         :return: The exception the link points to, if any.
         """
 
     @abstractmethod
-    def write(self, exception: BaseException, linked: BaseException | None) -> None:
+    def write(self, instance: BaseException, value: BaseException | None) -> None:
         """
         Let the link of the exception point to another exception.
 
-        :param exception: The exception the link starts at.
-        :param linked: The exception the link points to.
+        :param instance: The exception the link starts at.
+        :param value: The exception the link points to.
         """
-
-    def __get__(
-        self, exception: BaseException | None, owner: type | None = None
-    ) -> BaseException | None:
-        """
-        :return: The linked exception, or ``None`` when accessed on the class, which is
-            the default of the dataclass field.
-        """
-        if exception is None:
-            return None
-        return self.read(exception)
-
-    def __set__(self, exception: BaseException, linked: BaseException | None) -> None:
-        """
-        Point the link to the exception, unless it already does.
-
-        .. note:: Writing the cause also suppresses the context in tracebacks, so the
-            default must not be written into a freshly constructed exception.
-        """
-        if linked is self.read(exception):
-            return
-        self.write(exception, linked)
 
 
 @dataclass
@@ -82,11 +64,11 @@ class CauseLink(ExceptionChainLink):
     The link to the exception that an exception was raised from with ``raise ... from``.
     """
 
-    def read(self, exception: BaseException) -> BaseException | None:
-        return exception.__cause__
+    def read(self, instance: BaseException) -> BaseException | None:
+        return instance.__cause__
 
-    def write(self, exception: BaseException, linked: BaseException | None) -> None:
-        exception.__cause__ = linked
+    def write(self, instance: BaseException, value: BaseException | None) -> None:
+        instance.__cause__ = value
 
 
 @dataclass
@@ -96,11 +78,11 @@ class ContextLink(ExceptionChainLink):
     recorded whether or not ``raise ... from`` was used.
     """
 
-    def read(self, exception: BaseException) -> BaseException | None:
-        return exception.__context__
+    def read(self, instance: BaseException) -> BaseException | None:
+        return instance.__context__
 
-    def write(self, exception: BaseException, linked: BaseException | None) -> None:
-        exception.__context__ = linked
+    def write(self, instance: BaseException, value: BaseException | None) -> None:
+        instance.__context__ = value
 
 
 # %% dataclass exceptions
