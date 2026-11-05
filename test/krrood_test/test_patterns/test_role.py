@@ -211,15 +211,17 @@ def test_mappings_between_roles_and_role_takers():
 
     delegate_role_takers = [representative, ceo, person]
     assert len(delegate_role_takers) == len(delegate.all_role_takers)
-    assert alliterable=(
-        EntityAndType(entity=role_taker) in map(EntityAndType, delegate.all_role_takers)
+    assert all(
+        EntityAndType(entity=role_taker)
+        in [EntityAndType(entity=taker) for taker in delegate.all_role_takers]
         for role_taker in delegate_role_takers
     )
 
     professor_role_takers = [person]
     assert len(professor_role_takers) == len(professor.all_role_takers)
     assert all(
-        EntityAndType(entity=role_taker) in map(EntityAndType, professor.all_role_takers)
+        EntityAndType(entity=role_taker)
+        in [EntityAndType(entity=taker) for taker in professor.all_role_takers]
         for role_taker in professor_role_takers
     )
 

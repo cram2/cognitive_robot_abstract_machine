@@ -87,6 +87,7 @@ if TYPE_CHECKING:
     from .datastructures.dataclasses import CaseQuery
 
 import ast
+from krrood.patterns.called_positionally import called_positionally
 
 
 class IDGenerator:
@@ -1502,19 +1503,23 @@ class FilteredDotExporter(object):
         )
 
     @staticmethod
-    def _default_nodenamefunc(*, node):
+    @called_positionally
+    def _default_nodenamefunc(node):
         return node.name
 
     @staticmethod
-    def _default_nodeattrfunc(*, node):
+    @called_positionally
+    def _default_nodeattrfunc(node):
         return None
 
     @staticmethod
-    def _default_edgeattrfunc(*, node, child):
+    @called_positionally
+    def _default_edgeattrfunc(node, child):
         return None
 
     @staticmethod
-    def _default_edgetypefunc(*, node, child):
+    @called_positionally
+    def _default_edgetypefunc(node, child):
         return "->"
 
     def __iter(self, *, indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc):

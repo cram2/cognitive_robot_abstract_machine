@@ -133,7 +133,7 @@ class TestMeshGlbCaching:
         mesh.export = counting_export
 
         threads = [
-            threading.Thread(target=visualizer._mesh_glb, args=(0,)) for _ in range(5)
+            threading.Thread(target=visualizer._mesh_glb, kwargs={"node_index": 0}) for _ in range(5)
         ]
         for started_thread in threads:
             started_thread.start()

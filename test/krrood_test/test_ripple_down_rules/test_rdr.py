@@ -177,7 +177,7 @@ class TestRDR(TestCase):
         save_dir = self.generated_rdrs_dir
         model_name = original_grdr.save(save_dir=save_dir, model_name="test_load_grdr_from_python")
         model_path = os.path.join(save_dir, model_name)
-        grdr_loaded = GeneralRDR.from_python(model_dir=model_path)
+        grdr_loaded = GeneralRDR.from_python(model_path=model_path)
         for case, target in zip(self.all_cases[: len(targets)], targets):
             cat = grdr_loaded.classify(case=case)
             for cat_name, cat_val in cat.items():

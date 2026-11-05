@@ -1599,7 +1599,7 @@ def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world
 
     world = handles_and_containers_world
     handle = variable(Handle, world.bodies)
-    predicate = IsReachable(location=handle)
+    predicate = IsReachable(body=handle)
     text = verbalize_expression(predicate)
     assert "a Handle" in text
     assert "is reachable" in text

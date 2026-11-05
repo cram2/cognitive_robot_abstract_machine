@@ -75,16 +75,14 @@ class SpelledOutHead(StrEnum):
             return None
         return next((head for head in cls if head == words[0]), None)
 
-    @property
-    def predicate_type(self) -> type[BooleanPredicate]:
+    def predicate_for(self, *, phrase: str) -> BooleanPredicate:
         """
-        The predicate whose head this word spells.
+        :param phrase: The words of the field name after this head.
+        :return: The predicate whose head this word spells, saying *phrase*.
         """
-        return (
-            PossessivePredicate
-            if self in (SpelledOutHead.HAS, SpelledOutHead.HAVE)
-            else AdjectivalPredicate
-        )
+        if self in (SpelledOutHead.HAS, SpelledOutHead.HAVE):
+            return PossessivePredicate(noun=phrase)
+        return AdjectivalPredicate(adjective=phrase)
 
 
 def default_boolean_predicate(attribute_name: str) -> BooleanPredicate:
@@ -107,7 +105,7 @@ def default_boolean_predicate(attribute_name: str) -> BooleanPredicate:
     words = attribute_name.split("_")
     spelled_head = SpelledOutHead.opening(words=words)
     if spelled_head is not None:
-        return spelled_head.predicate_type(" ".join(words[1:]))
+        return spelled_head.predicate_for(phrase=" ".join(words[1:]))
     if morphology.is_past_participle(words[-1]) or morphology.is_likely_adjective(
         words[-1]
     ):
