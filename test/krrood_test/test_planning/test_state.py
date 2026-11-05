@@ -1,4 +1,5 @@
-"""Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
+"""
+Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
 
 A query reads the values the state's facts give ground terms - attributes, indexed elements,
 calls, symbolic functions and predicates - and live values for every other ground term.
@@ -9,7 +10,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from sqlalchemy.orm import sessionmaker
+from typing_extensions import Callable
 
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageGenerativeBackend,
+    ProbabilisticBackend,
+    QueryBackend,
+    SQLAlchemyBackend,
+)
+from krrood.entity_query_language.exceptions import BackendCannotReadState
 from krrood.entity_query_language.factories import (
     a,
     flat_variable,
@@ -17,6 +27,7 @@ from krrood.entity_query_language.factories import (
     not_,
     the,
     variable,
+    variable_from,
 )
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.planning.exceptions import (
@@ -32,10 +43,12 @@ from ..dataset.setting_with_side_effects import (
     AttributeReadThroughProperty,
     AttributeSetThroughProperty,
     AttributesSetThroughSetattr,
+    ElementsInAnImmutableContainer,
     ElementsSetThroughSetitem,
     FrozenAttributes,
     SlottedAttributes,
 )
+from ..dataset.objects_compared_by_value import PointComparedByValue
 from ..dataset.blocks_world import (
     Block,
     IsOn,
@@ -52,8 +65,10 @@ from ..dataset.blocks_world import (
 
 @dataclass
 class TwoTowers:
-    """A blocksworld with block ``c`` on block ``a``, blocks ``a`` and ``b`` on
-    the table, and a shelf holding ``a`` and ``b`` in its slots."""
+    """
+    A blocksworld with block ``c`` on block ``a``, blocks ``a`` and ``b`` on the table,
+    and a shelf holding ``a`` and ``b`` in its slots.
+    """
 
     table: Table
     """
@@ -61,7 +76,9 @@ class TwoTowers:
     """
 
     a: Block
-    """The bottom block of the first tower."""
+    """
+    The bottom block of the first tower.
+    """
 
     b: Block
     """
@@ -69,7 +86,9 @@ class TwoTowers:
     """
 
     c: Block
-    """The top block of the first tower."""
+    """
+    The top block of the first tower.
+    """
 
     shelf: Shelf
     """
@@ -282,8 +301,9 @@ def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term
         lambda: literal(SlottedAttributes(1.0)).coordinate,
         lambda: literal(FrozenAttributes(1.0)).coordinate,
         lambda: literal(AttributeReadThroughProperty(1.0)).diameter,
+        lambda: literal(ElementsInAnImmutableContainer((0.0, 1.0))).end_points[0],
     ],
-    ids=["slot", "frozen dataclass", "read-only property"],
+    ids=["slot", "frozen dataclass", "read-only property", "immutable container"],
 )
 def test_assigning_a_ground_term_that_is_only_stored_is_accepted(ground_term):
     expression = ground_term()
@@ -362,8 +382,10 @@ def test_ground_term_reached_through_another_object_is_the_same_ground_term(two_
 
 
 def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
-    """Two blocks that compare equal are still different objects, so assigning
-    a ground term of one never assigns the other."""
+    """
+    Two blocks that compare equal are still different objects, so assigning a ground
+    term of one never assigns the other.
+    """
     first = Block("d", two_towers.table)
     second = Block("d", two_towers.table)
     state = State().with_facts(literal(first).support == two_towers.c)
@@ -374,9 +396,10 @@ def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
 
 
 def test_ground_terms_identify_list_arguments_by_identity(two_towers):
-    """Two lists with the same elements are still different objects, so
-    assigning a ground term called with one never assigns the ground term
-    called with the other."""
+    """
+    Two lists with the same elements are still different objects, so assigning a ground
+    term called with one never assigns the ground term called with the other.
+    """
     first = [two_towers.b]
     second = [two_towers.b]
     state = State().with_facts(tallest_tower(literal(first)) == 7)
@@ -396,6 +419,36 @@ def test_ground_terms_compare_hashable_arguments_by_value(two_towers):
     assert State().with_facts(slots[key] == two_towers.c) == State().with_facts(
         slots[equal_key] == two_towers.c
     )
+
+
+@pytest.mark.parametrize(
+    "ground_term_of",
+    [
+        lambda point: literal(point).coordinate,
+        lambda point: literal(point).shifted_by(1.0),
+    ],
+    ids=["attribute", "method call"],
+)
+def test_equal_objects_never_share_their_ground_terms(ground_term_of):
+    """
+    The object a ground term belongs to is compared by identity, so assigning a ground
+    term of one object never assigns that of an equal but distinct object.
+    """
+    first = PointComparedByValue(1.0)
+    second = PointComparedByValue(1.0)
+    state = State().with_facts(ground_term_of(first) == 7.0)
+
+    assert ground_term_of(second).tolist(state=state) == [
+        ground_term_of(second).tolist()[0]
+    ]
+
+
+def test_equal_containers_never_share_their_elements():
+    first = ElementsInAnImmutableContainer(tuple([0.0, 1.0]))
+    second = ElementsInAnImmutableContainer(tuple([0.0, 1.0]))
+    state = State().with_facts(literal(first).end_points[0] == 7.0)
+
+    assert literal(second).end_points[0].tolist(state=state) == [second.end_points[0]]
 
 
 # %% ground terms read through other ground terms
@@ -420,8 +473,10 @@ def test_symbolic_function_receives_assigned_attribute_as_argument(two_towers):
 
 
 def test_python_body_reads_live_values_it_does_not_receive_as_arguments(two_towers):
-    """:class:`IsOn` reads ``self.block.support`` in Python, so it sees ``b``
-    on the table although the state puts ``b`` on ``c``."""
+    """
+    :class:`IsOn` reads ``self.block.support`` in Python, so it sees ``b`` on the table
+    although the state puts ``b`` on ``c``.
+    """
     result = (
         (block := a(Block).from_(two_towers.blocks))
         .where(IsOn(block, two_towers.c))
@@ -496,8 +551,10 @@ def test_results_read_the_state_wherever_they_are_consumed(two_towers):
 
 
 def test_state_reaches_only_the_evaluation_it_is_given_to(two_towers):
-    """A query evaluated while an evaluation under a state is part way through
-    reads the live values."""
+    """
+    A query evaluated while an evaluation under a state is part way through reads the
+    live values.
+    """
     supports = (
         a(Block)
         .from_([two_towers.b, two_towers.c])
@@ -516,8 +573,10 @@ def test_state_reaches_only_the_evaluation_it_is_given_to(two_towers):
 
 
 def test_query_started_during_another_evaluation_reads_state(two_towers):
-    """A query started from inside a running evaluation, here by a symbolic
-    function, reads the same state as the evaluation that started it."""
+    """
+    A query started from inside a running evaluation, here by a symbolic function, reads
+    the same state as the evaluation that started it.
+    """
 
     @symbolic_function
     def is_covered(candidate: Block) -> bool:
@@ -530,6 +589,38 @@ def test_query_started_during_another_evaluation_reads_state(two_towers):
     )
 
     assert result == [two_towers.a, two_towers.c]
+
+
+# %% backends and states
+
+
+def test_generative_backend_reads_state(two_towers):
+    state = State().with_facts(literal(two_towers.c).support == two_towers.table)
+    generated = a(Block)(name=variable_from(["d", "e"]), support=two_towers.table)
+    generated.where(literal(two_towers.c).support == two_towers.table)
+
+    result = generated.tolist(
+        backend=EntityQueryLanguageGenerativeBackend(), state=state
+    )
+
+    assert [block.name for block in result] == ["d", "e"]
+
+
+@pytest.mark.parametrize(
+    "create_backend",
+    [
+        lambda: SQLAlchemyBackend(sessionmaker()),
+        lambda: ProbabilisticBackend(),
+    ],
+    ids=["sql", "probabilistic"],
+)
+def test_backend_that_cannot_read_a_state_refuses_one(
+    two_towers, create_backend: Callable[[], QueryBackend]
+):
+    query = a(Block).from_(two_towers.blocks)
+
+    with pytest.raises(BackendCannotReadState):
+        query.evaluate(backend=create_backend(), state=State())
 
 
 # %% building states

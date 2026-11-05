@@ -170,14 +170,18 @@ class CauseEffectVariables:
     The variable a ``causes_effect(...)`` condition declares as the effect.
     """
 
-    confounder_variables: list[random_events.variable.Variable]
+    adjustment_variables_by_cause: dict[
+        random_events.variable.Variable, list[random_events.variable.Variable]
+    ]
     """
-    Variables assigned a ``confounder`` marker: Pearl's backdoor-criterion adjustment
-    set, summed back out of each cause candidate's interventional probability so it is
-    not left baked into the correlation between cause and effect.
+    Per cause candidate, the variables its interventional search adjusts for: Pearl's
+    backdoor-criterion adjustment set, summed back out of the candidate's interventional
+    probability so it is not left baked into the correlation between cause and effect.
+    They are the variables marked ``confounder``, and those a learned causal structure
+    chose for the candidate.
 
-    Empty for a query with no confounders declared, so the interventional search falls
-    back to an empty adjustment set.
+    Empty for a candidate with neither, so its search falls back to an empty adjustment
+    set.
     """
 
 

@@ -1,4 +1,6 @@
-"""States that assign values to ground terms without changing live objects."""
+"""
+States that assign values to ground terms without changing live objects.
+"""
 
 from __future__ import annotations
 
@@ -54,7 +56,8 @@ class State(TermReader):
     """
 
     assignments: dict[GroundTerm, Any] = field(default_factory=dict)
-    """The value of every ground term this state changes.
+    """
+    The value of every ground term this state changes.
 
     Never mutated; a changed state is a new :class:`State`.
     """

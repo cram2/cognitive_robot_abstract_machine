@@ -1,4 +1,6 @@
-"""Errors raised while building states."""
+"""
+Errors raised while building states.
+"""
 
 from __future__ import annotations
 
@@ -15,8 +17,9 @@ from krrood.exceptions import DataclassException
 
 @dataclass
 class ConditionIsNotAFact(DataclassException):
-    """A condition that does not fix the value of a ground term was given as a
-    fact."""
+    """
+    A condition that does not fix the value of a ground term was given as a fact.
+    """
 
     condition: Any
     """
@@ -35,8 +38,10 @@ class ConditionIsNotAFact(DataclassException):
 
 @dataclass
 class ComparisonIsNotAnEquality(ConditionIsNotAFact):
-    """A fact compares a ground term by other than equality, which constrains
-    its value without fixing it."""
+    """
+    A fact compares a ground term by other than equality, which constrains its value
+    without fixing it.
+    """
 
     condition: Comparator
     """
@@ -59,8 +64,9 @@ class ComparisonIsNotAnEquality(ConditionIsNotAFact):
 
 @dataclass
 class FactValueIsNotConstant(DataclassException):
-    """A fact compares a ground term with an expression instead of with a
-    value."""
+    """
+    A fact compares a ground term with an expression instead of with a value.
+    """
 
     condition: Any
     """
@@ -76,8 +82,10 @@ class FactValueIsNotConstant(DataclassException):
 
 @dataclass
 class MissingGroundTerm(DataclassException):
-    """A fact gives a value to a ground term that does not exist, such as an
-    attribute the instance does not have."""
+    """
+    A fact gives a value to a ground term that does not exist, such as an attribute the
+    instance does not have.
+    """
 
     term: GroundTerm
     """
@@ -93,8 +101,10 @@ class MissingGroundTerm(DataclassException):
 
 @dataclass
 class AssignmentBypassesSetter(DataclassException):
-    """A fact gives a value to a ground term that live objects set through code
-    of their own class, such as a property setter, which a state never runs."""
+    """
+    A fact gives a value to a ground term that live objects set through code of their
+    own class, such as a property setter, which a state never runs.
+    """
 
     term: GroundTerm
     """

@@ -109,10 +109,40 @@ class GraphNode:
         """
         if self.level is not NodeLevel.PART_ATTRIBUTE:
             raise NotAPartAttribute(self)
-        owner, attribute = self.name.split(f".{self.collection}.", 1)
         return replace(
-            self.variable, name=f"{owner}.{self.collection}[{index}].{attribute}"
+            self.variable,
+            name=f"{self._part_variable_name_start}{index}{self._part_variable_name_end}",
         )
+
+    def part_index_of(self, variable_name: str) -> int | None:
+        """
+        :param variable_name: The name of a query's variable.
+        :return: The position of the part whose copy of the attribute the variable is,
+            the inverse of :meth:`variable_of_part`; ``None`` if it is no such copy.
+        """
+        if self.level is not NodeLevel.PART_ATTRIBUTE:
+            return None
+        start, end = self._part_variable_name_start, self._part_variable_name_end
+        if not (variable_name.startswith(start) and variable_name.endswith(end)):
+            return None
+        index = variable_name[len(start) : len(variable_name) - len(end)]
+        return int(index) if index.isdigit() else None
+
+    @property
+    def _part_variable_name_start(self) -> str:
+        """
+        :return: What a part's copy of the attribute is named before the part's
+            position, ``Class.collection[``.
+        """
+        return self.name.split(f".{self.collection}.", 1)[0] + f".{self.collection}["
+
+    @property
+    def _part_variable_name_end(self) -> str:
+        """
+        :return: What a part's copy of the attribute is named after the part's
+            position, ``].attribute``.
+        """
+        return "]." + self.name.split(f".{self.collection}.", 1)[1]
 
 
 @dataclass(frozen=True)
@@ -242,6 +272,33 @@ class MemberGraph(DirectedAcyclicGraph[GraphNode]):
         return result
 
 
+@dataclass(frozen=True)
+class NodeReference:
+    """
+    A graph node as a query's variable refers to it: a part attribute's template node
+    together with the position of the part the variable is a copy for.
+    """
+
+    node: GraphNode
+    """
+    The node.
+    """
+
+    part_index: int | None = None
+    """
+    The position of the part, for a part attribute's node; ``None`` otherwise.
+    """
+
+    @property
+    def variable(self) -> Variable:
+        """
+        :return: The variable the reference stands for.
+        """
+        if self.part_index is None:
+            return self.node.variable
+        return self.node.variable_of_part(self.part_index)
+
+
 # %% the graph
 
 
@@ -321,6 +378,20 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             if node.name == name:
                 return node
         raise UnknownGraphNode(name, self.node_names)
+
+    def reference_of(self, variable_name: str) -> NodeReference | None:
+        """
+        :param variable_name: The name of a query's variable.
+        :return: The node the variable stands for, with the part's position for one
+            part's copy of a part attribute; ``None`` if the graph has no node for it.
+        """
+        for node in self.nodes():
+            if node.name == variable_name:
+                return NodeReference(node)
+            part_index = node.part_index_of(variable_name)
+            if part_index is not None:
+                return NodeReference(node, part_index)
+        return None
 
     @property
     def node_names(self) -> list[str]:
