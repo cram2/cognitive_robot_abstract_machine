@@ -64,12 +64,12 @@ from the activated CRAM environment:
 
 ```bash
 sudo apt install -y nvidia-cuda-toolkit g++-12
-python3 -m pip install tensorrt-cu12==10.13.3.9
+python3 -m pip install "tensorrt-cu12>=10.13.3,<11"
 cd $OVERLAY_WS
 python3 -m colcon build --merge-install --packages-select robokudo_foundation_pose_tensorrt
 ```
 
-The meshes of the examples are in the ROS package `robokudo_cad_data`. See the README of
+Meshes are not distributed with the CRAM stack, provide your own for `ObjectClassMesh`. See the README of
 `robokudo_foundation_pose_tensorrt` for the TensorRT engines and their cache.
 
 ### PyCharm setup
