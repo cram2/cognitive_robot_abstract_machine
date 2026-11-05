@@ -733,7 +733,7 @@ class Match(
         :param key: A function to extract the key from the expression's value.
         :return: This match.
         """
-        self._symbolic_expression_.ordered_by(variable, descending=descending, key=key)
+        self._symbolic_expression_.ordered_by(variable=variable, descending=descending, key=key)
         return self
 
     def distinct(self, *on: Selectable | Any) -> Self:
@@ -764,7 +764,7 @@ class Match(
         :param n: The maximum number of results to return.
         :return: This match.
         """
-        self._symbolic_expression_.limit(n)
+        self._symbolic_expression_.limit(n=n)
         return self
 
     @property

@@ -910,15 +910,15 @@ def test_limit(handles_and_containers_world):
     world = handles_and_containers_world
     body = variable(type_=Body, domain=world.bodies)
     query = an(entity(body).where(contains(body.name, "Handle")))
-    assert len(list(query.limit(2).evaluate())) == 2
-    assert len(list(query.limit(1).evaluate())) == 1
-    assert len(list(query.limit(3).evaluate())) == 3
+    assert len(list(query.limit(n=2).evaluate())) == 2
+    assert len(list(query.limit(n=1).evaluate())) == 1
+    assert len(list(query.limit(n=3).evaluate())) == 3
     with pytest.raises(NonPositiveLimitValue):
-        list(query.limit(0).evaluate())
+        list(query.limit(n=0).evaluate())
     with pytest.raises(NonPositiveLimitValue):
-        list(query.limit(-1).evaluate())
+        list(query.limit(n=-1).evaluate())
     with pytest.raises(NonPositiveLimitValue):
-        list(query.limit("0").evaluate())
+        list(query.limit(n="0").evaluate())
 
 
 @pytest.fixture
@@ -1218,7 +1218,7 @@ def test_order_by_not_evaluated_variable(handles_and_containers_world):
 def test_ordering_the_query_by_the_query_itself(handles_and_containers_world):
     body = variable(Body, domain=handles_and_containers_world.bodies)
     query = entity(body).where(contains(body.name, "Handle"))
-    ordered_query = a(query.ordered_by(query.name[-1], descending=True))
+    ordered_query = a(query.ordered_by(variable=query.name[-1], descending=True))
     filtered_values = [
         b for b in handles_and_containers_world.bodies if "Handle" in b.name
     ]

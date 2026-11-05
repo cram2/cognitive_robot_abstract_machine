@@ -348,7 +348,7 @@ def test_translate_limit(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b)).limit(5)
+    query = an(entity(b)).limit(n=5)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).limit(5)
@@ -365,7 +365,7 @@ def test_order_by(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size))
+    query = an(entity(b).ordered_by(variable=b.size))
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size)
@@ -384,7 +384,7 @@ def test_order_by_descending(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size, descending=True))
+    query = an(entity(b).ordered_by(variable=b.size, descending=True))
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size.desc())
@@ -597,7 +597,7 @@ def test_where_and_order_by(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).where(b.size > 5).ordered_by(b.size))
+    query = an(entity(b).where(b.size > 5).ordered_by(variable=b.size))
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).where(BodyDAO.size > 5).order_by(BodyDAO.size)
@@ -618,7 +618,7 @@ def test_limit_and_order_by(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size)).limit(2)
+    query = an(entity(b).ordered_by(variable=b.size)).limit(n=2)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size).limit(2)
@@ -639,7 +639,7 @@ def test_where_and_limit(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).where(b.size > 10)).limit(2)
+    query = an(entity(b).where(b.size > 10)).limit(n=2)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).where(BodyDAO.size > 10).limit(2)
@@ -703,7 +703,7 @@ def test_order_by_descending_and_limit(session, database):
     session.commit()
 
     b = variable(type_=Body, domain=[])
-    query = an(entity(b).ordered_by(b.size, descending=True)).limit(2)
+    query = an(entity(b).ordered_by(variable=b.size, descending=True)).limit(n=2)
 
     translator = eql_to_sql(query, session)
     expected = select(BodyDAO).order_by(BodyDAO.size.desc()).limit(2)
@@ -1119,7 +1119,7 @@ def test_big_query_select_part(session):
             move_pick.grasp_config.approach_direction,
         )
         .where(move_pick.grasp_config.rotate_gripper < 0.9)
-        .ordered_by(move_pick.robot_x)
+        .ordered_by(variable=move_pick.robot_x)
     )
 
     translator = eql_to_sql(query, session)
@@ -1383,7 +1383,7 @@ def test_count_all_derives_dao_from_where_clause(session, database):
 
 def test_order_by_aggregate(session, database):
     """
-    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True)
+    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c, descending=True)
     raises an error because _apply_clauses calls translate_attribute() on a Count
     aggregator instead of _translate_comparator_operand().
 
@@ -1404,7 +1404,7 @@ def test_order_by_aggregate(session, database):
 
     b = variable(type_=Body, domain=[])
     c = count(b)
-    query = an(set_of(b.size, c).grouped_by(b.size).ordered_by(c, descending=True))
+    query = an(set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c, descending=True))
 
     translator = eql_to_sql(query, session)
     results = translator.evaluate()

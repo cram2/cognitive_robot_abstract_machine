@@ -138,7 +138,7 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
     (no plan).
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(a(set_of(employee).ordered_by(employee.salary, descending=True)))
+    >>> verbalize_expression(a(set_of(employee).ordered_by(variable=employee.salary, descending=True)))
     'Report Employees ordered by their salaries from highest to lowest'
     """
 
@@ -175,7 +175,7 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
         *"ordered by their salaries from lowest to highest"* span, otherwise nothing:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         builder = query._ordered_by_builder_

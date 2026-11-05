@@ -75,7 +75,7 @@ scoped = constrained(name="R2", battery=100)
 assert isinstance(scoped, Match)
 assert_type(scoped.from_(domain=[Robot(name="R2", battery=100)]), Match[Robot])
 assert_type(scoped.where(scoped.battery == 100), Match[Robot])
-assert_type(scoped.ordered_by(scoped.battery), Match[Robot])
+assert_type(scoped.ordered_by(variable=scoped.battery), Match[Robot])
 assert_type(scoped.limit(n=1), Match[Robot])
 
 

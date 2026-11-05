@@ -286,7 +286,7 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
                 SupportedBy(supported=v.root, supporting=couch_table.root),
             )
             .ordered_by(
-                v,
+                variable=v,
                 key=lambda x: closes_to_border(
                     x.root,
                 ),
@@ -361,7 +361,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
                 SupportedBy(supported=v.root, supporting=couch_table.root),
             )
             .ordered_by(
-                v,
+                variable=v,
                 key=lambda x: closes_to_border(
                     x.root,
                 ),

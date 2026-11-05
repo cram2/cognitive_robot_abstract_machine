@@ -117,7 +117,7 @@ def test_unlimited_ordered_set_of_reports_pronominalised():
     An unranked ordered set-of reports the plural population, pronominalised to "their".
     """
     e = variable(Employee, [])
-    text = verbalize_expression(a(set_of(e).ordered_by(e.salary, descending=True)))
+    text = verbalize_expression(a(set_of(e).ordered_by(variable=e.salary, descending=True)))
     assert text == "Report Employees ordered by their salaries from highest to lowest"
 
 
@@ -131,8 +131,8 @@ def _pnl_query(n: int):
         set_of(pnl.period, revenue)
         .grouped_by(pnl.period)
         .where(pnl.period.begin.month == pnl.period.end.month)
-        .ordered_by(revenue, descending=True)
-        .limit(n)
+        .ordered_by(variable=revenue, descending=True)
+        .limit(n=n)
     )
 
 
@@ -157,7 +157,7 @@ def test_set_of_limit_ascending_is_bottom():
     pnl = variable(ProfitAndLossStatement, domain=None)
     revenue = eql.sum(pnl.revenue.money.amount)
     q = a(
-        set_of(pnl.period, revenue).grouped_by(pnl.period).ordered_by(revenue).limit(2)
+        set_of(pnl.period, revenue).grouped_by(pnl.period).ordered_by(variable=revenue).limit(n=2)
     )
     text = verbalize_expression(q)
     assert text.startswith("For the two ProfitAndLossStatements with the lowest sum")
@@ -179,8 +179,8 @@ def _top_revenue_month_query(*, by_year: bool = False):
     return a(
         set_of(*keys, eql.sum(pnl.revenue.money.amount))
         .grouped_by(*keys)
-        .ordered_by(eql.sum(pnl.revenue.money.amount), descending=True)
-        .limit(1)
+        .ordered_by(variable=eql.sum(pnl.revenue.money.amount), descending=True)
+        .limit(n=1)
     )
 
 
@@ -223,8 +223,8 @@ def test_grouped_aggregation_limit_one_ascending_is_lowest():
     query = a(
         set_of(pnl.period.begin.month, eql.sum(pnl.revenue.money.amount))
         .grouped_by(pnl.period.begin.month)
-        .ordered_by(eql.sum(pnl.revenue.money.amount))
-        .limit(1)
+        .ordered_by(variable=eql.sum(pnl.revenue.money.amount))
+        .limit(n=1)
     )
     text = verbalize_expression(query)
     assert "the lowest sum of the amount of money of its revenue" in text
@@ -243,8 +243,8 @@ def test_ranked_report_reduces_only_the_ranked_aggregate():
     query = a(
         set_of(pnl.period.begin.month, ranked, other)
         .grouped_by(pnl.period.begin.month)
-        .ordered_by(ranked, descending=True)
-        .limit(1)
+        .ordered_by(variable=ranked, descending=True)
+        .limit(n=1)
     )
     text = verbalize_expression(query)
     assert text == (
@@ -265,8 +265,8 @@ def test_ranked_report_generalises_to_the_average_aggregate():
     query = a(
         set_of(pnl.period.begin.month, average)
         .grouped_by(pnl.period.begin.month)
-        .ordered_by(average, descending=True)
-        .limit(1)
+        .ordered_by(variable=average, descending=True)
+        .limit(n=1)
     )
     text = verbalize_expression(query)
     assert text == (

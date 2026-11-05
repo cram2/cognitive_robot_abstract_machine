@@ -113,7 +113,7 @@ class SelectionAssembler:
         plural and the selection is a variable, else its default referring form.
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(a(set_of(employee)).ordered_by(employee.salary, descending=True))
+        >>> verbalize_expression(a(set_of(employee)).ordered_by(variable=employee.salary, descending=True))
         'Report Employees ordered by their salaries from highest to lowest'
         """
         if number is GrammaticalNumber.PLURAL and isinstance(variable, Variable):
@@ -136,7 +136,7 @@ class SelectionAssembler:
         >>> employee = variable(Employee, [])
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(a(set_of(employee.name, robot.name)).ordered_by(
-        ...     employee.salary, descending=True).limit(2))
+        ...     variable=employee.salary, descending=True).limit(n=2))
         'Find the top two (the name of an Employee, the name of a Robot)'
         """
         tuple_phrase = PhraseFragment(

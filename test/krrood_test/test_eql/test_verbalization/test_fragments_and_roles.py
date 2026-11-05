@@ -247,7 +247,7 @@ def test_ordered_by_direction_fragment(handles_and_containers_world):
     query = an(
         entity(cabinet)
         .grouped_by(cabinet)
-        .ordered_by(eql.count(drawer), descending=True)
+        .ordered_by(variable=eql.count(drawer), descending=True)
     )
 
     frag = EQLVerbalizer().build(expression=query)

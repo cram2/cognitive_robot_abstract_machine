@@ -31,30 +31,30 @@ from krrood.patterns.role_predicates import IsSameSemanticEntity
 
 results: tuple[VerbalizationResult, ...] = (
     VerbalizationResult(
-        AttributeOwnerClass, "the attribute owner class of an Attribute"
+        callable_class=AttributeOwnerClass, sentence="the attribute owner class of an Attribute"
     ),
-    VerbalizationResult(IsClass, "an object is a class"),
-    VerbalizationResult(IsSubclass, "a subclass is a subclass of a parent or parents"),
-    VerbalizationResult(NodeChildren, "the node children of a CanBehaveLikeAVariable"),
+    VerbalizationResult(callable_class=IsClass, sentence="an object is a class"),
+    VerbalizationResult(callable_class=IsSubclass, sentence="a subclass is a subclass of a parent or parents"),
+    VerbalizationResult(callable_class=NodeChildren, sentence="the node children of a CanBehaveLikeAVariable"),
     VerbalizationResult(
-        NodeDescendants, "the node descendants of a SymbolicExpression"
+        callable_class=NodeDescendants, sentence="the node descendants of a SymbolicExpression"
     ),
-    VerbalizationResult(NodeId, "the node id of a SymbolicExpression"),
-    VerbalizationResult(NodeParents, "the node parents of a SymbolicExpression"),
-    VerbalizationResult(NodeType, "the node type of a Selectable"),
-    VerbalizationResult(RuntimeType, "the runtime type of an object"),
-    VerbalizationResult(HasType, "a variable is of type Integer"),
-    VerbalizationResult(HasTypes, "a variable is of type Integer or Text"),
-    VerbalizationResult(Is, "a first entity is the same object as a second entity"),
-    VerbalizationResult(Length, "the length of an iterable"),
-    VerbalizationResult(IsReachable, "a location is reachable for a body"),
-    VerbalizationResult(WorksIn, "an employee works in a department"),
+    VerbalizationResult(callable_class=NodeId, sentence="the node id of a SymbolicExpression"),
+    VerbalizationResult(callable_class=NodeParents, sentence="the node parents of a SymbolicExpression"),
+    VerbalizationResult(callable_class=NodeType, sentence="the node type of a Selectable"),
+    VerbalizationResult(callable_class=RuntimeType, sentence="the runtime type of an object"),
+    VerbalizationResult(callable_class=HasType, sentence="a variable is of type Integer"),
+    VerbalizationResult(callable_class=HasTypes, sentence="a variable is of type Integer or Text"),
+    VerbalizationResult(callable_class=Is, sentence="a first entity is the same object as a second entity"),
+    VerbalizationResult(callable_class=Length, sentence="the length of an iterable"),
+    VerbalizationResult(callable_class=IsReachable, sentence="a location is reachable for a body"),
+    VerbalizationResult(callable_class=WorksIn, sentence="an employee works in a department"),
     VerbalizationResult(
-        InheritancePathLength,
-        "the inheritance path length between a child class and a parent class",
+        callable_class=InheritancePathLength,
+        sentence="the inheritance path length between a child class and a parent class",
     ),
     VerbalizationResult(
-        IsSameSemanticEntity,
-        "a first entity is the same semantic entity as a second entity",
+        callable_class=IsSameSemanticEntity,
+        sentence="a first entity is the same semantic entity as a second entity",
     ),
 )

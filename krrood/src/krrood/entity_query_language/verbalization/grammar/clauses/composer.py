@@ -92,7 +92,7 @@ class ClauseComposer:
         salaries from lowest to highest"* span after the *"Report Employees"* selection:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         return OrderedByAssembler(context=self.context).clause(query=node)

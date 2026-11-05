@@ -38,60 +38,60 @@ def _int():
 
 
 def test_limit_without_order_first_singular():
-    assert verbalize_expression(entity(_int()).limit(1)) == "Find the first Integer"
+    assert verbalize_expression(entity(_int()).limit(n=1)) == "Find the first Integer"
 
 
 def test_limit_without_order_first_plural():
     assert (
-        verbalize_expression(entity(_int()).limit(2)) == "Find the first two Integers"
+        verbalize_expression(entity(_int()).limit(n=2)) == "Find the first two Integers"
     )
 
 
 def test_descending_self_singular_is_highest():
     v = _int()
-    q = entity(v).ordered_by(v, descending=True).limit(1)
+    q = entity(v).ordered_by(variable=v, descending=True).limit(n=1)
     assert verbalize_expression(q) == "Find the highest Integer"
 
 
 def test_descending_self_plural_is_top_n():
     v = _int()
-    q = entity(v).ordered_by(v, descending=True).limit(3)
+    q = entity(v).ordered_by(variable=v, descending=True).limit(n=3)
     assert verbalize_expression(q) == "Find the top three Integers"
 
 
 def test_ascending_self_singular_is_lowest():
     v = _int()
-    q = entity(v).ordered_by(v, descending=False).limit(1)
+    q = entity(v).ordered_by(variable=v, descending=False).limit(n=1)
     assert verbalize_expression(q) == "Find the lowest Integer"
 
 
 def test_ascending_self_plural_is_bottom_n():
     v = _int()
-    q = entity(v).ordered_by(v, descending=False).limit(3)
+    q = entity(v).ordered_by(variable=v, descending=False).limit(n=3)
     assert verbalize_expression(q) == "Find the bottom three Integers"
 
 
 def test_descending_attribute_singular_is_with_the_highest():
     e = variable(Employee, [])
-    q = entity(e).ordered_by(e.salary, descending=True).limit(1)
+    q = entity(e).ordered_by(variable=e.salary, descending=True).limit(n=1)
     assert verbalize_expression(q) == "Find the Employee with the highest salary"
 
 
 def test_descending_attribute_plural_is_top_n_by():
     e = variable(Employee, [])
-    q = entity(e).ordered_by(e.salary, descending=True).limit(3)
+    q = entity(e).ordered_by(variable=e.salary, descending=True).limit(n=3)
     assert verbalize_expression(q) == "Find the top three Employees by salary"
 
 
 def test_ascending_attribute_singular_is_with_the_lowest():
     e = variable(Employee, [])
-    q = entity(e).ordered_by(e.salary, descending=False).limit(1)
+    q = entity(e).ordered_by(variable=e.salary, descending=False).limit(n=1)
     assert verbalize_expression(q) == "Find the Employee with the lowest salary"
 
 
 def test_ascending_attribute_plural_is_bottom_n_by():
     e = variable(Employee, [])
-    q = entity(e).ordered_by(e.salary, descending=False).limit(3)
+    q = entity(e).ordered_by(variable=e.salary, descending=False).limit(n=3)
     assert verbalize_expression(q) == "Find the bottom three Employees by salary"
 
 
@@ -101,7 +101,7 @@ def test_ascending_attribute_plural_is_bottom_n_by():
 def test_limit_suppresses_the_ordered_by_clause():
     e = variable(Employee, [])
     text = verbalize_expression(
-        entity(e).ordered_by(e.salary, descending=True).limit(3)
+        entity(e).ordered_by(variable=e.salary, descending=True).limit(n=3)
     )
     assert "ordered by" not in text
     assert "from highest to lowest" not in text
@@ -113,7 +113,7 @@ def test_ordering_without_limit_reports_the_ordered_listing():
     population and keeps the ordered-by clause.
     """
     e = variable(Employee, [])
-    text = verbalize_expression(an(entity(e).ordered_by(e.salary, descending=True)))
+    text = verbalize_expression(an(entity(e).ordered_by(variable=e.salary, descending=True)))
     assert text == "Report Employees ordered by their salaries from highest to lowest"
 
 
@@ -124,7 +124,7 @@ def test_conditioned_ordering_still_reports():
     its restriction.
     """
     e = variable(Employee, [])
-    text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(e.salary)))
+    text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(variable=e.salary)))
     assert (
         text
         == "Report Employees whose salaries are greater than 5, ordered by their salaries from lowest to highest"
@@ -139,8 +139,8 @@ def test_ranking_composes_with_where_clause():
     q = (
         entity(e)
         .where(e.salary > 1000)
-        .ordered_by(e.starting_salary, descending=True)
-        .limit(3)
+        .ordered_by(variable=e.starting_salary, descending=True)
+        .limit(n=3)
     )
     assert verbalize_expression(q) == (
         "Find the top three Employees by starting_salary whose salaries are greater than 1000"
@@ -152,8 +152,8 @@ def test_plural_ranking_subject_pronominalises_as_their():
     q = (
         entity(e)
         .where(e.department.name == "Sales")
-        .ordered_by(e.salary, descending=True)
-        .limit(3)
+        .ordered_by(variable=e.salary, descending=True)
+        .limit(n=3)
     )
     text = verbalize_expression(q)
     assert "the top three Employees by salary" in text
@@ -165,8 +165,8 @@ def test_singular_ranking_subject_pronominalises_as_its():
     q = (
         entity(e)
         .where(e.department.name == "Sales")
-        .ordered_by(e.salary, descending=True)
-        .limit(1)
+        .ordered_by(variable=e.salary, descending=True)
+        .limit(n=1)
     )
     text = verbalize_expression(q)
     assert "the Employee with the highest salary" in text
@@ -181,8 +181,8 @@ def test_ranking_hierarchical_rendering():
     q = (
         entity(e)
         .where(e.salary > 1000)
-        .ordered_by(e.starting_salary, descending=True)
-        .limit(3)
+        .ordered_by(variable=e.starting_salary, descending=True)
+        .limit(n=3)
     )
     text = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=PlainFormatter())).verbalize(expression=q)
     assert text == (

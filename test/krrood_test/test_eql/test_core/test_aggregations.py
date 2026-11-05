@@ -592,7 +592,7 @@ def test_order_by_aggregation(handles_and_containers_world):
     query = an(
         entity(cabinet)
         .grouped_by(cabinet)
-        .ordered_by(eql.count(drawer), descending=True)
+        .ordered_by(variable=eql.count(drawer), descending=True)
     )
     assert query.tolist() == sorted(
         cabinet.tolist(), key=lambda c: len(c.drawers), reverse=True

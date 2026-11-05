@@ -362,10 +362,10 @@ the list). When there is more than one, the wording matches it: the verb becomes
 salaries are …"*) and a per-item value spreads to each (*"their salaries"*):
 
 ```{code-cell} ipython3
-print(verbalize_expression(an(entity(employee).ordered_by(employee.salary))))
+print(verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary))))
 
 print(verbalize_expression(
-    an(entity(employee).where(employee.salary > 5).ordered_by(employee.salary))
+    an(entity(employee).where(employee.salary > 5).ordered_by(variable=employee.salary))
 ))
 ```
 

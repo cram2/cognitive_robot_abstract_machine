@@ -632,7 +632,7 @@ class CoreferenceProcessor(RealizationPass):
         A plural subject records a plural number, so its possessive reads *"their"*:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         for frame in reversed(self._subject_stack):

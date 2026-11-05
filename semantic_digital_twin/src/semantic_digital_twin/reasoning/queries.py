@@ -77,7 +77,7 @@ def get_next_object_using_planar_distance(
         semantic_annotations_on_surfaces([supporting_surface], main_body._world)
     )
     return entity(supported_semantic_annotations).ordered_by(
-        compute_euclidean_planar_distance(
+        variable=compute_euclidean_planar_distance(
             body1=supported_semantic_annotations.bodies[0],
             body2=main_body,
             ignore_dimension=ignore_dimension,
@@ -128,7 +128,7 @@ def goal_surface_of_object(
             <= threshold,
             SupportedBy(supported=obj.bodies[0], supporting=supporting_body),
         )
-        .ordered_by(distance)
+        .ordered_by(variable=distance)
     )
     return next(
         query[supporting_surface].evaluate(),
@@ -220,5 +220,5 @@ def sort_annotations_by_volume(
             return 0.0
 
     return entity(annotaion_var).ordered_by(
-        get_volume(annotaion_var), descending=not order
+        variable=get_volume(annotaion_var), descending=not order
     )

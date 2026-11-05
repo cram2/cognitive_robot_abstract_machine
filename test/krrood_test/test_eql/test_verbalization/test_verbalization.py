@@ -1351,7 +1351,7 @@ def test_verbalize_order_by_aggregation(handles_and_containers_world):
     query = an(
         entity(cabinet)
         .grouped_by(cabinet)
-        .ordered_by(eql.count(drawer), descending=True)
+        .ordered_by(variable=eql.count(drawer), descending=True)
     )
     text = verbalize_expression(query)
 
@@ -2333,7 +2333,7 @@ def test_grouped_by_without_instantiated_variable(handles_and_containers_world):
     query = an(
         entity(cabinet)
         .grouped_by(cabinet)
-        .ordered_by(eql.count(drawer), descending=True)
+        .ordered_by(variable=eql.count(drawer), descending=True)
     )
     text = verbalize_expression(query)
     assert (

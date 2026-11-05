@@ -332,7 +332,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(a(set_of(employee.department, employee.name).ordered_by(
-        ...     employee.salary, descending=True).limit(3)))
+        ...     variable=employee.salary, descending=True).limit(n=3)))
         'Report, for the top three Employees by salary, their departments and their names'
         """
         subject = self._tuple_subject(node=node, plan=plan)
@@ -401,7 +401,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(a(set_of(employee.department, employee.name).ordered_by(
-        ...     employee.salary, descending=True).limit(3)))
+        ...     variable=employee.salary, descending=True).limit(n=3)))
         'Report, for the top three Employees by salary, their departments and their names'
         """
         if plan.discourse_root is None:
@@ -424,7 +424,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(a(set_of(employee.department, employee.name).ordered_by(
-        ...     employee.salary, descending=True).limit(3)))
+        ...     variable=employee.salary, descending=True).limit(n=3)))
         'Report, for the top three Employees by salary, their departments and their names'
         """
         if order_key is None:
@@ -440,7 +440,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
         >>> employee = variable(Employee, [])
         >>> verbalize_expression(a(set_of(employee.department, employee.name, employee.salary
-        ...     ).ordered_by(employee.salary, descending=True).limit(3)))
+        ...     ).ordered_by(variable=employee.salary, descending=True).limit(n=3)))
         'Report, for the top three Employees by salary, their departments and their names'
         """
         selected = list(node._selected_variables_)
@@ -618,7 +618,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         >>> employee = variable(Employee, [])
         >>> department = variable(Department, [])
         >>> verbalize_expression(a(set_of(employee.salary, department.name).ordered_by(
-        ...     employee.salary).limit(3)))
+        ...     variable=employee.salary).limit(n=3)))
         'Find the bottom three (the salary of an Employee, the name of a Department)'
         """
         if plan.ranking is None:
@@ -642,7 +642,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         it produces *"Report"* rather than *"Find"*:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         if plan.report is not None:
@@ -661,7 +661,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         and its possessive as *"their salaries"* rather than the singular forms:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         if plan.ranking is not None:
@@ -728,7 +728,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         reduces to *"the Robot"* and a WHERE pronominalises (*"its"* / *"their"*).
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(3))
+        >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=3))
         'Find the top three Employees by salary'
         """
         surface = ranking_surface(RankingRequest(plan=plan.ranking))
@@ -843,7 +843,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         without a ``limit`` keeps the clause; a limited set-of keeps it too (no ranking selection).
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         composer = ClauseComposer(context=self.context)

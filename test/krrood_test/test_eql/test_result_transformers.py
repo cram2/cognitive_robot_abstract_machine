@@ -36,7 +36,7 @@ def test_result_stages_reports_the_quantifier_kind():
 def test_result_stages_includes_an_ordering_stage_when_ordered():
     """An ordered query exposes an :class:`Ordering` stage carrying its direction."""
     value = variable(int, [3, 1, 2])
-    ordered_query = an(entity(value).ordered_by(value, descending=True))
+    ordered_query = an(entity(value).ordered_by(variable=value, descending=True))
 
     assert any(
         isinstance(stage, Ordering) and stage.descending

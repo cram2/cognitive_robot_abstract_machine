@@ -116,7 +116,7 @@ class RankingForm(SpecificityRule):
     a new subclass; nothing else changes (open/closed). Mirrors ``grammar/conditions/placement.py``.
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(3))
+    >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
 
     The family's alternatives are its three templates, and a descending ranking by an
@@ -158,7 +158,7 @@ class LeadingRankForm(RankingForm):
     selection itself, and the unrelated-key fallback (key suppressed).
 
     >>> robot = variable(Robot, [])
-    >>> verbalize_expression(entity(robot).limit(2))
+    >>> verbalize_expression(entity(robot).limit(n=2))
     'Find the first two Robots'
     """
 
@@ -192,7 +192,7 @@ class AttributeSuperlativeForm(LeadingRankForm):
     *"the Employee with the highest salary"* / *"… with the lowest salary"*.
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(1))
+    >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=1))
     'Find the Employee with the highest salary'
     """
 
@@ -238,7 +238,7 @@ class AttributeRankedByForm(LeadingRankForm):
     *"the bottom three Employees by salary"*.
 
     >>> employee = variable(Employee, [])
-    >>> verbalize_expression(entity(employee).ordered_by(employee.salary, descending=True).limit(3))
+    >>> verbalize_expression(entity(employee).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
     """
 
@@ -292,7 +292,7 @@ def ranking_surface(request: RankingRequest) -> RankingSurface:
 
     >>> employee = variable(Employee, [])
     >>> verbalize_expression(
-    ...     the(entity(employee)).ordered_by(employee.salary, descending=True).limit(3))
+    ...     the(entity(employee)).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
     """
     return RankingForm.most_applicable(request=request).render(request)
