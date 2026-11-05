@@ -115,6 +115,48 @@ class FromDataAccessObjectWorkItem(DataAccessObjectWorkItem):
 
 
 @dataclass
+class ObjectInheritingFromAlternativeMapping:
+    """
+    A domain object whose class inherits from an alternatively mapped class, and so
+    takes the attributes it inherits from the domain object of that class's mapping.
+    """
+
+    domain_object: Any
+    """
+    The object whose inherited attributes are set.
+    """
+
+    parent: AlternativeMapping
+    """
+    The mapping of the alternatively mapped base class, built from the object's row.
+    """
+
+    own_attribute_keys: tuple[str, ...]
+    """
+    The attributes the object's own columns and relationships set, which the parent does
+    not override.
+    """
+
+    def copy_inherited_attributes(self, parent_domain_object: Any) -> None:
+        """
+        Set every field of the object that the parent's domain object has and the
+        object's own columns and relationships do not set.
+
+        :param parent_domain_object: The domain object the parent mapping converted to.
+        """
+        for field_ in fields(self.domain_object):
+            if field_.name in self.own_attribute_keys:
+                continue
+            if not hasattr(parent_domain_object, field_.name):
+                continue
+            object.__setattr__(
+                self.domain_object,
+                field_.name,
+                getattr(parent_domain_object, field_.name),
+            )
+
+
+@dataclass
 class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkItem]):
     """
     State for converting Data Access Objects back to domain objects.
@@ -147,6 +189,14 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     that, the child can copy its inherited fields from the parent.
     """
 
+    objects_inheriting_from_alternative_mappings: list[
+        ObjectInheritingFromAlternativeMapping
+    ] = field(default_factory=list)
+    """
+    The objects of this conversion whose classes inherit from an alternatively mapped
+    class, waiting for their parent mappings to be converted.
+    """
+
     _class_dependencies: rustworkx.PyDiGraph = field(
         default_factory=lambda: rustworkx.PyDiGraph(multigraph=False)
     )
@@ -170,6 +220,14 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     `_populate_relationship` method. The keys are the ids of the instances of the
     alternative mappings and the values are descriptions of how they are referenced. The
     descriptions are MappedVariable instances from EQL.
+    """
+
+    _alternative_mappings_being_resolved: set[AlternativeMapping] = field(
+        default_factory=set
+    )
+    """
+    The alternative mappings whose conversion has started and not finished, which a
+    reference cycle leads back to.
     """
 
     _converted_alternative_mappings: dict[AlternativeMapping, Any] = field(
@@ -200,17 +258,33 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     ) -> Any:
         """
         Convert an alternative mapping to its final domain object exactly once per
-        instance.
+        instance, after the mappings of the same class its fields hold directly, so that
+        its :meth:`~AlternativeMapping.to_domain_object` sees their domain objects. The
+        class dependencies order mappings of different classes.
 
         :param alternative_mapping: The alternative mapping instance to convert.
         :return: The final domain object.
         """
-        try:
+        if alternative_mapping in self._converted_alternative_mappings:
             return self._converted_alternative_mappings[alternative_mapping]
-        except KeyError:
-            domain_object = alternative_mapping.to_domain_object()
-            self._converted_alternative_mappings[alternative_mapping] = domain_object
-            return domain_object
+
+        self._alternative_mappings_being_resolved.add(alternative_mapping)
+        for field_ in fields(alternative_mapping):
+            value = getattr(alternative_mapping, field_.name)
+            if (
+                type(value) is type(alternative_mapping)
+                and value not in self._alternative_mappings_being_resolved
+            ):
+                object.__setattr__(
+                    alternative_mapping,
+                    field_.name,
+                    self.resolve_alternative_mapping(value),
+                )
+        domain_object = alternative_mapping.to_domain_object()
+        self._alternative_mappings_being_resolved.discard(alternative_mapping)
+
+        self._converted_alternative_mappings[alternative_mapping] = domain_object
+        return domain_object
 
     def resolve_result(self, result: Any) -> Any:
         """
@@ -291,7 +365,6 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
         # add all dependencies between the classes defined from the alternative mappings
         for alternative_mapping_type in alternative_mapping_types:
-
             self._build_dependencies_of_alternative_mapping(
                 alternative_mapping_type, alternative_mapping_types, types_to_index
             )
@@ -315,10 +388,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         """
         # get all concrete types that are affected by the dependencies
         for required_domain_type in alternative_mapping.required_pre_build_classes():
-
             # for every concrete dao type discovered in the discovery phase
             for concrete_alternative_mapping in concrete_alternative_mappings:
-
                 # get the concrete domain type of the dao current dao type
                 concrete_domain_type = concrete_alternative_mapping.original_class()
 
@@ -370,3 +441,14 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
                     reference._set_external_root_instance_value_(
                         referencing_instance, domain_object
                     )
+
+    def copy_attributes_inherited_from_alternative_mappings(self) -> None:
+        """
+        Convert the parent mapping of every object whose class inherits from an
+        alternatively mapped class, and copy the inherited attributes onto the object.
+        """
+        for inheriting_object in self.objects_inheriting_from_alternative_mappings:
+            inheriting_object.copy_inherited_attributes(
+                self.resolve_alternative_mapping(inheriting_object.parent)
+            )
+        self.objects_inheriting_from_alternative_mappings.clear()
