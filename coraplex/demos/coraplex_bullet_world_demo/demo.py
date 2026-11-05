@@ -32,6 +32,11 @@ from krrood.entity_query_language.factories import (
     entity,
     variable,
 )
+from semantic_digital_twin.adapters.package_resolver import (
+    CompositePathResolver,
+    PackageUriResolver,
+    SearchPathFileResolver,
+)
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
 )
@@ -67,22 +72,27 @@ from semantic_digital_twin.world import World
 
 class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from, under the coraplex resources.
+    The files the demonstration builds its scene from, under the coraplex resources or
+    in a ROS package.
     """
 
     APARTMENT = os.path.join("worlds", "apartment.urdf")
-    MILK = os.path.join("objects", "milk.stl")
-    BOWL = os.path.join("objects", "bowl.stl")
-    SPOON = os.path.join("objects", "spoon.stl")
+    MILK = "package://iai_objects/objects/milk.stl"
+    BOWL = "package://iai_objects/objects/bowl.stl"
+    SPOON = "package://iai_objects/objects/spoon.stl"
 
     @property
     def path(self) -> str:
         """
         :return: Where the file is read from.
         """
-        return os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", self.value
-        )
+        resources = os.path.join(os.path.dirname(__file__), "..", "..", "resources")
+        return CompositePathResolver(
+            resolvers=[
+                SearchPathFileResolver(root_directories=[resources]),
+                PackageUriResolver(),
+            ]
+        ).resolve(self.value)
 
 
 class ApartmentBody(StrEnum):

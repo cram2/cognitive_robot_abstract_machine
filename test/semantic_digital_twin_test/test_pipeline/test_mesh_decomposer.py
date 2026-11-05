@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from semantic_digital_twin.adapters.mesh import STLParser
@@ -15,16 +13,7 @@ from semantic_digital_twin.world_description.geometry import Box
 
 @pytest.fixture(scope="function")
 def jeroen_cup_world_fixture():
-    stl_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "stl",
-    )
-    world = STLParser(os.path.join(stl_dir, "jeroen_cup.stl")).parse()
+    world = STLParser("package://iai_objects/objects/jeroen_cup.stl").parse()
     world.root.name = PrefixedName("root")
     return world
 

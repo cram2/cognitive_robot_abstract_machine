@@ -133,9 +133,7 @@ from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 spoon = STLParser(
-    os.path.join(
-        os.path.dirname(coraplex.__file__), "..", "..", "resources", "objects", "spoon.stl"
-    )
+    "package://iai_objects/objects/spoon.stl"
 ).parse()
 
 with world.modify_world():

@@ -1,5 +1,6 @@
 import math
 import os
+import shutil
 import tracemalloc
 from importlib.resources import files
 from pathlib import Path
@@ -12,6 +13,7 @@ from trimesh.visual import TextureVisuals
 from trimesh.visual.material import SimpleMaterial
 
 from krrood.adapters.json_serializer import from_json, to_json
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
@@ -242,20 +244,27 @@ def test_per_vertex_colors_survive_serialization_unwelded(tmp_path):
     )
 
 
-def test_serialization_reproduces_the_same_mesh():
+@pytest.fixture
+def milk_file_outside_any_package(tmp_path) -> Path:
+    """
+    :return: A copy of the milk carton mesh outside any ROS package, which a mesh
+        serializes with its geometry.
+    """
+    milk_file = tmp_path / "milk.stl"
+    shutil.copy(
+        PackageUriResolver().resolve("package://iai_objects/objects/milk.stl"),
+        milk_file,
+    )
+    return milk_file
+
+
+def test_serialization_reproduces_the_same_mesh(milk_file_outside_any_package):
     """
     A deserialized mesh is the mesh that was serialized, not a differently tessellated
     reading of the same file: same vertices, same faces, and the same answer to whether
     it bounds a volume.
     """
-    original = Mesh(
-        filename=os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "stl",
-            "milk.stl",
-        )
-    )
+    original = Mesh(filename=str(milk_file_outside_any_package))
 
     restored = Mesh.from_json(original.to_json())
 
@@ -270,19 +279,14 @@ def test_serialization_reproduces_the_same_mesh():
     assert restored.mesh.is_volume == original.mesh.is_volume
 
 
-def test_serialization_preserves_watertightness_of_a_closed_mesh():
+def test_serialization_preserves_watertightness_of_a_closed_mesh(
+    milk_file_outside_any_package,
+):
     """
     Volume and boolean operations need a watertight mesh, so a closed mesh must still
     bound a volume after a round-trip.
     """
-    original = Mesh(
-        filename=os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "stl",
-            "milk.stl",
-        )
-    )
+    original = Mesh(filename=str(milk_file_outside_any_package))
     assert original.mesh.is_volume
 
     restored = Mesh.from_json(original.to_json())
@@ -542,6 +546,27 @@ def test_a_shape_survives_a_json_round_trip(shape):
 
     assert restored == shape
     assert restored.to_json() == payload
+
+
+# %% meshes of a ROS package in json
+
+
+def test_a_mesh_in_a_package_is_serialized_without_its_geometry(installed_mesh_file):
+    payload = Mesh(filename=str(installed_mesh_file)).to_json()
+
+    assert "mesh" not in payload
+
+
+def test_a_received_package_mesh_reads_the_file_of_the_receiving_install(
+    mesh_package_installer, tmp_path
+):
+    sender_file = mesh_package_installer(tmp_path / "sender")
+    payload = Mesh(filename=str(sender_file)).to_json()
+    receiver_file = mesh_package_installer(tmp_path / "receiver")
+
+    received = Mesh.from_json(payload)
+
+    assert received.local_file == receiver_file
 
 
 # %% a prism of equilateral cross-section

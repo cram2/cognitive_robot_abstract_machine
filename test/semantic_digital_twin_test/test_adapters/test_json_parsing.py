@@ -1,5 +1,4 @@
 import json
-import os
 from copy import deepcopy
 
 import numpy as np
@@ -428,22 +427,7 @@ def test_transformation_matrix_json_serialization_with_world_in_kwargs():
 
 
 def test_json_serialization_with_mesh():
-    body: Body = (
-        STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "..",
-                "semantic_digital_twin",
-                "resources",
-                "stl",
-                "milk.stl",
-            )
-        )
-        .parse()
-        .root
-    )
+    body: Body = STLParser("package://iai_objects/objects/milk.stl").parse().root
 
     json_data = to_json(body)
     body2 = from_json(json_data)
@@ -462,9 +446,9 @@ def test_json_serialization_with_mesh():
 # %% connection references survive same-name ambiguity
 
 
-def _world_with_two_equally_named_connections() -> (
-    tuple[World, RevoluteConnection, RevoluteConnection]
-):
+def _world_with_two_equally_named_connections() -> tuple[
+    World, RevoluteConnection, RevoluteConnection
+]:
     """
     A world holding two revolute connections that share one name.
 

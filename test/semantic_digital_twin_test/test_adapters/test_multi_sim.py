@@ -794,16 +794,7 @@ def test_mujoco_with_tracy_dae_files():
 
 
 def test_mujocosim_world_with_added_objects(test_urdf_1_world):
-    milk_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "stl",
-        "milk.stl",
-    )
+    milk_path = "package://iai_objects/objects/milk.stl"
     stl_parser = STLParser(milk_path)
     mesh_world = stl_parser.parse()
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1090,9 +1081,9 @@ def test_world_sim_state_sync():
         falling_box, box_connection = spawn_state_sync_scene(world)
 
         body_names = multi_sim.simulator.get_all_body_names().result
-        assert {"ground_plane", "falling_box"}.issubset(
-            body_names
-        ), f"scene bodies were not spawned in the simulator; bodies={body_names}"
+        assert {"ground_plane", "falling_box"}.issubset(body_names), (
+            f"scene bodies were not spawned in the simulator; bodies={body_names}"
+        )
 
         box_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=float(init_pos[0]),
@@ -1532,9 +1523,9 @@ def test_pose_written_during_sim_to_world_pull_reaches_the_simulator():
 
     def blocking_read(connection, qpos_address):
         pull_is_inside.set()
-        assert let_pull_finish.wait(
-            timeout=10
-        ), "test did not release the sim → world pull"
+        assert let_pull_finish.wait(timeout=10), (
+            "test did not release the sim → world pull"
+        )
         return original_read(connection, qpos_address)
 
     write_failed = []

@@ -103,20 +103,9 @@ def setup_world() -> World:
             "apartment.urdf",
         )
     ).parse()
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", "objects", "milk.stl"
-        )
-    ).parse()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").parse()
     cereal_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "resources",
-            "objects",
-            "breakfast_cereal.stl",
-        )
+        "package://iai_objects/objects/breakfast_cereal.stl"
     ).parse()
     # apartment_world.merge_world(pr2_sem_world)
     apartment_world.merge_world(milk_world)
@@ -133,10 +122,10 @@ def setup_world() -> World:
             1.5, 2.5, 0, reference_frame=apartment_root
         )
 
-    apartment_world.get_body_by_name("milk.stl").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.0345, reference_frame=apartment_world.root
-        )
+    apartment_world.get_body_by_name(
+        "milk.stl"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        2.37, 2, 1.0345, reference_frame=apartment_world.root
     )
     apartment_world.get_body_by_name(
         "breakfast_cereal.stl"

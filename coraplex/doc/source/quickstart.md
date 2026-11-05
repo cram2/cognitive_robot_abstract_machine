@@ -40,13 +40,13 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
 apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").parse()
-milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").parse()
+milk_world = STLParser("package://iai_objects/objects/milk.stl").parse()
 pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").parse()
 ```
 
 ```{note}
-The PR2 description is resolved from the `iai_pr2_description` ROS package rather than a file shipped with
-CoraPlex. CoraPlex itself only bundles `resources/worlds` and `resources/objects`.
+The PR2 description and the milk mesh are resolved from the `iai_pr2_description` and `iai_objects` ROS packages
+rather than files shipped with CoraPlex. CoraPlex itself only bundles `resources/worlds`.
 ```
 
 As you might have noticed each of the parsers returns an independent world which is not really useful. Therefore we need to

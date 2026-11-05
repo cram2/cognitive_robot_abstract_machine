@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing_extensions import Any
 
-import coraplex as _coraplex_pkg
 import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 import krrood.entity_query_language.factories as eql
 from giskardpy.motion_statechart.data_types import LifeCycleValues
@@ -71,7 +70,6 @@ from experiments.experiment_definitions import (
     TypstRenderer,
 )
 
-_CORAPLEX_RESOURCES = Path(_coraplex_pkg.__file__).parent.parent.parent / "resources"
 _DATABASE_PATH = Path(__file__).parent / "querying.db"
 
 
@@ -159,8 +157,8 @@ def build_plan() -> Plan:
     """
     world = setup_world()
 
-    spoon = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "spoon.stl")).parse()
-    bowl = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "bowl.stl")).parse()
+    spoon = STLParser("package://iai_objects/objects/spoon.stl").parse()
+    bowl = STLParser("package://iai_objects/objects/bowl.stl").parse()
 
     with world.modify_world():
         world.merge_world_at_pose(
@@ -283,9 +281,7 @@ def _q_total_duration(plan: Plan) -> BehaviourQuery:
         query=eql.set_of(
             min_start := eql.min(n.start_time),
             max_end := eql.max(n.end_time),
-        ).where(
-            n.start_time != None, n.end_time != None
-        ),  # noqa: E711
+        ).where(n.start_time != None, n.end_time != None),  # noqa: E711
     )
 
 

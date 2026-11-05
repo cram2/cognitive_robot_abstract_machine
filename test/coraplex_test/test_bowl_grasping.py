@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 from numpy.typing import NDArray
 import pytest
@@ -20,13 +18,7 @@ from ..conftest import SAMPLING_SEED
 
 # %% fixtures
 
-BOWL_MESH = str(
-    Path(__file__).resolve().parents[2]
-    / "coraplex"
-    / "resources"
-    / "objects"
-    / "bowl.stl"
-)
+BOWL_MESH = "package://iai_objects/objects/bowl.stl"
 """
 The bowl the demos transport, an irregular scan rather than a turned shape.
 """

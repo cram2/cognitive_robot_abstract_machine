@@ -115,6 +115,9 @@ class MJCFParser(WorldModelParser):
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
+        for mesh in self.spec.meshes:
+            if package_uri_resolver.supports(mesh.file):
+                mesh.file = package_uri_resolver.resolve(mesh.file)
 
     @cached_property
     def resolved_document(self) -> ET.Element:
@@ -723,9 +726,9 @@ class MJCFParser(WorldModelParser):
             joint_name = mujoco_actuator.target
             connection = self.world.get_connection_by_name(joint_name)
             dofs = list(connection.dofs)
-            assert (
-                len(dofs) == 1
-            ), f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
+            assert len(dofs) == 1, (
+                f"Actuator {actuator_name} is associated with joint {joint_name} which has {len(connection.dofs)} DOFs, but only single-DOF joints are supported for actuators."
+            )
             actuator.add_dof(dofs[0])
         else:
             actuator.add_dof(

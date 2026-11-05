@@ -193,9 +193,9 @@ resources = Path(files("semantic_digital_twin")).parent.parent / "resources"
 
 world = World.create_with_root_body()
 
-# A mesh body, loaded from file.
+# A mesh body, loaded from a ROS package.
 milk_mesh = BodySpecification.mesh(
-    name="milk_mesh", filename=str(resources / "stl" / "milk.stl")
+    name="milk_mesh", filename="package://iai_objects/objects/milk.stl"
 ).spawn(world)
 
 # A hollow crate: the outer box minus the carved-out interior, expressed as one event.

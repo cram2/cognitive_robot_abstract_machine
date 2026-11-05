@@ -16,11 +16,9 @@ directories.
 from __future__ import annotations
 
 import math
-import os
 from dataclasses import dataclass
 from enum import Enum, IntEnum, StrEnum
 
-from ament_index_python.packages import get_package_share_directory
 
 from coraplex.datastructures.dataclasses import Context
 from coraplex.datastructures.enums import ExecutionType
@@ -50,40 +48,23 @@ from semantic_digital_twin.world import World
 
 class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from.
+    The files the demonstration builds its scene from, as ``package://`` URIs.
     """
 
-    APARTMENT = os.path.join("mjcf", "scene-bodies.xml")
+    APARTMENT = "package://iai_garmi_apartment/mjcf/scene-bodies.xml"
     """
-    The apartment scene GARMI acts in, in the ``iai_garmi_apartment`` package.
-    """
-
-    BOWL = os.path.join("objects", "bowl.stl")
-    """
-    The bowl's mesh, under the coraplex resources.
+    The apartment scene GARMI acts in.
     """
 
-    SPOON = os.path.join("objects", "spoon.stl")
+    BOWL = "package://iai_objects/objects/bowl.stl"
     """
-    The spoon's mesh, under the coraplex resources.
+    The bowl's mesh.
     """
 
-    @property
-    def path(self) -> str:
-        """
-        :return: Where the file is read from.
-        """
-        if self is SceneFile.APARTMENT:
-            return os.path.join(
-                get_package_share_directory("iai_garmi_apartment"), self.value
-            )
-        return os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "..",
-            "resources",
-            self.value,
-        )
+    SPOON = "package://iai_objects/objects/spoon.stl"
+    """
+    The spoon's mesh.
+    """
 
 
 class SceneBody(StrEnum):
@@ -244,7 +225,7 @@ class GarmiApartmentDemonstration(RobotDemonstration):
         :return: The apartment's MuJoCo scene.
         """
         return WorldSpecification.from_mjcf(
-            SceneFile.APARTMENT.path, use_visual_as_collision_backup=True
+            SceneFile.APARTMENT, use_visual_as_collision_backup=True
         )
 
     def robot_specification(self) -> RobotSpecification:
@@ -259,9 +240,7 @@ class GarmiApartmentDemonstration(RobotDemonstration):
         )
 
     def is_scene_populated(self, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(
-            SceneBody.APARTMENT
-        )
+        return world.is_kinematic_structure_entity_in_world_by_name(SceneBody.APARTMENT)
 
     def populate_scene(self, world: World) -> None:
         """
@@ -284,7 +263,7 @@ class GarmiApartmentDemonstration(RobotDemonstration):
             SceneBody.BOWL,
             BodySpecification.mesh(
                 SceneBody.BOWL,
-                SceneFile.BOWL.path,
+                SceneFile.BOWL,
                 parent_T_self=ScenePose.BOWL_START.value.transform,
             ),
             parent_connection_specification=Connection6DoFSpecification(),
@@ -298,7 +277,7 @@ class GarmiApartmentDemonstration(RobotDemonstration):
             SceneBody.SPOON,
             BodySpecification.mesh(
                 SceneBody.SPOON,
-                SceneFile.SPOON.path,
+                SceneFile.SPOON,
                 parent_T_self=ScenePose.SPOON_START.value.transform,
             ),
             parent_connection_specification=Connection6DoFSpecification(),

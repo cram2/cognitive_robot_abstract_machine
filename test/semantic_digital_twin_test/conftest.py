@@ -9,9 +9,12 @@ regenerate_orm_interfaces()
 
 
 import os
+import shutil
+from pathlib import Path
 
 import pytest
 import sqlalchemy
+from typing_extensions import Callable
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
@@ -20,6 +23,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
 )
 from krrood.ormatic.utils import create_engine, drop_database
 from krrood.utils import recursive_subclasses
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 
 from semantic_digital_twin.world import World
@@ -69,3 +73,40 @@ def table_world():
     table_path = os.path.join(urdf_dir, "table.urdf")
 
     return URDFParser.from_file(file_path=table_path).parse()
+
+
+# %% ROS packages holding mesh files
+
+
+@pytest.fixture
+def mesh_package_installer(monkeypatch) -> Callable[[Path], Path]:
+    """
+    :return: A function that installs the package ``mesh_package``, holding a copy of
+        the jeroen cup, into the ament prefix it is given, makes that prefix the only
+        one searched and returns the installed mesh file.
+    """
+    jeroen_cup = Path(
+        PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl")
+    )
+
+    def install(prefix: Path) -> Path:
+        share = prefix / "share"
+        package_index = share / "ament_index" / "resource_index" / "packages"
+        package_index.mkdir(parents=True)
+        (package_index / "mesh_package").touch()
+        mesh_file = share / "mesh_package" / "meshes" / jeroen_cup.name
+        mesh_file.parent.mkdir(parents=True)
+        shutil.copy(jeroen_cup, mesh_file)
+        monkeypatch.setenv("AMENT_PREFIX_PATH", str(prefix))
+        return mesh_file
+
+    return install
+
+
+@pytest.fixture
+def installed_mesh_file(mesh_package_installer, tmp_path) -> Path:
+    """
+    :return: A mesh file in the share directory of the package ``mesh_package``, which
+        is registered in an ament prefix.
+    """
+    return mesh_package_installer(tmp_path)

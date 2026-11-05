@@ -55,7 +55,6 @@ CallbackT = TypeVar("CallbackT", bound=Callback)
 """
 The kind of publisher a test started.
 """
-
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
@@ -81,7 +80,6 @@ from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.mmp_dresden import MMPDresden
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
-
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Table,
@@ -131,44 +129,42 @@ from semantic_digital_twin.world_description.world_entity import (
     Body,
     Region,
 )
-
 ###############################
 ### Fixture Usage Guide #######
 ###############################
 
 """
-This file composes the Pytest fixtures for all tests in the monorepo. 
+This file composes the Pytest fixtures for all tests in the monorepo.
+
 Some basic facts about fixtures:
- * conftest.py and test directories inherit the fixtures from contests from upper directories 
- * Fixtures can be scoped, possible values are: function, class, module, package, session 
- * Fixtures can use other fixtures 
+ * conftest.py and test directories inherit the fixtures from contests from upper directories
+ * Fixtures can be scoped, possible values are: function, class, module, package, session
+ * Fixtures can use other fixtures
     * This only works the requesting fixture is scoped less or equal the the requested fixture (function requesting session works)
- * The return/yield value of fixtures is being cached. 
+ * The return/yield value of fixtures is being cached.
     * In case of worlds this is important since always the same world is returned by a session scoped fixture
 
 General Remarks:
     * Apparently generating the robot semantic view takes some time so it should be done in the session scoped setup
 
-The structure of fixtures in this conftest: 
-    * World setup fixtures: 
+The structure of fixtures in this conftest:
+    * World setup fixtures:
         These setup a world and return it, they are scoped for a whole session
-         THEY SHOULD NOT BE USED DIRECTLY! 
-         This is the case since the returned world will always be the same and changing the state or model of it will 
+         THEY SHOULD NOT BE USED DIRECTLY!
+         This is the case since the returned world will always be the same and changing the state or model of it will
          cause side effects in other tests. They can only be used if the test does not change the state or model
-    * Merging setup fixtures: 
-        These combine one or more different worlds from other fixtures. 
-        THEY SHOULD NOT BE USED DIRECTLY 
-        for the same reason as the world setup fixtures. 
+    * Merging setup fixtures:
+        These combine one or more different worlds from other fixtures.
+        THEY SHOULD NOT BE USED DIRECTLY
+        for the same reason as the world setup fixtures.
     * State reset fixture:
-        This fixtures are scoped for functions and reset the state between tests runs. 
+        This fixtures are scoped for functions and reset the state between tests runs.
         THEY CAN BE USED FOR TESTS THAT ONLY CHANGE THE STATE
-        Since resetting the state between test runs is easy this is the most common fixture for tests 
-    * Model changing fixtures: 
-        This fixtures are scoped for functions, they are a copy of the world from the world setup and are discarded 
-        after the test since there is no good method to reset the model after a test has changed it. 
-
+        Since resetting the state between test runs is easy this is the most common fixture for tests
+    * Model changing fixtures:
+        This fixtures are scoped for functions, they are a copy of the world from the world setup and are discarded
+        after the test since there is no good method to reset the model after a test has changed it.
 """
-
 
 # %% repeatable location samples
 
@@ -176,7 +172,6 @@ SAMPLING_SEED = 0
 """
 The sampling seed of every plan context the tests build, so location samples repeat.
 """
-
 
 LIVING_WORLDS = pytest.StashKey[LivingWorlds]()
 """
@@ -288,7 +283,10 @@ def mini_world() -> World:
 
 @pytest.fixture()
 def world_with_two_bodies() -> tuple[World, Body, Body]:
-    """A fresh world with an unconnected parent and child body, ready to receive a connection."""
+    """
+    A fresh world with an unconnected parent and child body, ready to receive a
+    connection.
+    """
     world = World()
     parent = Body(name=PrefixedName("parent"))
     child = Body(name=PrefixedName("child"))
@@ -647,36 +645,11 @@ def _apartment_world_setup():
             "apartment.urdf",
         )
     ).parse()
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "milk.stl",
-        )
-    ).parse()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").parse()
     cereal_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "breakfast_cereal.stl",
-        )
+        "package://iai_objects/objects/breakfast_cereal.stl"
     ).parse()
-    spoon_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "spoon.stl",
-        )
-    ).parse()
+    spoon_world = STLParser("package://iai_objects/objects/spoon.stl").parse()
 
     apartment_world.merge_world_at_pose(
         milk_world,
@@ -900,16 +873,7 @@ def _simple_apartment_setup():
         world.add_connection(wall_3_connection)
         world.add_connection(wall_4_connection)
 
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "milk.stl",
-        )
-    ).parse()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").parse()
     world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
@@ -1022,9 +986,9 @@ def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     apartment_copy = deepcopy(_apartment_world_setup)
 
     pr2_copy.merge_world(apartment_copy)
-    pr2_copy.get_body_by_name("base_footprint").parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
-    )
+    pr2_copy.get_body_by_name(
+        "base_footprint"
+    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     return pr2_copy
 
 
@@ -1171,7 +1135,9 @@ def init_rospy():
 @pytest.fixture(scope="function")
 def rclpy_node():
     """
-    You can use this fixture if you want to use the marker visualizer of semDT and need a ros node.
+    You can use this fixture if you want to use the marker visualizer of semDT and need
+    a ros node.
+
     ..warning::
         This fixture can not be used in multiple tests at once
     """

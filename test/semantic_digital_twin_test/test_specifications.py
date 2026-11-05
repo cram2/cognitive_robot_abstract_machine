@@ -338,7 +338,9 @@ def test_world_specification_from_gazebo_environment():
         lambda: BodySpecification.box("shape", Scale(1, 1, 1)),
         lambda: BodySpecification.sphere("shape", 0.5),
         lambda: BodySpecification.cylinder("shape", 0.4, 1.0),
-        lambda: BodySpecification.mesh("shape", str(RESOURCES / "stl" / "milk.stl")),
+        lambda: BodySpecification.mesh(
+            "shape", "package://iai_objects/objects/milk.stl"
+        ),
     ],
 )
 def test_shape_constructors_spawn(empty_world, make_spec):
@@ -362,7 +364,7 @@ def test_from_event_constructor_spawns(empty_world):
         lambda pose: BodySpecification.sphere("shape", 0.5, parent_T_self=pose),
         lambda pose: BodySpecification.cylinder("shape", 0.4, 1.0, parent_T_self=pose),
         lambda pose: BodySpecification.mesh(
-            "shape", str(RESOURCES / "stl" / "milk.stl"), parent_T_self=pose
+            "shape", "package://iai_objects/objects/milk.stl", parent_T_self=pose
         ),
         lambda pose: BodySpecification.from_event(
             "shape",
@@ -1754,8 +1756,12 @@ def _factory_overrides():
         for method_name, method in vars(annotation_type).items():
             if not method_name.startswith("create_with_new_"):
                 continue
-            yield annotation_type, method_name, inspect.signature(
-                method.__func__ if isinstance(method, classmethod) else method
+            yield (
+                annotation_type,
+                method_name,
+                inspect.signature(
+                    method.__func__ if isinstance(method, classmethod) else method
+                ),
             )
 
 

@@ -34,7 +34,6 @@ class HomogeneousTransformationMatrixToRos2Converter(
         HomogeneousTransformationMatrix, geometry_msgs.TransformStamped
     ]
 ):
-
     @classmethod
     def convert(
         cls, data: HomogeneousTransformationMatrix
@@ -60,7 +59,6 @@ class HomogeneousTransformationMatrixToRos2Converter(
 
 @dataclass
 class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseStamped]):
-
     @classmethod
     def convert(cls, data: Pose) -> geometry_msgs.PoseStamped:
         result = geometry_msgs.PoseStamped()
@@ -82,7 +80,6 @@ class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseSt
 
 @dataclass
 class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
-
     @classmethod
     def convert(cls, data: Pose) -> geometry_msgs.Pose:
         result = geometry_msgs.Pose()
@@ -102,7 +99,6 @@ class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
 
 @dataclass
 class Point3ToRos2Converter(SemDTToRos2Converter[Point3, geometry_msgs.PointStamped]):
-
     @classmethod
     def convert(cls, data: Point3) -> geometry_msgs.PointStamped:
         point_stamped = geometry_msgs.PointStamped()
@@ -119,7 +115,6 @@ class Point3ToRos2Converter(SemDTToRos2Converter[Point3, geometry_msgs.PointStam
 class Vector3ToRos2Converter(
     SemDTToRos2Converter[Vector3, geometry_msgs.Vector3Stamped]
 ):
-
     @classmethod
     def convert(cls, data: Vector3) -> geometry_msgs.Vector3Stamped:
         vector_stamped = geometry_msgs.Vector3Stamped()
@@ -136,7 +131,6 @@ class Vector3ToRos2Converter(
 class QuaternionToRos2Converter(
     SemDTToRos2Converter[Quaternion, geometry_msgs.QuaternionStamped]
 ):
-
     @classmethod
     def convert(cls, data: Quaternion) -> geometry_msgs.QuaternionStamped:
         vector_stamped = geometry_msgs.QuaternionStamped()
@@ -151,7 +145,6 @@ class QuaternionToRos2Converter(
 
 @dataclass
 class ColorToRos2Converter(SemDTToRos2Converter[Color, ColorRGBA]):
-
     @classmethod
     def convert(cls, data: Color) -> ColorRGBA:
         return std_msgs.ColorRGBA(r=data.R, g=data.G, b=data.B, a=data.A)
@@ -159,7 +152,6 @@ class ColorToRos2Converter(SemDTToRos2Converter[Color, ColorRGBA]):
 
 @dataclass
 class ShapeToRos2Converter(SemDTToRos2Converter[InputType, Marker]):
-
     @classmethod
     def convert(cls, data: InputType) -> Marker:
         marker = visualization_msgs.Marker()
@@ -172,7 +164,6 @@ class ShapeToRos2Converter(SemDTToRos2Converter[InputType, Marker]):
 
 @dataclass
 class BoxToRos2Converter(ShapeToRos2Converter[Box]):
-
     @classmethod
     def convert(cls, data: Box) -> Marker:
         marker = super().convert(data)
@@ -185,7 +176,6 @@ class BoxToRos2Converter(ShapeToRos2Converter[Box]):
 
 @dataclass
 class CylinderToRos2Converter(ShapeToRos2Converter[Cylinder]):
-
     @classmethod
     def convert(cls, data: Cylinder) -> Marker:
         marker = super().convert(data)
@@ -198,7 +188,6 @@ class CylinderToRos2Converter(ShapeToRos2Converter[Cylinder]):
 
 @dataclass
 class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
-
     @classmethod
     def convert(cls, data: Sphere) -> Marker:
         marker = super().convert(data)
@@ -211,7 +200,6 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 
 @dataclass
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
-
     @classmethod
     def mesh_resource_of(cls, mesh: Mesh) -> str:
         """
@@ -219,13 +207,10 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
             directory, so the receiving machine resolves it in its own install;
             otherwise a ``file://`` URI.
         """
-        if mesh.filename.startswith("package://"):
-            return mesh.filename
-        parts = mesh.local_file.parts
-        if "share" not in parts[:-2]:
+        package_uri = mesh.package_uri
+        if package_uri is None:
             return "file://" + str(mesh.local_file)
-        share_index = len(parts) - 1 - parts[::-1].index("share")
-        return "package://" + "/".join(parts[share_index + 1 :])
+        return package_uri
 
     @classmethod
     def convert(cls, data: Mesh) -> Marker:

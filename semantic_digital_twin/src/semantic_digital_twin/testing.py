@@ -2,8 +2,6 @@ import os
 
 import pytest
 from dataclasses import dataclass, field
-from importlib.resources import files
-from pathlib import Path
 from typing_extensions import Optional, Tuple
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -147,12 +145,7 @@ def world_setup_simple():
             [
                 Mesh(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
-                    filename=os.path.join(
-                        Path(files("semantic_digital_twin")).parent.parent,
-                        "resources",
-                        "stl",
-                        "jeroen_cup.stl",
-                    ),
+                    filename="package://iai_objects/objects/jeroen_cup.stl",
                     scale=Scale(10, 10, 10),
                 )
             ]
