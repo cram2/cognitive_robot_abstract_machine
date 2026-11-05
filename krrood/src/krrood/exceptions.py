@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import types
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import KW_ONLY, dataclass, field
 from typing_extensions import Any, Protocol
 
 
@@ -26,6 +26,86 @@ class CanBehaveLikeDataclassException(Protocol):
         """
 
 
+# %% exception chaining
+
+
+@dataclass
+class ExceptionChainLink(ABC):
+    """
+    A link from an exception to another one in its chain, exposed as a dataclass field so
+    that it can be given at construction and is persisted and serialized with the
+    exception.
+    """
+
+    @abstractmethod
+    def read(self, exception: BaseException) -> BaseException | None:
+        """
+        :param exception: The exception the link starts at.
+        :return: The exception the link points to, if any.
+        """
+
+    @abstractmethod
+    def write(self, exception: BaseException, linked: BaseException | None) -> None:
+        """
+        Let the link of the exception point to another exception.
+
+        :param exception: The exception the link starts at.
+        :param linked: The exception the link points to.
+        """
+
+    def __get__(
+        self, exception: BaseException | None, owner: type | None = None
+    ) -> BaseException | None:
+        """
+        :return: The linked exception, or ``None`` when accessed on the class, which is
+            the default of the dataclass field.
+        """
+        if exception is None:
+            return None
+        return self.read(exception)
+
+    def __set__(self, exception: BaseException, linked: BaseException | None) -> None:
+        """
+        Point the link to the exception, unless it already does.
+
+        .. note:: Writing the cause also suppresses the context in tracebacks, so the
+            default must not be written into a freshly constructed exception.
+        """
+        if linked is self.read(exception):
+            return
+        self.write(exception, linked)
+
+
+@dataclass
+class CauseLink(ExceptionChainLink):
+    """
+    The link to the exception that an exception was raised from with ``raise ... from``.
+    """
+
+    def read(self, exception: BaseException) -> BaseException | None:
+        return exception.__cause__
+
+    def write(self, exception: BaseException, linked: BaseException | None) -> None:
+        exception.__cause__ = linked
+
+
+@dataclass
+class ContextLink(ExceptionChainLink):
+    """
+    The link to the exception that was being handled when an exception was raised,
+    recorded whether or not ``raise ... from`` was used.
+    """
+
+    def read(self, exception: BaseException) -> BaseException | None:
+        return exception.__context__
+
+    def write(self, exception: BaseException, linked: BaseException | None) -> None:
+        exception.__context__ = linked
+
+
+# %% dataclass exceptions
+
+
 @dataclass
 class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
     """
@@ -39,6 +119,18 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
     print_stack_trace: bool = field(default=True, kw_only=True)
     """
     Whether the stack trace of this exception should be printed when it is handled.
+    """
+
+    _: KW_ONLY
+
+    raised_from: Exception | None = CauseLink()
+    """
+    The exception this one was raised from with ``raise ... from``, if any.
+    """
+
+    raised_while_handling: Exception | None = ContextLink()
+    """
+    The exception that was being handled when this one was raised, if any.
     """
 
     def __post_init__(self):
