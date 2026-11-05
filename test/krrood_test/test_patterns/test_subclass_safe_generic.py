@@ -105,17 +105,17 @@ def test_resolving_generic_type_preserves_parent_field_kwargs():
 
 def test_recreated_field_with_built_in_type_is_preserved_when_resolving_generic_type():
     cls = SubClassGenericThatRecreatesAField
-    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls)
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=True)
 
 
 def test_recreated_field_with_non_builtin_type_is_preserved_when_resolving_generic_type():
     cls = SubClassGenericThatRecreatesAFieldWithNonBuiltInType
-    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls)
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=True)
 
 
 def test_recreated_field_with_var_type_is_preserved_when_resolving_generic_type():
     cls = SubClassGenericThatRecreatesAFieldWithAnotherVar
-    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls)
+    assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=True)
 
 
 def assert_field_kwargs_are_preserved_when_resolving_generic_type(cls, kw_only=False):
