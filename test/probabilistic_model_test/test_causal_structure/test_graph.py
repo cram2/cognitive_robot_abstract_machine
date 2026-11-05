@@ -123,14 +123,59 @@ def test_graph_round_trips_through_json():
 # %% the nodes of a relational graph
 
 
-def test_variable_of_part_names_the_indexed_copy():
-    node = GraphNode(
+def disturbed_neighbour() -> GraphNode:
+    """
+    :return: The node of an attribute every neighbour of a scene has.
+    """
+    return GraphNode(
         variable=Continuous("Scene.neighbours.disturbed"),
         level=NodeLevel.PART_ATTRIBUTE,
         collection="neighbours",
     )
 
-    assert node.variable_of_part(3).name == "Scene.neighbours[3].disturbed"
+
+def test_variable_of_part_names_the_indexed_copy():
+    assert (
+        disturbed_neighbour().variable_of_part(3).name
+        == "Scene.neighbours[3].disturbed"
+    )
+
+
+def test_part_index_of_reads_the_position_back_from_the_copy():
+    node = disturbed_neighbour()
+
+    assert node.part_index_of(node.variable_of_part(3).name) == 3
+
+
+@pytest.mark.parametrize(
+    "variable_name",
+    [
+        "Scene.neighbours.disturbed",
+        "Scene.obstacles[3].disturbed",
+        "Scene.neighbours[3].displacement",
+        "Scene.neighbours[first].disturbed",
+    ],
+)
+def test_part_index_of_is_none_for_a_variable_that_is_no_copy(variable_name):
+    assert disturbed_neighbour().part_index_of(variable_name) is None
+
+
+def test_part_index_of_is_none_for_a_node_of_no_part():
+    node = GraphNode(
+        variable=Continuous("Scene.friction"), level=NodeLevel.EXAMPLE_ATTRIBUTE
+    )
+
+    assert node.part_index_of("Scene.neighbours[3].disturbed") is None
+
+
+def test_reference_of_a_copy_names_the_node_and_the_part():
+    node = disturbed_neighbour()
+    graph = CausalGraph.from_edges([node], [])
+
+    reference = graph.reference_of(node.variable_of_part(3).name)
+
+    assert (reference.node, reference.part_index) == (node, 3)
+    assert reference.variable == node.variable_of_part(3)
 
 
 # %% cells for the support of an adjustment

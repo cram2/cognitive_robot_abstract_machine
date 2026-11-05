@@ -105,6 +105,10 @@
 - Never use all-caps words for emphasis in docstrings or comments; use RST emphasis (`*word*`). Genuine identifiers, acronyms and enum/constant names (`UUID`, `WHERE`, `Definiteness.DEFINITE`) are exempt
 - Always format modified Python files with ruff followed by docformatter, through the repository's pre-commit hook
 
+# Entity query language
+<!-- from EntityQueryLanguageRules in krrood/development_tools/agents/shipped_rules/entity_query_language.py -->
+- Pick `a` or `an` so the query reads as correct English with the entity it quantifies: `a(Drawer)` and `an(Interval.around)`, never `an(Drawer)` or `a(Interval.around)`
+
 # Imports
 <!-- from ImportsRules in krrood/development_tools/agents/shipped_rules/imports.py -->
 - Imports are absolute. Exception: a test imports another test module (a shared mimic or fixture from the test datasets) relatively
