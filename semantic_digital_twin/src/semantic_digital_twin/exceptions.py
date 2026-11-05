@@ -24,7 +24,9 @@ if TYPE_CHECKING:
         HasSupportingSurface,
     )
     from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
-    from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
+    from semantic_digital_twin.grasping.object_relative_grasp import (
+        ObjectRelativeGrasp,
+    )
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -2468,12 +2470,12 @@ class NoGraspGeometry(UsageError):
 
 
 @dataclass
-class SurfaceGraspNotOnSurfaceError(UsageError):
+class GraspNotOnObjectError(UsageError):
     """
-    Raised when a surface grasp names a point the object's grasp surface does not reach.
+    Raised when a grasp names a place that does not reach the surface of the object.
     """
 
-    surface_grasp: SurfaceGrasp
+    grasp: ObjectRelativeGrasp
     """
     The grasp that missed.
     """
@@ -2484,16 +2486,12 @@ class SurfaceGraspNotOnSurfaceError(UsageError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"No surface of '{self.graspable.name}' lies at azimuth "
-            f"{self.surface_grasp.azimuth:.3f} rad and height "
-            f"{self.surface_grasp.height:.3f} of its bounding box."
-        )
+        return f"{self.grasp} does not reach the surface of '{self.graspable.name}'."
 
     def suggest_correction(self) -> str:
         return (
-            "keep the height of a surface grasp between 0 and 1, and check with "
-            "SurfaceGrasp.reaches_surface_of before asking for its grasp candidate."
+            "keep the parameters of the grasp within the bounds its strategy states, and "
+            "check with reaches_surface_of before asking for its grasp candidate."
         )
 
 

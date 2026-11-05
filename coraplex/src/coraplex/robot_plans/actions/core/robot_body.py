@@ -89,7 +89,8 @@ class MoveFingersToWidthAction(
     squeeze: float = 0.0
     """
     How far past that width each fingertip is sent, in metres, so the fingers press into
-    an object rather than merely touching it.
+    an object rather than merely touching it. The object stops them short of that, so
+    fingers squeezing it count as done once they stopped approaching it.
 
     Keep it small, since it is commanded penetration into a body that does not yield.
     """
@@ -111,6 +112,7 @@ class MoveFingersToWidthAction(
             gripper=self.gripper,
             width=max(0.0, self.width - 2 * self.squeeze),
             threshold=self.threshold,
+            tolerate_finger_stall=self.squeeze > 0.0,
             name="MoveFingersToWidth",
         )
 

@@ -222,6 +222,87 @@ overlap) has nothing for an adjustment set to correct, the same as an empty one.
 
 ---
 
+### Letting a learned graph choose the adjustment set
+
+Marking `confounder` asserts that adjusting for that variable identifies the effect, and
+nothing checks the assertion. A causal structure learned from the training data can
+choose the set instead, or check the declared one. Learn it once per fitted relational
+circuit and hand it to the backend by class.
+
+Here `SceneRoom` is an ORM-mapped class of rooms, each with a `position`
+(a `KRROODPosition` of `x`, `y` and `z`), an `orientation` and a list of `objects`
+(each a `SceneObject` whose `type` is a `SceneObjectType`, such as `CHAIR`), and `rooms`
+is a list of `SceneRoom` instances.
+The relational circuit is fitted on them first, stratified by the cause so it can be
+intervened on, and the structure is learned from the same circuit and rooms:
+
+```python
+from krrood.class_diagrams.class_diagram import ClassDiagram
+from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.entity_query_language.factories import a, cause
+from krrood.parametrization.model_registries import RelationalCircuitRegistry
+from probabilistic_model.causal_structure.domain_causal_knowledge import (
+    DomainCausalKnowledge,
+)
+from probabilistic_model.causal_structure.learning import (
+    RelationalCausalStructureLearner,
+)
+from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.learning_method import StratifiedLearning
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
+    RelationalProbabilisticCircuit,
+)
+
+circuit = RelationalProbabilisticCircuit(
+    SceneRoom,
+    learning_method=StratifiedLearning(
+        variables=["SceneRoom.position.x"], method=JointProbabilityTree()
+    ),
+).fit(rooms)
+class_diagram = ClassDiagram([SceneRoom, SceneObject, KRROODPosition, KRROODOrientation])
+structure = RelationalCausalStructureLearner(class_diagram).learn(
+    circuit,
+    rooms,
+    DomainCausalKnowledge(
+        tiers=[["SceneRoom.position.x"], ["SceneRoom.objects.type"]]
+    ),
+)
+backend = ProbabilisticBackend(
+    model_registry=RelationalCircuitRegistry(circuit),
+    causal_structures={SceneRoom: structure},
+)
+
+# Does a room's x position cause its first object to be a chair? No confounder marked:
+# the learned graph chooses what to adjust for, here among rooms of four objects.
+query = a(SceneRoom)(
+    position=a(KRROODPosition)(x=cause, y=..., z=...),
+    orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
+    objects=[a(SceneObject)(type=...) for _ in range(4)],
+)
+query.causes_effect(query.objects[0].type == SceneObjectType.CHAIR)
+backend.rank_causes(query)
+```
+
+The learned edges are kept in the class diagram, as causal relations of `SceneRoom`
+next to its associations; the structure reads them from there whenever a query asks.
+
+What the backend does with the learned structure:
+
+| The query marks | For a class without a structure | For a class with one |
+|---|---|---|
+| `cause`, `confounder`, `causes_effect` | backdoor adjustment with the marked set, unchecked | the marked set is checked; a set that fails the adjustment criterion raises {py:class}`~probabilistic_model.causal_structure.exceptions.InvalidAdjustmentSet` |
+| `cause`, `causes_effect` | an empty adjustment set, which is plain conditioning | the set is chosen from the graph, among the variables the query names and the aggregation statistics; {py:class}`~krrood.entity_query_language.exceptions.EffectNotIdentified` if the graph identifies the effect by no such set |
+
+When the graph leaves the direction of an edge at the cause open, the effect is only
+partially identified: `backend.interventional_range(query)` then returns, per region of
+the cause, the lowest and highest effect probability across the candidate sets. And a
+query that marks only `causes_effect(...)` lets `backend.rank_causes(query)` rank every
+variable it names that may be a cause of the effect in the learned graph.
+
+Each cause candidate gets its own set. A part attribute is one node for every part of
+its collection (`Class.collection.attribute`); a query on one part uses that part's
+copy.
+
 ## Declaring a causal query
 
 `cause` and `causes_effect()` are always used together: `cause` marks the field to

@@ -175,14 +175,14 @@ def test_undirected_edge_gives_partial_identification():
     graph = undirected_parent()
 
     assert identify(graph, {"A"}) == PartiallyIdentifiedEffect(
-        candidate_adjustments=[AdjustmentSet(), adjustment_of(graph, {"A"})],
+        parent_sets=[AdjustmentSet(), adjustment_of(graph, {"A"})],
         includes_member_without_causal_path=False,
     )
 
 
 def test_effect_may_be_parent_of_cause():
     assert identify(undirected_cause_and_effect(), set()) == PartiallyIdentifiedEffect(
-        candidate_adjustments=[AdjustmentSet()],
+        parent_sets=[AdjustmentSet()],
         includes_member_without_causal_path=True,
     )
 
@@ -193,6 +193,45 @@ def test_graph_without_member_graphs_leaves_the_effect_unidentified():
     )
 
     assert identification == UnidentifiedEffect(UnidentifiedReason.NO_MEMBER_GRAPH)
+
+
+# %% what an identification offers to adjust for
+
+
+def test_identified_effect_offers_its_one_set():
+    graph = confounded()
+    adjustment = adjustment_of(graph, {"Z"})
+    identification = IdentifiedEffect(adjustment)
+
+    assert (
+        identification.candidate_adjustments,
+        identification.is_identified,
+        identification.includes_no_effect,
+    ) == ([adjustment], True, False)
+
+
+def test_partially_identified_effect_offers_every_parent_set():
+    identification = identify(undirected_cause_and_effect(), set())
+
+    assert (
+        identification.candidate_adjustments,
+        identification.is_identified,
+        identification.includes_no_effect,
+    ) == (
+        identification.parent_sets,
+        False,
+        identification.includes_member_without_causal_path,
+    )
+
+
+def test_unidentified_effect_offers_nothing():
+    identification = UnidentifiedEffect(UnidentifiedReason.NO_MEMBER_GRAPH)
+
+    assert (
+        identification.candidate_adjustments,
+        identification.is_identified,
+        identification.includes_no_effect,
+    ) == ([], False, False)
 
 
 # %% checking a declared adjustment set

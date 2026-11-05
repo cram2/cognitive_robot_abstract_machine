@@ -331,7 +331,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if (
             isinstance(grasp, FlatVariable)
             and isinstance(grasp._child_, InstantiatedVariable)
-            and grasp._child_._type_ is GraspsByCloseness
+            and grasp._child_._factory_ is GraspsByCloseness
         ):
             return PickUpTarget(graspable=grasp._child_._kwargs_["graspable"], arm=arm)
         grasps = grasp._domain_ if isinstance(grasp, Variable) else [grasp]

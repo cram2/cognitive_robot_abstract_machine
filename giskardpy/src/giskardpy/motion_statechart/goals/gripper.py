@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from cramph.composites import Parallel
 from cramph.node import StatechartNode
@@ -14,6 +15,7 @@ from giskardpy.motion_statechart.mixins import (
     HasTwoFingerGripperParameters,
 )
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.tasks.cartesian_tasks import DistanceAlongAxis
 from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
@@ -68,7 +70,7 @@ class MoveFingers(
     Drive the fingers of an end effector to a goal.
 
     Fingers that close on an object stop short of their goal, so the goal can be told to
-    settle for fingers that have stopped moving instead.
+    settle for fingers that have stopped approaching it instead.
     """
 
     nodes: list[StatechartNode] = field(default_factory=list, init=False)
@@ -133,31 +135,33 @@ class MoveFingers(
     def _finger_goal(self) -> StatechartNode:
         """
         :return: The node that is done once the fingers arrived, which with
-            :attr:`tolerate_finger_stall` is also done once they stopped moving short of it.
+            :attr:`tolerate_finger_stall` is also done once they stopped short of it.
 
         The stall monitor sits beside the finger task rather than replacing its
-        observation, because fingers standing still does not mean the goal was reached.
+        observation, because fingers that stopped short have not reached the goal.
         """
         finger_task = self.create_finger_task()
         if not self.tolerate_finger_stall:
             return finger_task
-        return Parallel(nodes=[finger_task, self._stall_monitor()], minimum_success=1)
+        return Parallel(
+            nodes=[finger_task, self._stall_monitor(finger_task)], minimum_success=1
+        )
 
-    def _stall_monitor(self) -> LocalMinimumReached:
+    def _stall_monitor(self, finger_task: MotionStatechartNode) -> Stalled:
         """
-        :return: A monitor that observes the fingers, and only those, standing still for
+        :param finger_task: The task driving the fingers to the goal.
+        :return: A monitor that observes `finger_task` no longer approaching its goal for
             long enough.
         """
-        return LocalMinimumReached(
-            degrees_of_freedom=[
-                connection.raw_dof for connection in self.finger_connections
-            ],
-            minimum_time=(
-                LocalMinimumReached.minimum_time
-                if self.finger_stall_minimum_time is None
-                else self.finger_stall_minimum_time
+        return Stalled(
+            monitored_node=finger_task,
+            timeout=timedelta(
+                seconds=(
+                    LocalMinimumReached.minimum_time
+                    if self.finger_stall_minimum_time is None
+                    else self.finger_stall_minimum_time
+                )
             ),
-            measure_from_own_start=True,
         )
 
 

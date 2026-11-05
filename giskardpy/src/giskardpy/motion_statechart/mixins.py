@@ -228,12 +228,14 @@ class HasFingerStallToleranceParameters:
 
     tolerate_finger_stall: bool = False
     """
-    Whether fingers that have stopped moving count as done, even short of their goal.
+    Whether fingers that have stopped approaching their goal count as done, even short
+    of it.
     """
 
     finger_stall_minimum_time: float | None = None
     """
-    How long the fingers must stand still before a stall counts, in seconds.
+    How long the fingers must have stopped approaching their goal before a stall counts,
+    in seconds.
 
     None keeps :attr:`~giskardpy.motion_statechart.monitors.monitors.LocalMinimumReached.minimum_time`.
     """
