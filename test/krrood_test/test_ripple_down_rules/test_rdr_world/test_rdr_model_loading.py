@@ -39,7 +39,7 @@ def test_model_saved_outside_a_package_is_loadable(
     A model is loadable from wherever it was saved, not only from inside a package.
     """
     save_directory = str(tmp_path / SAVE_DIRECTORY_NAME)
-    model_name = drawer_cabinet_rdr.save(save_directory)
+    model_name = drawer_cabinet_rdr.save(save_dir=save_directory)
     loaded_rdr = GeneralRDR.load(load_dir=save_directory, model_name=model_name)
     assert loaded_rdr.classify(
         case=handles_and_containers_world

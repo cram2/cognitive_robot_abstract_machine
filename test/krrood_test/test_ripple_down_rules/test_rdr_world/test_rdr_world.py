@@ -45,7 +45,7 @@ def test_write_drawer_cabinet_rdr_to_python_file(
 ):
     rdrs_dir = os.path.join(dirname(__file__), "..", "test_generated_rdrs", "view_rdr")
     os.makedirs(rdrs_dir, exist_ok=True)
-    drawer_cabinet_rdr._write_to_python(rdrs_dir)
+    drawer_cabinet_rdr._write_to_python(model_dir=rdrs_dir)
     loaded_rdr_classifier = drawer_cabinet_rdr.get_rdr_classifier_from_python_file(
         rdrs_dir
     )

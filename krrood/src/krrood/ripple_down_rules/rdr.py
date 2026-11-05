@@ -1113,7 +1113,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
     def write_rules_as_source_code_to_file(
         self,
         *, rule: Rule,
-        file,
+        filename: str,
         parent_indent: str = "",
         defs_file: str | None = None,
         package_name: str | None = None,
@@ -1122,7 +1122,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         Write the rules as source code to a file.
 
         :param rule: The rule to write as source code.
-        :param file: The file to write the source code to.
+        :param filename: The file to write the source code to.
         :param parent_indent: The indentation of the parent rule.
         :param defs_file: The file to write the definitions to.
         :param package_name: The name of the package that contains the RDR classifier function, this
@@ -1182,7 +1182,7 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
         # Write the rules as source code to the main file
         self.write_rules_as_source_code_to_file(
             rule=self.start_rule,
-            file=file_name,
+            filename=file_name,
             parent_indent=" " * 4,
             defs_file=defs_file_name,
             package_name=package_name,

@@ -295,4 +295,4 @@ def ranking_surface(request: RankingRequest) -> RankingSurface:
     ...     the(entity(employee)).ordered_by(variable=employee.salary, descending=True).limit(n=3))
     'Find the top three Employees by salary'
     """
-    return RankingForm.most_applicable(request=request).render(request)
+    return RankingForm.most_applicable(request=request).render(request=request)

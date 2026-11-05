@@ -36,7 +36,7 @@ def test_a_referenced_object_is_written_as_its_reference(element):
 
     data = to_json(create_element_in_every_position(element), **writer.create_kwargs())
 
-    assert data["direct"] == writer.write_reference(element=element)
+    assert data["direct"] == writer.write_reference(obj=element)
 
 
 def test_every_position_refers_to_the_object_the_reader_has(element):

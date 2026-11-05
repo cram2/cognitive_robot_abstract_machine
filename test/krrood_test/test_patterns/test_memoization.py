@@ -100,7 +100,7 @@ def test_owner_of_a_memoized_method_can_be_pickled():
 
     restored_owner = pickle.loads(pickle.dumps(owner))
 
-    assert restored_owner.square(4) == 16
+    assert restored_owner.square(value=4) == 16
     assert restored_owner.computation_count == 2
 
 

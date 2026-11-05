@@ -179,7 +179,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         True
         """
         return ExistentialPhrase.for_number(number=self._number(antecedent=antecedent)).build_phrase(
-            antecedent.type_name, referent_id=self._antecedent_referent_id(antecedent=antecedent)
+            type_name=antecedent.type_name, referent_id=self._antecedent_referent_id(antecedent=antecedent)
         )
 
     @staticmethod

@@ -1016,9 +1016,9 @@ def test_multiple_dependent_selectables(handles_and_containers_world):
     cabinet_drawers = flat_variable(cabinet.drawers)
     old_evaluate = cabinet_drawers._evaluate__
 
-    def _cabinet_drawers_evaluate__(bindings):
-        assert cabinet._id_ in bindings
-        yield from old_evaluate(bindings)
+    def _cabinet_drawers_evaluate__(*, sources):
+        assert cabinet._id_ in sources
+        yield from old_evaluate(sources=sources)
 
     cabinet_drawers._evaluate__ = _cabinet_drawers_evaluate__
 

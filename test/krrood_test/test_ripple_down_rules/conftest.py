@@ -112,5 +112,5 @@ def drawer_rdr(
     if save_answers:
         expert.save_answers(path=filename)
     for case_query in drawer_case_queries:
-        assert is_matching(lambda case, modify_case, case_query: rdr.classify(case=case, modify_case=modify_case, case_query=case_query), case_query)
+        assert is_matching(lambda case: rdr.classify(case=case), case_query)
     return rdr

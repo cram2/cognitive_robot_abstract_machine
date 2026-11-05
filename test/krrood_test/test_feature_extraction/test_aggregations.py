@@ -383,7 +383,7 @@ def test_symbolic_features_are_derivable_without_a_domain_object():
     )
     instance = SceneRoomAggregations(role_taker=room, field_name="objects")
     assert (
-        SceneRoomAggregations.symbolic_features_of_field("objects")
+        SceneRoomAggregations.symbolic_features_of_field(field_name="objects")
         == instance.symbolic_aggregation_features()
     )
 

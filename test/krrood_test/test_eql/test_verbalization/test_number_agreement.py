@@ -84,7 +84,7 @@ def test_existential_noun_pluralised_by_the_pass():
     )
     assert (
         _realised(
-            ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).build_phrase("Robot")
+            ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).build_phrase(type_name="Robot")
         )
         == "there are Robots"
     )

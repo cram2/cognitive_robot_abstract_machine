@@ -459,7 +459,7 @@ def place(request: Placement, context: RuleContext) -> Placed:
     'Find a Robot whose battery is greater than 50'
     """
     form = ConditionForm.most_applicable(request=request)
-    return Placed(position=form.position, fragment=form.render(request, context))
+    return Placed(position=form.position, fragment=form.render(request=request, context=context))
 
 
 # %% placing a whole subject restriction

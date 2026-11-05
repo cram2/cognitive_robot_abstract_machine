@@ -172,7 +172,7 @@ def correct_drawer_rdr(drawer_case_queries, drawer_expert) -> GeneralRDR:
     rdr = GeneralRDR()
     rdr.fit(case_queries=drawer_case_queries, expert=drawer_expert, animate_tree=False)
     for case_query in drawer_case_queries:
-        assert is_matching(lambda case, modify_case, case_query: rdr.classify(case=case, modify_case=modify_case, case_query=case_query), case_query)
+        assert is_matching(lambda case: rdr.classify(case=case), case_query)
     return rdr
 
 
@@ -210,4 +210,4 @@ def saved_drawer_cabinet_rdr(request, drawer_cabinet_rdr) -> SavedRDRModel:
     one nor writes the path a test running beside it is writing.
     """
     directory = Path(__file__).parent.parent / "test_results" / request.node.name
-    return SavedRDRModel(directory=directory, name=drawer_cabinet_rdr.save(str(directory)))
+    return SavedRDRModel(directory=directory, name=drawer_cabinet_rdr.save(save_dir=str(directory)))
