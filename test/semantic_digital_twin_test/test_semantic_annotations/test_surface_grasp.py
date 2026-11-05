@@ -33,7 +33,6 @@ from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
 from krrood_spatial_math.spatial_types import (
-    AxisAngle,
     HomogeneousTransformationMatrix,
     Twist,
     Vector3,
@@ -301,7 +300,7 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
         assert grasp.height > LIFTING_HEIGHT
         assert grasp.result.lifted
         assert isinstance(grasp.result.slip.translation, Vector3)
-        assert isinstance(grasp.result.slip.rotation, AxisAngle)
+        assert isinstance(grasp.result.slip.rotation_vector, Vector3)
 
 
 def test_a_uniform_prior_cannot_answer_for_lifting_grasps(carton):

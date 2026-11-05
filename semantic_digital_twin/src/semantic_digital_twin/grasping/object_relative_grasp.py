@@ -17,7 +17,7 @@ from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
 )
-from krrood_spatial_math.spatial_types import AxisAngle, Twist, Vector3
+from krrood_spatial_math.spatial_types import Twist, Vector3
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 
 if TYPE_CHECKING:
@@ -83,7 +83,7 @@ def _any_twist() -> Match[Twist]:
     """
     return a(Twist)(
         translation=a(Vector3)(x=..., y=..., z=...),
-        rotation=a(AxisAngle)(axis=a(Vector3)(x=..., y=..., z=...), angle=...),
+        rotation_vector=a(Vector3)(x=..., y=..., z=...),
     )
 
 

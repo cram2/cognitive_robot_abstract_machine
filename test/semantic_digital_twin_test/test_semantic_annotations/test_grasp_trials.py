@@ -22,7 +22,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from krrood_spatial_math.spatial_types import (
-    AxisAngle,
     HomogeneousTransformationMatrix,
     Twist,
     Vector3,
@@ -53,10 +52,8 @@ class RecordingPerformer(GraspPerformer):
         return GraspResult(
             object_raised=True,
             motion_completed=True,
-            object_displacement=Twist(
-                translation=Vector3(0.0, 0.0, 0.2), rotation=AxisAngle()
-            ),
-            slip=Twist(translation=Vector3(), rotation=AxisAngle()),
+            object_displacement=Twist(translation=Vector3(0.0, 0.0, 0.2)),
+            slip=Twist(),
         )
 
 

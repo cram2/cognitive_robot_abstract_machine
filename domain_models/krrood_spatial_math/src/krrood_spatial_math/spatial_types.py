@@ -2452,44 +2452,44 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 @dataclass(eq=False, init=False, repr=False)
 class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
     """
-    How a rigid body moved: a translation and a rotation, both along the axes of its
-    reference frame.
+    How a rigid body moved: a translation and a rotation vector, both along the axes of
+    its reference frame.
     """
 
     def __init__(
         self,
         translation: Vector3 | None = None,
-        rotation: AxisAngle | None = None,
+        rotation_vector: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
     ):
         """
         :param translation: How far and in which direction the body moved, in meters.
             Defaults to no translation.
-        :param rotation: How the body turned. Defaults to no rotation.
+        :param rotation_vector: The axis the body turned around, scaled by the angle it
+            turned by in radians. Defaults to no rotation.
         :param reference_frame: The frame along whose axes the body moved.
         """
         if translation is None:
             translation = Vector3()
-        if rotation is None:
-            rotation = AxisAngle()
+        if rotation_vector is None:
+            rotation_vector = Vector3()
         self.casadi_sx = sm.to_sx(
             [
                 translation.x,
                 translation.y,
                 translation.z,
-                rotation.axis.x,
-                rotation.axis.y,
-                rotation.axis.z,
-                rotation.angle,
+                rotation_vector.x,
+                rotation_vector.y,
+                rotation_vector.z,
             ]
         )
         self.reference_frame = reference_frame
         super().__post_init__()
 
     def _verify_type(self):
-        if self.shape != (7, 1):
+        if self.shape != (6, 1):
             raise WrongDimensionsError(
-                expected_dimensions=(7, 1), actual_dimensions=self.shape
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
             )
 
     @classmethod
@@ -2499,15 +2499,14 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
         return cls(
             translation=Vector3(*data["translation"]),
-            rotation=AxisAngle(axis=Vector3(*data["axis"]), angle=data["angle"]),
+            rotation_vector=Vector3(*data["rotation_vector"]),
             reference_frame=reference_frame,
         )
 
     def _constant_to_json(self) -> dict[str, Any]:
         return {
             "translation": self.translation.to_np()[:3].tolist(),
-            "axis": self.rotation.axis.to_np()[:3].tolist(),
-            "angle": float(self.rotation.angle),
+            "rotation_vector": self.rotation_vector.to_np()[:3].tolist(),
         }
 
     @classmethod
@@ -2515,12 +2514,12 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :param start_T_end: Where the body ended up, relative to where it started.
         :return: The motion from the start to the end, in the reference frame of
-            ``start_T_end``, turning by an angle in [0, pi]. No rotation is the angle
-            zero about the z-axis.
+            ``start_T_end``, turning by an angle in [0, pi].
         """
+        rotation = start_T_end.axis_angle
         return cls(
             translation=Vector3.from_iterable(start_T_end.position),
-            rotation=start_T_end.axis_angle,
+            rotation_vector=rotation.axis * rotation.angle,
             reference_frame=start_T_end.reference_frame,
         )
 
@@ -2534,14 +2533,13 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
     @property
-    def rotation(self) -> AxisAngle:
+    def rotation_vector(self) -> Vector3:
         """
-        :return: How the body turned.
+        :return: The axis the body turned around, scaled by the angle it turned by in
+            radians.
         """
-        return AxisAngle(
-            axis=Vector3(x=self[3], y=self[4], z=self[5]),
-            angle=self[6],
-            reference_frame=self.reference_frame,
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
         )
 
 

@@ -189,27 +189,27 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
 @dataclass(eq=False)
 class TwistMapping(AlternativeMapping[Twist]):
     translation: Vector3
-    rotation: AxisAngle
+    rotation_vector: Vector3
     reference_frame: KinematicStructureEntity | None
 
     @classmethod
     def from_domain_object(cls, obj: Twist):
         return cls(
             translation=obj.translation,
-            rotation=obj.rotation,
+            rotation_vector=obj.rotation_vector,
             reference_frame=obj.reference_frame,
         )
 
     def to_domain_object(self) -> Twist:
         return Twist(
             translation=self.translation,
-            rotation=self.rotation,
+            rotation_vector=self.rotation_vector,
             reference_frame=self.reference_frame,
         )
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [Vector3, AxisAngle]
+        return [Vector3]
 
 
 @dataclass(eq=False)
