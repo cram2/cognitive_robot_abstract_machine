@@ -29,14 +29,20 @@ from krrood.planning.exceptions import (
 
 @dataclass(frozen=True)
 class Fact:
-    """The value of the ground term an expression reads, for every binding of
-    the expression's operands."""
+    """
+    The value of the ground term an expression reads, for every binding of the
+    expression's operands.
+    """
 
     expression: GroundTermExpression
-    """The expression whose ground terms are given the value."""
+    """
+    The expression whose ground terms are given the value.
+    """
 
     value: Any
-    """The value every ground term of :attr:`expression` has."""
+    """
+    The value every ground term of :attr:`expression` has.
+    """
 
     @classmethod
     def from_condition(cls, condition: SymbolicExpression) -> Fact:
