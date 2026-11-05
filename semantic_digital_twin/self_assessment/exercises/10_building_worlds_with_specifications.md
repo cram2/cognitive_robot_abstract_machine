@@ -246,7 +246,8 @@ robot_world = robot_specification.create_world()
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 if len(robot_world.get_semantic_annotations_by_type(PR2)) != 1: raise ExerciseVerificationFailed("The robot should be annotated.")
-odometry_body = robot_world.get_body_by_name("odom")
+pr2 = robot_world.get_semantic_annotations_by_type(PR2)[0]
+odometry_body = robot_world.get_body_by_name(pr2.mobile_base.odometry_body_name)
 if odometry_body.parent_connection.parent is not robot_world.root: raise ExerciseVerificationFailed("The odometry body hangs off the world root.")
 root_T_odometry = robot_world.compute_forward_kinematics(robot_world.root, odometry_body)
 if not abs(root_T_odometry.position.to_np()[0] - 1.0) < 1e-6: raise ExerciseVerificationFailed("The localization pose should apply.")
