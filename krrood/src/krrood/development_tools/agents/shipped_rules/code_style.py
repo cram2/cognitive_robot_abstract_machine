@@ -8,6 +8,10 @@ import dataclasses
 from enum import Enum
 
 
+from krrood.development_tools.agents.positional_parameters import (
+    PositionalFieldsChecker,
+    PositionalParametersChecker,
+)
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.ormatic.utils import classproperty
 
@@ -36,12 +40,30 @@ class CodeStyleRules(Section):
     )
 
     ACCESS_ATTRIBUTES_DIRECTLY = (
-        f"Access attributes with `.`, never with {CodeReference(getattr).name}, and "
+        f"Access attributes with `.`, never with {CodeReference(target=getattr).name}, and "
         "never wrap "
         "attribute access in try-except"
     )
 
     NO_MUTABLE_DEFAULT_ARGUMENTS = "Never use mutable objects as default arguments"
+
+    KEYWORD_ONLY_DATACLASS_FIELDS = (
+        "Every dataclass is declared with `kw_only=True`, so its fields are passed "
+        f"by keyword. A dataclass an {CodeReference(target=Enum).name} mixes in is exempt, "
+        "since the enum passes its member values positionally",
+        (),
+        PositionalFieldsChecker(),
+    )
+
+    KEYWORD_ONLY_METHOD_PARAMETERS = (
+        "Every parameter of a method after `self` or `cls` is keyword-only: a `*` "
+        "comes before them, as in `def move_to(self, *, target: Pose)`. Dunder "
+        "methods, property setters and deleters, and overrides of a method that a "
+        "standard library or third-party base class defines are exempt, since "
+        "Python or that library passes their arguments positionally",
+        (),
+        PositionalParametersChecker(),
+    )
 
     NEVER_REIMPLEMENT = (
         "Never reimplement what the codebase or an existing dependency already "
@@ -122,8 +144,8 @@ class NamingRules(Section):
 
     NEVER_SHADOW_BOUND_NAMES = (
         "Never take an identifier the language or something in scope already "
-        f"binds: {CodeReference(Enum).name} reserves `name`, a parameter `field` "
-        f"shadows {CodeReference(dataclasses.field).path}, a field shadows a method of the same name. These "
+        f"binds: {CodeReference(target=Enum).name} reserves `name`, a parameter `field` "
+        f"shadows {CodeReference(target=dataclasses.field).path}, a field shadows a method of the same name. These "
         "fail at runtime or silently, not at import"
     )
 

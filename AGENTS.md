@@ -15,6 +15,8 @@
 - Never duplicate code. Never put methods in a catch-all module such as `utils.py`; move them onto the class that owns the behaviour
 - Access attributes with `.`, never with `getattr`, and never wrap attribute access in try-except
 - Never use mutable objects as default arguments
+- Every dataclass is declared with `kw_only=True`, so its fields are passed by keyword. A dataclass an `Enum` mixes in is exempt, since the enum passes its member values positionally (checked by `krrood check`)
+- Every parameter of a method after `self` or `cls` is keyword-only: a `*` comes before them, as in `def move_to(self, *, target: Pose)`. Dunder methods, property setters and deleters, and overrides of a method that a standard library or third-party base class defines are exempt, since Python or that library passes their arguments positionally (checked by `krrood check`)
 - Never reimplement what the codebase or an existing dependency already provides. When searching for it, never cut off the output of grep or other searches; narrow the search instead
 
 ## Naming
