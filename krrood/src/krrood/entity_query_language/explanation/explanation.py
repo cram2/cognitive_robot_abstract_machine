@@ -338,7 +338,7 @@ class InferenceExplanation(Symbol):
 
         satisfied_conditions = []
         for condition_id in self.operation_result.satisfied_condition_ids:
-            condition_expr = self.query_root._get_expression_by_id_(condition_id)
+            condition_expr = self.query_root._get_expression_by_id_(id_=condition_id)
             if isinstance(condition_expr, (LogicalOperator,)):
                 continue
             satisfied_conditions.append(

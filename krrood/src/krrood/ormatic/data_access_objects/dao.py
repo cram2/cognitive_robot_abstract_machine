@@ -659,7 +659,7 @@ class DataAccessObject(HasGeneric[T]):
         temp_dao = state.pop(source=source_object)
 
         # create dao of alternatively mapped superclass
-        parent_dao = alternative_base.original_class().to_dao(source_object, state)
+        parent_dao = alternative_base.original_class().to_dao(source_object=source_object, state=state)
 
         # Restore the object in the memo dictionary
         if temp_dao is not None:

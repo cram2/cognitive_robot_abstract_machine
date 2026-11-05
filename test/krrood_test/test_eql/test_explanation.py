@@ -428,7 +428,7 @@ def test_satisfied_conditions_exclude_a_short_circuited_operator():
     assert len(true_results) == 1
 
     satisfied = val._conditions_root_._subtree_expressions_with_ids_(
-        true_results[0].satisfied_condition_ids
+        ids=true_results[0].satisfied_condition_ids
     )
     assert any(isinstance(expression, OR) for expression in satisfied)
     assert not any(isinstance(expression, AND) for expression in satisfied)

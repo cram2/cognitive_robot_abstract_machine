@@ -181,8 +181,8 @@ def test_shared_state_does_not_rerun_post_init(session, database, monkeypatch):
     monkeypatch.setattr(ContainerGeneration, "__post_init__", counting_post_init)
 
     state = FromDataAccessObjectState()
-    container_1 = container_dao.from_dao(state)
-    container_2 = container_dao.from_dao(state)
+    container_1 = container_dao.from_dao(state=state)
+    container_2 = container_dao.from_dao(state=state)
 
     # both conversions return the same instance
     assert container_1 is container_2
@@ -219,8 +219,8 @@ def test_shared_state_converts_alternative_mappings_once(
     monkeypatch.setattr(EntityMapping, "to_domain_object", counting_to_domain_object)
 
     state = FromDataAccessObjectState()
-    aggregator_1 = aggregator_daos[0].from_dao(state)
-    aggregator_2 = aggregator_daos[1].from_dao(state)
+    aggregator_1 = aggregator_daos[0].from_dao(state=state)
+    aggregator_2 = aggregator_daos[1].from_dao(state=state)
 
     # the shared entity is converted exactly once
     assert len(calls) == 1
@@ -268,8 +268,8 @@ def test_repeated_from_dao_on_alternatively_mapped_dao_with_shared_state_returns
 
     queried = session.scalars(select(BackreferenceMappingDAO)).one()
     state = FromDataAccessObjectState()
-    first = queried.from_dao(state)
-    second = queried.from_dao(state)
+    first = queried.from_dao(state=state)
+    second = queried.from_dao(state=state)
     assert first is second
 
 

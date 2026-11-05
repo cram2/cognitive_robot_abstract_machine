@@ -494,14 +494,14 @@ class ProbabilisticBackend(GenerativeBackend):
         :raises NoSolutionFound: If the match's conditions leave the model no solution.
         """
         self.choose_adjustment_sets(parameters=parameters, expression=expression)
-        model = self.model_registry.get_model(parameters)
+        model = self.model_registry.get_model(parameters=parameters)
 
         if parameters.search_cause_variables:
             cause_effect = self._resolve_cause_and_effect_variables(
                 parameters=parameters, expression=expression
             )
             if not isinstance(model, CausalCircuit):
-                raise DoRequiresCausalCircuitModel(model)
+                raise DoRequiresCausalCircuitModel(resolved_model=model)
             # search every candidate cause independently and keep the primary one's
             # already effect-truncated, already region-narrowed circuit -- see
             # _resolve_primary_intervention for why this needs no joint intervention
@@ -514,7 +514,7 @@ class ProbabilisticBackend(GenerativeBackend):
                 adjustment_variables_by_cause=cause_effect.adjustment_variables_by_cause,
             )
             truncated = parameters.apply_krrood_variable_truncation(
-                primary.narrowed_circuit
+                model=primary.narrowed_circuit
             )
         else:
             # apply literal-assignment conditions, then where-conditions, then
@@ -522,7 +522,7 @@ class ProbabilisticBackend(GenerativeBackend):
             # UnderspecifiedParameters.resolve_conditioned_and_truncated_model, which
             # Distribution._resolve_ also reuses to answer a distribution(...) query
             # with exactly this same sequence, without the sampling step.
-            truncated = parameters.resolve_conditioned_and_truncated_model(model)
+            truncated = parameters.resolve_conditioned_and_truncated_model(model=model)
 
         if truncated is None:
             raise NoSolutionFound(expression=expression._get_expression_())
@@ -553,14 +553,14 @@ class ProbabilisticBackend(GenerativeBackend):
             raise NoCausesEffectConditionForCause(expression=expression._get_expression_())
         if len(parameters.effect_variables_from_causes_effect) > 1:
             raise MultipleEffectVariablesNotSupported(
-                parameters.effect_variables_from_causes_effect
+                variables=parameters.effect_variables_from_causes_effect
             )
         [effect_variable] = parameters.effect_variables_from_causes_effect
         return CauseEffectVariables(
             cause_variables=parameters.search_cause_variables,
             effect_variable=effect_variable,
             adjustment_variables_by_cause={
-                cause_variable: parameters.adjustment_variables_of(cause_variable)
+                cause_variable: parameters.adjustment_variables_of(cause_variable=cause_variable)
                 for cause_variable in parameters.search_cause_variables
             },
         )
@@ -715,7 +715,7 @@ class ProbabilisticBackend(GenerativeBackend):
         :raises EffectNotIdentified: If the structure leaves the effect of a cause
             unidentified, with no candidate sets.
         """
-        parameters = UnderspecifiedParameters(expression)
+        parameters = UnderspecifiedParameters(statement=expression)
         structure = self.causal_structures.get(parameters.queried_class)
         if structure is None:
             raise NoLearnedCausalStructure(
@@ -742,7 +742,7 @@ class ProbabilisticBackend(GenerativeBackend):
                 candidates.variables
             )
             candidates_by_cause.append(candidates)
-        model = self.model_registry.get_model(parameters)
+        model = self.model_registry.get_model(parameters=parameters)
         if not isinstance(model, CausalCircuit):
             raise DoRequiresCausalCircuitModel(model)
         effect_event = parameters.truncation_assignments_from_where_conditions
@@ -1001,7 +1001,7 @@ class ProbabilisticBackend(GenerativeBackend):
         if not parameters.search_cause_variables:
             raise NoCauseVariablesForRanking(expression=expression._get_expression_())
         self.choose_adjustment_sets(parameters=parameters, expression=expression)
-        model = self.model_registry.get_model(parameters)
+        model = self.model_registry.get_model(parameters=parameters)
         if not isinstance(model, CausalCircuit):
             raise DoRequiresCausalCircuitModel(model)
         cause_effect = self._resolve_cause_and_effect_variables(parameters=parameters, expression=expression)

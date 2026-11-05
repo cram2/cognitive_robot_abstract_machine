@@ -136,7 +136,7 @@ def test_get_comparators_between_attributes(drawer_explanation):
 
 
 def test_drawer_connection_variable_nodes_count(drawer_explanation):
-    nodes = drawer_explanation.get_variable_nodes_of_given_type(Connection).tolist()
+    nodes = drawer_explanation.get_variable_nodes_of_given_type(type_=Connection).tolist()
     assert len(nodes) == 2
     node_types = {n._type_ for n in nodes}
     assert FixedConnection in node_types
@@ -144,7 +144,7 @@ def test_drawer_connection_variable_nodes_count(drawer_explanation):
 
 
 def test_drawer_handle_variable_nodes_count(drawer_explanation):
-    nodes = drawer_explanation.get_variable_nodes_of_given_type(Handle).tolist()
+    nodes = drawer_explanation.get_variable_nodes_of_given_type(type_=Handle).tolist()
     assert len(nodes) == 1
     assert nodes[0]._type_ is Handle
 
@@ -168,7 +168,7 @@ def test_cabinet_drawer_variable_nodes_count(cabinet_explanation):
 
 def test_drawer_handle_value_matches_instance(drawer_explanation):
     handles = drawer_explanation.get_values_of_variable_nodes_of_given_type(
-        Handle
+        type_=Handle
     ).tolist()
     assert len(handles) == 1
 
@@ -195,7 +195,7 @@ def test_cabinet_drawer_values_are_in_cabinet(cabinet_explanation):
 
 def test_drawer_conditions_relating_connections(drawer_explanation):
     conditions = drawer_explanation.get_conditions_that_relate_the_variables_of_type(
-        Connection
+        type_=Connection
     ).tolist()
     assert len(conditions) == 1
     assert all(isinstance(c, Comparator) for c in conditions)
@@ -210,7 +210,7 @@ def test_drawer_conditions_relating_bodies(drawer_explanation):
     #   fixed_conn.parent (Body) and prismatic_conn.child (Body) in condition 1
     #   fixed_conn.child  (Body) and handle (Handle < Body)       in condition 2
     conditions = drawer_explanation.get_conditions_that_relate_the_variables_of_type(
-        Body
+        type_=Body
     ).tolist()
     assert len(conditions) == 2
 
@@ -241,7 +241,7 @@ def test_cabinet_no_conditions_relating_connections(cabinet_explanation):
 def test_drawer_relates_fixed_connection_to_prismatic(drawer_explanation):
     # FixedConnection.parent == PrismaticConnection.child
     conditions = drawer_explanation.get_conditions_that_relate_variables_of_types(
-        FixedConnection, PrismaticConnection
+        type_a=FixedConnection, type_b=PrismaticConnection
     ).tolist()
     assert len(conditions) == 1
 
@@ -249,7 +249,7 @@ def test_drawer_relates_fixed_connection_to_prismatic(drawer_explanation):
 def test_drawer_relates_fixed_connection_to_handle(drawer_explanation):
     # fixed_conn.child == handle.
     conditions = drawer_explanation.get_conditions_that_relate_variables_of_types(
-        FixedConnection, Handle
+        type_a=FixedConnection, type_b=Handle
     ).tolist()
     assert len(conditions) == 1
 
@@ -264,9 +264,9 @@ def test_cabinet_relates_prismatic_connection_to_drawer(cabinet_explanation):
 
 def test_get_conditions_that_relate_variables_of_types_is_symmetric(drawer_explanation):
     ab = drawer_explanation.get_conditions_that_relate_variables_of_types(
-        FixedConnection, PrismaticConnection
+        type_a=FixedConnection, type_b=PrismaticConnection
     ).tolist()
     ba = drawer_explanation.get_conditions_that_relate_variables_of_types(
-        PrismaticConnection, FixedConnection
+        type_a=PrismaticConnection, type_b=FixedConnection
     ).tolist()
     assert {c._id_ for c in ab} == {c._id_ for c in ba}

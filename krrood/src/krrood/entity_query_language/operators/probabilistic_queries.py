@@ -218,7 +218,7 @@ class Distribution(ProbabilisticQuery):
         self.marginalize_for = tuple(
             (
                 query._rerooted_on_selection_(chain=attribute)
-                if query._is_attribute_of_self_(attribute)
+                if query._is_attribute_of_self_(expression=attribute)
                 else attribute
             )
             for attribute in self.marginalize_for
