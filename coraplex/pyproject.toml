@@ -29,8 +29,8 @@ dependencies = [
     "tqdm==4.66.3",
     "psutil~=5.9.0",
     "typing_extensions>=4.10.0",
-    "probabilistic_model>=7.1.0",
-    "random_events>=4.1.18",
+    "probabilistic_model>=26.10.0",
+    "random_events>=26.10.0",
     "numpy",
     "objgraph",
     "pint>=0.21.1",
@@ -38,18 +38,19 @@ dependencies = [
     "rustworkx",
     "pillow",
     "polytope",
-    "semantic_digital_twin",
-    "krrood_spatial_math[casadi]",
+    "semantic_digital_twin>=26.10.0",
+    "krrood_spatial_math[casadi]>=26.10.0",
     "trimesh",
-    "cramph",
-    "giskardpy",
-    "krrood",
+    "cramph>=26.10.0",
+    "giskardpy>=26.10.0",
+    "krrood>=26.10.0",
 ]
 license = "LGPL-3.0-only"
 
 [project.urls]
 "Source" = 'https://github.com/cram2/coraplex'
 "Bug Tracker" = 'https://github.com/cram2/coraplex/issues'
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)

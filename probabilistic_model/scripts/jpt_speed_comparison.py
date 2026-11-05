@@ -25,8 +25,8 @@ number_of_variables = 5
 number_of_samples_per_component = 100000
 number_of_samples_for_evaluation = 5000
 number_of_components = 2
-min_samples_leaf = 0.0005
-min_samples_per_quantile = 10
+minimum_samples_leaf = 0.0005
+minimum_samples_per_quantile = 10
 
 # performance evaluation
 number_of_iterations = 100
@@ -52,13 +52,13 @@ data = np.concatenate(data, axis=0)
 df = pd.DataFrame(data, columns=[f"x_{i}" for i in range(number_of_variables)])
 
 variables = infer_variables_from_dataframe(
-    df, min_samples_per_quantile=min_samples_per_quantile
+    df, minimum_samples_per_quantile=minimum_samples_per_quantile
 )
 
 # create models
 if not load_from_disc:
     rustworkx_model = JointProbabilityTree(
-        variables, min_samples_per_leaf=min_samples_leaf
+        variables, minimum_samples_per_leaf=minimum_samples_leaf
     )
     rustworkx_model = rustworkx_model.fit(df)
     jax_model = CircuitRepresentations().convert(
@@ -117,7 +117,6 @@ def eval_performance(
     times_rustworkx = []
 
     for index in tqdm.trange(number_of_iterations, desc="Evaluating performance"):
-
         current_log_likelihood_jax, time_jax = timed_jax_method()
         current_log_likelihood_rustworkx, time_rustworkx = timed_rustworkx_method()
         if index >= warmup_iterations:

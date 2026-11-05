@@ -30,6 +30,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Verb,
 )
 from krrood.inheritance_path_length import inheritance_path_length
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
@@ -173,7 +174,7 @@ class Reachable(Predicate):
 @symbolic_function
 def compute_euclidean_planar_distance(
     body1: Body, body2: Body, ignore_dimension: Vector3
-):
+) -> Scalar:
     """
     Computes the Euclidean distance between two bodies in 2D space, ignoring a specific
     dimension specified by the user. The ignored dimension is set to zero before the

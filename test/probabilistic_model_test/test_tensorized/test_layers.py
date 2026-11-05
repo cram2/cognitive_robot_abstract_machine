@@ -1049,7 +1049,7 @@ def joint_probability_tree() -> ProbabilisticCircuit:
     """
     np.random.seed(69)
     return fit_joint_probability_tree(
-        correlated_gaussian_samples(3), min_samples_per_quantile=100
+        correlated_gaussian_samples(3), minimum_samples_per_quantile=100
     )
 
 
