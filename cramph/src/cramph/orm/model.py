@@ -144,10 +144,10 @@ class StatechartMapping(AlternativeMapping[Statechart]):
         latest = statechart.state_history.latest_item
         if latest is not None:
             statechart.life_cycle_state.data = (
-                latest.life_cycle_state.covering_every_node().data
+                latest.life_cycle_state.copy_covering_every_node().data
             )
             statechart.observation_state.data = (
-                latest.observation_state.covering_every_node().data
+                latest.observation_state.copy_covering_every_node().data
             )
         statechart.compiler.add_transitions()
         return statechart

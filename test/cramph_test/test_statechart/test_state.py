@@ -30,11 +30,11 @@ class TestStateCoveringNodesThatJoinedLater:
         recorded_observation = statechart.observation_state.snapshot()
         statechart.add_node(CountTicks(name="second", ticks=1))
 
-        assert recorded_life_cycle.covering_every_node().data.tolist() == [
+        assert recorded_life_cycle.copy_covering_every_node().data.tolist() == [
             LifeCycleValues.RUNNING,
             recorded_life_cycle.default_value,
         ]
-        assert recorded_observation.covering_every_node().data.tolist() == [
+        assert recorded_observation.copy_covering_every_node().data.tolist() == [
             ObservationStateValues.TRUE,
             recorded_observation.default_value,
         ]

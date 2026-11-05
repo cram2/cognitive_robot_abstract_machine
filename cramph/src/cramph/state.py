@@ -147,7 +147,7 @@ class State(MutableMapping[StatechartNode, float], SubclassJSONSerializer, ABC):
             data=self.data.copy(),
         )
 
-    def covering_every_node(self) -> Self:
+    def copy_covering_every_node(self) -> Self:
         """
         :return: A copy holding the value of every node this state records, and
             :attr:`default_value` for every node that joined :attr:`statechart` since.
