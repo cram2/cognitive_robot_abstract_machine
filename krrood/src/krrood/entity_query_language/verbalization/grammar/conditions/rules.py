@@ -252,7 +252,7 @@ class CoindexedFoldRule(PhraseRule):
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
         ...     flatten_fragment_to_plain_text,
         ... )
-        >>> flatten_fragment_to_plain_text(CoindexedFoldRule._attribute(('name', Bird)))
+        >>> flatten_fragment_to_plain_text(CoindexedFoldRule._attribute(pair=('name', Bird)))
         'name'
         """
         name, owner = pair
@@ -442,7 +442,7 @@ class NotRule(PhraseRule):
     """Generic negation *"not (<child>)"* (specialised by the guarded Not rules below).
 
     >>> robot = variable(Robot, [])
-    >>> verbalize_expression(Not(or_(robot.battery > 50, robot.name == 'x')))
+    >>> verbalize_expression(Not(_child_=or_(robot.battery > 50, robot.name == 'x')))
     "not (the battery of a Robot is greater than 50, or the name of the Robot is 'x')"
     """
 
@@ -482,10 +482,10 @@ class NotVerbalizablePredicateRule(PhraseRule):
     clause in *"not (...)"*. A clause with no verb or copula head has nothing to negate, so it falls
     back to the wrapped form.
 
-    >>> verbalize_expression(Not(IsReachable(variable(Location, []), variable(Robot, []))))
+    >>> verbalize_expression(Not(_child_=IsReachable(location=variable(Location, []), body=variable(Robot, []))))
     'a Location is not reachable for a Robot'
     >>> employee, department = variable(StaffMember, []), variable(Department, [])
-    >>> verbalize_expression(Not(WorksIn(employee, department)))
+    >>> verbalize_expression(Not(_child_=WorksIn(employee=employee, department=department)))
     'a StaffMember does not work in a Department'
     """
 
@@ -522,7 +522,7 @@ class NotComparatorRule(PhraseRule):
     """
     Inline negated comparator *"a is not greater than b"* (Not over a Comparator).
 
-    >>> verbalize_expression(Not(variable(Robot, []).battery > 50))
+    >>> verbalize_expression(Not(_child_=variable(Robot, []).battery > 50))
     'the battery of a Robot is not greater than 50'
     """
 
@@ -536,7 +536,7 @@ class NotComparatorRule(PhraseRule):
         over the generic :class:`NotRule`, which is why the example reads the inline *is not greater
         than 50* instead of the wrapped *not (… is greater than 50)*.
 
-        >>> verbalize_expression(Not(variable(Robot, []).battery > 50))
+        >>> verbalize_expression(Not(_child_=variable(Robot, []).battery > 50))
         'the battery of a Robot is not greater than 50'
         """
         return isinstance(node._child_, Comparator)
@@ -548,7 +548,7 @@ class NotComparatorRule(PhraseRule):
         Pushing the negation into the predicate is what yields the inline *is not greater than 50*
         operator span, leaving no outer *not (…)* wrapper.
 
-        >>> verbalize_expression(Not(variable(Robot, []).battery > 50))
+        >>> verbalize_expression(Not(_child_=variable(Robot, []).battery > 50))
         'the battery of a Robot is not greater than 50'
         """
         return ConditionAssembler(context=context).predicate(comparator=node._child_, negated=True)
@@ -559,7 +559,7 @@ class NotBooleanAttributeRule(PhraseRule):
     Negated boolean attribute chain *"<nav> is not <attribute>"* (Not over a bool-
     attribute chain).
 
-    >>> verbalize_expression(Not(variable(Task, []).completed))
+    >>> verbalize_expression(Not(_child_=variable(Task, []).completed))
     'a Task is not completed'
     """
 
@@ -573,7 +573,7 @@ class NotBooleanAttributeRule(PhraseRule):
         generic :class:`NotRule`, which is why the example reads the predicative *is not completed*
         instead of the wrapped *not (a Task is completed)*.
 
-        >>> verbalize_expression(Not(variable(Task, []).completed))
+        >>> verbalize_expression(Not(_child_=variable(Task, []).completed))
         'a Task is not completed'
         """
         return is_boolean_attribute_chain(node._child_)
@@ -585,7 +585,7 @@ class NotBooleanAttributeRule(PhraseRule):
         It owns the *is not completed* span, emitting the boolean attribute as a negated predicative
         rather than appending a *not (…)* wrapper.
 
-        >>> verbalize_expression(Not(variable(Task, []).completed))
+        >>> verbalize_expression(Not(_child_=variable(Task, []).completed))
         'a Task is not completed'
         """
         plan = context.microplan.plan_for(node=node._child_, planner=ChainPlanner)
@@ -758,7 +758,7 @@ class CausesEffectRule(PhraseRule):
     recognisable from its verbalization alone rather than reading as a vague *"what"*.
 
     >>> pick = variable(Pick, [])
-    >>> verbalize_expression(CausesEffect(pick.grasped == True, cause_attributes=[pick.arm]))
+    >>> verbalize_expression(CausesEffect(_child_=pick.grasped == True, cause_attributes=[pick.arm]))
     'the arm of a Pick causes the Pick to be grasped'
     """
 

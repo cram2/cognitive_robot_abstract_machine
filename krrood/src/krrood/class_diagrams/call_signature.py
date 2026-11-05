@@ -24,7 +24,7 @@ class CallSignature:
     The parameters a call to one callee passes its arguments to, as its caller writes
     them: a class is called without ``self``, a method read from its class with it.
 
-    >>> CallSignature.of(divmod).accepts_keyword("x")
+    >>> CallSignature.of(callee=divmod).accepts_keyword(keyword="x")
     False
     """
 

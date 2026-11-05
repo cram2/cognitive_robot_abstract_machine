@@ -39,7 +39,7 @@ class OrthographyProcessor(RealizationPass):
         ...                                WordFragment(text=")", spacing=Spacing.LEFT)])
         >>> flatten_fragment_to_plain_text(parens)
         '( x )'
-        >>> flatten_fragment_to_plain_text(OrthographyProcessor().process(parens))
+        >>> flatten_fragment_to_plain_text(OrthographyProcessor().process(fragment=parens))
         '(x)'
         """
         rebuilt = map_structural_children(fragment, lambda fragment: self.process(fragment=fragment))
@@ -60,7 +60,7 @@ class OrthographyProcessor(RealizationPass):
             token the next.
 
         >>> glued = OrthographyProcessor()._apply_glue(
-        ...     [WordFragment(text="x"), WordFragment(text=",", spacing=Spacing.LEFT), WordFragment(text="y")])
+        ...     parts=[WordFragment(text="x"), WordFragment(text=",", spacing=Spacing.LEFT), WordFragment(text="y")])
         >>> len(glued)
         2
         """
@@ -88,9 +88,9 @@ class OrthographyProcessor(RealizationPass):
         """:return: A zero-separator group of *items* (the single item itself when there is only one).
 
         >>> only = WordFragment(text="x")
-        >>> OrthographyProcessor._merge([only]) is only
+        >>> OrthographyProcessor._merge(items=[only]) is only
         True
-        >>> OrthographyProcessor._merge([only, WordFragment(text="y")]).separator
+        >>> OrthographyProcessor._merge(items=[only, WordFragment(text="y")]).separator
         <Separator.NONE: ''>
         """
         return (

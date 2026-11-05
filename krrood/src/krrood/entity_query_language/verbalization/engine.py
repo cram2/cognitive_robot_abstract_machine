@@ -43,8 +43,8 @@ def root_context(
 
     >>> from krrood.entity_query_language.verbalization.context import MicroplanningServices
     >>> robot = variable(Robot, [])
-    >>> context = root_context(MicroplanningServices.from_expression(robot), RULES)
-    >>> type(context.child(robot)).__name__
+    >>> context = root_context(MicroplanningServices.from_expression(expression=robot), RULES)
+    >>> type(context.child(node=robot)).__name__
     'NounPhrase'
     """
     return RuleContext(
@@ -125,9 +125,9 @@ def _with_source(
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import RoleFragment
     >>> robot = variable(Robot, [])
-    >>> _with_source(RoleFragment.for_variable("Robot", robot), robot).source is robot
+    >>> _with_source(RoleFragment.for_variable(label="Robot", expression=robot), robot).source is robot
     True
-    >>> stamped = _with_source(RoleFragment.for_variable("Robot", robot), robot)
+    >>> stamped = _with_source(RoleFragment.for_variable(label="Robot", expression=robot), robot)
     >>> _with_source(stamped, variable(Robot, [])).source is robot
     True
     """

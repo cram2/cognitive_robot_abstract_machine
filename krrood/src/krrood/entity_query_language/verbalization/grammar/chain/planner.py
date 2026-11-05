@@ -58,7 +58,7 @@ class ChainPlan:
         """:return: ``True`` when the chain is a single attribute on a variable (the bare-plural
         *"attributes of Roots"* form).
 
-        >>> ChainPlanner(variable(Robot, []).battery).plan().is_single_variable_attribute
+        >>> ChainPlanner(node=variable(Robot, []).battery).plan().is_single_variable_attribute
         True
         """
         return (
@@ -77,7 +77,7 @@ class ChainPlan:
         :param number: The grammatical number requested for the chain.
         :return: ``True`` when the chain renders as the bare-plural attribute form.
 
-        >>> ChainPlanner(variable(Robot, []).battery).plan().renders_as_plural_attribute(GrammaticalNumber.PLURAL)
+        >>> ChainPlanner(node=variable(Robot, []).battery).plan().renders_as_plural_attribute(number=GrammaticalNumber.PLURAL)
         True
         """
         return number is GrammaticalNumber.PLURAL and self.is_single_variable_attribute
@@ -92,14 +92,14 @@ class ChainPlanner(Planner[MappedVariable, ChainPlan]):
 
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
-    >>> ChainPlanner(variable(Task, []).completed).plan().is_boolean_terminal
+    >>> ChainPlanner(node=variable(Task, []).completed).plan().is_boolean_terminal
     True
     """
 
     def plan(self) -> ChainPlan:
         """:return: The chain plan: the walked chain, its root, display parts, and boolean form.
 
-        >>> ChainPlanner(variable(Task, []).name).plan().is_boolean_terminal
+        >>> ChainPlanner(node=variable(Task, []).name).plan().is_boolean_terminal
         False
         """
         chain, root = walk_chain(self.node)

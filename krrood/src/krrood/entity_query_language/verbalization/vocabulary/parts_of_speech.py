@@ -85,7 +85,7 @@ class Noun(ClauseElement):
         chosen by the determiner pass (*"a"* / *"an"*) and the head pluralises and reduces with
         coreference — else the constituent's own fragment.
 
-        >>> Noun("instance").as_fragment().definiteness
+        >>> Noun(content="instance").as_fragment().definiteness
         <Definiteness.INDEFINITE: 'indefinite'>
         """
         if isinstance(self.content, str):
@@ -98,7 +98,7 @@ class Noun(ClauseElement):
     def the(cls, *, head: str) -> Noun:
         """:return: a definite literal noun (*"the name"*).
 
-        >>> Noun.the("name").as_fragment().definiteness
+        >>> Noun.the(head="name").as_fragment().definiteness
         <Definiteness.DEFINITE: 'definite'>
         """
         return cls(content=head, definiteness=Definiteness.DEFINITE)
@@ -107,7 +107,7 @@ class Noun(ClauseElement):
     def bare(cls, *, head: str) -> Noun:
         """:return: a bare literal noun with no article (*"of type"*, not *"of a type"*).
 
-        >>> Noun.bare("type").as_fragment().definiteness
+        >>> Noun.bare(head="type").as_fragment().definiteness
         <Definiteness.BARE: 'bare'>
         """
         return cls(content=head, definiteness=Definiteness.BARE)
@@ -136,7 +136,7 @@ class Verb(ClauseElement):
     def as_fragment(self) -> RoleFragment:
         """:return: a ``VERB``-role leaf carrying the lemma for the morphology pass to inflect.
 
-        >>> Verb("work").as_fragment().role
+        >>> Verb(lemma="work").as_fragment().role
         <SemanticRole.VERB: 'verb'>
         """
         return RoleFragment(text=self.lemma, role=SemanticRole.VERB, number=self.number)
@@ -156,7 +156,7 @@ class Adjective(ClauseElement):
     def as_fragment(self) -> WordFragment:
         """:return: a plain word leaf for the adjective.
 
-        >>> Adjective("reachable").as_fragment().text
+        >>> Adjective(word="reachable").as_fragment().text
         'reachable'
         """
         return WordFragment(text=self.word)
@@ -214,7 +214,7 @@ class OneOf(ClauseElement):
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
         ...     flatten_fragment_to_plain_text,
         ... )
-        >>> flatten_fragment_to_plain_text(OneOf((int, str)).as_fragment())
+        >>> flatten_fragment_to_plain_text(OneOf(members=(int, str)).as_fragment())
         'one of Integer or Text'
         """
         members = list(
@@ -269,7 +269,7 @@ class DisjunctivePhrase(ClauseElement):
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
         ...     flatten_fragment_to_plain_text,
         ... )
-        >>> flatten_fragment_to_plain_text(DisjunctivePhrase((int, str)).as_fragment())
+        >>> flatten_fragment_to_plain_text(DisjunctivePhrase(members=(int, str)).as_fragment())
         'Integer or Text'
         """
         value = (
@@ -310,7 +310,7 @@ class ConjunctivePhrase(ClauseElement):
         ... )
         >>> flatten_fragment_to_plain_text(
         ...     ConjunctivePhrase(
-        ...         [WordFragment(text="a"), WordFragment(text="b")]
+        ...         items=[WordFragment(text="a"), WordFragment(text="b")]
         ...     ).as_fragment()
         ... )
         'a and b'
@@ -367,8 +367,8 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     ...     flatten_fragment_to_plain_text, WordFragment,
     ... )
     >>> flatten_fragment_to_plain_text(
-    ...     clause(Noun(WordFragment(text="an Employee")), Verb("work"), Prepositions.IN,
-    ...            Noun(WordFragment(text="a Department")))
+    ...     clause(Noun(content=WordFragment(text="an Employee")), Verb(lemma="work"), Prepositions.IN,
+    ...            Noun(content=WordFragment(text="a Department")))
     ... )
     'an Employee work in a Department'
     """
@@ -445,7 +445,7 @@ class FunctionVerbalizationTemplates:
         'quarter'
         >>> flatten_fragment_to_plain_text(realize_tree(
         ...     FunctionVerbalizationTemplates.possessive(
-        ...         Noun.the("capacity"), function_class=type("RemainingLoad", (), {})
+        ...         Noun.the(head="capacity"), function_class=type("RemainingLoad", (), {})
         ...     )
         ... ))
         'the remaining load of the capacity'
@@ -483,8 +483,8 @@ class FunctionVerbalizationTemplates:
         ... )
         >>> flatten_fragment_to_plain_text(realize_tree(
         ...     FunctionVerbalizationTemplates.custom_relation(
-        ...         Noun.the("begin"),
-        ...         Noun.the("end"),
+        ...         Noun.the(head="begin"),
+        ...         Noun.the(head="end"),
         ...         function_class=type("InheritancePathLength", (), {}),
         ...         relation=Prepositions.BETWEEN,
         ...     )
@@ -542,13 +542,13 @@ def predicate_clause(
     >>> def render(fragment):
     ...     return flatten_fragment_to_plain_text(realize_tree(fragment))
     >>> class IsReachable: pass
-    >>> render(predicate_clause(IsReachable, Noun("Robot")))
+    >>> render(predicate_clause(IsReachable, Noun(content="Robot")))
     'a Robot is reachable'
     >>> class ConnectsTo: pass
-    >>> render(predicate_clause(ConnectsTo, Noun("body"), Noun("gripper")))
+    >>> render(predicate_clause(ConnectsTo, Noun(content="body"), Noun(content="gripper")))
     'a body connects to a gripper'
     >>> class IsOneMonth: pass
-    >>> render(predicate_clause(IsOneMonth, Noun.the("begin"), Noun.the("end")))
+    >>> render(predicate_clause(IsOneMonth, Noun.the(head="begin"), Noun.the(head="end")))
     'one month holds given the begin and the end'
     """
     head, *rest = camel_case_to_words(predicate_class.__name__).split()

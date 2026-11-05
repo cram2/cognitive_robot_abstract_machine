@@ -184,7 +184,7 @@ class LiteralRule(PhraseRule):
         identity head plus the qualifying detail :meth:`_identifying_fields` supplies:
 
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))
+        >>> verbalize_expression(a(entity(robot).where(robot == Robot(name="R2D2", battery=80, operational=True))))
         "Find a Robot such that the Robot is a specific Robot with name 'R2D2'"
         """
         value = node._value_
@@ -223,7 +223,7 @@ class LiteralRule(PhraseRule):
         specific Robot"*):
 
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))
+        >>> verbalize_expression(a(entity(robot).where(robot == Robot(name="R2D2", battery=80, operational=True))))
         "Find a Robot such that the Robot is a specific Robot with name 'R2D2'"
         """
         names = LiteralRule._declared_identifying_names(value=value)

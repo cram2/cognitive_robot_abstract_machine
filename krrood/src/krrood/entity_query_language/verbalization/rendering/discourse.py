@@ -97,8 +97,8 @@ class QueryScope(DiscourseScopeRule):
         >>> robot = variable(Robot, [])
         >>> from krrood.entity_query_language.verbalization.context import MicroplanningServices
         >>> query = entity(robot).where(robot.battery > 50)
-        >>> services = MicroplanningServices.from_expression(query)
-        >>> QueryScope.focus(query, services.microplan) == robot._id_
+        >>> services = MicroplanningServices.from_expression(expression=query)
+        >>> QueryScope.focus(node=query, microplan=services.microplan) == robot._id_
         True
         """
         return cls._focus_from_plan(plan=microplan.plan_for(node=node, planner=QueryPlanner))
@@ -111,7 +111,7 @@ class QueryScope(DiscourseScopeRule):
 
         >>> robot = variable(Robot, [])
         >>> scope = entity(robot).where(robot.battery > 50)
-        >>> QueryScope._focus_from_plan(QueryPlanner(scope).plan()) == robot._id_
+        >>> QueryScope._focus_from_plan(plan=QueryPlanner(node=scope).plan()) == robot._id_
         True
         """
         if plan.is_aggregation_subquery and plan.aggregation_data is not None:
@@ -141,7 +141,7 @@ class QuantifierScope(DiscourseScopeRule):
         pronominalise.
 
         >>> robot = variable(Robot, [])
-        >>> QuantifierScope.focus(exists(robot, robot.battery > 0), None) == robot._id_
+        >>> QuantifierScope.focus(node=exists(robot, robot.battery > 0), microplan=None) == robot._id_
         True
         """
         return node.variable._id_
@@ -188,21 +188,21 @@ class DiscourseModel:
         >>> from krrood.entity_query_language.verbalization.context import MicroplanningServices
         >>> robot = variable(Robot, [])
         >>> query = a(entity(robot).where(robot.battery > 50))
-        >>> services = MicroplanningServices.from_expression(query)
-        >>> model = DiscourseModel.from_expression(query, services.microplan)
+        >>> services = MicroplanningServices.from_expression(expression=query)
+        >>> model = DiscourseModel.from_expression(expression=query, microplan=services.microplan)
         >>> scope = next(node for node in query._all_expressions_ if isinstance(node, Entity))
-        >>> model.is_scope(scope)
+        >>> model.is_scope(source=scope)
         True
-        >>> model.focus_of(scope) == robot._id_
+        >>> model.focus_of(source=scope) == robot._id_
         True
 
         A quantifier opens a scope too, focused on its bound variable:
 
         >>> robot = variable(Robot, [])
         >>> existential = exists(robot, robot.battery > 50)
-        >>> services = MicroplanningServices.from_expression(existential)
-        >>> model = DiscourseModel.from_expression(existential, services.microplan)
-        >>> model.focus_of(existential) == robot._id_
+        >>> services = MicroplanningServices.from_expression(expression=existential)
+        >>> model = DiscourseModel.from_expression(expression=existential, microplan=services.microplan)
+        >>> model.focus_of(source=existential) == robot._id_
         True
         """
         focus: dict[uuid.UUID, uuid.UUID | None] = {}
@@ -226,7 +226,7 @@ class DiscourseModel:
         Only a real expression carries an ``_id_``; a synthetic coordination artifact (or ``None``)
         is never a scope.
 
-        >>> EMPTY_DISCOURSE.is_scope(None)
+        >>> EMPTY_DISCOURSE.is_scope(source=None)
         False
         """
         if not isinstance(source, SymbolicExpression):
@@ -236,7 +236,7 @@ class DiscourseModel:
     def focus_of(self, *, source: FoldNode | None) -> uuid.UUID | None:
         """:return: The focus referent of *source*'s scope, or ``None``.
 
-        >>> EMPTY_DISCOURSE.focus_of(None) is None
+        >>> EMPTY_DISCOURSE.focus_of(source=None) is None
         True
         """
         if not isinstance(source, SymbolicExpression):
@@ -247,7 +247,7 @@ class DiscourseModel:
         """:return: ``True`` when *node_id* is a quantity the query selects (e.g. an aggregation's
         measured attribute), so its repeat mention reduces to a bare *"the <attribute>"*.
 
-        >>> EMPTY_DISCOURSE.is_selected_quantity(None)
+        >>> EMPTY_DISCOURSE.is_selected_quantity(node_id=None)
         False
         """
         return node_id is not None and node_id in self._selected_quantities

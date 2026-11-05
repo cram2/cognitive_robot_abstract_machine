@@ -234,7 +234,7 @@ class RangeBoundFold(ConjunctFold):
         """:return: *conjuncts* with each complementary bound pair folded to a :class:`RangeFold`.
 
         >>> robot = variable(Robot, [])
-        >>> isinstance(RangeBoundFold().apply([robot.battery >= 20, robot.battery <= 80])[0], RangeFold)
+        >>> isinstance(RangeBoundFold().apply(conjuncts=[robot.battery >= 20, robot.battery <= 80])[0], RangeFold)
         True
         """
         return fold_range_pairs(conjuncts)
@@ -254,7 +254,7 @@ class CoindexedComparisonFold(ConjunctFold):
         >>> Span = dataclasses.make_dataclass("Span", [("low", int), ("high", int)])
         >>> Pair = dataclasses.make_dataclass("Pair", [("left", Span), ("right", Span)])
         >>> pair = variable(Pair, [])
-        >>> folded = CoindexedComparisonFold().apply([pair.left.low == pair.right.low, pair.left.high == pair.right.high])
+        >>> folded = CoindexedComparisonFold().apply(conjuncts=[pair.left.low == pair.right.low, pair.left.high == pair.right.high])
         >>> isinstance(folded[0], CoindexedFold)
         True
         """
@@ -284,7 +284,7 @@ class ConjunctReducer:
         :return: The list with each fold's recognised groups reduced to artifacts.
 
         >>> robot = variable(Robot, [])
-        >>> len(ConjunctReducer().reduce([robot.battery >= 20, robot.battery <= 80]))
+        >>> len(ConjunctReducer().reduce(conjuncts=[robot.battery >= 20, robot.battery <= 80]))
         1
         """
         items: ConjunctList = list(conjuncts)
@@ -767,7 +767,7 @@ def build_between(
     :return: The range phrase fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(build_between(WordFragment("x"), WordFragment("1"), WordFragment("10"), compact=False))
+    >>> flatten_fragment_to_plain_text(build_between(WordFragment(text="x"), WordFragment(text="1"), WordFragment(text="10"), compact=False))
     'x is between 1 and 10'
     """
     # Spread the range phrase's parts so the clause stays flat ([left, operator, bounds]); the
@@ -803,7 +803,7 @@ def between_phrase(
     :return: The range-predicate fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment("1"), WordFragment("10"), compact=False))
+    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment(text="1"), WordFragment(text="10"), compact=False))
     'is between 1 and 10'
     """
     return PhraseFragment(
@@ -856,7 +856,7 @@ def disjunctive_phrase(
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, RoleFragment,
     ... )
-    >>> members = [RoleFragment.for_literal(value) for value in ("a", "b", "c")]
+    >>> members = [RoleFragment.for_literal(value=value) for value in ("a", "b", "c")]
     >>> flatten_fragment_to_plain_text(disjunctive_phrase(members))
     "'a', 'b', or 'c'"
     """
@@ -883,7 +883,7 @@ def one_of(candidates: list[VerbalizationFragment]) -> VerbalizationFragment | N
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, RoleFragment,
     ... )
-    >>> options = [RoleFragment.for_literal(value) for value in ("a", "b", "c")]
+    >>> options = [RoleFragment.for_literal(value=value) for value in ("a", "b", "c")]
     >>> flatten_fragment_to_plain_text(one_of(options))
     "one of 'a', 'b', or 'c'"
     >>> one_of([]) is None

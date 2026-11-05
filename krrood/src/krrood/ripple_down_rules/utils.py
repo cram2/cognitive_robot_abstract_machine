@@ -1607,7 +1607,7 @@ subgraph cluster_legend {
         >>> s1ca = Node("sub1Ca", parent=s1c)
 
         >>> from anytree.exporter import DotExporter
-        >>> DotExporter(root).to_dotfile("tree.dot")
+        >>> DotExporter(root).to_dotfile(filename="tree.dot")
 
         The generated file should be handed over to the `dot` tool from the
         http://www.graphviz.org/ package::

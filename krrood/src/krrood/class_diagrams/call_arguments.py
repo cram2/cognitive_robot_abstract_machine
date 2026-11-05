@@ -24,7 +24,7 @@ class CallArguments:
     and contents, and any other value by identity, so two objects that compare equal
     but cannot be hashed are different arguments.
 
-    >>> CallArguments((1, [2, 3]), {"scale": 2.0}) == CallArguments((1, [2, 3]), {"scale": 2.0})
+    >>> CallArguments(positional=(1, [2, 3]), keyword={"scale": 2.0}) == CallArguments(positional=(1, [2, 3]), keyword={"scale": 2.0})
     True
     """
 

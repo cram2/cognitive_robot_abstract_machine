@@ -46,7 +46,7 @@ def attribute_fragment(
     (*"beginning"* for ``begin``) applies here just as it does for a standalone attribute leaf.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-    >>> flatten_fragment_to_plain_text(attribute_fragment(PathStep("salary")))
+    >>> flatten_fragment_to_plain_text(attribute_fragment(PathStep(name="salary")))
     'salary'
     """
     if step.source_reference is None:
@@ -66,7 +66,7 @@ def indexed_noun(
     the ordinal precedes it as a modifier.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, PhraseFragment
-    >>> step = PathStep("tasks", ordinal="first")
+    >>> step = PathStep(name="tasks", ordinal="first")
     >>> flatten_fragment_to_plain_text(PhraseFragment(parts=indexed_noun(step)))
     'first task'
     """
@@ -82,7 +82,7 @@ def _ordinal_genitive_step(
     (*"the first task of a Worker"*).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> step = PathStep("tasks", ordinal="first")
+    >>> step = PathStep(name="tasks", ordinal="first")
     >>> flatten_fragment_to_plain_text(_ordinal_genitive_step(step, WordFragment(text="Worker")))
     'the first task of Worker'
     """
@@ -119,7 +119,7 @@ def _genitive_step(
     through :func:`_relative_clause`).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(_genitive_step(PathStep("battery"), WordFragment(text="Robot")))
+    >>> flatten_fragment_to_plain_text(_genitive_step(PathStep(name="battery"), WordFragment(text="Robot")))
     'the battery of Robot'
     """
     article = _genitive_article(step)
@@ -223,7 +223,7 @@ def coordinated_genitive(
     than repeated owner by owner (*"the department of an Employee and its salary"*).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> attributes = [attribute_fragment(PathStep("department")), attribute_fragment(PathStep("salary"))]
+    >>> attributes = [attribute_fragment(PathStep(name="department")), attribute_fragment(PathStep(name="salary"))]
     >>> flatten_fragment_to_plain_text(coordinated_genitive(attributes, WordFragment(text="Employee")))
     'the department and salary of Employee'
     """
@@ -248,7 +248,7 @@ def _extend_hop(
     *assigned_to*) would instead become a *"… to which … is assigned"* relative clause.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(_extend_hop(PathStep("battery"), WordFragment(text="Robot")))
+    >>> flatten_fragment_to_plain_text(_extend_hop(PathStep(name="battery"), WordFragment(text="Robot")))
     'the battery of Robot'
     """
     if step.is_relation:
@@ -290,10 +290,10 @@ def chain_head_number(
     this returns plural.
 
     >>> from krrood.entity_query_language.verbalization.fragments.features import GrammaticalNumber
-    >>> chain_head_number([PathStep("battery", is_scalar_value=True)], GrammaticalNumber.PLURAL)
+    >>> chain_head_number([PathStep(name="battery", is_scalar_value=True)], GrammaticalNumber.PLURAL)
     <GrammaticalNumber.PLURAL: 'plural'>
     >>> chain_head_number(
-    ...     [PathStep("assigned_to"), PathStep("battery", is_scalar_value=True)], GrammaticalNumber.PLURAL
+    ...     [PathStep(name="assigned_to"), PathStep(name="battery", is_scalar_value=True)], GrammaticalNumber.PLURAL
     ... )
     <GrammaticalNumber.SINGULAR: 'singular'>
     """

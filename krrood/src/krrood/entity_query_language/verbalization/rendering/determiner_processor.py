@@ -67,8 +67,8 @@ class DeterminerProcessor(RewritePass):
         :return: The lowered fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> phrase = NounPhrase(head=RoleFragment.for_type(Robot), definiteness=Definiteness.INDEFINITE)
-        >>> flatten_fragment_to_plain_text(DeterminerProcessor()._lower_noun_phrase(phrase))
+        >>> phrase = NounPhrase(head=RoleFragment.for_type(type_=Robot), definiteness=Definiteness.INDEFINITE)
+        >>> flatten_fragment_to_plain_text(DeterminerProcessor()._lower_noun_phrase(noun_phrase=phrase))
         'a Robot'
         """
         # An ordinal distinguisher ("a [second] Robot") sits ahead of any pre-head qualifier ("the
@@ -156,7 +156,7 @@ class DeterminerProcessor(RewritePass):
         """
         Tag the head leaf with the phrase's number.
 
-        >>> DeterminerProcessor._tag_number(WordFragment(text="Robot"), GrammaticalNumber.PLURAL).number
+        >>> DeterminerProcessor._tag_number(head=WordFragment(text="Robot"), number=GrammaticalNumber.PLURAL).number
         <GrammaticalNumber.PLURAL: 'plural'>
         """
         if isinstance(head, (WordFragment, RoleFragment)):
@@ -180,20 +180,20 @@ class DeterminerProcessor(RewritePass):
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> flatten_fragment_to_plain_text(
-        ...     DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.SINGULAR, WordFragment(text="hour")))
+        ...     DeterminerProcessor._determiner(definiteness=Definiteness.INDEFINITE, number=GrammaticalNumber.SINGULAR, article_anchor=WordFragment(text="hour")))
         'an'
         >>> flatten_fragment_to_plain_text(
-        ...     DeterminerProcessor._determiner(Definiteness.DEFINITE, GrammaticalNumber.SINGULAR, WordFragment(text="Robot")))
+        ...     DeterminerProcessor._determiner(definiteness=Definiteness.DEFINITE, number=GrammaticalNumber.SINGULAR, article_anchor=WordFragment(text="Robot")))
         'the'
-        >>> DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.PLURAL, WordFragment(text="Robot")) is None
+        >>> DeterminerProcessor._determiner(definiteness=Definiteness.INDEFINITE, number=GrammaticalNumber.PLURAL, article_anchor=WordFragment(text="Robot")) is None
         True
         >>> flatten_fragment_to_plain_text(
-        ...     DeterminerProcessor._determiner(Definiteness.INDEFINITE, GrammaticalNumber.SINGULAR,
-        ...                                      WordFragment(text="Robot"), alternative=True))
+        ...     DeterminerProcessor._determiner(definiteness=Definiteness.INDEFINITE, number=GrammaticalNumber.SINGULAR,
+        ...                                      article_anchor=WordFragment(text="Robot"), alternative=True))
         'another'
         >>> flatten_fragment_to_plain_text(
-        ...     DeterminerProcessor._determiner(Definiteness.DEFINITE, GrammaticalNumber.SINGULAR,
-        ...                                      WordFragment(text="Robot"), alternative=True))
+        ...     DeterminerProcessor._determiner(definiteness=Definiteness.DEFINITE, number=GrammaticalNumber.SINGULAR,
+        ...                                      article_anchor=WordFragment(text="Robot"), alternative=True))
         'the other'
         """
         if definiteness is Definiteness.UNIQUE:

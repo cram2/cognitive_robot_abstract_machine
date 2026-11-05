@@ -102,7 +102,7 @@ def is_concrete_object_literal(expression: SymbolicExpression) -> bool:
         or ``None`` is not.
 
     >>> robot = variable(Robot, [])
-    >>> is_concrete_object_literal((robot == Robot("R2D2", 80, True)).right)
+    >>> is_concrete_object_literal((robot == Robot(name="R2D2", battery=80, operational=True)).right)
     True
     >>> is_concrete_object_literal((robot.battery > 50).right)
     False

@@ -61,7 +61,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
     >>> connection = variable(FixedConnection, [])
-    >>> InstantiatedPlanner(inference(Drawer)(container=connection.parent, handle=connection.child)).plan().type_name
+    >>> InstantiatedPlanner(node=inference(Drawer)(container=connection.parent, handle=connection.child)).plan().type_name
     'Drawer'
     """
 
@@ -70,7 +70,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
 
         >>> connection = variable(FixedConnection, [])
         >>> drawer = inference(Drawer)(container=connection.parent, handle=connection.child)
-        >>> InstantiatedPlanner(drawer).plan().type_name
+        >>> InstantiatedPlanner(node=drawer).plan().type_name
         'Drawer'
         """
         return InstantiatedPlan(type_name=self._type_name(), bindings=self._bindings())
@@ -79,7 +79,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         """:return: The display name of the instantiated type (*"Drawer"*).
 
         >>> connection = variable(FixedConnection, [])
-        >>> InstantiatedPlanner(inference(Drawer)(container=connection.parent, handle=connection.child))._type_name()
+        >>> InstantiatedPlanner(node=inference(Drawer)(container=connection.parent, handle=connection.child))._type_name()
         'Drawer'
         """
         return getattr(self.node._type_, "__name__", str(self.node._type_))
@@ -88,7 +88,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         """:return: One :class:`BindingPlan` per field binding, in construction order.
 
         >>> connection = variable(FixedConnection, [])
-        >>> bindings = InstantiatedPlanner(inference(Drawer)(container=connection.parent, handle=connection.child))._bindings()
+        >>> bindings = InstantiatedPlanner(node=inference(Drawer)(container=connection.parent, handle=connection.child))._bindings()
         >>> [binding.field_name for binding in bindings]
         ['container', 'handle']
         """
@@ -109,7 +109,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
             ``_verbalization_fragment_`` with its own structured surface.
 
         >>> connection = variable(FixedConnection, [])
-        >>> InstantiatedPlanner.has_fragment(inference(Drawer)(container=connection.parent, handle=connection.child))
+        >>> InstantiatedPlanner.has_fragment(node=inference(Drawer)(container=connection.parent, handle=connection.child))
         False
         """
         factory = node._factory_

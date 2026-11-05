@@ -49,9 +49,9 @@ class MorphologyProcessor(RewritePass):
         """:return: *leaf* with number and polarity realised, then reset; a leaf with no realisable
         feature is returned unchanged.
 
-        >>> MorphologyProcessor().rewrite(WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
+        >>> MorphologyProcessor().rewrite(leaf=WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
         'Robots'
-        >>> MorphologyProcessor().rewrite(WordFragment(text="Robot")).text
+        >>> MorphologyProcessor().rewrite(leaf=WordFragment(text="Robot")).text
         'Robot'
         """
         if not isinstance(leaf, (WordFragment, RoleFragment)):
@@ -73,7 +73,7 @@ class MorphologyProcessor(RewritePass):
         """:return: the ``VERB`` leaf's lemma realised — present 3rd-person singular (*"works"*),
         bare plural (*"work"*), or do-support negation (*"does not work"* / *"do not work"*).
 
-        >>> MorphologyProcessor()._realize_verb(RoleFragment(text="work", role=SemanticRole.VERB)).text
+        >>> MorphologyProcessor()._realize_verb(leaf=RoleFragment(text="work", role=SemanticRole.VERB)).text
         'works'
         """
         plural = leaf.number is GrammaticalNumber.PLURAL
@@ -92,7 +92,7 @@ class MorphologyProcessor(RewritePass):
         non-copula operator (*"greater than"*) is returned unchanged but for its reset features.
 
         >>> MorphologyProcessor()._realize_copula(
-        ...     RoleFragment(text="is", role=SemanticRole.OPERATOR, negated=True)
+        ...     leaf=RoleFragment(text="is", role=SemanticRole.OPERATOR, negated=True)
         ... ).text
         'is not'
         """

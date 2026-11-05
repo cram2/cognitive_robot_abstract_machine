@@ -82,7 +82,7 @@ class SelectedVariableSubjectRule(RestrictionSubjectRule):
 
         >>> robot = variable(Robot, [])
         >>> query = an(entity(robot).where(robot.battery > 50))
-        >>> SelectedVariableSubjectRule.subject(query, query.selected_variable) is robot
+        >>> SelectedVariableSubjectRule.subject(expression=query, selected_variable=query.selected_variable) is robot
         True
         """
         return selected_variable
@@ -127,7 +127,7 @@ class AggregationSourceSubjectRule(RestrictionSubjectRule):
 
         >>> employee = variable(Employee, [])
         >>> query = an(entity(max(employee.salary)).where(employee.department == 'Sales'))
-        >>> AggregationSourceSubjectRule.subject(query, query.selected_aggregator) is employee
+        >>> AggregationSourceSubjectRule.subject(expression=query, selected_variable=query.selected_aggregator) is employee
         True
         """
         return aggregation_source_root(expression)

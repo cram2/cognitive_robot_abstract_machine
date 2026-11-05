@@ -65,7 +65,7 @@ class FragmentRenderer(ABC):
         :return: Coloured (and optionally linked) string.
 
         >>> from krrood.entity_query_language.verbalization.fragments.roles import SemanticRole
-        >>> ParagraphRenderer()._render_role("Robot", SemanticRole.VARIABLE, None)
+        >>> ParagraphRenderer()._render_role(text="Robot", role=SemanticRole.VARIABLE, source_reference=None)
         'Robot'
         """
         colored = self.formatter.colorize(text=text, role=role)
@@ -99,8 +99,8 @@ class ParagraphRenderer(FragmentRenderer):
 
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
-        >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
-        >>> ParagraphRenderer().render(tree)
+        >>> tree = EQLVerbalizer().build(expression=a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
+        >>> ParagraphRenderer().render(fragment=tree)
         'Find a Robot whose battery is between 50 and 90'
         """
 
@@ -164,8 +164,8 @@ class HierarchicalRenderer(FragmentRenderer):
 
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
-        >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
-        >>> print(HierarchicalRenderer().render(tree))
+        >>> tree = EQLVerbalizer().build(expression=a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
+        >>> print(HierarchicalRenderer().render(fragment=tree))
         Find a Robot
           - whose battery is between 50 and 90
         """
@@ -207,8 +207,8 @@ class HierarchicalRenderer(FragmentRenderer):
 
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
-        >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
-        >>> print(HierarchicalRenderer()._render_item(tree, 0))
+        >>> tree = EQLVerbalizer().build(expression=a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
+        >>> print(HierarchicalRenderer()._render_item(fragment=tree, depth=0))
         Find a Robot
           - whose battery is between 50 and 90
         """
@@ -236,8 +236,8 @@ class HierarchicalRenderer(FragmentRenderer):
 
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> robot = variable(Robot, [])
-        >>> tree = EQLVerbalizer().build(a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
-        >>> HierarchicalRenderer()._inline(tree)
+        >>> tree = EQLVerbalizer().build(expression=a(entity(robot).where(and_(robot.battery > 50, robot.battery < 90))))
+        >>> HierarchicalRenderer()._inline(fragment=tree)
         'Find a Robot whose battery is between 50 and 90'
         """
 

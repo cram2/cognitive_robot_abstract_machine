@@ -492,7 +492,7 @@ def negate_clause(fragment: VerbalizationFragment) -> VerbalizationFragment | No
     ...     PhraseFragment, WordFragment,
     ... )
     >>> from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import Verb
-    >>> clause = PhraseFragment(parts=[WordFragment(text="an Employee"), Verb("work").as_fragment()])
+    >>> clause = PhraseFragment(parts=[WordFragment(text="an Employee"), Verb(lemma="work").as_fragment()])
     >>> negate_clause(clause).parts[1].negated
     True
     >>> negate_clause(WordFragment(text="a Robot")) is None
@@ -528,7 +528,7 @@ def coindexed_operator(operation) -> VerbalizationFragment:
     ...     MorphologyProcessor,
     ... )
     >>> realise = lambda fragment: flatten_fragment_to_plain_text(
-    ...     MorphologyProcessor().process(fragment)
+    ...     MorphologyProcessor().process(fragment=fragment)
     ... )
     >>> realise(coindexed_operator(operator.eq))
     'are equal to'

@@ -87,7 +87,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
         >>> aggregated = AntecedentInformation(root=None, variable=None, type_name='Drawer',
         ...     aggregation_status=AggregationStatus.AGGREGATED)
-        >>> InferenceAssembler._number(aggregated).name
+        >>> InferenceAssembler._number(antecedent=aggregated).name
         'PLURAL'
         """
         return GrammaticalNumber.of(

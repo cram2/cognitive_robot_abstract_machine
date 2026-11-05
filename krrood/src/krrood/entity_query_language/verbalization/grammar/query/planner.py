@@ -212,14 +212,14 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
-    >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+    >>> QueryPlanner(node=entity(variable(Robot, []))).plan().selected_type
     'Robot'
     """
 
     def plan(self) -> QueryPlan:
         """:return: The plan: selection shape, definiteness, restriction partition, aggregation.
 
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind.name
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().kind.name
         'SUBJECT'
         """
         self.node.build()
@@ -317,7 +317,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     def _kind(self) -> SelectionKind:
         """:return: The selection kind — ``SET_OF``, ``ENTITY_SELECTOR``, ``EMPTY`` or ``SUBJECT``.
 
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().kind
         <SelectionKind.SUBJECT: 3>
         """
         if isinstance(self.node, SetOf):
@@ -332,9 +332,9 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     def _is_the(self) -> bool:
         """:return: ``True`` when the query is quantified by ``the`` (a uniqueness claim).
 
-        >>> QueryPlanner(the(entity(variable(Robot, [])))).plan().is_the
+        >>> QueryPlanner(node=the(entity(variable(Robot, [])))).plan().is_the
         True
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().is_the
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().is_the
         False
         """
         builder = getattr(self.node, "_quantifier_builder_", None)
@@ -343,7 +343,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     def _selected_type(self) -> str:
         """:return: The display name of the selected entity's type (*"Robot"*).
 
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().selected_type
         'Robot'
         """
         return FallbackNouns.ENTITY.name_of(node=self._selected)

@@ -54,9 +54,9 @@ class RewritePass(RealizationPass, ABC):
         ...     RoleFragment, PhraseFragment, flatten_fragment_to_plain_text)
         >>> class Shout(RewritePass):
         ...     def rewrite(self, leaf):
-        ...         return RoleFragment.for_operator(leaf.text.upper())
-        >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)])
-        >>> flatten_fragment_to_plain_text(Shout().process(phrase))
+        ...         return RoleFragment.for_operator(label=leaf.text.upper())
+        >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator(label="is"), RoleFragment.for_literal(value=42)])
+        >>> flatten_fragment_to_plain_text(Shout().process(fragment=phrase))
         'IS 42'
         """
         return map_fragment(fragment, lambda leaf: self.rewrite(leaf=leaf))

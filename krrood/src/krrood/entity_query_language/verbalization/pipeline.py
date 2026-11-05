@@ -135,7 +135,7 @@ class VerbalizationPipeline:
         It runs the full path — build the fragment tree, then render it — whereas
         :meth:`verbalize_fragment` renders an already-built fragment.
 
-        >>> VerbalizationPipeline.plain().verbalize(a(entity(variable(Robot, []))))
+        >>> VerbalizationPipeline.plain().verbalize(expression=a(entity(variable(Robot, []))))
         'Find a Robot'
         """
         # Match/Distribution/Probability all resolve, via _get_expression_, to the
@@ -166,8 +166,8 @@ class VerbalizationPipeline:
         :class:`EQLVerbalizer`, it applies this pipeline's renderer (and HTML wrapping) without
         re-building — the step :meth:`verbalize` calls after building.
 
-        >>> tree = EQLVerbalizer().build(a(entity(variable(Robot, []))))
-        >>> VerbalizationPipeline.plain().verbalize_fragment(tree)
+        >>> tree = EQLVerbalizer().build(expression=a(entity(variable(Robot, []))))
+        >>> VerbalizationPipeline.plain().verbalize_fragment(fragment=tree)
         'Find a Robot'
         """
         result = self.renderer.render(fragment=fragment)

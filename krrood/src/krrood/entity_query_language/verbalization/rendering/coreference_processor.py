@@ -148,10 +148,10 @@ class CoreferenceProcessor(RealizationPass):
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> robot = variable(Robot, [])
         >>> query = a(entity(robot))
-        >>> shared = MicroplanningServices.from_expression(robot)
-        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(query, shared))
+        >>> shared = MicroplanningServices.from_expression(expression=robot)
+        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(expression=query, services=shared))
         'Find a Robot'
-        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(query, shared))
+        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(expression=query, services=shared))
         'Find the Robot'
         """
         self._seen = set(self.previously_introduced_referents)
@@ -262,7 +262,7 @@ class CoreferenceProcessor(RealizationPass):
 
         >>> location = variable(Location, [])
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(for_all(location, IsReachable(location, robot)))
+        >>> verbalize_expression(for_all(location, IsReachable(location=location, body=robot)))
         'for all Locations, they are reachable for a Robot'
         """
         subject = clause.parts[0]
@@ -607,9 +607,9 @@ class CoreferenceProcessor(RealizationPass):
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> robot = variable(Robot, [])
-        >>> query, shared = a(entity(robot)), MicroplanningServices.from_expression(robot)
-        >>> _ = EQLVerbalizer().build(query, shared)
-        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(query, shared))
+        >>> query, shared = a(entity(robot)), MicroplanningServices.from_expression(expression=robot)
+        >>> _ = EQLVerbalizer().build(expression=query, services=shared)
+        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(expression=query, services=shared))
         'Find the Robot'
         """
         return NounPhrase(

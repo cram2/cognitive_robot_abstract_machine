@@ -235,7 +235,7 @@ class Match(
         >>> @dataclass
         >>> class Drawer:
         >>>     body: Body
-        >>> drawer = a(Drawer)(body=a(Body)(name="drawer_1")).from_(world.views)
+        >>> drawer = a(Drawer)(body=a(Body)(name="drawer_1")).from_(domain=world.views)
 
     A match reads like an instance of the matched class - ``drawer.body`` is the ``body``
     of the query the match stands for - and like a query, whose modifiers return the

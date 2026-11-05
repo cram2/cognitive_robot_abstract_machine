@@ -221,9 +221,9 @@ class NounCountability:
     def classify(self, *, noun: str) -> Countability:
         """:return: the countability of *noun* (case-insensitive lookup).
 
-        >>> NounCountability().classify("money")
+        >>> NounCountability().classify(noun="money")
         <Countability.UNCOUNTABLE: 'uncountable'>
-        >>> NounCountability().classify("battery")
+        >>> NounCountability().classify(noun="battery")
         <Countability.COUNTABLE: 'countable'>
         """
         if noun.lower() in self.uncountable_nouns:
@@ -233,9 +233,9 @@ class NounCountability:
     def is_uncountable(self, *, noun: str) -> bool:
         """:return: whether *noun* is a mass noun.
 
-        >>> NounCountability().is_uncountable("water")
+        >>> NounCountability().is_uncountable(noun="water")
         True
-        >>> NounCountability().is_uncountable("department")
+        >>> NounCountability().is_uncountable(noun="department")
         False
         """
         return self.classify(noun=noun) is Countability.UNCOUNTABLE

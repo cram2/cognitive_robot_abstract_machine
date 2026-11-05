@@ -125,7 +125,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         :param number: Grammatical-number feature.
         :return: A fragment with the ``VARIABLE`` role.
 
-        >>> RoleFragment.for_variable("Robot", variable(Robot, [])).text
+        >>> RoleFragment.for_variable(label="Robot", expression=variable(Robot, [])).text
         'Robot'
         """
         return cls(
@@ -159,7 +159,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
             (*"assigned to"*); defaults to the field's registered display name, else *attribute_name*.
         :return: A fragment with the ``ATTRIBUTE`` role.
 
-        >>> RoleFragment.for_attribute(Robot, "battery").text
+        >>> RoleFragment.for_attribute(owner=Robot, attribute_name="battery").text
         'battery'
         """
         surface_text = (
@@ -203,7 +203,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         :param text: Surface word override; defaults to the class ``__name__``.
         :return: A fragment with the ``VARIABLE`` role.
 
-        >>> RoleFragment.for_type(Robot).text
+        >>> RoleFragment.for_type(type_=Robot).text
         'Robot'
         """
         is_class = isinstance(type_, type)
@@ -227,7 +227,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         :param value: The Python value to render.
         :return: A fragment with the ``LITERAL`` role.
 
-        >>> RoleFragment.for_literal(42).text
+        >>> RoleFragment.for_literal(value=42).text
         '42'
         """
         return cls(text=value_phrase(value), role=SemanticRole.LITERAL)
@@ -244,9 +244,9 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         :class:`~…vocabulary.parts_of_speech.OneOf`). Prefer :meth:`for_literal` directly when the
         value is always a literal.
 
-        >>> RoleFragment.for_value(int).text
+        >>> RoleFragment.for_value(value=int).text
         'Integer'
-        >>> RoleFragment.for_value(42).text
+        >>> RoleFragment.for_value(value=42).text
         '42'
         """
         return (
@@ -261,7 +261,7 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         :param label: Display text (e.g. ``"is"``, ``"not"``, ``"greater than"``).
         :return: A fragment with the ``OPERATOR`` role.
 
-        >>> RoleFragment.for_operator("greater than").text
+        >>> RoleFragment.for_operator(label="greater than").text
         'greater than'
         """
         return cls(text=label, role=SemanticRole.OPERATOR)
@@ -457,7 +457,7 @@ def fold_fragment(
     :param block: Handler for a raw ``BlockFragment`` (controls its own recursion).
     :return: The folded value.
 
-    >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)])
+    >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator(label="is"), RoleFragment.for_literal(value=42)])
     >>> fold_fragment(phrase, word=lambda text: [text], role=lambda text, role, ref: [text],
     ...               phrase=lambda parts, separator: [w for part in parts for w in part],
     ...               block=lambda block: [])
@@ -496,7 +496,7 @@ def map_structural_children(
     :param recurse: Transform applied to each child.
     :return: The rebuilt container, or ``None`` when *fragment* is not a structural container.
 
-    >>> map_structural_children(RoleFragment.for_operator("is"), lambda f: f) is None
+    >>> map_structural_children(RoleFragment.for_operator(label="is"), lambda f: f) is None
     True
     """
     match fragment:
@@ -527,8 +527,8 @@ def map_fragment(
     :param leaf: Transform applied to each leaf fragment (identity for unaffected leaves).
     :return: The rebuilt tree.
 
-    >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)])
-    >>> shouted = map_fragment(phrase, lambda leaf: RoleFragment.for_operator(leaf.text.upper()))
+    >>> phrase = PhraseFragment(parts=[RoleFragment.for_operator(label="is"), RoleFragment.for_literal(value=42)])
+    >>> shouted = map_fragment(phrase, lambda leaf: RoleFragment.for_operator(label=leaf.text.upper()))
     >>> flatten_fragment_to_plain_text(shouted)
     'IS 42'
     """
@@ -547,7 +547,7 @@ def flatten_fragment_to_plain_text(fragment: VerbalizationFragment) -> str:
     :return: Plain-text representation with spaces between tokens.
 
     >>> flatten_fragment_to_plain_text(
-    ...     PhraseFragment(parts=[RoleFragment.for_operator("is"), RoleFragment.for_literal(42)]))
+    ...     PhraseFragment(parts=[RoleFragment.for_operator(label="is"), RoleFragment.for_literal(value=42)]))
     'is 42'
     """
 
@@ -590,10 +590,10 @@ def oxford_comma(
         three or more, so a pair takes none); pass ``True`` only to join two independent clauses.
     :return: A single fragment representing the joined sequence.
 
-    >>> words = [RoleFragment.for_operator(w) for w in ("a", "b", "c")]
-    >>> flatten_fragment_to_plain_text(oxford_comma(words, RoleFragment.for_operator("and")))
+    >>> words = [RoleFragment.for_operator(label=w) for w in ("a", "b", "c")]
+    >>> flatten_fragment_to_plain_text(oxford_comma(words, RoleFragment.for_operator(label="and")))
     'a, b, and c'
-    >>> flatten_fragment_to_plain_text(oxford_comma(words[:2], RoleFragment.for_operator("and")))
+    >>> flatten_fragment_to_plain_text(oxford_comma(words[:2], RoleFragment.for_operator(label="and")))
     'a and b'
     """
     if not parts:
@@ -638,7 +638,7 @@ def apply_subject_verb_agreement(
     ... )
     >>> leaf = RoleFragment(text="is", role=SemanticRole.OPERATOR)
     >>> plural_leaf = apply_subject_verb_agreement(leaf, GrammaticalNumber.PLURAL)
-    >>> MorphologyProcessor().rewrite(plural_leaf).text
+    >>> MorphologyProcessor().rewrite(leaf=plural_leaf).text
     'are'
 
     :param part: A clause constituent, checked for the predicate-word shape.

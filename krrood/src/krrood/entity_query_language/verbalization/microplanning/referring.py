@@ -223,14 +223,14 @@ def operand_head_noun(node: Variable, edges: list[ParentEdge]) -> str:
     A typed operand keeps its type noun even filling a field of ``IsReachable`` (whose
     ``location`` field is declared ``object``, an uninformative type on its own):
 
-    >>> reachable = IsReachable(variable(Robot, []), variable(Robot, []))
-    >>> operand_head_noun(variable(Robot, []), [ParentEdge(reachable, "location")])
+    >>> reachable = IsReachable(location=variable(Robot, []), body=variable(Robot, []))
+    >>> operand_head_noun(variable(Robot, []), [ParentEdge(parent=reachable, field_name="location")])
     'Robot'
 
     An untyped operand falls through to the field name, else to ``"object"`` once there is no
     sole field to name it by:
 
-    >>> operand_head_noun(variable(object, []), [ParentEdge(reachable, "location")])
+    >>> operand_head_noun(variable(object, []), [ParentEdge(parent=reachable, field_name="location")])
     'location'
     >>> operand_head_noun(variable(object, []), [])
     'object'
@@ -239,7 +239,7 @@ def operand_head_noun(node: Variable, edges: list[ParentEdge]) -> str:
     reads a field name — only its type, or ``"object"`` as the last resort:
 
     >>> operand_head_noun(
-    ...     variable(object, []), [ParentEdge(reachable, "location"), ParentEdge(reachable, "location")]
+    ...     variable(object, []), [ParentEdge(parent=reachable, field_name="location"), ParentEdge(parent=reachable, field_name="location")]
     ... )
     'object'
     """
@@ -523,7 +523,7 @@ class ReferringExpressions:
         :return: An instance with the head-noun map pre-built for *expression*.
 
         >>> first, second = variable(Robot, []), variable(Robot, [])
-        >>> referring = ReferringExpressions.from_expression(an(set_of(first, second)))
+        >>> referring = ReferringExpressions.from_expression(expression=an(set_of(first, second)))
         >>> referring.head_nouns[first._id_]
         'Robot'
         """
@@ -580,7 +580,7 @@ class ReferringExpressions:
 
         >>> transaction = variable(BankTransaction, [])
         >>> source = an(entity(max(transaction.amount_details.amount)))
-        >>> transaction._id_ in ReferringExpressions._aggregation_source_ids(source)
+        >>> transaction._id_ in ReferringExpressions._aggregation_source_ids(expression=source)
         True
         """
         ids: set[uuid.UUID] = set()
@@ -631,7 +631,7 @@ class ReferringExpressions:
             :func:`_child_edges_by_id` — looked up for *node* and passed on to
             :func:`operand_head_noun`.
 
-        >>> ReferringExpressions._resolve_head_noun(variable(Robot, []), {})
+        >>> ReferringExpressions._resolve_head_noun(node=variable(Robot, []), edges_by_id={})
         'Robot'
         """
         if isinstance(node, Variable) and not isinstance(node, Literal):
@@ -664,17 +664,17 @@ class ReferringExpressions:
         A scanned variable resolves from the map:
 
         >>> robot = variable(Robot, [])
-        >>> ReferringExpressions.from_expression(an(entity(robot))).head_noun_of(robot)
+        >>> ReferringExpressions.from_expression(expression=an(entity(robot))).head_noun_of(variable=robot)
         'Robot'
 
         An aggregation source is scanned but excluded, so it falls back to its type label:
 
         >>> transaction = variable(BankTransaction, [])
         >>> query = a(entity(sum(transaction.amount_details.amount)))
-        >>> referring = ReferringExpressions.from_expression(query)
+        >>> referring = ReferringExpressions.from_expression(expression=query)
         >>> transaction._id_ in referring.head_nouns
         False
-        >>> referring.head_noun_of(transaction)
+        >>> referring.head_noun_of(variable=transaction)
         'BankTransaction'
         """
         return self.head_nouns.get(variable._id_, self._variable_type_label(variable=variable))
@@ -695,7 +695,7 @@ class ReferringExpressions:
             determiner-distinguished form (if this noun turns out to be shared with another
             referent) is decided later, by the coreference pass.
 
-        >>> ReferringExpressions().noun_for_parts(variable(Robot, [])).label
+        >>> ReferringExpressions().noun_for_parts(variable=variable(Robot, [])).label
         'Robot'
         """
         self.seen.add(variable._id_)

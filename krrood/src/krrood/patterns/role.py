@@ -72,7 +72,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     False
     >>> len({person, student})
     2
-    >>> bool(IsSameSemanticEntity(person, student))
+    >>> bool(IsSameSemanticEntity(first_entity=person, second_entity=student))
     True
     """
 

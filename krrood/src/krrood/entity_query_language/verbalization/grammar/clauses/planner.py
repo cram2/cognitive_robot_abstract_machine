@@ -59,7 +59,7 @@ class GroupedByPlanner(Planner[Query, GroupPlan]):
 
     >>> employee = variable(Employee, [])
     >>> GroupedByPlanner(
-    ...     a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
+    ...     node=a(set_of(employee.department, sum(employee.salary)).grouped_by(employee.department))
     ... ).plan().has_keys
     True
     """
@@ -67,7 +67,7 @@ class GroupedByPlanner(Planner[Query, GroupPlan]):
     def plan(self) -> GroupPlan:
         """:return: The group plan: the group-by keys and the expressions aggregated over them.
 
-        >>> GroupedByPlanner(an(entity(variable(Employee, [])))).plan().has_keys
+        >>> GroupedByPlanner(node=an(entity(variable(Employee, [])))).plan().has_keys
         False
         """
         grouped = self._grouped_by()
@@ -82,7 +82,7 @@ class GroupedByPlanner(Planner[Query, GroupPlan]):
     def _grouped_by(self) -> GroupedBy | None:
         """:return: The query's grouped-by expression (``None`` when the query is ungrouped).
 
-        >>> GroupedByPlanner(an(entity(variable(Employee, []))))._grouped_by() is None
+        >>> GroupedByPlanner(node=an(entity(variable(Employee, []))))._grouped_by() is None
         True
         """
         return self.node._grouped_by_expression_
