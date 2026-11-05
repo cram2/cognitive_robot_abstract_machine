@@ -37,8 +37,8 @@ def _realised(fragment) -> str:
 
 
 def test_number_of_bridges_boolean_plan_features():
-    assert GrammaticalNumber.of(True) is GrammaticalNumber.PLURAL
-    assert GrammaticalNumber.of(False) is GrammaticalNumber.SINGULAR
+    assert GrammaticalNumber.of(is_plural=True) is GrammaticalNumber.PLURAL
+    assert GrammaticalNumber.of(is_plural=False) is GrammaticalNumber.SINGULAR
 
 
 def test_copula_agreement_is_applied_by_the_pass():
@@ -77,7 +77,7 @@ def test_existential_noun_pluralised_by_the_pass():
     assert (
         _realised(
             ExistentialPhrase.for_number(number=GrammaticalNumber.SINGULAR).build_phrase(
-                "Robot"
+                type_name="Robot"
             )
         )
         == "there's a Robot"

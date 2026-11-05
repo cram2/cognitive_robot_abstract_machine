@@ -1768,8 +1768,8 @@ class TestJsonSerialization:
             id(y),
         }
         assert np.array_equal(
-            expression_copy.substitute([x, y], values).to_np(),
-            expression.substitute([x, y], values).to_np(),
+            expression_copy.substitute(old_variables=[x, y], new_variables=values).to_np(),
+            expression.substitute(old_variables=[x, y], new_variables=values).to_np(),
         )
 
     def test_variables_sharing_a_name_stay_apart(self):
@@ -1780,7 +1780,7 @@ class TestJsonSerialization:
         expression_copy = from_json(to_json(expression))
 
         assert np.array_equal(
-            expression_copy.substitute([first, second], values).to_np(),
+            expression_copy.substitute(old_variables=[first, second], new_variables=values).to_np(),
             expression.substitute(old_variables=[first, second], new_variables=values).to_np(),
         )
 
@@ -1804,7 +1804,7 @@ class TestJsonSerialization:
         assert variables_by_id.keys() == {first_id, second_id}
         assert np.array_equal(
             expression_copy.substitute(
-                [variables_by_id[first_id], variables_by_id[second_id]], values
+                old_variables=[variables_by_id[first_id], variables_by_id[second_id]], new_variables=values
             ).to_np(),
             expected,
         )

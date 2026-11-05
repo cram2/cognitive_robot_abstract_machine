@@ -192,7 +192,7 @@ def test_relearning_replaces_the_causal_relations_of_the_class(
 
     assert len(
         CausalRelationsOfClass(
-            class_diagram=class_diagram, owner=class_diagram.get_wrapped_class(SceneRoom)
+            class_diagram=class_diagram, owner=class_diagram.get_wrapped_class(clazz=SceneRoom)
         ).relations
     ) == len(graph.edges())
 
@@ -210,11 +210,11 @@ def test_a_part_attribute_is_reached_through_its_collection(
         for relation in CausalRelationsOfClass(class_diagram=class_diagram, owner=room).relations
         for endpoint in (relation.first, relation.second)
         if isinstance(endpoint, AttributeEndpoint)
-        and endpoint.fields[0] == room.get_field("objects")
+        and endpoint.fields[0] == room.get_field(name="objects")
     } == {
         (
-            room.get_field("objects"),
-            class_diagram.get_wrapped_class(SceneObject).get_field("type"),
+            room.get_field(name="objects"),
+            class_diagram.get_wrapped_class(clazz=SceneObject).get_field(name="type"),
         )
     }
 
@@ -237,7 +237,7 @@ def test_a_statistic_of_the_parts_is_reached_through_their_collection(
         for relation in CausalRelationsOfClass(class_diagram=class_diagram, owner=scene).relations
         for endpoint in (relation.first, relation.second)
         if isinstance(endpoint, StatisticEndpoint)
-        and endpoint.collection == scene.get_field("rooms")
+        and endpoint.collection == scene.get_field(name="rooms")
     } == {
         f"{SceneWithExchangeableParts.__name__}.rooms.{statistic._name_}"
         for statistic in room_extractor.aggregation_features

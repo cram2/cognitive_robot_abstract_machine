@@ -12,6 +12,7 @@ from typing_extensions import Any, Callable
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.class_diagrams.exceptions import ArgumentsPassableOnlyByPosition
+from krrood.patterns.called_positionally import called_positionally
 
 # %% mimic callees
 
@@ -32,7 +33,7 @@ def scale_all(*values: float) -> list[float]:
     return [value * 2.0 for value in values]
 
 
-@dataclass(kw_only=True)
+@dataclass
 class Scaler:
     """
     A mutable dataclass, so neither it nor its bound methods can be hashed.
@@ -40,7 +41,8 @@ class Scaler:
 
     factor: float = 2.0
 
-    def scale(self, *, value: float) -> float:
+    @called_positionally
+    def scale(self, value: float) -> float:
         return value * self.factor
 
 

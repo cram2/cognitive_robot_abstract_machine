@@ -320,7 +320,7 @@ class CoreferenceProcessor(RealizationPass):
         """
         if self._owner_is_subject(owned=owned):
             possessive = Pronouns.possessive(
-                self._subject_stack[-1].number
+                number=self._subject_stack[-1].number
             ).as_fragment()
             return PhraseFragment(parts=[possessive, self._walk(fragment=owned.attributes)])
         return coordinated_genitive(

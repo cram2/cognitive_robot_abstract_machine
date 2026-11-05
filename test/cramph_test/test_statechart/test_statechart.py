@@ -3629,7 +3629,7 @@ class TestObservationPredicates:
         variable = FloatVariable(name="observation")
 
         answer = predicate.expression(variable).substitute(
-            [variable], [float(observation)]
+            old_variables=[variable], new_variables=[float(observation)]
         )
 
         assert ObservationStateValues(float(answer)) == expected

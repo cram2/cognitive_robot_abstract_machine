@@ -96,7 +96,10 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for super_domain, super_field in self.super_relations:
             self.__class__(
-                super_domain, self.target, super_field, inferred=True
+                source=super_domain,
+                target=self.target,
+                wrapped_field=super_field,
+                inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
     def infer_inverse_relation(self):
@@ -106,7 +109,10 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         if self.inverse_of:
             inverse_domain, inverse_field = self.inverse_domain_and_field
             self.__class__(
-                inverse_domain, self.source, inverse_field, inferred=True
+                source=inverse_domain,
+                target=self.source,
+                wrapped_field=inverse_field,
+                inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
     @cached_property
@@ -174,9 +180,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for nxt_relation in self.target_outgoing_relations_with_same_descriptor_type:
             self.__class__(
-                self.source,
-                nxt_relation.target,
-                nxt_relation.wrapped_field,
+                source=self.source,
+                target=nxt_relation.target,
+                wrapped_field=nxt_relation.wrapped_field,
                 inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
@@ -186,9 +192,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for nxt_relation in self.source_incoming_relations_with_same_descriptor_type:
             self.__class__(
-                nxt_relation.source,
-                self.target,
-                nxt_relation.wrapped_field,
+                source=nxt_relation.source,
+                target=self.target,
+                wrapped_field=nxt_relation.wrapped_field,
                 inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 

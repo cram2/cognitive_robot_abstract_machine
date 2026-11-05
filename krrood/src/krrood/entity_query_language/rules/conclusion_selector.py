@@ -261,7 +261,7 @@ class Alternative(OR, ConclusionSelector):
         self,
         *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        for output in OR._evaluate__(self, sources):
+        for output in OR._evaluate__(self, sources=sources):
             if output.is_true:
                 self._conclusions_.update(
                     output.previous_operation_result.operand._conclusions_

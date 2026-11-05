@@ -370,7 +370,7 @@ class RippleDownRules(ABC):
                 target = {case_query.attribute_name: case_query.target(case_query.case)}
                 if len(targets) < len(case_queries):
                     targets.append(target)
-                match = is_matching(lambda case, modify_case, case_query: self.classify(case=case, modify_case=modify_case, case_query=case_query), case_query, pred_cat)
+                match = is_matching(lambda case: self.classify(case=case), case_query, pred_cat)
                 if not match:
                     print(f"Predicted: {pred_cat} but expected: {target}")
                 if animate_tree and len(self.start_rule.descendants) > num_rules:
@@ -378,7 +378,7 @@ class RippleDownRules(ABC):
                     self.update_figures()
             i += 1
             all_predictions = [
-                1 if is_matching(lambda case, modify_case, case_query: self.classify(case=case, modify_case=modify_case, case_query=case_query), case_query) else 0
+                1 if is_matching(lambda case: self.classify(case=case), case_query) else 0
                 for case_query in case_queries
                 if case_query.target is not None
             ]

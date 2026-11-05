@@ -149,6 +149,6 @@ class HasFactoryAndKwargs(Generic[T]):
 
     def __deepcopy__(self, memo):
         return self.__class__(
-            self._factory_,
+            _factory_=self._factory_,
             _kwargs_={name: deepcopy(value) for name, value in self._kwargs_.items()},
         )

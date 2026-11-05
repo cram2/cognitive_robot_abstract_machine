@@ -609,8 +609,8 @@ def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
     (restored_variable,) = restored.free_variables()
     assert restored_variable is variable
     np.testing.assert_allclose(
-        restored.substitute([variable], [0.4]).to_np(),
-        spatial_type.substitute([variable], [0.4]).to_np(),
+        restored.substitute(old_variables=[variable], new_variables=[0.4]).to_np(),
+        spatial_type.substitute(old_variables=[variable], new_variables=[0.4]).to_np(),
     )
 
 

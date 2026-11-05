@@ -91,7 +91,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         'PLURAL'
         """
         return GrammaticalNumber.of(
-            antecedent.aggregation_status == AggregationStatus.AGGREGATED
+            is_plural=antecedent.aggregation_status == AggregationStatus.AGGREGATED
         )
 
     # %% IF clause
@@ -227,7 +227,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         """
         intro: VerbalizationFragment = ExistentialPhrase.for_number(
             number=GrammaticalNumber.SINGULAR
-        ).build_phrase(structure.consequent_type)
+        ).build_phrase(type_name=structure.consequent_type)
         whose_clauses = [
             PhraseFragment(
                 parts=[Keywords.WHOSE.as_fragment(), self._binding_predicate(binding=binding)]
@@ -256,7 +256,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ...     entity(drawer).where(connection.parent == variable(Container, [])))
         True
         """
-        number = GrammaticalNumber.of(binding.is_plural_field)
+        number = GrammaticalNumber.of(is_plural=binding.is_plural_field)
         return ConditionAssembler(context=self.context).attribute_predicate(
             attribute_name=binding.field_name, number=number, value=self._binding_value(binding=binding)
         )

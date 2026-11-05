@@ -44,7 +44,7 @@ def test_chain_through_an_index_by_a_value_reaches_its_value(
     chain = variable(Cabinet, domain=cabinets).drawers[0].handle.name
 
     assert (
-        chain.apply_mapping_on_external_root(cabinet) == cabinet.drawers[0].handle.name
+        chain.apply_mapping_on_external_root(instance=cabinet) == cabinet.drawers[0].handle.name
     )
 
 

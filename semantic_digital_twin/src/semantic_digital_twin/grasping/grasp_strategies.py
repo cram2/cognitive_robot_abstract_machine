@@ -50,7 +50,7 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
         :return: The statement of where this strategy allows the object to be grasped.
         :raises NoGraspGeometry: If the object has no shape to measure.
         """
-        grasp_type = self.get_type_of_generic_parameter(GraspT)
+        grasp_type = self.get_type_of_generic_parameter(parameter=GraspT)
         grasp = grasp_type.any_pattern(result_pattern() if result_pattern else None)
         return grasp.where(*self.conditions(grasp, graspable))
 

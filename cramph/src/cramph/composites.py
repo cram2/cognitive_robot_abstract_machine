@@ -897,7 +897,7 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
         :return: The kind of :class:`CompositeNodeChoosingItsChild` this chooser
             chooses the children of.
         """
-        return cls.get_type_of_generic_parameter(GenericChoosingNode)
+        return cls.get_type_of_generic_parameter(parameter=GenericChoosingNode)
 
     def has_choice_for(self, node: GenericChoosingNode) -> bool:
         """

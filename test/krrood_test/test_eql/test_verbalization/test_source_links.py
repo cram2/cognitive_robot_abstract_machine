@@ -78,7 +78,7 @@ class _ConstantResolver:
     def __init__(self, url: str = "http://example.com/source") -> None:
         self._url = url
 
-    def resolve(self, *, ref: SourceReference) -> str | None:
+    def resolve(self, *, reference: SourceReference) -> str | None:
         return self._url
 
 
@@ -87,7 +87,7 @@ class _NoneResolver:
     Stub resolver that always returns None (no link available).
     """
 
-    def resolve(self, *, ref: SourceReference) -> str | None:
+    def resolve(self, *, reference: SourceReference) -> str | None:
         return None
 
 

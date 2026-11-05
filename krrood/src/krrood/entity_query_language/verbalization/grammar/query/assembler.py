@@ -103,7 +103,7 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             SelectionKind.EMPTY: self._realize_empty,
             SelectionKind.SUBJECT: self._assemble_subject,
         }
-        return handlers[plan.kind](node, plan)
+        return handlers[plan.kind](node=node, plan=plan)
 
     def _realize_entity_selector(
         self, *, node: Query, plan: QueryPlan

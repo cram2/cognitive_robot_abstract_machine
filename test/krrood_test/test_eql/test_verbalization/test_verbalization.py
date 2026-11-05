@@ -1625,7 +1625,7 @@ def test_verbalize_custom_predicate_employee_domain():
 
     employee = variable(Employee, [])
     department = variable(Department, [])
-    predicate = WorksInDepartment(employee, department)
+    predicate = WorksInDepartment(employee=employee, department=department)
     text = verbalize_expression(predicate)
     assert "Employee" in text
     assert "works in" in text
@@ -1648,7 +1648,7 @@ def test_verbalize_predicate_without_fragment_raises():
 
     employee = variable(Employee, [])
     with pytest.raises(PredicateFragmentRequiredError):
-        verbalize_expression(EarnsMoreThan(employee, 50000.0))
+        verbalize_expression(EarnsMoreThan(employee=employee, threshold=50000.0))
 
 
 def test_name_based_clause_reads_a_verb_name_verb_first():
@@ -1672,7 +1672,7 @@ def test_name_based_clause_reads_a_verb_name_verb_first():
 
     employee = variable(Employee, [])
     assert (
-        verbalize_expression(EarnsMoreThan(employee, 50000.0))
+        verbalize_expression(EarnsMoreThan(employee=employee, threshold=50000.0))
         == "an Employee earns more than 50000.0"
     )
 
@@ -1696,7 +1696,7 @@ def test_name_based_clause_reads_a_copular_name_as_subject_is_complement():
             return predicate_clause(cls, subject, *objects)
 
     employee = variable(Employee, [])
-    assert verbalize_expression(IsActive(employee)) == "an Employee is active"
+    assert verbalize_expression(IsActive(entity=employee)) == "an Employee is active"
 
 
 # %% Aggregator coreference & HAVING compact form
@@ -2014,7 +2014,7 @@ def test_verbalize_triple():
 
     source = variable(Body, [])
     target = variable(Handle, [])
-    predicate = ConnectsTo(source, target)
+    predicate = ConnectsTo(source=source, target=target)
     text = verbalize_expression(predicate)
 
     assert "a Body" in text
@@ -2039,7 +2039,7 @@ def test_verbalize_1arg_predicate_without_fragment_raises():
 
     employee = variable(Employee, [])
     with pytest.raises(PredicateFragmentRequiredError):
-        verbalize_expression(IsActive(employee))
+        verbalize_expression(IsActive(entity=employee))
 
 
 # %% Same-type variable disambiguation

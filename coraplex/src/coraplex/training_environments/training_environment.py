@@ -101,7 +101,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         """
         :return: The type of action that is trained.
         """
-        return type(self).get_type_of_generic_parameter(TrainedAction)
+        return type(self).get_type_of_generic_parameter(parameter=TrainedAction)
 
     @abstractmethod
     def setup_world(self, *kwargs) -> World:

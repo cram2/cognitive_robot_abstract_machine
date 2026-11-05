@@ -79,14 +79,14 @@ def test_only_inherited_associations_are_left_out(diagram):
 
 def test_an_added_relation_is_among_the_outgoing_relations(diagram):
     position = diagram.get_wrapped_class(clazz=KRROODPosition)
-    diagram.get_out_edges(position)
+    diagram.get_out_edges(cls=position)
     relation = Inheritance(
-        source=position, target=diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
+        source=position, target=diagram.get_wrapped_class(clazz=DoubleKRROODPositionAggregator)
     )
 
     diagram.add_relation(relation)
 
-    assert relation in diagram.get_out_edges(position)
+    assert relation in diagram.get_out_edges(cls=position)
 
 
 def test_a_removed_relation_is_no_longer_among_the_outgoing_relations(diagram):
@@ -95,8 +95,8 @@ def test_a_removed_relation_is_no_longer_among_the_outgoing_relations(diagram):
         source=position, target=diagram.get_wrapped_class(clazz=DoubleKRROODPositionAggregator)
     )
     diagram.add_relation(relation=relation)
-    diagram.get_out_edges(position)
+    diagram.get_out_edges(cls=position)
 
     diagram.remove_relation(relation)
 
-    assert relation not in diagram.get_out_edges(position)
+    assert relation not in diagram.get_out_edges(cls=position)

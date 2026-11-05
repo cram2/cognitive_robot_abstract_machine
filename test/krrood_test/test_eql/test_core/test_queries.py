@@ -638,9 +638,9 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
             body2 != body3,
             body3 != body1,
             HaveSameFirstCharacter(
-                body1,
-                body2,
-                body3,
+                body1=body1,
+                body2=body2,
+                body3=body3,
             ),
         )
     )
@@ -655,11 +655,11 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
         len([h for h in world.bodies if isinstance(h, Handle)])
     ) + factorial(len([c for c in world.bodies if isinstance(c, Container)]))
     assert len(body_pairs) == expected, "Should generate at least one handle."
-    assert all(HaveSameFirstCharacter(b1, b2, b3)() for b1, b2, b3 in body_pairs), (
+    assert all(HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)() for b1, b2, b3 in body_pairs), (
         "All generated items should satisfy the predicate."
     )
     assert all(
-        not HaveSameFirstCharacter(b1, b2, b3)()
+        not HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)()
         for b1 in world.bodies
         for b2 in world.bodies
         for b3 in world.bodies
@@ -691,7 +691,7 @@ def test_select_predicate(handles_and_containers_world):
             )
 
     body = variable(Body, world.bodies)
-    has_name = HasName(body, "Handle1")
+    has_name = HasName(body=body, name="Handle1")
     query = the(entity(has_name).where(has_name))
 
     handle1 = query.tolist()[0]
@@ -742,7 +742,7 @@ def test_literal_predicate(handles_and_containers_world):
                 Noun(content=fields["name"]),
             )
 
-    has_name = HasName(world.bodies[0], world.bodies[0].name)
+    has_name = HasName(body=world.bodies[0], name=world.bodies[0].name)
     with pytest.raises(LiteralConditionError):
         query = the(entity(variable(Body, world.bodies)).where(has_name))
 

@@ -143,7 +143,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         >>> verbalize_expression(inference(Cabinet)(container=variable(Container, []), drawers=variable(Drawer, [])))
         'a Cabinet, where the container of the Cabinet is a Container, and the drawers of the Cabinet are Drawers'
         """
-        return Copulas.for_number(number=GrammaticalNumber.of(binding.is_plural))
+        return Copulas.for_number(number=GrammaticalNumber.of(is_plural=binding.is_plural))
 
     def _value(self, *, binding: BindingPlan) -> VerbalizationFragment:
         """:return: The binding's value expression, rendered in the binding's number (*"the parent of
@@ -158,7 +158,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
         return self.context.child(
-            node=binding.value, number=GrammaticalNumber.of(binding.is_plural)
+            node=binding.value, number=GrammaticalNumber.of(is_plural=binding.is_plural)
         )
 
     # %% phrase assembly

@@ -307,7 +307,7 @@ class InstantiatedVariable(
         self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         MultiArityExpressionThatPerformsACartesianProduct._replace_child_field_(
-            self, old_child, new_child
+            self, old_child=old_child, new_child=new_child
         )
         for name, child in self._child_variables_.items():
             if child._id_ == old_child._id_:

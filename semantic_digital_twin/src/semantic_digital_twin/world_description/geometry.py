@@ -1539,7 +1539,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :param coordinates: The corner's coordinate along each of :meth:`axes`.
         :return: The corner, in the reference frame of the box's origin.
         """
-        point_type = self.get_type_of_generic_parameter(PointT)
+        point_type = self.get_type_of_generic_parameter(parameter=PointT)
         return point_type(*coordinates, reference_frame=self.origin.reference_frame)
 
     def to_array_bounds(self) -> CoordinateBounds:

@@ -31,8 +31,8 @@ def test_the_fields_to_an_attribute_start_at_the_class(class_diagram):
     attribute = variable(SceneRoom, []).position.x
 
     assert AttributeEndpoint.along(class_diagram=class_diagram, access_path=attribute._access_path_).fields == (
-        class_diagram.get_wrapped_class(SceneRoom).get_field("position"),
-        class_diagram.get_wrapped_class(KRROODPosition).get_field("x"),
+        class_diagram.get_wrapped_class(clazz=SceneRoom).get_field(name="position"),
+        class_diagram.get_wrapped_class(clazz=KRROODPosition).get_field(name="x"),
     )
 
 

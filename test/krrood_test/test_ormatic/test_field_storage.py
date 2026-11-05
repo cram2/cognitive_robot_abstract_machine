@@ -48,7 +48,7 @@ def field_named(ormatic: ORMatic, name: str) -> WrappedField:
 )
 def test_field_is_stored_the_way_its_type_calls_for(ormatic, field_name, storage):
     assert (
-        ormatic.field_classifier.classify(field_named(ormatic, field_name)) is storage
+        ormatic.field_classifier.classify(wrapped_field=field_named(ormatic, field_name)) is storage
     )
 
 

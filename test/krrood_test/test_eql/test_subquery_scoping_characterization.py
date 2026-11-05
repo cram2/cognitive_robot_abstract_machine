@@ -49,7 +49,7 @@ def test_isolation_is_owned_by_the_query_scope_not_the_quantifier(monkeypatch):
     def recording_evaluate(self, sources):
         if self._is_compiled_product_:
             sources_seen_by_compiled_queries.append(dict(sources.bindings))
-        yield from original_evaluate(self, sources)
+        yield from original_evaluate(self, sources=sources)
 
     monkeypatch.setattr(Query, "_evaluate__", recording_evaluate)
 
@@ -71,7 +71,7 @@ def test_constant_subquery_is_computed_once_per_evaluation(monkeypatch):
     def counting_product(self, sources):
         nonlocal product_computations
         product_computations += 1
-        return original_product(self, sources)
+        return original_product(self, sources=sources)
 
     monkeypatch.setattr(Query, "_evaluate_product_", counting_product)
 

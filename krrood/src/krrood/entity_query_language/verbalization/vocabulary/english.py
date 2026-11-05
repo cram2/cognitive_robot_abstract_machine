@@ -789,8 +789,8 @@ class ExistentialPhrase(VocabEnum):
         "there's an Apple"
         """
         if referent_id is not None and self is ExistentialPhrase.THERE_IS:
-            return self.value.build_phrase(type_name, referent_id=referent_id)
-        return self.value.build_phrase(type_name)
+            return self.value.build_phrase(type_name=type_name, referent_id=referent_id)
+        return self.value.build_phrase(type_name=type_name)
 
 
 class FallbackNouns(VocabEnum):
@@ -842,10 +842,10 @@ class GroupKeyPhrases(VocabEnum):
         :return: Group-key phrase fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(GroupKeyPhrases.COMMON_OF.build_phrase("location", "Robots"))
+        >>> flatten_fragment_to_plain_text(GroupKeyPhrases.COMMON_OF.build_phrase(field_name="location", plural_root="Robots"))
         'the common location of the Robots'
         """
-        return self.value.build_phrase(field_name, plural_root)
+        return self.value.build_phrase(field_name=field_name, root=plural_root)
 
 
 class Operators(Enum):

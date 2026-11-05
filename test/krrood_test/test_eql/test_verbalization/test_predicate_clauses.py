@@ -272,4 +272,4 @@ def test_predicate_returning_a_string_template_is_rejected():
             return "{who} says hello"  # a string template — no longer supported
 
     with pytest.raises(NonFragmentPredicateError):
-        verbalize_expression(SaysHello(variable(Location, [])))
+        verbalize_expression(SaysHello(who=variable(Location, [])))

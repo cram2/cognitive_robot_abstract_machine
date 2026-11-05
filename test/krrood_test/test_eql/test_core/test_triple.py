@@ -56,6 +56,6 @@ def test_a_triple_built_from_a_symbolic_subject_is_symbolic(drawer: Drawer):
 )
 def test_a_triple_reads_back_the_types_it_relates(parameter, related_type):
     assert (
-        TripleDeclaringItsObjectFirst.get_type_of_generic_parameter(parameter)
+        TripleDeclaringItsObjectFirst.get_type_of_generic_parameter(parameter=parameter)
         is related_type
     )
