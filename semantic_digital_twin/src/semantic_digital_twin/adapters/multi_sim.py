@@ -4162,7 +4162,9 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         return changed
 
     def _write_connections_to_qpos(
-        self, positions: numpy.ndarray, previous_positions: numpy.ndarray
+        self,
+        positions: NDArray[numpy.float64],
+        previous_positions: NDArray[numpy.float64],
     ) -> None:
         """
         Push ``world.state`` into ``_mj_data.qpos`` for every joint-backed
@@ -4213,7 +4215,9 @@ class MujocoSynchronizer(MultiSimSynchronizer):
             self._command_actuators()
 
     def _move_position_set_points(
-        self, positions: numpy.ndarray, previous_positions: numpy.ndarray
+        self,
+        positions: NDArray[numpy.float64],
+        previous_positions: NDArray[numpy.float64],
     ) -> None:
         """
         Move the set point of every position servo by as much as the world's position of
