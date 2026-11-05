@@ -19,6 +19,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointVelocityLimit,
 )
 from cramph.nodes_for_testing import ConstTrueNode
+from giskardpy.motion_statechart.weights import VelocityUnit
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import (
     shortest_angular_distance,
@@ -362,3 +363,105 @@ def test_daisy_arm_reaches_its_park_state(
     executor.tick_until_end()
 
     assert park_state.is_achieved()
+
+
+# %% velocity units of joint velocity limits
+
+
+def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_the_joint(
+    pr2_world_state_reset,
+):
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    limit = JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.05)
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(limit)
+    executor.compile(statechart=statechart)
+
+    assert [
+        constraint.velocity_unit
+        for constraint in limit.constraint_collection.inequality_constraints
+    ] == [head_pan_joint.dof.limits.upper.velocity]
+
+
+def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
+    pr2_world_state_reset,
+):
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    start_position = head_pan_joint.position
+    executor = StatechartExecutor(
+        context=StatechartContext(world=pr2_world_state_reset),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_nodes(
+        [
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_mapping({head_pan_joint: 0.5})
+            ),
+            JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.0),
+        ]
+    )
+    executor.compile(statechart=statechart)
+
+    for _ in range(100):
+        executor.tick()
+
+    assert abs(head_pan_joint.position - start_position) < joint_goal.threshold
+
+
+# %% velocity units of joint goals
+
+
+def world_with_revolute_joints(
+    maximum_speeds: list[float],
+) -> tuple[World, list[RevoluteConnection]]:
+    """
+    :return: A world with one revolute joint per maximum speed, all children of one root,
+        and those joints.
+    """
+    world = World()
+    joints = []
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        for index, maximum_speed in enumerate(maximum_speeds):
+            dof = DegreeOfFreedom(
+                name=PrefixedName(f"dof_{index}"),
+                limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                    maximum_speed=maximum_speed
+                ),
+            )
+            world.add_degree_of_freedom(dof)
+            joint = RevoluteConnection(
+                parent=root,
+                child=Body(name=PrefixedName(f"tip_{index}")),
+                axis=Vector3.Z(),
+                raw_dof=dof,
+            )
+            world.add_connection(joint)
+            joints.append(joint)
+    return world, joints
+
+
+def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and_the_joint_velocity_unit():
+    fast_speed = 2 * VelocityUnit.JOINT
+    slow_speed = VelocityUnit.JOINT / 2
+    world, joints = world_with_revolute_joints([fast_speed, slow_speed])
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(
+        goal := JointPositionList(
+            goal_state=JointState.from_mapping({joint: 1.0 for joint in joints})
+        )
+    )
+    executor.compile(statechart=statechart)
+
+    assert [
+        constraint.velocity_unit
+        for constraint in goal.constraint_collection.equality_constraints
+    ] == [VelocityUnit.JOINT, slow_speed]

@@ -42,9 +42,9 @@ class DefaultWeights(FloatEnum):
 
 class VelocityUnit(FloatEnum):
     """
-    The speeds at which Cartesian quantities typically change. A constraint on such a
-    quantity that is violated by this speed for the whole control horizon costs its
-    weight, whatever speed the constraint itself drives at.
+    The speeds at which quantities typically change. A constraint on such a quantity
+    that is violated by this speed for the whole control horizon costs its weight,
+    whatever speed the constraint itself drives at.
     """
 
     TRANSLATION = 0.2
@@ -55,4 +55,9 @@ class VelocityUnit(FloatEnum):
     ROTATION = 0.4
     """
     Unit: rad/s.
+    """
+
+    JOINT = 1.0
+    """
+    Unit: rad/s or m/s. A joint whose velocity limit is lower uses its velocity limit.
     """

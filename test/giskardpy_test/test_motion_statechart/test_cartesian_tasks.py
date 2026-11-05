@@ -8,7 +8,7 @@ import pytest
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from cramph.data_types import ObservationStateValues, LifeCycleValues
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
 from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from cramph.composites import Sequence, Parallel
@@ -2496,6 +2496,37 @@ class TestVelocityTasks:
         assert tight_cycles >= 2 * loose_cycles, (
             f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
         )
+
+    @pytest.mark.parametrize(
+        "limit_type", ["position", "rotation"], ids=["position", "rotation"]
+    )
+    def test_a_velocity_limit_measures_its_violation_in_a_velocity_unit(
+        self, pr2_world_state_reset: World, limit_type: str
+    ):
+        world = pr2_world_state_reset
+        tip = world.get_kinematic_structure_entity_by_name("base_footprint")
+        root = world.get_kinematic_structure_entity_by_name("odom_combined")
+        if limit_type == "position":
+            limit = CartesianPositionVelocityLimit(
+                root_link=root, tip_link=tip, max_linear_velocity=0.05
+            )
+            velocity_unit = VelocityUnit.TRANSLATION
+        else:
+            limit = CartesianRotationVelocityLimit(
+                root_link=root, tip_link=tip, max_angular_velocity=0.1
+            )
+            velocity_unit = VelocityUnit.ROTATION
+        executor = StatechartExecutor(
+            context=StatechartContext(world=world), extensions=[MotionControl()]
+        )
+        motion_statechart = Statechart(context=executor.context)
+        motion_statechart.add_node(limit)
+        executor.compile(statechart=motion_statechart)
+
+        assert [
+            constraint.velocity_unit
+            for constraint in limit.constraint_collection.inequality_constraints
+        ] == [velocity_unit]
 
 
 class TestDebugExpressions:

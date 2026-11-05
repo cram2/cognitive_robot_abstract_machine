@@ -135,10 +135,9 @@ class GeometricConstraintBuilder:
         :param cruise_velocity: rad/s
         """
         angle = sm.safe_acos(frame_V_current.dot(frame_V_goal))
-        # avoid singularity by staying away from pi
-        angle_limited = sm.min(
-            sm.max(angle, -VelocityUnit.ROTATION), VelocityUnit.ROTATION
-        )
+        # step at most one rotational velocity unit, read as an angle, towards the goal,
+        # so the error stays tangential and away from the singularity at pi
+        angle_limited = sm.min(angle, VelocityUnit.ROTATION)
         angle_limited = angle_limited.safe_division(angle)
         root_V_goal_normal_intermediate = frame_V_current.slerp(
             frame_V_goal, angle_limited

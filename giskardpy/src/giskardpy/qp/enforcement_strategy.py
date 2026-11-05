@@ -338,7 +338,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
     def reachable_change_of_constraint(self, constraint: GiskardConstraint) -> Scalar:
         """
         The largest change of a constraint's expression that may be demanded within the
-        control horizon: the change the robot executes at the constraint's reference
+        control horizon: the change the robot executes at the constraint's cruise
         velocity, see :attr:`QPControllerConfig.executed_to_mean_velocity_ratio`.
         """
         if constraint.cruise_velocity is None:
