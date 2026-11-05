@@ -28,6 +28,7 @@ from .graphs import (
     confounded,
     mediated,
     undirected_chain,
+    undirected_parent,
     without_member_graphs,
 )
 
@@ -109,6 +110,12 @@ def test_nodes_without_an_edge_are_not_adjacent():
     graph = mediated()
 
     assert not graph.adjacent(graph.node("X"), graph.node("Y"))
+
+
+def test_a_node_an_undirected_edge_may_point_into_is_a_possible_ancestor():
+    graph = undirected_parent()
+
+    assert graph.possible_ancestors(graph.node("X")) == {graph.node("A")}
 
 
 # %% storing a graph
