@@ -10,7 +10,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from sqlalchemy.orm import sessionmaker
+from typing_extensions import Callable
 
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageGenerativeBackend,
+    ProbabilisticBackend,
+    QueryBackend,
+    SQLAlchemyBackend,
+)
+from krrood.entity_query_language.exceptions import BackendCannotReadState
 from krrood.entity_query_language.factories import (
     a,
     flat_variable,
@@ -18,6 +27,7 @@ from krrood.entity_query_language.factories import (
     not_,
     the,
     variable,
+    variable_from,
 )
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.planning.exceptions import (
@@ -38,6 +48,7 @@ from ..dataset.setting_with_side_effects import (
     FrozenAttributes,
     SlottedAttributes,
 )
+from ..dataset.objects_compared_by_value import PointComparedByValue
 from ..dataset.blocks_world import (
     Block,
     IsOn,
@@ -410,6 +421,36 @@ def test_ground_terms_compare_hashable_arguments_by_value(two_towers):
     )
 
 
+@pytest.mark.parametrize(
+    "ground_term_of",
+    [
+        lambda point: literal(point).coordinate,
+        lambda point: literal(point).shifted_by(1.0),
+    ],
+    ids=["attribute", "method call"],
+)
+def test_equal_objects_never_share_their_ground_terms(ground_term_of):
+    """
+    The object a ground term belongs to is compared by identity, so assigning a ground
+    term of one object never assigns that of an equal but distinct object.
+    """
+    first = PointComparedByValue(1.0)
+    second = PointComparedByValue(1.0)
+    state = State().with_facts(ground_term_of(first) == 7.0)
+
+    assert ground_term_of(second).tolist(state=state) == [
+        ground_term_of(second).tolist()[0]
+    ]
+
+
+def test_equal_containers_never_share_their_elements():
+    first = ElementsInAnImmutableContainer(tuple([0.0, 1.0]))
+    second = ElementsInAnImmutableContainer(tuple([0.0, 1.0]))
+    state = State().with_facts(literal(first).end_points[0] == 7.0)
+
+    assert literal(second).end_points[0].tolist(state=state) == [second.end_points[0]]
+
+
 # %% ground terms read through other ground terms
 
 
@@ -548,6 +589,38 @@ def test_query_started_during_another_evaluation_reads_state(two_towers):
     )
 
     assert result == [two_towers.a, two_towers.c]
+
+
+# %% backends and states
+
+
+def test_generative_backend_reads_state(two_towers):
+    state = State().with_facts(literal(two_towers.c).support == two_towers.table)
+    generated = a(Block)(name=variable_from(["d", "e"]), support=two_towers.table)
+    generated.where(literal(two_towers.c).support == two_towers.table)
+
+    result = generated.tolist(
+        backend=EntityQueryLanguageGenerativeBackend(), state=state
+    )
+
+    assert [block.name for block in result] == ["d", "e"]
+
+
+@pytest.mark.parametrize(
+    "create_backend",
+    [
+        lambda: SQLAlchemyBackend(sessionmaker()),
+        lambda: ProbabilisticBackend(),
+    ],
+    ids=["sql", "probabilistic"],
+)
+def test_backend_that_cannot_read_a_state_refuses_one(
+    two_towers, create_backend: Callable[[], QueryBackend]
+):
+    query = a(Block).from_(two_towers.blocks)
+
+    with pytest.raises(BackendCannotReadState):
+        query.evaluate(backend=create_backend(), state=State())
 
 
 # %% building states

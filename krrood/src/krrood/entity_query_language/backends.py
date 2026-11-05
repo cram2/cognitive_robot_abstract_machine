@@ -45,6 +45,7 @@ from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.ormatic.eql_interface import eql_to_sql
+from krrood.ormatic.utils import classproperty
 
 try:
     from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
@@ -124,6 +125,14 @@ class QueryBackend(ABC):
     :class:`EntityQueryLanguageGenerativeBackend`; :class:`ProbabilisticBackend` always
     raises when it cannot resolve a causal model, regardless of this flag.
     """
+
+    @classproperty
+    def reads_state(cls) -> bool:
+        """
+        Whether this backend's evaluations read the values of ground terms from the
+        state they are given.
+        """
+        return False
 
     @abstractmethod
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
@@ -221,6 +230,13 @@ class EntityQueryLanguageBackend(SelectiveBackend):
     Constructing new instances is the job of a :class:`GenerativeBackend`.
     """
 
+    @classproperty
+    def reads_state(cls) -> bool:
+        """
+        Unlike :meth:`QueryBackend.reads_state`, holds: evaluation runs in this process.
+        """
+        return True
+
     def _evaluate(self, expression: Evaluable) -> Iterable:
         yield from expression._evaluate_natively_()
 
@@ -234,6 +250,14 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     constructor, and keeps those that satisfy the match: the values its pattern states
     and its ``where`` conditions.
     """
+
+    @classproperty
+    def reads_state(cls) -> bool:
+        """
+        Unlike :meth:`QueryBackend.reads_state`, holds: generation selects in this
+        process.
+        """
+        return True
 
     def _evaluate(self, expression: Match[T]) -> Iterable[T]:
         self._warn_or_raise_on_unresolved_cause_(expression)
@@ -882,7 +906,6 @@ class ProbabilisticBackend(GenerativeBackend):
 
         narrowed = region.distribution.truncated(copy.deepcopy(effect_truncation_event))
         if narrowed.distribution is None or narrowed.probability <= 0.0:
-
             return None
         return ScoredIntervention(
             cause_variable, float(narrowed.probability), narrowed.distribution

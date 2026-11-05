@@ -48,6 +48,27 @@ class TermValue:
     """
 
 
+@dataclass(frozen=True, eq=False)
+class ObjectIdentity:
+    """
+    The identity of an object, which no other object shares, however the two compare.
+    """
+
+    identified_object: Any
+    """
+    The object.
+    """
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, ObjectIdentity)
+            and self.identified_object is other.identified_object
+        )
+
+    def __hash__(self) -> int:
+        return id(self.identified_object)
+
+
 @dataclass(frozen=True)
 class FunctionKey:
     """
@@ -72,9 +93,10 @@ class GroundTerm(ABC):
     A function applied to concrete arguments.
 
     Two ground terms are equal when they apply the same function to the same arguments,
-    however the arguments were passed and including defaults that were left out.
-    Hashable arguments are compared by value and all others by identity, so two objects
-    that compare equal but cannot be hashed are different arguments.
+    however the arguments were passed and including defaults that were left out. The
+    object a ground term belongs to - an attribute's instance, an index's container, a
+    method's receiver - is compared by identity, other hashable arguments by value and
+    all others by identity.
 
     >>> def area(width: float, height: float = 1.0) -> float:
     ...     return width * height
@@ -175,7 +197,7 @@ class AttributeTerm(GroundTerm):
 
     @property
     def normalized_arguments(self) -> tuple[Hashable, ...]:
-        return (ensure_hashable(self.instance),)
+        return (ObjectIdentity(self.instance),)
 
     def has_live_value(self) -> bool:
         return hasattr(self.instance, self.attribute_name)
@@ -223,7 +245,7 @@ class IndexTerm(GroundTerm):
 
     @property
     def normalized_arguments(self) -> tuple[Hashable, ...]:
-        return ensure_hashable(self.container), ensure_hashable(self.key)
+        return ObjectIdentity(self.container), ensure_hashable(self.key)
 
     def setting_runs_code(self) -> bool:
         """
@@ -301,10 +323,26 @@ class CallTerm(GroundTerm):
         Passing an argument by position or by name, or leaving out one that has a
         default, gives the same arguments.
         """
+        arguments = CallSignature.from_callable(self.callee).bind(self.arguments)
+        normalized = arguments.key_by(ensure_hashable)
+        if not self._is_method_of_first_argument(arguments):
+            return normalized
+        return ObjectIdentity(arguments.positional[0]), *normalized[1:]
+
+    def _is_method_of_first_argument(self, arguments: CallArguments) -> bool:
+        """
+        :param arguments: The arguments of the call, bound to the signature.
+        :return: Whether :attr:`callee` is a method the class of the first argument
+            defines, so the first argument is its receiver.
+        """
+        if not (inspect.isfunction(self.callee) and arguments.positional):
+            return False
+        definition = inspect.getattr_static(
+            type(arguments.positional[0]), self.callee.__name__, None
+        )
         return (
-            CallSignature.from_callable(self.callee)
-            .bind(self.arguments)
-            .key_by(ensure_hashable)
+            not isinstance(definition, staticmethod)
+            and inspect.unwrap(definition) is self.callee
         )
 
     def live_value(self) -> Any:
