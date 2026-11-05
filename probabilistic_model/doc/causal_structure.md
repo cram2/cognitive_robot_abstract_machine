@@ -77,8 +77,11 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
 `causal_structures`. For such a class, a query that marks `cause` and `causes_effect`
 but no `confounder` has its adjustment set chosen
 from the learned graph, a marked `confounder` set is checked, and an effect the graph
-does not identify raises `EffectNotIdentified`. See the EQL causality guide for
-examples.
+does not identify raises `EffectNotIdentified`.
+`ProbabilisticBackend.interventional_range` answers a partially identified effect with
+the lowest and highest probability across the candidate sets. A query with
+`causes_effect` and no `cause` lets `rank_causes` rank every variable that may be an
+ancestor of the effect. See the EQL causality guide for examples.
 
 ## What the data has to supply
 

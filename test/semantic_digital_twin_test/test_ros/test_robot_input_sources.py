@@ -12,6 +12,7 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
 )
 from semantic_digital_twin.adapters.ros.lidar import SubscribedLidarSource
 from semantic_digital_twin.adapters.sensors.lidar import SimulatedLidarSource
+from semantic_digital_twin.input_synchronization import WorldStateInputs
 from semantic_digital_twin.robots.input_source import RobotTopic
 from semantic_digital_twin.robots.pr2 import PR2, PR2Topic
 from semantic_digital_twin.robots.robot_parts import KinematicChain, MobileBase
@@ -76,6 +77,27 @@ def test_a_switched_chain_writes_only_its_own_joints(annotated_pr2, rclpy_node):
         annotated_pr2.left_arm.source.connections
         == annotated_pr2.left_arm.active_connections
     )
+
+
+def test_a_robot_read_by_both_loops_subscribes_to_its_joint_states_once(
+    annotated_pr2, rclpy_node
+):
+    """
+    Every message wakes every subscription on the topic, so a subscription per part and
+    loop starves whatever else the node receives.
+    """
+    annotated_pr2.use_real_sources(rclpy_node)
+    world = annotated_pr2._world
+
+    WorldStateInputs(world=world).add_robot_inputs(annotated_pr2)
+    WorldStateInputs(world=world, reapplies_inputs=True).add_robot_inputs(annotated_pr2)
+
+    joint_state_subscriptions = [
+        subscription
+        for subscription in rclpy_node.subscriptions
+        if subscription.topic_name == f"/{RobotTopic.JOINT_STATES}"
+    ]
+    assert joint_state_subscriptions == [annotated_pr2.left_arm.source.subscription]
 
 
 def test_every_part_read_from_the_robot_is_an_input_to_apply(annotated_pr2, rclpy_node):

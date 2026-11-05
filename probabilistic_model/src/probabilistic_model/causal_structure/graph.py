@@ -430,6 +430,17 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
                 return edge
         return None
 
+    def possible_ancestors(self, node: GraphNode) -> set[GraphNode]:
+        """
+        :param node: A node of the graph.
+        :return: The nodes with a directed path to it in at least one member graph.
+        """
+        return {
+            ancestor
+            for member in self.member_graphs()
+            for ancestor in member.ancestors(node)
+        }
+
     def adjacent(self, first: GraphNode, second: GraphNode) -> bool:
         """
         :param first: A node.
