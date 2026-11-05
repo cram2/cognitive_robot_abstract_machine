@@ -281,7 +281,7 @@ class MoveAndPickUpAction(SequentialAction):
             ),
             pick_up=a(PickUpAction)(
                 grasp=flat_variable(
-                    GraspsByCloseness(graspable, standing_position, number_of_grasps)
+                    GraspsByCloseness(graspable=graspable, standing_position=standing_position, number_of_grasps=number_of_grasps)
                 ),
                 arm=arm,
             ),
@@ -375,7 +375,7 @@ class MoveAndOpenAction(SequentialAction):
             ),
             open_container=a(OpenAction)(
                 grasp=flat_variable(
-                    GraspsByCloseness(handle, standing_position, number_of_grasps)
+                    GraspsByCloseness(graspable=handle, standing_position=standing_position, number_of_grasps=number_of_grasps)
                 ),
                 arm=arm,
             ),

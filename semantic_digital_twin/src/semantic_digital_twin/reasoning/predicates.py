@@ -324,7 +324,7 @@ class Supports(Predicate):
             if candidate is self.supporting_body:
                 continue
             if SupportedBy(
-                candidate, self.supporting_body, self.maximum_intersection_height
+                supported=candidate, supporting=self.supporting_body, maximum_intersection_height=self.maximum_intersection_height
             )():
                 return True
         return False

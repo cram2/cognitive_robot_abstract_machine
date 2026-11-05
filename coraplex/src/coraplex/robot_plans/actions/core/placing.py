@@ -146,7 +146,7 @@ class PlaceAction(
         object_body = self.object_designator.root
         for arm in self.robot.all_arms:
             end_effector = arm.end_effector
-            if GripperHolds(end_effector, object_body)():
+            if GripperHolds(end_effector=end_effector, body=object_body)():
                 return arm, GraspCandidate(
                     self.object_designator, end_effector.held_body_T_grasp
                 )

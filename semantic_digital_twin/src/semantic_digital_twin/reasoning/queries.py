@@ -110,7 +110,7 @@ def goal_surface_of_object(
     supporting_surface = variable(HasSupportingSurface, supporting_surfaces)
     supporting_body = supporting_surface.bodies[0]
     non_supporting_table = entity(supporting_surface).where(
-        not_(Supports(supporting_body))
+        not_(Supports(supporting_body=supporting_body))
     )
 
     # Query annotations on the surfaces of the tables
@@ -126,7 +126,7 @@ def goal_surface_of_object(
         .where(
             (distance := inheritance_distance(object_of_interest, type_(obj)))
             <= threshold,
-            SupportedBy(obj.bodies[0], supporting_body),
+            SupportedBy(supported=obj.bodies[0], supporting=supporting_body),
         )
         .ordered_by(distance)
     )
@@ -156,7 +156,7 @@ def filter_annotations_by_color(
 
     matching_body = entity(body).where(
         body.visual != None,
-        length(body.visual.shapes) > 0,
+        length(iterable=body.visual.shapes) > 0,
         body.visual.shapes[0].color == color,
     )
     semantic_annotation = variable(HasRootBody, world.semantic_annotations)

@@ -106,7 +106,7 @@ def inheritance_distance(child_class: type, parent_class: type) -> int:
     common_ancestor = nearest_common_ancestor(type(child_class), parent_class)
     if common_ancestor is None:
         return math.inf
-    path_length = inheritance_path_length(type(child_class), common_ancestor)
+    path_length = inheritance_path_length(child_class=type(child_class), parent_class=common_ancestor)
     return path_length if path_length is not None else math.inf
 
 def nearest_common_ancestor(

@@ -111,7 +111,7 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
             if subclass.matches_generic_type(clazz=clazz):
                 return subclass
             else:
-                distance = inheritance_path_length(clazz, subclass.original_class())
+                distance = inheritance_path_length(child_class=clazz, parent_class=subclass.original_class())
                 if distance is not None:
                     distances[subclass] = distance
 

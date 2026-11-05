@@ -601,10 +601,10 @@ def handles(world: World) -> list[Handle]:
         entity(inference(Handle)(root=grip))
         .where(
             joint.child == mount.parent,
-            HasCollisionGeometry(grip),
-            not_(IsPartOfARobot(grip)),
-            not_(IsNamedAfterFurniture(grip)),
-            not_(HasAnotherAnnotation(grip, Handle, world.semantic_annotations)),
+            HasCollisionGeometry(body=grip),
+            not_(IsPartOfARobot(body=grip)),
+            not_(IsNamedAfterFurniture(body=grip)),
+            not_(HasAnotherAnnotation(body=grip, annotation_type=Handle, annotations=world.semantic_annotations)),
         )
         .tolist()
     )
@@ -624,8 +624,8 @@ def drawers_with_a_handle(world: World) -> list[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child, handle=handle))
         .where(
-            HasCollisionGeometry(slider.child),
-            not_(IsPartOfARobot(slider.child)),
+            HasCollisionGeometry(body=slider.child),
+            not_(IsPartOfARobot(body=slider.child)),
             mount.parent == slider.child,
             mount.child == handle.root,
         )
@@ -645,8 +645,8 @@ def drawers_without_a_handle(world: World) -> list[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child))
         .where(
-            HasCollisionGeometry(slider.child),
-            not_(IsPartOfARobot(slider.child)),
+            HasCollisionGeometry(body=slider.child),
+            not_(IsPartOfARobot(body=slider.child)),
             not_(
                 exists(
                     mount,
@@ -669,8 +669,8 @@ def doors_with_a_handle(world: World) -> list[Door]:
     return (
         entity(inference(Door)(root=hinge.child, handle=handle))
         .where(
-            HasCollisionGeometry(hinge.child),
-            not_(IsPartOfARobot(hinge.child)),
+            HasCollisionGeometry(body=hinge.child),
+            not_(IsPartOfARobot(body=hinge.child)),
             mount.parent == hinge.child,
             mount.child == handle.root,
         )
@@ -705,8 +705,8 @@ def doors_without_a_handle(
     return (
         entity(inference(Door)(root=hinge.child))
         .where(
-            HasCollisionGeometry(hinge.child),
-            not_(IsPartOfARobot(hinge.child)),
+            HasCollisionGeometry(body=hinge.child),
+            not_(IsPartOfARobot(body=hinge.child)),
             follower.parent == hinge.child,
             follower.multiplier != independent_joint_multiplier,
             mount.parent == follower.child,
@@ -749,10 +749,10 @@ def _containers_of_kind(world: World, kind: ContainerKind | None) -> list[Cabine
             )
         )
         .where(
-            not_(IsPartOfARobot(container)),
-            HoldsOpenableParts(container, annotations),
-            NamedContainerKind(container) == kind,
-            not_(NamesARecognisedKind(container)),
+            not_(IsPartOfARobot(body=container)),
+            HoldsOpenableParts(body=container, annotations=annotations),
+            NamedContainerKind(body=container) == kind,
+            not_(NamesARecognisedKind(body=container)),
         )
         .tolist()
     )
@@ -807,9 +807,9 @@ def _furniture_named_after(
     return (
         entity(inference(annotation_type)(root=body))
         .where(
-            HasCollisionGeometry(body),
-            not_(IsPartOfARobot(body)),
-            IsNamedAfter(body, annotation_type),
+            HasCollisionGeometry(body=body),
+            not_(IsPartOfARobot(body=body)),
+            IsNamedAfter(body=body, annotation_type=annotation_type),
         )
         .tolist()
     )

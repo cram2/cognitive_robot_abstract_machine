@@ -175,7 +175,7 @@ class DrawerOpening(
         return [
             drawer
             for drawer in world.get_semantic_annotations_by_type(Drawer)
-            if InsideOf(object_body, drawer.root).compute_containment_ratio()
+            if InsideOf(body=object_body, other=drawer.root).compute_containment_ratio()
             > self.minimum_containment_ratio
             and drawer.opening_ratio < self.minimum_opening_ratio
         ]

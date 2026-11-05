@@ -66,14 +66,14 @@ def _build_type_existence_condition(
     :param type_: The type to check for subclass membership.
     :return: An :func:`~krrood.entity_query_language.factories.exists` expression encoding the check.
     """
-    node_type_variable = node_type(node_variable)
+    node_type_variable = node_type(node=node_variable)
     return exists(
         node_variable,
         and_(
             HasType(variable=node_variable, types_=Selectable),
             node_type_variable != None,
-            is_class(node_type_variable),
-            issubclass_(node_type_variable, type_),
+            is_class(object=node_type_variable),
+            issubclass_(subclass=node_type_variable, parent_or_parents=type_),
         ),
     )
 
@@ -471,7 +471,7 @@ class InferenceExplanation(Symbol):
             entity(node)
             .where(
                 explanation.satisfied_condition_ids != None,
-                contains(explanation.satisfied_condition_ids, node_id(node)),
+                contains(explanation.satisfied_condition_ids, node_id(node=node)),
             )
             .distinct()
         )
@@ -488,7 +488,7 @@ class InferenceExplanation(Symbol):
             type_=type_, node_variable=self.create_query_node_variable(explanation_variable=explanation)
         )
         operation_result = explanation.operation_result
-        node_identifier = node_id(node)
+        node_identifier = node_id(node=node)
         return (
             entity(operation_result.all_bindings[node_identifier])
             .where(contains(operation_result.all_bindings, node_identifier))
@@ -509,9 +509,9 @@ class InferenceExplanation(Symbol):
             entity(node_variable)
             .where(
                 HasType(variable=node_variable, types_=Selectable),
-                (node_type_ := node_type(node_variable)) != None,
-                is_class(node_type_),
-                issubclass_(node_type_, type_),
+                (node_type_ := node_type(node=node_variable)) != None,
+                is_class(object=node_type_),
+                issubclass_(subclass=node_type_, parent_or_parents=type_),
             )
             .distinct(node_variable)
         )
@@ -551,25 +551,25 @@ class InferenceExplanation(Symbol):
         :return: An entity containing condition expressions that relate the participating instances in the inference of this instance.
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
-        child1 = flat_variable(node_children(condition_node))
-        child2 = flat_variable(node_children(condition_node))
+        child1 = flat_variable(node_children(node=condition_node))
+        child2 = flat_variable(node_children(node=condition_node))
 
         # Use exists(node, conditions) directly — avoids the _expression_/An-quantifier
         # problem that arises when passing a built entity to exists().  When .build() is
         # called on an entity, _expression_ is set to an An quantifier; _update_children_
         # then passes that An to Exists.left, and An._evaluate__ ignores sources entirely.
         child1_with_descendants = concatenation(
-            child1, flat_variable(node_descendants(child1))
+            child1, flat_variable(node_descendants(node=child1))
         )
         child2_with_descendants = concatenation(
-            child2, flat_variable(node_descendants(child2))
+            child2, flat_variable(node_descendants(node=child2))
         )
 
         return (
             entity(condition_node)
             .where(
                 HasType(variable=condition_node, types_=(Comparator, InstantiatedVariable)),
-                node_id(child1) != node_id(child2),
+                node_id(node=child1) != node_id(node=child2),
                 _build_type_existence_condition(child1_with_descendants, type_),
                 _build_type_existence_condition(child2_with_descendants, type_),
             )
@@ -594,18 +594,18 @@ class InferenceExplanation(Symbol):
         :return: An entity containing the matching condition expressions.
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
-        desc_a = flat_variable(node_descendants(condition_node))
-        desc_b = flat_variable(node_descendants(condition_node))
+        desc_a = flat_variable(node_descendants(node=condition_node))
+        desc_b = flat_variable(node_descendants(node=condition_node))
 
         return (
             entity(condition_node)
             .where(
                 HasType(variable=condition_node, types_=(Comparator, InstantiatedVariable)),
-                node_id(desc_a) != node_id(desc_b),
+                node_id(node=desc_a) != node_id(node=desc_b),
                 _build_type_existence_condition(desc_a, type_a),
                 _build_type_existence_condition(desc_b, type_b),
             )
-            .distinct(node_id(condition_node))
+            .distinct(node_id(node=condition_node))
         )
 
     @staticmethod
@@ -621,7 +621,7 @@ class InferenceExplanation(Symbol):
         :return: A :class:`~krrood.entity_query_language.core.mapped_variable.FlatVariable` iterating
             over all descendant symbolic expressions of the query root.
         """
-        return flat_variable(node_descendants(explanation_variable.query_root))
+        return flat_variable(node_descendants(node=explanation_variable.query_root))
 
     def create_explanation_variable(
         self,

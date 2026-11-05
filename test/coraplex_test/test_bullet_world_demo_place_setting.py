@@ -52,9 +52,9 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
     spoon_drawer = world.get_body_by_name(ApartmentSurface.SPOON_DRAWER)
     table = world.get_body_by_name(ApartmentSurface.TABLE)
 
-    assert SupportedBy(milk.annotation_in(world).root, counter)()
-    assert SupportedBy(bowl.annotation_in(world).root, counter)()
-    assert SupportedBy(spoon.annotation_in(world).root, spoon_drawer)()
+    assert SupportedBy(supported=milk.annotation_in(world).root, supporting=counter)()
+    assert SupportedBy(supported=bowl.annotation_in(world).root, supporting=counter)()
+    assert SupportedBy(supported=spoon.annotation_in(world).root, supporting=spoon_drawer)()
 
     for placed_object in demonstration.place_setting:
         body = placed_object.annotation_in(world).root
@@ -67,6 +67,6 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
                 )
             )
 
-    assert SupportedBy(milk.annotation_in(world).root, table)()
-    assert SupportedBy(bowl.annotation_in(world).root, table)()
-    assert SupportedBy(spoon.annotation_in(world).root, table)()
+    assert SupportedBy(supported=milk.annotation_in(world).root, supporting=table)()
+    assert SupportedBy(supported=bowl.annotation_in(world).root, supporting=table)()
+    assert SupportedBy(supported=spoon.annotation_in(world).root, supporting=table)()
