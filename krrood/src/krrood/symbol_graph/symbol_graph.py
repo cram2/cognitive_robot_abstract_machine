@@ -1,3 +1,7 @@
+"""
+The graph of the symbols created in the process, of the classes they belong to and of the relations between them.
+"""
+
 from __future__ import annotations
 
 import os
@@ -492,6 +496,22 @@ class SymbolGraph(metaclass=SingletonMeta):
         yield from (
             edge
             for _, _, edge in self._instance_graph.out_edges(wrapped_instance.index)
+        )
+
+    def subgraph_of_relations_of_fields(
+        self, condition: Callable[[WrappedField], bool]
+    ) -> PyDiGraph[WrappedInstance, PredicateClassRelation]:
+        """
+        :param condition: Whether the relations of a field belong to the subgraph.
+        :return: The subgraph of the instance graph made of the relations of the fields that meet the condition and of
+            the instances they relate.
+        """
+        return self._instance_graph.edge_subgraph(
+            [
+                (relation.source.index, relation.target.index)
+                for relation in self.relations()
+                if condition(relation.wrapped_field)
+            ]
         )
 
     def to_dot(
