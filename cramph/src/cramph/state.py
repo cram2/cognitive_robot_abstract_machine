@@ -147,6 +147,17 @@ class State(MutableMapping[StatechartNode, float], SubclassJSONSerializer, ABC):
             data=self.data.copy(),
         )
 
+    def covering_every_node(self) -> Self:
+        """
+        :return: A copy holding the value of every node this state records, and
+            :attr:`default_value` for every node that joined :attr:`statechart` since.
+        """
+        missing = len(self.statechart.nodes) - len(self.data)
+        return self.__class__(
+            statechart=self.statechart,
+            data=np.append(self.data, np.full(missing, float(self.default_value))),
+        )
+
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
         :return: The JSON representation of the base class, extended with the raw :attr:`data` array.
