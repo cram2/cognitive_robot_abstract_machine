@@ -41,7 +41,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -369,7 +369,7 @@ def _grasp_signature(grasp: GraspCandidate) -> tuple:
 
 def _assert_each_standing_pose_keeps_the_closest_grasps(
     pick_ups: list[MoveAndPickUpAction],
-    graspable: CanBeGrasped,
+    graspable: IsGraspable,
     number_of_grasps: int,
 ) -> None:
     """
@@ -401,7 +401,7 @@ def _assert_each_standing_pose_keeps_the_closest_grasps(
 def _assert_each_standing_pose_tries_its_grasps_closest_first(
     steps: list[MoveAndPickUpAction | MoveAndOpenAction],
     grasp_of: Callable[[MoveAndPickUpAction | MoveAndOpenAction], GraspCandidate],
-    graspable: CanBeGrasped,
+    graspable: IsGraspable,
 ) -> None:
     """
     Assert that the grasps `steps` take from each of their standing poses come in the

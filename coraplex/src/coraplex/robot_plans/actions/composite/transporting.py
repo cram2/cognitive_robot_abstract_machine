@@ -26,7 +26,7 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 
@@ -52,7 +52,7 @@ class TransportAction(SequentialAction):
     @classmethod
     def from_graspable_by_closest_grasps(
         cls,
-        graspable: CanBeGrasped,
+        graspable: IsGraspable,
         target_location: Pose,
         arm: Arm,
         context: StatechartContext,
@@ -245,7 +245,7 @@ class MoveAndPickUpAction(SequentialAction):
     @classmethod
     def from_graspable_by_closest_grasps(
         cls,
-        graspable: CanBeGrasped,
+        graspable: IsGraspable,
         arm: Arm,
         context: StatechartContext,
         number_of_grasps: int = GraspsByCloseness.number_of_grasps,

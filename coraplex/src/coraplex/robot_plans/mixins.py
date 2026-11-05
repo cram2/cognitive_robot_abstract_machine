@@ -93,7 +93,7 @@ class HasGraspCandidateParameter(DesignatorParameterMixin):
     The grasp to take hold by.
 
     One of the object's own
-    :meth:`~semantic_digital_twin.semantic_annotations.mixins.CanBeGrasped.grasp_candidates`.
+    :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`.
     """
 
 

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
         HasRootBody,
         HasSupportingSurface,
     )
-    from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
     from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
@@ -2449,7 +2449,7 @@ class NoGraspGeometry(UsageError):
     shape to derive them from.
     """
 
-    graspable: CanBeGrasped
+    graspable: IsGraspable
     """
     The annotation whose grasps were asked for.
     """
@@ -2478,7 +2478,7 @@ class SurfaceGraspNotOnSurfaceError(UsageError):
     The grasp that missed.
     """
 
-    graspable: CanBeGrasped
+    graspable: IsGraspable
     """
     The object it was meant for.
     """

@@ -45,7 +45,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasLegs,
     HasSink,
     HasShelfLayers,
-    CanBeGrasped,
+    IsGraspable,
     HasPinchableWall,
     HasRim,
 )
@@ -100,7 +100,7 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(CanBeGrasped):
+class Handle(IsGraspable):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -949,21 +949,21 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Container(CanBeGrasped):
+class Container(IsGraspable):
     """
     An object that holds contents and has an opening they go in and out through.
     """
 
 
 @dataclass(eq=False)
-class Cookware(CanBeGrasped):
+class Cookware(IsGraspable):
     """
     An object used to cook with.
     """
 
 
 @dataclass(eq=False)
-class Tableware(CanBeGrasped):
+class Tableware(IsGraspable):
     """
     An object a table is set with for a meal.
     """
@@ -977,7 +977,7 @@ class Bottle(Container):
 
 
 @dataclass(eq=False)
-class Statue(CanBeGrasped): ...
+class Statue(IsGraspable): ...
 
 
 @dataclass(eq=False)
@@ -1101,7 +1101,7 @@ class Bowl(HasRim, HasSupportingSurface, Container, Tableware, IsPerceivable):
 
 # Food Items
 @dataclass(eq=False)
-class Food(CanBeGrasped):
+class Food(IsGraspable):
     """
     A Group class for Food.
     """
@@ -1380,7 +1380,7 @@ class WallDecor(Decor):
 
 
 @dataclass(eq=False)
-class Cloth(CanBeGrasped): ...
+class Cloth(IsGraspable): ...
 
 
 @dataclass(eq=False)
@@ -1438,7 +1438,7 @@ class Vase(Container):
 
 
 @dataclass(eq=False)
-class Book(CanBeGrasped):
+class Book(IsGraspable):
     """
     A book.
     """
@@ -1568,21 +1568,21 @@ class Spoon(Cutlery, IsPerceivable): ...
 
 
 @dataclass(eq=False)
-class Pencil(CanBeGrasped):
+class Pencil(IsGraspable):
     """
     A pencil.
     """
 
 
 @dataclass(eq=False)
-class Pen(CanBeGrasped):
+class Pen(IsGraspable):
     """
     A pen.
     """
 
 
 @dataclass(eq=False)
-class ShapeSortingPiece(CanBeGrasped):
+class ShapeSortingPiece(IsGraspable):
     """
     A loose piece of a shape-sorting toy, which drops through the hole of its
     own outline.
@@ -1631,7 +1631,7 @@ class ShapeSortingPiece(CanBeGrasped):
 
 
 @dataclass(eq=False)
-class Baseball(CanBeGrasped):
+class Baseball(IsGraspable):
     """
     A baseball.
     """
@@ -1680,7 +1680,7 @@ class Human(Agent):
 
 
 @dataclass(eq=False)
-class Parcel(CanBeGrasped):
+class Parcel(IsGraspable):
     """
     A parcel, as handled in a warehouse.
     """
@@ -1816,7 +1816,7 @@ class Cooktop(HasRootBody):
 
 
 @dataclass(eq=False)
-class Tool(CanBeGrasped, ABC):
+class Tool(IsGraspable, ABC):
     """
     A tool that is held by a robot's end effector to act on other bodies.
     """

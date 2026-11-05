@@ -36,7 +36,7 @@ from semantic_digital_twin.reasoning.predicates import (
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from krrood_spatial_math.spatial_types import Point3, Pose, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -211,7 +211,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         object_of_interest = an(
             entity(
                 semantic_annotation := variable(
-                    CanBeGrasped, domain=self.world.semantic_annotations
+                    IsGraspable, domain=self.world.semantic_annotations
                 )
             ).where(semantic_annotation.root == body)
         ).first()

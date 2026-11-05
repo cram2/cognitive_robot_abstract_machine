@@ -57,7 +57,7 @@ from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
@@ -247,7 +247,7 @@ class PickUpTarget:
     The object a pick-up takes hold of, and the arm it takes hold with.
     """
 
-    graspable: CanBeGrasped
+    graspable: IsGraspable
     """
     The object that is picked up.
     """

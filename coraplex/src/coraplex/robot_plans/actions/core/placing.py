@@ -27,7 +27,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -127,7 +127,7 @@ class PlaceAction(
         held_body = end_effector.held_body
         if held_body is None:
             raise ObjectIsNotHeld(self.arm)
-        for graspable in self.world.get_semantic_annotations_by_type(CanBeGrasped):
+        for graspable in self.world.get_semantic_annotations_by_type(IsGraspable):
             if graspable.root is held_body:
                 return GraspCandidate(graspable, end_effector.held_body_T_grasp)
         raise HeldBodyIsNotGraspable(self.arm, held_body)

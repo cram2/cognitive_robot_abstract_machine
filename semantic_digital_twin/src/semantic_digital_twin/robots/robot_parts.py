@@ -822,7 +822,7 @@ class EndEffector(AbstractRobotPart, ABC):
         :attr:`tool_frame`.
 
         It is the x-axis of the grasp frame
-        :meth:`~semantic_digital_twin.semantic_annotations.mixins.CanBeGrasped.grasp_candidates`
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`
         describes.
         """
 
@@ -833,7 +833,7 @@ class EndEffector(AbstractRobotPart, ABC):
         The axis the fingers close along, expressed in :attr:`tool_frame`.
 
         It is the y-axis of the grasp frame
-        :meth:`~semantic_digital_twin.semantic_annotations.mixins.CanBeGrasped.grasp_candidates`
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`
         describes, and has to be perpendicular to :attr:`approach_axis`.
         """
 

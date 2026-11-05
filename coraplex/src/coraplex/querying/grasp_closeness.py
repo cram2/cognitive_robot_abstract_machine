@@ -13,7 +13,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     FunctionVerbalizationTemplates,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import CanBeGrasped
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from krrood_spatial_math.spatial_types import Pose2D
 
 # %% how close a grasp is to where the robot stands
@@ -73,7 +73,7 @@ class GraspsByCloseness(SymbolicFunction):
     position, the closest first, and at most :attr:`number_of_grasps` of them.
     """
 
-    graspable: CanBeGrasped
+    graspable: IsGraspable
     """
     The object offering the grasps.
     """
