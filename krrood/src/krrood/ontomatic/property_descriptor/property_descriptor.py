@@ -1,3 +1,7 @@
+"""
+Descriptors that manage the fields relating symbols and keep the relations in the symbol graph.
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -6,6 +10,7 @@ from functools import cached_property, lru_cache
 
 from typing_extensions import ClassVar, Any, Iterable, Dict, List
 
+from krrood.ontomatic.property_descriptor.mixins import HasChainAxioms
 from krrood.ontomatic.property_descriptor.monitored_container import (
     MonitoredContainer,
     monitored_type_map,
@@ -35,6 +40,40 @@ DomainRangeMap = Dict[SymbolType, SymbolType]
 """
 Type alias for the domain-range map.
 """
+
+
+@dataclass(frozen=True)
+class ChainPosition:
+    """
+    The place of a descriptor class in a property chain that implies another descriptor class.
+    """
+
+    implied_descriptor: type[PropertyDescriptor]
+    """
+    The descriptor class the chain implies.
+    """
+    chain: tuple[type[PropertyDescriptor], ...]
+    """
+    The descriptor classes of the chain, in order.
+    """
+    index: int
+    """
+    The index of the descriptor class in the chain.
+    """
+
+    @property
+    def descriptors_before(self) -> tuple[type[PropertyDescriptor], ...]:
+        """
+        The descriptor classes of the chain that come before this position.
+        """
+        return self.chain[: self.index]
+
+    @property
+    def descriptors_after(self) -> tuple[type[PropertyDescriptor], ...]:
+        """
+        The descriptor classes of the chain that come after this position.
+        """
+        return self.chain[self.index + 1 :]
 
 
 @dataclass
@@ -110,11 +149,32 @@ class PropertyDescriptor(Symbol):
     """
     A set of all range types for this descriptor class.
     """
+    chains_with_descriptor: ClassVar[
+        defaultdict[type[PropertyDescriptor], set[ChainPosition]]
+    ] = defaultdict(set)
+    """
+    For each descriptor class, the positions it takes in the property chains that imply other descriptor classes.
+    """
 
     def __post_init__(self):
+        """
+        Register the descriptor for its domain, and the chains that imply its class.
+        """
         self._validate_non_redundant_domain()
         self._update_wrapped_field()
         self._update_domain_and_range()
+        if isinstance(self, HasChainAxioms):
+            self._register_chain_axioms()
+
+    def _register_chain_axioms(self):
+        """
+        Register the position of every descriptor class of every chain that implies this descriptor class.
+        """
+        for chain in self.get_chain_axioms():
+            for index, descriptor_class in enumerate(chain):
+                self.chains_with_descriptor[descriptor_class].add(
+                    ChainPosition(type(self), chain, index)
+                )
 
     @cached_property
     def private_attr_name(self) -> str:
@@ -293,9 +353,8 @@ class PropertyDescriptor(Symbol):
         :param domain_type: The domain type that has an associated field with this descriptor class.
         """
         class_diagram = SymbolGraph().class_diagram
-        association_condition = (
-            lambda association: type(association.wrapped_field.property_descriptor)
-            is cls
+        association_condition = lambda association: (
+            type(association.wrapped_field.property_descriptor) is cls
         )
         result = next(
             class_diagram.get_outgoing_associations_with_condition(

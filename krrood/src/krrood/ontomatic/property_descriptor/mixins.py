@@ -1,3 +1,7 @@
+"""
+Mixins that give property descriptors the characteristics of OWL properties.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -10,6 +14,9 @@ if TYPE_CHECKING:
     )
 
 
+# %% property characteristics
+
+
 @dataclass
 class TransitiveProperty:
     """
@@ -17,6 +24,47 @@ class TransitiveProperty:
     """
 
     ...
+
+
+@dataclass
+class SymmetricProperty(ABC):
+    """
+    A mixin for descriptors that relate the object of every statement back to its
+    subject.
+    """
+
+    ...
+
+
+@dataclass
+class ASymmetricProperty(ABC):
+    """
+    A mixin for descriptors that never relate the object of a statement back to its
+    subject.
+    """
+
+    ...
+
+
+@dataclass
+class ReflexiveProperty(ABC):
+    """
+    A mixin for descriptors that relate every individual to itself.
+    """
+
+    ...
+
+
+@dataclass
+class IrreflexiveProperty(ABC):
+    """
+    A mixin for descriptors that never relate an individual to itself.
+    """
+
+    ...
+
+
+# %% properties related to other properties
 
 
 @dataclass
@@ -32,3 +80,64 @@ class HasInverseProperty(ABC):
         The inverse of the property.
         """
         ...
+
+
+@dataclass
+class HasEquivalentProperties(ABC):
+    """
+    A mixin for descriptors whose statements are also statements of other properties,
+    and the other way round.
+    """
+
+    @classmethod
+    @abstractmethod
+    def get_equivalent_properties(cls) -> list[type[PropertyDescriptor]]:
+        """
+        The properties equivalent to this property.
+        """
+        ...
+
+
+@dataclass
+class HasDisjointProperties(ABC):
+    """
+    A mixin for descriptors that never relate the same two individuals as certain other
+    properties.
+    """
+
+    @classmethod
+    @abstractmethod
+    def get_disjoint_properties(cls) -> list[type[PropertyDescriptor]]:
+        """
+        The properties disjoint with this property.
+        """
+        ...
+
+
+@dataclass
+class HasChainAxioms(ABC):
+    """
+    A mixin for descriptors implied by chains of properties: a statement of each
+    property of a chain, each starting where the previous one ends, implies a statement
+    of this property from the first subject to the last object.
+    """
+
+    @classmethod
+    @abstractmethod
+    def get_chain_axioms(cls) -> list[tuple[type[PropertyDescriptor], ...]]:
+        """
+        The chains of properties that imply this property.
+        """
+        ...
+
+
+# %% classes
+
+
+@dataclass
+class IsBaseClass(ABC):
+    """
+    A mixin for the class every class of a generated ontology module inherits from.
+    """
+
+    ...
