@@ -1,10 +1,20 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
+from inspect import isclass, ismethod
 
-from typing_extensions import Callable, Any, Generic, Iterator, TypeVar
+from typing_extensions import (
+    Callable,
+    Any,
+    Generic,
+    Iterator,
+    Self,
+    TypeVar,
+    get_origin,
+)
 
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 
 T = TypeVar("T")
@@ -75,6 +85,30 @@ class HasFactoryAndKwargs(Generic[T]):
                 )
             factory_keyword_arguments[key] = value
         return factory_keyword_arguments
+
+    @staticmethod
+    def _type_built_by_(factory: Callable[..., Any]) -> type | None:
+        """
+        :param factory: A class, function or method.
+        :return: The class itself; otherwise the class its return annotation names, the
+            class a method annotated with :data:`~typing.Self` is bound to, the origin
+            of a parameterized generic it names (``list`` for ``list[int]``), or
+            :class:`object` for :data:`~typing.Any`. ``None`` when it has no return
+            annotation or the annotation names no class.
+        """
+        if isclass(factory):
+            return factory
+        return_annotation = get_type_hints_of_object(factory).get("return")
+        if return_annotation is Self and ismethod(factory):
+            owner = factory.__self__
+            return owner if isclass(owner) else type(owner)
+        if return_annotation is Any:
+            return object
+        if isclass(return_annotation):
+            return return_annotation
+        if isclass(get_origin(return_annotation)):
+            return get_origin(return_annotation)
+        return None
 
     def _stated_values_(self, keyword: str) -> Iterator[Any]:
         """

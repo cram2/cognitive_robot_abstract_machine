@@ -50,9 +50,11 @@ from krrood.entity_query_language.core.base_expressions import (
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
+from krrood.entity_query_language.exceptions import ResultTypeCannotBeDetermined
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
+from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -79,7 +81,8 @@ def symbolic_function(
         all_kwargs = signature.bind_by_name(CallArguments(args, kwargs))
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
-                _type_=function,
+                _factory_=function,
+                _declared_factory_=wrapper,
                 _kwargs_=all_kwargs,
             )
         return function(*args, **kwargs)
@@ -236,10 +239,19 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
         )
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
-                _type_=cls,
+                _type_=cls._bound_value_type_,
+                _factory_=cls,
                 _kwargs_=all_kwargs,
             )
         return super().__new__(cls)
+
+    @classproperty
+    def _bound_value_type_(cls) -> type:
+        """
+        The type of the value :meth:`_bound_value_` contributes to a query result, the
+        class itself by default.
+        """
+        return cls
 
     @classmethod
     def _construct_normally_(cls, **kwargs) -> SymbolicCallable:
@@ -333,6 +345,19 @@ class SymbolicFunction(SymbolicCallable, ABC):
         what it computes (exactly as a ``@symbolic_function`` is called), not the instance.
         """
         return cls._construct_normally_(**kwargs)()
+
+    @classproperty
+    def _bound_value_type_(cls) -> type:
+        """
+        The return type of :meth:`__call__`.
+
+        :raises ResultTypeCannotBeDetermined: If :meth:`__call__`'s return annotation
+            names no type.
+        """
+        return_type = InstantiatedVariable._type_built_by_(cls.__call__)
+        if return_type is None:
+            raise ResultTypeCannotBeDetermined(cls.__call__)
+        return return_type
 
     @abstractmethod
     def __call__(self) -> Any:
