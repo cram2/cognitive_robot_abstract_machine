@@ -335,7 +335,7 @@ class LookAtTheGoalWhileNavigating(ParallelInsertion[NavigateAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: NavigateAction) -> List[StatechartNode]:
-        return [LookAtAction(target=plan_node.target_location)]
+        return [LookAtAction(target=plan_node.target_location.pose)]
 
 
 plan_transformations = [LookAtTheGoalWhileNavigating()]
@@ -370,7 +370,7 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
         navigate = plan_node
         target = navigate.world.transform(navigate.target_location, navigate.world.root)
         distance = navigate.robot.root.global_pose.position.euclidean_distance(
-            target.position
+            target.pose.position
         )
         return float(distance) > self.minimum_distance
 ```
