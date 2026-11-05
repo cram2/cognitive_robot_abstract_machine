@@ -124,8 +124,8 @@ class TestFeatureFunctions:
         height_goal = HeightGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -175,8 +175,8 @@ class TestFeatureFunctions:
         height_goal = HeightGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -230,8 +230,8 @@ class TestFeatureFunctions:
         reach_point = ReachPoint(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
         )
         statechart.add_node(reach_point)
         statechart.add_node(EndMotion.when_true(reach_point))
@@ -275,8 +275,8 @@ class TestFeatureFunctions:
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -330,8 +330,8 @@ class TestFeatureFunctions:
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -385,8 +385,8 @@ class TestFeatureFunctions:
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -444,16 +444,16 @@ class TestFeatureFunctions:
                 HeightGoal(
                     root_link=root,
                     tip_link=tip,
-                    tip_point=tip_point,
-                    reference_point=reference_point,
+                    controlled_feature=tip_point,
+                    reference_feature=reference_point,
                     lower_limit=height_lower,
                     upper_limit=height_upper,
                 ),
                 DistanceGoal(
                     root_link=root,
                     tip_link=tip,
-                    tip_point=tip_point,
-                    reference_point=reference_point,
+                    controlled_feature=tip_point,
+                    reference_feature=reference_point,
                     lower_limit=distance_lower,
                     upper_limit=distance_upper,
                 ),
@@ -523,24 +523,24 @@ class TestFeatureFunctions:
         height_goal = HeightGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=height_lower,
             upper_limit=height_upper,
         )
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            tip_point=tip_point,
-            reference_point=reference_point,
+            controlled_feature=tip_point,
+            reference_feature=reference_point,
             lower_limit=distance_lower,
             upper_limit=distance_upper,
         )
         align_perpendicular = AlignPerpendicular(
             root_link=root,
             tip_link=tip,
-            tip_normal=tip_normal,
-            reference_normal=reference_normal,
+            controlled_feature=tip_normal,
+            reference_feature=reference_normal,
             threshold=perpendicular_threshold,
         )
 
@@ -619,7 +619,7 @@ def test_pointing(pr2_world_state_reset: World):
     pointing = Pointing(
         root_link=root,
         tip_link=tip,
-        goal_point=goal_point,
+        goal=goal_point,
         pointing_axis=pointing_axis,
     )
     statechart.add_node(pointing)
@@ -667,7 +667,7 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     pointing = Pointing(
         root_link=base,
         tip_link=head,
-        goal_point=goal_point,
+        goal=goal_point,
         pointing_axis=Vector3.X(reference_frame=head),
     )
     statechart.add_node(pointing)
@@ -720,12 +720,10 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     pointing = Pointing(
         root_link=base,
         tip_link=head,
-        goal_point=world_T_region.position,
+        goal=world_T_region.position,
         pointing_axis=Vector3.X(reference_frame=head),
     )
-    region_goal = JointPositionList(
-        goal_state=JointState.from_mapping({region_joint: 0.8})
-    )
+    region_goal = JointPositionList(goal=JointState.from_mapping({region_joint: 0.8}))
     statechart.add_node(both := Parallel(nodes=[pointing, region_goal]))
     end = EndMotion()
     end.start_condition = both.observes_true
@@ -761,7 +759,7 @@ def test_pointing_cone(pr2_world_state_reset: World):
     pointing_cone = PointingCone(
         root_link=root,
         tip_link=tip,
-        goal_point=goal_point,
+        goal=goal_point,
         pointing_axis=pointing_axis,
         cone_theta=cone_theta,
     )
@@ -817,7 +815,10 @@ def test_align_planes(pr2_world_state_reset: World):
     tip_normal = Vector3.Y(reference_frame=tip)
 
     align_planes = AlignPlanes(
-        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
+        root_link=root,
+        tip_link=tip,
+        reference_feature=goal_normal,
+        controlled_feature=tip_normal,
     )
     statechart.add_node(align_planes)
 
@@ -869,8 +870,8 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     align_perp = AlignPerpendicular(
         root_link=root,
         tip_link=tip,
-        reference_normal=goal_normal,
-        tip_normal=tip_normal,
+        reference_feature=goal_normal,
+        controlled_feature=tip_normal,
     )
     statechart.add_node(align_perp)
 
@@ -932,8 +933,8 @@ def test_angle_goal(pr2_world_state_reset: World):
     angle_goal = AngleGoal(
         root_link=root,
         tip_link=tip,
-        tip_vector=tip_vector,
-        reference_vector=reference_vector,
+        controlled_feature=tip_vector,
+        reference_feature=reference_vector,
         lower_angle=lower_angle,
         upper_angle=upper_angle,
     )
@@ -984,7 +985,7 @@ class TestArticulateGraspedMechanism:
             open_goal := ArticulateGraspedMechanism(
                 environment_link=prismatic_bot2.get_body_by_name("robot"),
                 tip_link=prismatic_bot2.get_body_by_name("robot2"),
-                goal_joint_state=0.0,
+                goal=0.0,
             )
         )
         executor.compile(statechart=motion_statechart)
@@ -1049,7 +1050,7 @@ class TestArticulateGraspedMechanism:
                         CartesianPose(
                             root_link=pr2_world_copy.root,
                             tip_link=r_tip,
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
                             ),
                         ),
@@ -1058,7 +1059,7 @@ class TestArticulateGraspedMechanism:
                                 ArticulateGraspedMechanism(
                                     tip_link=r_tip,
                                     environment_link=handle,
-                                    goal_joint_state=open_goal,
+                                    goal=open_goal,
                                 ),
                                 JointPositionReached(
                                     connection=root_C_hinge,
@@ -1072,7 +1073,7 @@ class TestArticulateGraspedMechanism:
                                 ArticulateGraspedMechanism(
                                     tip_link=r_tip,
                                     environment_link=handle,
-                                    goal_joint_state=close_goal,
+                                    goal=close_goal,
                                 ),
                                 JointPositionReached(
                                     connection=root_C_hinge,
@@ -1134,14 +1135,14 @@ class TestArticulateGraspedMechanism:
                     CartesianPose(
                         root_link=world.root,
                         tip_link=tip,
-                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                             yaw=np.pi, reference_frame=handle.root
                         ),
                     ),
                     opening := ArticulateGraspedMechanism(
                         tip_link=tip,
                         environment_link=handle.root,
-                        goal_joint_state=open_position,
+                        goal=open_position,
                     ),
                 ]
             )
@@ -1167,7 +1168,7 @@ class TestArticulateGraspedMechanism:
 
         [hold] = [node for node in opening.nodes if isinstance(node, CartesianPose)]
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert largest_drift <= hold.translation_threshold
+        assert largest_drift <= hold.position_threshold
 
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03
@@ -1224,14 +1225,14 @@ class TestArticulateGraspedMechanism:
                         CartesianPose(
                             root_link=pr2_world_copy.root,
                             tip_link=r_tip,
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 reference_frame=cap_body
                             ),
                         ),
                         open := ArticulateGraspedMechanism(
                             tip_link=r_tip,
                             environment_link=cap_body,
-                            goal_joint_state=unscrew_goal,
+                            goal=unscrew_goal,
                         ),
                     ]
                 ),
@@ -1270,7 +1271,7 @@ class TestArticulateGraspedMechanism:
                 close := ArticulateGraspedMechanism(
                     tip_link=r_tip,
                     environment_link=cap_body,
-                    goal_joint_state=tightened_goal_joint_state,
+                    goal=tightened_goal_joint_state,
                 ),
             ]
         )
@@ -1310,7 +1311,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=0.0,
+            goal=0.0,
         )
 
         nodes = self._expanded_nodes(goal, prismatic_bot)
@@ -1332,7 +1333,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=0.0,
+            goal=0.0,
             mechanism_weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             grasp_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
@@ -1356,12 +1357,12 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=within_limits,
+            goal=within_limits,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal_joint_state == within_limits
+        assert goal.goal == within_limits
 
     def test_a_goal_beyond_the_upper_limit_is_clamped_to_it(self, prismatic_bot):
         """
@@ -1372,21 +1373,21 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=1e3,
+            goal=1e3,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal_joint_state == goal.connection.dof.limits.upper.position
+        assert goal.goal == goal.connection.dof.limits.upper.position
 
     def test_a_goal_below_the_lower_limit_is_clamped_to_it(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=-1e3,
+            goal=-1e3,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal_joint_state == goal.connection.dof.limits.lower.position
+        assert goal.goal == goal.connection.dof.limits.lower.position

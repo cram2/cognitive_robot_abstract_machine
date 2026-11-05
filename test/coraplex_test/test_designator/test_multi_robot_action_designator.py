@@ -91,7 +91,7 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm, EndEffector
 from ..conftest import (
     grasp_point_of,
     left_or_only_arm,
@@ -358,8 +358,8 @@ def test_navigate_multi(multiple_robot_apartment_context, rclpy_node):
     target_position = [5, 2, 0]
 
     plan = NavigateAction(
-        target_location=Pose(
-            Point3.from_iterable(target_position), reference_frame=world.root
+        target_location=Pose2D.from_xy_yaw(
+            *target_position[:2], reference_frame=world.root
         )
     )
 
@@ -587,6 +587,9 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
 
 
 def test_place_multi(multiple_robot_apartment_context):
+    """
+    On every robot, the milk is no longer attached to the tool frame once it is placed.
+    """
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
@@ -609,8 +612,8 @@ def test_place_multi(multiple_robot_apartment_context):
                 arm=left_or_only_arm(view),
             ),
             PlaceAction(
-                object_designator=world.get_semantic_annotations_by_type(Milk)[0],
-                target_location=Pose(
+                arm=left_or_only_arm(view),
+                target_pose=Pose(
                     Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root
                 ),
             ),
@@ -686,10 +689,12 @@ def test_open(multiple_robot_apartment_context):
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                target_location=Pose(
-                    Point3.from_iterable([1.6, 1.9, 0]),
-                    Quaternion.from_iterable([0, 0, 0.3, 1]),
-                    reference_frame=world.root,
+                target_location=Pose2D.from_pose(
+                    Pose(
+                        Point3.from_iterable([1.6, 1.9, 0]),
+                        Quaternion.from_iterable([0, 0, 0.3, 1]),
+                        reference_frame=world.root,
+                    )
                 )
             ),
             OpenAction.from_handle(
@@ -720,10 +725,12 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                target_location=heading_towards(
-                    navigate_position,
-                    handle.root.global_pose.position.to_np(),
-                    world,
+                target_location=Pose2D.from_pose(
+                    heading_towards(
+                        navigate_position,
+                        handle.root.global_pose.position.to_np(),
+                        world,
+                    )
                 )
             ),
             CloseAction.from_handle(handle, left_or_only_arm(robot)),
@@ -777,6 +784,9 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
 
 
 def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
+    """
+    On every robot, standing off the grasp and reaching it runs through.
+    """
     world, robot, extensions = multiple_robot_apartment_context
     # a Stretch keeps its heading while it reaches, so it stands behind the grasp,
     # where its arm already points along the approach
@@ -791,7 +801,7 @@ def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
             x=0.7, y=-1.3, z=0.9, reference_frame=world.root
         ),
         hip_rotation=0.0,
-        end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+        arm=world.get_semantic_annotations_by_type(Arm)[0],
     )
 
     plan = move_to_reach
@@ -834,7 +844,7 @@ def test_multi_robot_gcs_navigation(multiple_robot_apartment_context, rclpy_node
     target_position = [5, 1]
 
     plan = PathPlanningNavigateAction(
-        target=Pose.from_xyz_rpy(*target_position, 0, reference_frame=world.root)
+        target_location=Pose2D.from_xy_yaw(*target_position, reference_frame=world.root)
     )
 
     run_plan(plan, extensions)
@@ -853,7 +863,7 @@ def test_gcs_navigation_arrives_at_each_waypoint_facing_the_next_one(
     world, robot, extensions = multiple_robot_apartment_context
 
     action = PathPlanningNavigateAction(
-        target=Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root)
+        target_location=Pose2D.from_xy_yaw(x=5, y=1, reference_frame=world.root)
     )
     attach_to_statechart(action, extensions)
 
@@ -886,7 +896,7 @@ def test_gcs_navigation_plans_on_the_floor_the_robot_stands_on(
     world, robot, extensions = multiple_robot_apartment_context
 
     action = PathPlanningNavigateAction(
-        target=Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root)
+        target_location=Pose2D.from_xy_yaw(x=5, y=1, reference_frame=world.root)
     )
     attach_to_statechart(action, extensions)
 
@@ -903,9 +913,9 @@ def test_gcs_navigation_plans_on_the_floor_the_robot_stands_on(
     assert floor_box.max_z == pytest.approx(float(base_pose.z), abs=1e-6)
 
     waypoints = action._waypoints()
-    assert [waypoint.reference_frame for waypoint in waypoints] == [floor.root] * len(
-        waypoints
-    )
+    assert [waypoint.reference_frame for waypoint in waypoints] == [
+        floor.supporting_surface
+    ] * len(waypoints)
 
 
 def test_gcs_navigation_takes_a_waypoints_height_from_that_waypoints_frame(
@@ -918,7 +928,7 @@ def test_gcs_navigation_takes_a_waypoints_height_from_that_waypoints_frame(
     world, robot, extensions = multiple_robot_apartment_context
 
     action = PathPlanningNavigateAction(
-        target=Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root)
+        target_location=Pose2D.from_xy_yaw(x=5, y=1, reference_frame=world.root)
     )
     attach_to_statechart(action, extensions)
 
@@ -927,7 +937,9 @@ def test_gcs_navigation_takes_a_waypoints_height_from_that_waypoints_frame(
         base_in_pose_frame = world.transform(
             robot.root.global_transform, pose.reference_frame
         )
-        assert float(pose.z) == pytest.approx(float(base_in_pose_frame.z))
+        assert float(pose.reference_frame.global_pose.z) == pytest.approx(
+            float(base_in_pose_frame.reference_frame.global_pose.z)
+        )
 
 
 def test_gcs_navigation_needs_a_floor_below_the_robot(
@@ -944,7 +956,7 @@ def test_gcs_navigation_needs_a_floor_below_the_robot(
     world.notify_state_change()
 
     action = PathPlanningNavigateAction(
-        target=Pose.from_xyz_rpy(5, 1, 0, reference_frame=world.root)
+        target_location=Pose2D.from_xy_yaw(x=5, y=1, reference_frame=world.root)
     )
 
     with pytest.raises(NoFloorBelowRobot) as raised:
@@ -1206,7 +1218,9 @@ def test_a_search_tries_the_looks_it_is_given_in_turn(
         ),
     )
     search = SearchAction(
-        navigate=NavigateAction(target_location=robot.root.global_pose),
+        navigate=NavigateAction(
+            target_location=Pose2D.from_pose(robot.root.global_pose)
+        ),
         looks=[look_up],
     )
 
@@ -1231,9 +1245,7 @@ def test_move_torso_runs_the_joint_goal_of_the_requested_state(
     expand(action, extensions)
 
     [joint_goal] = nodes_of_type(action, JointPositionList)
-    assert joint_goal.goal_state == robot.get_torso().get_joint_state_by_type(
-        TorsoState.HIGH
-    )
+    assert joint_goal.goal == robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
 
 
 def test_set_gripper_drives_the_gripper_it_names(multiple_robot_apartment_context):
@@ -1267,7 +1279,7 @@ def test_park_arms_caps_joint_velocity_only_when_asked(
     expand(uncapped, extensions)
 
     [limit] = nodes_of_type(capped, JointVelocityLimit)
-    assert limit.max_velocity == capped.max_joint_velocity
+    assert limit.max_joint_velocity == capped.max_joint_velocity
     assert limit in capped.nodes
     assert nodes_of_type(uncapped, JointVelocityLimit) == []
 
@@ -1286,7 +1298,7 @@ def test_closing_drives_the_mechanism_to_the_closed_joint_position(
     expand(action, extensions)
 
     [closing] = nodes_of_type(action, ArticulateGraspedMechanism)
-    assert closing.goal_joint_state == action.closed_joint_position
+    assert closing.goal == action.closed_joint_position
 
 
 def test_opening_drives_the_mechanism_to_its_upper_limit(
@@ -1303,7 +1315,7 @@ def test_opening_drives_the_mechanism_to_its_upper_limit(
 
     [opening] = nodes_of_type(action, ArticulateGraspedMechanism)
     mechanism = handle.root.get_first_parent_connection_of_type(ActiveConnection1DOF)
-    assert opening.goal_joint_state == mechanism.dof.limits.upper.position
+    assert opening.goal == mechanism.dof.limits.upper.position
 
 
 def test_look_at_points_the_default_camera(multiple_robot_apartment_context):
@@ -1363,19 +1375,19 @@ def test_moving_the_manipulator_relaxes_collisions_only_when_allowed(
     The gripper is only let through its surroundings when the caller asks.
     """
     _, robot, extensions = multiple_robot_apartment_context
-    end_effector = left_or_only_arm(robot).end_effector
+    arm = left_or_only_arm(robot)
     allowed = MoveManipulatorAction(
-        target_pose=Pose(), end_effector=end_effector, allow_gripper_collision=True
+        target_pose=Pose(), arm=arm, allow_gripper_collision=True
     )
     forbidden = MoveManipulatorAction(
-        target_pose=Pose(), end_effector=end_effector, allow_gripper_collision=False
+        target_pose=Pose(), arm=arm, allow_gripper_collision=False
     )
 
     expand(allowed, extensions)
     expand(forbidden, extensions)
 
     [rule] = allowed.temporary_collision_rules
-    assert rule.end_effector is end_effector
+    assert rule.end_effector is arm.end_effector
     assert forbidden.temporary_collision_rules == []
     assert nodes_of_type(allowed, UpdateTemporaryCollisionRules) == []
     assert len(nodes_of_type(forbidden, CartesianPose)) == 1
@@ -1393,7 +1405,7 @@ def test_moving_the_manipulator_hands_what_accompanies_it_to_its_pose(
         robot.mobile_base.full_body_controlled = False
     action = MoveManipulatorAction(
         target_pose=Pose(),
-        end_effector=left_or_only_arm(robot).end_effector,
+        arm=left_or_only_arm(robot),
         allow_gripper_collision=True,
     )
 
@@ -1418,7 +1430,7 @@ def test_a_pose_of_the_tool_center_point_holds_what_accompanies_it(
     arm = left_or_only_arm(robot)
     action = MoveManipulatorAction(
         target_pose=Pose(),
-        end_effector=arm.end_effector,
+        arm=arm,
         allow_gripper_collision=False,
     )
     expand(action, extensions)
@@ -1451,7 +1463,7 @@ def test_navigating_drives_the_base_towards_what_it_should_face(
     Navigating commands the base pose, and runs nothing else.
     """
     _, robot, extensions = robot_without_differential_drive_context
-    action = NavigateAction(target_location=Pose())
+    action = NavigateAction(target_location=Pose2D())
 
     statechart_of(robot_executor(extensions), action)
 
@@ -1466,7 +1478,7 @@ def test_navigating_writes_the_odometry_when_simulated(
     A simulated run has no drive to follow a pose, so it sets the odometry itself.
     """
     _, _, extensions = robot_without_differential_drive_context
-    action = NavigateAction(target_location=Pose())
+    action = NavigateAction(target_location=Pose2D())
 
     expand(action, extensions)
 
@@ -1482,7 +1494,7 @@ def test_navigating_drives_the_base_when_physically_simulated(
     why performing in physics is told apart from performing kinematically.
     """
     _, robot, extensions = robot_without_differential_drive_context
-    action = NavigateAction(target_location=Pose())
+    action = NavigateAction(target_location=Pose2D())
 
     statechart_of(physically_simulated_executor(extensions), action)
 
@@ -1503,7 +1515,7 @@ def arm_and_look_actions(robot: AbstractRobot) -> list[Action]:
     return [
         MoveManipulatorAction(
             target_pose=Pose(),
-            end_effector=arm.end_effector,
+            arm=arm,
             allow_gripper_collision=False,
         ),
         FollowToolCenterPointPathAction(
@@ -1601,7 +1613,7 @@ def test_fingers_squeezing_an_object_are_done_once_it_stops_them(
 
     statechart_of(physically_simulated_executor(extensions), pressing)
 
-    assert pressing.goal.tolerate_stall
+    assert pressing.goal.tolerate_finger_stall
 
 
 def test_fingers_sent_only_to_a_width_have_to_reach_it(
@@ -1613,7 +1625,7 @@ def test_fingers_sent_only_to_a_width_have_to_reach_it(
 
     statechart_of(physically_simulated_executor(extensions), touching)
 
-    assert not touching.goal.tolerate_stall
+    assert not touching.goal.tolerate_finger_stall
 
 
 def test_fingers_sent_to_a_width_stand_that_far_apart(
@@ -1719,10 +1731,8 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
                 grasp=milk.grasp_candidates()[0], arm=right_or_only_arm(robot)
             ),
             PlaceAction(
-                object_designator=milk,
-                target_location=Pose.from_xyz_rpy(
-                    1, 1, 0.8, reference_frame=world.root
-                ),
+                arm=right_or_only_arm(robot),
+                target_pose=Pose.from_xyz_rpy(1, 1, 0.8, reference_frame=world.root),
             ),
         ]
     )
@@ -1849,7 +1859,7 @@ def drive_ahead(robot: AbstractRobot) -> NavigateAction:
     :return: The drive moving `robot` a short way.
     """
     return NavigateAction(
-        target_location=Pose.from_xyz_rpy(x=0.3, reference_frame=robot.root)
+        target_location=Pose2D.from_xy_yaw(x=0.3, reference_frame=robot.root)
     )
 
 
@@ -1958,15 +1968,19 @@ def test_a_cup_picked_up_by_a_statement_ends_upright(
 def test_a_placing_carries_its_object_to_where_it_stands(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    The carry is the first of the steps, before the robot turns towards the target and
+    places.
+    """
     _, robot, extensions = multiple_robot_apartment_context
-    cup = cup_held_tilted(robot)
+    cup_held_tilted(robot)
     target = Pose.from_xyz_rpy(x=0.8, z=0.8, reference_frame=robot.root)
     move_and_place = MoveAndPlaceAction(
         carry=CarryAction(navigate=drive_ahead(robot)),
         face_and_look_at=FaceAndLookAtAction(
             face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
         ),
-        place=PlaceAction(object_designator=cup, target_location=target),
+        place=PlaceAction(arm=left_or_only_arm(robot), target_pose=target),
     )
 
     expand(move_and_place, extensions)
@@ -2018,8 +2032,8 @@ class CupForEachArm:
         """
         return [
             PlaceAction(
-                object_designator=pick_up.grasp.graspable,
-                target_location=self.world.transform(
+                arm=pick_up.arm,
+                target_pose=self.world.transform(
                     Pose.from_xyz_rpy(
                         y=sideways_distance,
                         reference_frame=pick_up.grasp.graspable.root,
@@ -2092,6 +2106,9 @@ def test_a_gripper_closes_at_its_grasp_although_the_other_arm_is_moving(
 def test_a_gripper_opens_at_its_place_target_although_the_other_arm_is_moving(
     cup_for_each_arm: CupForEachArm,
 ) -> None:
+    """
+    Two places running in parallel each leave their own cup at their own target.
+    """
     # One after the other, so that both cups sit in their grippers at their grasps.
     run_plan(
         Sequence(nodes=cup_for_each_arm.pick_ups),
@@ -2101,10 +2118,10 @@ def test_a_gripper_opens_at_its_place_target_although_the_other_arm_is_moving(
 
     run_plan(Parallel(nodes=places), cup_for_each_arm.context_extensions)
 
-    for place in places:
+    for place, pick_up in zip(places, cup_for_each_arm.pick_ups):
         np.testing.assert_allclose(
-            place.object_designator.root.global_pose.position.to_np()[:3],
-            place.target_location.position.to_np()[:3],
+            pick_up.grasp.graspable.root.global_pose.position.to_np()[:3],
+            place.target_pose.position.to_np()[:3],
             atol=2 * place.position_threshold,
         )
 

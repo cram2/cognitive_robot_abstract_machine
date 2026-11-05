@@ -141,7 +141,7 @@ class TestJointGoals:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             joint_goal := JointPositionList(
-                goal_state=JointState.from_str_dict(js, giskard.api.world),
+                goal=JointState.from_str_dict(js, giskard.api.world),
             )
         )
         statechart.add_node(EndMotion.when_true(joint_goal))
@@ -175,7 +175,7 @@ class TestCartGoals:
             cart_goal := CartesianPose(
                 root_link=giskard.base_footprint,
                 tip_link=giskard.right_tip,
-                goal_pose=tip_goal,
+                goal=tip_goal,
             )
         )
         statechart.add_node(EndMotion.when_true(cart_goal))
@@ -247,7 +247,7 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             joint_goal := JointPositionList(
-                goal_state=HomogeneousTransformationMatrix(),
+                goal=HomogeneousTransformationMatrix(),
             )
         )
         statechart.add_node(EndMotion.when_true(joint_goal))
@@ -258,7 +258,7 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             joint_goal := JointPositionList(
-                goal_state=JointState.from_str_dict(
+                goal=JointState.from_str_dict(
                     giskard.better_pose_left, world=giskard.api.world
                 ),
             )
@@ -274,7 +274,7 @@ class TestActionServerEvents:
             CartesianPose(
                 root_link=giskard.map,
                 tip_link=giskard.base_footprint,
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=100, reference_frame=giskard.base_footprint
                 ),
             )
@@ -291,7 +291,7 @@ class TestActionServerEvents:
             cart_goal := CartesianPose(
                 root_link=giskard.map,
                 tip_link=giskard.base_footprint,
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                     y=1, reference_frame=giskard.base_footprint
                 ),
             )
@@ -311,7 +311,7 @@ class TestActionServerEvents:
             CartesianPose(
                 root_link=giskard.map,
                 tip_link=giskard.base_footprint,
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
             )
@@ -343,7 +343,7 @@ class TestActionServerEvents:
             CartesianPose(
                 root_link=giskard.map,
                 tip_link=giskard.base_footprint,
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
             )
@@ -384,7 +384,7 @@ class TestActionServerEvents:
             CartesianPose(
                 root_link=giskard.map,
                 tip_link=giskard.base_footprint,
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
             )

@@ -21,7 +21,7 @@ class TestPointingDebugExpressions:
         task = Pointing(
             root_link=root,
             tip_link=tip,
-            goal_point=Point3(x=1, reference_frame=root),
+            goal=Point3(x=1, reference_frame=root),
             pointing_axis=Vector3(x=1, reference_frame=tip),
             name="point",
         )
@@ -42,7 +42,7 @@ class TestPointingDebugExpressions:
         task = PointingCone(
             root_link=root,
             tip_link=tip,
-            goal_point=Point3(x=1, reference_frame=root),
+            goal=Point3(x=1, reference_frame=root),
             pointing_axis=Vector3(x=1, reference_frame=tip),
             cone_theta=0.1,
             name="cone",

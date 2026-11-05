@@ -199,7 +199,7 @@ def test_a_joint_goal_moves_the_mock_robot(robot: ControllerManagerRobotTester) 
     motion_statechart = Statechart(context=robot.api.context)
     motion_statechart.add_node(
         joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
+            goal=JointState.from_str_dict(
                 {UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal}, robot.api.world
             )
         )

@@ -109,7 +109,7 @@ def test_two_goals(pr2_world_state_reset: World):
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
         [
-            JointPositionList(goal_state=JointState.from_mapping({torso_joint: 0.1})),
+            JointPositionList(goal=JointState.from_mapping({torso_joint: 0.1})),
             local_min := LocalMinimumReached(),
         ]
     )
@@ -127,7 +127,7 @@ def test_two_goals(pr2_world_state_reset: World):
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         joint_goal := JointPositionList(
-            goal_state=JointState.from_mapping({r_wrist_roll_joint: 1})
+            goal=JointState.from_mapping({r_wrist_roll_joint: 1})
         )
     )
     statechart.add_node(EndMotion.when_true(joint_goal))
@@ -169,7 +169,7 @@ def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: W
         combined := Parallel(
             nodes=[
                 joint_goal := JointPositionList(
-                    goal_state=JointState.from_mapping({torso_joint: 1.0}),
+                    goal=JointState.from_mapping({torso_joint: 1.0}),
                 ),
                 LocalMinimumReached(
                     degrees_of_freedom=[torso_joint.raw_dof],
@@ -216,7 +216,7 @@ def test_joint_position_list_alone_times_out_on_stall(
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         joint_goal := JointPositionList(
-            goal_state=JointState.from_mapping({torso_joint: 1.0}),
+            goal=JointState.from_mapping({torso_joint: 1.0}),
         )
     )
     statechart.add_node(EndMotion.when_true(joint_goal))
@@ -248,7 +248,7 @@ def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
         [
-            JointPositionList(goal_state=JointState.from_mapping({moving_joint: 2.0})),
+            JointPositionList(goal=JointState.from_mapping({moving_joint: 2.0})),
             local_min := LocalMinimumReached(
                 degrees_of_freedom=[torso_joint.raw_dof], minimum_time=0.1
             ),
@@ -314,12 +314,12 @@ def test_long_goal(pr2_world_state_reset: World):
                 tip_link=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
                     "base_footprint"
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=50, reference_frame=pr2_world_state_reset.root
                 ),
             ),
             JointPositionList(
-                goal_state=JointState.from_str_dict(
+                goal=JointState.from_str_dict(
                     {
                         PR2Joint.TORSO_LIFT: 0.2999225173357618,
                         PR2Joint.HEAD_PAN: 0.042,
@@ -427,7 +427,7 @@ class TestTemplates:
             name="Position Knife",
             root_link=map_link,
             tip_link=knife,
-            goal_pose=pre_cut_pose,
+            goal=pre_cut_pose,
         )
         cut = Sequence(
             nodes=[
@@ -435,7 +435,7 @@ class TestTemplates:
                     name="Down",
                     root_link=map_link,
                     tip_link=knife,
-                    goal_pose=Pose(
+                    goal=Pose(
                         position=Point3(x=-depth, reference_frame=knife),
                         reference_frame=knife,
                     ),
@@ -444,7 +444,7 @@ class TestTemplates:
                     name="Up",
                     root_link=map_link,
                     tip_link=knife,
-                    goal_pose=Pose(
+                    goal=Pose(
                         position=Point3(x=depth, reference_frame=knife),
                         reference_frame=knife,
                     ),
@@ -453,7 +453,7 @@ class TestTemplates:
                     name="Move Right",
                     root_link=map_link,
                     tip_link=knife,
-                    goal_pose=Pose(
+                    goal=Pose(
                         position=Point3(y=right_shift, reference_frame=knife),
                         reference_frame=knife,
                     ),
@@ -512,14 +512,14 @@ class TestTemplates:
                     AlignPlanes(
                         root_link=map,
                         tip_link=r_tip,
-                        tip_normal=Vector3.X(reference_frame=r_tip),
-                        goal_normal=Vector3.X(reference_frame=map),
+                        controlled_feature=Vector3.X(reference_frame=r_tip),
+                        reference_feature=Vector3.X(reference_frame=map),
                     ),
                     AlignPlanes(
                         root_link=map,
                         tip_link=r_tip,
-                        tip_normal=Vector3.Y(reference_frame=r_tip),
-                        goal_normal=Vector3.Z(reference_frame=map),
+                        controlled_feature=Vector3.Y(reference_frame=r_tip),
+                        reference_feature=Vector3.Z(reference_frame=map),
                     ),
                 ]
             )
@@ -640,7 +640,7 @@ class TestMaxManipulability:
         cart_goal = CartesianPose(
             root_link=pr2_world_state_reset.root,
             tip_link=tip,
-            goal_pose=goal_pose,
+            goal=goal_pose,
         )
         statechart.add_nodes(
             [
@@ -657,4 +657,4 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.translation_threshold)
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.position_threshold)

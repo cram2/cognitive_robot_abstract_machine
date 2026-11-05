@@ -259,7 +259,7 @@ class InteractiveMarkerNode:
                 goal_transformation := CartesianPose(
                     root_link=kinematic_chain_marker.root_body,
                     tip_link=kinematic_chain_marker.tip_body,
-                    goal_pose=goal_transformation,
+                    goal=goal_transformation,
                 ),
                 motion_timeout := CountSeconds(seconds=self.motion_timeout_seconds),
             ]

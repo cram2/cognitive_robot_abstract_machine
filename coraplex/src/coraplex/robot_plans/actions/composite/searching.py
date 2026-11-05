@@ -13,8 +13,11 @@ from cramph.composites import TryInOrder
 from cramph.context import StatechartContext
 from cramph.node import StatechartNode
 from krrood.entity_query_language.factories import a, variable
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
@@ -110,7 +113,7 @@ class SearchAction(SequentialAction):
         return cls(
             navigate=a(NavigateAction)(
                 target_location=variable(
-                    Pose,
+                    Pose2D,
                     domain=VisibilityLocation(
                         target_pose=target_location, context=context
                     ),

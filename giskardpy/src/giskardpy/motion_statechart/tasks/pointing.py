@@ -5,20 +5,12 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class Pointing(CartesianTask):
+class Pointing(CartesianTask[Point3]):
     """
-    Will orient pointing_axis at goal_point.
-    """
-
-    goal_point: Point3
-    """
-    Where to point pointing_axis at.
+    Will orient :attr:`pointing_axis` at :attr:`goal`, with an error in radians.
     """
 
     pointing_axis: Vector3
@@ -26,23 +18,14 @@ class Pointing(CartesianTask):
     The axis of tip_link that will be used for pointing.
     """
 
-    max_velocity: float = 0.3
+    reference_velocity: float = 0.3
     """
-    Reference angular velocity for normalization in rad/s.
+    The velocity the constraints of this task are normalized with, in rad/s.
     """
-
-    threshold: float = 0.01
-    """
-    Observation is true if the pointing angle is below this threshold.
-    """
-
-    @property
-    def goal_reference_frame(self) -> KinematicStructureEntity:
-        return self.goal_point.reference_frame
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
-        Build motion constraints that swing the pointing axis onto :attr:`goal_point`.
+        Build motion constraints that swing the pointing axis onto :attr:`goal`.
 
         :return: The artifacts of this task, whose error is the angle between the
             pointing axis and the goal direction.
@@ -58,7 +41,7 @@ class Pointing(CartesianTask):
             self.root_link, self.tip_link
         )
 
-        root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
+        root_P_goal_point = self.root_T_goal_reference_frame @ self.goal
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
@@ -71,7 +54,7 @@ class Pointing(CartesianTask):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=tip_V_goal_axis,
             frame_V_goal=tip_V_pointing_axis,
-            reference_velocity=self.max_velocity,
+            reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(
@@ -83,14 +66,10 @@ class Pointing(CartesianTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PointingCone(CartesianTask):
+class PointingCone(CartesianTask[Point3]):
     """
-    Will orient pointing_axis at goal_point with a cone-shaped tolerance region.
-    """
-
-    goal_point: Point3
-    """
-    Where to point pointing_axis at.
+    Will orient :attr:`pointing_axis` at :attr:`goal` with a cone-shaped tolerance
+    region, with an error in radians.
     """
 
     pointing_axis: Vector3
@@ -103,19 +82,10 @@ class PointingCone(CartesianTask):
     Slack cone region in radians.
     """
 
-    max_velocity: float = 0.3
+    reference_velocity: float = 0.3
     """
-    Reference angular velocity for normalization in rad/s.
+    The velocity the constraints of this task are normalized with, in rad/s.
     """
-
-    threshold: float = 0.01
-    """
-    Observation is true if the pointing angle is below this threshold.
-    """
-
-    @property
-    def goal_reference_frame(self) -> KinematicStructureEntity:
-        return self.goal_point.reference_frame
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -134,7 +104,7 @@ class PointingCone(CartesianTask):
             self.root_link, self.tip_link
         )
 
-        root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
+        root_P_goal_point = self.root_T_goal_reference_frame @ self.goal
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
@@ -151,7 +121,7 @@ class PointingCone(CartesianTask):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis_proj,
-            reference_velocity=self.max_velocity,
+            reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(

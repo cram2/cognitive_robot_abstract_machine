@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from typing_extensions import Any, Self
 
@@ -15,9 +15,10 @@ from cramph.node import (
     expanded_child_field,
 )
 from giskardpy.motion_statechart.exceptions import RobotWithoutMobileBaseError
-from giskardpy.motion_statechart.binding_policy import (
-    ForwardKinematicsBinding,
-    GoalBindingPolicy,
+from giskardpy.motion_statechart.graph_node import BindsGoalReferenceFrame
+from giskardpy.motion_statechart.mixins import (
+    HasThresholdParameter,
+    HasWeightParameter,
 )
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.tasks.drive_tasks import (
@@ -27,7 +28,6 @@ from giskardpy.motion_statechart.tasks.drive_tasks import (
     BaseTurnTowardsGoalPosition,
 )
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_if_cases
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, MobileBase
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
@@ -48,15 +48,13 @@ class MobileBasePoseGoal(ABC):
 
     @classmethod
     @abstractmethod
-    def moving_base_of(
-        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
-    ) -> Self:
+    def moving_base_of(cls, robot: AbstractRobot, goal: Pose, threshold: float) -> Self:
         """
-        :param robot: The robot whose base is put at `goal_pose`.
-        :param goal_pose: Where the root of `robot` should end up.
-        :param threshold: How far the base may be from `goal_pose`, in meters and in
+        :param robot: The robot whose base is put at `goal`.
+        :param goal: Where the root of `robot` should end up.
+        :param threshold: How far the base may be from `goal`, in meters and in
             radians, to count as arrived.
-        :return: A new node putting the base of `robot` at `goal_pose`.
+        :return: A new node putting the base of `robot` at `goal`.
         """
 
 
@@ -69,11 +67,14 @@ class DrivenBaseGoal(
     FailsOnObservingFalse,
     CompositeNode,
     MobileBasePoseGoal,
+    BindsGoalReferenceFrame[Pose],
+    HasWeightParameter,
+    HasThresholdParameter,
     ABC,
 ):
     """
     Drives a base along the floor and turns it about the vertical until it stands below
-    :attr:`goal_pose`, facing its way.
+    :attr:`goal`, facing its way. Its threshold holds in meters and in radians.
 
     The base is moved relative to the body it is attached to, as it is whenever the
     tasks are built, so the goal follows a base moved under another parent while the
@@ -84,42 +85,6 @@ class DrivenBaseGoal(
     mobile_base: MobileBase
     """
     The base moved, by the drive attaching its robot to its parent.
-    """
-
-    goal_pose: Pose
-    """
-    Pose to reach.
-    """
-
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Task priority relative to other tasks.
-    """
-
-    threshold: float = 0.01
-    """
-    How far the base may be from :attr:`goal_pose`, in meters and in radians, to count
-    as arrived.
-    """
-
-    binding_policy: GoalBindingPolicy = GoalBindingPolicy.Bind_on_start
-    """
-    When the pose of the reference frame of :attr:`goal_pose` is read.
-    """
-
-    parent_T_goal_reference_frame: HomogeneousTransformationMatrix = (
-        expanded_child_field()
-    )
-    """
-    The pose of the reference frame of :attr:`goal_pose` relative to the body the base
-    is attached to, as :attr:`binding_policy` fixes it; the tasks are expressed over it.
-    """
-
-    _forward_kinematics_binding: ForwardKinematicsBinding = field(
-        init=False, repr=False
-    )
-    """
-    Fixes :attr:`parent_T_goal_reference_frame` to the current pose of the frame.
     """
 
     @property
@@ -145,9 +110,7 @@ class DrivenBaseGoal(
         """
 
     @classmethod
-    def moving_base_of(
-        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
-    ) -> Self:
+    def moving_base_of(cls, robot: AbstractRobot, goal: Pose, threshold: float) -> Self:
         """
         Differs from :meth:`MobileBasePoseGoal.moving_base_of` in requiring `robot` to
         have a mobile base.
@@ -156,17 +119,7 @@ class DrivenBaseGoal(
         """
         if not isinstance(robot, HasMobileBase) or robot.mobile_base is None:
             raise RobotWithoutMobileBaseError(robot=robot)
-        return cls(
-            mobile_base=robot.mobile_base, goal_pose=goal_pose, threshold=threshold
-        )
-
-    @property
-    def _goal_reference_frame_name(self) -> PrefixedName:
-        """
-        :return: The name the variables of :attr:`parent_T_goal_reference_frame` are
-            created under.
-        """
-        return PrefixedName("parent_T_goal_ref", str(self.name))
+        return cls(mobile_base=robot.mobile_base, goal=goal, threshold=threshold)
 
     @property
     def _drive_parent(self) -> KinematicStructureEntity:
@@ -175,20 +128,32 @@ class DrivenBaseGoal(
         """
         return self.driven_body.parent_kinematic_structure_entity
 
+    @property
+    def goal_binding_root(self) -> KinematicStructureEntity:
+        return self._drive_parent
+
+    def _root_T_goal_reference_frame_to_bind(self) -> HomogeneousTransformationMatrix:
+        """
+        Differs from
+        :meth:`BindsGoalReferenceFrame._root_T_goal_reference_frame_to_bind` in binding
+        the matrix :meth:`expand` created, which the tasks are expressed over.
+        """
+        return self.root_T_goal_reference_frame
+
     def expand(self) -> None:
         """
         Add the node running the tasks.
         """
-        self.parent_T_goal_reference_frame = (
+        self.root_T_goal_reference_frame = (
             HomogeneousTransformationMatrix.create_with_variables(
                 str(self._goal_reference_frame_name)
             )
         )
         self._create_motion(
             dict(
-                base=self.driven_body,
-                goal_pose=self.goal_pose,
-                parent_T_goal_reference_frame=self.parent_T_goal_reference_frame,
+                driven_body=self.driven_body,
+                goal=self.goal,
+                parent_T_goal_reference_frame=self.root_T_goal_reference_frame,
                 weight=self.weight,
                 threshold=self.threshold,
             )
@@ -196,34 +161,16 @@ class DrivenBaseGoal(
         self._add_child_to_statechart(self.motion)
         self._succeed_at_its_goal(self.motion)
 
-    def set_up(self) -> None:
-        """
-        Bind :attr:`parent_T_goal_reference_frame`, which the tasks are expressed over.
-        """
-        super().set_up()
-        self._forward_kinematics_binding = ForwardKinematicsBinding(
-            name=self._goal_reference_frame_name,
-            root=self._drive_parent,
-            tip=self.goal_pose.reference_frame,
-            float_variable_data=self.context.float_variable_data,
-            root_T_tip=self.parent_T_goal_reference_frame,
-        )
-        self._forward_kinematics_binding.bind(self.context.world)
-
-    def on_start(self) -> None:
-        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._forward_kinematics_binding.bind(self.context.world)
-
     def build_artifacts(self) -> NodeArtifacts:
         """
         Report the outcome of :attr:`motion`, and express
-        :attr:`parent_T_goal_reference_frame` relative to the new parent of the base if
-        it was moved under another parent, since the tasks are rebuilt against it.
+        :attr:`root_T_goal_reference_frame` relative to the new parent of the base if it
+        was moved under another parent, since the tasks are rebuilt against it.
 
         Where the goal's reference frame was bound is kept.
         """
-        if self._forward_kinematics_binding.root is not self._drive_parent:
-            self._forward_kinematics_binding.change_root(
+        if self._goal_reference_frame_binding.root is not self._drive_parent:
+            self._goal_reference_frame_binding.change_root(
                 self._drive_parent, self.context.world
             )
         return NodeArtifacts(

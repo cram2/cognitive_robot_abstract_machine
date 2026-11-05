@@ -73,8 +73,8 @@ class CarryAction(ParallelAction):
             AlignPlanes(
                 root_link=self.world.root,
                 tip_link=held_body,
-                tip_normal=Vector3.Z(reference_frame=held_body),
-                goal_normal=Vector3.Z(reference_frame=self.world.root),
+                controlled_feature=Vector3.Z(reference_frame=held_body),
+                reference_feature=Vector3.Z(reference_frame=self.world.root),
                 threshold=self.upright_threshold,
             )
             for held_body in held_bodies.values()

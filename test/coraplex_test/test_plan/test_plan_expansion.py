@@ -438,7 +438,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(
 
     plan = PickUpAction(grasp=milk.grasp_candidates()[0], arm=view.right_arm)
     targets = [
-        node.goal_pose
+        node.goal
         for node in motion_nodes_of(plan, extensions)
         if isinstance(node, CartesianPose)
     ]

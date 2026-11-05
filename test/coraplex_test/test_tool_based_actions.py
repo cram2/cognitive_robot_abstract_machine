@@ -31,8 +31,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Sponge,
     Whisk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -121,7 +124,7 @@ def test_mixing_action_expands_to_aligned_motion(tool_action_world):
 
     assert len(goals) == 1
     trajectory = _trajectory_of(goals[0])
-    assert len(trajectory.goal_points) > 0
+    assert len(trajectory.goal) > 0
     assert len(_alignments_of(goals[0])) == 1
     assert trajectory.tip_link == whisk.get_tool_frame()
 
@@ -147,8 +150,8 @@ def test_cutting_action_pointer_stride_reduces_waypoints(tool_action_world):
     dense_goal = _tool_path_goals(dense_action, extensions)[0]
     strided_goal = _tool_path_goals(strided_action, extensions)[0]
 
-    dense_points = _trajectory_of(dense_goal).goal_points
-    strided_points = _trajectory_of(strided_goal).goal_points
+    dense_points = _trajectory_of(dense_goal).goal
+    strided_points = _trajectory_of(strided_goal).goal
     assert len(dense_points) > 0
     assert len(strided_points) == pytest.approx(len(dense_points) / 10, abs=1)
     assert len(_alignments_of(dense_goal)) == 2
@@ -189,7 +192,7 @@ def test_wiping_action_around_target_pose(tool_action_world):
     goals = _tool_path_goals(action, extensions)
 
     assert len(goals) == 1
-    assert len(_trajectory_of(goals[0]).goal_points) > 0
+    assert len(_trajectory_of(goals[0]).goal) > 0
     assert len(_alignments_of(goals[0])) == 1
 
 
@@ -384,7 +387,7 @@ def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
     ]
     assert final_waypoint_reached.tip_link is tool_body
     assert final_waypoint_reached.goal_point is action._waypoints[-1]
-    assert final_waypoint_reached.threshold == action.final_waypoint_success_tolerance
+    assert final_waypoint_reached.threshold == action.final_waypoint_threshold
 
 
 def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
@@ -407,7 +410,7 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
+                target_location=Pose2D.from_xy_yaw(
                     x=1.85, y=2.2, reference_frame=world.root
                 )
             ),
@@ -442,7 +445,7 @@ def test_a_wipe_stalled_close_to_its_final_waypoint_is_done(
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
+                target_location=Pose2D.from_xy_yaw(
                     x=1.85, y=2.2, reference_frame=world.root
                 )
             ),

@@ -449,7 +449,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
         arm=view.right_arm,
     )
     targets = [
-        node.goal_pose
+        node.goal
         for node in motion_nodes_of(plan, extensions)
         if isinstance(node, CartesianPose)
     ]
@@ -1048,7 +1048,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     reach = CartesianPosition(
         root_link=world.root,
         tip_link=view.right_arm.end_effector.tool_frame,
-        goal_point=Point3(reference_frame=milk_body),
+        goal=Point3(reference_frame=milk_body),
         name="MoveTCP",
     )
     statechart = build_perception_task(detection, world, rclpy_node)

@@ -58,7 +58,7 @@ def test_position_reached(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal_point)
+    drive = CartesianPosition(root_link=root, tip_link=tip, goal=goal_point)
     monitor = PositionReached(
         root_link=root,
         tip_link=tip,
@@ -95,7 +95,7 @@ def test_position_reached_binding_policies(
     drive = CartesianPosition(
         root_link=root,
         tip_link=tip,
-        goal_point=goal_point,
+        goal=goal_point,
         binding_policy=binding_policy,
     )
     monitor = PositionReached(
@@ -124,9 +124,7 @@ def test_orientation_reached(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianOrientation(
-        root_link=root, tip_link=tip, goal_orientation=goal_orientation
-    )
+    drive = CartesianOrientation(root_link=root, tip_link=tip, goal=goal_orientation)
     monitor = OrientationReached(
         root_link=root,
         tip_link=tip,
@@ -152,7 +150,7 @@ def test_pose_reached(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianPose(root_link=root, tip_link=tip, goal_pose=goal_pose)
+    drive = CartesianPose(root_link=root, tip_link=tip, goal=goal_pose)
     monitor = PoseReached(
         root_link=root,
         tip_link=tip,
@@ -178,7 +176,7 @@ def test_pointing_at(pr2_world_state_reset: World):
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
     drive = Pointing(
-        root_link=root, tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis
+        root_link=root, tip_link=tip, goal=goal_point, pointing_axis=pointing_axis
     )
     monitor = PointingAt(
         root_link=root, tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis
@@ -202,7 +200,10 @@ def test_vectors_aligned(pr2_world_state_reset: World):
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
     drive = AlignPlanes(
-        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
+        root_link=root,
+        tip_link=tip,
+        reference_feature=goal_normal,
+        controlled_feature=tip_normal,
     )
     monitor = VectorsAligned(
         root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
@@ -225,7 +226,7 @@ def test_distance_to_line(pr2_world_state_reset: World):
 
     executor = _create_executor(pr2_world_state_reset)
     statechart = Statechart(context=executor.context)
-    drive = CartesianPosition(root_link=root, tip_link=tip, goal_point=center_point)
+    drive = CartesianPosition(root_link=root, tip_link=tip, goal=center_point)
     monitor = DistanceToLine(
         root_link=root,
         tip_link=tip,

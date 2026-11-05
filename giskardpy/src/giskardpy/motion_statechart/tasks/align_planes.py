@@ -6,54 +6,40 @@ from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
     DebugExpression,
 )
+from giskardpy.motion_statechart.mixins import (
+    HasFeaturePairParameters,
+    HasReferenceVelocityParameter,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+)
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AlignPlanes(ConvergingTask):
+class AlignPlanes(
+    ConvergingTask,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+    HasFeaturePairParameters[Vector3],
+    HasReferenceVelocityParameter,
+):
     """
-    Will orient the tip plane to align with the goal plane.
+    Will orient the plane fixed on :attr:`tip_link` to align with the plane fixed on
+    :attr:`root_link`, with an error in radians.
 
-    The planes are represented as normal vectors.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain.
-    """
-
-    goal_normal: Vector3
-    """
-    Normal vector of the goal plane.
-    """
-
-    tip_normal: Vector3
-    """
-    Normal vector of the tip plane.
-    """
-
-    threshold: float = 0.01
-    """
-    Angle in radians below which the planes are considered aligned.
+    The planes are represented by their normal vectors, :attr:`controlled_feature` and
+    :attr:`reference_feature`.
     """
 
     reference_velocity: float = 0.5
     """
-    Reference angular velocity for normalization in rad/s.
+    The velocity the constraints of this task are normalized with, in rad/s.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Priority weight relative to other tasks.
+    Above collision avoidance by default.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -65,11 +51,11 @@ class AlignPlanes(ConvergingTask):
         """
         artifacts = MotionNodeArtifacts()
         tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_normal
+            target_frame=self.tip_link, spatial_object=self.controlled_feature
         )
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_normal
+            target_frame=self.root_link, spatial_object=self.reference_feature
         )
         root_V_root_normal.scale(1)
 

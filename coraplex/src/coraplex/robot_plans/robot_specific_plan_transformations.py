@@ -72,8 +72,8 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
             AlignPlanes(
                 tip_link=torso_tip,
                 root_link=root,
-                tip_normal=Vector3.X(torso_tip),
-                goal_normal=Vector3.Z(root),
+                controlled_feature=Vector3.X(torso_tip),
+                reference_feature=Vector3.Z(root),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE.value,
             )
         ]
@@ -188,8 +188,8 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             name=plan_node.name,
             root_link=plan_node.root_link,
             tip_link=plan_node.tip_link,
-            goal_pose=plan_node.goal_pose,
-            translation_threshold=plan_node.translation_threshold,
+            goal=plan_node.goal,
+            position_threshold=plan_node.position_threshold,
             orientation_threshold=plan_node.orientation_threshold,
             binding_policy=plan_node.binding_policy,
         )
@@ -238,18 +238,18 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
                         name="Keep holding handle",
                         root_link=handle,
                         tip_link=tool_frame,
-                        goal_pose=Pose(reference_frame=tool_frame),
+                        goal=Pose(reference_frame=tool_frame),
                     ),
                     AlignPlanes(
                         root_link=plan_node.world.root,
                         tip_link=robot_root,
-                        goal_normal=Vector3.X(handle),
-                        tip_normal=Vector3.NEGATIVE_Y(robot_root),
+                        reference_feature=Vector3.X(handle),
+                        controlled_feature=Vector3.NEGATIVE_Y(robot_root),
                     ),
                     ArticulateGraspedMechanism(
                         tip_link=tool_frame,
                         environment_link=handle,
-                        goal_joint_state=closing_goal.goal_joint_state,
+                        goal=closing_goal.goal,
                     ),
                 ]
             ),

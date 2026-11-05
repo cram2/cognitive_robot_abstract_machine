@@ -90,7 +90,7 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
     motion_statechart = Statechart(context=giskard.api.context)
     motion_statechart.add_node(
         lift_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
+            goal=JointState.from_str_dict(
                 {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
             )
         )
@@ -116,7 +116,7 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
     motion_statechart = Statechart(context=giskard.api.context)
     motion_statechart.add_node(
         JointPositionList(
-            goal_state=JointState.from_str_dict(
+            goal=JointState.from_str_dict(
                 {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
             )
         )

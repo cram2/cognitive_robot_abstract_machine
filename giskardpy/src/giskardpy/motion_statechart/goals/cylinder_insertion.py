@@ -12,31 +12,30 @@ from cramph.node import (
 )
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
+from giskardpy.motion_statechart.mixins import (
+    HasReferenceVelocityParameter,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+    HasWeightParameter,
+)
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 
 # %% staying on a line
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class StayOnLineTask(ConvergingTask):
+class StayOnLineTask(
+    ConvergingTask,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+    HasReferenceVelocityParameter,
+):
     """
-    Keeps a point on the tip on the line segment between two points.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain, which the controlled point is attached to.
+    Keeps a point on the tip on the line segment between two points, with an error in
+    meters.
     """
 
     tip_P_tool: Point3
@@ -56,7 +55,7 @@ class StayOnLineTask(ConvergingTask):
 
     reference_velocity: float = 0.1
     """
-    Reference velocity for normalization in m/s.
+    The velocity the constraints of this task are normalized with, in m/s.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -96,7 +95,9 @@ class StayOnLineTask(ConvergingTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class InsertCylinder(EndedByOwner, CompositeNode):
+class InsertCylinder(
+    EndedByOwner, CompositeNode, HasTipLinkParameter, HasWeightParameter
+):
     """
     Inserts a grasped cylinder into a hole.
 
@@ -105,11 +106,6 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     3. Straighten the cylinder so it is aligned with the hole axis.
 
     Observes True once the cylinder is straightened.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Controlled tip of the kinematic chain; the grasped body to insert.
     """
 
     tip_P_tool: Point3
@@ -127,14 +123,15 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     Insertion axis of the cylinder.
     """
 
-    up_axis: Vector3
+    hole_normal: Vector3
     """
     Axis pointing out of the hole.
     """
 
     pre_grasp_height: float = 0.2
     """
-    Distance above the hole along :attr:`up_axis` at which the insertion starts, in m.
+    Distance above the hole along :attr:`hole_normal` at which the insertion starts, in
+    m.
     """
 
     tilt: float = np.pi / 10
@@ -149,12 +146,12 @@ class InsertCylinder(EndedByOwner, CompositeNode):
 
     approach_velocity: float = 0.1
     """
-    Maximum velocity while reaching the point above the hole, in m/s.
+    Reference velocity while reaching the point above the hole, in m/s.
     """
 
     insertion_velocity: float = 0.05
     """
-    Maximum velocity while moving down into the hole, in m/s.
+    Reference velocity while moving down into the hole, in m/s.
     """
 
     straightening_velocity: float = 0.025
@@ -164,7 +161,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Task priority relative to other tasks.
+    Above collision avoidance by default.
     """
 
     reach_top: ReachPoint = expanded_child_field()
@@ -195,7 +192,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     def expand(self) -> None:
         root = self.context.world.root
         root_V_up = self.context.world.transform(
-            target_frame=root, spatial_object=self.up_axis
+            target_frame=root, spatial_object=self.hole_normal
         )
         root_P_hole = self.context.world.transform(
             target_frame=root, spatial_object=self.hole_point
@@ -206,17 +203,17 @@ class InsertCylinder(EndedByOwner, CompositeNode):
             name=f"{self.name}/reach top",
             root_link=root,
             tip_link=self.tip_link,
-            tip_point=self.tip_P_tool,
-            reference_point=root_P_top,
-            maximum_velocity=self.approach_velocity,
+            controlled_feature=self.tip_P_tool,
+            reference_feature=root_P_top,
+            reference_velocity=self.approach_velocity,
             weight=self.weight,
         )
         self.tilt_task = AngleGoal(
             name=f"{self.name}/slightly tilted",
             root_link=root,
             tip_link=self.tip_link,
-            tip_vector=self.tip_V_axis,
-            reference_vector=root_V_up,
+            controlled_feature=self.tip_V_axis,
+            reference_feature=root_V_up,
             lower_angle=self.tilt,
             upper_angle=self.tilt,
             threshold=self.tilt_threshold,
@@ -235,17 +232,17 @@ class InsertCylinder(EndedByOwner, CompositeNode):
             name=f"{self.name}/insert",
             root_link=root,
             tip_link=self.tip_link,
-            tip_point=self.tip_P_tool,
-            reference_point=root_P_hole,
-            maximum_velocity=self.insertion_velocity,
+            controlled_feature=self.tip_P_tool,
+            reference_feature=root_P_hole,
+            reference_velocity=self.insertion_velocity,
             weight=self.weight,
         )
         self.tilt_straight_task = AlignPlanes(
             name=f"{self.name}/tilt straight",
             root_link=root,
             tip_link=self.tip_link,
-            tip_normal=self.tip_V_axis,
-            goal_normal=root_V_up,
+            controlled_feature=self.tip_V_axis,
+            reference_feature=root_V_up,
             reference_velocity=self.straightening_velocity,
             weight=self.weight,
         )

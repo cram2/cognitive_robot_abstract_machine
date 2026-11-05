@@ -13,8 +13,8 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     FunctionVerbalizationTemplates,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
+from krrood_spatial_math.spatial_types import Pose2D
 
 # %% how close a grasp is to where the robot stands
 
@@ -73,15 +73,15 @@ class GraspsByCloseness(SymbolicFunction):
     position, the closest first, and at most :attr:`number_of_grasps` of them.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object offering the grasps.
     """
 
-    standing_position: Pose
+    standing_position: Pose2D
     """
-    Where the robot stands while taking one of the grasps, read when the grasps are
-    ranked, so a pose relative to the robot is where the robot stands then.
+    Where the robot stands on the floor while taking one of the grasps, read when the
+    grasps are ranked, so a pose relative to the robot is where the robot stands then.
     """
 
     number_of_grasps: int | None = 3
@@ -91,9 +91,9 @@ class GraspsByCloseness(SymbolicFunction):
 
     def __call__(self) -> list[GraspCandidate]:
         world = self.graspable.root._world
-        world_P_standing = world.transform(self.standing_position, world.root).to_np()[
-            :, 3
-        ]
+        world_P_standing = world.transform(
+            self.standing_position.pose, world.root
+        ).to_np()[:, 3]
         world_T_object = self.graspable.root.global_transform.to_np()
         grasps_by_closeness = sorted(
             self.graspable.grasp_candidates(),

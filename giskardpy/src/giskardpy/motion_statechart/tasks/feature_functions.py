@@ -1,63 +1,43 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import field, dataclass
+from abc import ABC
+from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
-from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
     DebugExpression,
 )
+from giskardpy.motion_statechart.mixins import (
+    FeatureType,
+    HasFeaturePairParameters,
+    HasReferenceVelocityParameter,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FeatureFunctionGoal(ConvergingTask, ABC):
+class FeatureFunctionGoal(
+    ConvergingTask,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+    HasFeaturePairParameters[FeatureType],
+    HasReferenceVelocityParameter,
+    ABC,
+):
     """
     Base for feature tasks operating on geometric features.
 
-    Transforms the controlled feature (from `tip_link`) and the reference feature
-    (from `root_link`) into a common frame and registers debug visualizations.
+    :attr:`controlled_feature` is fixed on :attr:`tip_link` and :attr:`reference_feature`
+    on :attr:`root_link`. Both are transformed into a common frame, and debug
+    visualizations are registered for them.
     """
-
-    tip_link: KinematicStructureEntity
-    """
-    The link where the controlled feature is attached. Defines the moving frame of reference.
-    """
-    root_link: KinematicStructureEntity
-    """
-    The static reference link. Defines the fixed frame of reference.
-    """
-    controlled_feature: Point3 | Vector3 = field(init=False)
-    """
-    The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
-    """
-    reference_feature: Point3 | Vector3 = field(init=False)
-    """
-    The geometric feature (point or vector) that serves as reference, expressed in the root link frame.
-    """
-
-    @abstractmethod
-    def get_controlled_and_reference_features(
-        self,
-    ) -> tuple[Point3 | Vector3, Point3 | Vector3]:
-        """
-        Return the controlled and reference features.
-
-        :return: Tuple (controlled_feature, reference_feature), each a Point3 or Vector3.
-        """
-        raise NotImplementedError
 
     def build(self) -> MotionNodeArtifacts:
-        self.controlled_feature, self.reference_feature = (
-            self.get_controlled_and_reference_features()
-        )
         feature_debug_expressions: list[DebugExpression] = []
         root_reference_feature = self.context.world.transform(
             target_frame=self.root_link, spatial_object=self.reference_feature
@@ -119,38 +99,13 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AlignPerpendicular(FeatureFunctionGoal):
+class AlignPerpendicular(FeatureFunctionGoal[Vector3]):
     """
     Align two normal vectors to be perpendicular.
 
-    The goal drives the angle between `tip_normal` and `reference_normal` to π/2.
-    Completion occurs when |current_angle - π/2| < `threshold`.
+    The goal drives the dot product of :attr:`controlled_feature` and
+    :attr:`reference_feature` to zero, and its error is the absolute dot product.
     """
-
-    tip_normal: Vector3
-    """
-    The normal vector to be controlled, defined in the tip link frame.
-    """
-    reference_normal: Vector3
-    """
-    The reference normal vector to align against, defined in the root link frame.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the alignment constraint in the optimization problem.
-    """
-    maximum_velocity: float = 0.2
-    """
-    Maximum allowed angular velocity for the alignment motion in radians per second.
-    """
-    threshold: float = 0.01
-    """
-    Tolerance threshold in radians. The goal is considered achieved when the absolute
-    difference between the current angle and 90 degrees is below this value.
-    """
-
-    def get_controlled_and_reference_features(self):
-        return self.tip_normal, self.reference_normal
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -162,7 +117,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
-            reference_velocity=self.maximum_velocity,
+            reference_velocity=self.reference_velocity,
             equality_bound=0 - expr,
             quadratic_weight=self.weight,
             task_expression=expr,
@@ -173,43 +128,25 @@ class AlignPerpendicular(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HeightGoal(FeatureFunctionGoal):
+class HeightGoal(FeatureFunctionGoal[Point3]):
     """
-    Moves the `tip_point` to be the specified distance away from the `reference_point`
+    Moves :attr:`controlled_feature` to be the specified distance away from
+    :attr:`reference_feature`
     along the z-axis of the map frame.
     """
 
-    tip_point: Point3
-    """
-    Tip point to be controlled.
-    """
-    reference_point: Point3
-    """
-    Reference point to measure the distance against.
-    """
     lower_limit: float
     """
-    Lower limit to control the distance away from the `reference_point`.
+    Lower limit to control the distance away from :attr:`reference_feature`.
     """
     upper_limit: float
     """
-    Upper limit to control the distance away from the `reference_point`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the height constraint in the optimization problem.
-    """
-    maximum_velocity: float = 0.2
-    """
-    Maximum allowed velocity for the height motion in meters per second.
+    Upper limit to control the distance away from :attr:`reference_feature`.
     """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
     """
-
-    def get_controlled_and_reference_features(self):
-        return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -223,7 +160,7 @@ class HeightGoal(FeatureFunctionGoal):
         ) @ Vector3.Z()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.maximum_velocity,
+            reference_velocity=self.reference_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -236,43 +173,25 @@ class HeightGoal(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DistanceGoal(FeatureFunctionGoal):
+class DistanceGoal(FeatureFunctionGoal[Point3]):
     """
-    Moves the `tip_point` to be the specified distance away from the `reference_point`
+    Moves :attr:`controlled_feature` to be the specified distance away from
+    :attr:`reference_feature`
     measured in the x-y-plane of the map frame.
     """
 
-    tip_point: Point3
-    """
-    Tip point to be controlled.
-    """
-    reference_point: Point3
-    """
-    Reference point to measure the distance against.
-    """
     lower_limit: float
     """
-    Lower limit to control the distance away from the `reference_point`.
+    Lower limit to control the distance away from :attr:`reference_feature`.
     """
     upper_limit: float
     """
-    Upper limit to control the distance away from the `reference_point`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the distance constraint in the optimization problem.
-    """
-    maximum_velocity: float = 0.2
-    """
-    Maximum allowed velocity for the distance motion in meters per second.
+    Upper limit to control the distance away from :attr:`reference_feature`.
     """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
     """
-
-    def get_controlled_and_reference_features(self):
-        return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -286,7 +205,7 @@ class DistanceGoal(FeatureFunctionGoal):
         expr = root_V_diff.norm()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.maximum_velocity,
+            reference_velocity=self.reference_velocity,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -297,7 +216,7 @@ class DistanceGoal(FeatureFunctionGoal):
         # An extra constraint that makes the execution more stable
         for i, axis_name in enumerate(["x", "y", "z"]):
             artifacts.constraints.add_inequality_constraint(
-                reference_velocity=self.maximum_velocity,
+                reference_velocity=self.reference_velocity,
                 lower_error=0,
                 upper_error=0,
                 quadratic_weight=self.weight,
@@ -310,34 +229,11 @@ class DistanceGoal(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ReachPoint(FeatureFunctionGoal):
+class ReachPoint(FeatureFunctionGoal[Point3]):
     """
-    Drives a controlled point on the tip onto a reference point.
+    Drives a controlled point on the tip onto a reference point, with an error in
+    meters.
     """
-
-    tip_point: Point3
-    """
-    The point to be controlled, defined in the tip link frame.
-    """
-    reference_point: Point3
-    """
-    The target point to reach, defined in the root link frame.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the reach constraint in the optimization problem.
-    """
-    maximum_velocity: float = 0.2
-    """
-    Maximum allowed velocity for the reaching motion in meters per second.
-    """
-    threshold: float = 0.01
-    """
-    Distance at or below which the goal is considered achieved, in meters.
-    """
-
-    def get_controlled_and_reference_features(self) -> tuple[Point3, Point3]:
-        return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -349,7 +245,7 @@ class ReachPoint(FeatureFunctionGoal):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=self.root_P_controlled_feature,
             frame_P_goal=self.root_P_reference_feature,
-            reference_velocity=self.maximum_velocity,
+            reference_velocity=self.reference_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = self.root_P_controlled_feature.euclidean_distance(
@@ -359,43 +255,24 @@ class ReachPoint(FeatureFunctionGoal):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AngleGoal(FeatureFunctionGoal):
+class AngleGoal(FeatureFunctionGoal[Vector3]):
     """
-    Controls the angle between the `tip_vector` and the `reference_vector` to be between
+    Controls the angle between :attr:`controlled_feature` and :attr:`reference_feature` to be between
     `lower_angle` and `upper_angle`.
     """
 
-    tip_vector: Vector3
-    """
-    Tip vector to be controlled.
-    """
-    reference_vector: Vector3
-    """
-    Reference vector to measure the angle against.
-    """
     lower_angle: float
     """
-    Lower limit to control the angle between the `tip_vector` and the `reference_vector`.
+    Lower limit to control the angle between the two features.
     """
     upper_angle: float
     """
-    Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the angle constraint in the optimization problem.
-    """
-    maximum_velocity: float = 0.2
-    """
-    Maximum allowed angular velocity for the angle motion in radians per second.
+    Upper limit to control the angle between the two features.
     """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
     """
-
-    def get_controlled_and_reference_features(self):
-        return self.tip_vector, self.reference_vector
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -409,7 +286,7 @@ class AngleGoal(FeatureFunctionGoal):
         )
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.maximum_velocity,
+            reference_velocity=self.reference_velocity,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
             quadratic_weight=self.weight,

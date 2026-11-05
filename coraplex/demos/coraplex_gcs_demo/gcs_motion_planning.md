@@ -120,7 +120,7 @@ def follow_path(waypoints):
             CartesianPose(
                 root_link=RobotAccess(robot).controlled_root,
                 tip_link=tool_frame,
-                goal_pose=pose,
+                goal=pose,
             )
             for pose in waypoints
         ]

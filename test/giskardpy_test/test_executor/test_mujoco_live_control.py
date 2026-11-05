@@ -68,7 +68,7 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     start = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
     goal_point = Point3(start[0], start[1], start[2] + 0.15, reference_frame=world.root)
     reach = CartesianPosition(
-        name="reach", root_link=world.root, tip_link=tool_frame, goal_point=goal_point
+        name="reach", root_link=world.root, tip_link=tool_frame, goal=goal_point
     )
     controller_config = QPControllerConfig(target_frequency=control_frequency)
 

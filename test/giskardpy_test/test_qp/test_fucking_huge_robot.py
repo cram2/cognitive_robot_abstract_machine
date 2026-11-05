@@ -198,7 +198,7 @@ def execute(link_length: float, vel_limit: float):
                 CartesianPosition(
                     root_link=fucking_huge_robot.root,
                     tip_link=eef,
-                    goal_point=Point3(y=-link_length, reference_frame=eef),
+                    goal=Point3(y=-link_length, reference_frame=eef),
                     reference_velocity=0.2 * link_length,
                 ),
             ]

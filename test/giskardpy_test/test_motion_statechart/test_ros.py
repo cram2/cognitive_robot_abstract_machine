@@ -90,7 +90,7 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
                         CartesianPose(
                             root_link=base_footprint,
                             tip_link=r_tip,
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
                             weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,

@@ -22,8 +22,11 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
     RotationMatrix,
+    Point3,
+    Pose,
+    Pose2D,
+    Vector3,
 )
-from krrood_spatial_math.spatial_types import Pose, Point3, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -169,10 +172,12 @@ class Costmap(Location):
     def __and__(self, other):
         return self.merge(other)
 
-    def candidates(self) -> Iterator[Pose]:
+    def candidates(self) -> Iterator[Pose2D]:
         return self.sample(self.number_of_samples, self.seed)
 
-    def sample(self, number_of_samples: int, seed: int | None = None) -> Iterator[Pose]:
+    def sample(
+        self, number_of_samples: int, seed: int | None = None
+    ) -> Iterator[Pose2D]:
         """
         Sample pose candidates from this map.
 
@@ -267,7 +272,7 @@ class Costmap(Location):
         self,
         number_of_samples: int,
         random_generator: np.random.Generator,
-    ) -> Iterator[Pose]:
+    ) -> Iterator[Pose2D]:
         """
         Sample candidates, the given number of them spread over this map's segments.
 
@@ -293,11 +298,12 @@ class Costmap(Location):
                 offset = (index - center) * self.resolution
                 position = self.origin.position + Vector3(offset[0], offset[1], 0)
 
-                orientation: Quaternion = self._orientation_facing_origin(position)
-                yield Pose(
-                    position,
-                    orientation,
-                    self.world.root,
+                yield Pose2D.from_pose(
+                    Pose(
+                        position,
+                        self._orientation_facing_origin(position),
+                        self.world.root,
+                    )
                 )
 
     def segment_map(self) -> list[NDArray[np.float64]]:

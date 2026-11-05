@@ -35,7 +35,7 @@ def _build_motion_statechart(
     goal = CartesianPosition(
         root_link=root,
         tip_link=tip,
-        goal_point=Point3(x=1, reference_frame=root),
+        goal=Point3(x=1, reference_frame=root),
         name="cart_pos",
     )
     motion_statechart.add_node(goal)

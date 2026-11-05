@@ -68,7 +68,7 @@ class MoveToolCenterPointAction(GoalAction):
         return CartesianPose(
             root_link=self.controlled_root,
             tip_link=self.arm.end_effector.tool_frame,
-            goal_pose=self.target,
+            goal=self.target,
         )
 
 

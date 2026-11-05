@@ -140,7 +140,7 @@ action is expanded, and that applies only to its robot type. Every executor appl
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.DriveWithTheDifferentialDrive` drives the base of
   every robot on a differential drive with a
   {class}`~giskardpy.motion_statechart.goals.base_pose_goals.DifferentialDriveBaseGoal`, which arrives within the
-  {attr}`~coraplex.robot_plans.actions.core.navigation.DrivesBase.base_pose_threshold` of the action.
+  {attr}`~coraplex.robot_plans.actions.core.navigation.DrivesBase.threshold` of the action.
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.MoveStretchToolCenterPointInAStraightLine` moves
   the tool center point of a Stretch to each of its targets along a straight line.
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.KeepStretchFromTurningWhileMovingItsTool` holds the

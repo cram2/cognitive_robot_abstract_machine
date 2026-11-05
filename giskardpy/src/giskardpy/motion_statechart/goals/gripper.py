@@ -7,6 +7,13 @@ from datetime import timedelta
 from cramph.composites import Parallel
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.mixins import (
+    HasFingerStallToleranceParameters,
+    HasGoalParameter,
+    HasJointVelocityLimitParameter,
+    HasThresholdParameter,
+    HasTwoFingerGripperParameters,
+)
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.tasks.cartesian_tasks import DistanceAlongAxis
@@ -36,14 +43,14 @@ class MovesGripperToConfiguration(ABC):
     def moving_gripper_to(
         cls,
         configuration: GripperConfiguration,
-        stall_minimum_time: float | None = None,
-        tolerate_stall: bool = False,
+        finger_stall_minimum_time: float | None = None,
+        tolerate_finger_stall: bool = False,
     ) -> StatechartNode:
         """
         :param configuration: The configuration to bring the gripper of its end effector
             into.
-        :param stall_minimum_time: See :attr:`MoveFingers.stall_minimum_time`.
-        :param tolerate_stall: See :attr:`MoveFingers.tolerate_stall`.
+        :param finger_stall_minimum_time: See :attr:`~giskardpy.motion_statechart.mixins.HasFingerStallToleranceParameters.finger_stall_minimum_time`.
+        :param tolerate_finger_stall: See :attr:`~giskardpy.motion_statechart.mixins.HasFingerStallToleranceParameters.tolerate_finger_stall`.
         :return: A new node bringing the gripper into `configuration`.
         """
 
@@ -52,33 +59,18 @@ class MovesGripperToConfiguration(ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
+class MoveFingers(
+    Parallel,
+    MovesGripperToConfiguration,
+    HasJointVelocityLimitParameter,
+    HasFingerStallToleranceParameters,
+    ABC,
+):
     """
     Drive the fingers of an end effector to a goal.
 
     Fingers that close on an object stop short of their goal, so the goal can be told to
     settle for fingers that have stopped approaching it instead.
-    """
-
-    tolerate_stall: bool = False
-    """
-    Whether fingers that have stopped approaching their goal count as done, even short
-    of it.
-    """
-
-    stall_minimum_time: float | None = None
-    """
-    How long the fingers must have stopped approaching their goal before a stall counts,
-    in seconds.
-
-    None keeps :attr:`~giskardpy.motion_statechart.monitors.monitors.LocalMinimumReached.minimum_time`.
-    """
-
-    finger_velocity: float | None = None
-    """
-    Maximum speed of the finger joints, in meters per second.
-
-    None leaves the speed capped only by the joints' own limits.
     """
 
     nodes: list[StatechartNode] = field(default_factory=list, init=False)
@@ -90,8 +82,8 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
     def moving_gripper_to(
         cls,
         configuration: GripperConfiguration,
-        stall_minimum_time: float | None = None,
-        tolerate_stall: bool = False,
+        finger_stall_minimum_time: float | None = None,
+        tolerate_finger_stall: bool = False,
     ) -> MoveFingers:
         """
         :return: A new goal driving the fingers into `configuration` at its finger
@@ -103,15 +95,15 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
             return MoveGripper(
                 gripper=end_effector,
                 width=end_effector.separation_at(configuration.joint_state),
-                finger_velocity=configuration.finger_velocity,
-                stall_minimum_time=stall_minimum_time,
-                tolerate_stall=tolerate_stall,
+                max_joint_velocity=configuration.finger_velocity,
+                finger_stall_minimum_time=finger_stall_minimum_time,
+                tolerate_finger_stall=tolerate_finger_stall,
             )
         return MoveFingersToJointState(
-            goal_state=configuration.joint_state,
-            finger_velocity=configuration.finger_velocity,
-            stall_minimum_time=stall_minimum_time,
-            tolerate_stall=tolerate_stall,
+            goal=configuration.joint_state,
+            max_joint_velocity=configuration.finger_velocity,
+            finger_stall_minimum_time=finger_stall_minimum_time,
+            tolerate_finger_stall=tolerate_finger_stall,
         )
 
     @property
@@ -132,24 +124,24 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
         Create the finger goal and the speed cap, after the nodes this goal was handed.
         """
         self.add_node(self._finger_goal())
-        if self.finger_velocity is not None:
+        if self.max_joint_velocity is not None:
             self.add_node(
                 JointVelocityLimit(
                     connections=self.finger_connections,
-                    max_velocity=self.finger_velocity,
+                    max_joint_velocity=self.max_joint_velocity,
                 )
             )
 
     def _finger_goal(self) -> StatechartNode:
         """
         :return: The node that is done once the fingers arrived, which with
-            :attr:`tolerate_stall` is also done once they stopped short of it.
+            :attr:`tolerate_finger_stall` is also done once they stopped short of it.
 
         The stall monitor sits beside the finger task rather than replacing its
         observation, because fingers that stopped short have not reached the goal.
         """
         finger_task = self.create_finger_task()
-        if not self.tolerate_stall:
+        if not self.tolerate_finger_stall:
             return finger_task
         return Parallel(
             nodes=[finger_task, self._stall_monitor(finger_task)], minimum_success=1
@@ -166,35 +158,23 @@ class MoveFingers(Parallel, MovesGripperToConfiguration, ABC):
             timeout=timedelta(
                 seconds=(
                     LocalMinimumReached.minimum_time
-                    if self.stall_minimum_time is None
-                    else self.stall_minimum_time
+                    if self.finger_stall_minimum_time is None
+                    else self.finger_stall_minimum_time
                 )
             ),
         )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveGripper(MoveFingers):
+class MoveGripper(MoveFingers, HasTwoFingerGripperParameters, HasThresholdParameter):
     """
     Open or close a two-finger gripper until its fingertips' facing surfaces stand
-    :attr:`width` apart.
-    """
-
-    gripper: HasTwoFingers
-    """
-    The gripper whose fingers move.
-    """
-
-    width: float
-    """
-    How far apart the fingertips' facing surfaces are to stand, in metres; negative
-    where they are to overlap, as a fully closed gripper's may.
+    :attr:`width` apart, with an error in metres.
     """
 
     threshold: float = 0.001
     """
-    How close, in metres, the fingertips have to come to :attr:`width` to count as
-    arrived.
+    A millimetre by default.
     """
 
     @property
@@ -210,8 +190,8 @@ class MoveGripper(MoveFingers):
         return DistanceAlongAxis(
             name=f"{self.name}/width",
             root_link=fingertips.tool_frame,
-            reference_point=fingertips.finger_P_facing_point,
-            tip_point=fingertips.thumb_P_facing_point,
+            reference_feature=fingertips.finger_P_facing_point,
+            controlled_feature=fingertips.thumb_P_facing_point,
             axis=fingertips.tool_V_finger_to_thumb,
             distance=self.width,
             threshold=self.threshold,
@@ -219,23 +199,18 @@ class MoveGripper(MoveFingers):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveFingersToJointState(MoveFingers):
+class MoveFingersToJointState(MoveFingers, HasGoalParameter[JointState]):
     """
-    Drive the fingers of a hand to a joint state, for a hand whose fingers do not close
-    to a single width.
-    """
-
-    goal_state: JointState
-    """
-    The joint state to drive the fingers to.
+    Drive the fingers of a hand to the joint state :attr:`goal`, for a hand whose
+    fingers do not close to a single width.
     """
 
     @property
     def finger_connections(self) -> list[ActiveConnection1DOF]:
-        return list(self.goal_state.connections)
+        return list(self.goal.connections)
 
     def create_finger_task(self) -> JointPositionList:
         """
-        :return: A new task driving the fingers to :attr:`goal_state`.
+        :return: A new task driving the fingers to :attr:`goal`.
         """
-        return JointPositionList(goal_state=self.goal_state)
+        return JointPositionList(goal=self.goal)

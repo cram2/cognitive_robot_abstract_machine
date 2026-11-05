@@ -4,27 +4,27 @@ from dataclasses import dataclass
 
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, ConvergingTask
+from giskardpy.motion_statechart.mixins import (
+    HasPoseReferenceVelocityParameters,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+)
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class GraspBar(ConvergingTask):
+class GraspBar(
+    ConvergingTask,
+    HasRootLinkParameter,
+    HasTipLinkParameter,
+    HasPoseReferenceVelocityParameters,
+):
     """
     Like a CartesianPose but with more freedom: the tip link is allowed to be at any
-    point along the bar axis within ``bar_center +/- bar_length / 2``.
+    point along the bar axis within ``bar_center +/- bar_length / 2``. Its error is the
+    distance to the bar, in meters.
 
     It aligns ``tip_grasp_axis`` with ``bar_axis`` while allowing rotation around it.
-    """
-
-    root_link: Body
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: Body
-    """
-    Tip link of the kinematic chain.
     """
 
     tip_grasp_axis: Vector3
@@ -47,19 +47,14 @@ class GraspBar(ConvergingTask):
     Length of the bar to be grasped.
     """
 
-    threshold: float = 0.01
-    """
-    Distance threshold to the bar for goal achievement in meters.
-    """
-
     reference_linear_velocity: float = 0.1
     """
-    Reference linear velocity for normalization in m/s.
+    The velocity the position constraints are normalized with, in m/s.
     """
 
     reference_angular_velocity: float = 0.5
     """
-    Reference angular velocity for normalization in rad/s.
+    The velocity the orientation constraints are normalized with, in rad/s.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE

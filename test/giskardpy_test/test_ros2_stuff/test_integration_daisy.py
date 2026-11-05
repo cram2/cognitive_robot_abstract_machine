@@ -89,7 +89,7 @@ def test_joints1(giskard: DAiSyTester) -> None:
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
         joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
+            goal=JointState.from_str_dict(
                 {
                     "left_wrist_1_joint": 1.23,
                     "left_wrist_2_joint": 1.23,

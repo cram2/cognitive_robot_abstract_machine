@@ -21,7 +21,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.object_relative_grasp import ObjectRelativeGrasp
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% grasps around an object's axis
 
@@ -32,7 +32,7 @@ class AxialGrasp(ObjectRelativeGrasp):
     A grasp of an elongated object with the gripper's tool centre point on the axis the
     object runs along, closing across it.
 
-    The axis is the object's :meth:`~HasGraspCandidates.grasp_axis`, running along
+    The axis is the object's :meth:`~IsGraspable.grasp_axis`, running along
     ``root_V_axis``. The x-axis of ``root_T_grasp`` is the direction of approach,
     ``root_V_reference`` turned by :attr:`angle` about ``root_V_axis``; its y-axis is
     the closing direction, ``root_V_axis`` crossed with the approach.
@@ -52,13 +52,13 @@ class AxialGrasp(ObjectRelativeGrasp):
     radians.
     """
 
-    def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
+    def reaches_surface_of(self, graspable: IsGraspable) -> bool:
         """
         :return: Whether :attr:`position` lies between the ends of the axis.
         """
         return 0.0 <= self.position <= 1.0
 
-    def grasp_candidate(self, graspable: HasGraspCandidates) -> GraspCandidate:
+    def grasp_candidate(self, graspable: IsGraspable) -> GraspCandidate:
         if not self.reaches_surface_of(graspable):
             raise GraspNotOnObjectError(grasp=self, graspable=graspable)
         axis = graspable.grasp_axis()

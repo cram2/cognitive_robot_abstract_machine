@@ -35,9 +35,7 @@ def main() -> None:
     motion_statechart = Statechart(context=giskard.context)
     motion_statechart.add_node(
         joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                goal_positions_in_radians, giskard.world
-            )
+            goal=JointState.from_str_dict(goal_positions_in_radians, giskard.world)
         )
     )
     motion_statechart.add_node(EndMotion.when_true(joint_goal))

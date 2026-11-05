@@ -56,7 +56,7 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
         hole_normal=Vector3.Z(reference_frame=root),
         noise_translation=0.01,
         noise_angle=0.05,
-        down_velocity=0.05,
+        reference_velocity=0.05,
         threshold=0.02,
     )
     statechart.add_node(wiggle)
@@ -127,7 +127,7 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
         hole_normal=Vector3.Z(reference_frame=root),
         noise_translation=0.05,
         noise_angle=0.2,
-        down_velocity=0.05,
+        reference_velocity=0.05,
     )
     statechart.add_node(wiggle)
     statechart.add_node(EndMotion.when_true(wiggle))
@@ -188,7 +188,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                                 CartesianPosition(
                                     root_link=root_link,
                                     tip_link=hpl,
-                                    goal_point=Point3(
+                                    goal=Point3(
                                         x=0.5, z=0.4, reference_frame=root_link
                                     ),
                                     weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,

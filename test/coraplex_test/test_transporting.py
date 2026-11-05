@@ -41,9 +41,14 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Pose,
+    Pose2D,
+    RotationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -86,7 +91,7 @@ def _pick_up_the_milk(
     return a(MoveAndPickUpAction)(
         navigate=a(NavigateAction)(
             target_location=variable(
-                Pose,
+                Pose2D,
                 domain=ReachabilityLocation(
                     Pose(reference_frame=milk.root),
                     robot.right_arm,
@@ -102,19 +107,17 @@ def _pick_up_the_milk(
     )
 
 
-def _place_at(
-    target: Pose, placed: HasGraspCandidates, extensions: list[ContextExtension]
-) -> MoveAndPlaceAction:
+def _place_at(target: Pose, extensions: list[ContextExtension]) -> MoveAndPlaceAction:
     """
-    :return: A place of `placed` at `target`, standing wherever its trial finds one
-        that works.
+    :return: A place at `target` with the right arm, standing wherever its trial finds
+        one that works.
     """
     robot = robot_of(extensions)
     return a(MoveAndPlaceAction)(
         carry=a(CarryAction)(
             navigate=a(NavigateAction)(
                 target_location=variable(
-                    Pose,
+                    Pose2D,
                     domain=ReachabilityLocation(
                         target,
                         robot.right_arm,
@@ -127,7 +130,7 @@ def _place_at(
             face_at=a(FaceAtAction)(target=target),
             look_at=a(LookAtAction)(target=target),
         ),
-        place=a(PlaceAction)(object_designator=placed, target_location=target),
+        place=a(PlaceAction)(arm=robot.right_arm, target_pose=target),
     )
 
 
@@ -142,13 +145,12 @@ def _standing_positions(navigate: Match) -> ReachabilityLocation:
 def _transport_of_the_milk(
     world: World, extensions: list[ContextExtension]
 ) -> TransportAction:
+    """
+    :return: A transport of the milk to the origin of the world, standing wherever each step's trial finds one that works.
+    """
     return TransportAction(
         pick_up=_pick_up_the_milk(world, extensions),
-        place=_place_at(
-            Pose(reference_frame=world.root),
-            world.get_semantic_annotations_by_type(Milk)[0],
-            extensions,
-        ),
+        place=_place_at(Pose(reference_frame=world.root), extensions),
     )
 
 
@@ -214,8 +216,8 @@ def pick_and_place_of_the_milk(world: World, arm: Arm) -> PickAndPlaceAction:
             grasp=variable(GraspCandidate, domain=milk.grasp_candidates()), arm=arm
         ),
         place=a(PlaceAction)(
-            object_designator=milk,
-            target_location=Pose(reference_frame=world.root),
+            arm=arm,
+            target_pose=Pose(reference_frame=world.root),
         ),
     )
 
@@ -243,7 +245,7 @@ def test_move_and_pick_up_takes_the_grasp_it_was_given(pr2_apartment_context) ->
     world, robot, extensions = pr2_apartment_context
     grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[-1]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=grasp,
         arm=robot.left_arm,
     )
@@ -264,7 +266,7 @@ def test_move_and_pick_up_approaches_with_the_clearances_it_was_given(
     world, robot, extensions = pr2_apartment_context
     approach_clearance, retreat_distance = 0.07, 0.13
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
         arm=robot.left_arm,
         approach_clearance=approach_clearance,
@@ -367,7 +369,7 @@ def _grasp_signature(grasp: GraspCandidate) -> tuple:
 
 def _assert_each_standing_pose_keeps_the_closest_grasps(
     pick_ups: list[MoveAndPickUpAction],
-    graspable: HasGraspCandidates,
+    graspable: IsGraspable,
     number_of_grasps: int,
 ) -> None:
     """
@@ -399,7 +401,7 @@ def _assert_each_standing_pose_keeps_the_closest_grasps(
 def _assert_each_standing_pose_tries_its_grasps_closest_first(
     steps: list[MoveAndPickUpAction | MoveAndOpenAction],
     grasp_of: Callable[[MoveAndPickUpAction | MoveAndOpenAction], GraspCandidate],
-    graspable: HasGraspCandidates,
+    graspable: IsGraspable,
 ) -> None:
     """
     Assert that the grasps `steps` take from each of their standing poses come in the
@@ -414,7 +416,9 @@ def _assert_each_standing_pose_tries_its_grasps_closest_first(
     ):
         steps_from_one_pose = list(steps_from_one_pose)
         standing_position = steps_from_one_pose[0].navigate.target_location
-        world_P_standing = world.transform(standing_position, world.root).to_np()[:, 3]
+        world_P_standing = world.transform(standing_position.pose, world.root).to_np()[
+            :, 3
+        ]
         closeness = [
             GraspCloseness.from_grasp(grasp_of(step), world_T_object, world_P_standing)
             for step in steps_from_one_pose
@@ -444,7 +448,7 @@ def test_grasps_ranked_from_the_robot_are_ranked_from_where_it_stands_when_ranke
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    ranking = GraspsByCloseness(milk, Pose(reference_frame=robot.root))
+    ranking = GraspsByCloseness(milk, Pose2D(reference_frame=robot.root))
     grasp = milk.grasp_candidates()[grasp_index]
 
     robot.root.parent_connection.origin = _standing_in_front_of(
@@ -459,7 +463,7 @@ def test_grasps_ranked_without_a_number_are_all_kept(pr2_apartment_context):
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
-    ranked = GraspsByCloseness(milk, Pose(reference_frame=robot.root), None)()
+    ranked = GraspsByCloseness(milk, Pose2D(reference_frame=robot.root), None)()
 
     assert sorted(map(_grasp_signature, ranked)) == sorted(
         map(_grasp_signature, milk.grasp_candidates())
@@ -712,7 +716,7 @@ def test_a_move_and_pick_up_faces_the_object_where_it_is_when_it_picks_it_up(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
         arm=robot.left_arm,
     )
@@ -761,36 +765,36 @@ def test_a_move_and_open_faces_the_handle_where_it_is_when_it_opens_the_containe
 # %% placing and opening from a standing position
 
 
-def _hold_the_milk(world: World, arm: Arm) -> Milk:
+def _hold_the_milk(world: World, arm: Arm) -> None:
     """
     Put the milk in the gripper of `arm`, as a pick-up does.
-
-    :return: The milk.
     """
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     tool_frame = arm.end_effector.tool_frame
     with world.modify_world():
         world.move_branch_with_fixed_connection(milk.root, tool_frame)
-    return milk
 
 
-def test_a_move_and_place_from_a_standing_position_places_the_given_object(
+def test_a_move_and_place_from_a_standing_position_places_with_the_given_arm(
     pr2_apartment_context,
 ) -> None:
+    """
+    The standing position goes to the drive, the target to the turn, the look and the
+    place, and the arm to the place.
+    """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    standing_position = Pose(reference_frame=world.root)
+    standing_position = Pose2D(reference_frame=world.root)
     target = Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root)
 
     move_and_place = MoveAndPlaceAction.from_standing_position(
-        standing_position, target, milk
+        standing_position, target, robot.left_arm
     )
 
     assert move_and_place.carry.navigate.target_location is standing_position
     assert move_and_place.face_and_look_at.face_at.target is target
     assert move_and_place.face_and_look_at.look_at.target is target
-    assert move_and_place.place.object_designator is milk
-    assert move_and_place.place.target_location is target
+    assert move_and_place.place.arm is robot.left_arm
+    assert move_and_place.place.target_pose is target
 
 
 def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
@@ -799,7 +803,7 @@ def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
     [grasp, *_] = handle.grasp_candidates()
-    standing_position = Pose(reference_frame=world.root)
+    standing_position = Pose2D(reference_frame=world.root)
 
     move_and_open = MoveAndOpenAction.from_standing_position(
         standing_position, grasp, robot.left_arm
@@ -905,19 +909,24 @@ def _navigation_targets(action: Action) -> list[Pose]:
     ]
 
 
-def _standing_pose(world: World) -> Pose:
-    return Pose.from_xyz_rpy(*STANDING_POSITION, 0.0, reference_frame=world.root)
+def _standing_pose(world: World) -> Pose2D:
+    return Pose2D.from_xy_yaw(*STANDING_POSITION, reference_frame=world.root)
 
 
 def _placing_the_held_milk(
     world: World, extensions: list[ContextExtension]
 ) -> MoveAndPlaceAction:
+    """
+    Puts the milk in the left gripper.
+
+    :return: A move-and-place with the left arm, from the standing pose of these tests.
+    """
     robot = robot_of(extensions)
-    milk = _hold_the_milk(world, robot.left_arm)
+    _hold_the_milk(world, robot.left_arm)
     return MoveAndPlaceAction.from_standing_position(
         standing_position=_standing_pose(world),
         target_location=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        object_designator=milk,
+        arm=robot.left_arm,
     )
 
 

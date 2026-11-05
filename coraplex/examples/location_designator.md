@@ -87,7 +87,7 @@ run(Sequence(nodes=[ParkArmsAction(arms=pr2_view.all_arms),
 ```python
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.locations.locations import ReachabilityLocation
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 
 location = ReachabilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")),
@@ -184,7 +184,7 @@ from krrood.entity_query_language.factories import a, variable
 
 navigate = a(NavigateAction)(
     target_location=variable(
-        Pose,
+        Pose2D,
         domain=ReachabilityLocation(
             Pose(reference_frame=world.get_body_by_name("milk.stl")),
             pr2_view.left_arm,

@@ -165,7 +165,7 @@ def _peak_acceleration_of_a_joint_goal(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        JointPositionList(goal_state=JointState.from_mapping({connection: 1.5}))
+        JointPositionList(goal=JointState.from_mapping({connection: 1.5}))
     )
     executor.compile(statechart=statechart)
     accelerations = []

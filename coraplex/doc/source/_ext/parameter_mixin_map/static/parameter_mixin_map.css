@@ -1,0 +1,112 @@
+/* The map the parameter-mixin-map directive embeds. The colour of an element names the framework that owns it. */
+
+.parameter-mixin-map {
+  --coraplex: #11707a;
+  --coraplex-soft: #dcefef;
+  --giskardpy: #a85a16;
+  --giskardpy-soft: #f6e6d6;
+  --shared: #7646a6;
+  --ink: var(--pst-color-text-base);
+  --muted: var(--pst-color-text-muted);
+  --line: var(--pst-color-border);
+  --surface: var(--pst-color-surface);
+  --canvas: var(--pst-color-background);
+  --code-font: var(--pst-font-family-monospace);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 1.5rem 0;
+}
+
+html[data-theme="dark"] .parameter-mixin-map {
+  --coraplex: #4fb6c0;
+  --coraplex-soft: #163538;
+  --giskardpy: #e2944e;
+  --giskardpy-soft: #3a2817;
+  --shared: #b58ae2;
+}
+
+.parameter-mixin-map code { font-family: var(--code-font); font-size: 0.88em; }
+.parameter-mixin-map .eyebrow { font-family: var(--code-font); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.parameter-mixin-map .eyebrow.coraplex { color: var(--coraplex); }
+.parameter-mixin-map .eyebrow.giskardpy { color: var(--giskardpy); }
+
+/* toolbar */
+.parameter-mixin-map .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; font-size: 13px; color: var(--muted); }
+.parameter-mixin-map .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.parameter-mixin-map .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.parameter-mixin-map .legend i.coraplex { background: var(--coraplex); }
+.parameter-mixin-map .legend i.giskardpy { background: var(--giskardpy); }
+.parameter-mixin-map .legend i.shared { background: var(--shared); }
+.parameter-mixin-map label.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; }
+
+/* diagram */
+.parameter-mixin-map .diagram-and-details { display: flex; flex-direction: column; gap: 10px; }
+.parameter-mixin-map .scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.parameter-mixin-map .diagram { display: block; width: 100%; min-width: 780px; height: auto; }
+.parameter-mixin-map .diagram text { font-family: var(--code-font); font-size: 11px; fill: var(--ink); cursor: pointer; }
+.parameter-mixin-map .diagram .parameter-names { fill: var(--muted); font-size: 10px; }
+.parameter-mixin-map .diagram .column-heading { font-size: 13px; font-weight: 600; fill: var(--muted); letter-spacing: 0.04em; cursor: default; }
+.parameter-mixin-map .diagram .section-heading { font-size: 9.5px; fill: var(--muted); cursor: default; text-transform: uppercase; letter-spacing: 0.05em; }
+.parameter-mixin-map .diagram .edge { fill: none; stroke-width: 1; opacity: 0.22; transition: opacity 0.12s; }
+.parameter-mixin-map .diagram .edge.coraplex { stroke: var(--coraplex); }
+.parameter-mixin-map .diagram .edge.giskardpy { stroke: var(--giskardpy); opacity: 0.13; }
+.parameter-mixin-map .diagram .edge.shared { stroke: var(--shared); stroke-width: 1.8; opacity: 0.55; }
+.parameter-mixin-map .diagram .pill { stroke-width: 1; }
+.parameter-mixin-map .diagram .pill.coraplex { fill: var(--coraplex-soft); stroke: var(--coraplex); }
+.parameter-mixin-map .diagram .pill.giskardpy { fill: var(--giskardpy-soft); stroke: var(--giskardpy); }
+.parameter-mixin-map .diagram .pill.shared { stroke: var(--shared); stroke-width: 2; }
+.parameter-mixin-map .diagram .dot.coraplex { fill: var(--coraplex); }
+.parameter-mixin-map .diagram .dot.giskardpy { fill: var(--giskardpy); }
+.parameter-mixin-map .diagram.focus .edge { opacity: 0.04; }
+.parameter-mixin-map .diagram.focus .edge.on { opacity: 0.95; stroke-width: 2; }
+.parameter-mixin-map .diagram.focus g.item { opacity: 0.28; }
+.parameter-mixin-map .diagram.focus g.item.on { opacity: 1; }
+.parameter-mixin-map .diagram g.item.selected text { font-weight: 600; }
+.parameter-mixin-map .diagram g.item:focus { outline: none; }
+.parameter-mixin-map .diagram g.item:focus-visible text { text-decoration: underline; }
+
+/* details */
+/* Sticks to the bottom of the window while the diagram scrolls past, so the details of what is under the pointer stay in view. */
+.parameter-mixin-map .details { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; position: sticky; bottom: 8px; z-index: 3; max-height: 38vh; overflow: auto; min-width: 0; font-size: 13px; box-shadow: 0 -4px 16px rgb(0 0 0 / 0.12); }
+.parameter-mixin-map .details .parameters { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px; }
+.parameter-mixin-map .details p { margin: 0; }
+.parameter-mixin-map .details .hint { color: var(--muted); }
+.parameter-mixin-map .details h4 { font-family: var(--code-font); font-size: 15px; font-weight: 500; overflow-wrap: anywhere; margin: 0; }
+.parameter-mixin-map .details .kind { font-size: 12px; color: var(--muted); }
+.parameter-mixin-map .parameters { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.parameter-mixin-map .parameters li { border-left: 2px solid var(--line); padding-left: 10px; margin: 0; }
+.parameter-mixin-map .parameters li.coraplex { border-left-color: var(--coraplex); }
+.parameter-mixin-map .parameters li.giskardpy { border-left-color: var(--giskardpy); }
+.parameter-mixin-map .parameters .signature { font-family: var(--code-font); font-size: 12.5px; overflow-wrap: anywhere; }
+.parameter-mixin-map .parameters .signature b { font-weight: 600; }
+.parameter-mixin-map .parameters .origin { font-family: var(--code-font); font-size: 11.5px; color: var(--muted); }
+.parameter-mixin-map .parameters .parameter-documentation { color: var(--muted); }
+.parameter-mixin-map .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.parameter-mixin-map .chip { font-family: var(--code-font); font-size: 11.5px; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--line); background: var(--canvas); color: var(--ink); cursor: pointer; }
+.parameter-mixin-map .chip.coraplex { border-color: var(--coraplex); }
+.parameter-mixin-map .chip.giskardpy { border-color: var(--giskardpy); }
+.parameter-mixin-map button:focus-visible { outline: 2px solid var(--shared); outline-offset: 2px; }
+
+/* matrix */
+.parameter-mixin-map .matrix-heading { margin: 1rem 0 0; }
+.parameter-mixin-map .tabs { display: flex; gap: 4px; }
+.parameter-mixin-map .tabs button { font: inherit; font-size: 13px; padding: 6px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 6px; cursor: pointer; }
+.parameter-mixin-map .tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--ink); }
+.parameter-mixin-map table.matrix { border-collapse: separate; border-spacing: 0; width: auto; margin: 0; font-variant-numeric: tabular-nums; }
+.parameter-mixin-map .matrix th, .parameter-mixin-map .matrix td { padding: 0; border: 0; border-bottom: 1px solid var(--line); background: var(--surface); }
+.parameter-mixin-map .matrix thead th { vertical-align: bottom; padding: 8px 0 6px; }
+.parameter-mixin-map .matrix thead th.column-name span { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--code-font); font-size: 11px; font-weight: 400; white-space: nowrap; display: inline-block; padding: 0 3px; }
+.parameter-mixin-map .matrix thead th.column-name.coraplex span { color: var(--coraplex); }
+.parameter-mixin-map .matrix thead th.column-name.giskardpy span { color: var(--giskardpy); }
+.parameter-mixin-map .matrix tbody th { font-family: var(--code-font); font-size: 12px; font-weight: 400; color: var(--ink); padding: 3px 14px 3px 10px; white-space: nowrap; position: sticky; left: 0; z-index: 1; text-align: left; }
+.parameter-mixin-map .matrix tbody th small { color: var(--muted); font-size: 10.5px; margin-left: 6px; }
+.parameter-mixin-map .matrix td { width: 24px; min-width: 24px; text-align: center; }
+.parameter-mixin-map .matrix td i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.parameter-mixin-map .matrix td i.coraplex { background: var(--coraplex); }
+.parameter-mixin-map .matrix td i.giskardpy { background: var(--giskardpy); }
+.parameter-mixin-map .matrix td i.shared { background: var(--shared); }
+.parameter-mixin-map .matrix tbody tr:hover th, .parameter-mixin-map .matrix tbody tr:hover td { background: var(--canvas); }
+.parameter-mixin-map .matrix tr.group th { font-size: 12px; color: var(--muted); padding: 10px 10px 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+@media (prefers-reduced-motion: reduce) { .parameter-mixin-map * { transition: none !important; } }

@@ -36,8 +36,8 @@ def align_planes_statechart(context: StatechartContext) -> Statechart:
         AlignPlanes(
             root_link=root,
             tip_link=tip,
-            goal_normal=Vector3.Z(reference_frame=root),
-            tip_normal=Vector3.Z(reference_frame=tip),
+            reference_feature=Vector3.Z(reference_frame=root),
+            controlled_feature=Vector3.Z(reference_frame=tip),
             name="align",
         )
     )
@@ -50,8 +50,8 @@ def build_align_planes_task(world: World) -> AlignPlanes:
     task = AlignPlanes(
         root_link=root,
         tip_link=tip,
-        goal_normal=Vector3.Z(reference_frame=root),
-        tip_normal=Vector3.Z(reference_frame=tip),
+        reference_feature=Vector3.Z(reference_frame=root),
+        controlled_feature=Vector3.Z(reference_frame=tip),
         name="align",
     )
     add_to_statechart_with_motion_control(task, world)

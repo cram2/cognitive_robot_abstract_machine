@@ -55,8 +55,8 @@ def test_height_monitor(pr2_world_state_reset: World):
     drive = HeightGoal(
         root_link=root,
         tip_link=tip,
-        tip_point=tip_point,
-        reference_point=reference_point,
+        controlled_feature=tip_point,
+        reference_feature=reference_point,
         lower_limit=lower_limit,
         upper_limit=upper_limit,
     )
@@ -92,8 +92,8 @@ def test_distance_monitor(pr2_world_state_reset: World):
     drive = DistanceGoal(
         root_link=root,
         tip_link=tip,
-        tip_point=tip_point,
-        reference_point=reference_point,
+        controlled_feature=tip_point,
+        reference_feature=reference_point,
         lower_limit=lower_limit,
         upper_limit=upper_limit,
     )
@@ -127,8 +127,8 @@ def test_angle_monitor(pr2_world_state_reset: World):
     drive = AngleGoal(
         root_link=root,
         tip_link=tip,
-        tip_vector=tip_vector,
-        reference_vector=reference_vector,
+        controlled_feature=tip_vector,
+        reference_feature=reference_vector,
         lower_angle=lower_angle,
         upper_angle=upper_angle,
     )
@@ -161,8 +161,8 @@ def test_perpendicular_monitor(pr2_world_state_reset: World):
     drive = AlignPerpendicular(
         root_link=root,
         tip_link=tip,
-        tip_normal=tip_normal,
-        reference_normal=reference_normal,
+        controlled_feature=tip_normal,
+        reference_feature=reference_normal,
     )
     monitor = PerpendicularMonitor(
         root_link=root,

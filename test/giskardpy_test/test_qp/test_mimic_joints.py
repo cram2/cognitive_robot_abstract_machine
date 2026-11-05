@@ -62,7 +62,7 @@ def test_joint_goal_on_a_mimic_joint_moves_the_joint_it_mimics(
     run_until_reached(
         hsr_world_copy,
         JointPositionList(
-            goal_state=JointState.from_str_dict(
+            goal=JointState.from_str_dict(
                 {HSRBJoint.TORSO_LIFT: torso_goal, HSRBJoint.HAND_MOTOR: 1.23},
                 hsr_world_copy,
             )
@@ -142,7 +142,7 @@ def test_lifting_the_gripper_lifts_the_torso_along(
                 "base_footprint"
             ),
             tip_link=gripper,
-            goal_pose=Pose.from_xyz_axis_angle(z=gripper_lift, reference_frame=gripper),
+            goal=Pose.from_xyz_axis_angle(z=gripper_lift, reference_frame=gripper),
         ),
     )
 
@@ -178,7 +178,7 @@ def test_lifting_the_head_drives_the_joint_the_torso_mimics(
                 "base_footprint"
             ),
             tip_link=head,
-            goal_pose=Pose.from_xyz_axis_angle(z=head_lift, reference_frame=head),
+            goal=Pose.from_xyz_axis_angle(z=head_lift, reference_frame=head),
         ),
     )
 

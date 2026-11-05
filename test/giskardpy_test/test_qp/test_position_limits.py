@@ -34,9 +34,7 @@ def test_joint_goal_inside_limits_reached(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: goal})
-    )
+    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: goal}))
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -61,7 +59,7 @@ def test_joint_goal_clamped_to_upper_limit(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: goal_beyond_limit})
+        goal=JointState.from_mapping({connection: goal_beyond_limit})
     )
     statechart.add_node(joint_goal)
     end = EndMotion()
@@ -86,7 +84,7 @@ def test_joint_goal_clamped_to_lower_limit(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: goal_beyond_limit})
+        goal=JointState.from_mapping({connection: goal_beyond_limit})
     )
     statechart.add_node(joint_goal)
     end = EndMotion()
@@ -113,9 +111,7 @@ def test_joint_above_upper_limit_recovers(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: goal})
-    )
+    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: goal}))
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -142,9 +138,7 @@ def test_joint_below_lower_limit_recovers(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: goal})
-    )
+    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: goal}))
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -179,7 +173,7 @@ def test_multiple_joints_outside_limits_recover(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(goal_state=JointState.from_mapping(goals))
+    joint_goal = JointPositionList(goal=JointState.from_mapping(goals))
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -339,7 +333,7 @@ def test_joint_goal_at_upper_limit_is_reached(prismatic_bot):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: upper}),
+        goal=JointState.from_mapping({connection: upper}),
         threshold=LIMIT_REACHING_TOLERANCE,
     )
     statechart.add_node(joint_goal)

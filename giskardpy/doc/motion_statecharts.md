@@ -72,7 +72,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 
 # goal_state is a JointState of the robot's joints
 motion_statechart = Statechart(context=executor.context)
-plan = Sequence(nodes=[JointPositionList(goal_state=goal_state)])
+plan = Sequence(nodes=[JointPositionList(goal=goal_state)])
 motion_statechart.add_node(plan)
 motion_statechart.add_node(EndMotion.when_true(plan))
 ```

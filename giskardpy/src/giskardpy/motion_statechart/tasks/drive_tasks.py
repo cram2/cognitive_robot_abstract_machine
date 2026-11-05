@@ -11,9 +11,9 @@ from dataclasses import dataclass, field
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianOrientation,
-    CartesianPosition,
+from giskardpy.motion_statechart.mixins import (
+    HasGoalParameter,
+    HasReferenceVelocityParameter,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
@@ -31,66 +31,59 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DrivenBaseTask(ConvergingTask, ABC):
+class DrivenBaseTask(
+    ConvergingTask, HasGoalParameter[Pose], HasReferenceVelocityParameter, ABC
+):
     """
-    Moves the base a drive carries towards :attr:`goal_pose`, relative to the parent of
-    the drive as it is whenever the task is built.
+    Moves the base a drive carries towards :attr:`goal`, relative to the parent of the
+    drive as it is whenever the task is built.
 
     A base moved under another parent while the statechart runs is therefore driven
     relative to that parent, and the joints above the drive are never moved for it.
     """
 
-    base: KinematicStructureEntity
+    driven_body: KinematicStructureEntity
     """
     The body the drive carries.
     """
 
-    goal_pose: Pose
-    """
-    Where the base should end up.
-    """
-
     parent_T_goal_reference_frame: HomogeneousTransformationMatrix
     """
-    The pose of the reference frame of :attr:`goal_pose` relative to the parent of the
-    drive, as the goal running this task fixed it.
+    The pose of the reference frame of :attr:`goal` relative to the parent of the drive,
+    as the goal running this task fixed it.
     """
 
     @property
     def drive_parent(self) -> KinematicStructureEntity:
         """
-        :return: The body the drive carrying :attr:`base` is attached to now.
+        :return: The body the drive carrying :attr:`driven_body` is attached to now.
         """
-        return self.base.parent_kinematic_structure_entity
+        return self.driven_body.parent_kinematic_structure_entity
 
     @property
     def parent_T_goal(self) -> Pose:
         """
-        :return: :attr:`goal_pose` relative to :attr:`drive_parent`.
+        :return: :attr:`goal` relative to :attr:`drive_parent`.
         """
-        parent_T_goal = self.parent_T_goal_reference_frame @ self.goal_pose
+        parent_T_goal = self.parent_T_goal_reference_frame @ self.goal
         parent_T_goal.reference_frame = self.drive_parent
         return parent_T_goal
 
     def parent_T_base(self) -> HomogeneousTransformationMatrix:
         """
-        :return: The pose of :attr:`base` relative to :attr:`drive_parent`, over the
-            degrees of freedom of the drive.
+        :return: The pose of :attr:`driven_body` relative to :attr:`drive_parent`, over
+            the degrees of freedom of the drive.
         """
         return self.context.world.compose_forward_kinematics_expression(
-            self.drive_parent, self.base
+            self.drive_parent, self.driven_body
         )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class BasePosition(DrivenBaseTask):
     """
-    Drives the base along the floor to below the position of :attr:`goal_pose`.
-    """
-
-    reference_velocity: float = CartesianPosition.default_reference_velocity
-    """
-    Reference velocity for normalization in m/s.
+    Drives the base along the floor to below the position of :attr:`goal`, with an error
+    in meters.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -121,12 +114,7 @@ class BasePosition(DrivenBaseTask):
 class DrivenBaseRotation(DrivenBaseTask, ABC):
     """
     Turns the base about the vertical until it faces the way the orientation
-    :meth:`parent_R_goal` describes does.
-    """
-
-    reference_velocity: float = CartesianOrientation.default_reference_velocity
-    """
-    Reference angular velocity for normalization in rad/s.
+    :meth:`parent_R_goal` describes does, with an error in radians.
     """
 
     @abstractmethod
@@ -163,7 +151,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
 @dataclass(eq=False, repr=False, kw_only=True)
 class BaseOrientation(DrivenBaseRotation):
     """
-    Turns the base to the orientation of :attr:`goal_pose`.
+    Turns the base to the orientation of :attr:`goal`.
     """
 
     def parent_R_goal(
@@ -175,8 +163,8 @@ class BaseOrientation(DrivenBaseRotation):
 @dataclass(eq=False, repr=False, kw_only=True)
 class BaseHeading(DrivenBaseRotation):
     """
-    Turns the front of the base towards the position of :attr:`goal_pose`, from wherever
-    the base is.
+    Turns the front of the base towards the position of :attr:`goal`, from wherever the
+    base is.
     """
 
     def parent_R_goal(
@@ -198,7 +186,7 @@ class BaseHeading(DrivenBaseRotation):
         """
         :param parent_T_base: The pose of the base relative to the drive's parent.
         :return: The point relative to the drive's parent the base faces the position of
-            :attr:`goal_pose` from.
+            :attr:`goal` from.
         """
         return parent_T_base.position
 
@@ -206,9 +194,9 @@ class BaseHeading(DrivenBaseRotation):
 @dataclass(eq=False, repr=False, kw_only=True)
 class BaseTurnTowardsGoalPosition(BaseHeading):
     """
-    Turns the front of the base towards the position of :attr:`goal_pose`, as seen from
-    where the base stood when the task started, so that driving does not bring the base
-    closer to facing it.
+    Turns the front of the base towards the position of :attr:`goal`, as seen from where
+    the base stood when the task started, so that driving does not bring the base closer
+    to facing it.
     """
 
     _parent_T_start_binding: ForwardKinematicsBinding = field(init=False, repr=False)
@@ -224,7 +212,7 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         self._parent_T_start_binding = ForwardKinematicsBinding(
             name=PrefixedName("parent_T_start", str(self.name)),
             root=self.drive_parent,
-            tip=self.base,
+            tip=self.driven_body,
             float_variable_data=self.context.float_variable_data,
         )
         self._parent_T_start_binding.bind(self.context.world)

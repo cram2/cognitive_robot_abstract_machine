@@ -7,6 +7,10 @@ from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.exceptions import EmptyGoalStateError
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.graph_node import ConvergingTask
+from giskardpy.motion_statechart.mixins import (
+    HasGoalParameter,
+    HasReferenceVelocityParameter,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -15,30 +19,19 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class JointPositionList(ConvergingTask):
+class JointPositionList(
+    ConvergingTask, HasGoalParameter[JointState], HasReferenceVelocityParameter
+):
     """
     Moves the robot to a given joint position.
+
+    Its error is the largest joint position error, in rad or m.
     """
 
-    goal_state: JointState
+    reference_velocity: float = 1.0
     """
-    The goal joint state.
-    """
-
-    threshold: float = 0.01
-    """
-    If all joint position errors are smaller than this threshold, the task's observation
-    state is true.
-    """
-
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    The weight of this task.
-    """
-
-    max_velocity: float = 1.0
-    """
-    The maximum velocity of the joints.
+    The velocity the constraint of each joint is normalized with, capped by the joint's
+    own velocity limits, in rad/s or m/s.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -49,15 +42,17 @@ class JointPositionList(ConvergingTask):
             position error, so the task succeeds only once every joint is within the
             threshold.
         """
-        if len(self.goal_state) == 0:
+        if len(self.goal) == 0:
             raise EmptyGoalStateError(node=self)
 
         artifacts = MotionNodeArtifacts()
         errors = []
-        for connection, target in self.goal_state.items():
+        for connection, target in self.goal.items():
             current = connection.dof.variables.position
             target = self.apply_limits_to_target(target, connection)
-            velocity = self.apply_limits_to_velocity(self.max_velocity, connection)
+            velocity = self.apply_limits_to_velocity(
+                self.reference_velocity, connection
+            )
             if (
                 isinstance(connection, RevoluteConnection)
                 and not connection.dof.has_position_limits()
@@ -109,7 +104,7 @@ class JointVelocityLimit(Task):
     The joints whose velocity is constrained.
     """
 
-    max_velocity: float = 0.1
+    max_joint_velocity: float = 0.1
     """
     Maximum allowed velocity (in rad/s or m/s, per joint).
     """
@@ -132,15 +127,15 @@ class JointVelocityLimit(Task):
         for connection in self.connections:
             position = connection.dof.variables.position
             artifacts.constraints.add_velocity_constraint(
-                upper_velocity_limit=self.max_velocity,
-                lower_velocity_limit=-self.max_velocity,
+                upper_velocity_limit=self.max_joint_velocity,
+                lower_velocity_limit=-self.max_joint_velocity,
                 quadratic_weight=self.weight,
                 task_expression=position,
-                velocity_limit=self.max_velocity,
+                velocity_limit=self.max_joint_velocity,
                 name=str(connection.name),
             )
             velocities.append(connection.dof.variables.velocity)
         artifacts.observation = sm.logic_all(
-            sm.abs(sm.Vector(velocities)) <= self.max_velocity
+            sm.abs(sm.Vector(velocities)) <= self.max_joint_velocity
         )
         return artifacts

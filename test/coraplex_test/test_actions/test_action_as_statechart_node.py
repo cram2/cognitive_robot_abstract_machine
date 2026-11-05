@@ -697,12 +697,15 @@ def test_a_pick_up_and_its_grasp_and_reach_let_the_gripper_touch(
 def test_a_place_lets_the_gripper_holding_its_object_touch(
     pr2_apartment_context,
 ) -> None:
+    """
+    The allowance covers the gripper of the arm the place is given, and the place declares it rather than running a node of its own for it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
     statechart_of(simulated_executor(extensions), Sequence(nodes=[pick_up, place]))
@@ -763,12 +766,15 @@ def test_a_pick_up_grasps_reattaches_and_lifts_as_its_own_steps(
 def test_a_place_reattaches_and_retracts_as_its_own_steps(
     pr2_apartment_context,
 ) -> None:
+    """
+    Putting the object back under the world and retracting are the last two steps directly below the place, not a sequence nested inside it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
     statechart_of(simulated_executor(extensions), Sequence(nodes=[pick_up, place]))

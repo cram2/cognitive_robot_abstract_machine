@@ -21,7 +21,7 @@ from krrood_spatial_math.spatial_types import Twist, Vector3
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% the result of trying a grasp
 
@@ -123,14 +123,14 @@ class ObjectRelativeGrasp(ABC):
         )
 
     @abstractmethod
-    def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
+    def reaches_surface_of(self, graspable: IsGraspable) -> bool:
         """
         :param graspable: The object to take hold of.
         :return: Whether the place this grasp names reaches the surface of the object.
         """
 
     @abstractmethod
-    def grasp_candidate(self, graspable: HasGraspCandidates) -> GraspCandidate:
+    def grasp_candidate(self, graspable: IsGraspable) -> GraspCandidate:
         """
         :param graspable: The object to take hold of.
         :return: This grasp as ``root_T_grasp`` on the object's root body, approaching

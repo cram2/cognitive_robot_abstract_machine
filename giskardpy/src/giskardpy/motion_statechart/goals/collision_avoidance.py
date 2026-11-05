@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import field, dataclass
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from itertools import combinations
 
@@ -23,6 +23,7 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from cramph.node import CompositeNode, NodeArtifacts, CancelStatechart
 from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.mixins import HasReferenceVelocityParameter
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.collision_checking.collision_groups import (
@@ -52,7 +53,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class _CollisionAvoidanceTask(ABC, Task):
+class _CollisionAvoidanceTask(Task, HasReferenceVelocityParameter, ABC):
     """
     Avoids collisions of :attr:`robot` with one inequality constraint per collision it
     avoids.
@@ -64,11 +65,6 @@ class _CollisionAvoidanceTask(ABC, Task):
     robot: AbstractRobot
     """
     The robot whose collisions are avoided.
-    """
-
-    max_velocity: float = 0.2
-    """
-    The maximum velocity for the collision avoidance task.
     """
 
     collision_variable_manager: BaseCollisionVariableManager | None = field(
@@ -185,6 +181,69 @@ def _single_robot_of_world(node: CompositeNode) -> AbstractRobot:
     return robots[0]
 
 
+@dataclass(eq=False, repr=False, kw_only=True)
+class CollisionAvoidance(
+    EndedByOwner, CompositeNode, HasReferenceVelocityParameter, ABC
+):
+    """
+    Avoids collisions of the robot with one task, and cancels the motion once one of
+    them is violated.
+
+    .. note:: Its children are left out of drawings. Set
+        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
+        :attr:`plot_specifications` to False to draw them.
+    """
+
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_composite_node_style
+    )
+
+    robot: AbstractRobot | None = None
+    """
+    The robot for which the collision avoidance goal is defined; ``None`` for the only
+    robot of the world it runs in.
+    """
+
+    cancel_if_collision_violated: bool = True
+    """
+    If True, the motion will be canceled if a collision is violated.
+    """
+
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        return super().required_context_extensions + (MotionControlContext,)
+
+    @abstractmethod
+    def _create_task(self) -> _CollisionAvoidanceTask:
+        """
+        :return: A new task avoiding the collisions of :attr:`robot`.
+        """
+
+    @abstractmethod
+    def _create_cancel_node(
+        self, task: _CollisionAvoidanceTask
+    ) -> _CancelBecauseCollisionViolated:
+        """
+        :param task: The task whose violated collisions cancel the motion.
+        :return: A new node cancelling the motion once `task` is violated.
+        """
+
+    def expand(self) -> None:
+        """
+        Add the task avoiding the collisions of :attr:`robot`, and the node cancelling
+        the motion once one is violated.
+
+        The task decides which collisions it avoids when it is built, in the context
+        that runs it.
+        """
+        if self.robot is None:
+            self.robot = _single_robot_of_world(self)
+        task = self._create_task()
+        self._add_child_to_statechart(task)
+        if self.cancel_if_collision_violated:
+            self._add_child_to_statechart(self._create_cancel_node(task))
+
+
 # %% external collision avoidance
 
 
@@ -252,7 +311,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             root_V_contact_normal = manager.get_root_V_contact_normal_symbol(contact)
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
-                reference_velocity=self.max_velocity,
+                reference_velocity=self.reference_velocity,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -277,68 +336,31 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
+class ExternalCollisionAvoidance(CollisionAvoidance):
     """
-    Avoids external collisions of every collision group of the robot with one task, and
-    cancels the motion once one of them is violated.
-
-    .. note:: Its children are left out of drawings. Set
-        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
-        :attr:`plot_specifications` to False to draw them.
+    Avoids external collisions of every collision group of the robot.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_composite_node_style
-    )
-
-    robot: AbstractRobot | None = None
-    """
-    The robot for which the collision avoidance goal is defined; ``None`` for the only
-    robot of the world it runs in.
-    """
-
-    max_velocity: float = 0.2
-    """
-    The maximum velocity for the collision avoidance task.
-    """
-
-    cancel_if_collision_violated: bool = True
-    """
-    If True, the motion will be canceled if a collision is violated.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def expand(self) -> None:
-        """
-        Add the task avoiding every external collision of :attr:`robot`, and the node
-        cancelling the motion once one is violated.
-
-        The task decides which collisions it avoids when it is built, in the context
-        that runs it.
-        """
-        if self.robot is None:
-            self.robot = _single_robot_of_world(self)
-        task = _ExternalCollisionAvoidanceTask(
-            name=f"{self.name}/task", robot=self.robot, max_velocity=self.max_velocity
+    def _create_task(self) -> _ExternalCollisionAvoidanceTask:
+        return _ExternalCollisionAvoidanceTask(
+            name=f"{self.name}/task",
+            robot=self.robot,
+            reference_velocity=self.reference_velocity,
         )
-        self._add_child_to_statechart(task)
-        if self.cancel_if_collision_violated:
-            self._add_child_to_statechart(
-                _CancelBecauseExternalCollisionViolated(
-                    tasks=[task],
-                    name="External Collision Violated",
-                )
-            )
+
+    def _create_cancel_node(
+        self, task: _ExternalCollisionAvoidanceTask
+    ) -> _CancelBecauseExternalCollisionViolated:
+        return _CancelBecauseExternalCollisionViolated(
+            tasks=[task], name="External Collision Violated"
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     """
     Monitors the distance to the closest external object for a specific collision group
-    of a body. Turns True if the distance falls below a given threshold.
+    of a body. Turns True if the distance falls below :attr:`distance_threshold`.
 
     .. note:: the input bodies are only used to look up the collision groups.
     """
@@ -348,9 +370,9 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     The robot body to monitor.
     """
 
-    threshold: float
+    distance_threshold: float
     """
-    Distance threshold in meters.
+    The distance in meters below which this monitor turns True.
     """
 
     collision_index: int = 0
@@ -377,8 +399,10 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
         )
 
         # 4. Return an observation artifact
-        # The node's observation_variable will be True when distance < threshold
-        return MotionNodeArtifacts(observation=distance_symbol < self.threshold)
+        # The node's observation_variable will be True when distance < distance_threshold
+        return MotionNodeArtifacts(
+            observation=distance_symbol < self.distance_threshold
+        )
 
 
 # %% temporary collision rules
@@ -570,7 +594,7 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
             )
             artifacts.constraints.add_inequality_constraint(
                 name=f"{group_a.root.name}/{group_b.root.name}/{contact.rank}",
-                reference_velocity=self.max_velocity,
+                reference_velocity=self.reference_velocity,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -595,60 +619,25 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
+class SelfCollisionAvoidance(CollisionAvoidance):
     """
     Avoids self collisions between every checked combination of collision groups of the
-    robot with one task, and cancels the motion once one of them is violated.
-
-    .. note:: Its children are left out of drawings. Set
-        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
-        :attr:`plot_specifications` to False to draw them.
+    robot.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_composite_node_style
-    )
-
-    robot: AbstractRobot | None = None
-    """
-    The robot for which the collision avoidance goal is defined; ``None`` for the only
-    robot of the world it runs in.
-    """
-
-    max_velocity: float = 0.2
-    """
-    The maximum velocity for the collision avoidance task.
-    """
-
-    cancel_if_collision_violated: bool = True
-    """
-    If True, the motion will be canceled if a collision is violated.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def expand(self) -> None:
-        """
-        Add the task avoiding every self collision of :attr:`robot`, and the node
-        cancelling the motion once one is violated.
-
-        The task decides which combinations of collision groups it avoids when it is
-        built, in the context that runs it.
-        """
-        if self.robot is None:
-            self.robot = _single_robot_of_world(self)
-        task = _SelfCollisionAvoidanceTask(
-            name=f"{self.name}/task", robot=self.robot, max_velocity=self.max_velocity
+    def _create_task(self) -> _SelfCollisionAvoidanceTask:
+        return _SelfCollisionAvoidanceTask(
+            name=f"{self.name}/task",
+            robot=self.robot,
+            reference_velocity=self.reference_velocity,
         )
-        self._add_child_to_statechart(task)
-        if self.cancel_if_collision_violated:
-            self._add_child_to_statechart(
-                _CancelBecauseSelfCollisionViolated(
-                    name="self collision violated", tasks=[task]
-                )
-            )
+
+    def _create_cancel_node(
+        self, task: _SelfCollisionAvoidanceTask
+    ) -> _CancelBecauseSelfCollisionViolated:
+        return _CancelBecauseSelfCollisionViolated(
+            name="self collision violated", tasks=[task]
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -656,7 +645,7 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     """
     Monitors the distance to the closest external object for the group of a body.
 
-    Turns True if the distance falls below a given threshold.
+    Turns True if the distance falls below :attr:`distance_threshold`.
     .. note:: the input bodies are only used to look up the collision groups.
     """
 
@@ -670,9 +659,9 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     Second robot body to monitor.
     """
 
-    threshold: float
+    distance_threshold: float
     """
-    Distance threshold in meters.
+    The distance in meters below which this monitor turns True.
     """
 
     @classproperty
@@ -692,4 +681,6 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             manager.avoided_contacts_of(combination)[0]
         )
 
-        return MotionNodeArtifacts(observation=distance_symbol < self.threshold)
+        return MotionNodeArtifacts(
+            observation=distance_symbol < self.distance_threshold
+        )

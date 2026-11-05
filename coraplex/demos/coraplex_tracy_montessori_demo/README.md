@@ -46,7 +46,7 @@ its own description.
 ParkArmsAction(all arms)
 for each piece, with the hole it was made for:
     PickUpAction(the piece's grasp, left arm)
-    PlaceAction(piece, 1 cm above that hole, in the orientation it stood in)
+    PlaceAction(left arm, 1 cm above that hole, in the orientation the piece stood in)
 ParkArmsAction(all arms)
 ```
 

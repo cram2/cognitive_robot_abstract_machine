@@ -21,22 +21,22 @@ class CartesianPoseStraight(CartesianPose):
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Task priority relative to other tasks.
+    Above collision avoidance by default.
     """
 
     def create_tasks(self) -> list[MotionStatechartNode]:
         """
-        :return: New position and orientation tasks reaching :attr:`goal_pose`, the
-            position along a straight line.
+        :return: New position and orientation tasks reaching :attr:`goal`, the position
+            along a straight line.
         """
         return [
             CartesianPositionStraight(
                 name=f"{self.name}/position",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_point=self.goal_pose.position,
+                goal=self.goal.position,
                 reference_velocity=self.reference_linear_velocity,
-                threshold=self.translation_threshold,
+                threshold=self.position_threshold,
                 weight=self.weight,
                 binding_policy=self.binding_policy,
             ),
@@ -44,7 +44,7 @@ class CartesianPoseStraight(CartesianPose):
                 name=f"{self.name}/orientation",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal_orientation=self.goal_pose.rotation_matrix,
+                goal=self.goal.rotation_matrix,
                 reference_velocity=self.reference_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,

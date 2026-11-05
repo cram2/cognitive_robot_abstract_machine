@@ -11,6 +11,7 @@ from giskardpy.motion_statechart.binding_policy import (
 )
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.mixins import HasRootLinkParameter, HasTipLinkParameter
 from cramph.node import NodeArtifacts
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
@@ -18,24 +19,20 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
     RotationMatrix,
     HomogeneousTransformationMatrix,
+    SpatialType,
 )
-from krrood_spatial_math.spatial_types import SpatialType
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class RootRelativeGoalMonitor(EndedByOwner, MotionStatechartNode, ABC):
+class RootRelativeGoalMonitor(
+    EndedByOwner, MotionStatechartNode, HasRootLinkParameter, ABC
+):
     """
     Base for monitors whose goal is captured relative to the kinematic chain via a
     forward kinematics binding.
 
     The :class:`GoalBindingPolicy` decides whether the goal is frozen once at build time
     or recaptured every time the monitor starts.
-    """
-
-    root_link: Body
-    """
-    Root link of the kinematic chain the goal is expressed in.
     """
 
     binding_policy: GoalBindingPolicy = GoalBindingPolicy.Bind_on_start
@@ -85,15 +82,10 @@ class RootRelativeGoalMonitor(EndedByOwner, MotionStatechartNode, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PoseReached(RootRelativeGoalMonitor):
+class PoseReached(RootRelativeGoalMonitor, HasTipLinkParameter):
     """
     Observes ``True`` once the tip link has reached the goal pose within the position
     and orientation thresholds.
-    """
-
-    tip_link: Body
-    """
-    Link that should reach the goal pose.
     """
 
     goal_pose: HomogeneousTransformationMatrix
@@ -138,14 +130,9 @@ class PoseReached(RootRelativeGoalMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PositionReached(RootRelativeGoalMonitor):
+class PositionReached(RootRelativeGoalMonitor, HasTipLinkParameter):
     """
     Observes ``True`` once the tip link is within ``threshold`` of the goal point.
-    """
-
-    tip_link: Body
-    """
-    Link that should reach the goal point.
     """
 
     goal_point: Point3
@@ -173,15 +160,10 @@ class PositionReached(RootRelativeGoalMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class OrientationReached(RootRelativeGoalMonitor):
+class OrientationReached(RootRelativeGoalMonitor, HasTipLinkParameter):
     """
     Observes ``True`` once the tip link orientation is within ``threshold`` of the goal
     orientation.
-    """
-
-    tip_link: Body
-    """
-    Link that should reach the goal orientation.
     """
 
     goal_orientation: RotationMatrix
@@ -209,25 +191,17 @@ class OrientationReached(RootRelativeGoalMonitor):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PointingAt(EndedByOwner, MotionStatechartNode):
+class PointingAt(
+    EndedByOwner, MotionStatechartNode, HasRootLinkParameter, HasTipLinkParameter
+):
     """
     Observes ``True`` once the pointing axis of the tip link is aimed at the goal point
     within ``threshold``.
     """
 
-    tip_link: Body
-    """
-    Link whose pointing axis is checked.
-    """
-
     goal_point: Point3
     """
     Point the tip link should point at.
-    """
-
-    root_link: Body
-    """
-    Reference link the goal point is expressed in.
     """
 
     pointing_axis: Vector3
@@ -262,20 +236,12 @@ class PointingAt(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class VectorsAligned(EndedByOwner, MotionStatechartNode):
+class VectorsAligned(
+    EndedByOwner, MotionStatechartNode, HasRootLinkParameter, HasTipLinkParameter
+):
     """
     Observes ``True`` once the tip normal is aligned with the goal normal within
     ``threshold``.
-    """
-
-    root_link: Body
-    """
-    Reference link the goal normal is expressed in.
-    """
-
-    tip_link: Body
-    """
-    Link the tip normal is expressed in.
     """
 
     goal_normal: Vector3
@@ -313,20 +279,12 @@ class VectorsAligned(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DistanceToLine(EndedByOwner, MotionStatechartNode):
+class DistanceToLine(
+    EndedByOwner, MotionStatechartNode, HasRootLinkParameter, HasTipLinkParameter
+):
     """
     Observes ``True`` once the tip link is within ``threshold`` of the line segment
     centered at ``center_point`` along ``line_axis``.
-    """
-
-    root_link: Body
-    """
-    Reference link the line is expressed in.
-    """
-
-    tip_link: Body
-    """
-    Link whose distance to the line is checked.
     """
 
     center_point: Point3

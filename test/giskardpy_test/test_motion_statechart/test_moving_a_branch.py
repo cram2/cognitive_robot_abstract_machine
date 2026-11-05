@@ -73,14 +73,14 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
                 CartesianPose(
                     root_link=world.root,
                     tip_link=robot,
-                    goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+                    goal=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
                     name="approach",
                 ),
                 MoveBranch(branch_root=box, new_parent=robot),
                 CartesianPose(
                     root_link=world.root,
                     tip_link=box,
-                    goal_pose=goal_pose,
+                    goal=goal_pose,
                     name="carry",
                 ),
             ]
@@ -111,7 +111,7 @@ def test_building_the_nodes_again_registers_no_further_variables(
         CartesianPose(
             root_link=world.root,
             tip_link=robot,
-            goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+            goal=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
     executor.compile(statechart)
@@ -186,7 +186,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
         CartesianPose(
             root_link=world.root,
             tip_link=robot,
-            goal_pose=Pose.from_xyz_rpy(x=5, reference_frame=world.root),
+            goal=Pose.from_xyz_rpy(x=5, reference_frame=world.root),
         )
     )
     statechart.add_node(driving_a_while := CountTicks(ticks=20))
@@ -238,7 +238,7 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
         CartesianPose(
             root_link=world.root,
             tip_link=robot,
-            goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+            goal=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
     executor.compile(statechart)
@@ -261,7 +261,7 @@ def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_a
         CartesianPose(
             root_link=world.root,
             tip_link=robot,
-            goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+            goal=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
     executor.compile(statechart)

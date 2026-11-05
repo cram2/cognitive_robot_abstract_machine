@@ -82,8 +82,8 @@ def test_gripper_is_given_the_width_between_its_facing_points(pr2_world_copy) ->
 
     [width_task] = nodes
     assert isinstance(width_task, DistanceAlongAxis)
-    assert width_task.reference_point.reference_frame is gripper.finger.tip
-    assert width_task.tip_point.reference_frame is gripper.thumb.tip
+    assert width_task.reference_feature.reference_frame is gripper.finger.tip
+    assert width_task.controlled_feature.reference_frame is gripper.thumb.tip
     assert width_task.distance == goal.width
     assert width_task.threshold == goal.threshold
 
@@ -92,13 +92,13 @@ def test_fingers_driven_to_a_joint_state_are_given_that_state(pr2_world_copy) ->
     goal_state = _left_gripper(pr2_world_copy).get_joint_state_by_type(
         GripperState.CLOSE
     )
-    goal = MoveFingersToJointState(goal_state=goal_state)
+    goal = MoveFingersToJointState(goal=goal_state)
 
     nodes = _expanded_nodes(goal, pr2_world_copy)
 
     [joint_goal] = nodes
     assert isinstance(joint_goal, JointPositionList)
-    assert joint_goal.goal_state == goal_state
+    assert joint_goal.goal == goal_state
 
 
 def test_gripper_commands_nothing_besides_the_fingers_by_default(
@@ -138,7 +138,7 @@ def test_gripper_tolerating_stall_settles_for_either_outcome(pr2_world_copy) -> 
     the finger task and the stall monitor sit under one goal that either of them can
     satisfy.
     """
-    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_stall=True)
+    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_finger_stall=True)
 
     nodes = _expanded_nodes(goal, pr2_world_copy)
 
@@ -152,7 +152,7 @@ def test_gripper_watches_only_the_fingers_for_stalling(pr2_world_copy) -> None:
     The stall monitor judges the finger task, not the whole robot, so the rest of the
     body moving cannot keep it from reporting settled fingers.
     """
-    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_stall=True)
+    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_finger_stall=True)
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
@@ -168,7 +168,7 @@ def test_gripper_keeps_the_monitors_dwell_time_when_none_is_given(
     Leaving the dwell time unset keeps whatever the monitor itself defaults to, so the
     default lives in one place.
     """
-    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_stall=True)
+    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_finger_stall=True)
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
@@ -184,13 +184,15 @@ def test_gripper_dwells_as_long_as_asked_before_accepting_a_stall(
     gets that time on the monitor.
     """
     goal = _half_open(
-        _left_gripper(pr2_world_copy), tolerate_stall=True, stall_minimum_time=2.5
+        _left_gripper(pr2_world_copy),
+        tolerate_finger_stall=True,
+        finger_stall_minimum_time=2.5,
     )
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
     monitor = next(node for node in nodes if isinstance(node, Stalled))
-    assert monitor.timeout == timedelta(seconds=goal.stall_minimum_time)
+    assert monitor.timeout == timedelta(seconds=goal.finger_stall_minimum_time)
 
 
 # %% capping the finger speed
@@ -201,12 +203,12 @@ def test_gripper_speed_cap_limits_the_finger_joints(pr2_world_copy) -> None:
     A finger speed applies to the joints that move the fingers, and to no others.
     """
     gripper = _left_gripper(pr2_world_copy)
-    goal = _half_open(gripper, finger_velocity=0.01)
+    goal = _half_open(gripper, max_joint_velocity=0.01)
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
     limit = next(node for node in nodes if isinstance(node, JointVelocityLimit))
-    assert limit.max_velocity == goal.finger_velocity
+    assert limit.max_joint_velocity == goal.max_joint_velocity
     assert limit.connections == gripper.finger_connections
 
 
@@ -217,7 +219,9 @@ def test_gripper_speed_cap_holds_whichever_way_the_goal_ends(pr2_world_copy) -> 
     while the fingers move.
     """
     goal = _half_open(
-        _left_gripper(pr2_world_copy), tolerate_stall=True, finger_velocity=0.01
+        _left_gripper(pr2_world_copy),
+        tolerate_finger_stall=True,
+        max_joint_velocity=0.01,
     )
 
     nodes = _expanded_nodes(goal, pr2_world_copy)
@@ -264,7 +268,7 @@ def test_fingers_reach_the_commanded_joint_state(pr2_world_state_reset) -> None:
         GripperState.OPEN
     )
 
-    _run(MoveFingersToJointState(goal_state=goal_state), pr2_world_state_reset)
+    _run(MoveFingersToJointState(goal=goal_state), pr2_world_state_reset)
 
     reached = [connection.position for connection in goal_state.connections]
     np.testing.assert_allclose(reached, goal_state.target_values, atol=1e-3)
