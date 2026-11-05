@@ -124,11 +124,11 @@ class GraspTrials:
         Try every drawn grasp.
 
         :return: A record of each grasp tried, with its result, as they are tried. A
-            grasp that does not lie on the grasped part is skipped.
+            grasp that does not reach the surface of the grasped part is skipped.
         """
         part = self.grasped_part
         for grasp in self.drawn_grasps():
-            if not grasp.lies_on(part):
+            if not grasp.reaches_surface_of(part):
                 continue
             grasp.result = self.performer.perform(grasp.grasp_candidate(part))
             yield GraspTrialRecord(grasped_part=part, grasp=grasp)

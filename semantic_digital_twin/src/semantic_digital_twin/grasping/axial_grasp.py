@@ -54,14 +54,14 @@ class AxialGrasp(ObjectRelativeGrasp):
     radians.
     """
 
-    def lies_on(self, graspable: HasGraspCandidates) -> bool:
+    def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
         """
         :return: Whether :attr:`position` lies between the ends of the axis.
         """
         return 0.0 <= self.position <= 1.0
 
     def grasp_candidate(self, graspable: HasGraspCandidates) -> GraspCandidate:
-        if not self.lies_on(graspable):
+        if not self.reaches_surface_of(graspable):
             raise GraspNotOnObjectError(grasp=self, graspable=graspable)
         lowest, highest = graspable.grasp_surface().bounds
         axis_index = int(np.argmax(highest - lowest))

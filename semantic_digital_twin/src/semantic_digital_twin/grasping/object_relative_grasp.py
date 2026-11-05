@@ -123,10 +123,10 @@ class ObjectRelativeGrasp(ABC):
         )
 
     @abstractmethod
-    def lies_on(self, graspable: HasGraspCandidates) -> bool:
+    def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
         """
         :param graspable: The object to take hold of.
-        :return: Whether the place this grasp names lies on the object.
+        :return: Whether the place this grasp names reaches the surface of the object.
         """
 
     @abstractmethod
@@ -136,8 +136,8 @@ class ObjectRelativeGrasp(ABC):
         :return: This grasp as ``root_T_grasp`` on the object's root body, approaching
             along its x-axis and closing along its y-axis; its axes are those a
             :class:`GraspResult` measures slip along.
-        :raises GraspNotOnObjectError: If the grasp does not :meth:`lie on <lies_on>`
-            the object.
+        :raises GraspNotOnObjectError: If the grasp does not
+            :meth:`reach the surface of <reaches_surface_of>` the object.
         """
 
 

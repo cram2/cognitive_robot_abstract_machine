@@ -472,15 +472,19 @@ class HasGraspCandidates(HasRootBody, Mixin):
             ``None`` draws uniformly from what it allows.
         :param result_pattern: Builds the pattern of the result the grasps are to have
             had; any result when ``None``.
-        :return: Grasps drawn from the statement of :attr:`grasp_strategy` that lie on
-            the object, at most :attr:`grasp_candidate_count` of them.
+        :return: Grasps drawn from the statement of :attr:`grasp_strategy` that reach the
+            surface of the object, at most :attr:`grasp_candidate_count` of them.
         """
         grasps = draw_grasps(
             self.grasp_strategy.statement(self, result_pattern),
             self.grasp_candidate_count,
             model_registry,
         )
-        return [grasp.grasp_candidate(self) for grasp in grasps if grasp.lies_on(self)]
+        return [
+            grasp.grasp_candidate(self)
+            for grasp in grasps
+            if grasp.reaches_surface_of(self)
+        ]
 
     def grasp_surface(self) -> trimesh.Trimesh:
         """

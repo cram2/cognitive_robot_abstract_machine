@@ -2472,7 +2472,7 @@ class NoGraspGeometry(UsageError):
 @dataclass
 class GraspNotOnObjectError(UsageError):
     """
-    Raised when a grasp names a place that does not lie on the object.
+    Raised when a grasp names a place that does not reach the surface of the object.
     """
 
     grasp: ObjectRelativeGrasp
@@ -2486,12 +2486,12 @@ class GraspNotOnObjectError(UsageError):
     """
 
     def error_message(self) -> str:
-        return f"{self.grasp} does not lie on '{self.graspable.name}'."
+        return f"{self.grasp} does not reach the surface of '{self.graspable.name}'."
 
     def suggest_correction(self) -> str:
         return (
             "keep the parameters of the grasp within the bounds its strategy states, and "
-            "check with lies_on before asking for its grasp candidate."
+            "check with reaches_surface_of before asking for its grasp candidate."
         )
 
 

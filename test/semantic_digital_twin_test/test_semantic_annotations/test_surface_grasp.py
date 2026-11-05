@@ -140,7 +140,7 @@ def test_a_rolled_grasp_closes_along_a_turned_direction(carton):
 def test_a_point_above_the_object_is_not_on_its_surface(carton):
     above = SurfaceGrasp(yaw=0.0, height=1.5, depth=0.0, pitch=0.0, roll=0.0)
 
-    assert not above.lies_on(carton)
+    assert not above.reaches_surface_of(carton)
     with pytest.raises(GraspNotOnObjectError):
         above.grasp_candidate(carton)
 

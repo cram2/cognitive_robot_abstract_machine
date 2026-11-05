@@ -86,7 +86,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         )
         return GraspCandidate(graspable, root_T_grasp.pose)
 
-    def lies_on(self, graspable: HasGraspCandidates) -> bool:
+    def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
         """
         :return: Whether the object's grasp surface reaches ``root_P_surface``.
         """

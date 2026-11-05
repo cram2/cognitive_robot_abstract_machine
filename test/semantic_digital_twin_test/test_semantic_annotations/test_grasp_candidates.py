@@ -858,7 +858,7 @@ def test_an_axial_grasp_beyond_the_ends_of_the_axis_does_not_lie_on_the_object()
     handle = _handle_with_bar_along(1)
     beyond = AxialGrasp(position=1.5, angle=0.0)
 
-    assert not beyond.lies_on(handle)
+    assert not beyond.reaches_surface_of(handle)
     with pytest.raises(GraspNotOnObjectError):
         beyond.grasp_candidate(handle)
 
