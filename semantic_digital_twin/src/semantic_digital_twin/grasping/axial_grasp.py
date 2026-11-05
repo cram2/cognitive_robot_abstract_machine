@@ -13,7 +13,6 @@ from typing_extensions import TYPE_CHECKING
 
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
-    Point3,
     RotationMatrix,
     Vector3,
 )
@@ -33,13 +32,12 @@ class AxialGrasp(ObjectRelativeGrasp):
     A grasp of an elongated object with the gripper's tool centre point on the axis the
     object runs along, closing across it.
 
-    The axis runs through the centre of the grasp surface's bounding box along its
-    longest extent, as ``root_V_axis``, from ``root_P_start`` at its lower end. The
-    gripper closes at ``root_P_grasp = root_P_start + position * length * root_V_axis``.
-    The x-axis of ``root_T_grasp`` is the direction of approach, ``root_V_reference``
-    turned by :attr:`angle` about ``root_V_axis``; its y-axis is the closing direction,
-    ``root_V_axis`` crossed with the approach. ``root_V_reference`` points straight down,
-    or along the root body's negative y-axis when the axis is vertical.
+    The axis is the object's :meth:`~HasGraspCandidates.grasp_axis`, running along
+    ``root_V_axis``. The x-axis of ``root_T_grasp`` is the direction of approach,
+    ``root_V_reference`` turned by :attr:`angle` about ``root_V_axis``; its y-axis is
+    the closing direction, ``root_V_axis`` crossed with the approach.
+    ``root_V_reference`` is the part of the root body's negative z-axis across the axis,
+    or of its negative y-axis when the axis runs mostly along z.
     """
 
     position: float
@@ -63,21 +61,21 @@ class AxialGrasp(ObjectRelativeGrasp):
     def grasp_candidate(self, graspable: HasGraspCandidates) -> GraspCandidate:
         if not self.reaches_surface_of(graspable):
             raise GraspNotOnObjectError(grasp=self, graspable=graspable)
-        lowest, highest = graspable.grasp_surface().bounds
-        axis_index = int(np.argmax(highest - lowest))
-        root_V_axis = Vector3.from_iterable(np.eye(3)[axis_index])
-        start = (lowest + highest) / 2
-        start[axis_index] = lowest[axis_index]
-        root_P_start = Point3.from_iterable(start)
-        length = float(highest[axis_index] - lowest[axis_index])
+        axis = graspable.grasp_axis()
+        root_V_axis = axis.direction
+        main_axis_index = int(np.argmax(np.abs(root_V_axis.to_np()[:3])))
         root_V_reference = (
-            Vector3.NEGATIVE_Y() if axis_index == 2 else Vector3.NEGATIVE_Z()
+            Vector3.NEGATIVE_Y() if main_axis_index == 2 else Vector3.NEGATIVE_Z()
         )
+        root_V_reference = root_V_reference - root_V_axis * root_V_reference.dot(
+            root_V_axis
+        )
+        root_V_reference.scale(1)
         root_V_approach = root_V_reference * math.cos(self.angle) + root_V_axis.cross(
             root_V_reference
         ) * math.sin(self.angle)
         root_T_grasp = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=root_P_start + root_V_axis * (self.position * length),
+            point=axis.start + (axis.end - axis.start) * self.position,
             rotation_matrix=RotationMatrix.from_vectors(
                 x=root_V_approach, y=root_V_axis.cross(root_V_approach)
             ),

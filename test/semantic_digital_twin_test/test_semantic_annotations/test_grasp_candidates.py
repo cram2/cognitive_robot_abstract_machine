@@ -56,7 +56,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    LineSegment3,
+    Point3,
+    Pose,
+    RotationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Mesh, Scale
@@ -852,6 +858,54 @@ def test_an_axial_grasp_turns_its_approach_about_the_axis(
         np.cross(bar_direction, approach_without_turn),
         atol=1e-9,
     )
+
+
+@pytest.mark.parametrize("bar_axis", [0, 1, 2], ids=["along-x", "along-y", "along-z"])
+def test_the_grasp_axis_of_a_bar_runs_through_its_centre_along_its_length(bar_axis):
+    bar_center = np.array([0.04, 0.0, -0.01])
+    handle = _handle_with_bar_along(bar_axis, tuple(bar_center))
+    half_length = float(max(handle.grasp_surface().extents)) / 2
+    bar_direction = np.eye(3)[bar_axis]
+
+    axis = handle.grasp_axis()
+
+    np.testing.assert_allclose(
+        axis.start.to_np()[:3], bar_center - half_length * bar_direction, atol=1e-9
+    )
+    np.testing.assert_allclose(
+        axis.end.to_np()[:3], bar_center + half_length * bar_direction, atol=1e-9
+    )
+
+
+@dataclass(eq=False)
+class HandleWithDiagonalBar(Handle):
+    """
+    A handle that states its grasp axis instead of leaving it to its bounding box.
+    """
+
+    def grasp_axis(self) -> LineSegment3:
+        return LineSegment3(
+            start=Point3(0.0, 0.0, 0.0, reference_frame=self.root),
+            end=Point3(0.1, 0.1, 0.1, reference_frame=self.root),
+        )
+
+
+def test_an_axial_grasp_follows_the_axis_its_object_states():
+    handle = _handle_with_bar_along(0)
+    diagonal = HandleWithDiagonalBar(root=handle.root)
+    with handle._world.modify_world():
+        handle._world.add_semantic_annotation(diagonal)
+    axis = diagonal.grasp_axis()
+    start, end = axis.start.to_np()[:3], axis.end.to_np()[:3]
+    axis_direction = axis.direction.to_np()[:3]
+
+    grasp = AxialGrasp(position=0.25, angle=1.0).grasp_candidate(diagonal)
+
+    np.testing.assert_allclose(
+        grasp.grasp_pose.to_np()[:3, 3], start + 0.25 * (end - start), atol=1e-9
+    )
+    for gripper_axis in axes_of(grasp.grasp_pose)[:, :2].T:
+        assert float(np.dot(gripper_axis, axis_direction)) == pytest.approx(0, abs=1e-9)
 
 
 def test_an_axial_grasp_beyond_the_ends_of_the_axis_does_not_lie_on_the_object():

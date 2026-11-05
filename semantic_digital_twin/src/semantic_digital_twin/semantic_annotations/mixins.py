@@ -64,6 +64,7 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
 from krrood_spatial_math.spatial_types import (
+    LineSegment3,
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
@@ -507,6 +508,22 @@ class HasGraspCandidates(HasRootBody, Mixin):
         if not surfaces:
             raise NoGraspGeometry(self)
         return trimesh.util.concatenate(surfaces)
+
+    def grasp_axis(self) -> LineSegment3:
+        """
+        :return: The axis an elongated object is grasped around, in the root body's
+            frame: through the centre of the bounding box of :meth:`grasp_surface`,
+            along its longest extent, from its lower to its upper end.
+        :raises NoGraspGeometry: If the object has no grasp surface.
+        """
+        lowest, highest = self.grasp_surface().bounds
+        axis_index = int(np.argmax(highest - lowest))
+        start, end = (lowest + highest) / 2, (lowest + highest) / 2
+        start[axis_index], end[axis_index] = lowest[axis_index], highest[axis_index]
+        return LineSegment3(
+            start=Point3.from_iterable(start, reference_frame=self.root),
+            end=Point3.from_iterable(end, reference_frame=self.root),
+        )
 
     def grasped_part(self) -> HasGraspCandidates:
         """

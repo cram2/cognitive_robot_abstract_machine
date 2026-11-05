@@ -1496,6 +1496,32 @@ class Line3:
     """
 
 
+@dataclass(eq=False)
+class LineSegment3:
+    """
+    A straight line in 3D space between two points.
+    """
+
+    start: Point3
+    """
+    The point the segment runs from.
+    """
+
+    end: Point3
+    """
+    The point the segment runs to, in the same reference frame as :attr:`start`.
+    """
+
+    @property
+    def direction(self) -> Vector3:
+        """
+        :return: The unit vector from :attr:`start` towards :attr:`end`.
+        """
+        direction = self.end - self.start
+        direction.scale(1)
+        return direction
+
+
 @dataclass(frozen=True)
 class OrthogonalProjection:
     """
