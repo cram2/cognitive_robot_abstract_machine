@@ -220,6 +220,19 @@ class ScoredIntervention:
 
 
 @dataclass
+class CandidateAdjustment:
+    """
+    One set of a query's variables that the effect of a cause may be identified by
+    adjusting for.
+    """
+
+    variables: list[random_events.variable.Variable]
+    """
+    The variables to adjust for.
+    """
+
+
+@dataclass
 class AdjustmentCandidates:
     """
     What a learned causal structure says one cause candidate adjusts for.
@@ -235,12 +248,25 @@ class AdjustmentCandidates:
     What the structure says about the effect of the cause.
     """
 
-    candidate_variables: list[list[random_events.variable.Variable]]
+    adjustments: list[CandidateAdjustment]
     """
-    The variables of each set the effect may be identified by adjusting for: the one
-    chosen set if the effect is identified, one per candidate if it is partially
-    identified, none if it is not identified.
+    Each set the effect may be identified by adjusting for: the one chosen set if the
+    effect is identified, one per candidate if it is partially identified, none if it
+    is not identified.
     """
+
+    @property
+    def variables(self) -> list[random_events.variable.Variable]:
+        """
+        :return: The variables of every candidate, each once, in order of first use.
+        """
+        return list(
+            dict.fromkeys(
+                variable
+                for adjustment in self.adjustments
+                for variable in adjustment.variables
+            )
+        )
 
 
 @dataclass
@@ -279,7 +305,7 @@ class InterventionalRange:
     The cause.
     """
 
-    candidate_adjustments: list[list[random_events.variable.Variable]]
+    candidate_adjustments: list[CandidateAdjustment]
     """
     The candidate adjustment sets the range is taken across.
     """

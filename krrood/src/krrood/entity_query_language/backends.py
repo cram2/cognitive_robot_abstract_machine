@@ -22,6 +22,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 from krrood.entity_query_language.operators.causal import (
     AdjustmentCandidates,
+    CandidateAdjustment,
     Cause,
     CauseEffectVariables,
     InterventionalRange,
@@ -76,8 +77,6 @@ try:
     from probabilistic_model.causal_structure.identification import (
         AdjustmentSelector,
         AdjustmentSet,
-        IdentifiedEffect,
-        PartiallyIdentifiedEffect,
     )
     from probabilistic_model.causal_structure.learning import LearnedCausalStructure
 except ImportError as e:
@@ -95,9 +94,7 @@ except ImportError as e:
     AdjustmentSet = NoneType
     NodeReference = NoneType
     NodeLevel = NoneType
-    IdentifiedEffect = NoneType
     AdjustmentSelector = NoneType
-    PartiallyIdentifiedEffect = NoneType
     LearnedCausalStructure = NoneType
 
 T = TypeVar("T")
@@ -616,14 +613,14 @@ class ProbabilisticBackend(GenerativeBackend):
                 cause_variable,
                 cause_effect.effect_variable,
             )
-            if not isinstance(candidates.identification, IdentifiedEffect):
+            if not candidates.identification.is_identified:
                 raise EffectNotIdentified(
                     cause_variable,
                     cause_effect.effect_variable,
                     candidates.identification,
                 )
             parameters.derived_adjustment_variables[cause_variable] = (
-                candidates.candidate_variables[0]
+                candidates.adjustments[0].variables
             )
 
     def possible_causes(
@@ -686,24 +683,19 @@ class ProbabilisticBackend(GenerativeBackend):
         identification = selector.identify(
             cause.node, effect.node, set(eligible), structure.training_rows
         )
-        match identification:
-            case IdentifiedEffect():
-                adjustments = [identification.adjustment]
-            case PartiallyIdentifiedEffect():
-                adjustments = identification.candidate_adjustments
-            case _:
-                adjustments = []
         return AdjustmentCandidates(
             cause_variable=cause_variable,
             identification=identification,
-            candidate_variables=[
-                [
-                    parameters.variables.setdefault(
-                        eligible[node].variable.name, eligible[node].variable
-                    )
-                    for node in sorted(adjustment.nodes)
-                ]
-                for adjustment in adjustments
+            adjustments=[
+                CandidateAdjustment(
+                    [
+                        parameters.variables.setdefault(
+                            eligible[node].variable.name, eligible[node].variable
+                        )
+                        for node in sorted(adjustment.nodes)
+                    ]
+                )
+                for adjustment in identification.candidate_adjustments
             ],
         )
 
@@ -740,18 +732,14 @@ class ProbabilisticBackend(GenerativeBackend):
                 cause_variable,
                 cause_effect.effect_variable,
             )
-            if not candidates.candidate_variables:
+            if not candidates.adjustments:
                 raise EffectNotIdentified(
                     cause_variable,
                     cause_effect.effect_variable,
                     candidates.identification,
                 )
-            parameters.derived_adjustment_variables[cause_variable] = list(
-                dict.fromkeys(
-                    variable
-                    for candidate in candidates.candidate_variables
-                    for variable in candidate
-                )
+            parameters.derived_adjustment_variables[cause_variable] = (
+                candidates.variables
             )
             candidates_by_cause.append(candidates)
         model = self.model_registry.get_model(parameters)
@@ -780,14 +768,12 @@ class ProbabilisticBackend(GenerativeBackend):
         :param effect_event: The effect's condition.
         :return: The cause's range per region.
         """
-        includes_no_effect = isinstance(
-            candidates.identification, PartiallyIdentifiedEffect
-        ) and (candidates.identification.includes_member_without_causal_path)
+        includes_no_effect = candidates.identification.includes_no_effect
         interventional_circuits = [
             model.backdoor_adjustment(
-                candidates.cause_variable, effect_variable, adjustment
+                candidates.cause_variable, effect_variable, adjustment.variables
             )
-            for adjustment in candidates.candidate_variables
+            for adjustment in candidates.adjustments
         ]
         observational = cls._probability_within(
             model.probabilistic_circuit, None, effect_event
@@ -809,7 +795,7 @@ class ProbabilisticBackend(GenerativeBackend):
             )
         return InterventionalRange(
             cause_variable=candidates.cause_variable,
-            candidate_adjustments=candidates.candidate_variables,
+            candidate_adjustments=candidates.adjustments,
             includes_no_effect=includes_no_effect,
             regions=regions,
         )
