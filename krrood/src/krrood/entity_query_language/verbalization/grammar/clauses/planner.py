@@ -75,7 +75,7 @@ class GroupedByPlanner(Planner[Query, GroupPlan]):
             return GroupPlan(keys=[], aggregated=[])
         return GroupPlan(
             keys=list(grouped.variables_to_group_by),
-            aggregated=self.node.aggregated_selections(grouped.group_key_root_ids),
+            aggregated=self.node.aggregated_selections(group_key_root_ids=grouped.group_key_root_ids),
             weaves_aggregated=not isinstance(self.node, SetOf),
         )
 

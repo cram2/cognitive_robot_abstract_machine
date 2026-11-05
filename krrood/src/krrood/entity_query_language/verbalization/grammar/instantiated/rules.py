@@ -91,7 +91,7 @@ class InstantiatedVerbalizableRule(PhraseRule):
             },
             raw=node._child_variables_,
         )
-        fragment = node._factory_._verbalization_fragment_(fields)
+        fragment = node._factory_._verbalization_fragment_(fields=fields)
         if not isinstance(fragment, VerbalizationFragment):
             raise NonFragmentPredicateError(
                 predicate_type=node._factory_, returned=fragment

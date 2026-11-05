@@ -576,7 +576,7 @@ def test_probabilistic_backend_samples_bindings_with_their_log_likelihood(
     query = a(Rectangle)(width=..., height=...)
     width = query._find_assigned_variable_(access_path_name="Rectangle.width")
     height = query._find_assigned_variable_(access_path_name="Rectangle.height")
-    rows = list(rectangle_backend.sample_bindings(query))
+    rows = list(rectangle_backend.sample_bindings(expression=query))
     assert len(rows) == rectangle_backend.number_of_samples
     assert {
         (row.bindings[width._id_], row.bindings[height._id_]) for row in rows
@@ -594,7 +594,7 @@ def test_probabilistic_backend_computes_the_log_likelihood_of_given_bindings(
     height = query._find_assigned_variable_(access_path_name="Rectangle.height")
     rectangle_width, rectangle_height = RECTANGLE_SIDES[1]
     bindings = {width._id_: rectangle_width, height._id_: rectangle_height}
-    row = rectangle_backend.compute_log_likelihood(query, bindings)
+    row = rectangle_backend.compute_log_likelihood(expression=query, bindings=bindings)
     assert row.bindings == bindings
     assert row.log_likelihood == pytest.approx(np.log(1 / len(RECTANGLE_SIDES)))
 
@@ -606,7 +606,7 @@ def test_bindings_the_model_cannot_produce_have_no_likelihood(rectangle_backend)
     first_width, _ = RECTANGLE_SIDES[0]
     _, second_height = RECTANGLE_SIDES[1]
     row = rectangle_backend.compute_log_likelihood(
-        query, {width._id_: first_width, height._id_: second_height}
+        expression=query, bindings={width._id_: first_width, height._id_: second_height}
     )
     assert row.log_likelihood == -np.inf
 
@@ -615,6 +615,6 @@ def test_a_sampled_row_is_a_role_of_the_operation_result_of_its_bindings(
     rectangle_backend,
 ):
     query = a(Rectangle)(width=..., height=...)
-    row = next(rectangle_backend.sample_bindings(query))
+    row = next(rectangle_backend.sample_bindings(expression=query))
     assert isinstance(row.role_taker, OperationResult)
     assert Role.roles_for(role_taker=row.role_taker, role_type=ProbabilisticOperationResult) == [row]

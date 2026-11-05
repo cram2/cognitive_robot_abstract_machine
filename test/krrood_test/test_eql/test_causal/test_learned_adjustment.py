@@ -137,7 +137,7 @@ def summer_structures(edges: list[FieldEdge]) -> dict[type, LearnedCausalStructu
     class_diagram = ClassDiagram(classes=[SummerDay])
     day = class_diagram.get_wrapped_class(clazz=SummerDay)
     relations = CausalRelationsOfClass(class_diagram=class_diagram, owner=day)
-    relations.replace_relations(
+    relations.replace_relationsrelations=(
         CausalRelation(
             source=day,
             target=day,

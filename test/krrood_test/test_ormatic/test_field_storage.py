@@ -56,6 +56,6 @@ def test_classification_logs_how_the_field_is_stored(ormatic, caplog):
     day = field_named(ormatic, "day")
 
     with caplog.at_level(logging.INFO, logger="krrood.ormatic.field_storage"):
-        ormatic.field_classifier.classify(day)
+        ormatic.field_classifier.classify(wrapped_field=day)
 
     assert CustomTypeRule.describe(field_to_store=FieldToStore(wrapped_field=day, ormatic=ormatic)) in caplog.messages

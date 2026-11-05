@@ -150,13 +150,13 @@ def test_drawer_handle_variable_nodes_count(drawer_explanation):
 
 
 def test_cabinet_connection_variable_nodes_count(cabinet_explanation):
-    nodes = cabinet_explanation.get_variable_nodes_of_given_type(Connection).tolist()
+    nodes = cabinet_explanation.get_variable_nodes_of_given_type(type_=Connection).tolist()
     assert len(nodes) == 1
     assert nodes[0]._type_ is PrismaticConnection
 
 
 def test_cabinet_drawer_variable_nodes_count(cabinet_explanation):
-    nodes = cabinet_explanation.get_variable_nodes_of_given_type(Drawer).tolist()
+    nodes = cabinet_explanation.get_variable_nodes_of_given_type(type_=Drawer).tolist()
     assert len(nodes) == 1
     assert nodes[0]._type_ is Drawer
 
@@ -175,7 +175,7 @@ def test_drawer_handle_value_matches_instance(drawer_explanation):
 
 def test_cabinet_drawer_values_are_in_cabinet(cabinet_explanation):
     drawers = cabinet_explanation.get_values_of_variable_nodes_of_given_type(
-        Drawer
+        type_=Drawer
     ).tolist()
     assert len(drawers) >= 1
     cabinet = cabinet_explanation.instance
@@ -218,7 +218,7 @@ def test_drawer_conditions_relating_bodies(drawer_explanation):
 def test_cabinet_conditions_relating_bodies(cabinet_explanation):
     # prismatic_conn.child (Body) and drawer.container (Container < Body) are in the same condition.
     conditions = cabinet_explanation.get_conditions_that_relate_the_variables_of_type(
-        Body
+        type_=Body
     ).tolist()
     assert len(conditions) == 1
     assert isinstance(conditions[0], Comparator)
@@ -228,7 +228,7 @@ def test_cabinet_no_conditions_relating_connections(cabinet_explanation):
     # There is only one Connection variable (prismatic_conn) in the cabinet rule,
     # so no condition can relate two distinct Connection nodes.
     conditions = cabinet_explanation.get_conditions_that_relate_the_variables_of_type(
-        Connection
+        type_=Connection
     ).tolist()
     assert len(conditions) == 0
 
@@ -256,7 +256,7 @@ def test_drawer_relates_fixed_connection_to_handle(drawer_explanation):
 
 def test_cabinet_relates_prismatic_connection_to_drawer(cabinet_explanation):
     conditions = cabinet_explanation.get_conditions_that_relate_variables_of_types(
-        PrismaticConnection, Drawer
+        type_a=PrismaticConnection, type_b=Drawer
     ).tolist()
     assert len(conditions) == 1
     assert isinstance(conditions[0], Comparator)

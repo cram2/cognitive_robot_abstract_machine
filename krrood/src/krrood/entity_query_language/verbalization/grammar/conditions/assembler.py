@@ -86,7 +86,7 @@ class ConditionAssembler(Assembler[Comparator, None]):
         transform = PredicateTransform.most_applicable(
             comparator=comparator, negated=negated
         )
-        return transform.render(comparator, self.context, negated)
+        return transform.render(comparator=comparator, context=self.context, negated=negated)
 
     def as_statements(
         self, *, conditions: list[SymbolicExpression]

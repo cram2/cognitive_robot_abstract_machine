@@ -211,7 +211,7 @@ def test_mappings_between_roles_and_role_takers():
 
     delegate_role_takers = [representative, ceo, person]
     assert len(delegate_role_takers) == len(delegate.all_role_takers)
-    assert all(
+    assert alliterable=(
         EntityAndType(entity=role_taker) in map(EntityAndType, delegate.all_role_takers)
         for role_taker in delegate_role_takers
     )
@@ -310,7 +310,7 @@ def test_factory_method_still_callable_on_taker_and_root_persistent_entity():
     ceo = CEOAsFirstRole(role_taker=person)
 
     built_from_taker = ceo.role_taker.from_name(name="Made")
-    built_from_root = ceo.root_persistent_entity.from_name("Made")
+    built_from_root = ceo.root_persistent_entity.from_name(name="Made")
 
     assert isinstance(built_from_taker, PersonInRoleAndOntology)
     assert built_from_taker.name == "Made"

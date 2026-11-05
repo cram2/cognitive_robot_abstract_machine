@@ -94,7 +94,7 @@ class Add(Conclusion):
         *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
-        v = next(self.value._evaluate_(sources)).value
+        v = next(self.value._evaluate_(sources=sources)).value
         new_bindings = sources.bindings | {self.variable._id_: v}
         yield OperationResult(bindings=new_bindings, operand=self, previous_operation_result=sources)
 

@@ -741,7 +741,7 @@ class IndexByExpression(Index[T]):
             if isinstance(value, UnificationDict) and self._key_ in value:
                 yield value[self._key_]
                 return
-            for key in self._key_._evaluate_(sources):
+            for key in self._key_._evaluate_(sources=sources):
                 yield value[key.value]
         except IndexError:  # break iterator if the key does not exist
             return

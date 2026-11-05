@@ -277,16 +277,16 @@ def test_guard_expressions_evaluate_to_plain_values_never_operation_results():
     leaf = animal.has_fur
     wrapped = Not(_child_=animal.has_fur)
 
-    animal._update_domain_([Animal(name="cat", has_fur=True)])
+    animal._update_domain_(domain=[Animal(name="cat", has_fur=True)])
     assert list(leaf.evaluate()) == [True]
     assert list(wrapped.evaluate()) == []
 
-    animal._update_domain_([Animal(name="snake", has_fur=False)])
+    animal._update_domain_(domain=[Animal(name="snake", has_fur=False)])
     assert list(leaf.evaluate()) == [False]
     assert [bool(result) for result in wrapped.evaluate()] == [True]
 
     for expression in (leaf, wrapped):
-        animal._update_domain_([Animal(name="cat", has_fur=True)])
+        animal._update_domain_(domain=[Animal(name="cat", has_fur=True)])
         assert not any(
             isinstance(result, OperationResult) for result in expression.evaluate()
         )

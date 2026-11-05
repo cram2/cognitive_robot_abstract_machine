@@ -2891,7 +2891,7 @@ def substitution_cache(method):
         substitutions = _variables_from_kwargs(bound_arguments.arguments)
         if isinstance(expression, tuple):
             return (expr.substitute(variables, substitutions) for expr in expression)
-        return expression.substitute(variables, substitutions)
+        return expression.substitute(old_variables=variables, new_variables=substitutions)
 
     return wrapper
 

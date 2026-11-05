@@ -122,7 +122,7 @@ def test_feature_extraction_with_aggregations(scenario):
 
 def test_create_dataframe_with_aggregations(scenario):
     room, room2, feature_extractor = scenario
-    dataframe = feature_extractor.create_dataframe([room, room2])
+    dataframe = feature_extractor.create_dataframe(instances=[room, room2])
     assert dataframe.shape == (2, len(feature_extractor.features))
     assert dataframe.columns.tolist() == feature_extractor.features
     assert dataframe.iloc[0, 1] == room.position.x
@@ -131,7 +131,7 @@ def test_create_dataframe_with_aggregations(scenario):
 
 def test_apply_mapping_with_aggregations(scenario):
     room, room2, feature_extractor = scenario
-    mapping = feature_extractor.apply_mapping(room)
+    mapping = feature_extractor.apply_mapping(instance=room)
     assert len(mapping) == 11
     assert mapping[10] == 3  # total count
 
@@ -147,8 +147,8 @@ def test_aggregation_features_flatten_the_features_of_every_exchangeable_part(
 
 def test_dataframe_preprocessing(scenario):
     room, room2, feature_extractor = scenario
-    dataframe = feature_extractor.create_dataframe([room, room2])
-    preprocessed_df = feature_extractor.preprocess_dataframe(dataframe)
+    dataframe = feature_extractor.create_dataframe(instances=[room, room2])
+    preprocessed_df = feature_extractor.preprocess_dataframe(df=dataframe)
     assert preprocessed_df.shape == (2, len(feature_extractor.features))
     assert preprocessed_df.columns.tolist() == feature_extractor.features
     assert preprocessed_df.iloc[0, 0] == room.type_in_need_of_preprocessing

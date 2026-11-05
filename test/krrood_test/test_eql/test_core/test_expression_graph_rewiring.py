@@ -40,7 +40,7 @@ def test_detaching_a_parent_keeps_the_other_parents():
     other_position = variable(KRROODPosition, [])
     x, y = position.x, position.y
 
-    y._replace_child_(position, other_position)
+    y._replace_child_(old_child=position, new_child=other_position)
 
     assert identifiers(position._parents_) == identifiers([x])
 
@@ -53,7 +53,7 @@ def test_replacing_a_child_with_its_sibling_leaves_the_sibling_once():
     x, y = position.x, position.y
     predicate = IsGreaterThan(value=x, bound=y)
 
-    predicate._replace_child_(x, y)
+    predicate._replace_child_(old_child=x, new_child=y)
 
     assert identifiers(predicate._children_) == identifiers([y])
 

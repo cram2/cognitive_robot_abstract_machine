@@ -37,7 +37,7 @@ def test_an_identifier_does_not_require_a_name():
 
 
 def test_a_named_object_binds_the_kind_of_its_name():
-    assert Landmark.get_type_of_generic_parameter(NameT) is str
+    assert Landmark.get_type_of_generic_parameter(parameter=NameT) is str
 
 
 # %% writing and resolving references

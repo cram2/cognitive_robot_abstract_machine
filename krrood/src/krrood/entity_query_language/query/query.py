@@ -681,7 +681,7 @@ class Query(
             outermost query of the current evaluation. The first compiled query to evaluate claims the
             outermost role; any other is nested.
         """
-        return evaluation_context.outermost_query.is_nested(self)
+        return evaluation_context.outermost_query.is_nested(query=self)
 
     def _produce_results_(self, *, sources: OperationResult) -> Iterator[OperationResult]:
         """
@@ -1070,7 +1070,7 @@ class SetOf(Query):
         """
         Update the result bindings with this operation's bindings.
         """
-        operation_result = super()._get_operation_result_(child_result)
+        operation_result = super()._get_operation_result_(child_result=child_result)
         operation_result.bindings = {
             self._id_: UnificationDict(
                 {var: operation_result[var._id_] for var in self._selected_variables_}
@@ -1089,7 +1089,7 @@ class Entity(Query[T]):
         """
         Update the result bindings with this operation's bindings.
         """
-        operation_result = super()._get_operation_result_(child_result)
+        operation_result = super()._get_operation_result_(child_result=child_result)
         operation_result.bindings = {
             self._id_: operation_result[self.selected_variable._id_]
         }
@@ -1146,4 +1146,4 @@ class Entity(Query[T]):
                 for child in selected._child_variables_.values()
                 if chain_root(child)._id_ not in group_key_root_ids
             ]
-        return super().aggregated_selections(group_key_root_ids)
+        return super().aggregated_selections(group_key_root_ids=group_key_root_ids)

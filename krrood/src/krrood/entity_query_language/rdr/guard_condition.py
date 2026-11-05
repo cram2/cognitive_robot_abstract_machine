@@ -57,7 +57,7 @@ class GuardCondition:
         :param case: The concrete case object to evaluate against.
         :return: ``True`` if the guard is satisfied.
         """
-        shared_variable._update_domain_([case])
+        shared_variable._update_domain_(domain=[case])
         # A leaf predicate yields its own bound boolean per case; a Not() has no
         # id-keyed payload of its own, so it yields the full binding row when it holds
         # and nothing when it does not. Both read correctly through bool().

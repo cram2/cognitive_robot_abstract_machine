@@ -164,9 +164,9 @@ class WhereExpressionToRandomEventTranslator:
             case operator.ne:
                 self._translate_not_equal(comparator, variable, result)
             case operator.gt:
-                self._translate_greater_than(comparator, variable, result)
+                self._translate_greater_than(comparator=comparator, parametrization_variable=variable, result=result)
             case operator.lt:
-                self._translate_less_than(comparator, variable, result)
+                self._translate_less_than(comparator=comparator, parametrization_variable=variable, result=result)
             case operator.ge:
                 self._translate_greater_than_or_equal(comparator, variable, result)
             case operator.le:

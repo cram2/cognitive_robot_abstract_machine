@@ -40,7 +40,7 @@ class Item:
 
 
 def _first(expr, sources=None):
-    return next(expr._evaluate_(sources))
+    return next(expr._evaluate_(sources=sources))
 
 
 def _all(expr, sources=None):
@@ -83,7 +83,7 @@ def test_pipeline_previous_links_stage_results():
     b = variable_from([10, 20])
 
     for r1 in q1._evaluate_():
-        for r2 in b._evaluate_(r1):
+        for r2 in b._evaluate_(sources=r1):
             assert r2.previous_operation_result is r1
 
 
@@ -102,7 +102,7 @@ def test_pipeline_stage1_values_accessible_from_stage2():
 
     pairs = []
     for r1 in q1._evaluate_():
-        for r2 in b._evaluate_(r1):
+        for r2 in b._evaluate_(sources=r1):
             a_val = r2.previous_operation_result.all_bindings[a._id_]
             b_val = r2.bindings[b._id_]
             pairs.append((a_val, b_val))
@@ -305,7 +305,7 @@ def test_inference_chain_reachable_from_pipeline():
     b = variable_from([42])
 
     for r1 in q1._evaluate_():
-        for r2 in b._evaluate_(r1):
+        for r2 in b._evaluate_(sources=r1):
             assert r2.previous_operation_result is r1
             # The inferred result must have a non-trivial previous chain (InstantiatedVariable → child variables)
             assert r1.previous_operation_result is not None

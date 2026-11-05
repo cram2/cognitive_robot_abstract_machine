@@ -212,7 +212,7 @@ class DiscourseModel:
                 node=node, microplan=microplan
             )
             if scope_rule is not None:
-                focus[node._id_] = scope_rule.focus(node, microplan)
+                focus[node._id_] = scope_rule.focus(node=node, microplan=microplan)
             leaf = (
                 aggregation_leaf_attribute(node) if isinstance(node, Entity) else None
             )

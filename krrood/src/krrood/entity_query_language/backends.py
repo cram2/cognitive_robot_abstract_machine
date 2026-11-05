@@ -412,8 +412,8 @@ class ProbabilisticBackend(GenerativeBackend):
         :return: The expectation of the averaged attribute.
         """
         attribute = average._leaf_attribute_
-        parameters = SelectedAttributesParameters((attribute,))
-        model = self.model_registry.get_model(parameters)
+        parameters = SelectedAttributesParameters(attributes=(attribute,))
+        model = self.model_registry.get_model(parameters=parameters)
         [random_event_variable] = parameters.variables.values()
         return model.expectation((random_event_variable,))[random_event_variable]
 
@@ -438,7 +438,7 @@ class ProbabilisticBackend(GenerativeBackend):
             its log-likelihood under the model, most likely first.
         :raises NoSolutionFound: If the match's conditions leave the model no solution.
         """
-        parameters = UnderspecifiedParameters(expression)
+        parameters = UnderspecifiedParameters(statement=expression)
         model = self._resolve_model_to_sample(parameters=parameters, expression=expression)
         number_of_samples = (
             expression._get_expression_()._limit_ or self.number_of_samples
@@ -473,7 +473,7 @@ class ProbabilisticBackend(GenerativeBackend):
         :raises ValueOutsideVariableDomain: If a value the bindings give is outside the
             domain of a variable of the model.
         """
-        parameters = UnderspecifiedParameters(expression)
+        parameters = UnderspecifiedParameters(statement=expression)
         model = self._resolve_model_to_sample(parameters=parameters, expression=expression)
         [log_likelihood] = model.log_likelihood(
             parameters.model_sample_from_bindings(variables=model.variables, bindings=bindings)
@@ -990,7 +990,7 @@ class ProbabilisticBackend(GenerativeBackend):
             :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`.
         :return: Every scoreable candidate, ranked highest-scoring first.
         """
-        parameters = UnderspecifiedParameters(expression)
+        parameters = UnderspecifiedParameters(statement=expression)
         if (
             not parameters.search_cause_variables
             and parameters.queried_class in self.causal_structures

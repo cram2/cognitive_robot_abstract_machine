@@ -38,11 +38,11 @@ def _first_result(expr, sources=None):
     """
     Return the first OperationResult from _evaluate_().
     """
-    return next(expr._evaluate_(sources))
+    return next(expr._evaluate_(sources=sources))
 
 
 def _all_results(expr, sources=None):
-    return list(expr._evaluate_(sources))
+    return list(expr._evaluate_(sources=sources))
 
 
 # ---------------------------------------------------------------------------

@@ -107,7 +107,7 @@ def default_boolean_predicate(attribute_name: str) -> BooleanPredicate:
     words = attribute_name.split("_")
     spelled_head = SpelledOutHead.opening(words=words)
     if spelled_head is not None:
-        return spelled_head.predicate_type(" ".join(words[1:]))
+        return spelled_head.predicate_type(" ".join(iterable=words[1:]))
     if morphology.is_past_participle(words[-1]) or morphology.is_likely_adjective(
         words[-1]
     ):

@@ -38,4 +38,4 @@ def test_the_fields_to_an_attribute_start_at_the_class(class_diagram):
 
 def test_a_field_the_class_lacks_raises(class_diagram):
     with pytest.raises(FieldIsUnMappedInClassDiagram):
-        class_diagram.get_wrapped_class(SceneRoom).get_field("height")
+        class_diagram.get_wrapped_class(clazz=SceneRoom).get_field(name="height")

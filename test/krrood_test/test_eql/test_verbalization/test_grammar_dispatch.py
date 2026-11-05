@@ -132,7 +132,7 @@ def test_fold_child_re_enters_the_fold():
             Mid,
             "parent",
             lambda node, context: PhraseFragment(
-                parts=[WordFragment(text="p"), context.child(child)]
+                parts=[WordFragment(text="p"), context.child(node=child)]
             ),
         ),
         _custom(Other, "child", lambda node, context: WordFragment(text="c")),

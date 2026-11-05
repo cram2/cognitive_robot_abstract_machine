@@ -92,7 +92,7 @@ def test_aggregated_selections_excludes_group_keys():
     other = variable(Body, [])
     query = set_of(body, sum(other.size)).grouped_by(body)
     grouped = query._grouped_by_expression_
-    aggregated = query.aggregated_selections(grouped.group_key_root_ids)
+    aggregated = query.aggregated_selections(group_key_root_ids=grouped.group_key_root_ids)
     assert aggregated == [sum(other.size)]
 
 

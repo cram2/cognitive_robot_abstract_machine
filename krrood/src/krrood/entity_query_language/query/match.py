@@ -494,7 +494,7 @@ class Match(
             self._variable_ = variable(self._type_, domain=self._domain_)
             return
 
-        self._variable_._update_domain_(_resolve_domain(self._type_, self._domain_))
+        self._variable_._update_domain_(domain=_resolve_domain(self._type_, self._domain_))
 
     def _evaluate_natively_(self) -> Iterator:
         """
@@ -529,7 +529,7 @@ class Match(
         """
         from krrood.entity_query_language.factories import entity
 
-        self._variable_._update_domain_(instances)
+        self._variable_._update_domain_(domain=instances)
         selection = entity(self._variable_)
         conditions = [*self._conditions_on_stated_values_, *self._where_conditions_]
         if conditions:
@@ -667,7 +667,7 @@ class Match(
         matched class, which grounding computes.
         """
         return self._is_pattern_keyword_kept_out_of_construction_(
-            self._factory_, self._type_, keyword, value_type
+            factory=self._factory_, matched_type=self._type_, keyword=keyword, value_type=value_type
         )
 
     @staticmethod

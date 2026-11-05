@@ -317,9 +317,9 @@ class RelationalCausalStructureLearner:
         ]
         example_names = [node.name for node in example_nodes]
         example_graph = self.learner.learn(
-            tables.example_rows,
-            example_nodes,
-            domain_knowledge.restricted_to(example_names),
+            rows=tables.example_rows,
+            nodes=example_nodes,
+            domain_knowledge=domain_knowledge.restricted_to(example_names),
         )
         nodes, edges = list(example_nodes), example_graph.edges()
         for part, rows in tables.part_rows.items():
@@ -443,7 +443,7 @@ class RelationalCausalStructureLearner:
         )
         names = [node.name for node in statistic_nodes + part_nodes]
         graph = self.learner.learn(
-            renamed, statistic_nodes + part_nodes, domain_knowledge.restricted_to(names)
+            rows=renamed, nodes=statistic_nodes + part_nodes, domain_knowledge=domain_knowledge.restricted_to(names)
         )
         return [
             edge

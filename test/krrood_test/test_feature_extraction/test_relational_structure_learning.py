@@ -171,7 +171,7 @@ def test_every_learned_edge_is_a_causal_relation_of_the_class(
         .selector.graph
     )
     relations = CausalRelationsOfClass(
-        class_diagram=class_diagram, owner=class_diagram.get_wrapped_class(SceneRoom)
+        class_diagram=class_diagram, owner=class_diagram.get_wrapped_class(clazz=SceneRoom)
     )
 
     node_of = {node.name: node for node in graph.nodes()}
@@ -203,7 +203,7 @@ def test_a_part_attribute_is_reached_through_its_collection(
     RelationalCausalStructureLearner(class_diagram, EveryPairJoinedLearner()).learn(
         relational_probabilistic_circuit, list(scenario)
     )
-    room = class_diagram.get_wrapped_class(SceneRoom)
+    room = class_diagram.get_wrapped_class(clazz=SceneRoom)
 
     assert {
         endpoint.fields
@@ -230,7 +230,7 @@ def test_a_statistic_of_the_parts_is_reached_through_their_collection(
             "rooms"
         ].template_distribution.feature_extractor
     )
-    scene = class_diagram.get_wrapped_class(SceneWithExchangeableParts)
+    scene = class_diagram.get_wrapped_class(clazz=SceneWithExchangeableParts)
 
     assert {
         endpoint.name

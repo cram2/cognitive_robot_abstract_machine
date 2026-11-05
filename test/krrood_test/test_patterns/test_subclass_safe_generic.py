@@ -751,8 +751,8 @@ def test_a_parameter_an_intermediate_class_bound_is_read_back():
     class CountingContainer(LabelledContainer[int]):
         pass
 
-    assert CountingContainer.get_type_of_generic_parameter(ContentType) is str
-    assert CountingContainer.get_type_of_generic_parameter(LabelType) is int
+    assert CountingContainer.get_type_of_generic_parameter(parameter=ContentType) is str
+    assert CountingContainer.get_type_of_generic_parameter(parameter=LabelType) is int
 
 
 def test_a_parameter_nothing_bound_is_rejected():
@@ -767,7 +767,7 @@ def test_a_parameter_nothing_bound_is_rejected():
         content: ContentType
 
     with pytest.raises(UnboundGenericParameter):
-        Container.get_type_of_generic_parameter(ContentType)
+        Container.get_type_of_generic_parameter(parameter=ContentType)
 
 
 def test_a_parameter_only_renamed_by_a_subclass_is_rejected():
@@ -789,7 +789,7 @@ def test_a_parameter_only_renamed_by_a_subclass_is_rejected():
         pass
 
     with pytest.raises(UnboundGenericParameter):
-        RenamingContainer.get_type_of_generic_parameter(ContentType)
+        RenamingContainer.get_type_of_generic_parameter(parameter=ContentType)
 
 
 def test_sibling_classes_each_read_back_their_own_binding():
@@ -811,9 +811,9 @@ def test_sibling_classes_each_read_back_their_own_binding():
     class NumberContainer(Container[int]):
         pass
 
-    assert TextContainer.get_type_of_generic_parameter(ContentType) is str
-    assert NumberContainer.get_type_of_generic_parameter(ContentType) is int
-    assert TextContainer.get_type_of_generic_parameter(ContentType) is str
+    assert TextContainer.get_type_of_generic_parameter(parameter=ContentType) is str
+    assert NumberContainer.get_type_of_generic_parameter(parameter=ContentType) is int
+    assert TextContainer.get_type_of_generic_parameter(parameter=ContentType) is str
 
 
 def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
@@ -831,14 +831,14 @@ def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
     class TextContainer(Container[str]):
         pass
 
-    first_lookup = TextContainer.get_type_of_generic_parameter(ContentType)
+    first_lookup = TextContainer.get_type_of_generic_parameter(parameter=ContentType)
     monkeypatch.setattr(
         TextContainer,
         "_get_generic_type_substitutions",
         classmethod(lambda cls: {}),
     )
 
-    assert TextContainer.get_type_of_generic_parameter(ContentType) is first_lookup
+    assert TextContainer.get_type_of_generic_parameter(parameter=ContentType) is first_lookup
 
 
 # %% attributes an interface declares
