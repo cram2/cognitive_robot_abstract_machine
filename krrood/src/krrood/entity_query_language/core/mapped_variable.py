@@ -43,7 +43,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     UnificationDict,
 )
-from krrood.entity_query_language.evaluation_context import values_in_current_context
+from krrood.entity_query_language.evaluation_context import EvaluationContext
 from krrood.entity_query_language.ground_term import (
     AttributeTerm,
     CallTerm,
@@ -606,7 +606,9 @@ class SingleValueMapping(MappedVariable[T], GroundTermExpression[GroundTermType]
     def _apply_mapping_(
         self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
-        return values_in_current_context(self._ground_term_(value))
+        term_value = EvaluationContext.current_value_of(self._ground_term_(value))
+        if term_value is not None:
+            yield term_value.value
 
     def _apply_mapping_on_external_value_(self, value: Any) -> Iterable[T]:
         """
@@ -767,7 +769,11 @@ class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
             yield value[self._key_]
             return
         for key in self._key_._evaluate_(sources):
-            yield from values_in_current_context(self._ground_term_(value, key.value))
+            term_value = EvaluationContext.current_value_of(
+                self._ground_term_(value, key.value)
+            )
+            if term_value is not None:
+                yield term_value.value
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(IndexByExpression, _key_=self._key_)

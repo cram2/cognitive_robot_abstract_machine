@@ -18,7 +18,6 @@ from typing_extensions import (
     Callable,
     Generic,
     Hashable,
-    Iterator,
     Mapping,
     Sequence,
     TypeVar,
@@ -35,6 +34,18 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 
 # %% ground terms
+
+
+@dataclass(frozen=True)
+class TermValue:
+    """
+    The value a ground term has, where it has one.
+    """
+
+    value: Any
+    """
+    The value, which may itself be ``None``.
+    """
 
 
 @dataclass(frozen=True)
@@ -133,12 +144,13 @@ class GroundTerm(ABC):
             :meth:`has_live_value` holds.
         """
 
-    def live_values(self) -> Iterator[Any]:
+    def live_term_value(self) -> TermValue | None:
         """
-        :return: The value this ground term currently has, or nothing when it has none.
+        :return: The value this ground term currently has, or ``None`` when it has none.
         """
-        if self.has_live_value():
-            yield self.live_value()
+        if not self.has_live_value():
+            return None
+        return TermValue(self.live_value())
 
 
 @dataclass(frozen=True, eq=False)
@@ -348,10 +360,10 @@ class TermReader(Interface):
     """
 
     @abstractmethod
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+    def value_of(self, term: GroundTerm) -> TermValue | None:
         """
         :param term: The ground term to read.
-        :return: The value of *term*, or nothing when it has none.
+        :return: The value of *term*, or ``None`` when it has none.
         """
 
 
@@ -361,5 +373,5 @@ class LiveTermReader(TermReader):
     Reads the value a ground term currently has on the live objects.
     """
 
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
-        return term.live_values()
+    def value_of(self, term: GroundTerm) -> TermValue | None:
+        return term.live_term_value()

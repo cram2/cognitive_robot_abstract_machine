@@ -22,7 +22,7 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
 )
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-from krrood.entity_query_language.evaluation_context import values_in_current_context
+from krrood.entity_query_language.evaluation_context import EvaluationContext
 from krrood.entity_query_language.ground_term import CallTerm, GroundTermExpression
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
@@ -263,9 +263,9 @@ class InstantiatedVariable(
                 for name, child in self._child_variables_.items()
                 if child._id_ in child_result.bindings
             }
-            (instance,) = values_in_current_context(
+            instance = EvaluationContext.current_value_of(
                 CallTerm.from_call(self._type_, CallArguments(keyword=arguments))
-            )
+            ).value
 
             bindings = {self._id_: instance} | child_result.bindings
             result = self._build_operation_result_(bindings, child_result)

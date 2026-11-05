@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import Any, Iterator
+from typing_extensions import Any
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.ground_term import (
     FunctionKey,
     GroundTerm,
     TermReader,
+    TermValue,
 )
 from krrood.planning.fact import Fact
 
@@ -82,8 +83,7 @@ class State(TermReader):
             assignments |= Fact.from_condition(fact).assignments()
         return State(assignments=assignments)
 
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+    def value_of(self, term: GroundTerm) -> TermValue | None:
         if term.function_key in self.assigned_functions and term in self.assignments:
-            yield self.assignments[term]
-            return
-        yield from term.live_values()
+            return TermValue(self.assignments[term])
+        return term.live_term_value()
