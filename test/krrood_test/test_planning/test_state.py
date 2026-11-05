@@ -1,4 +1,5 @@
-"""Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
+"""
+Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
 
 A query reads the values the state's facts give ground terms - attributes, indexed elements,
 calls, symbolic functions and predicates - and live values for every other ground term.
@@ -32,6 +33,7 @@ from ..dataset.setting_with_side_effects import (
     AttributeReadThroughProperty,
     AttributeSetThroughProperty,
     AttributesSetThroughSetattr,
+    ElementsInAnImmutableContainer,
     ElementsSetThroughSetitem,
     FrozenAttributes,
     SlottedAttributes,
@@ -52,8 +54,10 @@ from ..dataset.blocks_world import (
 
 @dataclass
 class TwoTowers:
-    """A blocksworld with block ``c`` on block ``a``, blocks ``a`` and ``b`` on
-    the table, and a shelf holding ``a`` and ``b`` in its slots."""
+    """
+    A blocksworld with block ``c`` on block ``a``, blocks ``a`` and ``b`` on the table,
+    and a shelf holding ``a`` and ``b`` in its slots.
+    """
 
     table: Table
     """
@@ -61,7 +65,9 @@ class TwoTowers:
     """
 
     a: Block
-    """The bottom block of the first tower."""
+    """
+    The bottom block of the first tower.
+    """
 
     b: Block
     """
@@ -69,7 +75,9 @@ class TwoTowers:
     """
 
     c: Block
-    """The top block of the first tower."""
+    """
+    The top block of the first tower.
+    """
 
     shelf: Shelf
     """
@@ -282,8 +290,9 @@ def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term
         lambda: literal(SlottedAttributes(1.0)).coordinate,
         lambda: literal(FrozenAttributes(1.0)).coordinate,
         lambda: literal(AttributeReadThroughProperty(1.0)).diameter,
+        lambda: literal(ElementsInAnImmutableContainer((0.0, 1.0))).end_points[0],
     ],
-    ids=["slot", "frozen dataclass", "read-only property"],
+    ids=["slot", "frozen dataclass", "read-only property", "immutable container"],
 )
 def test_assigning_a_ground_term_that_is_only_stored_is_accepted(ground_term):
     expression = ground_term()
@@ -362,8 +371,10 @@ def test_ground_term_reached_through_another_object_is_the_same_ground_term(two_
 
 
 def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
-    """Two blocks that compare equal are still different objects, so assigning
-    a ground term of one never assigns the other."""
+    """
+    Two blocks that compare equal are still different objects, so assigning a ground
+    term of one never assigns the other.
+    """
     first = Block("d", two_towers.table)
     second = Block("d", two_towers.table)
     state = State().with_facts(literal(first).support == two_towers.c)
@@ -374,9 +385,10 @@ def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
 
 
 def test_ground_terms_identify_list_arguments_by_identity(two_towers):
-    """Two lists with the same elements are still different objects, so
-    assigning a ground term called with one never assigns the ground term
-    called with the other."""
+    """
+    Two lists with the same elements are still different objects, so assigning a ground
+    term called with one never assigns the ground term called with the other.
+    """
     first = [two_towers.b]
     second = [two_towers.b]
     state = State().with_facts(tallest_tower(literal(first)) == 7)
@@ -420,8 +432,10 @@ def test_symbolic_function_receives_assigned_attribute_as_argument(two_towers):
 
 
 def test_python_body_reads_live_values_it_does_not_receive_as_arguments(two_towers):
-    """:class:`IsOn` reads ``self.block.support`` in Python, so it sees ``b``
-    on the table although the state puts ``b`` on ``c``."""
+    """
+    :class:`IsOn` reads ``self.block.support`` in Python, so it sees ``b`` on the table
+    although the state puts ``b`` on ``c``.
+    """
     result = (
         (block := a(Block).from_(two_towers.blocks))
         .where(IsOn(block, two_towers.c))
@@ -496,8 +510,10 @@ def test_results_read_the_state_wherever_they_are_consumed(two_towers):
 
 
 def test_state_reaches_only_the_evaluation_it_is_given_to(two_towers):
-    """A query evaluated while an evaluation under a state is part way through
-    reads the live values."""
+    """
+    A query evaluated while an evaluation under a state is part way through reads the
+    live values.
+    """
     supports = (
         a(Block)
         .from_([two_towers.b, two_towers.c])
@@ -516,8 +532,10 @@ def test_state_reaches_only_the_evaluation_it_is_given_to(two_towers):
 
 
 def test_query_started_during_another_evaluation_reads_state(two_towers):
-    """A query started from inside a running evaluation, here by a symbolic
-    function, reads the same state as the evaluation that started it."""
+    """
+    A query started from inside a running evaluation, here by a symbolic function, reads
+    the same state as the evaluation that started it.
+    """
 
     @symbolic_function
     def is_covered(candidate: Block) -> bool:

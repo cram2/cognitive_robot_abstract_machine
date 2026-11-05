@@ -208,7 +208,8 @@ class IndexTerm(GroundTerm):
 
     container: Any
     """
-    The container that stores the element.
+    The object that stores the element, such as a sequence or a mapping: anything that
+    supports reading an element by key, whether or not it supports assigning one.
     """
 
     key: Any
@@ -227,9 +228,14 @@ class IndexTerm(GroundTerm):
     def setting_runs_code(self) -> bool:
         """
         Setting runs code where the container's class defines its own item assignment
-        instead of inheriting a builtin one.
+        instead of inheriting a builtin one, and never where it has no item assignment.
         """
-        return not isinstance(type(self.container).__setitem__, WrapperDescriptorType)
+        item_assignment = inspect.getattr_static(
+            type(self.container), "__setitem__", None
+        )
+        return item_assignment is not None and not isinstance(
+            item_assignment, WrapperDescriptorType
+        )
 
     def has_live_value(self) -> bool:
         """
