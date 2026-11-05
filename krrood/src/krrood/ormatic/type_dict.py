@@ -5,7 +5,7 @@ from typing_extensions import Any, Iterator
 from krrood.inheritance_path_length import inheritance_path_length
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeDict:
     """
     A dictionary that gets the closest key, using the inheritance path length instead of
@@ -17,7 +17,7 @@ class TypeDict:
     The pure data dict.
     """
 
-    def _get_inheritance_path_length_of_keys(self, clazz: type) -> dict[type, int]:
+    def _get_inheritance_path_length_of_keys(self, *, clazz: type) -> dict[type, int]:
         """
         Get the inheritance path length of all keys in the dictionary relative to the
         given class.
@@ -32,7 +32,7 @@ class TypeDict:
         }
 
     def __getitem__(self, key: type) -> Any:
-        distances = self._get_inheritance_path_length_of_keys(key)
+        distances = self._get_inheritance_path_length_of_keys(clazz=key)
         if distances:
             return self._dict[min(distances, key=distances.get)]
         else:
@@ -40,7 +40,7 @@ class TypeDict:
                 f"No matching key found for {key} using inheritance path length"
             )
 
-    def get(self, key: type, default: Any = None) -> Any:
+    def get(self, *, key: type, default: Any = None) -> Any:
         try:
             return self[key]
         except KeyError:
@@ -59,7 +59,7 @@ class TypeDict:
         return self._dict.__len__()
 
     def __contains__(self, key: type) -> bool:
-        return len(self._get_inheritance_path_length_of_keys(key)) > 0
+        return len(self._get_inheritance_path_length_of_keys(clazz=key)) > 0
 
     def keys(self) -> Iterator[type]:
         return self._dict.keys()

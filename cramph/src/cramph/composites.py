@@ -1314,7 +1314,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
         if self._candidates is None:
             self._candidates_pulled = 0
             self.candidate_limit = self.statement._limit_ or default_candidate_limit
-            self._candidates = query_backend.evaluate(self.statement)
+            self._candidates = query_backend.evaluate(expression=self.statement)
         if self.reached_candidate_limit:
             self.stop_grounding()
             return None

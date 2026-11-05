@@ -10,14 +10,14 @@ from random_events.interval import closed
 from random_events.variable import Continuous
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Coin:
     a: float
     b: float
     c: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OtherClass:
     d: float
 

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FragmentRenderer(ABC):
     """
     Abstract base that converts a fragment tree into a string.
@@ -45,7 +45,7 @@ class FragmentRenderer(ABC):
     """
 
     @abstractmethod
-    def render(self, fragment: VerbalizationFragment) -> str:
+    def render(self, *, fragment: VerbalizationFragment) -> str:
         """
         Render a fragment tree into a string.
 
@@ -54,7 +54,7 @@ class FragmentRenderer(ABC):
         """
         ...
 
-    def _render_role(self, text: str, role, source_reference) -> str:
+    def _render_role(self, *, text: str, role, source_reference) -> str:
         """
         Colorise *text* for *role* and, when a resolver and source reference are
         present, wrap the result with a hyperlink.
@@ -68,16 +68,16 @@ class FragmentRenderer(ABC):
         >>> ParagraphRenderer()._render_role("Robot", SemanticRole.VARIABLE, None)
         'Robot'
         """
-        colored = self.formatter.colorize(text, role)
+        colored = self.formatter.colorize(text=text, role=role)
         if source_reference is not None and self.link_resolver is not None:
-            url = self.link_resolver.resolve(source_reference)
+            url = self.link_resolver.resolve(reference=source_reference)
             if url is not None:
                 tooltip = docstring_for_source_ref(source_reference)
-                return self.formatter.wrap_link(colored, url, tooltip=tooltip)
+                return self.formatter.wrap_link(text=colored, url=url, tooltip=tooltip)
         return colored
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParagraphRenderer(FragmentRenderer):
     """
     Flattens the entire fragment tree into a single prose string.
@@ -86,7 +86,7 @@ class ParagraphRenderer(FragmentRenderer):
     adds no visual structure — only content is preserved.
     """
 
-    def render(self, fragment: VerbalizationFragment) -> str:
+    def render(self, *, fragment: VerbalizationFragment) -> str:
         """
         Render *fragment* and all descendants into a flat prose string.
 
@@ -105,28 +105,28 @@ class ParagraphRenderer(FragmentRenderer):
         """
 
         def _block(block: BlockFragment) -> str:
-            rendered = [self.render(item) for item in block.items]
+            rendered = [self.render(fragment=item) for item in block.items]
             if block.conjunction is not None and len(rendered) > 1:
                 # Oxford coordination: "a, b, and c" (the comma before the conjunction is the
                 # ", "-join itself, matching the project's house style, incl. "a, and b").
-                conjunction = self.render(block.conjunction)
+                conjunction = self.render(fragment=block.conjunction)
                 rendered[-1] = f"{conjunction}{self.formatter.space}{rendered[-1]}"
             prose = ", ".join(rendered)
             if block.header is None:
                 return prose
-            header_str = self.render(block.header)
+            header_str = self.render(fragment=block.header)
             return f"{header_str}{self.formatter.space}{prose}" if prose else header_str
 
         return fold_fragment(
             fragment,
             word=lambda text: text,
-            role=lambda text, role, reference: self._render_role(text, role, reference),
+            role=lambda text, role, reference: self._render_role(text=text, role=role, source_reference=reference),
             phrase=lambda parts, separator: separator.join(parts),
             block=_block,
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HierarchicalRenderer(FragmentRenderer):
     """
     Renders block trees as indented bullet lists.
@@ -154,7 +154,7 @@ class HierarchicalRenderer(FragmentRenderer):
     Bullet character prepended to each list item.
     """
 
-    def render(self, fragment: VerbalizationFragment, depth: int = 0) -> str:
+    def render(self, *, fragment: VerbalizationFragment, depth: int = 0) -> str:
         """
         Render *fragment* with indented bullet structure.
 
@@ -179,14 +179,14 @@ class HierarchicalRenderer(FragmentRenderer):
                         else ""
                     )
                     lines.append(
-                        self.formatted_indent * depth + bullet + self._inline(header)
+                        self.formatted_indent * depth + bullet + self._inline(fragment=header)
                     )
                     depth = depth + 1
                 for item in items:
-                    lines.append(self._render_item(item, depth))
+                    lines.append(self._render_item(fragment=item, depth=depth))
                 return self.formatter.newline.join(lines)
             case _:
-                return self.formatted_indent * depth + self._inline(fragment)
+                return self.formatted_indent * depth + self._inline(fragment=fragment)
 
     @property
     def formatted_indent(self) -> str:
@@ -197,7 +197,7 @@ class HierarchicalRenderer(FragmentRenderer):
         """
         return self.indent_size.value.replace(" ", self.formatter.space)
 
-    def _render_item(self, fragment: VerbalizationFragment, depth: int) -> str:
+    def _render_item(self, *, fragment: VerbalizationFragment, depth: int) -> str:
         """Render one item, prepending the bullet at its indentation level.
 
         Its contribution is the per-item dispatch: a *block* item recurses into :meth:`render` (no
@@ -214,16 +214,16 @@ class HierarchicalRenderer(FragmentRenderer):
         """
         match fragment:
             case BlockFragment():
-                return self.render(fragment, depth)
+                return self.render(fragment=fragment, depth=depth)
             case _:
                 prefix = (
                     self.formatted_indent * depth
                     + self.bullet.value
                     + self.formatter.space
                 )
-                return prefix + self._inline(fragment)
+                return prefix + self._inline(fragment=fragment)
 
-    def _inline(self, fragment: VerbalizationFragment) -> str:
+    def _inline(self, *, fragment: VerbalizationFragment) -> str:
         """Render a fragment as a flat inline string. A nested block is flattened to prose (its
         items coordinated as in paragraph rendering) rather than expanded into bullets — bullets are
         for a block that sits at the item level, not one embedded in a phrase (e.g. a *"whose …"*
@@ -242,20 +242,20 @@ class HierarchicalRenderer(FragmentRenderer):
         """
 
         def _flatten(block: BlockFragment) -> str:
-            rendered = [self._inline(item) for item in block.items]
+            rendered = [self._inline(fragment=item) for item in block.items]
             if block.conjunction is not None and len(rendered) > 1:
-                conjunction = self._inline(block.conjunction)
+                conjunction = self._inline(fragment=block.conjunction)
                 rendered[-1] = f"{conjunction}{self.formatter.space}{rendered[-1]}"
             prose = ", ".join(rendered)
             if block.header is None:
                 return prose
-            header_str = self._inline(block.header)
+            header_str = self._inline(fragment=block.header)
             return f"{header_str}{self.formatter.space}{prose}" if prose else header_str
 
         return fold_fragment(
             fragment,
             word=lambda text: text,
-            role=lambda text, role, reference: self._render_role(text, role, reference),
+            role=lambda text, role, reference: self._render_role(text=text, role=role, source_reference=reference),
             phrase=lambda parts, separator: separator.join(parts),
             block=_flatten,
         )

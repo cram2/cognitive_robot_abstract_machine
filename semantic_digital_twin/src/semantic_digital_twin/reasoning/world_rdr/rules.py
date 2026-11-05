@@ -266,13 +266,13 @@ class IsNamedAfter(Predicate):
         return kind is not None and kind.value is self.annotation_type
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after <annotation type>"*.
         """
         return predicate_clause(
-            cls, Noun(fields["body"]), Noun(fields["annotation_type"])
+            cls, Noun(content=fields["body"]), Noun(content=fields["annotation_type"])
         )
 
 
@@ -293,12 +293,12 @@ class NamesARecognisedKind(Predicate):
         return asserted_kind(_name_words(self.body), NamedKind) is not None
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> names a recognised kind"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 @dataclass(eq=False)
@@ -321,12 +321,12 @@ class IsNamedAfterFurniture(Predicate):
         return kind is not None and kind.is_furniture
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after furniture"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 @dataclass(eq=False)
@@ -351,12 +351,14 @@ class NamedContainerKind(SymbolicFunction):
         return None
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the named container kind of <body>"*.
         """
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 # %% what the rules leave alone
@@ -393,12 +395,12 @@ class IsPartOfARobot(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is part of a robot"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 # %% the geometry a body carries
@@ -422,12 +424,12 @@ class HasCollisionGeometry(Predicate):
         return self.body.has_collision()
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has collision geometry"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 # %% identities the world already holds
@@ -467,18 +469,18 @@ class HasAnotherAnnotation(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has an annotation besides <annotation type>"*, which
             names the annotations it was looked up in no more than the rule does.
         """
         return clause(
-            Noun(fields["body"]),
-            Verb("have"),
-            Noun("annotation"),
+            Noun(content=fields["body"]),
+            Verb(lemma="have"),
+            Noun(content="annotation"),
             Prepositions.BESIDES,
-            Noun(fields["annotation_type"]),
+            Noun(content=fields["annotation_type"]),
         )
 
 
@@ -569,13 +571,13 @@ class HoldsOpenableParts(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> holds openable parts"*, which names the annotations
             it looked them up in no more than the rule does.
         """
-        return clause(Noun(fields["body"]), Verb("hold"), Noun.bare("openable parts"))
+        return clause(Noun(content=fields["body"]), Verb(lemma="hold"), Noun.bare(head="openable parts"))
 
 
 # %% graspable parts

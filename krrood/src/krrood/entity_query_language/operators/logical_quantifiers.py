@@ -19,7 +19,7 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class QuantifiedConditional(LogicalBinaryOperator, ABC):
     """
     This is the super class of the universal, and existential conditional operators.
@@ -37,7 +37,7 @@ class QuantifiedConditional(LogicalBinaryOperator, ABC):
         return self.right
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class ForAll(QuantifiedConditional):
     """
     This operator is the universal conditional operator.
@@ -58,19 +58,19 @@ class ForAll(QuantifiedConditional):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
         solution_set = None
 
-        for variable_result in self.variable._evaluate_(sources):
+        for variable_result in self.variable._evaluate_(sources=sources):
             if solution_set is None:
-                solution_set = self.get_all_candidate_solutions(variable_result)
+                solution_set = self.get_all_candidate_solutions(variable_result=variable_result)
             else:
                 solution_set = [
                     solution
                     for solution in solution_set
                     if self.evaluate_condition(
-                        OperationResult({**solution, **variable_result.bindings})
+                        sources=OperationResult(bindings={**solution, **variable_result.bindings})
                     )
                 ]
             if not solution_set:
@@ -79,15 +79,15 @@ class ForAll(QuantifiedConditional):
 
         # Yield the remaining bindings (non-universal) merged with the incoming sources
         yield from [
-            self._build_operation_result_with_truth_(True, sources.bindings | solution)
+            self._build_operation_result_with_truth_(truth=True, bindings=sources.bindings | solution)
             for solution in solution_set
         ]
 
-    def get_all_candidate_solutions(self, variable_result: OperationResult):
+    def get_all_candidate_solutions(self, *, variable_result: OperationResult):
         values_that_satisfy_condition = []
         # Evaluate the condition under this particular universal value
         for condition_result in self._evaluate_child_as_condition_(
-            self.condition, variable_result
+            child=self.condition, sources=variable_result
         ):
             if condition_result.is_false:
                 continue
@@ -99,18 +99,18 @@ class ForAll(QuantifiedConditional):
             values_that_satisfy_condition.append(condition_bindings)
         return values_that_satisfy_condition
 
-    def evaluate_condition(self, sources: OperationResult) -> bool:
+    def evaluate_condition(self, *, sources: OperationResult) -> bool:
         for condition_result in self._evaluate_child_as_condition_(
-            self.condition, sources
+            child=self.condition, sources=sources
         ):
             return condition_result.is_true
         return False
 
     def _invert_(self):
-        return Exists(self.variable, self.condition._invert_())
+        return Exists(left=self.variable, right=self.condition._invert_())
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Exists(QuantifiedConditional):
     """
     An existential checker that checks if a condition holds for any value of the
@@ -121,35 +121,35 @@ class Exists(QuantifiedConditional):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
         for variable_result in self._evaluate_child_as_condition_(
-            self.variable, sources
+            child=self.variable, sources=sources
         ):
             if (
                 variable_result.is_false
                 or self.variable._id_ not in variable_result.bindings
             ):
                 continue
-            variable_result = variable_result.update(sources.bindings)
-            if not self._condition_holds_for_(variable_result):
+            variable_result = variable_result.update(other=sources.bindings)
+            if not self._condition_holds_for_(variable_result=variable_result):
                 continue
             yield self._build_operation_result_with_truth_(
-                True,
-                sources.bindings
+                truth=True,
+                bindings=sources.bindings
                 | {
                     id_: variable_result.bindings[id_]
                     for id_ in self._ids_of_variables_to_add_to_sources_
                     if id_ in variable_result.bindings
                 },
-                variable_result,
+                child_result=variable_result,
             )
             return
 
         # Negation as failure: no variable value satisfied the condition.
-        yield self._build_operation_result_with_truth_(False, sources.bindings)
+        yield self._build_operation_result_with_truth_(truth=False, bindings=sources.bindings)
 
-    def _condition_holds_for_(self, variable_result: OperationResult) -> bool:
+    def _condition_holds_for_(self, *, variable_result: OperationResult) -> bool:
         """
         :param variable_result: A binding for this quantifier's variable.
         :return: Whether the condition is true for any evaluation under *variable_result*.
@@ -157,7 +157,7 @@ class Exists(QuantifiedConditional):
         return any(
             condition_result.is_true
             for condition_result in self._evaluate_child_as_condition_(
-                self.condition, variable_result
+                child=self.condition, sources=variable_result
             )
         )
 

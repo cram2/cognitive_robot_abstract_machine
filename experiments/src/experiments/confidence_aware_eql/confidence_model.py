@@ -161,8 +161,8 @@ class PerClassConfidenceModel:
         grounded = self.circuit.ground(
             _build_grounding_query(self.circuit.class_, instance)
         )
-        dataframe = self.circuit.feature_extractor.create_dataframe([instance])
-        dataframe = self.circuit.feature_extractor.preprocess_dataframe(dataframe)
+        dataframe = self.circuit.feature_extractor.create_dataframe(instances=[instance])
+        dataframe = self.circuit.feature_extractor.preprocess_dataframe(df=dataframe)
         variable_names = [variable.name for variable in grounded.variables]
         event = np.full((1, len(variable_names)), np.nan)
         for index, name in enumerate(variable_names):

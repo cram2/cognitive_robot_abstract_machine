@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Query
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExpressionBuilder(ABC):
     """
     Base class for builder classes of symbolic expressions.
@@ -89,7 +89,7 @@ class ExpressionBuilder(ABC):
         return hash((self.__class__, self.query))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FilterBuilder(ExpressionBuilder, ABC):
     """
     Metadata for Filter subclasses.
@@ -110,14 +110,14 @@ class FilterBuilder(ExpressionBuilder, ABC):
         """
         # If there are no conditions raise error.
         if len(self.conditions) == 0:
-            raise NoConditionsProvided(self.query)
+            raise NoConditionsProvided(query=self.query)
 
         # If there's a constant condition raise error.
         literal_expressions = [
             exp for exp in self.conditions if not isinstance(exp, SymbolicExpression)
         ]
         if literal_expressions:
-            raise LiteralConditionError(self.query, literal_expressions)
+            raise LiteralConditionError(query=self.query, literal_conditions=literal_expressions)
 
     @cached_property
     def aggregators_and_non_aggregators_in_conditions(
@@ -161,7 +161,7 @@ class FilterBuilder(ExpressionBuilder, ABC):
         return chained_logic(AND, *self.conditions)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class WhereBuilder(FilterBuilder):
     """
     Metadata for the `Where` Filter.
@@ -179,13 +179,13 @@ class WhereBuilder(FilterBuilder):
             self.aggregators_and_non_aggregators_in_conditions
         )
         if aggregators:
-            raise AggregatorInWhereConditionsError(aggregators, query=self.query)
+            raise AggregatorInWhereConditionsError(aggregators=aggregators, query=self.query)
 
     def build(self) -> Where:
-        return Where(self.conditions_expression)
+        return Where(_child_=self.conditions_expression)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HavingBuilder(FilterBuilder):
     """
     Metadata for the `Having` Filter.
@@ -206,12 +206,12 @@ class HavingBuilder(FilterBuilder):
             for var in non_aggregators
         ):
             raise NonAggregatorInHavingConditionsError(
-                non_aggregators, query=self.query
+                non_aggregators=non_aggregators, query=self.query
             )
-        return Having(self.grouped_by, self.conditions_expression)
+        return Having(left=self.grouped_by, right=self.conditions_expression)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class GroupedByBuilder(ExpressionBuilder):
     """
     Metadata for the GroupedBy operation.
@@ -250,19 +250,19 @@ class GroupedByBuilder(ExpressionBuilder):
             self.query._aggregators_and_non_aggregators_in_selection_
         )
         if aggregators and not all(
-            self.variable_is_in_or_derived_from_a_grouped_by_variable(v)
+            self.variable_is_in_or_derived_from_a_grouped_by_variable(variable=v)
             for v in non_aggregated_variables
         ):
             raise NonAggregatedSelectedVariablesError(
-                self,
-                non_aggregated_variables,
-                aggregators,
+                grouped_by_builder=self,
+                non_aggregated_variables=non_aggregated_variables,
+                aggregated_variables=aggregators,
                 query=self.query,
             )
 
     @memoize
     def variable_is_in_or_derived_from_a_grouped_by_variable(
-        self, variable: SymbolicExpression
+        self, *, variable: SymbolicExpression
     ) -> bool:
         """
         Check if the variable is in or derived from a grouped by variable.
@@ -274,7 +274,7 @@ class GroupedByBuilder(ExpressionBuilder):
         elif variable._id_ in self.ids_of_aggregated_variables:
             return False
         elif isinstance(variable, MappedVariable) and any(
-            self.variable_is_in_or_derived_from_a_grouped_by_variable(d)
+            self.variable_is_in_or_derived_from_a_grouped_by_variable(variable=d)
             for d in variable._descendants_
         ):
             return True
@@ -371,7 +371,7 @@ class GroupedByBuilder(ExpressionBuilder):
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QuantifierBuilder(ExpressionBuilder):
     """
     Holds the result-quantifier specification (kind ``An``/``The`` and an optional constraint) that
@@ -389,7 +389,7 @@ class QuantifierBuilder(ExpressionBuilder):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class OrderedByBuilder(ExpressionBuilder):
     """
     Holds the ordering specification (variable, direction, key) that the query's ordering pipeline

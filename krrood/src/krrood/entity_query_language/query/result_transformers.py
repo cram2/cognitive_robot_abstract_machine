@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ResultTransformer(ABC):
     """
     A single stage in a query's result pipeline that maps a stream of result rows to
@@ -34,7 +34,7 @@ class ResultTransformer(ABC):
 
     @abstractmethod
     def transform(
-        self, results: Iterator[OperationResult]
+        self, *, results: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
         """
         :param results: The incoming result rows.
@@ -42,7 +42,7 @@ class ResultTransformer(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Ordering(ResultTransformer):
     """
     Sorts a query's results by the value of an ordering variable.
@@ -64,11 +64,11 @@ class Ordering(ResultTransformer):
     """
 
     def transform(
-        self, results: Iterator[OperationResult]
+        self, *, results: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
-        yield from sorted(results, key=self._sort_key_, reverse=self.descending)
+        yield from sorted(results, key=lambda result: self._sort_key_(result=result), reverse=self.descending)
 
-    def _sort_key_(self, result: OperationResult) -> Any:
+    def _sort_key_(self, *, result: OperationResult) -> Any:
         """
         :param result: A result row to order.
         :return: The comparison key for *result*, resolving the ordering variable against the row's
@@ -77,14 +77,14 @@ class Ordering(ResultTransformer):
         variable_id = self.variable._id_
         if variable_id not in result.all_bindings:
             ordering_value = next(
-                self.variable._evaluate_(OperationResult(result.all_bindings))
+                self.variable._evaluate_(sources=OperationResult(bindings=result.all_bindings))
             ).value
         else:
             ordering_value = result.all_bindings[variable_id]
         return self.key(ordering_value) if self.key else ordering_value
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Quantification(ResultTransformer):
     """
     Enforces a query's result-count constraint (``an``/``the`` and custom
@@ -108,7 +108,7 @@ class Quantification(ResultTransformer):
     """
 
     def transform(
-        self, results: Iterator[OperationResult]
+        self, *, results: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
         if self.constraint is None:
             yield from results
@@ -117,7 +117,7 @@ class Quantification(ResultTransformer):
         for result in results:
             number_of_results += 1
             self.constraint.assert_satisfaction(
-                number_of_results, self.owner, done=False
+                number_of_solutions=number_of_results, quantified_expression=self.owner, done=False
             )
             yield result
-        self.constraint.assert_satisfaction(number_of_results, self.owner, done=True)
+        self.constraint.assert_satisfaction(number_of_solutions=number_of_results, quantified_expression=self.owner, done=True)

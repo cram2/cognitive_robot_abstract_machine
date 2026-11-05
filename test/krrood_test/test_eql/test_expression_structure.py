@@ -23,7 +23,7 @@ from krrood.entity_query_language.query.query import Entity
 from ..dataset.semantic_world_like_classes import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Appointment:
     """
     A domain class with both a date-only and a datetime field for temporality tests.
@@ -104,7 +104,7 @@ def test_entity_aggregated_selections_falls_back_to_generic_for_plain_selection(
     body = variable(Body, [])
     selection = sum(body.size)
     entity_query = Entity(_selected_variables_=(selection,))
-    assert entity_query.aggregated_selections(set()) == [selection]
+    assert entity_query.aggregated_selections(group_key_root_ids=set()) == [selection]
 
 
 def test_is_temporal_recognizes_datetime_value_and_attribute():

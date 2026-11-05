@@ -21,7 +21,7 @@ ignored_classes |= set(
 
 # Create an ORMatic object with the classes to be mapped
 ormatic = ORMatic.from_package(
-    [experiments], [coraplex.orm.ormatic_interface], ignored_classes, type_mappings={}
+    packages=[experiments], ormatic_interface_dependencies=[coraplex.orm.ormatic_interface], ignored_classes=ignored_classes, type_mappings={}
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 
@@ -36,4 +36,4 @@ ormatic_interface_path = (
     / "ormatic_interface.py"
 )
 with open(ormatic_interface_path, "w") as f:
-    ormatic.to_sqlalchemy_file(f)
+    ormatic.to_sqlalchemy_file(file=f)

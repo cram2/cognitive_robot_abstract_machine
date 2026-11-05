@@ -19,7 +19,7 @@ from krrood.entity_query_language.verbalization.fragments.roles import SemanticR
 # fragment tree, to avoid a cycle) and re-exported here for the ``for_number`` selectors and importers.
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PlainWord:
     """
     A neutral word/phrase with no semantic role.
@@ -39,7 +39,7 @@ class PlainWord:
         return WordFragment(text=self.text)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PunctuationWord(PlainWord):
     """
     A punctuation token carrying an orthographic spacing feature, so the orthography
@@ -60,7 +60,7 @@ class PunctuationWord(PlainWord):
         return WordFragment(text=self.text, spacing=self.spacing)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RoleWord:
     """
     A word/phrase carrying a fixed semantic role.
@@ -103,7 +103,7 @@ class LogicalWord(RoleWord):
     _role_ = SemanticRole.LOGICAL
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AggregationWord(RoleWord):
     """
     Aggregation phrase with the ``AGGREGATION`` role.
@@ -137,7 +137,7 @@ class PronounWord(RoleWord):
     _role_ = SemanticRole.VARIABLE
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class OperatorPhrase:
     """
     All eight text variants for one comparison operator, co-located.

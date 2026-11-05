@@ -48,7 +48,7 @@ def general_rdr_classify(
     while True:
         new_conclusions = {}
         for attribute_name, rdr in classifiers_dict.items():
-            pred_atts = rdr.classify(case_cp, case_query=case_query)
+            pred_atts = rdr.classify(case=case_cp, case_query=case_query)
             if pred_atts is None and type(None) not in rdr.conclusion_type:
                 continue
             if rdr.mutually_exclusive:
@@ -69,7 +69,7 @@ def general_rdr_classify(
                     conclusions[attribute_name].update(pred_atts)
             if attribute_name in new_conclusions:
                 temp_case_query = CaseQuery(
-                    case_cp, attribute_name, rdr.conclusion_type, rdr.mutually_exclusive
+                    original_case=case_cp, attribute_name=attribute_name, _attribute_types=rdr.conclusion_type, mutually_exclusive=rdr.mutually_exclusive
                 )
                 update_case_in_case_query(temp_case_query, new_conclusions)
         if (
@@ -168,7 +168,7 @@ def update_case_with_conclusion_output(
     if len(new_conclusions) == 0:
         return new_conclusions
     temp_case_query = CaseQuery(
-        case, attribute_name, conclusion_type, mutually_exclusive=mutually_exclusive
+        original_case=case, attribute_name=attribute_name, _attribute_types=conclusion_type, mutually_exclusive=mutually_exclusive
     )
     if not isinstance(output, Dict):
         output = {attribute_name: output}
@@ -193,7 +193,7 @@ def get_an_updated_case_copy(
     """
     case_cp = copy_case(case)
     temp_case_query = CaseQuery(
-        case_cp, attribute_name, conclusion_type, mutually_exclusive=mutually_exclusive
+        original_case=case_cp, attribute_name=attribute_name, _attribute_types=conclusion_type, mutually_exclusive=mutually_exclusive
     )
     output = conclusion(case_cp)
     if not isinstance(output, Dict):
@@ -294,10 +294,10 @@ def create_case_query_from_method(
     output_name = list(func_output.keys())[0]
     func_args_type_hints.update({output_name: Union[tuple(output_type)]})
     return CaseQuery(
-        case,
-        output_name,
-        tuple(output_type),
-        mutual_exclusive,
+        original_case=case,
+        attribute_name=output_name,
+        _attribute_types=tuple(output_type),
+        mutually_exclusive=mutual_exclusive,
         scope=scope,
         is_function=True,
         function_args_type_hints=func_args_type_hints,

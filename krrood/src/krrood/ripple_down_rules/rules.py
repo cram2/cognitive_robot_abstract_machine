@@ -20,7 +20,7 @@ from krrood.ripple_down_rules.datastructures.enums import RDREdge, Stop
 from krrood.ripple_down_rules.helpers import get_an_updated_case_copy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Rule(ABC):
     conditions: CallableExpression | None = field(default=None)
     """
@@ -134,7 +134,7 @@ class Rule(ABC):
         if self.node:
             self.node.weight = new_weight.value
 
-    def get_an_updated_case_copy(self, case: Case) -> Case:
+    def get_an_updated_case_copy(self, *, case: Case) -> Case:
         """
         :param case: The case to copy and update.
         :return: A copy of the case updated with this rule conclusion.
@@ -169,7 +169,7 @@ class Rule(ABC):
             return "white"
 
     @classmethod
-    def from_case_query(cls, case_query: CaseQuery, parent: Rule | None = None) -> Rule:
+    def from_case_query(cls, *, case_query: CaseQuery, parent: Rule | None = None) -> Rule:
         """
         Create a SingleClassRule from a CaseQuery.
 
@@ -185,7 +185,7 @@ class Rule(ABC):
             conclusion_name=case_query.attribute_name,
         )
 
-    def _post_detach(self, parent):
+    def _post_detach(self, *, parent):
         """
         Called after this node is detached from the tree, useful when drawing the tree.
 
@@ -194,9 +194,9 @@ class Rule(ABC):
         self.weight = None
 
     def __call__(self, x: Case) -> Self:
-        return self.evaluate(x)
+        return self.evaluate(x=x)
 
-    def evaluate(self, x: Case) -> Rule:
+    def evaluate(self, *, x: Case) -> Rule:
         """
         Check if the rule or its refinement or its alternative match the case,
         by checking if the conditions are met, then return the rule that matches the case.
@@ -208,17 +208,17 @@ class Rule(ABC):
         if not self.conditions:
             raise ValueError("Rule has no conditions")
         self.fired = self.conditions(x)
-        return self.evaluate_next_rule(x)
+        return self.evaluate_next_rule(x=x)
 
     @abstractmethod
-    def evaluate_next_rule(self, x: Case):
+    def evaluate_next_rule(self, *, x: Case):
         """
         Evaluate the next rule after this rule is evaluated.
         """
         pass
 
     def write_conclusion_as_source_code(
-        self, parent_indent: str = "", defs_file: str | None = None
+        self, *, parent_indent: str = "", defs_file: str | None = None
     ) -> str:
         """
         Get the source code representation of the conclusion of the rule.
@@ -232,7 +232,7 @@ class Rule(ABC):
         else:
             conclusion = self.conclusion.conclusion
         conclusion_func, conclusion_func_call = self.get_conclusion_as_source_code(
-            conclusion, parent_indent=parent_indent
+            conclusion=conclusion, parent_indent=parent_indent
         )
         if conclusion_func is not None:
             with open(defs_file, "a") as f:
@@ -248,7 +248,7 @@ class Rule(ABC):
         return f"conditions_{self.uid}"
 
     def get_conclusion_as_source_code(
-        self, conclusion: Any, parent_indent: str = ""
+        self, *, conclusion: Any, parent_indent: str = ""
     ) -> tuple[str | None, str]:
         """
         Convert the conclusion of a rule to source code.
@@ -303,7 +303,7 @@ class Rule(ABC):
             )
 
     def write_condition_as_source_code(
-        self, parent_indent: str = "", defs_file: str | None = None
+        self, *, parent_indent: str = "", defs_file: str | None = None
     ) -> str:
         """
         Get the source code representation of the conditions of the rule.
@@ -361,7 +361,7 @@ class Rule(ABC):
         Get the name of the conditions of the rule, which is the user input of the conditions.
         """
         if isinstance(self.conditions, CallableExpression):
-            return self.expression_name(self.conditions)
+            return self.expression_name(expression=self.conditions)
         return None
 
     @property
@@ -370,11 +370,11 @@ class Rule(ABC):
         Get the name of the conclusion of the rule, which is the user input of the conclusion.
         """
         if isinstance(self.conclusion, CallableExpression):
-            return self.expression_name(self.conclusion)
+            return self.expression_name(expression=self.conclusion)
         return None
 
     @staticmethod
-    def expression_name(expression: CallableExpression) -> str:
+    def expression_name(*, expression: CallableExpression) -> str:
         """
         Get the name of the expression, which is the user input of the expression if it exists,
         otherwise it is the conclusion or conditions of the rule.
@@ -417,7 +417,7 @@ class Rule(ABC):
         return hash(self.uid)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasAlternativeRule:
     """
     A mixin class for rules that have an alternative rule.
@@ -459,7 +459,7 @@ class HasAlternativeRule:
         self.furthest_alternative = [new_rule]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasRefinementRule:
     _refinement: HasAlternativeRule | None = field(init=False, default=None)
     """
@@ -490,7 +490,7 @@ class HasRefinementRule:
             self._refinement = new_rule
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SingleClassRule(Rule, HasAlternativeRule, HasRefinementRule):
     """
     A rule in the SingleClassRDR classifier, it can have a refinement or an alternative rule or both.
@@ -498,17 +498,17 @@ class SingleClassRule(Rule, HasAlternativeRule, HasRefinementRule):
 
     mutually_exclusive: bool = field(init=False, default=True)
 
-    def evaluate_next_rule(self, x: Case) -> SingleClassRule:
+    def evaluate_next_rule(self, *, x: Case) -> SingleClassRule:
         if self.fired:
             returned_rule = self.refinement(x) if self.refinement else self
         else:
             returned_rule = self.alternative(x) if self.alternative else self
         return returned_rule if returned_rule.fired else self
 
-    def fit_rule(self, case_query: CaseQuery):
+    def fit_rule(self, *, case_query: CaseQuery):
         new_rule = SingleClassRule(
-            case_query.conditions,
-            case_query.target,
+            conditions=case_query.conditions,
+            conclusion=case_query.target,
             corner_case=case_query.case,
             _parent=self,
         )
@@ -521,7 +521,7 @@ class SingleClassRule(Rule, HasAlternativeRule, HasRefinementRule):
         return "elif" if self.weight == RDREdge.Alternative else "if"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class MultiClassRefinementRule(Rule, HasAlternativeRule, ABC):
     """
     A rule in the MultiClassRDR classifier, it can have an alternative rule and a top rule.
@@ -537,7 +537,7 @@ class MultiClassRefinementRule(Rule, HasAlternativeRule, ABC):
         return "elif" if self.weight == RDREdge.Alternative else "if"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class MultiClassStopRule(MultiClassRefinementRule):
     """
     A rule in the MultiClassRDR classifier, it can have an alternative rule and a top rule,
@@ -554,7 +554,7 @@ class MultiClassStopRule(MultiClassRefinementRule):
     """
 
     def evaluate_next_rule(
-        self, x: Case
+        self, *, x: Case
     ) -> MultiClassRefinementRule | MultiClassTopRule | None:
         if self.fired:
             self.top_rule.fired = False
@@ -565,12 +565,12 @@ class MultiClassStopRule(MultiClassRefinementRule):
             return self.top_rule.alternative
 
     def get_conclusion_as_source_code(
-        self, conclusion: Any, parent_indent: str = ""
+        self, *, conclusion: Any, parent_indent: str = ""
     ) -> tuple[None, str]:
         return None, f"{parent_indent}{' ' * 4}pass\n"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
     """
     A rule in the MultiClassRDR classifier, it can have an alternative rule and a top rule,
@@ -580,13 +580,13 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
     weight: RDREdge = field(init=False, default_factory=lambda: RDREdge.Filter)
 
     def evaluate_next_rule(
-        self, x: Case
+        self, *, x: Case
     ) -> MultiClassRefinementRule | MultiClassTopRule | None:
         if self.fired:
             if self.refinement:
                 case_cp = x
                 if isinstance(self.refinement, MultiClassFilterRule):
-                    case_cp = self.get_an_updated_case_copy(case_cp)
+                    case_cp = self.get_an_updated_case_copy(case=case_cp)
                 return self.refinement(case_cp)
             else:
                 return self.top_rule.alternative
@@ -596,10 +596,10 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
             return self.top_rule.alternative
 
     def get_conclusion_as_source_code(
-        self, conclusion: Any, parent_indent: str = ""
+        self, *, conclusion: Any, parent_indent: str = ""
     ) -> tuple[None, str]:
         func, func_call = super().get_conclusion_as_source_code(
-            str(conclusion), parent_indent=parent_indent
+            conclusion=str(conclusion), parent_indent=parent_indent
         )
         conclusion_str = func_call.replace("return ", "").strip()
         conclusion_str = conclusion_str.replace("(case)", "(case_cp)")
@@ -615,7 +615,7 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
         return func, statement
 
     def get_parent_to_filter(
-        self, parent: None | MultiClassRefinementRule | MultiClassTopRule = None
+        self, *, parent: None | MultiClassRefinementRule | MultiClassTopRule = None
     ) -> MultiClassFilterRule | MultiClassTopRule:
         parent = self.parent if parent is None else parent
         if (
@@ -627,7 +627,7 @@ class MultiClassFilterRule(MultiClassRefinementRule, HasRefinementRule):
             return parent.parent
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
     """
     A rule in the MultiClassRDR classifier, it can have a refinement and a next rule.
@@ -637,12 +637,12 @@ class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
     weight: RDREdge = field(init=False, default_factory=lambda: RDREdge.Next)
 
     def evaluate_next_rule(
-        self, x: Case
+        self, *, x: Case
     ) -> MultiClassStopRule | MultiClassTopRule | None:
         if self.fired and self.refinement:
             case_cp = x
             if isinstance(self.refinement, MultiClassFilterRule):
-                case_cp = self.get_an_updated_case_copy(case_cp)
+                case_cp = self.get_an_updated_case_copy(case=case_cp)
             return self.refinement(case_cp)
         elif self.alternative:  # Here alternative refers to next rule in MultiClassRDR
             return self.alternative
@@ -650,30 +650,30 @@ class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
 
     def fit_rule(
         self,
-        case_query: CaseQuery,
+        *, case_query: CaseQuery,
         refinement_type: type[MultiClassRefinementRule] | None = None,
     ):
         if self.fired and case_query.target != self.conclusion:
             if refinement_type in [None, MultiClassStopRule]:
                 new_rule = MultiClassStopRule(
-                    case_query.conditions, corner_case=case_query.case, _parent=self
+                    conditions=case_query.conditions, corner_case=case_query.case, _parent=self
                 )
             elif refinement_type is MultiClassFilterRule:
-                new_rule = MultiClassFilterRule.from_case_query(case_query, parent=self)
+                new_rule = MultiClassFilterRule.from_case_query(case_query=case_query, parent=self)
             else:
                 raise ValueError(f"Unknown refinement type {refinement_type}")
             new_rule.top_rule = self
             self.refinement = new_rule
         elif not self.fired:
             self.alternative = MultiClassTopRule.from_case_query(
-                case_query, parent=self
+                case_query=case_query, parent=self
             )
 
     def get_conclusion_as_source_code(
-        self, conclusion: Any, parent_indent: str = ""
+        self, *, conclusion: Any, parent_indent: str = ""
     ) -> tuple[str, str]:
         func, func_call = super().get_conclusion_as_source_code(
-            str(conclusion), parent_indent=parent_indent
+            conclusion=str(conclusion), parent_indent=parent_indent
         )
         conclusion_str = func_call.replace("return ", "").strip()
         indent = parent_indent + " " * 4

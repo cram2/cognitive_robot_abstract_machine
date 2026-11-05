@@ -56,7 +56,7 @@ def describe_by_repr(payload: Any) -> list[str]:
     return [repr(payload)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphLayoutOptions:
     """
     Additional options that each visualization library needs to realise a specific layout.
@@ -67,14 +67,14 @@ class GraphLayoutOptions:
     Additional options for each layout that are needed by the specific graph library.
     """
 
-    def get_options(self, layout: GraphLayout) -> dict[str, Any]:
+    def get_options(self, *, layout: GraphLayout) -> dict[str, Any]:
         return self.layout_options.get(layout, {})
 
-    def add_new_options(self, layout: GraphLayout, options: dict[str, Any]) -> None:
+    def add_new_options(self, *, layout: GraphLayout, options: dict[str, Any]) -> None:
         self.layout_options[layout] = options
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphVisualizerBase(ABC):
     """Common interface and node access for the live rustworkx graph visualizers.
 
@@ -127,14 +127,14 @@ class GraphVisualizerBase(ABC):
     open_browser: bool = True
     """Whether to open the application in a web browser when started."""
 
-    def node_label(self, node_index: int) -> str:
+    def node_label(self, *, node_index: int) -> str:
         """
         :param node_index: The rustworkx index of the node.
         :return: The label drawn on the node.
         """
         return self.label_getter(self.graph[node_index])
 
-    def node_color(self, node_index: int) -> str:
+    def node_color(self, *, node_index: int) -> str:
         """
         :param node_index: The rustworkx index of the node.
         :return: The color of the node.
@@ -143,7 +143,7 @@ class GraphVisualizerBase(ABC):
             return self.default_node_color
         return self.color_getter(self.graph[node_index])
 
-    def node_border_color(self, node_index: int) -> str | None:
+    def node_border_color(self, *, node_index: int) -> str | None:
         """
         :param node_index: The rustworkx index of the node.
         :return: The border color of the node, or ``None`` to derive one automatically from its fill color.
@@ -152,7 +152,7 @@ class GraphVisualizerBase(ABC):
             return None
         return self.border_color_getter(self.graph[node_index])
 
-    def node_position(self, node_index: int) -> NodePosition | None:
+    def node_position(self, *, node_index: int) -> NodePosition | None:
         """
         :param node_index: The rustworkx index of the node.
         :return: The node's explicit position, or ``None`` if no :attr:`position_getter` is set.
@@ -161,7 +161,7 @@ class GraphVisualizerBase(ABC):
             return None
         return self.position_getter(self.graph[node_index])
 
-    def node_details(self, node_index: int) -> list[str]:
+    def node_details(self, *, node_index: int) -> list[str]:
         """
         :param node_index: The rustworkx index of the clicked node.
         :return: The detail lines describing the node's payload.

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransitiveProperty:
     """
     A mixin for descriptors that are transitive.
@@ -19,7 +19,7 @@ class TransitiveProperty:
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasInverseProperty(ABC):
     """
     A mixin for descriptors that have an inverse property.

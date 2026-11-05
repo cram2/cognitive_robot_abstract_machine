@@ -11,7 +11,7 @@ from krrood.entity_query_language.predicate import Symbol
 from krrood.patterns.role import Role, factory_method
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HasName:
     name: str
     default_name: str = field(default="", kw_only=True)
@@ -23,25 +23,25 @@ class HasName:
         return self.name == other.name
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RecognizedGroup(HasName, Symbol):
     members: Set[PersonInRoleAndOntology] = field(default_factory=set)
     sub_organization_of: List[RecognizedGroup] = field(default_factory=list)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Company(RecognizedGroup): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Country(RecognizedGroup): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Course(HasName, Symbol): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersonInRoleAndOntology(HasName, Symbol):
     works_for: RecognizedGroup = None
     member_of: List[RecognizedGroup] = field(default_factory=list)
@@ -55,7 +55,7 @@ class PersonInRoleAndOntology(HasName, Symbol):
         return self.member_of
 
     @classmethod
-    def from_name(cls, name: str) -> Self:
+    def from_name(cls, *, name: str) -> Self:
         """
         A factory classmethod detected via its ``-> Self`` return annotation.
         """
@@ -78,7 +78,7 @@ class PersonInRoleAndOntology(HasName, Symbol):
         return cls.__name__
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SubclassOfARoleTaker(PersonInRoleAndOntology):
     introduced_attribute: str = field(default="", kw_only=True)
 
@@ -88,16 +88,16 @@ TPersonInRoleAndOntology = TypeVar(
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CEOAsFirstRole(Role[TPersonInRoleAndOntology], Symbol):
     head_of: RecognizedGroup = None
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CEOThatOverridesFactory(Role[TPersonInRoleAndOntology], Symbol):
 
     @classmethod
-    def from_name(cls, name: str) -> Self:
+    def from_name(cls, *, name: str) -> Self:
         """
         Overrides the taker factory so the role is preserved instead of being dropped.
         """
@@ -107,16 +107,16 @@ class CEOThatOverridesFactory(Role[TPersonInRoleAndOntology], Symbol):
 TSubclassOfARoleTaker = TypeVar("TSubclassOfARoleTaker", bound=SubclassOfARoleTaker)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SubclassOfRoleThatUpdatesRoleTakerType(CEOAsFirstRole[TSubclassOfARoleTaker]): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ProfessorAsFirstRole(Role[TPersonInRoleAndOntology], Symbol):
     teacher_of: List[Course] = field(default_factory=list, kw_only=True)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AssociateProfessorAsSubClassOfARoleInSameModule(
     ProfessorAsFirstRole[TPersonInRoleAndOntology]
 ): ...
@@ -125,7 +125,7 @@ class AssociateProfessorAsSubClassOfARoleInSameModule(
 TCEOAsFirstRole = TypeVar("TCEOAsFirstRole", bound=CEOAsFirstRole)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RepresentativeAsSecondRole(Role[TCEOAsFirstRole], Symbol):
     representative_of: RecognizedGroup = field(default=None, kw_only=True)
 
@@ -135,12 +135,12 @@ TRepresentativeAsSecondRole = TypeVar(
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class DelegateAsThirdRole(Role[TRepresentativeAsSecondRole], Symbol):
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RoleForTakerInAnotherModule(Role[RoleTakerInAnotherModule]):
     introduced_attribute: str = field(default="", kw_only=True)
     same_module_annotated_introduced_attribute: DelegateAsThirdRole = field(

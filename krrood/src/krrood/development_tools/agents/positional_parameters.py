@@ -49,6 +49,35 @@ class ImplicitArgumentDecorator(StrEnum):
     """
 
 
+@dataclass(frozen=True)
+class NameDispatch:
+    """
+    An installed base class that calls the methods of its subclasses whose names start
+    with a prefix, passing their arguments positionally.
+    """
+
+    base: type
+    """
+    The base class.
+    """
+
+    method_prefix: str
+    """
+    The start of the names of the methods it calls.
+    """
+
+
+class NameDispatchingBase(NameDispatch, Enum):
+    """
+    The installed base classes dispatching to methods by name.
+    """
+
+    NODE_VISITOR = (ast.NodeVisitor, "visit_")
+    """
+    Calls ``visit_<node class name>`` for each syntax tree node it visits.
+    """
+
+
 class PositionallyCalledAccessor(StrEnum):
     """
     The property accessors Python calls with a positional argument.
@@ -280,4 +309,8 @@ class PositionalParametersChecker(CodeRuleChecker):
             return True
         return self.installed_code.defines_inherited_method(
             cls=cls, method_name=method.name
+        ) or any(
+            issubclass(cls, dispatch.base)
+            and method.name.startswith(dispatch.method_prefix)
+            for dispatch in NameDispatchingBase
         )

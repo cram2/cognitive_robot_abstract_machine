@@ -33,10 +33,10 @@ def confidence_model():
 def _concluding_rule_for(cup: Cup) -> SymbolicExpression:
     """A trivial always-true rule whose conclusion binds ``cup`` to a result variable."""
     cup_variable = variable(Cup, domain=[cup])
-    condition = HasType(cup_variable, Cup)
+    condition = HasType(variable=cup_variable, types_=Cup)
     concluded = deduced_variable(Cup)
     with condition:
-        Add(concluded, cup_variable)
+        Add(left=concluded, right=cup_variable)
     return condition
 
 

@@ -10,7 +10,7 @@ from krrood.entity_query_language.verbalization.grammar.framework.planner import
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Microplan:
     """
     A read model over the planners: each node's plan is computed once and cached.
@@ -33,7 +33,7 @@ class Microplan:
 
     def plan_for(
         self,
-        node: TSymbolicExpression,
+        *, node: TSymbolicExpression,
         planner: type[Planner[TSymbolicExpression, TPlan]],
     ) -> TPlan:
         """

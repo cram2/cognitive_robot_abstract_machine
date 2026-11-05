@@ -11,7 +11,7 @@ from krrood.entity_query_language.factories import a, and_, not_
 from krrood.entity_query_language.operators.core_logical_operators import AND
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pick:
     arm: float
     status: str
@@ -22,50 +22,50 @@ class Pick:
 
 def test_causes_effect_accepts_a_literal_comparator():
     pick = a(Pick)(arm=..., status="idle")
-    CausesEffect(pick.status == "SUCCESS")  # does not raise
+    CausesEffect(_child_=pick.status == "SUCCESS")  # does not raise
 
 
 def test_causes_effect_accepts_a_conjunction_of_literal_comparators():
     pick = a(Pick)(arm=..., status="idle")
-    CausesEffect(and_(pick.status == "SUCCESS", pick.arm == 0.3))  # does not raise
+    CausesEffect(_child_=and_(pick.status == "SUCCESS", pick.arm == 0.3))  # does not raise
 
 
 def test_causes_effect_rejects_a_comparison_between_two_attributes():
     first_pick = a(Pick)(arm=..., status="idle")
     second_pick = a(Pick)(arm=..., status="idle")
     with pytest.raises(CausesEffectRequiresEqualityComparator):
-        CausesEffect(first_pick.arm == second_pick.arm)
+        CausesEffect(_child_=first_pick.arm == second_pick.arm)
 
 
 def test_causes_effect_rejects_an_inequality_comparator():
     pick = a(Pick)(arm=..., status="idle")
     with pytest.raises(CausesEffectRequiresEqualityComparator):
-        CausesEffect(pick.arm > 0.3)
+        CausesEffect(_child_=pick.arm > 0.3)
 
 
 def test_causes_effect_rejects_an_ellipsis_valued_comparator():
     pick = a(Pick)(arm=..., status="idle")
     with pytest.raises(CausesEffectRequiresEqualityComparator):
-        CausesEffect(pick.status == ...)
+        CausesEffect(_child_=pick.status == ...)
 
 
 def test_causes_effect_rejects_a_set_valued_comparator():
     pick = a(Pick)(arm=..., status="idle")
     with pytest.raises(CausesEffectRequiresEqualityComparator):
-        CausesEffect(pick.status == {"SUCCESS", "FAILURE"})
+        CausesEffect(_child_=pick.status == {"SUCCESS", "FAILURE"})
 
 
 # %% transparent evaluation
 
 
 def test_causes_effect_selects_the_same_instances_as_a_plain_where():
-    matching = Pick(0.3, "SUCCESS")
-    non_matching = Pick(0.7, "FAILURE")
+    matching = Pick(arm=0.3, status="SUCCESS")
+    non_matching = Pick(arm=0.7, status="FAILURE")
 
-    plain = a(Pick).from_([matching, non_matching])
+    plain = a(Pick).from_(domain=[matching, non_matching])
     plain.where(plain.status == "SUCCESS")
 
-    wrapped = a(Pick).from_([matching, non_matching])
+    wrapped = a(Pick).from_(domain=[matching, non_matching])
     wrapped.causes_effect(wrapped.status == "SUCCESS")
 
     backend = EntityQueryLanguageBackend()
@@ -75,11 +75,11 @@ def test_causes_effect_selects_the_same_instances_as_a_plain_where():
 
 
 def test_causes_effect_negation_still_selects_the_complement():
-    matching = Pick(0.3, "SUCCESS")
-    non_matching = Pick(0.7, "FAILURE")
+    matching = Pick(arm=0.3, status="SUCCESS")
+    non_matching = Pick(arm=0.7, status="FAILURE")
 
-    wrapped = a(Pick).from_([matching, non_matching])
-    wrapped.where(not_(CausesEffect(wrapped.status == "SUCCESS")))
+    wrapped = a(Pick).from_(domain=[matching, non_matching])
+    wrapped.where(not_(CausesEffect(_child_=wrapped.status == "SUCCESS")))
 
     backend = EntityQueryLanguageBackend()
     assert list(wrapped.evaluate(backend=backend)) == [non_matching]

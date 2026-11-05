@@ -48,7 +48,7 @@ class ResolutionMode(StrEnum):
     """Auto-resolved condition is shown to the expert as a pre-seeded suggestion."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ResolvedCondition:
     """An automatically derived condition expression and its provenance."""
 
@@ -69,7 +69,7 @@ class ConditionResolver(ABC):
     @abstractmethod
     def resolve(
             self,
-            case: Any,
+            *, case: Any,
             case_variable: Variable,
             target_conclusion: Any,
             current_conclusion: Any,
@@ -103,7 +103,7 @@ class TargetSufficientConditionsBasedResolver(ConditionResolver):
 
     def resolve(
             self,
-            case: Any,
+            *, case: Any,
             case_variable: Variable,
             target_conclusion: Any,
             current_conclusion: Any,
@@ -114,10 +114,10 @@ class TargetSufficientConditionsBasedResolver(ConditionResolver):
     ) -> ResolvedCondition | None:
         for sufficient_condition_set in target_knowledge.sufficient_condition_sets:
             for guard in sufficient_condition_set.conditions:
-                if guard.holds_for(case_variable, case) and not guard.holds_for(
-                        case_variable, corner_case
+                if guard.holds_for(shared_variable=case_variable, case=case) and not guard.holds_for(
+                        shared_variable=case_variable, case=corner_case
                 ):
-                    return ResolvedCondition(guard.as_expression, type(self))
+                    return ResolvedCondition(expression=guard.as_expression, resolver_type=type(self))
         return None
 
 
@@ -136,7 +136,7 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 
     def _active_path(
             self,
-            firing_anchor: SymbolicExpression | None,
+            *, firing_anchor: SymbolicExpression | None,
             current_knowledge: ConclusionSufficientConditionSets,
     ) -> SufficientConditionSet | None:
         """:return: The sufficient condition set in which ``firing_anchor`` appears as a
@@ -160,7 +160,7 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 
     def resolve(
             self,
-            case: Any,
+            *, case: Any,
             case_variable: Variable,
             target_conclusion: Any,
             current_conclusion: Any,
@@ -175,19 +175,19 @@ class CornerCaseKnowledgeResolver(ConditionResolver):
 
         :return: A :class:`ResolvedCondition`, or ``None`` if no discriminating guard is found.
         """
-        active = self._active_path(firing_anchor, current_knowledge)
+        active = self._active_path(firing_anchor=firing_anchor, current_knowledge=current_knowledge)
         for sufficient_condition_set in current_knowledge.sufficient_condition_sets:
             if sufficient_condition_set is active:
                 continue
             for guard in sufficient_condition_set.conditions:
-                if guard.holds_for(case_variable, case) and not guard.holds_for(
-                        case_variable, corner_case
+                if guard.holds_for(shared_variable=case_variable, case=case) and not guard.holds_for(
+                        shared_variable=case_variable, case=corner_case
                 ):
-                    return ResolvedCondition(guard.as_expression, type(self))
+                    return ResolvedCondition(expression=guard.as_expression, resolver_type=type(self))
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChainConditionResolver(ConditionResolver):
     """A Chain-of-Responsibility that tries each resolver in order, returning the first match."""
 
@@ -196,7 +196,7 @@ class ChainConditionResolver(ConditionResolver):
 
     def resolve(
             self,
-            case: Any,
+            *, case: Any,
             case_variable: Variable,
             target_conclusion: Any,
             current_conclusion: Any,
@@ -212,14 +212,14 @@ class ChainConditionResolver(ConditionResolver):
         """
         for resolver in self.resolvers:
             result = resolver.resolve(
-                case,
-                case_variable,
-                target_conclusion,
-                current_conclusion,
-                corner_case,
-                target_knowledge,
-                current_knowledge,
-                firing_anchor,
+                case=case,
+                case_variable=case_variable,
+                target_conclusion=target_conclusion,
+                current_conclusion=current_conclusion,
+                corner_case=corner_case,
+                target_knowledge=target_knowledge,
+                current_knowledge=current_knowledge,
+                firing_anchor=firing_anchor,
             )
             if result is not None:
                 return result
@@ -230,4 +230,4 @@ class ChainConditionResolver(ConditionResolver):
         """Return the standard chain: :class:`TargetSufficientConditionsBasedResolver` then
         :class:`CornerCaseKnowledgeResolver`, in priority order.
         """
-        return cls([TargetSufficientConditionsBasedResolver(), CornerCaseKnowledgeResolver()])
+        return cls(resolvers=[TargetSufficientConditionsBasedResolver(), CornerCaseKnowledgeResolver()])

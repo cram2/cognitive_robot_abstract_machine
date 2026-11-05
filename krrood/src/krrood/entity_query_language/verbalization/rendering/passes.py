@@ -26,7 +26,7 @@ class RealizationPass(ABC):
     """
 
     @abstractmethod
-    def process(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
+    def process(self, *, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """
         :param fragment: Root of the (partly realised) fragment tree.
         :return: The tree after this pass (a new tree; passes never mutate in place).
@@ -44,10 +44,10 @@ class RewritePass(RealizationPass, ABC):
     """
 
     @abstractmethod
-    def rewrite(self, leaf: VerbalizationFragment) -> VerbalizationFragment:
+    def rewrite(self, *, leaf: VerbalizationFragment) -> VerbalizationFragment:
         """:param leaf: A leaf fragment. :return: Its replacement (or *leaf* unchanged)."""
 
-    def process(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
+    def process(self, *, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """:return: *fragment* rebuilt bottom-up with :meth:`rewrite` applied to every leaf.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
@@ -59,4 +59,4 @@ class RewritePass(RealizationPass, ABC):
         >>> flatten_fragment_to_plain_text(Shout().process(phrase))
         'IS 42'
         """
-        return map_fragment(fragment, self.rewrite)
+        return map_fragment(fragment, lambda leaf: self.rewrite(leaf=leaf))

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing_extensions import Any
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class SourceReference:
     """
     A reference to the Python source entity — a class, or an attribute of a class — that
@@ -25,7 +25,7 @@ class SourceReference:
     """
 
     @classmethod
-    def for_type(cls, type_: Any) -> SourceReference | None:
+    def for_type(cls, *, type_: Any) -> SourceReference | None:
         """
         :param type_: Candidate type (any value accepted; non-types return ``None``).
         :return: A source reference for the class when *t* is a real ``type``, else ``None``.
@@ -33,7 +33,7 @@ class SourceReference:
         return cls(owner_type=type_) if isinstance(type_, type) else None
 
     @classmethod
-    def for_attribute(cls, owner: Any, attribute_name: str) -> SourceReference | None:
+    def for_attribute(cls, *, owner: Any, attribute_name: str) -> SourceReference | None:
         """
         :param owner: Candidate owner class (any value; non-types return ``None``).
         :param attribute_name: Canonical attribute name on *owner*.

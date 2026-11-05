@@ -72,9 +72,9 @@ def test_positional_construction_preserved():
     The existing positional constructions still build (``text`` first), with the
     inherited ``number`` defaulting to SINGULAR.
     """
-    assert WordFragment("the").text == "the"
-    assert WordFragment("the").number is GrammaticalNumber.SINGULAR
-    role = RoleFragment("Robot", SemanticRole.VARIABLE)
+    assert WordFragment(text="the").text == "the"
+    assert WordFragment(text="the").number is GrammaticalNumber.SINGULAR
+    role = RoleFragment(text="Robot", role=SemanticRole.VARIABLE)
     assert (role.text, role.role, role.number) == (
         "Robot",
         SemanticRole.VARIABLE,
@@ -97,6 +97,6 @@ def test_number_passed_by_keyword():
         is GrammaticalNumber.PLURAL
     )
     assert (
-        NounPhrase(head=WordFragment("x"), number=GrammaticalNumber.PLURAL).number
+        NounPhrase(head=WordFragment(text="x"), number=GrammaticalNumber.PLURAL).number
         is GrammaticalNumber.PLURAL
     )

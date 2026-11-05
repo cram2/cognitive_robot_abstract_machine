@@ -17,11 +17,11 @@ def test_removing_an_instance_keeps_an_equal_one():
     """
     Removing one of two equal instances removes that instance, not the one added first.
     """
-    first, second = Label("a"), Label("a")
+    first, second = Label(text="a"), Label(text="a")
 
-    SymbolGraph().remove_node(SymbolGraph().get_wrapped_instance(second))
+    SymbolGraph().remove_node(wrapped_instance=SymbolGraph().get_wrapped_instance(instance=second))
 
-    remaining = {id(label) for label in SymbolGraph().get_instances_of_type(Label)}
+    remaining = {id(label) for label in SymbolGraph().get_instances_of_type(type_=Label)}
     assert (id(first) in remaining, id(second) in remaining) == (True, False)
 
 
@@ -32,12 +32,12 @@ def test_dead_instances_are_removed_and_live_ones_kept():
     """
     Removing dead instances keeps every instance that is still alive.
     """
-    kept = Label("kept")
+    kept = Label(text="kept")
     for text in ("first dead", "second dead"):
-        Label(text)
+        Label(text=text)
     gc.collect()
 
     SymbolGraph().remove_dead_instances()
 
-    labels = list(SymbolGraph().get_instances_of_type(Label))
+    labels = list(SymbolGraph().get_instances_of_type(type_=Label))
     assert [label for label in labels if label is not None] == [kept]

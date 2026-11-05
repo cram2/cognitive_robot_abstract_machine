@@ -545,7 +545,7 @@ def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_gras
 
     pick_ups = list(
         itertools.islice(
-            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            EntityQueryLanguageGenerativeBackend().evaluate(expression=step),
             2 * GraspsByCloseness.number_of_grasps,
         )
     )
@@ -570,7 +570,7 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
 
     pick_ups = list(
         itertools.islice(
-            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            EntityQueryLanguageGenerativeBackend().evaluate(expression=step),
             2 * NON_DEFAULT_NUMBER_OF_GRASPS,
         )
     )
@@ -592,7 +592,7 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_from_each_standing_pose_close
 
     pick_ups = list(
         itertools.islice(
-            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            EntityQueryLanguageGenerativeBackend().evaluate(expression=step),
             2 * GraspsByCloseness.number_of_grasps,
         )
     )
@@ -616,7 +616,7 @@ def test_a_transport_of_a_graspable_picks_it_up_by_the_closest_grasps(
 
     pick_ups = list(
         itertools.islice(
-            EntityQueryLanguageGenerativeBackend().evaluate(transport.pick_up),
+            EntityQueryLanguageGenerativeBackend().evaluate(expression=transport.pick_up),
             GraspsByCloseness.number_of_grasps,
         )
     )
@@ -641,7 +641,7 @@ def test_a_transport_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
 
     pick_ups = list(
         itertools.islice(
-            EntityQueryLanguageGenerativeBackend().evaluate(transport.pick_up),
+            EntityQueryLanguageGenerativeBackend().evaluate(expression=transport.pick_up),
             NON_DEFAULT_NUMBER_OF_GRASPS,
         )
     )
@@ -821,7 +821,7 @@ def test_an_opening_of_a_handle_is_grounded_by_every_grasp_the_handle_offers(
 
     openings = list(
         EntityQueryLanguageGenerativeBackend().evaluate(
-            OpenAction.from_handle(handle, robot.left_arm)
+            expression=OpenAction.from_handle(handle, robot.left_arm)
         )
     )
 
@@ -855,7 +855,7 @@ def test_an_opening_of_a_handle_first_tries_the_grasp_facing_the_robot(
         standing.x, standing.y, 0.0, reference_frame=world.root
     )
 
-    first_opening = next(iter(EntityQueryLanguageGenerativeBackend().evaluate(opening)))
+    first_opening = next(iter(EntityQueryLanguageGenerativeBackend().evaluate(expression=opening)))
 
     assert _grasp_signature(first_opening.grasp) == _grasp_signature(facing_grasp)
 
@@ -875,7 +875,7 @@ def test_a_move_and_open_tries_the_grasps_from_each_standing_pose_closest_first(
 
     openings = list(
         itertools.islice(
-            EntityQueryLanguageGenerativeBackend().evaluate(step),
+            EntityQueryLanguageGenerativeBackend().evaluate(expression=step),
             2 * GraspsByCloseness.number_of_grasps,
         )
     )

@@ -29,7 +29,7 @@ from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from random_events.variable import compatible_types
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtractedFeatures:
     """
     The result of traversing an object graph for features.
@@ -46,7 +46,7 @@ class ExtractedFeatures:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FeatureExtractor:
     """
     Extracts symbolic features from domain objects, including scalar attributes, unique-
@@ -87,7 +87,7 @@ class FeatureExtractor:
         return set(itertools.chain.from_iterable(self.exchangeable_features.values()))
 
     @classmethod
-    def from_instances(cls, instances: list[Any]) -> FeatureExtractor:
+    def from_instances(cls, *, instances: list[Any]) -> FeatureExtractor:
         """
         Create a new feature extractor from the given instances.
 
@@ -103,11 +103,11 @@ class FeatureExtractor:
 
         first_instance = instances[0]
         root = variable(type(first_instance), [])
-        extracted = cls._extract_features(first_instance, root)
+        extracted = cls._extract_features(example_instance=first_instance, symbolic_root=root)
         return cls(extracted_features=extracted)
 
     @staticmethod
-    def _data_access_object_class_of(instance: Any) -> type[DataAccessObject]:
+    def _data_access_object_class_of(*, instance: Any) -> type[DataAccessObject]:
         """
         :param instance: A domain object.
         :return: The data access object class that describes the attributes of its type.
@@ -115,12 +115,12 @@ class FeatureExtractor:
         """
         data_access_object_class = get_data_access_object_class(type(instance))
         if data_access_object_class is None:
-            raise NoDAOFoundForTypeError(type(instance))
+            raise NoDAOFoundForTypeError(obj=type(instance))
         return data_access_object_class
 
     @staticmethod
     def _extract_features(
-        example_instance: Any, symbolic_root: Variable
+        *, example_instance: Any, symbolic_root: Variable
     ) -> ExtractedFeatures:
         """
         Traverses the object graph breadth-first and collects all features.
@@ -146,38 +146,38 @@ class FeatureExtractor:
             seen[id(current_instance)] = current_instance
 
             data_access_object_class = FeatureExtractor._data_access_object_class_of(
-                current_instance
+                instance=current_instance
             )
             schema = get_dao_schema(data_access_object_class)
 
             result.extend(
                 FeatureExtractor._process_attributes(
-                    current_instance,
-                    current_symbolic,
-                    data_access_object_class,
-                    schema.data_column_names,
+                    instance=current_instance,
+                    symbolic_root=current_symbolic,
+                    data_access_object_class=data_access_object_class,
+                    column_names=schema.data_column_names,
                 )
             )
 
             exchangeable_features.update(
                 FeatureExtractor._process_many_to_many(
-                    current_instance, schema.collection_relationships
+                    current_instance=current_instance, relationships=schema.collection_relationships
                 )
             )
             queue.extend(
                 FeatureExtractor._process_many_to_one(
-                    current_instance,
-                    current_symbolic,
-                    schema.single_relationships,
+                    instance=current_instance,
+                    symbolic_root=current_symbolic,
+                    relationships=schema.single_relationships,
                 )
             )
 
         result.extend(itertools.chain.from_iterable(exchangeable_features.values()))
-        return ExtractedFeatures(result, exchangeable_features)
+        return ExtractedFeatures(features=result, exchangeable_features=exchangeable_features)
 
     @staticmethod
     def _process_attributes(
-        instance: Any,
+        *, instance: Any,
         symbolic_root: Variable,
         data_access_object_class: type[DataAccessObject],
         column_names: tuple[str, ...],
@@ -199,8 +199,8 @@ class FeatureExtractor:
         for name in column_names:
             column = column_by_name[name]
             value = FeatureExtractor._as_feature_value(
-                getattr(instance, column.key),
-                get_python_type_from_sqlalchemy_column(column),
+                value=getattr(instance, column.key),
+                type_=get_python_type_from_sqlalchemy_column(column),
             )
 
             if not isinstance(value, compatible_types):
@@ -208,13 +208,13 @@ class FeatureExtractor:
 
             symbolic_attribute = getattr(symbolic_root, column.name)
             symbolic_attribute._type_ = FeatureExtractor._type_of_column_value(
-                column, value
+                column=column, value=value
             )
             result.append(symbolic_attribute)
         return result
 
     @staticmethod
-    def _as_feature_value(value: Any, type_: type) -> Any:
+    def _as_feature_value(*, value: Any, type_: type) -> Any:
         """
         The value as a feature holds it.
 
@@ -235,7 +235,7 @@ class FeatureExtractor:
         return value
 
     @staticmethod
-    def _type_of_column_value(column: sqlalchemy.Column, value: Any) -> type:
+    def _type_of_column_value(*, column: sqlalchemy.Column, value: Any) -> type:
         """
         The python type of what a column holds.
 
@@ -254,7 +254,7 @@ class FeatureExtractor:
 
     @staticmethod
     def _process_many_to_one(
-        instance: Any,
+        *, instance: Any,
         symbolic_root: Variable,
         relationships: tuple[SingleRelationship, ...],
     ) -> deque[Any]:
@@ -278,7 +278,7 @@ class FeatureExtractor:
 
     @staticmethod
     def _process_many_to_many(
-        current_instance: Any,
+        *, current_instance: Any,
         relationships: tuple[CollectionRelationship, ...],
     ) -> dict[str, list[MappedVariable]]:
         """
@@ -305,7 +305,7 @@ class FeatureExtractor:
 
         return result
 
-    def apply_mapping(self, instance: Any) -> list[Any]:
+    def apply_mapping(self, *, instance: Any) -> list[Any]:
         """
         Extracts the mapped values for each feature from the given instance.
 
@@ -323,29 +323,29 @@ class FeatureExtractor:
         for feature in self.features:
             if feature in aggregation_features:
                 result.append(
-                    feature.apply_mapping_on_external_root(aggregation_instance)
+                    feature.apply_mapping_on_external_root(instance=aggregation_instance)
                 )
             else:
                 result.append(
                     self._as_feature_value(
-                        feature.apply_mapping_on_external_root(instance),
-                        feature._type_,
+                        value=feature.apply_mapping_on_external_root(instance=instance),
+                        type_=feature._type_,
                     )
                 )
         return result
 
-    def create_dataframe(self, instances: list[Any]) -> pd.DataFrame:
+    def create_dataframe(self, *, instances: list[Any]) -> pd.DataFrame:
         """
         Create a dataframe from the given instances.
 
         :param instances: The instances to create the dataframe from.
         :return: A dataframe containing the mapped values for each feature.
         """
-        result = [self.apply_mapping(instance) for instance in instances]
+        result = [self.apply_mapping(instance=instance) for instance in instances]
         features_names = [feature._name_ for feature in self.features]
         return pd.DataFrame(columns=features_names, data=result)
 
-    def preprocess_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+    def preprocess_dataframe(self, *, df: pd.DataFrame) -> pd.DataFrame:
         """
         Check the dataframe's columns are of types a JointProbabilityTree can be fitted
         on.

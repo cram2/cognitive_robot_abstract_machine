@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeResolutionError(TypeError):
     """
     Error raised when a type cannot be resolved, even if searched for manually.
@@ -55,7 +55,7 @@ class TypeResolutionError(TypeError):
         super().__init__(f"Could not resolve type for {self.name}")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedField:
     """
     A class that wraps a field of dataclass and provides some utility functions.
@@ -165,7 +165,7 @@ class WrappedField:
                 names.update(vars(module))
         return names
 
-    def _find_class_by_name(self, class_name: str) -> type:
+    def _find_class_by_name(self, *, class_name: str) -> type:
         """
         Find a class by name in the class diagram or sys.modules.
         """
@@ -270,7 +270,7 @@ class WrappedField:
                     return self.resolved_type
                 else:
                     raise MissingContainedTypeOfContainer(
-                        self.clazz.clazz, self.name, self.container_type
+                        class_=self.clazz.clazz, field_name=self.name, container_type=self.container_type
                     )
 
     @cached_property
@@ -455,7 +455,7 @@ def manually_search_for_class_name(target_class_name: str) -> type:
     found_classes += search_class_in_sys_modules(target_class_name)
 
     if len(found_classes) == 0:
-        raise TypeResolutionError(target_class_name)
+        raise TypeResolutionError(name=target_class_name)
     elif len(found_classes) == 1:
         resolved_class = found_classes[0]
     else:

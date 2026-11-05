@@ -15,7 +15,7 @@ from ..dataset.example_classes import (
 @pytest.fixture
 def diagram() -> ClassDiagram:
     return ClassDiagram(
-        [
+        classes=[
             KRROODPosition,
             KRROODPositions,
             KRROODPositionsSubclassWithAnotherKRROODPosition,
@@ -81,7 +81,7 @@ def test_an_added_relation_is_among_the_outgoing_relations(diagram):
     position = diagram.get_wrapped_class(KRROODPosition)
     diagram.get_out_edges(position)
     relation = Inheritance(
-        position, diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
+        source=position, target=diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
     )
 
     diagram.add_relation(relation)
@@ -92,7 +92,7 @@ def test_an_added_relation_is_among_the_outgoing_relations(diagram):
 def test_a_removed_relation_is_no_longer_among_the_outgoing_relations(diagram):
     position = diagram.get_wrapped_class(KRROODPosition)
     relation = Inheritance(
-        position, diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
+        source=position, target=diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
     )
     diagram.add_relation(relation)
     diagram.get_out_edges(position)

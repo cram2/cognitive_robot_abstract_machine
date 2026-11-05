@@ -29,7 +29,7 @@ from krrood.entity_query_language.factories import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Item:
     value: int
 

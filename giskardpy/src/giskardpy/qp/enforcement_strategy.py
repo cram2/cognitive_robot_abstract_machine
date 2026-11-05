@@ -255,7 +255,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
-            + [sm.Matrix.zeros(jacobian.shape[0], self.number_of_jerk_columns)]
+            + [sm.Matrix.zeros(rows=jacobian.shape[0], columns=self.number_of_jerk_columns)]
         )
 
     def create_slack_matrix(self) -> Matrix:
@@ -265,7 +265,7 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         if len(self.constraints) == 0:
             return sm.Matrix()
         return sm.Matrix.diag(
-            [
+            args=[
                 self.qp_controller_config.control_time_step.total_seconds()
                 for _ in self.constraints
             ]
@@ -411,7 +411,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             * self.qp_controller_config.control_time_step.total_seconds()
         )
         missing_variables = self.qp_controller_config.max_derivative - 1
-        eye = sm.Matrix.eye(self.qp_controller_config.prediction_horizon)[
+        eye = sm.Matrix.eye(size=self.qp_controller_config.prediction_horizon)[
             :-2, : self.qp_controller_config.prediction_horizon - missing_variables
         ]
         J_vel_limit_block = eye.kron(jacobian)
@@ -420,7 +420,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             [
                 J_vel_limit_block,
                 sm.Matrix.zeros(
-                    J_vel_limit_block.shape[0], self.number_of_jerk_columns
+                    rows=J_vel_limit_block.shape[0], columns=self.number_of_jerk_columns
                 ),
             ]
         )
@@ -436,7 +436,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
             self.qp_controller_config.prediction_horizon - 2 for c in self.constraints
         )
         return (
-            sm.Matrix.eye(num_slack_variables)
+            sm.Matrix.eye(size=num_slack_variables)
             * self.qp_controller_config.control_time_step.total_seconds()
         )
 
@@ -598,7 +598,7 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         """
         Returns an empty slack matrix, as the system dynamics need no slack variables.
         """
-        return sm.Matrix.zeros(self.number_of_jerk_columns, 0)
+        return sm.Matrix.zeros(rows=self.number_of_jerk_columns, columns=0)
 
     def create_slack_variables(self) -> DirectLimits:
         """
@@ -620,7 +620,7 @@ class SystemDynamicsStrategy(EnforcementStrategy):
         """
         Builds the equality bounds linking the first horizon steps to the current state.
         """
-        res = sm.Vector.zeros(self.number_of_jerk_columns)
+        res = sm.Vector.zeros(size=self.number_of_jerk_columns)
         res[: self.number_of_free_variables] = (
             -self.velocity_variables
             - self.acceleration_variables

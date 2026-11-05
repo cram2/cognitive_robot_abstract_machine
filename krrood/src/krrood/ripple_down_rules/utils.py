@@ -1498,32 +1498,32 @@ class FilteredDotExporter(object):
         edgeattrfunc = self.edgeattrfunc or self._default_edgeattrfunc
         edgetypefunc = self.edgetypefunc or self._default_edgetypefunc
         return self.__iter(
-            indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc
+            indent=indent, nodenamefunc=nodenamefunc, nodeattrfunc=nodeattrfunc, edgeattrfunc=edgeattrfunc, edgetypefunc=edgetypefunc
         )
 
     @staticmethod
-    def _default_nodenamefunc(node):
+    def _default_nodenamefunc(*, node):
         return node.name
 
     @staticmethod
-    def _default_nodeattrfunc(node):
+    def _default_nodeattrfunc(*, node):
         return None
 
     @staticmethod
-    def _default_edgeattrfunc(node, child):
+    def _default_edgeattrfunc(*, node, child):
         return None
 
     @staticmethod
-    def _default_edgetypefunc(node, child):
+    def _default_edgetypefunc(*, node, child):
         return "->"
 
-    def __iter(self, indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc):
+    def __iter(self, *, indent, nodenamefunc, nodeattrfunc, edgeattrfunc, edgetypefunc):
         yield "{self.graph} {self.name} {{".format(self=self)
-        for option in self.__iter_options(indent):
+        for option in self.__iter_options(indent=indent):
             yield option
-        for node in self.__iter_nodes(indent, nodenamefunc, nodeattrfunc):
+        for node in self.__iter_nodes(indent=indent, nodenamefunc=nodenamefunc, nodeattrfunc=nodeattrfunc):
             yield node
-        for edge in self.__iter_edges(indent, nodenamefunc, edgeattrfunc, edgetypefunc):
+        for edge in self.__iter_edges(indent=indent, nodenamefunc=nodenamefunc, edgeattrfunc=edgeattrfunc, edgetypefunc=edgetypefunc):
             yield edge
         if self.use_legend:
             legend_dot_graph = """
@@ -1546,13 +1546,13 @@ subgraph cluster_legend {
                 yield "%s" % (line.strip())
         yield "}"
 
-    def __iter_options(self, indent):
+    def __iter_options(self, *, indent):
         options = self.options
         if options:
             for option in options:
                 yield "%s%s" % (indent, option)
 
-    def __iter_nodes(self, indent, nodenamefunc, nodeattrfunc):
+    def __iter_nodes(self, *, indent, nodenamefunc, nodeattrfunc):
         for node in PreOrderIter(self.node, maxlevel=self.maxlevel):
             nodename = nodenamefunc(node)
             if (
@@ -1562,9 +1562,9 @@ subgraph cluster_legend {
                 continue
             nodeattr = nodeattrfunc(node)
             nodeattr = " [%s]" % nodeattr if nodeattr is not None else ""
-            yield '%s"%s"%s;' % (indent, FilteredDotExporter.esc(nodename), nodeattr)
+            yield '%s"%s"%s;' % (indent, FilteredDotExporter.esc(value=nodename), nodeattr)
 
-    def __iter_edges(self, indent, nodenamefunc, edgeattrfunc, edgetypefunc):
+    def __iter_edges(self, *, indent, nodenamefunc, edgeattrfunc, edgetypefunc):
         maxlevel = self.maxlevel - 1 if self.maxlevel else None
         for node in PreOrderIter(self.node, maxlevel=maxlevel):
             nodename = nodenamefunc(node)
@@ -1585,13 +1585,13 @@ subgraph cluster_legend {
                 edgeattr = " [%s]" % edgeattr if edgeattr is not None else ""
                 yield '%s"%s" %s "%s"%s;' % (
                     indent,
-                    FilteredDotExporter.esc(nodename),
+                    FilteredDotExporter.esc(value=nodename),
                     edgetype,
-                    FilteredDotExporter.esc(childname),
+                    FilteredDotExporter.esc(value=childname),
                     edgeattr,
                 )
 
-    def to_dotfile(self, filename):
+    def to_dotfile(self, *, filename):
         """
         Write graph to `filename`.
 
@@ -1618,7 +1618,7 @@ subgraph cluster_legend {
             for line in self:
                 file.write("%s\n" % line)
 
-    def to_picture(self, filename):
+    def to_picture(self, *, filename):
         """
         Write graph to a temporary file and invoke `dot`.
 
@@ -1647,7 +1647,7 @@ subgraph cluster_legend {
         return Source("\n".join(self), filename=self.name)
 
     @staticmethod
-    def esc(value):
+    def esc(*, value):
         """
         Escape Strings.
         """
@@ -1702,9 +1702,9 @@ def render_tree(
             de.to_source().view()
         else:
             filename = filename or "rule_tree"
-            de.to_dotfile(f"{filename}{'.dot'}")
+            de.to_dotfile(filename=f"{filename}{'.dot'}")
             try:
-                de.to_picture(f"{filename}{'.svg'}")
+                de.to_picture(filename=f"{filename}{'.svg'}")
             except FileNotFoundError as e:
                 logger.warning(f"{e}")
 

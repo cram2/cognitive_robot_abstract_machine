@@ -211,7 +211,7 @@ class MotionServer:
         self.outgoing_world_updates.start_goal()
         error: Exception | None = None
         try:
-            goal = MotionGoal.from_json(json.loads(self.action_server.goal_msg.goal))
+            goal = MotionGoal.from_json(data=json.loads(self.action_server.goal_msg.goal))
             self.client_watchdog.watch(goal.client)
             self.wait_for_required_world_updates(goal.required_position)
             self.compile_goal(goal)

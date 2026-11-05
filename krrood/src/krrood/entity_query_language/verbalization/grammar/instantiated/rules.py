@@ -29,7 +29,7 @@ class InstantiatedVariableRule(PhraseRule):
     construct = InstantiatedVariable
 
     def build(
-        self, node: InstantiatedVariable, context: RuleContext
+        self, *, node: InstantiatedVariable, context: RuleContext
     ) -> VerbalizationFragment:
         """:return: The instantiated variable's *"a TypeName, where the field of the TypeName is …"*
         noun phrase, built by the :class:`InstantiatedAssembler`.
@@ -47,7 +47,7 @@ class InstantiatedVariableRule(PhraseRule):
         factory = node._factory_
         if isinstance(factory, type) and issubclass(factory, Verbalizable):
             raise PredicateFragmentRequiredError(node=node)
-        return InstantiatedAssembler(context).assemble(node)
+        return InstantiatedAssembler(context=context).assemble(node=node)
 
 
 class InstantiatedVerbalizableRule(PhraseRule):
@@ -58,7 +58,7 @@ class InstantiatedVerbalizableRule(PhraseRule):
 
     construct = InstantiatedVariable
 
-    def when(self, node: InstantiatedVariable, context: RuleContext) -> bool:
+    def when(self, *, node: InstantiatedVariable, context: RuleContext) -> bool:
         """:return: ``True`` when *node*'s type supplies a verbalization fragment, selecting this rule
         over the generic *"a TypeName, where …"* form.
 
@@ -69,10 +69,10 @@ class InstantiatedVerbalizableRule(PhraseRule):
         >>> verbalize_expression(inference(IsReachable)(location=variable(Location, []), body=variable(Robot, [])))
         'a Location is reachable for a Robot'
         """
-        return InstantiatedPlanner.has_fragment(node)
+        return InstantiatedPlanner.has_fragment(node=node)
 
     def build(
-        self, node: InstantiatedVariable, context: RuleContext
+        self, *, node: InstantiatedVariable, context: RuleContext
     ) -> VerbalizationFragment:
         """:return: the type's verbalization fragment, built from its rendered field fragments
         (*"a Location is reachable for a Robot"*).
@@ -86,7 +86,7 @@ class InstantiatedVerbalizableRule(PhraseRule):
         """
         fields = RenderedFields(
             fragments={
-                name: context.child(child)
+                name: context.child(node=child)
                 for name, child in node._child_variables_.items()
             },
             raw=node._child_variables_,

@@ -16,7 +16,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AttributeAssignment:
     """
     One ``object.attribute == value`` equality from a match's construction pattern.
@@ -46,7 +46,7 @@ class AttributeAssignment:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AttributeGroup:
     """
     The equality assignments that share one object — e.g. the *x*, *y*, *z* of one
@@ -88,7 +88,7 @@ class AttributeGroup:
         return [a for a in self.assignments if a.is_predicted]
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class MatchPlan:
     """
     The *what to say* decomposition of a match: what it selects, the grouped
@@ -127,7 +127,7 @@ class MatchPlan:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MatchPlanner(Planner[Match, MatchPlan]):
     """
     Decompose a ``Match`` into a ``MatchPlan``: split the construction-pattern
@@ -154,7 +154,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
         # Aggregate single-hop equalities by their object via the shared owner-grouping primitive;
         # conditions that are not such an equality (``_as_assignment`` → ``None``) are the remainder.
         owner_groups, other = group_by_owner(
-            list(match._conditions_), self._as_assignment
+            list(match._conditions_), lambda condition: self._as_assignment(condition=condition)
         )
         groups = [
             AttributeGroup(object=group.owner, assignments=group.items)
@@ -169,7 +169,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
 
     @staticmethod
     def _as_assignment(
-        condition: SymbolicExpression,
+        *, condition: SymbolicExpression,
     ) -> tuple[SymbolicExpression, AttributeAssignment] | None:
         """
         :param condition: A construction-pattern condition.

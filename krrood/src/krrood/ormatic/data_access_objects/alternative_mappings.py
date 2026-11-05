@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AlternativeMapping(HasGeneric[T], abc.ABC):
     """
     Base class for alternative mapping implementations.
@@ -37,7 +37,7 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
 
     @classmethod
     def to_dao(
-        cls, source_object: T, state: ToDataAccessObjectState | None = None
+        cls, *, source_object: T, state: ToDataAccessObjectState | None = None
     ) -> T:
         """
         Resolve a source object to a DAO.
@@ -46,17 +46,17 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
         :param state: The conversion state.
         :return: The converted DAO instance.
         """
-        if state is not None and state.has(source_object):
-            return state.get(source_object)
+        if state is not None and state.has(source=source_object):
+            return state.get(source=source_object)
         elif isinstance(source_object, cls):
             return source_object
         else:
-            result = cls.from_domain_object(source_object)
+            result = cls.from_domain_object(obj=source_object)
             return result
 
     @classmethod
     @abc.abstractmethod
-    def from_domain_object(cls, obj: T) -> Self:
+    def from_domain_object(cls, *, obj: T) -> Self:
         """
         Create this from a domain object.
 
@@ -91,10 +91,10 @@ class AlternativeMapping(HasGeneric[T], abc.ABC):
 
 
 def raise_uncallable_function(function_mapping: FunctionMapping):
-    raise UncallableFunction(function_mapping)
+    raise UncallableFunction(function_mapping=function_mapping)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FunctionMapping(AlternativeMapping[FunctionType]):
     """
     Alternative mapping for functions.
@@ -116,7 +116,7 @@ class FunctionMapping(AlternativeMapping[FunctionType]):
     """
 
     @classmethod
-    def from_domain_object(cls, obj: Callable) -> Self:
+    def from_domain_object(cls, *, obj: Callable) -> Self:
 
         if "." in obj.__qualname__:
             class_name = obj.__qualname__.split(".")[0]

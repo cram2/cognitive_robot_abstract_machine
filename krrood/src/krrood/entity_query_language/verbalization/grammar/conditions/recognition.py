@@ -247,7 +247,7 @@ def fold_shared_subject_conjunction(
     for operand in operands:
         if not isinstance(operand, Comparator):
             return None
-        if not Operators.is_value_comparison(operand.operation):
+        if not Operators.is_value_comparison(function=operand.operation):
             return None
         left = operand.left
         if not isinstance(left, Variable) or isinstance(left, Literal):
@@ -263,7 +263,7 @@ def fold_shared_subject_conjunction(
     )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class SuperlativeFold:
     """
     A subject restriction of the form ``subject.<chain> == max/min(<same-type>.<same

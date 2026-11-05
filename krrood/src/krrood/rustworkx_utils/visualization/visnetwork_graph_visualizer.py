@@ -23,7 +23,7 @@ VisEdge = Dict[str, Any]
 """A single vis-network edge."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisNetworkGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by vis-network.
 
@@ -74,10 +74,10 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
         return [
             {
                 "id": str(index),
-                "label": self.node_label(index),
+                "label": self.node_label(node_index=index),
                 "color": {
-                    "background": self.node_color(index),
-                    "border": self.node_border_color(index) or self.default_border_color,
+                    "background": self.node_color(node_index=index),
+                    "border": self.node_border_color(node_index=index) or self.default_border_color,
                 },
             }
             for index in self.graph.node_indices()
@@ -108,7 +108,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "visnetwork_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
+                layout_options_json=json.dumps(self.layout_options.get_options(layout=self.layout)),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
             )
 
@@ -124,7 +124,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             """
             Called for each node to parse the node details to json
             """
-            return jsonify(details=self.node_details(node_index))
+            return jsonify(details=self.node_details(node_index=node_index))
 
         return application
 

@@ -16,7 +16,7 @@ from types import FrameType
 from typing_extensions import Callable, Any
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StackFrame:
     """
     A single frame in a captured call stack.
@@ -88,7 +88,7 @@ class StackFrame:
 
     @classmethod
     def from_frame_info(
-        cls, frame_info: inspect.FrameInfo, capture_scope: bool = False
+        cls, *, frame_info: inspect.FrameInfo, capture_scope: bool = False
     ) -> StackFrame:
         """
         Eagerly extract all data from a live ``FrameInfo`` and drop the frame reference.
@@ -104,7 +104,7 @@ class StackFrame:
             frame_info.code_context[0].strip() if frame_info.code_context else None
         )
         return cls._from_frame(
-            frame_info.frame,
+            frame=frame_info.frame,
             filename=frame_info.filename,
             lineno=frame_info.lineno,
             function_name=frame_info.function,
@@ -114,7 +114,7 @@ class StackFrame:
 
     @classmethod
     def from_raw_frame(
-        cls, frame: FrameType, capture_scope: bool = False
+        cls, *, frame: FrameType, capture_scope: bool = False
     ) -> StackFrame:
         """
         Eagerly extract all data from a live frame object and drop the frame reference.
@@ -133,7 +133,7 @@ class StackFrame:
         lineno = frame.f_lineno
         snippet = linecache.getline(filename, lineno).strip() or None
         return cls._from_frame(
-            frame,
+            frame=frame,
             filename=filename,
             lineno=lineno,
             function_name=frame.f_code.co_name,
@@ -144,8 +144,7 @@ class StackFrame:
     @classmethod
     def _from_frame(
         cls,
-        frame: FrameType,
-        *,
+        *, frame: FrameType,
         filename: str,
         lineno: int,
         function_name: str,
@@ -199,7 +198,7 @@ def _is_external_filename(filename: str) -> bool:
     return "site-packages" in filename or "dist-packages" in filename
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CallStack:
     """
     An ordered sequence of :class:`StackFrame` objects, innermost frame first.
@@ -217,7 +216,7 @@ class CallStack:
         return iter(self.frames)
 
     @classmethod
-    def capture(cls, skip: int = 0) -> CallStack:
+    def capture(cls, *, skip: int = 0) -> CallStack:
         """
         Capture the current call stack, building :class:`StackFrame` objects only for
         frames that are not in installed third-party packages.
@@ -236,15 +235,15 @@ class CallStack:
         try:
             frame: FrameType | None = sys._getframe(1 + skip)
         except ValueError:
-            return cls([])
+            return cls(frames=[])
         kept: list[StackFrame] = []
         while frame is not None:
             if not _is_external_filename(frame.f_code.co_filename):
-                kept.append(StackFrame.from_raw_frame(frame))
+                kept.append(StackFrame.from_raw_frame(frame=frame))
             frame = frame.f_back
-        return cls(kept)
+        return cls(frames=kept)
 
-    def filter(self, package: str | None = None) -> CallStack:
+    def filter(self, *, package: str | None = None) -> CallStack:
         """
         Build a new :class:`CallStack` with external-library frames removed.
 
@@ -259,9 +258,9 @@ class CallStack:
             if package is not None and package not in frame.filename:
                 continue
             kept.append(frame)
-        return CallStack(kept)
+        return CallStack(frames=kept)
 
-    def root_frame_in(self, package: str) -> StackFrame | None:
+    def root_frame_in(self, *, package: str) -> StackFrame | None:
         """
         Find the outermost frame (highest in the call hierarchy) whose ``module_name``
         contains *package*.  This is the entry point into the library from the caller's

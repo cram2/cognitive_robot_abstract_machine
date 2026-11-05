@@ -26,7 +26,7 @@ from krrood.class_diagrams.exceptions import FactoryMethodDecoratorError
 from krrood.class_diagrams.factory_method_registry import FactoryMethodRegistry
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FactoryMethodMarker:
     """
     Descriptor that marks the classmethod it wraps as a factory and registers it
@@ -53,7 +53,7 @@ class FactoryMethodMarker:
         Register the factory with :class:`FactoryMethodRegistry` once the owner is
         known.
         """
-        FactoryMethodRegistry().register(owner, name)
+        FactoryMethodRegistry().register(owner=owner, name=name)
 
     def __get__(self, instance: Any, owner: type = None) -> Any:
         """
@@ -75,7 +75,7 @@ def factory_method(method: classmethod) -> FactoryMethodMarker:
     """
     if not isinstance(method, classmethod):
         raise FactoryMethodDecoratorError(decorated_name=_decorated_name(method))
-    return FactoryMethodMarker(method)
+    return FactoryMethodMarker(wrapped=method)
 
 
 def _decorated_name(method: Any) -> str:
@@ -110,7 +110,7 @@ def is_factory_method(cls: type, name: str) -> bool:
     :param name: The attribute name to classify.
     :return: Whether ``cls.<name>`` is a factory classmethod.
     """
-    if FactoryMethodRegistry().is_registered(cls, name):
+    if FactoryMethodRegistry().is_registered(cls=cls, name=name):
         return True
     attribute = inspect.getattr_static(cls, name, None)
     if not isinstance(attribute, classmethod):

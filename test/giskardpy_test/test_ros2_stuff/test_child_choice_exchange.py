@@ -321,7 +321,7 @@ class ClientAndRunningStatechart:
         feedback = self.feedback_publisher.create_states()
         feedback[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         sent_choices = [
-            ChildChoiceMessage.from_json(json.loads(json.dumps(choice.to_json())))
+            ChildChoiceMessage.from_json(data=json.loads(json.dumps(choice.to_json())))
             for choice in self.client.answer(json.loads(json.dumps(feedback)))
         ]
         for choice in sent_choices:

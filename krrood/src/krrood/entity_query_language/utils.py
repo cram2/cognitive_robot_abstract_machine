@@ -135,9 +135,9 @@ def cartesian_product_while_passing_the_bindings_around(
             Evaluate the inner expression and combine its bindings with the previous
             stage's bindings.
             """
-            for result in inner_expression._evaluate_(prev):
+            for result in inner_expression._evaluate_(sources=prev):
                 if prev is not None:
-                    result.update(prev)
+                    result.update(other=prev)
                 yield result
 
         return stage

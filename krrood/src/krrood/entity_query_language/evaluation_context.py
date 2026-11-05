@@ -55,33 +55,33 @@ class EvaluationObserver(ABC):
     """
 
     def on_evaluate_enter(
-        self, expression: SymbolicExpression, sources: OperationResult | None = None
+        self, *, expression: SymbolicExpression, sources: OperationResult | None = None
     ) -> None:
         """
         Called when entering an expression's _evaluate_ method.
         """
 
-    def on_evaluate_exit(self, expression: SymbolicExpression) -> None:
+    def on_evaluate_exit(self, *, expression: SymbolicExpression) -> None:
         """
         Called when exiting an expression's _evaluate_ method.
         """
 
     def on_result_yielded(
-        self, expression: SymbolicExpression, result: OperationResult
+        self, *, expression: SymbolicExpression, result: OperationResult
     ) -> None:
         """
         Called for each OperationResult yielded from _evaluate_.
         """
 
     def on_conclusions_processed(
-        self, expression: SymbolicExpression, result: OperationResult
+        self, *, expression: SymbolicExpression, result: OperationResult
     ) -> None:
         """
         Called after _evaluate_conclusions_and_update_bindings_ completes.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActiveConditionsRoot:
     """
     Tracks which node is the active conditions root for the current evaluation pass.
@@ -104,7 +104,7 @@ class ActiveConditionsRoot:
     """
 
     def set_active_root_if_not_set(
-        self, root: SymbolicExpression, has_condition: bool
+        self, *, root: SymbolicExpression, has_condition: bool
     ) -> None:
         """
         Set *root* as the active conditions root for this pass, unless one is already
@@ -120,12 +120,12 @@ class ActiveConditionsRoot:
             self._root_id = root._id_
             self.has_condition = has_condition
 
-    def is_active_root(self, node: SymbolicExpression) -> bool:
+    def is_active_root(self, *, node: SymbolicExpression) -> bool:
         """:return: ``True`` if *node* is the active conditions root for this pass."""
         return self._root_id == node._id_
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TruthValueOperatorChildren:
     """
     Tracks which nodes were evaluated as a direct child of a
@@ -147,7 +147,7 @@ class TruthValueOperatorChildren:
     far this pass.
     """
 
-    def record(self, expression_id: uuid.UUID) -> None:
+    def record(self, *, expression_id: uuid.UUID) -> None:
         """
         Record *expression_id* as evaluated as a direct child of a
         ``TruthValueOperator`` during the current pass.
@@ -158,7 +158,7 @@ class TruthValueOperatorChildren:
         return expression_id in self._ids
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvaluatedExpressionIds:
     """
     Tracks every expression id evaluated so far during the current evaluation pass.
@@ -180,13 +180,13 @@ class EvaluatedExpressionIds:
     while the set has a given length is reused instead of copying the whole set again.
     """
 
-    def record(self, expression_id: uuid.UUID) -> None:
+    def record(self, *, expression_id: uuid.UUID) -> None:
         """
         Record *expression_id* as evaluated during the current pass.
         """
         self._ids.add(expression_id)
 
-    def merge(self, other: OrderedSet) -> None:
+    def merge(self, *, other: OrderedSet) -> None:
         """
         Merge *other* into the recorded ids (for example, ids evaluated by an earlier
         stage of the same result chain).
@@ -205,7 +205,7 @@ class EvaluatedExpressionIds:
         return self._snapshot[1]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OutermostQuery:
     """
     Tracks which compiled query node is the outermost query for the current evaluation
@@ -223,7 +223,7 @@ class OutermostQuery:
     takes it.
     """
 
-    def is_nested(self, query: SymbolicExpression) -> bool:
+    def is_nested(self, *, query: SymbolicExpression) -> bool:
         """
         Record *query* as the outermost query if none is recorded yet, then report
         whether *query* is nested inside some other, already-recorded outermost query.
@@ -237,7 +237,7 @@ class OutermostQuery:
         return self.node._id_ != query._id_
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubqueryResultCache:
     """
     Caches an uncorrelated subquery's result stream per query node for one evaluation
@@ -252,7 +252,7 @@ class SubqueryResultCache:
     Cached result stream keyed by the compiled query node's identifier.
     """
 
-    def get_or_create(self, query_id: uuid.UUID, factory: Callable[[], Any]) -> Any:
+    def get_or_create(self, *, query_id: uuid.UUID, factory: Callable[[], Any]) -> Any:
         """
         Return the cached stream for *query_id*, creating it via *factory* if not
         already cached.
@@ -267,7 +267,7 @@ class SubqueryResultCache:
         return self._streams[query_id]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvaluationContext:
     """
     Carries observer state through the evaluation pipeline.
@@ -347,7 +347,7 @@ class EvaluationContext:
     exhausted or closed.
     """
 
-    def is_child_of_truth_value_operator(self, expression: SymbolicExpression) -> bool:
+    def is_child_of_truth_value_operator(self, *, expression: SymbolicExpression) -> bool:
         """
         :param expression: The symbolic expression to test.
         :return: ``True`` if *expression* was evaluated as a direct child of a
@@ -368,7 +368,7 @@ class EvaluationContext:
             _evaluation_context_var.reset(context_token)
 
     def iterate_as_current(
-        self, results: Iterator[OperationResult]
+        self, *, results: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
         """
         Iterate the given results with this context as the current evaluation context
@@ -409,7 +409,7 @@ class EvaluationContext:
             ``None``.
         """
         for observer in self.observers:
-            observer.on_evaluate_enter(expression, sources)
+            observer.on_evaluate_enter(expression=expression, sources=sources)
 
     def on_evaluate_exit(self, *, expression: SymbolicExpression) -> None:
         """
@@ -418,7 +418,7 @@ class EvaluationContext:
         :param expression: The expression that just finished evaluating.
         """
         for observer in self.observers:
-            observer.on_evaluate_exit(expression)
+            observer.on_evaluate_exit(expression=expression)
 
     def on_result_yielded(
         self,
@@ -433,7 +433,7 @@ class EvaluationContext:
         :param result: The :class:`OperationResult` that was yielded.
         """
         for observer in self.observers:
-            observer.on_result_yielded(expression, result)
+            observer.on_result_yielded(expression=expression, result=result)
 
     def on_conclusions_processed(
         self,
@@ -448,4 +448,4 @@ class EvaluationContext:
         :param result: The :class:`OperationResult` after conclusion processing.
         """
         for observer in self.observers:
-            observer.on_conclusions_processed(expression, result)
+            observer.on_conclusions_processed(expression=expression, result=result)

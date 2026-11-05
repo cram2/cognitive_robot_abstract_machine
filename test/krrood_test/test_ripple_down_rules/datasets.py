@@ -29,7 +29,7 @@ from krrood.ripple_down_rules.rdr_decorators import RDRDecorator
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ZooDataset:
     """
     The feature, target, and id columns of the zoo dataset, as fetched from the UCI ML
@@ -159,7 +159,7 @@ def load_zoo_dataset(
     ]
     category_id_to_name = {i + 1: name for i, name in enumerate(category_names)}
     # targets = [getattr(SpeciesCol, category_id_to_name[i]) for i in y.values.flatten()]
-    targets = [Species.from_str(category_id_to_name[i]) for i in y.values.flatten()]
+    targets = [Species.from_str(value=category_id_to_name[i]) for i in y.values.flatten()]
     return all_cases, targets
 
 
@@ -194,7 +194,7 @@ class Habitat(Category):
     air = "air"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PhysicalObject:
     """
     A physical object is an object that can be contained in a container.
@@ -218,14 +218,14 @@ class PhysicalObject:
     """
 
     _is_a_robot_rdr: ClassVar[RDRDecorator] = RDRDecorator(
-        _rdr_json_dir, (bool,), True, package_name="test"
+        models_dir=_rdr_json_dir, output_type=(bool,), mutual_exclusive=True, package_name="test"
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.
     """
 
     _select_parts_rdr: ClassVar[RDRDecorator] = RDRDecorator(
-        _rdr_json_dir, (Self,), False, package_name="test"
+        models_dir=_rdr_json_dir, output_type=(Self,), mutual_exclusive=False, package_name="test"
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.
@@ -245,7 +245,7 @@ class PhysicalObject:
 
     @_select_parts_rdr.decorator
     def select_objects_that_are_parts_of_robot(
-        self, objects: list[PhysicalObject], robot: Robot
+        self, *, objects: list[PhysicalObject], robot: Robot
     ) -> list[PhysicalObject]:
         pass
 
@@ -264,11 +264,11 @@ class PhysicalObject:
         return hash(self.name)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Part(PhysicalObject): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Robot(PhysicalObject):
     parts: list[Part] = field(default_factory=list)
 
@@ -320,39 +320,39 @@ class MappedAnimal(MappedAsDataclass, Base):
     habitats: Mapped[set[HabitatTable]] = relationship(default_factory=set)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class WorldEntity:
     world: World | None = field(default=None, kw_only=True, repr=False, hash=False)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Body(WorldEntity):
     name: str
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Handle(Body): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Container(Body): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Connection(WorldEntity):
     parent: Body
     child: Body
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class FixedConnection(Connection): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class PrismaticConnection(Connection): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class World:
     id: int = 0
     bodies: list[Body] = field(default_factory=list)
@@ -368,11 +368,11 @@ class World:
         return self.id == other.id
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class View(WorldEntity): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Drawer(View):
     handle: Handle
     container: Container
@@ -391,7 +391,7 @@ class Drawer(View):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cabinet(View):
     container: Container
     drawers: list[Drawer] = field(default_factory=list)

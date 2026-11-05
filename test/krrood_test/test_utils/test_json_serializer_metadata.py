@@ -3,7 +3,7 @@ from krrood.adapters.json_serializer import to_json, from_json
 from krrood.patterns.field_metadata import JSONMetadata
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MetadataTestDataclass:
     public_init: str = "public_init"
     _private_init: str = field(

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoGenericError(DataclassException, TypeError):
     """
     Exception raised when the original class for a DataAccessObject subclass cannot be
@@ -35,7 +35,7 @@ class NoGenericError(DataclassException, TypeError):
         return "did you forget to parameterise the DataAccessObject subclass?"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDAOFoundError(DataclassException, TypeError):
     """
     Represents an error raised when no DAO (Data Access Object) class is found for a
@@ -62,7 +62,7 @@ class NoDAOFoundError(DataclassException, TypeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QueryCannotBePersisted(DataclassException, TypeError):
     """
     Raised when an object that is to be stored holds an entity query language query in
@@ -84,7 +84,7 @@ class QueryCannotBePersisted(DataclassException, TypeError):
         return "Store the objects the query was answered with instead of the query."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDAOFoundForTypeError(NoDAOFoundError):
     """
     Raised when no DAO class is found for a domain *type* rather than for a concrete
@@ -99,7 +99,7 @@ class NoDAOFoundForTypeError(NoDAOFoundError):
         return f"No DAO found for type {self.obj}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDAOFoundForSelectionError(NoDAOFoundError):
     """
     Raised when none of the selected expressions of a query resolve to a DAO-bearing
@@ -110,7 +110,7 @@ class NoDAOFoundForSelectionError(NoDAOFoundError):
         return f"No DAO could be derived from the selected expressions: {self.obj}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDAOFoundDuringParsingError(NoDAOFoundError):
 
     dao: type
@@ -132,7 +132,7 @@ class NoDAOFoundDuringParsingError(NoDAOFoundError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedRelationshipError(DataclassException, ValueError):
     """
     Raised when a relationship direction is not supported by the ORM mapping.
@@ -150,7 +150,7 @@ class UnsupportedRelationshipError(DataclassException, ValueError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UncallableFunction(NotImplementedError):
     """
     Exception raised when anonymous functions are reconstructed and then called.
@@ -168,7 +168,7 @@ class UncallableFunction(NotImplementedError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedColumnType(DataclassException, TypeError):
     """
     Exception raised when a column type is neither a type_mapping nor a builtin
@@ -184,7 +184,7 @@ class UnsupportedColumnType(DataclassException, TypeError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ZoneInfoWithoutKey(DataclassException, ValueError):
     """
     Raised when a timezone that has no IANA key, such as one read from a file, is
@@ -205,7 +205,7 @@ class ZoneInfoWithoutKey(DataclassException, ValueError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConversionOrderCycle(DataclassException, ValueError):
     """
     Raised when the alternative mappings of a conversion cannot be put in any order,

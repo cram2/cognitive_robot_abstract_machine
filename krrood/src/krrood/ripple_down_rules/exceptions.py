@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from krrood.ripple_down_rules.experts import Expert
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RDRLoadError(DataclassException):
     """
     Raised when there is an error loading the RDR model.
@@ -33,7 +33,7 @@ class RDRLoadError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSavePathFoundForExpertAnswers(InputError):
     """
     Exception raised when no save path is found for expert answers.
@@ -54,7 +54,7 @@ class NoSavePathFoundForExpertAnswers(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoLoadPathFoundForExpertAnswers(InputError):
     """
     Exception raised when no load path is found for expert answers.
@@ -75,7 +75,7 @@ class NoLoadPathFoundForExpertAnswers(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonInteractiveTerminalError(InputError):
     """
     Raised when the embedded Ipython expert shell is started without an interactive
@@ -96,7 +96,7 @@ class NonInteractiveTerminalError(InputError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDistinguishingAttributeFound(InputError):
     """
     Raised by :class:`krrood.ripple_down_rules.experts.Oracle` when none of a case's
@@ -127,7 +127,7 @@ class NoDistinguishingAttributeFound(InputError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OracleCannotInferConclusionWithoutTarget(InputError):
     """
     Raised by :class:`krrood.ripple_down_rules.experts.Oracle` when asked for a

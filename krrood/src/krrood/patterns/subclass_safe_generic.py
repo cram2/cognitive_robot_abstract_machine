@@ -58,7 +58,7 @@ ResolvableType: TypeAlias = (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SubClassSafeGeneric(ABC):
     """
     Generic-agnostic engine that updates field types when a subclass binds the generic type
@@ -111,12 +111,12 @@ class SubClassSafeGeneric(ABC):
             logger.debug(message)
             return
         for name, result in resolution_results.items():
-            if not result.resolved or cls._is_declared_by_an_interface(name):
+            if not result.resolved or cls._is_declared_by_an_interface(name=name):
                 continue
-            cls._update_field_kwargs(name, {"type": result.resolved_type})
+            cls._update_field_kwargs(name=name, kwargs={"type": result.resolved_type})
 
     @classmethod
-    def _is_declared_by_an_interface(cls, name: str) -> bool:
+    def _is_declared_by_an_interface(cls, *, name: str) -> bool:
         """
         :param name: The name of an annotated attribute of this class.
         :return: Whether the nearest class annotating it is an interface, which
@@ -127,7 +127,7 @@ class SubClassSafeGeneric(ABC):
             for base in cls.__mro__
             if name in vars(base).get("__annotations__", {})
         )
-        return Interface.is_interface(declaring_class)
+        return Interface.is_interface(class_=declaring_class)
 
     @classmethod
     def get_generic_type_parameters(cls) -> list[type]:
@@ -138,7 +138,7 @@ class SubClassSafeGeneric(ABC):
 
     @classmethod
     @lru_cache(maxsize=None)
-    def get_type_of_generic_parameter(cls, parameter: TypeVar) -> ResolvableType:
+    def get_type_of_generic_parameter(cls, *, parameter: TypeVar) -> ResolvableType:
         """
         Read back the type this class binds one type parameter to.
 
@@ -151,12 +151,12 @@ class SubClassSafeGeneric(ABC):
         """
         bound_type = cls._get_generic_type_substitutions().get(parameter)
         if bound_type is None or isinstance(bound_type, (TypeVar, TypeVarTuple)):
-            raise UnboundGenericParameter(cls, parameter)
+            raise UnboundGenericParameter(affected_class=cls, parameter=parameter)
         return bound_type
 
     @staticmethod
     def _substitutions_bind_a_concrete_type(
-        substitutions: dict[Any, ResolvableType],
+        *, substitutions: dict[Any, ResolvableType],
     ) -> bool:
         """
         Report whether the substitution map assigns at least one type parameter to a
@@ -177,7 +177,7 @@ class SubClassSafeGeneric(ABC):
 
     @classmethod
     def _update_field_kwargs(
-        cls, name: str, kwargs: dict[str, Any], type_: type | None = None
+        cls, *, name: str, kwargs: dict[str, Any], type_: type | None = None
     ):
         """
         Update the field kwargs with the provided keyword arguments.
@@ -235,14 +235,14 @@ class SubClassSafeGeneric(ABC):
 
         substitutions = {}
         for base in getattr(cls, "__orig_bases__", []):
-            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base)
+            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base=base)
             if base_origin is None or not issubclass(base_origin, SubClassSafeGeneric):
                 continue
 
             # Map the root TypeVars of the base to the concrete arguments provided here
             if resolved_types:
                 substitutions.update(
-                    cls._get_resolved_type_substitutions(base_origin, resolved_types)
+                    cls._get_resolved_type_substitutions(base_origin=base_origin, resolved_types=resolved_types)
                 )
 
             # Recursively pull substitutions already defined by the parent
@@ -251,7 +251,7 @@ class SubClassSafeGeneric(ABC):
             substitutions.update(base_origin._get_generic_type_substitutions())
 
         if substitutions:
-            substitutions = cls._resolve_substitutions_transitively(substitutions)
+            substitutions = cls._resolve_substitutions_transitively(substitutions=substitutions)
 
         cls._subclass_safe_substitutions = substitutions
         return substitutions
@@ -259,7 +259,7 @@ class SubClassSafeGeneric(ABC):
     @classmethod
     def _get_resolved_type_substitutions(
         cls,
-        base_origin: type,
+        *, base_origin: type,
         resolved_types: tuple[type, ...],
     ) -> dict[Any, ResolvableType]:
         """
@@ -293,22 +293,22 @@ class SubClassSafeGeneric(ABC):
             matched_pairs = zip(root_parameters, resolved_types)
         else:
             matched_pairs = cls._match_type_var_tuple_variable_to_resolved_type(
-                type_var_tuple_index,
-                root_parameters,
-                resolved_types,
-                base_origin,
+                type_var_tuple_index=type_var_tuple_index,
+                root_parameters=root_parameters,
+                resolved_types=resolved_types,
+                base_origin=base_origin,
             )
 
         return {
             ensure_hashable(old_type): new_type
             for old_type, new_type in matched_pairs
-            if cls._fulfills_substitution_condition(old_type, new_type)
+            if cls._fulfills_substitution_condition(old_type=old_type, new_type=new_type)
         }
 
     @classmethod
     def _fulfills_substitution_condition(
         cls,
-        old_type: Any,
+        *, old_type: Any,
         new_type: type | tuple[type, ...] | None,
     ) -> bool:
         """
@@ -338,7 +338,7 @@ class SubClassSafeGeneric(ABC):
     @classmethod
     def _match_type_var_tuple_variable_to_resolved_type(
         cls,
-        type_var_tuple_index: int,
+        *, type_var_tuple_index: int,
         root_parameters: list[Any],
         resolved_types: tuple[type, ...],
         base_origin: type,
@@ -391,7 +391,7 @@ class SubClassSafeGeneric(ABC):
 
     @classmethod
     def _resolve_substitutions_transitively(
-        cls, substitutions: dict[Any, ResolvableType]
+        cls, *, substitutions: dict[Any, ResolvableType]
     ) -> dict[Any, ResolvableType]:
         """
         Recursively resolve TypeVars in the substitution map to their most concrete form
@@ -461,7 +461,7 @@ class SubClassSafeGeneric(ABC):
 
     @classmethod
     def _resolve_base_origin_and_arguments(
-        cls, base: type
+        cls, *, base: type
     ) -> tuple[type | None, tuple[type, ...]]:
         """
         Resolve the origin and generic arguments for a base class.

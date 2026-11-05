@@ -36,7 +36,7 @@ def test_inference_builds_with_a_factory_method():
     )
     assert interval._type_ is Interval
     assert interval._factory_ == Interval.around
-    assert interval.tolist() == [Interval.around(5, 2)]
+    assert interval.tolist() == [Interval.around(center=5, radius=2)]
 
 
 def test_declared_factory_of_an_inferred_type_is_its_factory():
@@ -48,7 +48,7 @@ def test_inferred_variable_is_a_factory_with_keyword_arguments():
     lower = variable_from([1])
     interval = inference(Interval)(lower=lower, upper=variable_from([3]))
     assert isinstance(interval, HasFactoryAndKwargs)
-    (stated_lower,) = interval._stated_values_("lower")
+    (stated_lower,) = interval._stated_values_(keyword="lower")
     assert stated_lower is lower
 
 
@@ -107,21 +107,21 @@ def test_symbolic_function_still_binds_its_computed_value():
 
 
 def test_predicate_type_and_factory_are_the_predicate_class():
-    expression = IsEven(variable_from([2]))
+    expression = IsEven(number=variable_from([2]))
     assert expression._type_ is IsEven
     assert expression._factory_ is IsEven
 
 
 def test_symbolic_function_class_type_is_the_return_type_of_its_call():
-    expression = Halved(variable_from([4]))
+    expression = Halved(number=variable_from([4]))
     assert expression._type_ is int
     assert expression._factory_ is Halved
 
 
 def test_symbolic_function_class_with_unannotated_call_is_rejected():
     with pytest.raises(ResultTypeCannotBeDetermined):
-        UnannotatedHalved(variable_from([4]))
+        UnannotatedHalved(number=variable_from([4]))
 
 
 def test_symbolic_function_class_still_binds_its_computed_value():
-    assert Halved(variable_from([4, 7])).tolist() == [Halved(4)(), Halved(7)()]
+    assert Halved(number=variable_from([4, 7])).tolist() == [Halved(number=4)(), Halved(number=7)()]

@@ -20,7 +20,7 @@ from krrood.patterns.exceptions import KeywordNamesNoFactoryParameter
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasFactoryAndKwargs(Generic[T]):
     """
     Mixin containing a hierarchy of factories and their keyword arguments.
@@ -53,12 +53,12 @@ class HasFactoryAndKwargs(Generic[T]):
         for key, value in self._factory_keyword_arguments_.items():
             if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 constructed_kwargs[key] = type(value)(
-                    self._recurse_construct_instance_and_get_value(element)
+                    self._recurse_construct_instance_and_get_value(value=element)
                     for element in value
                 )
             else:
                 constructed_kwargs[key] = (
-                    self._recurse_construct_instance_and_get_value(value)
+                    self._recurse_construct_instance_and_get_value(value=value)
                 )
         return self._factory_(**constructed_kwargs)
 
@@ -77,9 +77,9 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         factory_keyword_arguments = {}
         for key, value in self._kwargs_.items():
-            if self._is_kept_out_of_construction_(key, type(value)):
+            if self._is_kept_out_of_construction_(keyword=key, value_type=type(value)):
                 continue
-            if not self._is_factory_parameter_(key):
+            if not self._is_factory_parameter_(keyword=key):
                 raise KeywordNamesNoFactoryParameter(
                     factory=self._factory_, keyword=key
                 )
@@ -87,7 +87,7 @@ class HasFactoryAndKwargs(Generic[T]):
         return factory_keyword_arguments
 
     @staticmethod
-    def _type_built_by_(factory: Callable[..., Any]) -> type | None:
+    def _type_built_by_(*, factory: Callable[..., Any]) -> type | None:
         """
         :param factory: A class, function or method.
         :return: The class itself; otherwise the class its return annotation names, the
@@ -110,7 +110,7 @@ class HasFactoryAndKwargs(Generic[T]):
             return get_origin(return_annotation)
         return None
 
-    def _stated_values_(self, keyword: str) -> Iterator[Any]:
+    def _stated_values_(self, *, keyword: str) -> Iterator[Any]:
         """
         :param keyword: A keyword argument.
         :return: The value given for that keyword, or nothing when none was given.
@@ -118,15 +118,15 @@ class HasFactoryAndKwargs(Generic[T]):
         if keyword in self._kwargs_:
             yield self._kwargs_[keyword]
 
-    def _is_factory_parameter_(self, keyword: str) -> bool:
+    def _is_factory_parameter_(self, *, keyword: str) -> bool:
         """
         :param keyword: A keyword argument.
         :return: Whether :attr:`_factory_` takes that keyword, as a parameter of that
             name or through arbitrary keywords (a ``**kwargs`` parameter).
         """
-        return CallSignature.of(self._factory_).accepts_keyword(keyword)
+        return CallSignature.of(callee=self._factory_).accepts_keyword(keyword=keyword)
 
-    def _is_kept_out_of_construction_(self, keyword: str, value_type: type) -> bool:
+    def _is_kept_out_of_construction_(self, *, keyword: str, value_type: type) -> bool:
         """
         :param keyword: A keyword argument.
         :param value_type: The type of the value given for that keyword.
@@ -136,7 +136,7 @@ class HasFactoryAndKwargs(Generic[T]):
         """
         return False
 
-    def _recurse_construct_instance_and_get_value(self, value: Any):
+    def _recurse_construct_instance_and_get_value(self, *, value: Any):
         """
         Recursively construct an instance and return it.
 

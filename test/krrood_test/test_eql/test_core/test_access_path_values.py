@@ -83,7 +83,7 @@ def test_chain_through_a_flattened_attribute_has_no_single_value(
     chain = flat_variable(variable(Cabinet, domain=cabinets).drawers).handle.name
 
     with pytest.raises(MultipleValuesAlongAccessPath):
-        chain.apply_mapping_on_external_root(cabinet)
+        chain.apply_mapping_on_external_root(instance=cabinet)
 
 
 def test_chain_through_a_flattened_attribute_is_rejected_whatever_the_collection_holds(
@@ -101,7 +101,7 @@ def test_chain_through_a_flattened_attribute_is_rejected_whatever_the_collection
     chain = flat_variable(variable(Cabinet, domain=cabinets).drawers).handle.name
 
     with pytest.raises(MultipleValuesAlongAccessPath):
-        chain.apply_mapping_on_external_root(cabinet)
+        chain.apply_mapping_on_external_root(instance=cabinet)
 
 
 # %% a step that maps one value to none
@@ -186,7 +186,7 @@ def test_chain_written_on_a_pattern_reaches_the_value_it_states():
     handle_name = "Handle1"
     drawer = a(Drawer)(handle=a(Handle)(name=handle_name))
 
-    assert drawer.handle.name.apply_mapping_on_external_root(drawer) is handle_name
+    assert drawer.handle.name.apply_mapping_on_external_root(instance=drawer) is handle_name
 
 
 def test_chain_through_a_pattern_that_does_not_state_the_attribute_reaches_no_value():
@@ -258,7 +258,7 @@ def test_setting_through_a_flattened_attribute_has_no_single_value(
     chain = flat_variable(variable(Cabinet, domain=cabinets).drawers).handle.name
 
     with pytest.raises(MultipleValuesAlongAccessPath):
-        chain._set_external_root_instance_value_(cabinet, "Handle9")
+        chain._set_external_root_instance_value_(instance=cabinet, value="Handle9")
 
 
 def test_setting_through_a_step_that_reaches_no_value_is_reported(

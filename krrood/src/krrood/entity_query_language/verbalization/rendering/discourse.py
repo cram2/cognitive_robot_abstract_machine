@@ -37,11 +37,11 @@ class DiscourseView(Protocol):
     focus referent is.
     """
 
-    def is_scope(self, source: FoldNode | None) -> bool: ...
+    def is_scope(self, *, source: FoldNode | None) -> bool: ...
 
-    def focus_of(self, source: FoldNode | None) -> uuid.UUID | None: ...
+    def focus_of(self, *, source: FoldNode | None) -> uuid.UUID | None: ...
 
-    def is_selected_quantity(self, node_id: uuid.UUID | None) -> bool: ...
+    def is_selected_quantity(self, *, node_id: uuid.UUID | None) -> bool: ...
 
 
 class DiscourseScopeRule(SpecificityRule):
@@ -59,20 +59,22 @@ class DiscourseScopeRule(SpecificityRule):
     """The EQL node class this scope rule opens a scope for (the ``isinstance`` gate)."""
 
     @classmethod
-    def applies(cls, node: SymbolicExpression, microplan: Microplan) -> bool:
+    def applies(cls, *, node: SymbolicExpression, microplan: Microplan) -> bool:
         """:return: ``True`` when *node* is an instance of this rule's :attr:`construct`.
 
         >>> robot = variable(Robot, [])
-        >>> QuantifierScope.applies(exists(robot, robot.battery > 0), None)
+        >>> QuantifierScope.applies(
+        ...     node=exists(robot, robot.battery > 0), microplan=None
+        ... )
         True
-        >>> QuantifierScope.applies(robot.battery > 0, None)
+        >>> QuantifierScope.applies(node=robot.battery > 0, microplan=None)
         False
         """
         return isinstance(node, cls.construct)
 
     @classmethod
     @abstractmethod
-    def focus(cls, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
+    def focus(cls, *, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
         """:return: The id of *node*'s focus referent — the one a possessive pronoun in its body
         resolves to (``None`` when the scope has no single subject)."""
 
@@ -89,7 +91,7 @@ class QueryScope(DiscourseScopeRule):
     construct = Query
 
     @classmethod
-    def focus(cls, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
+    def focus(cls, *, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
         """:return: The query's focus referent, read from its plan.
 
         >>> robot = variable(Robot, [])
@@ -99,10 +101,10 @@ class QueryScope(DiscourseScopeRule):
         >>> QueryScope.focus(query, services.microplan) == robot._id_
         True
         """
-        return cls._focus_from_plan(microplan.plan_for(node, QueryPlanner))
+        return cls._focus_from_plan(plan=microplan.plan_for(node=node, planner=QueryPlanner))
 
     @staticmethod
-    def _focus_from_plan(plan: QueryPlan) -> uuid.UUID | None:
+    def _focus_from_plan(*, plan: QueryPlan) -> uuid.UUID | None:
         """:return: The focus referent id for a query plan — the aggregation source for an
         aggregation value-subquery, else the WHERE subject, else the single common chain root (so a
         subject-less query like a ``set_of`` still pronominalises *"its …"*), else ``None``.
@@ -134,7 +136,7 @@ class QuantifierScope(DiscourseScopeRule):
     construct = QuantifiedConditional
 
     @classmethod
-    def focus(cls, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
+    def focus(cls, *, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
         """:return: The bound variable's referent id — the condition's chains rooted there
         pronominalise.
 
@@ -145,7 +147,7 @@ class QuantifierScope(DiscourseScopeRule):
         return node.variable._id_
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class DiscourseModel:
     """
     The focus referent of every discourse scope, projected once via the
@@ -175,7 +177,7 @@ class DiscourseModel:
 
     @classmethod
     def from_expression(
-        cls, expression: SymbolicExpression, microplan: Microplan
+        cls, *, expression: SymbolicExpression, microplan: Microplan
     ) -> DiscourseModel:
         """
         :param expression: The root EQL expression.
@@ -206,7 +208,9 @@ class DiscourseModel:
         focus: dict[uuid.UUID, uuid.UUID | None] = {}
         selected_quantities: set[uuid.UUID] = set()
         for node in expression._all_expressions_:
-            scope_rule = DiscourseScopeRule.most_applicable(node, microplan)
+            scope_rule = DiscourseScopeRule.most_applicable(
+                node=node, microplan=microplan
+            )
             if scope_rule is not None:
                 focus[node._id_] = scope_rule.focus(node, microplan)
             leaf = (
@@ -214,9 +218,9 @@ class DiscourseModel:
             )
             if leaf is not None:
                 selected_quantities.add(leaf._id_)
-        return cls(focus, frozenset(selected_quantities))
+        return cls(_focus_by_scope=focus, _selected_quantities=frozenset(selected_quantities))
 
-    def is_scope(self, source: FoldNode | None) -> bool:
+    def is_scope(self, *, source: FoldNode | None) -> bool:
         """:return: ``True`` when *source* is a query node that opens a discourse scope.
 
         Only a real expression carries an ``_id_``; a synthetic coordination artifact (or ``None``)
@@ -229,7 +233,7 @@ class DiscourseModel:
             return False
         return source._id_ in self._focus_by_scope
 
-    def focus_of(self, source: FoldNode | None) -> uuid.UUID | None:
+    def focus_of(self, *, source: FoldNode | None) -> uuid.UUID | None:
         """:return: The focus referent of *source*'s scope, or ``None``.
 
         >>> EMPTY_DISCOURSE.focus_of(None) is None
@@ -239,7 +243,7 @@ class DiscourseModel:
             return None
         return self._focus_by_scope.get(source._id_)
 
-    def is_selected_quantity(self, node_id: uuid.UUID | None) -> bool:
+    def is_selected_quantity(self, *, node_id: uuid.UUID | None) -> bool:
         """:return: ``True`` when *node_id* is a quantity the query selects (e.g. an aggregation's
         measured attribute), so its repeat mention reduces to a bare *"the <attribute>"*.
 
@@ -249,7 +253,7 @@ class DiscourseModel:
         return node_id is not None and node_id in self._selected_quantities
 
 
-EMPTY_DISCOURSE = DiscourseModel({})
+EMPTY_DISCOURSE = DiscourseModel(_focus_by_scope={})
 """
 A discourse model with no scopes — for local sub-tree realisation (opaque templates).
 """

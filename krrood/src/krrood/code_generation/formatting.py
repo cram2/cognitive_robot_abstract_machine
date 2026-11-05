@@ -20,7 +20,7 @@ def run_subprocess_on_file(command: list[str]) -> None:
     try:
         result = subprocess.run(command, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        raise SubprocessExecutionError(command, e.returncode, e.stdout, e.stderr) from e
+        raise SubprocessExecutionError(command=command, return_code=e.returncode, stdout=e.stdout, stderr=e.stderr) from e
 
 
 def run_black_on_file(filename: str) -> None:

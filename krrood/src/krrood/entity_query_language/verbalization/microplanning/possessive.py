@@ -50,9 +50,9 @@ def attribute_fragment(
     'salary'
     """
     if step.source_reference is None:
-        return RoleFragment.for_attribute(None, step.name, number)
+        return RoleFragment.for_attribute(owner=None, attribute_name=step.name, number=number)
     return RoleFragment.for_attribute(
-        step.source_reference.owner_type, step.source_reference.attribute, number
+        owner=step.source_reference.owner_type, attribute_name=step.source_reference.attribute, number=number
     )
 
 
@@ -103,7 +103,7 @@ def _genitive_article(step: PathStep) -> VerbalizationFragment | None:
     A genitive hop is a fresh, non-anaphoric description of an attribute, so a mass-noun hop reads
     in its bare generic form; only countable hops take *"the"*.
     """
-    if NounCountability().is_uncountable(step.name):
+    if NounCountability().is_uncountable(noun=step.name):
         return None
     return Articles.THE.as_fragment()
 
@@ -156,7 +156,7 @@ def _relative_clause(
         modifiers = [
             Keywords.WHO.as_fragment(),
             RoleFragment.for_attribute(
-                relation.owner_class, step.name, text=relation.active_verb
+                owner=relation.owner_class, attribute_name=step.name, text=relation.active_verb
             ),
             owner_fragment,
         ]
@@ -165,13 +165,13 @@ def _relative_clause(
             WordFragment(text=relation.preposition),
             Keywords.WHICH.as_fragment(),
             owner_fragment,
-            Copulas.for_number(owner_number),
+            Copulas.for_number(number=owner_number),
             RoleFragment.for_attribute(
-                relation.owner_class, step.name, text=relation.participle
+                owner=relation.owner_class, attribute_name=step.name, text=relation.participle
             ),
         ]
     return NounPhrase(
-        head=RoleFragment.for_type(relation.value_type),
+        head=RoleFragment.for_type(type_=relation.value_type),
         definiteness=Definiteness.DEFINITE,
         modifiers=modifiers,
         referent_id=relation.referent_id,
@@ -204,9 +204,9 @@ def subject_relative_relation(
     return PhraseFragment(
         parts=[
             Keywords.THAT.as_fragment(),
-            Copulas.for_number(number),
+            Copulas.for_number(number=number),
             RoleFragment.for_attribute(
-                owner_class, attribute_name, text=relation.participle
+                owner=owner_class, attribute_name=attribute_name, text=relation.participle
             ),
             WordFragment(text=relation.preposition),
             object_fragment,
@@ -341,7 +341,7 @@ def pronominal_path(
     possessive_pronoun = Pronouns.possessive(subject_number).as_fragment()
     if not parts:
         return possessive_pronoun
-    nominative_pronoun = Pronouns.nominative(subject_number).as_fragment()
+    nominative_pronoun = Pronouns.nominative(number=subject_number).as_fragment()
     # The innermost hop, adjacent to the elided root, takes the pronoun; the rest extend it exactly
     # as :func:`possessive_path` does.
     first, rest = parts[0], parts[1:]

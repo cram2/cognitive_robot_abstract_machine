@@ -19,10 +19,10 @@ class ContextAwareCopilotShell:
     def _init_shell(self):
         cfg = Config()
         shell = InteractiveShellEmbed(config=cfg, user_ns=self.scope)
-        self._add_keybindings(shell)
+        self._add_keybindings(shell=shell)
         return shell
 
-    def _add_keybindings(self, shell):
+    def _add_keybindings(self, *, shell):
         kb = KeyBindings()
 
         @kb.add("c-space")  # Trigger with Ctrl+Space
@@ -33,7 +33,7 @@ class ContextAwareCopilotShell:
 
             print("\n🔍 Generating context-aware suggestion...\n")
             # suggestion = self.get_suggestion(current_code, context)
-            suggestion = self.get_suggestion_local(current_code, context)
+            suggestion = self.get_suggestion_local(code=current_code, context_vars=context)
             print(f"\n💡 Suggestion:\n{suggestion}\n")
 
         shell.pt_app.key_bindings = kb
@@ -57,7 +57,7 @@ class ContextAwareCopilotShell:
 
         return "\n".join(summary[-10:])  # Limit to last 10 vars
 
-    def get_suggestion(self, code, context_vars):
+    def get_suggestion(self, *, code, context_vars):
         prompt = f"""You're a Python assistant helping inside a live debugger shell.
 Current variables:
 {context_vars}
@@ -84,7 +84,7 @@ Respond with a Python snippet that makes sense in context.
         except Exception as e:
             return f"❌ Error: {e}"
 
-    def get_suggestion_local(self, code, context_vars):
+    def get_suggestion_local(self, *, code, context_vars):
         prompt = f"""You are a helpful Python assistant.
     Current variables:
     {context_vars}

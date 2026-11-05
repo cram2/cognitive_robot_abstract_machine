@@ -25,7 +25,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Thing:
     battery: int
     salary: int
@@ -49,7 +49,7 @@ def test_attribute_predicate_selects_the_whose_form():
     """
     thing = variable(_Thing, [])
     form = ConditionForm.most_applicable(
-        Placement(item=thing.battery > 50, subject=thing)
+        request=Placement(item=thing.battery > 50, subject=thing)
     )
     assert form is WhosePredicateForm
     assert form.position is SurfacePosition.WHOSE
@@ -62,7 +62,9 @@ def test_range_fold_selects_the_whose_range_form():
     """
     thing = variable(_Thing, [])
     (folded,) = fold_range_pairs([thing.salary > 100, thing.salary < 200])
-    form = ConditionForm.most_applicable(Placement(item=folded, subject=thing))
+    form = ConditionForm.most_applicable(
+        request=Placement(item=folded, subject=thing)
+    )
     assert form is WhoseRangeForm
     assert form.position is SurfacePosition.WHOSE
 
@@ -75,7 +77,7 @@ def test_non_foldable_conjunct_falls_back_to_standalone():
     """
     thing = variable(_Thing, [])
     form = ConditionForm.most_applicable(
-        Placement(item=thing.battery > thing.salary, subject=thing)
+        request=Placement(item=thing.battery > thing.salary, subject=thing)
     )
     assert form is StandaloneForm
     assert form.position is SurfacePosition.STANDALONE
@@ -89,6 +91,6 @@ def test_selection_is_total():
     thing = variable(_Thing, [])
     other = variable(_Thing, [])
     form = ConditionForm.most_applicable(
-        Placement(item=other.battery > 1, subject=thing)
+        request=Placement(item=other.battery > 1, subject=thing)
     )
     assert form is StandaloneForm

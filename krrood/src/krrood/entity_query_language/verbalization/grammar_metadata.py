@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GrammarMetadata(FieldMetadata):
     """
     Grammar / verbalization hints for a field.

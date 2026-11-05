@@ -184,7 +184,7 @@ def test_ranking_hierarchical_rendering():
         .ordered_by(e.starting_salary, descending=True)
         .limit(3)
     )
-    text = VerbalizationPipeline(HierarchicalRenderer(PlainFormatter())).verbalize(q)
+    text = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=PlainFormatter())).verbalize(expression=q)
     assert text == (
         "Find the top three Employees by starting_salary\n"
         "  - whose salaries are greater than 1000"
@@ -245,5 +245,5 @@ def test_ranking_form_selection(n, direction, relation, expected):
         relation=relation_value,
         order_key=None,
     )
-    form = RankingForm.most_applicable(RankingRequest(plan=plan))
+    form = RankingForm.most_applicable(request=RankingRequest(plan=plan))
     assert form.__name__ == expected

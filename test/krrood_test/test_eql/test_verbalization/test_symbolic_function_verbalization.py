@@ -27,7 +27,7 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import Noun
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RemainingLoad(SymbolicFunction):
     """
     A value ``SymbolicFunction`` with a custom noun surface, exercising the class form.
@@ -47,8 +47,8 @@ class RemainingLoad(SymbolicFunction):
         return self.capacity - self.load
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return Noun(WordFragment(text="the remaining load")).as_fragment()
+    def _verbalization_fragment_(cls, *, fields):
+        return Noun(content=WordFragment(text="the remaining load")).as_fragment()
 
 
 def test_symbolic_function_and_predicate_share_a_base():
@@ -67,7 +67,7 @@ def test_symbolic_function_subclass_uses_its_custom_fragment():
     """
     numbers = variable(int, [])
     assert (
-        verbalize_expression(a(set_of(RemainingLoad(numbers, numbers))))
+        verbalize_expression(a(set_of(RemainingLoad(capacity=numbers, load=numbers))))
         == "Find the remaining load"
     )
 
@@ -80,7 +80,7 @@ def test_symbolic_function_subclass_evaluates_via_call():
     assert RemainingLoad._construct_normally_(capacity=10, load=3)() == 7
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Doubled(SymbolicFunction):
     """
     A single-argument value ``SymbolicFunction``, exercising query evaluation.
@@ -95,8 +95,8 @@ class Doubled(SymbolicFunction):
         return self.number * 2
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return Noun(WordFragment(text="the doubled number")).as_fragment()
+    def _verbalization_fragment_(cls, *, fields):
+        return Noun(content=WordFragment(text="the doubled number")).as_fragment()
 
 
 def test_symbolic_function_binds_its_computed_value_in_a_query():
@@ -105,7 +105,7 @@ def test_symbolic_function_binds_its_computed_value_in_a_query():
     called), exactly like a ``@symbolic_function`` — not the constructed instance.
     """
     numbers = variable(int, domain=[1, 2, 3])
-    values = sorted(an(entity(Doubled(numbers))).tolist())
+    values = sorted(an(entity(Doubled(number=numbers))).tolist())
     assert values == [2, 4, 6]
 
 

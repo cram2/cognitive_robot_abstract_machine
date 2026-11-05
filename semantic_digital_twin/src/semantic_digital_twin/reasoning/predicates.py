@@ -101,19 +101,19 @@ class InContactWith(Triple[TBody, TBody]):
         return result.distance
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the body is in contact with the other body"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["body1"]),
+            Noun(content=fields["body1"]),
             Copula(),
             Prepositions.IN,
-            Noun.bare("contact"),
+            Noun.bare(head="contact"),
             Prepositions.WITH,
-            Noun(fields["body2"]),
+            Noun(content=fields["body2"]),
         )
 
 
@@ -156,18 +156,18 @@ class Reachable(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the pose is reachable by the tip"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["pose"]),
+            Noun(content=fields["pose"]),
             Copula(),
-            Adjective("reachable"),
+            Adjective(word="reachable"),
             Prepositions.BY,
-            Noun(fields["tip"]),
+            Noun(content=fields["tip"]),
         )
 
 
@@ -265,7 +265,7 @@ class SupportedBy(Triple[TBody, TBody]):
         return self.supporting
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the supported body is supported by the supporting body"*.
 
@@ -275,11 +275,11 @@ class SupportedBy(Triple[TBody, TBody]):
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["supported"]),
+            Noun(content=fields["supported"]),
             Copula(),
-            Adjective("supported"),
+            Adjective(word="supported"),
             Prepositions.BY,
-            Noun(fields["supporting"]),
+            Noun(content=fields["supporting"]),
         )
 
     def __call__(self) -> bool:
@@ -330,7 +330,7 @@ class Supports(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the body is supporting a body"*, naming what is held up, which the
         class name leaves implicit.
@@ -338,10 +338,10 @@ class Supports(Predicate):
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["supporting_body"]),
+            Noun(content=fields["supporting_body"]),
             Copula(),
-            Adjective("supporting"),
-            Noun("body"),
+            Adjective(word="supporting"),
+            Noun(content="body"),
         )
 
 
@@ -407,17 +407,17 @@ class InsideRegion(Triple[TBody, TRegion]):
         return intersection.volume / body_volume
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the body is inside the region"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["body"]),
+            Noun(content=fields["body"]),
             Copula(),
             Prepositions.INSIDE,
-            Noun(fields["region"]),
+            Noun(content=fields["region"]),
         )
 
 
@@ -468,7 +468,7 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the point is left of the other point, seen from the point of view"*,
         with the direction taken from the relation's own name.
@@ -477,12 +477,12 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
         """
         direction = camel_case_to_words(cls.__name__).lower()
         return clause(
-            Noun(fields["point"]),
+            Noun(content=fields["point"]),
             Copula(),
-            Adjective(direction),
-            Noun(fields["other"]),
+            Adjective(word=direction),
+            Noun(content=fields["other"]),
             Prepositions.FROM,
-            Noun(fields["point_of_view"]),
+            Noun(content=fields["point_of_view"]),
         )
 
     point_of_view: HomogeneousTransformationMatrix
@@ -655,17 +655,17 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
         return float(inside.mean())
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the body is inside the other"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["body"]),
+            Noun(content=fields["body"]),
             Copula(),
             Prepositions.INSIDE,
-            Noun(fields["other"]),
+            Noun(content=fields["other"]),
         )
 
 
@@ -689,13 +689,13 @@ class ContainsType(Predicate):
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["iterable"]),
-            Verb("contain"),
-            Noun("instance"),
+            Noun(content=fields["iterable"]),
+            Verb(lemma="contain"),
+            Noun(content="instance"),
             Prepositions.OF,
-            Noun(fields["obj_type"]),
+            Noun(content=fields["obj_type"]),
         )
 
 
@@ -762,13 +762,13 @@ class PlaceIsOccupied(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         Reads as *"the place is occupied"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
-        return clause(Noun(fields["box"]), Copula(), Adjective("occupied"))
+        return clause(Noun(content=fields["box"]), Copula(), Adjective(word="occupied"))
 
 
 @symbolic_function

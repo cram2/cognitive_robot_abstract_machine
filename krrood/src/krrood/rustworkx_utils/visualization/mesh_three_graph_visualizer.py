@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from flask import Flask
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
     """Render a live rustworkx graph of world entities with 3d-force-graph, drawing each ``Body``
     node using its actual :attr:`~semantic_digital_twin.world_description.world_entity.Body.visual`
@@ -80,7 +80,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
     graph's node spacing.
     """
 
-    def node_extra_data(self, node_index: int) -> dict[str, Any]:
+    def node_extra_data(self, *, node_index: int) -> dict[str, Any]:
         """
         :param node_index: The rustworkx index of the node.
         :return: A ``meshUrl`` field when the node's
@@ -91,7 +91,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
             return {}
         return {"meshUrl": f"mesh/{node_index}.glb"}
 
-    def register_additional_routes(self, application: Flask) -> None:
+    def register_additional_routes(self, *, application: Flask) -> None:
         """
         Serve each node's exported mesh at ``/mesh/<node_index>.glb``.
 
@@ -104,7 +104,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
             """
             Called for each node to convert the mesh attached to it to glb
             """
-            glb_bytes = self._mesh_glb(node_index)
+            glb_bytes = self._mesh_glb(node_index=node_index)
             if glb_bytes is None:
                 return Response(status=404)
             return Response(glb_bytes, mimetype="model/gltf-binary")
@@ -210,7 +210,7 @@ class MeshThreeGraphVisualizer(ThreeGraphVisualizer):
 }})();
 """
 
-    def _mesh_glb(self, node_index: int) -> bytes | None:
+    def _mesh_glb(self, *, node_index: int) -> bytes | None:
         """
         :param node_index: The rustworkx index of the node.
         :return: The node's mesh exported as glTF-binary (GLB) bytes, cached after the first

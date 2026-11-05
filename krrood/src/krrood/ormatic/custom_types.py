@@ -215,7 +215,7 @@ class ZoneInfoType(TextValueType[zoneinfo.ZoneInfo]):
         self, value: zoneinfo.ZoneInfo | None, dialect: Dialect
     ) -> str | None:
         if value is not None and value.key is None:
-            raise ZoneInfoWithoutKey(value)
+            raise ZoneInfoWithoutKey(zone=value)
         return super().process_bind_param(value, dialect)
 
 

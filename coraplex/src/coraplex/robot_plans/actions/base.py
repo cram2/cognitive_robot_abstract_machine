@@ -80,7 +80,7 @@ class Action(CompositeNode, ABC):
         statechart_fields = {action_field.name for action_field in fields(Action)}
         return {
             discovered.public_name: getattr(self, discovered.field.name)
-            for discovered in DataclassOnlyIntrospector().discover(type(self))
+            for discovered in DataclassOnlyIntrospector().discover(owner_cls=type(self))
             if discovered.field.init and discovered.field.name not in statechart_fields
         }
 

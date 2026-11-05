@@ -250,7 +250,7 @@ class MilkGraspedLow(Milk):
 
     @classproperty
     def grasp_strategy(cls) -> GraspStrategy:
-        return GraspFromAnySide(height=Bounds(0.05, 0.5))
+        return GraspFromAnySide(height=Bounds(lower=0.05, upper=0.5))
 
 
 def test_an_annotation_can_state_where_it_may_be_grasped(milk):
@@ -346,7 +346,7 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
 
 
 def test_a_wall_is_pinched_as_deep_as_asked(bowl):
-    strategy = PinchARim(depth=Bounds(0.1, 0.9))
+    strategy = PinchARim(depth=Bounds(lower=0.1, upper=0.9))
     allowed = allowed_intervals(strategy.statement(bowl.rim))
     wall_thickness = strategy.depth_unit(bowl.rim, bowl.rim.grasp_surface())
 
@@ -359,7 +359,7 @@ def test_a_wall_is_pinched_as_deep_as_asked(bowl):
 
 
 def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
-    pitch, roll = Bounds(0.0, 0.3), Bounds(-0.2, 0.2)
+    pitch, roll = Bounds(lower=0.0, upper=0.3), Bounds(lower=-0.2, upper=0.2)
     allowed = allowed_intervals(PinchARim(pitch=pitch, roll=roll).statement(bowl.rim))
 
     assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(pitch.upper)
@@ -368,7 +368,7 @@ def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
 
 
 def test_a_rim_is_pinched_between_the_heights_asked(bowl):
-    height = Bounds(0.1, 0.9)
+    height = Bounds(lower=0.1, upper=0.9)
     allowed = allowed_intervals(PinchARim(height=height).statement(bowl.rim))
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(height.lower)
@@ -379,7 +379,7 @@ def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked
     bowl,
 ):
     bowl.rim = None
-    rim_depth, rim_fraction = 0.02, Bounds(0.1, 0.9)
+    rim_depth, rim_fraction = 0.02, Bounds(lower=0.1, upper=0.9)
     allowed = allowed_intervals(
         PinchTheTopOfAWall(rim_depth=rim_depth, rim_fraction=rim_fraction).statement(
             bowl
@@ -464,7 +464,7 @@ def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
 
 def test_cutlery_is_grasped_along_its_length_as_far_as_asked():
     spoon = _spoon_lying_along(0)
-    strategy = GraspAcrossTheLength(position=Bounds(0.3, 0.7))
+    strategy = GraspAcrossTheLength(position=Bounds(lower=0.3, upper=0.7))
     allowed = allowed_intervals(strategy.statement(spoon))
 
     assert allowed["position"].simple_sets[0].lower == pytest.approx(
@@ -560,7 +560,7 @@ def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
 
 def test_a_handle_is_grasped_along_its_bar_and_around_it_as_far_as_asked():
     handle = _mug(with_handle=True).handle
-    strategy = GraspABar(position=Bounds(0.3, 0.7), angle=Bounds(0.5, 1.5))
+    strategy = GraspABar(position=Bounds(lower=0.3, upper=0.7), angle=Bounds(lower=0.5, upper=1.5))
     allowed = allowed_intervals(strategy.statement(handle))
 
     assert allowed["position"].simple_sets[0].lower == pytest.approx(

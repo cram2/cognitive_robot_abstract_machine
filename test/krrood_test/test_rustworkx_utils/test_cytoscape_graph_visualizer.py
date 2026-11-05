@@ -12,7 +12,7 @@ from krrood.rustworkx_utils.visualization.cytoscape_graph_visualizer import (
 from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NamedPayload:
     """A payload whose name is shown as the node label and detail line."""
 
@@ -23,7 +23,7 @@ class NamedPayload:
 def chain_graph(names: list[str]) -> rx.PyDiGraph:
     """Build a directed chain of :class:`NamedPayload` nodes."""
     graph = rx.PyDiGraph(multigraph=False)
-    indices = [graph.add_node(NamedPayload(name)) for name in names]
+    indices = [graph.add_node(NamedPayload(name=name)) for name in names]
     for parent, child in zip(indices, indices[1:]):
         graph.add_edge(parent, child, None)
     return graph
@@ -147,14 +147,14 @@ class TestLayout:
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
         assert (
-            CytoscapeGraphVisualizer.layout_options.get_options(visualizer.layout)["name"]
+            CytoscapeGraphVisualizer.layout_options.get_options(layout=visualizer.layout)["name"]
             == "breadthfirst"
         )
 
     def test_physics_layout_runs_a_continuous_force_simulation(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = CytoscapeGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = CytoscapeGraphVisualizer.layout_options.get_options(layout=visualizer.layout)
         assert options["name"] == "cola"
         assert options["infinite"] is True
 
@@ -225,7 +225,7 @@ class TestExtensionHooks:
 
 
 class TestCheckDependencies:
-    def test_raises_when_flask_is_missing(self, monkeypatch):
+    def test_raises_when_flask_is_missing(self, *, monkeypatch):
         original_find_spec = importlib.util.find_spec
 
         def find_spec_without_flask(name, *args, **kwargs):

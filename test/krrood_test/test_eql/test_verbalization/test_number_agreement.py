@@ -33,7 +33,7 @@ def _realised(fragment) -> str:
     """
     Apply the morphology pass (as ``build`` does), then flatten to plain text.
     """
-    return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
+    return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment=fragment))
 
 
 def test_number_of_bridges_boolean_plan_features():
@@ -42,8 +42,8 @@ def test_number_of_bridges_boolean_plan_features():
 
 
 def test_copula_agreement_is_applied_by_the_pass():
-    assert _realised(Copulas.for_number(GrammaticalNumber.SINGULAR)) == "is"
-    assert _realised(Copulas.for_number(GrammaticalNumber.PLURAL)) == "are"
+    assert _realised(Copulas.for_number(number=GrammaticalNumber.SINGULAR)) == "is"
+    assert _realised(Copulas.for_number(number=GrammaticalNumber.PLURAL)) == "are"
 
 
 def test_predicative_operator_factors_copula_for_agreement():
@@ -76,7 +76,7 @@ def test_predicative_operator_factors_copula_for_agreement():
 def test_existential_noun_pluralised_by_the_pass():
     assert (
         _realised(
-            ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).build_phrase(
+            ExistentialPhrase.for_number(number=GrammaticalNumber.SINGULAR).build_phrase(
                 "Robot"
             )
         )
@@ -84,7 +84,7 @@ def test_existential_noun_pluralised_by_the_pass():
     )
     assert (
         _realised(
-            ExistentialPhrase.for_number(GrammaticalNumber.PLURAL).build_phrase("Robot")
+            ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).build_phrase("Robot")
         )
         == "there are Robots"
     )

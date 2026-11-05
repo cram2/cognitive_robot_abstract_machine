@@ -54,9 +54,9 @@ def extract_feature_dataframe(objects: list[Any]) -> pd.DataFrame:
     :param objects: The semantic objects whose features are extracted.
     :return: One row per object with a mass and a class column.
     """
-    extractor = FeatureExtractor.from_instances(objects)
-    extracted = extractor.create_dataframe(objects)
-    extracted = extractor.preprocess_dataframe(extracted)
+    extractor = FeatureExtractor.from_instances(instances=objects)
+    extracted = extractor.create_dataframe(instances=objects)
+    extracted = extractor.preprocess_dataframe(df=extracted)
 
     mass_column = next(name for name in extracted.columns if name.endswith(".mass"))
     dataframe = pd.DataFrame(

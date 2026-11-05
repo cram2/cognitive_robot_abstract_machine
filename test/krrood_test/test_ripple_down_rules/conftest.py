@@ -14,8 +14,8 @@ def pytest_generate_tests(metafunc):
         all_cases, all_targets = load_zoo_dataset("./test_results/zoo")
 
         possible_case_queries = [
-            CaseQuery(all_cases[0], "species", (Species,), True),
-            CaseQuery(all_cases[1], "habitat", (Habitat,), False),
+            CaseQuery(original_case=all_cases[0], attribute_name="species", _attribute_types=(Species,), mutually_exclusive=True),
+            CaseQuery(original_case=all_cases[1], attribute_name="habitat", _attribute_types=(Habitat,), mutually_exclusive=False),
         ]
         metafunc.parametrize("case_query", possible_case_queries)
 
@@ -50,10 +50,10 @@ def drawer_case_queries(handles_and_containers_world) -> List[CaseQuery]:
     world = handles_and_containers_world
     for handle in [body for body in world.bodies if isinstance(body, Handle)]:
         for container in [body for body in world.bodies if isinstance(body, Container)]:
-            view = Drawer(handle, container, world=world)
+            view = Drawer(handle=handle, container=container, world=world)
             all_possible_drawers.append(view)
     case_queries = [
-        CaseQuery(possible_drawer, "correct", (bool,), True, default_value=False)
+        CaseQuery(original_case=possible_drawer, attribute_name="correct", _attribute_types=(bool,), mutually_exclusive=True, default_value=False)
         for possible_drawer in all_possible_drawers
     ]
     return case_queries
@@ -73,14 +73,14 @@ def view_rdr(
         os.path.dirname(__file__), "test_expert_answers", "view_rdr_expert_answers_fit"
     )
     if use_loaded_answers:
-        expert.load_answers(filename)
+        expert.load_answers(path=filename)
     rdr = GeneralRDR()
     for view in views:
-        rdr.fit_case(CaseQuery(world, "views", (view,), False), expert=expert)
+        rdr.fit_case(case_query=CaseQuery(original_case=world, attribute_name="views", _attribute_types=(view,), mutually_exclusive=False), expert=expert)
     if save_answers:
-        expert.save_answers(filename)
+        expert.save_answers(path=filename)
 
-    found_views = rdr.classify(world)
+    found_views = rdr.classify(case=world)
     for view in views:
         assert len([v for v in found_views["views"] if isinstance(v, view)]) > 0
 
@@ -92,7 +92,7 @@ def view_case_query(world: World, view_type: type[View]) -> CaseQuery:
     """
     Create a CaseQuery for the given view type in the provided world.
     """
-    return CaseQuery(world, "views", (view_type,), False)
+    return CaseQuery(original_case=world, attribute_name="views", _attribute_types=(view_type,), mutually_exclusive=False)
 
 
 @pytest.fixture
@@ -106,11 +106,11 @@ def drawer_rdr(
         "correct_drawer_rdr_expert_answers_fit",
     )
     if use_loaded_answers:
-        expert.load_answers(filename)
+        expert.load_answers(path=filename)
     rdr = GeneralRDR()
-    rdr.fit(drawer_case_queries, expert=expert, animate_tree=False)
+    rdr.fit(case_queries=drawer_case_queries, expert=expert, animate_tree=False)
     if save_answers:
-        expert.save_answers(filename)
+        expert.save_answers(path=filename)
     for case_query in drawer_case_queries:
-        assert is_matching(rdr.classify, case_query)
+        assert is_matching(lambda case, modify_case, case_query: rdr.classify(case=case, modify_case=modify_case, case_query=case_query), case_query)
     return rdr

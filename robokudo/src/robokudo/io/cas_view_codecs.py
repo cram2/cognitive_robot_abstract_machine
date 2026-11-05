@@ -461,7 +461,7 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
         """
         tracker = world.get_world_entity_tracker()
         kwargs = tracker.create_kwargs() if tracker is not None else {}
-        return HomogeneousTransformationMatrix.from_json(payload.payload, **kwargs)
+        return HomogeneousTransformationMatrix.from_json(data=payload.payload, **kwargs)
 
 
 # %% Recorded camera observations
@@ -525,7 +525,7 @@ class CameraObservationCodec(ViewCodec):
         )
         return ViewPayload(
             serializer_id=self.serializer_id,
-            payload=DataclassJSONSerializer.to_json(recorded),
+            payload=DataclassJSONSerializer.to_json(instance=recorded),
             type_name=_full_type_name(value),
         )
 
@@ -544,9 +544,9 @@ class CameraObservationCodec(ViewCodec):
         :raises InvalidCameraObservation: If the recorded camera or model is invalid.
         """
         recorded = DataclassJSONSerializer.from_json(
-            payload.payload, RecordedCameraObservation, **tracker.create_kwargs()
+            data=payload.payload, clazz=RecordedCameraObservation, **tracker.create_kwargs()
         )
-        camera = tracker.get(UUID(recorded.camera_id))
+        camera = tracker.get(key=UUID(recorded.camera_id))
         if not isinstance(camera, Camera):
             raise InvalidCameraObservation(reason="recorded entity is not a camera")
         if not isinstance(recorded.effective_camera_model, PinholeCameraModel):

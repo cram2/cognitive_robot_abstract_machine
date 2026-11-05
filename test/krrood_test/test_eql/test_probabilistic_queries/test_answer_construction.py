@@ -47,12 +47,12 @@ class LargeNumber(enum.IntEnum):
     SECOND = 2**53 + 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Counter:
     number: LargeNumber
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Die:
     face: int
     color: Color
@@ -67,7 +67,7 @@ def backend_of_dice() -> ProbabilisticBackend:
     :return: A backend whose model gives the faces 1 and 6 and both colors, built over
         the variables the backend creates for :func:`die_query`.
     """
-    variables = UnderspecifiedParameters(die_query()).variables
+    variables = UnderspecifiedParameters(statement=die_query()).variables
     face, color = variables["Die.face"], variables["Die.color"]
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
@@ -90,7 +90,7 @@ def backend_of_dice() -> ProbabilisticBackend:
             circuit,
         )
     )
-    return ProbabilisticBackend(model_registry=DictRegistry({Die: circuit}))
+    return ProbabilisticBackend(model_registry=DictRegistry(models={Die: circuit}))
 
 
 def test_integer_attributes_are_answered_as_integers():
@@ -118,7 +118,7 @@ def number_of_match_walks_for(amount: int, monkeypatch) -> int:
 
     backend = backend_of_dice()
     query = die_query()
-    query.limit(amount)
+    query.limit(n=amount)
     monkeypatch.setattr(
         AbstractMatchExpression, "_matches_with_variables_", property(counted)
     )
@@ -139,20 +139,20 @@ def test_a_variable_named_like_several_attributes_is_refused(monkeypatch):
     The attributes of a query have distinct names, so two of them are given the same
     name here.
     """
-    parameters = UnderspecifiedParameters(die_query())
+    parameters = UnderspecifiedParameters(statement=die_query())
     variable = parameters.variables["Die.face"]
     monkeypatch.setattr(
         AttributeMatch, "name_from_variable_access_path", property(lambda _: "Die.face")
     )
     with pytest.raises(AmbiguousVariableName) as error:
-        list(parameters.bindings_from_model_samples([variable], np.array([[1.0]])))
+        list(parameters.bindings_from_model_samples(variables=[variable], samples=np.array([[1.0]])))
     assert error.value.variable is variable
     assert len(error.value.attribute_matches) == 2
 
 
 def test_domain_elements_that_samples_cannot_tell_apart_are_refused():
     query = a(Counter)(number=...)
-    number = UnderspecifiedParameters(query).variables["Counter.number"]
+    number = UnderspecifiedParameters(statement=query).variables["Counter.number"]
     circuit = ProbabilisticCircuit()
     leaf(
         SymbolicDistribution(
@@ -161,7 +161,7 @@ def test_domain_elements_that_samples_cannot_tell_apart_are_refused():
         ),
         circuit,
     )
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Counter: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Counter: circuit}))
     with pytest.raises(DomainElementsIndistinguishableInSamples) as error:
         list(query.evaluate(backend=backend))
     assert error.value.variable == number

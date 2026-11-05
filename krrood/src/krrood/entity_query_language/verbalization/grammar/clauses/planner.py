@@ -9,7 +9,7 @@ from krrood.entity_query_language.query.query import Query, SetOf
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class GroupPlan:
     """
     The GROUP BY keys and the expressions aggregated over them.
@@ -46,7 +46,7 @@ class GroupPlan:
         return bool(self.keys)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GroupedByPlanner(Planner[Query, GroupPlan]):
     """
     Decompose a query's GROUP BY into a ``GroupPlan``.

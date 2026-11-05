@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 CytoscapeElement = Dict[str, Dict[str, Any]]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CytoscapeGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by Cytoscape.js.
 
@@ -53,7 +53,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
     )
     """The Cytoscape.js layout options for each :class:`GraphLayout`."""
 
-    def _node_element(self, node_index: int) -> CytoscapeElement:
+    def _node_element(self, *, node_index: int) -> CytoscapeElement:
         """
         :param node_index: The rustworkx index of the node.
         :return: The Cytoscape.js element for the node, with its border color included only if
@@ -62,10 +62,10 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         """
         data: dict[str, Any] = {
             "id": str(node_index),
-            "label": self.node_label(node_index),
-            "color": self.node_color(node_index),
+            "label": self.node_label(node_index=node_index),
+            "color": self.node_color(node_index=node_index),
         }
-        border_color = self.node_border_color(node_index)
+        border_color = self.node_border_color(node_index=node_index)
         if border_color is not None:
             data["borderColor"] = border_color
         return {"data": data}
@@ -74,7 +74,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         """
         :return: The Cytoscape.js node and edge elements for the current graph.
         """
-        elements = [self._node_element(index) for index in self.graph.node_indices()]
+        elements = [self._node_element(node_index=index) for index in self.graph.node_indices()]
         elements += [
             {
                 "data": {
@@ -119,7 +119,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "cytoscape_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
+                layout_options_json=json.dumps(self.layout_options.get_options(layout=self.layout)),
                 extra_node_styles_json=json.dumps(self.extra_node_styles()),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
                 extra_script=self.extra_script(),
@@ -137,7 +137,7 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             """
             Is called for each node to parse the node details to json
             """
-            return jsonify(details=self.node_details(node_index))
+            return jsonify(details=self.node_details(node_index=node_index))
 
         return application
 

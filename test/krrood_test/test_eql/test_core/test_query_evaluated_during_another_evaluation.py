@@ -65,7 +65,7 @@ def test_rule_tree_evaluated_while_another_query_is_evaluated_concludes_the_kind
     opening = Opening(width=0.5)
     kind = variable(
         OpeningKind,
-        domain=KindConcludedOnIteration(build_opening_kind_rule_tree(opening)),
+        domain=KindConcludedOnIteration(rule_tree=build_opening_kind_rule_tree(opening)),
     )
 
     assert an(entity(kind)).tolist() == [NarrowOpeningKind(opening=opening)]

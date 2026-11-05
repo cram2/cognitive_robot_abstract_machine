@@ -81,13 +81,13 @@ from krrood.entity_query_language.verbalization.verbalizer import (
 from ...dataset.department_and_employee import Department, Employee
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Task:
     name: str
     completed: bool
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Robot:
     name: str
     battery: int
@@ -108,12 +108,12 @@ from ...dataset.semantic_world_like_classes import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmountDetails:
     amount: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BankTransaction:
     amount_details: AmountDetails
     booking_date: datetime.datetime
@@ -156,7 +156,7 @@ def test_verbalization_produces_natural_language_not_repr():
     the expression's repr string like '(EntityType)'.
     """
 
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class _Smoke:
         value: float
 
@@ -189,8 +189,8 @@ def test_verbalize_variable_coreference():
     context = MicroplanningServices()
     pipeline = VerbalizationPipeline.plain()
     x = variable(Handle, [])
-    first = pipeline.verbalize(x, context)
-    second = pipeline.verbalize(x, context)
+    first = pipeline.verbalize(expression=x, services=context)
+    second = pipeline.verbalize(expression=x, services=context)
     assert first == "a Handle"
     assert second == "the Handle"
 
@@ -244,7 +244,7 @@ def test_verbalize_has_types_is_membership():
     """
     subject = variable(Body, [])
     assert (
-        verbalize_expression(HasTypes(subject, (Apple, Cabinet)))
+        verbalize_expression(HasTypes(variable=subject, types_=(Apple, Cabinet)))
         == "a Body is of type Apple or Cabinet"
     )
 
@@ -263,7 +263,7 @@ def test_verbalize_has_types_lists_all_admissible_types():
         Handle,
         PrismaticConnection,
     )
-    text = verbalize_expression(HasTypes(subject, many))
+    text = verbalize_expression(HasTypes(variable=subject, types_=many))
     assert text == (
         "a Body is of type Apple, Cabinet, Container, Drawer, "
         "FixedConnection, Handle, or PrismaticConnection"
@@ -296,7 +296,7 @@ def test_verbalize_attribute_uses_of_form_all_hops():
 
 
 def test_verbalize_index_access_rendered_as_ordinal():
-    @dataclass
+    @dataclass(kw_only=True)
     class Robot:
         tasks: list
 
@@ -311,7 +311,7 @@ def test_verbalize_index_access_rendered_as_ordinal():
 
 
 def test_verbalize_negative_index_reads_from_the_end():
-    @dataclass
+    @dataclass(kw_only=True)
     class Robot:
         tasks: list
 
@@ -321,11 +321,11 @@ def test_verbalize_negative_index_reads_from_the_end():
 
 
 def test_verbalize_index_then_attribute_is_ordinal_chain():
-    @dataclass
+    @dataclass(kw_only=True)
     class Task:
         name: str
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Robot:
         tasks: list
 
@@ -336,7 +336,7 @@ def test_verbalize_index_then_attribute_is_ordinal_chain():
 
 
 def test_verbalize_bool_attribute_predicative():
-    @dataclass
+    @dataclass(kw_only=True)
     class _RobotActive:
         active: bool
 
@@ -349,7 +349,7 @@ def test_verbalize_bool_attribute_predicative():
 
 
 def test_verbalize_bool_attribute_negated():
-    @dataclass
+    @dataclass(kw_only=True)
     class _RobotActive:
         active: bool
 
@@ -389,55 +389,55 @@ def test_verbalize_second_index_ordinal():
 
 
 # %% Relational navigation: a verb-named hop reads as a relative clause
-@dataclass
+@dataclass(kw_only=True)
 class _NavRobot:
     operational: bool
     battery: int
     power: int
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavPerson:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavAuthor:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavAddress:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavMission:
     assigned_to: _NavRobot  # past participle + preposition → relation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavPair:
     primary: _NavMission
     secondary: _NavMission  # two missions, so two distinct assigned_to robots
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavBook:
     owned_by: _NavPerson  # agentive "by"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavDoc:
     written_by: _NavAuthor  # irregular participle + agentive "by"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavParcel:
     sent_to: _NavAddress  # irregular participle + goal "to"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavPanel:
     # "lit" is an irregular participle the shape heuristic misses, so it declares its form.
     lit: bool = field(
@@ -445,17 +445,17 @@ class _NavPanel:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavGadget:
     color_in: _NavPanel  # "color" is not a participle → plain genitive hop
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavDept:
     name: str
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _NavEmp:
     department: _NavDept
 
@@ -558,17 +558,17 @@ def test_non_relational_navigation_unchanged():
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Cash:
     amount: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Wallet:
     money: _Cash
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Holder:
     wallet: _Wallet
 
@@ -776,14 +776,14 @@ def test_pronominal_relative_clause_agrees_with_subject_number():
         realize_subtree,
     )
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Target:
         pass
 
     step = PathStep(
-        "assigned_to",
-        None,
-        relation=RelationStep(_Target, _NavMission, "assigned", "to"),
+        name="assigned_to",
+        source_reference=None,
+        relation=RelationStep(value_type=_Target, owner_class=_NavMission, participle="assigned", preposition="to"),
     )
     assert (
         realize_subtree(pronominal_path([step], GrammaticalNumber.SINGULAR))
@@ -1301,8 +1301,8 @@ def test_nested_non_aggregation_entity_keeps_distinguishing():
 # %% Integration: target test cases
 def test_verbalize_presentation_example():
     robots = [
-        _Robot("Robot1", 100, [_Task("Task1", True)]),
-        _Robot("Robot3", 75, [_Task("Task5", False)]),
+        _Robot(name="Robot1", battery=100, tasks=[_Task(name="Task1", completed=True)]),
+        _Robot(name="Robot3", battery=75, tasks=[_Task(name="Task5", completed=False)]),
     ]
     r = variable(_Robot, robots)
     q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))
@@ -1441,7 +1441,7 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     prismatic_connection = variable(PrismaticConnection, world.connections)
     fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.parent,
         handle=fixed_connection.child,
@@ -1480,7 +1480,7 @@ def test_verbalize_inference_rule_golden(doors_and_drawers_world):
     prismatic_connection = variable(PrismaticConnection, world.connections)
     fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.parent,
         handle=fixed_connection.child,
@@ -1511,7 +1511,7 @@ def test_verbalize_inference_no_sub_query_golden(doors_and_drawers_world):
 
 
 def test_verbalize_condition_graph_example():
-    @dataclass(frozen=True)
+    @dataclass(kw_only=True, frozen=True)
     class Item:
         value: int
 
@@ -1528,12 +1528,12 @@ def test_verbalize_condition_graph_example():
 
 
 def test_verbalize_has_type_with_exists():
-    fb1 = FruitBox("FruitBox1", [Apple("apple"), Body("Body1")])
-    fb2 = FruitBox("FruitBox2", [Body("Body3")])
+    fb1 = FruitBox(name="FruitBox1", fruits=[Apple(name="apple"), Body(name="Body1")])
+    fb2 = FruitBox(name="FruitBox2", fruits=[Body(name="Body3")])
     fruit_box = variable(FruitBox, domain=[fb1, fb2])
     query = an(
         entity(fruit_box).where(
-            exists(fruit_box, HasType(flat_variable(fruit_box.fruits), Apple))
+            exists(fruit_box, HasType(variable=flat_variable(fruit_box.fruits), types_=Apple))
         )
     )
     text = verbalize_expression(query)
@@ -1547,7 +1547,7 @@ def test_verbalize_has_type_with_exists():
 # %% Predicate fragment tests
 def test_verbalize_has_type():
     fruit = variable(Body, [])
-    predicate = HasType(fruit, Apple)
+    predicate = HasType(variable=fruit, types_=Apple)
     text = verbalize_expression(predicate)
     assert "Body" in text
     assert "is of type" in text
@@ -1556,7 +1556,7 @@ def test_verbalize_has_type():
 
 def test_verbalize_has_type_tuple_of_types():
     fruit = variable(Body, [])
-    predicate = HasType(fruit, (Apple, Body))
+    predicate = HasType(variable=fruit, types_=(Apple, Body))
     text = verbalize_expression(predicate)
     assert "is of type" in text
     assert "Apple" in text
@@ -1571,14 +1571,14 @@ def test_has_type_lists_a_tuple_of_types_disjunctively():
     """
     fruit = variable(Body, [])
     assert (
-        verbalize_expression(HasType(fruit, (Apple, Body)))
+        verbalize_expression(HasType(variable=fruit, types_=(Apple, Body)))
         == "a Body is of type Apple or Body"
     )
 
 
 def test_verbalize_contains_type():
     fruit_box = variable(FruitBox, [])
-    predicate = ContainsType(fruit_box.fruits, Apple)
+    predicate = ContainsType(iterable=fruit_box.fruits, obj_type=Apple)
     text = verbalize_expression(predicate)
     assert "contains an instance of" in text
     assert "Apple" in text
@@ -1586,7 +1586,7 @@ def test_verbalize_contains_type():
 
 
 def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world):
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class IsReachable(Predicate):
         body: Any
 
@@ -1595,18 +1595,18 @@ def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world
 
         @classmethod
         def _verbalization_fragment_(cls, fields):
-            return clause(Noun(fields["body"]), Copula(), Adjective("reachable"))
+            return clause(Noun(content=fields["body"]), Copula(), Adjective(word="reachable"))
 
     world = handles_and_containers_world
     handle = variable(Handle, world.bodies)
-    predicate = IsReachable(handle)
+    predicate = IsReachable(location=handle)
     text = verbalize_expression(predicate)
     assert "a Handle" in text
     assert "is reachable" in text
 
 
 def test_verbalize_custom_predicate_employee_domain():
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class WorksInDepartment(Predicate):
         employee: Any
         department: Any
@@ -1617,10 +1617,10 @@ def test_verbalize_custom_predicate_employee_domain():
         @classmethod
         def _verbalization_fragment_(cls, fields):
             return clause(
-                Noun(fields["employee"]),
-                Verb("work"),
+                Noun(content=fields["employee"]),
+                Verb(lemma="work"),
                 Prepositions.IN,
-                Noun(fields["department"]),
+                Noun(content=fields["department"]),
             )
 
     employee = variable(Employee, [])
@@ -1638,7 +1638,7 @@ def test_verbalize_predicate_without_fragment_raises():
     it fails loudly instead of guessing a sentence.
     """
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class EarnsMoreThan(Predicate):
         employee: Any
         threshold: float
@@ -1657,7 +1657,7 @@ def test_name_based_clause_reads_a_verb_name_verb_first():
     — verb-first for a plain verb name (``EarnsMoreThan`` → *"… earns more than …"*).
     """
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class EarnsMoreThan(Predicate):
         employee: Any
         threshold: float
@@ -1683,7 +1683,7 @@ def test_name_based_clause_reads_a_copular_name_as_subject_is_complement():
     <complement>"*.
     """
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class IsActive(Predicate):
         entity: Any
 
@@ -1889,7 +1889,7 @@ def test_verbalize_inference_repeated_entity_article(doors_and_drawers_world):
     prismatic_connection = variable(PrismaticConnection, world.connections)
     fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     drawer = inference(Drawer)(
         container=fixed_connection.parent,
         handle=fixed_connection.child,
@@ -1928,7 +1928,7 @@ def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
     its own constraint frame.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Wrapper:
         drawer: Any
 
@@ -1937,7 +1937,7 @@ def test_verbalize_double_nested_constraint_stack(doors_and_drawers_world):
     prismatic_connection = variable(PrismaticConnection, world.connections)
     fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.parent,
         handle=fixed_connection.child,
@@ -1964,7 +1964,7 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     The inner and outer constraint frames must remain separate.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Wrapper:
         drawer: Any
         connection: Any
@@ -1974,7 +1974,7 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     prismatic_connection = variable(PrismaticConnection, world.connections)
     fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     drawer_var = inference(Drawer)(
         container=fixed_connection.parent,
         handle=fixed_connection.child,
@@ -1983,7 +1983,7 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     # A second entity used directly by the outer Wrapper
     handle2 = variable(Handle, world.bodies)
     pc2 = variable(PrismaticConnection, world.connections)
-    fc2 = a(FixedConnection)(parent=pc2.child, child=handle2).from_(world.connections)
+    fc2 = a(FixedConnection)(parent=pc2.child, child=handle2).from_(domain=world.connections)
 
     wrapper_var = inference(Wrapper)(drawer=drawer_var, connection=fc2.parent)
     text = verbalize_expression(wrapper_var)
@@ -1996,7 +1996,7 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
 
 # %% 2-argument Predicate triple form
 def test_verbalize_triple():
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class ConnectsTo(Triple):
         source: Any
         target: Any
@@ -2030,7 +2030,7 @@ def test_verbalize_1arg_predicate_without_fragment_raises():
     decision, never a silent guess.
     """
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class IsActive(Predicate):
         entity: Any
 
@@ -2102,7 +2102,7 @@ def test_single_type_variable_not_disambiguated():
 
 
 def test_number_of_business_transactions():
-    @dataclass
+    @dataclass(kw_only=True)
     class BankTransaction:
         amount: float
         date: str
@@ -2196,8 +2196,8 @@ def test_inference_planner_decomposes_rule_without_rendering(
     )
     query.build()
 
-    assert InferencePlanner.can_handle(query) is True
-    plan = InferencePlanner(query).plan()
+    assert InferencePlanner.can_handle(entity=query) is True
+    plan = InferencePlanner(node=query).plan()
 
     assert plan.consequent_type == "Cabinet"
     assert [b.field_name for b in plan.consequent_bindings] == ["container", "drawers"]
@@ -2223,7 +2223,7 @@ def test_inference_planner_decomposes_rule_without_rendering(
     assert conditions, "expected at least one attributed antecedent condition"
     antecedent = plan.primary_antecedents[0]
     form = ConditionForm.most_applicable(
-        Placement(item=antecedent.conditions[0], subject=antecedent.variable)
+        request=Placement(item=antecedent.conditions[0], subject=antecedent.variable)
     )
     assert form.position is SurfacePosition.WHOSE
 
@@ -2247,7 +2247,7 @@ def test_query_planner_collects_subject_restriction_without_placing():
 
     r = variable(_Robot, [])
     query = entity(r).where(r.battery > 50)
-    plan = QueryPlanner(query).plan()
+    plan = QueryPlanner(node=query).plan()
 
     assert plan.kind is SelectionKind.SUBJECT
     assert plan.is_the is False
@@ -2262,7 +2262,9 @@ def test_query_planner_collects_subject_restriction_without_placing():
 
     # "battery > 50" is a single-hop, non-boolean attribute predicate → the registry selects the
     # whose-predicate form (slot WHOSE: "whose battery is greater than 50").
-    form = ConditionForm.most_applicable(Placement(item=conjunct, subject=plan.subject))
+    form = ConditionForm.most_applicable(
+        request=Placement(item=conjunct, subject=plan.subject)
+    )
     assert form is WhosePredicateForm
     assert form.position is SurfacePosition.WHOSE
 
@@ -2279,7 +2281,7 @@ def test_instantiated_planner_decomposes_bindings_without_rendering(
 
     drawer = variable(Drawer, handles_and_containers_world.views)
     instantiated = inference(Cabinet)(drawers=drawer)
-    plan = InstantiatedPlanner(instantiated).plan()
+    plan = InstantiatedPlanner(node=instantiated).plan()
 
     assert plan.type_name == "Cabinet"
     # "drawers" is a plural field name → plural copula/value at realisation time.
@@ -2300,7 +2302,7 @@ def test_grouped_by_planner_extracts_keys_without_rendering(
     query = entity(cabinet).grouped_by(cabinet)
     query.build()
 
-    plan = GroupedByPlanner(query).plan()
+    plan = GroupedByPlanner(node=query).plan()
     assert plan.has_keys
     assert len(plan.keys) == 1
     # The selected variable *is* the group key, so nothing is aggregated over it.
@@ -2343,10 +2345,10 @@ def test_grouped_by_without_instantiated_variable(handles_and_containers_world):
 # %% Fixture
 @pytest.fixture
 def departments_and_employees_fixture():
-    d1 = Department("HR")
-    d2 = Department("Finance")
-    e1 = Employee("John", d1, 10000)
-    e2 = Employee("Anna", d2, 40000)
+    d1 = Department(name="HR")
+    d2 = Department(name="Finance")
+    e1 = Employee(name="John", department=d1, salary=10000)
+    e2 = Employee(name="Anna", department=d2, salary=40000)
     return [d1, d2], [e1, e2]
 
 
@@ -2743,7 +2745,7 @@ def test_fold_range_pairs_ignores_unrelated_bounds():
 
 def test_pr_example():
 
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class BankTransaction:
         amount: float
         booking_date: datetime.datetime
@@ -2770,7 +2772,7 @@ def test_verbalize_expression_no_renderer_backward_compatible():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    plain = VerbalizationPipeline.plain().verbalize(q)
+    plain = VerbalizationPipeline.plain().verbalize(expression=q)
     assert verbalize_expression(q) == plain
 
 
@@ -2780,7 +2782,7 @@ def test_verbalize_expression_explicit_plain_paragraph():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    result = VerbalizationPipeline.plain().verbalize(q)
+    result = VerbalizationPipeline.plain().verbalize(expression=q)
     assert "Find" in result
     assert "Robot" in result
     assert "\033" not in result
@@ -2793,7 +2795,7 @@ def test_verbalize_expression_ansi_paragraph():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    result = VerbalizationPipeline(ParagraphRenderer(ANSIFormatter())).verbalize(q)
+    result = VerbalizationPipeline(renderer=ParagraphRenderer(formatter=ANSIFormatter())).verbalize(expression=q)
     assert "\033[" in result
     assert "Robot" in result
 
@@ -2804,7 +2806,7 @@ def test_verbalize_expression_ansi_hierarchical():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
-    result = VerbalizationPipeline(HierarchicalRenderer(ANSIFormatter())).verbalize(q)
+    result = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=ANSIFormatter())).verbalize(expression=q)
     assert "\033[" in result
     assert "\n" in result
 
@@ -2815,7 +2817,7 @@ def test_verbalize_expression_html_paragraph():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    result = VerbalizationPipeline(ParagraphRenderer(HTMLFormatter())).verbalize(q)
+    result = VerbalizationPipeline(renderer=ParagraphRenderer(formatter=HTMLFormatter())).verbalize(expression=q)
     assert "<span" in result
     # HTML pipeline wraps output in a dark <div> for Jupyter rendering.
     assert "<div" in result
@@ -2827,7 +2829,7 @@ def test_verbalize_expression_html_hierarchical():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
-    result = VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(q)
+    result = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(expression=q)
     assert "<span" in result
     assert "<br>" in result
 
@@ -2835,12 +2837,12 @@ def test_verbalize_expression_html_hierarchical():
 @pytest.mark.parametrize(
     "renderer_factory",
     [
-        lambda: ParagraphRenderer(PlainFormatter()),
-        lambda: ParagraphRenderer(ANSIFormatter()),
-        lambda: ParagraphRenderer(HTMLFormatter()),
-        lambda: HierarchicalRenderer(PlainFormatter()),
-        lambda: HierarchicalRenderer(ANSIFormatter()),
-        lambda: HierarchicalRenderer(HTMLFormatter()),
+        lambda: ParagraphRenderer(formatter=PlainFormatter()),
+        lambda: ParagraphRenderer(formatter=ANSIFormatter()),
+        lambda: ParagraphRenderer(formatter=HTMLFormatter()),
+        lambda: HierarchicalRenderer(formatter=PlainFormatter()),
+        lambda: HierarchicalRenderer(formatter=ANSIFormatter()),
+        lambda: HierarchicalRenderer(formatter=HTMLFormatter()),
     ],
 )
 def test_verbalize_expression_all_combos_produce_non_empty(renderer_factory):
@@ -2849,7 +2851,7 @@ def test_verbalize_expression_all_combos_produce_non_empty(renderer_factory):
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    result = VerbalizationPipeline(renderer_factory()).verbalize(q)
+    result = VerbalizationPipeline(renderer=renderer_factory()).verbalize(expression=q)
     assert isinstance(result, str)
     assert len(result) > 0
     assert "Robot" in result
@@ -2863,14 +2865,14 @@ def test_verbalize_expression_equivalence_to_pipeline():
     q = an(entity(r).where(r.battery > 50))
 
     for renderer in [
-        ParagraphRenderer(PlainFormatter()),
-        ParagraphRenderer(ANSIFormatter()),
-        ParagraphRenderer(HTMLFormatter()),
-        HierarchicalRenderer(PlainFormatter()),
-        HierarchicalRenderer(ANSIFormatter()),
-        HierarchicalRenderer(HTMLFormatter()),
+        ParagraphRenderer(formatter=PlainFormatter()),
+        ParagraphRenderer(formatter=ANSIFormatter()),
+        ParagraphRenderer(formatter=HTMLFormatter()),
+        HierarchicalRenderer(formatter=PlainFormatter()),
+        HierarchicalRenderer(formatter=ANSIFormatter()),
+        HierarchicalRenderer(formatter=HTMLFormatter()),
     ]:
-        result = VerbalizationPipeline(renderer).verbalize(q)
+        result = VerbalizationPipeline(renderer=renderer).verbalize(expression=q)
         assert isinstance(result, str) and len(result) > 0, (
             f"Empty result for {type(renderer).__name__} / "
             f"{type(renderer.formatter).__name__}"
@@ -2892,8 +2894,8 @@ def test_verbalize_expression_html_hierarchical_handles_constrained_aggregation(
         .grouped_by(employee.department)
         .having(avg_salary > 30000)
     )
-    result = VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(
-        query
+    result = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(
+        expression=query
     )
     # The grouped report fronts its HAVING onto the group key, so it is a single prose line (no
     # block <br>); the HTML wrapper and coloured content still render end-to-end.

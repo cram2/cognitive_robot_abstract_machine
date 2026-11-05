@@ -126,7 +126,7 @@ class PartLearningMethods(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         result = cls(from_json(data["default"], **kwargs))
         result.methods_by_path = {
             path: from_json(method, **kwargs)

@@ -23,7 +23,7 @@ A mapping of container types to their monitored container types.
 T = TypeVar("T", bound=Symbol)
 
 
-@dataclass(init=False)
+@dataclass(kw_only=True, init=False)
 class MonitoredContainer(Generic[T], ABC):
     """
     A container abstract class to be inherited from for specific container types to invoke the on-add
@@ -70,7 +70,7 @@ class MonitoredContainer(Generic[T], ABC):
         self._owner_ref: weakref.ref[Symbol] | None = None
         super().__init__(*args, **kwargs)
 
-    def _bind_owner(self, owner) -> MonitoredContainer:
+    def _bind_owner(self, *, owner) -> MonitoredContainer:
         """
         Bind the owning instance via a weak reference and return self.
         """
@@ -86,7 +86,7 @@ class MonitoredContainer(Generic[T], ABC):
 
     def _on_add(
         self,
-        value: Symbol,
+        *, value: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = True,
     ) -> Symbol | weakref.ref[Symbol]:
@@ -101,17 +101,17 @@ class MonitoredContainer(Generic[T], ABC):
             itself
         """
         if inferred:
-            value = weakref.ref(value, self._remove_item)
+            value = weakref.ref(value, lambda item: self._remove_item(item=item))
         owner = self._owner
         if owner is not None and add_relation_to_the_graph:
             self._descriptor.add_relation_to_the_graph_and_apply_implications(
-                owner, value, inferred=inferred
+                domain_value=owner, range_value=value, inferred=inferred
             )
         return value
 
     def _update(
         self,
-        value: Symbol,
+        *, value: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = False,
     ) -> bool:
@@ -127,14 +127,14 @@ class MonitoredContainer(Generic[T], ABC):
         if value in self:
             return False
         self._add_item(
-            value,
+            item=value,
             inferred=inferred,
             add_relation_to_the_graph=add_relation_to_the_graph,
         )
         return True
 
     @abstractmethod
-    def _remove_item(self, item):
+    def _remove_item(self, *, item):
         """
         This method is called when an item is removed from the container.
 
@@ -146,7 +146,7 @@ class MonitoredContainer(Generic[T], ABC):
     @abstractmethod
     def _add_item(
         self,
-        item: Symbol,
+        *, item: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = True,
     ):
@@ -178,7 +178,7 @@ class MonitoredContainer(Generic[T], ABC):
         ...
 
 
-@dataclass(init=False)
+@dataclass(kw_only=True, init=False)
 class MonitoredList(MonitoredContainer, list):
     """
     A list that invokes the descriptor on_add for further implicit inferences.
@@ -190,35 +190,35 @@ class MonitoredList(MonitoredContainer, list):
 
     def extend(self, items):
         for item in items:
-            self._add_item(item)
+            self._add_item(item=item)
 
     def append(self, item):
-        self._add_item(item)
+        self._add_item(item=item)
 
     def _add_item(
-        self, item, inferred: bool = False, add_relation_to_the_graph: bool = True
+        self, *, item, inferred: bool = False, add_relation_to_the_graph: bool = True
     ):
         item = self._on_add(
-            item, inferred=inferred, add_relation_to_the_graph=add_relation_to_the_graph
+            value=item, inferred=inferred, add_relation_to_the_graph=add_relation_to_the_graph
         )
         super().append(item)
 
     def __setitem__(self, idx, value):
-        value = self._on_add(value)
+        value = self._on_add(value=value)
         super().__setitem__(idx, value)
 
     def insert(self, idx, item):
-        item = self._on_add(item)
+        item = self._on_add(value=item)
         super().insert(idx, item)
 
-    def _remove_item(self, item):
+    def _remove_item(self, *, item):
         self.remove(item)
 
     def _clear(self):
         self.clear()
 
 
-@dataclass(init=False)
+@dataclass(kw_only=True, init=False)
 class MonitoredSet(MonitoredContainer, set):
     """
     A set that invokes the descriptor on_add for further implicit inferences.
@@ -229,23 +229,23 @@ class MonitoredSet(MonitoredContainer, set):
         return set
 
     def add(self, value):
-        self._add_item(value)
+        self._add_item(item=value)
 
     def update(self, values):
         for value in values:
-            self._add_item(value)
+            self._add_item(item=value)
 
     def _add_item(
-        self, value, inferred: bool = False, add_relation_to_the_graph: bool = True
+        self, *, item, inferred: bool = False, add_relation_to_the_graph: bool = True
     ):
         value = self._on_add(
-            value,
+            value=item,
             inferred=inferred,
             add_relation_to_the_graph=add_relation_to_the_graph,
         )
         super().add(value)
 
-    def _remove_item(self, item):
+    def _remove_item(self, *, item):
         self.remove(item)
 
     def _clear(self):

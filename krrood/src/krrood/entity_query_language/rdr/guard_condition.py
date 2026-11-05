@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.variable import Variable
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class GuardCondition:
     """
     A condition that must be satisfied for a rule to be applied.
@@ -44,7 +44,7 @@ class GuardCondition:
 
     def holds_for(
         self,
-        shared_variable: Variable,
+        *, shared_variable: Variable,
         case: Any,
     ) -> bool:
         """

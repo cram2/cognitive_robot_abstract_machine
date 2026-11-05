@@ -24,7 +24,7 @@ from krrood.entity_query_language.core.helpers import unwrap_if_literal
 from krrood.entity_query_language.core.variable import Variable
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Conclusion(BinaryExpression, ABC):
     """
     Base for side-effecting/action clauses that adjust outputs (e.g., Set, Add).
@@ -83,7 +83,7 @@ class Conclusion(BinaryExpression, ABC):
         return f"{self.__class__.__name__}({self.variable._var_._name_}, {value_str})"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Add(Conclusion):
     """
     Add a new value to the domain of a variable.
@@ -91,12 +91,12 @@ class Add(Conclusion):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
         v = next(self.value._evaluate_(sources)).value
         new_bindings = sources.bindings | {self.variable._id_: v}
-        yield OperationResult(new_bindings, self, sources)
+        yield OperationResult(bindings=new_bindings, operand=self, previous_operation_result=sources)
 
 
 ConclusionType = TypeVar("ConclusionType", bound=Conclusion)

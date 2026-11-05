@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import jinja2
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CodeGenerator:
     """Base class for Jinja2-based code generation.
 
@@ -41,7 +41,7 @@ class CodeGenerator:
             lstrip_blocks=True,
         )
 
-    def render(self, template_name: str, **context: object) -> str:
+    def render(self, *, template_name: str, **context: object) -> str:
         """Load *template_name* and render it with *context*.
 
         :param template_name: The ``.py.jinja`` file name (e.g. ``"rdr_module.py.jinja"``).

@@ -59,7 +59,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
     planner = InferencePlanner
 
-    def realize(self, node: Entity, plan: RuleStructure) -> VerbalizationFragment:
+    def realize(self, *, node: Entity, plan: RuleStructure) -> VerbalizationFragment:
         """
         :param node: The inference-rule query.
         :param plan: The IF/THEN rule structure.
@@ -73,16 +73,16 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             header=None,
             items=[
                 BlockFragment(
-                    header=Keywords.IF.as_fragment(), items=self._if_items(plan)
+                    header=Keywords.IF.as_fragment(), items=self._if_items(structure=plan)
                 ),
                 BlockFragment(
-                    header=Keywords.THEN.as_fragment(), items=self._then_items(plan)
+                    header=Keywords.THEN.as_fragment(), items=self._then_items(structure=plan)
                 ),
             ],
         )
 
     @staticmethod
-    def _number(antecedent: AntecedentInformation) -> GrammaticalNumber:
+    def _number(*, antecedent: AntecedentInformation) -> GrammaticalNumber:
         """:return: The grammatical number of an antecedent — plural if and only if aggregated.
 
         >>> aggregated = AntecedentInformation(root=None, variable=None, type_name='Drawer',
@@ -96,7 +96,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
     # %% IF clause
 
-    def _if_items(self, structure: RuleStructure) -> list[VerbalizationFragment]:
+    def _if_items(self, *, structure: RuleStructure) -> list[VerbalizationFragment]:
         """
         :return: One item per antecedent — *"there's a <Type> whose …, and …"* — plus any unmatched
             conditions; *"true"* when there are none.
@@ -114,15 +114,15 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         True
         """
         items: list[VerbalizationFragment] = [
-            self._antecedent(antecedent) for antecedent in structure.primary_antecedents
+            self._antecedent(antecedent=antecedent) for antecedent in structure.primary_antecedents
         ]
         items += [
-            self.context.child(condition)
+            self.context.child(node=condition)
             for condition in structure.unmatched_conditions
         ]
         return items or [Keywords.TRUE.as_fragment()]
 
-    def _antecedent(self, antecedent: AntecedentInformation) -> VerbalizationFragment:
+    def _antecedent(self, *, antecedent: AntecedentInformation) -> VerbalizationFragment:
         """:return: The antecedent's existential intro as a head line with its conditions beneath it —
         the intro woven with its conditions by the shared restriction machinery (the same per-clause
         *"whose"* / *"such that …"* form a query selection uses). Inline / in paragraph this reads
@@ -135,14 +135,14 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ...     entity(drawer).where(connection.parent == variable(Container, [])))
         True
         """
-        intro = self._antecedent_intro(antecedent)
+        intro = self._antecedent_intro(antecedent=antecedent)
         if not antecedent.conditions or antecedent.variable is None:
             return intro
         restriction = as_subject_restrictions(
             antecedent.conditions,
             antecedent.variable,
             self.context,
-            self._number(antecedent),
+            self._number(antecedent=antecedent),
         )
         header = (
             PhraseFragment(parts=[intro, *restriction.inline_modifiers])
@@ -163,7 +163,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         return BlockFragment(header=header, items=items, bulleted_header=False)
 
     def _antecedent_intro(
-        self, antecedent: AntecedentInformation
+        self, *, antecedent: AntecedentInformation
     ) -> VerbalizationFragment:
         """:return: *"there's a <Type>"* / *"there are <Types>"* — the antecedent's existential intro.
 
@@ -178,13 +178,13 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ...     connection.parent == variable(Container, []))).startswith("If there's a FixedConnection")
         True
         """
-        return ExistentialPhrase.for_number(self._number(antecedent)).build_phrase(
-            antecedent.type_name, referent_id=self._antecedent_referent_id(antecedent)
+        return ExistentialPhrase.for_number(number=self._number(antecedent=antecedent)).build_phrase(
+            antecedent.type_name, referent_id=self._antecedent_referent_id(antecedent=antecedent)
         )
 
     @staticmethod
     def _antecedent_referent_id(
-        antecedent: AntecedentInformation,
+        *, antecedent: AntecedentInformation,
     ) -> uuid.UUID | None:
         """
         :return: The antecedent's canonical referent id — the selected variable for an entity
@@ -209,7 +209,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
     # %% THEN clause
 
-    def _then_items(self, structure: RuleStructure) -> list[VerbalizationFragment]:
+    def _then_items(self, *, structure: RuleStructure) -> list[VerbalizationFragment]:
         """:return: The consequent as a single entry — *"there's a <Consequent>"* head line with each
         field binding prefixed by its own *"whose"* (the same form a query subject restriction uses):
         *"whose <field> is <value>, and whose …"* inline / in paragraph, sub-points in hierarchical.
@@ -226,11 +226,11 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         True
         """
         intro: VerbalizationFragment = ExistentialPhrase.for_number(
-            GrammaticalNumber.SINGULAR
+            number=GrammaticalNumber.SINGULAR
         ).build_phrase(structure.consequent_type)
         whose_clauses = [
             PhraseFragment(
-                parts=[Keywords.WHOSE.as_fragment(), self._binding_predicate(binding)]
+                parts=[Keywords.WHOSE.as_fragment(), self._binding_predicate(binding=binding)]
             )
             for binding in structure.consequent_bindings
         ]
@@ -245,7 +245,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             )
         ]
 
-    def _binding_predicate(self, binding: ConsequentBinding) -> VerbalizationFragment:
+    def _binding_predicate(self, *, binding: ConsequentBinding) -> VerbalizationFragment:
         """:return: The bare *"<field> is/are <value>"* predicate for one consequent binding (the
         shared *"whose"* envelope is added once by :meth:`_then_items`).
 
@@ -257,11 +257,11 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         True
         """
         number = GrammaticalNumber.of(binding.is_plural_field)
-        return ConditionAssembler(self.context).attribute_predicate(
-            binding.field_name, number, self._binding_value(binding)
+        return ConditionAssembler(context=self.context).attribute_predicate(
+            attribute_name=binding.field_name, number=number, value=self._binding_value(binding=binding)
         )
 
-    def _binding_value(self, binding: ConsequentBinding) -> VerbalizationFragment:
+    def _binding_value(self, *, binding: ConsequentBinding) -> VerbalizationFragment:
         """
         :return: The binding's value: *"the <plural chain>"* (aggregated), bare plural, the
             group-key *"common …"* phrase, or the plain rendering.
@@ -284,19 +284,19 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
                 parts=[
                     Articles.THE.as_fragment(),
                     self.context.child(
-                        binding.value_expression, number=GrammaticalNumber.PLURAL
+                        node=binding.value_expression, number=GrammaticalNumber.PLURAL
                     ),
                 ]
             )
         if binding.is_plural_field:
             return self.context.child(
-                binding.value_expression, number=GrammaticalNumber.PLURAL
+                node=binding.value_expression, number=GrammaticalNumber.PLURAL
             )
         if binding.aggregation_status == AggregationStatus.GROUP_KEY:
-            return self._group_key_value(binding.value_expression)
-        return self.context.child(binding.value_expression)
+            return self._group_key_value(expression=binding.value_expression)
+        return self.context.child(node=binding.value_expression)
 
-    def _group_key_value(self, expression: SymbolicExpression) -> VerbalizationFragment:
+    def _group_key_value(self, *, expression: SymbolicExpression) -> VerbalizationFragment:
         """:return: *"the common <field> of the <Roots>"* — a binding that refers to a GROUP BY key.
 
         Its contribution here is the guard, not the *"common …"* phrase: the group key is a bare
@@ -312,8 +312,8 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         """
         chain, current = walk_chain(expression)
         if not chain or not isinstance(current, Variable):
-            return self.context.child(expression)
-        root_type = FallbackNouns.ENTITY.name_of(current)
+            return self.context.child(node=expression)
+        root_type = FallbackNouns.ENTITY.name_of(node=current)
         parts = build_path_parts(chain)
         field = list(reversed(parts))[0].name if parts else root_type
-        return GroupKeyPhrases.COMMON_OF.build_phrase(field, root_type)
+        return GroupKeyPhrases.COMMON_OF.build_phrase(field_name=field, plural_root=root_type)

@@ -11,7 +11,7 @@ from krrood.patterns.field_metadata import FieldMetadata
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MarksAStructuralPart(FieldMetadata):
     """
     Metadata mimicking a relation marker that carries a payload describing the relation.
@@ -23,14 +23,14 @@ class MarksAStructuralPart(FieldMetadata):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MarksAnIdentifyingField(FieldMetadata):
     """
     A second metadata type, used to check that discovery discriminates by type.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OwnerWithMarkedAndUnmarkedFields:
     """
     Mimic declaring both marked and unmarked fields, the marked ones interleaved with
@@ -48,7 +48,7 @@ class OwnerWithMarkedAndUnmarkedFields:
     identifier: str = field(default="", metadata=MarksAnIdentifyingField().as_dict())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HeirDeclaringAnotherMarkedField(OwnerWithMarkedAndUnmarkedFields):
     """
     Mimic adding a marked field to an owner that already has some, to exercise
@@ -60,7 +60,7 @@ class HeirDeclaringAnotherMarkedField(OwnerWithMarkedAndUnmarkedFields):
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OwnerWithoutAnyMarkedField:
     """
     Mimic marking no field at all.
@@ -80,8 +80,8 @@ class NotADataclass:
 
 def test_only_marked_fields_are_discovered_in_declaration_order():
     wrapped_fields = WrappedClass(
-        OwnerWithMarkedAndUnmarkedFields
-    ).fields_with_metadata(MarksAStructuralPart)
+        clazz=OwnerWithMarkedAndUnmarkedFields
+    ).fields_with_metadata(metadata_type=MarksAStructuralPart)
 
     assert [wrapped_field.field.name for wrapped_field in wrapped_fields] == [
         "consuming_part",
@@ -90,8 +90,8 @@ def test_only_marked_fields_are_discovered_in_declaration_order():
 
 
 def test_inherited_marked_fields_are_discovered():
-    wrapped_fields = WrappedClass(HeirDeclaringAnotherMarkedField).fields_with_metadata(
-        MarksAStructuralPart
+    wrapped_fields = WrappedClass(clazz=HeirDeclaringAnotherMarkedField).fields_with_metadata(
+        metadata_type=MarksAStructuralPart
     )
 
     assert [wrapped_field.field.name for wrapped_field in wrapped_fields] == [
@@ -103,8 +103,8 @@ def test_inherited_marked_fields_are_discovered():
 
 def test_discovery_discriminates_between_metadata_types():
     wrapped_fields = WrappedClass(
-        OwnerWithMarkedAndUnmarkedFields
-    ).fields_with_metadata(MarksAnIdentifyingField)
+        clazz=OwnerWithMarkedAndUnmarkedFields
+    ).fields_with_metadata(metadata_type=MarksAnIdentifyingField)
 
     assert [wrapped_field.field.name for wrapped_field in wrapped_fields] == [
         "identifier"
@@ -113,15 +113,15 @@ def test_discovery_discriminates_between_metadata_types():
 
 def test_class_without_marked_fields_discovers_nothing():
     assert (
-        WrappedClass(OwnerWithoutAnyMarkedField).fields_with_metadata(
-            MarksAStructuralPart
+        WrappedClass(clazz=OwnerWithoutAnyMarkedField).fields_with_metadata(
+            metadata_type=MarksAStructuralPart
         )
         == []
     )
 
 
 def test_non_dataclass_discovers_nothing():
-    assert WrappedClass(NotADataclass).fields_with_metadata(MarksAStructuralPart) == []
+    assert WrappedClass(clazz=NotADataclass).fields_with_metadata(metadata_type=MarksAStructuralPart) == []
 
 
 # %% reading the metadata back
@@ -137,29 +137,29 @@ def _dataclass_field(clazz: type, name: str):
 
 def test_metadata_of_wrapped_field_carries_the_payload():
     [consuming_part, plain_part] = WrappedClass(
-        OwnerWithMarkedAndUnmarkedFields
-    ).fields_with_metadata(MarksAStructuralPart)
+        clazz=OwnerWithMarkedAndUnmarkedFields
+    ).fields_with_metadata(metadata_type=MarksAStructuralPart)
 
-    assert MarksAStructuralPart.of_wrapped_field(consuming_part).consumes_the_part
-    assert not MarksAStructuralPart.of_wrapped_field(plain_part).consumes_the_part
+    assert MarksAStructuralPart.of_wrapped_field(wrapped_field=consuming_part).consumes_the_part
+    assert not MarksAStructuralPart.of_wrapped_field(wrapped_field=plain_part).consumes_the_part
 
 
 def test_metadata_of_unmarked_wrapped_field_is_none():
     wrapped_field = WrappedField(
-        WrappedClass(OwnerWithMarkedAndUnmarkedFields),
-        _dataclass_field(OwnerWithMarkedAndUnmarkedFields, "unmarked_before"),
+        clazz=WrappedClass(clazz=OwnerWithMarkedAndUnmarkedFields),
+        field=_dataclass_field(OwnerWithMarkedAndUnmarkedFields, "unmarked_before"),
     )
 
-    assert MarksAStructuralPart.of_wrapped_field(wrapped_field) is None
+    assert MarksAStructuralPart.of_wrapped_field(wrapped_field=wrapped_field) is None
 
 
 def test_metadata_is_found_when_the_public_name_differs_from_the_field_name():
     # A field managed by a property descriptor is addressed under a public name that is
     # not its dataclass field name; the metadata still lives on the dataclass field.
     wrapped_field = WrappedField(
-        WrappedClass(OwnerWithMarkedAndUnmarkedFields),
-        _dataclass_field(OwnerWithMarkedAndUnmarkedFields, "consuming_part"),
+        clazz=WrappedClass(clazz=OwnerWithMarkedAndUnmarkedFields),
+        field=_dataclass_field(OwnerWithMarkedAndUnmarkedFields, "consuming_part"),
         public_name="parts",
     )
 
-    assert MarksAStructuralPart.of_wrapped_field(wrapped_field).consumes_the_part
+    assert MarksAStructuralPart.of_wrapped_field(wrapped_field=wrapped_field).consumes_the_part

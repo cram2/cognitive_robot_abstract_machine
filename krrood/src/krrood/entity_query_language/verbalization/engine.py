@@ -106,8 +106,8 @@ def fold(
         # so a nested Entity renders as a noun phrase. Declared on the rule (not pushed by hand
         # in assemblers) so the policy lives in one place. ``when`` already ran outside.
         with services.configuration.query_depth_scope():
-            return _with_source(rule.build(node, context), node)
-    return _with_source(rule.build(node, context), node)
+            return _with_source(rule.build(node=node, context=context), node)
+    return _with_source(rule.build(node=node, context=context), node)
 
 
 def _with_source(

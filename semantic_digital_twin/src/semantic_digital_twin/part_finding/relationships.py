@@ -50,8 +50,8 @@ class PartRelationshipInspector:
         """
         return [
             cls(relationship_field=wrapped_field)
-            for wrapped_field in WrappedClass(whole_type).fields_with_metadata(
-                IsPartWholeRelationship
+            for wrapped_field in WrappedClass(clazz=whole_type).fields_with_metadata(
+                metadata_type=IsPartWholeRelationship
             )
             if issubclass(wrapped_field.type_endpoint, HasRootBody)
         ]

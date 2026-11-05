@@ -59,7 +59,7 @@ class ConfidenceGuardObserver(EvaluationObserver):
     """The fitted confidence model every concluded instance is checked against."""
 
     def on_conclusions_processed(
-        self, expression: SymbolicExpression, result: OperationResult
+        self, *, expression: SymbolicExpression, result: OperationResult
     ) -> None:
         """
         Check every instance this rule just concluded and raise on the first unfamiliar one.
@@ -100,7 +100,7 @@ def evaluate_with_confidence_guard(
     context = create_default_evaluation_context()
     context.observers.append(ConfidenceGuardObserver(confidence_model))
     context.active_conditions_root.set_active_root_if_not_set(
-        expression._conditions_root_, has_condition=expression._has_condition_
+        root=expression._conditions_root_, has_condition=expression._has_condition_
     )
     set_evaluation_context(context)
     try:

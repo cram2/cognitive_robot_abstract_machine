@@ -63,7 +63,7 @@ def drawer_explanation(doors_and_drawers_world) -> InferenceExplanation:
     handle = variable(Handle, world.bodies)
     prismatic_conn = variable(PrismaticConnection, world.connections)
     fixed_conn = a(FixedConnection)(parent=prismatic_conn.child, child=handle).from_(
-        world.connections
+        domain=world.connections
     )
     drawers = inference(Drawer)(
         container=fixed_conn.parent, handle=fixed_conn.child

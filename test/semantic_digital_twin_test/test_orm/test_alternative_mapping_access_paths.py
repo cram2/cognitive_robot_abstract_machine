@@ -121,7 +121,7 @@ def test_a_twist_survives_being_stored():
         )
     )
 
-    restored = TwistMapping.from_domain_object(twist).to_domain_object()
+    restored = TwistMapping.from_domain_object(obj=twist).to_domain_object()
 
     assert restored.reference_frame is root
     assert np.allclose(restored.to_np(), twist.to_np())

@@ -16,7 +16,7 @@ from krrood.adapters.json_serializer import (
 # %% an element every reader already has
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReaderOwnedElement(SubclassJSONSerializer):
     """
     An element that whoever reads a document already has, so the document may refer to
@@ -29,21 +29,21 @@ class ReaderOwnedElement(SubclassJSONSerializer):
     """
 
     def to_json(self, **kwargs) -> Dict[str, Any]:
-        return DataclassJSONSerializer.to_json(self, **kwargs)
+        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        return DataclassJSONSerializer.from_json(data, clazz=cls, **kwargs)
+    def _from_json(cls, *, data: Dict[str, Any], **kwargs) -> Self:
+        return DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReaderOwnedElementTracker(DeserializedObjectTracker[str, ReaderOwnedElement]):
     """
     The elements the reader of a document already has.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReaderOwnedElementReference(SubclassJSONSerializer):
     """
     Refers to an element by its key.
@@ -58,24 +58,24 @@ class ReaderOwnedElementReference(SubclassJSONSerializer):
         return {**super().to_json(**kwargs), "key": self.key}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> ReaderOwnedElement:
-        return ReaderOwnedElementTracker.from_kwargs(kwargs).get(data["key"])
+    def _from_json(cls, *, data: Dict[str, Any], **kwargs) -> ReaderOwnedElement:
+        return ReaderOwnedElementTracker.from_kwargs(from_json_kwargs=kwargs).get(key=data["key"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReaderOwnedElementReferenceWriter(ReferenceWriter[ReaderOwnedElement]):
     """
     Writes elements as references to their key.
     """
 
-    def write_reference(self, element: ReaderOwnedElement) -> Dict[str, Any]:
-        return ReaderOwnedElementReference(key=element.key).to_json()
+    def write_reference(self, *, obj: ReaderOwnedElement) -> Dict[str, Any]:
+        return ReaderOwnedElementReference(key=obj.key).to_json()
 
 
 # %% the places an element can be held in
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ElementHolder:
     """
     Holds an element in a field of a dataclass without a serialization of its own.
@@ -87,7 +87,7 @@ class ElementHolder:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ElementHolderWithOwnSerialization(SubclassJSONSerializer):
     """
     Holds an element in a field it serializes itself.
@@ -105,11 +105,11 @@ class ElementHolderWithOwnSerialization(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: Dict[str, Any], **kwargs) -> Self:
         return cls(element=from_json(data["element"], **kwargs))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ElementInEveryPosition:
     """
     Holds one element in every kind of position a serialized document can hold it in.

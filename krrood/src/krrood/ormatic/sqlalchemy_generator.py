@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SQLAlchemyGenerator:
     """
     A class for generating SQLAlchemy declarative mappings from ORMatic models.
@@ -38,7 +38,7 @@ class SQLAlchemyGenerator:
             ),
         )
 
-    def to_sqlalchemy_file(self, file: TextIO):
+    def to_sqlalchemy_file(self, *, file: TextIO):
         """
         Generate a Python file with SQLAlchemy declarative mappings from the
         ORMatic models.
@@ -46,7 +46,7 @@ class SQLAlchemyGenerator:
         :param file: The file to write to
         """
         output = self._generator.render(
-            "sqlalchemy_model.py.jinja",
+            template_name="sqlalchemy_model.py.jinja",
             ormatic=self.ormatic,
         )
 

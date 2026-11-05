@@ -14,7 +14,7 @@ from krrood.class_diagrams.method_classifier import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassWithMarkedFactory:
     """
     Mimics a class whose factory is declared with the explicit ``@factory_method``
@@ -32,7 +32,7 @@ class ClassWithMarkedFactory:
         return cls(value="made")
 
     @classmethod
-    def from_value(cls, value: str) -> Self:
+    def from_value(cls, *, value: str) -> Self:
         """
         A factory recognised through its ``-> Self`` return annotation, without a
         marker.
@@ -54,16 +54,16 @@ class SubclassInheritingFactory(ClassWithMarkedFactory):
 
 
 def test_descriptor_registers_marked_factory_at_definition():
-    assert FactoryMethodRegistry().is_registered(ClassWithMarkedFactory, "make")
+    assert FactoryMethodRegistry().is_registered(cls=ClassWithMarkedFactory, name="make")
 
 
 def test_registration_is_inherited_by_subclasses():
-    assert FactoryMethodRegistry().is_registered(SubclassInheritingFactory, "make")
+    assert FactoryMethodRegistry().is_registered(cls=SubclassInheritingFactory, name="make")
 
 
 def test_unmarked_classmethod_is_not_registered():
     assert not FactoryMethodRegistry().is_registered(
-        ClassWithMarkedFactory, "from_value"
+        cls=ClassWithMarkedFactory, name="from_value"
     )
 
 

@@ -251,7 +251,7 @@ class LearnedCausalStructure:
         """
         :return: What chooses an adjustment set from the class's causal relations.
         """
-        return AdjustmentSelector(self.relations.causal_graph(self.nodes))
+        return AdjustmentSelector(self.relations.causal_graph(nodes=self.nodes))
 
 
 # %% learning from a relational circuit's tables
@@ -346,17 +346,17 @@ class RelationalCausalStructureLearner:
         :return: The causal relations of the class.
         """
         relations = CausalRelationsOfClass(
-            self.class_diagram, self.class_diagram.get_wrapped_class(circuit.class_)
+            class_diagram=self.class_diagram, owner=self.class_diagram.get_wrapped_class(clazz=circuit.class_)
         )
         endpoints = self.create_endpoints(circuit.feature_extractor, None)
         for part, template in circuit.exchangeable_distribution_templates.items():
             endpoints += self.create_endpoints(
                 template.template_distribution.feature_extractor,
-                relations.owner.get_field(part),
+                relations.owner.get_field(name=part),
             )
         endpoint_of = {endpoint.name: endpoint for endpoint in endpoints}
         relations.replace_relations(
-            [
+            relations=[
                 CausalRelation(
                     source=relations.owner,
                     target=relations.owner,
@@ -383,12 +383,12 @@ class RelationalCausalStructureLearner:
         prefix = () if collection is None else (collection,)
         return [
             (
-                StatisticEndpoint(feature, collection)
+                StatisticEndpoint(statistic=feature, collection=collection)
                 if feature in extractor.aggregation_features
                 else AttributeEndpoint(
-                    prefix
+                    fields=prefix
                     + AttributeEndpoint.along(
-                        self.class_diagram, feature._access_path_
+                        class_diagram=self.class_diagram, access_path=feature._access_path_
                     ).fields
                 )
             )

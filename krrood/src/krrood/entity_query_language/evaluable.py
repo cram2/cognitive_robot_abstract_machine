@@ -36,7 +36,7 @@ class Evaluable(ABC):
         """
         ...
 
-    def evaluate(self, backend: QueryBackend | None = None) -> Iterator:
+    def evaluate(self, *, backend: QueryBackend | None = None) -> Iterator:
         """
         Evaluate using the given backend, returning an iterator over the results.
 
@@ -48,9 +48,9 @@ class Evaluable(ABC):
             from krrood.entity_query_language.backends import EntityQueryLanguageBackend
 
             backend = EntityQueryLanguageBackend()
-        return backend.evaluate(self)
+        return backend.evaluate(expression=self)
 
-    def tolist(self, backend: QueryBackend | None = None) -> list:
+    def tolist(self, *, backend: QueryBackend | None = None) -> list:
         """
         Evaluate and return the results as a list.
 
@@ -59,7 +59,7 @@ class Evaluable(ABC):
         """
         return make_list(self.evaluate(backend=backend))
 
-    def first(self, backend: QueryBackend | None = None):
+    def first(self, *, backend: QueryBackend | None = None):
         """
         Evaluate and return the first result.
 

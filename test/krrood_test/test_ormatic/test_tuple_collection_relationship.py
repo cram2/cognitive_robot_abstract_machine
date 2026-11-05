@@ -35,13 +35,13 @@ def module(tmp_path_factory):
     classes, once, so the two tests below don't redeclare the same classes into the
     shared registry twice.
     """
-    class_diagram = ClassDiagram([TupleCollectionOwner, TupleCollectionMember])
-    instance = ORMatic(class_diagram)
+    class_diagram = ClassDiagram(classes=[TupleCollectionOwner, TupleCollectionMember])
+    instance = ORMatic(class_dependency_graph=class_diagram)
     instance.make_all_tables()
 
     interface_file = tmp_path_factory.mktemp("tuple_collection") / "tuple_collection_interface.py"
     with open(interface_file, "w") as f:
-        instance.to_sqlalchemy_file(f)
+        instance.to_sqlalchemy_file(file=f)
 
     spec = importlib.util.spec_from_file_location(
         "tuple_collection_interface", interface_file

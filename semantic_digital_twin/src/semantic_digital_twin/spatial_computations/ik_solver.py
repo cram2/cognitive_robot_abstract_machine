@@ -389,7 +389,7 @@ class QPProblem:
         self.lower_box_constraints, self.upper_box_constraints = (
             self.constraint_builder.build_box_constraints(self.active_dofs)
         )
-        self.box_constraint_matrix = Matrix.eye(len(self.lower_box_constraints))
+        self.box_constraint_matrix = Matrix.eye(size=len(self.lower_box_constraints))
 
         # Goal constraints
         self.eq_bound_expr, self.neq_matrix = (
@@ -397,9 +397,9 @@ class QPProblem:
         )
 
         # Combine constraints
-        self.l = Matrix.vstack([self.lower_box_constraints, self.eq_bound_expr])
-        self.u = Matrix.vstack([self.upper_box_constraints, self.eq_bound_expr])
-        self.A = Matrix.vstack([self.box_constraint_matrix, self.neq_matrix])
+        self.l = Matrix.vstack(list_of_matrices=[self.lower_box_constraints, self.eq_bound_expr])
+        self.u = Matrix.vstack(list_of_matrices=[self.upper_box_constraints, self.eq_bound_expr])
+        self.A = Matrix.vstack(list_of_matrices=[self.box_constraint_matrix, self.neq_matrix])
 
     def _setup_weights(self):
         """
@@ -420,11 +420,11 @@ class QPProblem:
         """
         variable_args = [self.active_variables, self.passive_variables]
 
-        self.l_f = self.l.compile(VariableParameters.from_lists(*variable_args))
-        self.u_f = self.u.compile(VariableParameters.from_lists(*variable_args))
-        self.A_f = self.A.compile(VariableParameters.from_lists(*variable_args))
+        self.l_f = self.l.compile(parameters=VariableParameters.from_lists(*variable_args))
+        self.u_f = self.u.compile(parameters=VariableParameters.from_lists(*variable_args))
+        self.A_f = self.A.compile(parameters=VariableParameters.from_lists(*variable_args))
         self.quadratic_weights_f = self.quadratic_weights.compile(
-            VariableParameters.from_lists(*variable_args)
+            parameters=VariableParameters.from_lists(*variable_args)
         )
         self.linear_weights_f = self.linear_weights.compile(
             VariableParameters.from_lists(*variable_args)
@@ -535,11 +535,11 @@ class ConstraintBuilder:
         rotation_state, rotation_error = self._compute_rotation_error(root_T_tip)
 
         # Current state and jacobian
-        current_expr = Matrix.vstack([position_state, rotation_state])
-        eq_bound_expr = Matrix.vstack([position_error, rotation_error])
+        current_expr = Matrix.vstack(list_of_matrices=[position_state, rotation_state])
+        eq_bound_expr = Matrix.vstack(list_of_matrices=[position_error, rotation_error])
 
-        J = current_expr.jacobian(active_variables)
-        neq_matrix = Matrix.hstack([J * self.dt, Matrix.eye(6) * self.dt])
+        J = current_expr.jacobian(variables=active_variables)
+        neq_matrix = Matrix.hstack(list_of_matrices=[J * self.dt, Matrix.eye(size=6) * self.dt])
 
         return eq_bound_expr, neq_matrix
 

@@ -73,7 +73,7 @@ class TestProfileSerialization:
     def test_phases_survive_the_round_trip(self):
         profile = make_profile([0.02, 0.04], [0.01, 0.03])
 
-        restored = CallTreeProfile.from_json(json.loads(json.dumps(profile.to_json())))
+        restored = CallTreeProfile.from_json(data=json.loads(json.dumps(profile.to_json())))
 
         assert restored == profile
 
@@ -84,7 +84,7 @@ class TestProfileSerialization:
         """
         profile = make_profile([0.02, 0.04], [0.01, 0.03])
 
-        restored = CallTreeProfile.from_json(json.loads(json.dumps(profile.to_json())))
+        restored = CallTreeProfile.from_json(data=json.loads(json.dumps(profile.to_json())))
 
         assert set(restored.phases) == {
             ("control_cycle",),

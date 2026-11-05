@@ -36,7 +36,7 @@ def truth_values(
     :param sources: The incoming result to evaluate against, if any.
     :return: The truth value of every ``OperationResult`` *expression* yields, in order.
     """
-    return [result.is_true for result in expression._evaluate_(sources)]
+    return [result.is_true for result in expression._evaluate_(sources=sources)]
 
 
 # %% comparators
@@ -163,7 +163,7 @@ def test_union_reports_the_truth_value_of_each_child_result():
     value = variable_from([6])
     other_value = variable_from([3])
 
-    assert truth_values(Union((value > 5, other_value > 5))) == [True, False]
+    assert truth_values(Union(_operation_children_=(value > 5, other_value > 5))) == [True, False]
 
 
 # %% concatenation
@@ -185,7 +185,7 @@ def test_concatenation_evaluated_on_its_own_yields_the_values_it_selected():
 # %% cost of reading a result's truth
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TruthCountingValue:
     """
     A value that records how often its truth was read.

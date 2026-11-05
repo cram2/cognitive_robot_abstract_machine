@@ -7,7 +7,7 @@ from krrood.ripple_down_rules.user_interface.ipython_custom_shell import IPython
 
 
 def make_shell() -> IPythonShell:
-    case_query = CaseQuery(object(), "attribute", (int,), True)
+    case_query = CaseQuery(original_case=object(), attribute_name="attribute", _attribute_types=(int,), mutually_exclusive=True)
     return IPythonShell(case_query=case_query)
 
 

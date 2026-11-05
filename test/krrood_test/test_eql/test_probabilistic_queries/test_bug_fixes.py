@@ -20,12 +20,12 @@ from krrood.parametrization.exceptions import (
 from krrood.parametrization.model_registries import DictRegistry, RelationalCircuitRegistry
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Arm:
     battery: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Robot:
     arm: Arm
 
@@ -53,7 +53,7 @@ def test_multi_hop_attribute_resolves_to_root_class():
     registered in the ModelRegistry, an Arm never is.
     """
     circuit, _ = _build_robot_circuit()
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Robot: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Robot: circuit}))
 
     x = variable(Robot)
     assert probability_of(x.arm.battery < 50).first(backend=backend) == pytest.approx(0.5)
@@ -69,7 +69,7 @@ def test_average_distinct_falls_through_to_native_evaluation():
     closed-form expectation has no notion of.
     """
     circuit, _ = _build_robot_circuit()
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Robot: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Robot: circuit}))
 
     x = variable(Robot)
     with pytest.raises(Exception):
@@ -87,7 +87,7 @@ def test_probability_of_bool_condition_verbalizes_but_does_not_evaluate():
     assert text == "the probability that True"
 
     circuit, _ = _build_robot_circuit()
-    backend = ProbabilisticBackend(model_registry=DictRegistry({Robot: circuit}))
+    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Robot: circuit}))
     with pytest.raises(JointQueryAcrossClassesNotSupported):
         probability_of(True).first(backend=backend)
 

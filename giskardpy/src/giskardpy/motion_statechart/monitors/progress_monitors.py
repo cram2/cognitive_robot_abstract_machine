@@ -247,7 +247,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
             ]
         )
         if self.monitored_tasks:
-            self.context.float_variable_data.register_expression(variables)
+            self.context.float_variable_data.register_expression(expression=variables)
         return variables
 
     def _compile_errors(self) -> None:
@@ -265,9 +265,9 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
             sparse=False,
         )
         self._compiled_errors.bind_args_to_memory_view(
-            0, self.context.world.state.positions
+            arg_idx=0, numpy_array=self.context.world.state.positions
         )
-        self.context.float_variable_data.bind_argument(self._compiled_errors, 1)
+        self.context.float_variable_data.bind_argument(compiled_function=self._compiled_errors, argument_index=1)
 
     def _running(self) -> NDArray[np.bool_]:
         """
@@ -340,11 +340,11 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         if self.monitored_tasks:
             self.context.float_variable_data.set_value(
-                self._errors_at_last_progress_variables, self._errors_at_last_progress
+                expression=self._errors_at_last_progress_variables, value=self._errors_at_last_progress
             )
             self.context.float_variable_data.set_value(
-                self._seconds_since_last_progress_variables,
-                self._seconds_since_last_progress,
+                expression=self._seconds_since_last_progress_variables,
+                value=self._seconds_since_last_progress,
             )
 
 

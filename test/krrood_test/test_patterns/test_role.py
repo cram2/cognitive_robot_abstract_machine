@@ -89,15 +89,15 @@ def test_role_is_not_an_instance_of_its_taker():
     assert isinstance(person, RepresentativeAsSecondRole) is False
 
     # Role membership is expressed through has_role, not inheritance.
-    assert Role.has_role(person, CEOAsFirstRole)
-    assert Role.has_role(ceo, RepresentativeAsSecondRole)
+    assert Role.has_role(role_taker=person, role_types=CEOAsFirstRole)
+    assert Role.has_role(role_taker=ceo, role_types=RepresentativeAsSecondRole)
 
 
 def test_role_native_attr_accessible_from_roles_dict():
     person = PersonInRoleAndOntology(name="Bass")
     ceo = CEOAsFirstRole(role_taker=person, head_of=Company(name="BassCo"))
-    assert Role.roles_for(person, CEOAsFirstRole)[0] is ceo
-    assert Role.roles_for(person, CEOAsFirstRole)[0].head_of == Company(name="BassCo")
+    assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0] is ceo
+    assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0].head_of == Company(name="BassCo")
 
 
 def test_getting_and_setting_attribute_between_sibling_roles():
@@ -115,9 +115,9 @@ def test_getting_and_setting_attribute_between_sibling_roles():
     assert ceo.head_of.name == "BassCo"
 
     # sibling role attrs are accessible via the roles dict on the shared taker
-    assert Role.roles_for(person, CEOAsFirstRole)[0].head_of.name == "BassCo"
+    assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0].head_of.name == "BassCo"
     assert (
-        Role.roles_for(person, ProfessorAsFirstRole)[0].teacher_of[0].name
+        Role.roles_for(role_taker=person, role_type=ProfessorAsFirstRole)[0].teacher_of[0].name
         == "BassCourse"
     )
 
@@ -150,10 +150,10 @@ def test_roles_are_distinct_objects_but_share_same_entity():
     assert len({person, ceo, representative, professor}) == 4
 
     # ...yet the IsSameEntity predicate sees through the role chain to the one root entity.
-    assert IsSameSemanticEntity(ceo, person)
-    assert IsSameSemanticEntity(ceo, representative)
-    assert IsSameSemanticEntity(ceo, professor)
-    assert IsSameSemanticEntity(representative, professor)
+    assert IsSameSemanticEntity(first_entity=ceo, second_entity=person)
+    assert IsSameSemanticEntity(first_entity=ceo, second_entity=representative)
+    assert IsSameSemanticEntity(first_entity=ceo, second_entity=professor)
+    assert IsSameSemanticEntity(first_entity=representative, second_entity=professor)
 
 
 def test_multiple_roles_of_same_type_on_same_taker():
@@ -162,7 +162,7 @@ def test_multiple_roles_of_same_type_on_same_taker():
     second = CEOAsFirstRole(role_taker=person, head_of=Company(name="Globex"))
 
     # Both same-type roles are retrievable and keep their own role-native state.
-    retrieved = Role.roles_for(person, CEOAsFirstRole)
+    retrieved = Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)
     assert len(retrieved) == 2
     assert {role.head_of.name for role in retrieved} == {"Acme", "Globex"}
 
@@ -170,7 +170,7 @@ def test_multiple_roles_of_same_type_on_same_taker():
     assert first is not second
     assert first != second
     assert len({first, second}) == 2
-    assert IsSameSemanticEntity(first, second)
+    assert IsSameSemanticEntity(first_entity=first, second_entity=second)
 
 
 def test_is_same_entity_predicate():
@@ -182,15 +182,15 @@ def test_is_same_entity_predicate():
     other_person = PersonInRoleAndOntology(name="Other")
 
     # Two roles on one taker, and a role versus its taker, are the same entity.
-    assert IsSameSemanticEntity(ceo, professor)
-    assert IsSameSemanticEntity(ceo, person)
+    assert IsSameSemanticEntity(first_entity=ceo, second_entity=professor)
+    assert IsSameSemanticEntity(first_entity=ceo, second_entity=person)
     # A role chain resolves to its root entity, in either operand order.
-    assert IsSameSemanticEntity(delegate, person)
-    assert IsSameSemanticEntity(person, delegate)
+    assert IsSameSemanticEntity(first_entity=delegate, second_entity=person)
+    assert IsSameSemanticEntity(first_entity=person, second_entity=delegate)
     # Unrelated entities are not the same; a plain object is the same as itself.
-    assert not IsSameSemanticEntity(ceo, other_person)
-    assert not IsSameSemanticEntity(person, other_person)
-    assert IsSameSemanticEntity(person, person)
+    assert not IsSameSemanticEntity(first_entity=ceo, second_entity=other_person)
+    assert not IsSameSemanticEntity(first_entity=person, second_entity=other_person)
+    assert IsSameSemanticEntity(first_entity=person, second_entity=person)
 
 
 def test_mappings_between_roles_and_role_takers():
@@ -203,23 +203,23 @@ def test_mappings_between_roles_and_role_takers():
 
     # Every role in the chain registers an edge to the root taker, so the root taker can
     # retrieve all of them (by identity), and each role reports the same underlying entity.
-    roles_of_person = Role.roles_for(person)
+    roles_of_person = Role.roles_for(role_taker=person)
     assert all(
         any(role is retrieved for retrieved in roles_of_person) for role in roles
     )
-    assert all(IsSameSemanticEntity(role, person) for role in roles)
+    assert all(IsSameSemanticEntity(first_entity=role, second_entity=person) for role in roles)
 
     delegate_role_takers = [representative, ceo, person]
     assert len(delegate_role_takers) == len(delegate.all_role_takers)
     assert all(
-        EntityAndType(role_taker) in map(EntityAndType, delegate.all_role_takers)
+        EntityAndType(entity=role_taker) in map(EntityAndType, delegate.all_role_takers)
         for role_taker in delegate_role_takers
     )
 
     professor_role_takers = [person]
     assert len(professor_role_takers) == len(professor.all_role_takers)
     assert all(
-        EntityAndType(role_taker) in map(EntityAndType, professor.all_role_takers)
+        EntityAndType(entity=role_taker) in map(EntityAndType, professor.all_role_takers)
         for role_taker in professor_role_takers
     )
 
@@ -230,10 +230,10 @@ def test_has_role():
     representative = RepresentativeAsSecondRole(role_taker=ceo)
     professor = ProfessorAsFirstRole(role_taker=person)
 
-    assert Role.has_role(person, CEOAsFirstRole)
-    assert Role.has_role(person, RepresentativeAsSecondRole)
-    assert not Role.has_role(person, DelegateAsThirdRole)
-    assert Role.has_role(person, ProfessorAsFirstRole)
+    assert Role.has_role(role_taker=person, role_types=CEOAsFirstRole)
+    assert Role.has_role(role_taker=person, role_types=RepresentativeAsSecondRole)
+    assert not Role.has_role(role_taker=person, role_types=DelegateAsThirdRole)
+    assert Role.has_role(role_taker=person, role_types=ProfessorAsFirstRole)
 
 
 def test_get_roles_of_type():
@@ -243,19 +243,19 @@ def test_get_roles_of_type():
     professor = ProfessorAsFirstRole(role_taker=person)
 
     assert isinstance(
-        Role.get_taker_roles_of_type(person, CEOAsFirstRole)[0], CEOAsFirstRole
+        Role.get_taker_roles_of_type(role_taker=person, role_type=CEOAsFirstRole)[0], CEOAsFirstRole
     )
     assert isinstance(
-        Role.get_taker_roles_of_type(person, RepresentativeAsSecondRole)[0],
+        Role.get_taker_roles_of_type(role_taker=person, role_type=RepresentativeAsSecondRole)[0],
         RepresentativeAsSecondRole,
     )
-    assert Role.get_taker_roles_of_type(person, DelegateAsThirdRole) == []
+    assert Role.get_taker_roles_of_type(role_taker=person, role_type=DelegateAsThirdRole) == []
     assert isinstance(
-        Role.get_taker_roles_of_type(person, ProfessorAsFirstRole)[0],
+        Role.get_taker_roles_of_type(role_taker=person, role_type=ProfessorAsFirstRole)[0],
         ProfessorAsFirstRole,
     )
     # All three roles (ceo, representative, professor) resolve back to the same taker.
-    assert len(Role.roles_for(person)) == 3
+    assert len(Role.roles_for(role_taker=person)) == 3
 
 
 def test_role_taker_associations():
@@ -264,7 +264,7 @@ def test_role_taker_associations():
         for cls in classes_of_module(university_ontology_like_classes)
         if is_dataclass(cls)
     ]
-    diagram = ClassDiagram(classes)
+    diagram = ClassDiagram(classes=classes)
     assert len(diagram._dependency_graph.edges()) == 29
     assert (
         len(
@@ -309,7 +309,7 @@ def test_factory_method_still_callable_on_taker_and_root_persistent_entity():
     person = PersonInRoleAndOntology(name="Bass")
     ceo = CEOAsFirstRole(role_taker=person)
 
-    built_from_taker = ceo.role_taker.from_name("Made")
+    built_from_taker = ceo.role_taker.from_name(name="Made")
     built_from_root = ceo.root_persistent_entity.from_name("Made")
 
     assert isinstance(built_from_taker, PersonInRoleAndOntology)
@@ -320,12 +320,12 @@ def test_factory_method_still_callable_on_taker_and_root_persistent_entity():
 def test_role_overriding_factory_method_shadows_the_guard():
     # A role that overrides the factory keeps the role instead of dropping it. Normal attribute
     # lookup finds the override, so __getattr__ (and the guard) never runs.
-    from_class = CEOThatOverridesFactory.from_name("Bass")
+    from_class = CEOThatOverridesFactory.from_name(name="Bass")
     assert isinstance(from_class, CEOThatOverridesFactory)
     assert from_class.name == "Bass"
 
     existing = CEOThatOverridesFactory(role_taker=PersonInRoleAndOntology(name="Seed"))
-    from_instance = existing.from_name("Bass")
+    from_instance = existing.from_name(name="Bass")
     assert isinstance(from_instance, CEOThatOverridesFactory)
     assert from_instance.name == "Bass"
 
@@ -371,14 +371,14 @@ def test_wrapped_class_exposes_factory_methods():
         )
         if is_dataclass(cls)
     ]
-    diagram = ClassDiagram(classes)
-    wrapped = diagram.get_wrapped_class(PersonInRoleAndOntology)
+    diagram = ClassDiagram(classes=classes)
+    wrapped = diagram.get_wrapped_class(clazz=PersonInRoleAndOntology)
     assert "from_name" in wrapped.factory_methods
     assert "spawn" in wrapped.factory_methods
     assert "describe" not in wrapped.factory_methods
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityAndType(Generic[T], SubClassSafeGeneric):
     entity: T
     type: builtins.type[T] = field(init=False)

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class InheritancePathLength(SymbolicFunction):
     """
     The inheritance path length between two classes, as a value operation.
@@ -50,7 +50,7 @@ class InheritancePathLength(SymbolicFunction):
         return _inheritance_path_length(self.child_class, self.parent_class, 0)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """:return: the noun phrase *"the inheritance path length between <child> and <parent>"* — a
         custom fragment because the length is BETWEEN its two operands, a relation the name-based
         *"of X and Y"* genitive cannot express."""
@@ -63,7 +63,7 @@ class InheritancePathLength(SymbolicFunction):
         )
 
         return FunctionVerbalizationTemplates.custom_relation(
-            cls, Prepositions.BETWEEN, *fields.values()
+            *fields.values(), function_class=cls, relation=Prepositions.BETWEEN
         )
 
 

@@ -23,7 +23,7 @@ def test_element_referenced_twice_deserializes_to_one_instance():
 def test_from_kwargs_returns_the_tracker_already_in_the_kwargs():
     tracker = KeyedElementTracker()
 
-    assert KeyedElementTracker.from_kwargs(tracker.create_kwargs()) is tracker
+    assert KeyedElementTracker.from_kwargs(from_json_kwargs=tracker.create_kwargs()) is tracker
 
 
 def test_trackers_of_different_types_keep_separate_kwargs():
@@ -31,28 +31,28 @@ def test_trackers_of_different_types_keep_separate_kwargs():
     kwargs = tracker.create_kwargs()
 
     assert (
-        type(OtherKeyedElementTracker.from_kwargs(kwargs)) is OtherKeyedElementTracker
+        type(OtherKeyedElementTracker.from_kwargs(from_json_kwargs=kwargs)) is OtherKeyedElementTracker
     )
-    assert KeyedElementTracker.from_kwargs(kwargs) is tracker
+    assert KeyedElementTracker.from_kwargs(from_json_kwargs=kwargs) is tracker
 
 
 def test_has_is_true_only_after_add():
     tracker = KeyedElementTracker()
     element = KeyedElement(key="element")
 
-    assert not tracker.has(element.key)
-    tracker.add(element.key, element)
-    assert tracker.has(element.key)
+    assert not tracker.has(key=element.key)
+    tracker.add(key=element.key, tracked_object=element)
+    assert tracker.has(key=element.key)
 
 
 def test_get_returns_the_added_object():
     tracker = KeyedElementTracker()
     element = KeyedElement(key="element")
-    tracker.add(element.key, element)
+    tracker.add(key=element.key, tracked_object=element)
 
-    assert tracker.get(element.key) is element
+    assert tracker.get(key=element.key) is element
 
 
 def test_get_of_an_untracked_key_raises():
     with pytest.raises(UntrackedObjectError):
-        KeyedElementTracker().get("untracked")
+        KeyedElementTracker().get(key="untracked")

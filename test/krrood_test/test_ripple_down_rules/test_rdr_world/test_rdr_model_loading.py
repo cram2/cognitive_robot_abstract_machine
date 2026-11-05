@@ -18,9 +18,9 @@ def test_load_chains_the_error_that_prevented_it(tmp_path):
     A failed load carries the error that caused it, so a caller is told why it failed.
     """
     with pytest.raises(Exception) as reading_the_model:
-        GeneralRDR.from_python(str(tmp_path / MISSING_MODEL_NAME))
+        GeneralRDR.from_python(model_dir=str(tmp_path / MISSING_MODEL_NAME))
     with pytest.raises(RDRLoadError) as loading_the_model:
-        GeneralRDR.load(str(tmp_path), model_name=MISSING_MODEL_NAME)
+        GeneralRDR.load(load_dir=str(tmp_path), model_name=MISSING_MODEL_NAME)
     assert type(loading_the_model.value.__cause__) is type(reading_the_model.value)
 
 
@@ -40,7 +40,7 @@ def test_model_saved_outside_a_package_is_loadable(
     """
     save_directory = str(tmp_path / SAVE_DIRECTORY_NAME)
     model_name = drawer_cabinet_rdr.save(save_directory)
-    loaded_rdr = GeneralRDR.load(save_directory, model_name=model_name)
+    loaded_rdr = GeneralRDR.load(load_dir=save_directory, model_name=model_name)
     assert loaded_rdr.classify(
-        handles_and_containers_world
+        case=handles_and_containers_world
     ) == drawer_cabinet_rdr.classify(handles_and_containers_world)

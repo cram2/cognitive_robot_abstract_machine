@@ -74,7 +74,7 @@ from ...test_feature_extraction.test_relational_probabilistic_circuit import (  
 # %% a summer whose season drives both ice cream sales and drownings
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SummerDay:
     season: int
     ice_cream: int
@@ -106,7 +106,7 @@ def summer_rows(row_count: int = 2000, seed: int = 0) -> pd.DataFrame:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldEdge:
     """
     An edge between two :class:`SummerDay` fields.
@@ -134,15 +134,15 @@ def summer_structures(edges: list[FieldEdge]) -> dict[type, LearnedCausalStructu
     :return: The structure of ``SummerDay`` with these causal relations in a class
         diagram, and the summer's rows to rank sets by.
     """
-    class_diagram = ClassDiagram([SummerDay])
-    day = class_diagram.get_wrapped_class(SummerDay)
-    relations = CausalRelationsOfClass(class_diagram, day)
+    class_diagram = ClassDiagram(classes=[SummerDay])
+    day = class_diagram.get_wrapped_class(clazz=SummerDay)
+    relations = CausalRelationsOfClass(class_diagram=class_diagram, owner=day)
     relations.replace_relations(
         CausalRelation(
             source=day,
             target=day,
-            first=AttributeEndpoint((day.get_field(edge.first),)),
-            second=AttributeEndpoint((day.get_field(edge.second),)),
+            first=AttributeEndpoint(fields=(day.get_field(name=edge.first),)),
+            second=AttributeEndpoint(fields=(day.get_field(name=edge.second),)),
             mark_at_first=EdgeMark.TAIL,
             mark_at_second=EdgeMark.ARROW if edge.directed else EdgeMark.TAIL,
         )
@@ -163,10 +163,10 @@ def true_summer_edges() -> list[FieldEdge]:
     :return: The edges the summer's rows are drawn from.
     """
     return [
-        FieldEdge("season", "ice_cream"),
-        FieldEdge("season", "drowning"),
-        FieldEdge("heat", "sunscreen"),
-        FieldEdge("heat", "drowning"),
+        FieldEdge(first="season", second="ice_cream"),
+        FieldEdge(first="season", second="drowning"),
+        FieldEdge(first="heat", second="sunscreen"),
+        FieldEdge(first="heat", second="drowning"),
     ]
 
 
@@ -185,7 +185,7 @@ def summer_circuit_registry(causes: list[str]) -> CausalCircuitRegistry:
         method=JointProbabilityTree(),
     ).fit(rows, variables)
     return CausalCircuitRegistry(
-        {
+        circuits={
             SummerDay: CausalCircuit.from_probabilistic_circuit(
                 circuit,
                 MarginalDeterminismTreeNode.from_variable_order(cause_variables),
@@ -228,9 +228,9 @@ def test_learned_graph_supplies_the_confounder(summer_backend_registry):
     learned = ProbabilisticBackend(
         model_registry=summer_backend_registry,
         causal_structures=summer_structures(true_summer_edges()),
-    ).rank_causes(ice_cream_query(declares_the_season=False))
+    ).rank_causes(expression=ice_cream_query(declares_the_season=False))
     declared = ProbabilisticBackend(model_registry=summer_backend_registry).rank_causes(
-        ice_cream_query(declares_the_season=True)
+        expression=ice_cream_query(declares_the_season=True)
     )
 
     assert [candidate.effect_probability_given_region for candidate in learned] == [
@@ -239,10 +239,10 @@ def test_learned_graph_supplies_the_confounder(summer_backend_registry):
 
 
 def test_backend_without_a_structure_for_the_class_chooses_nothing():
-    parameters = UnderspecifiedParameters(ice_cream_query(declares_the_season=False))
+    parameters = UnderspecifiedParameters(statement=ice_cream_query(declares_the_season=False))
 
     ProbabilisticBackend().choose_adjustment_sets(
-        parameters, ice_cream_query(declares_the_season=False)
+        parameters=parameters, expression=ice_cream_query(declares_the_season=False)
     )
 
     assert parameters.derived_adjustment_variables == {}
@@ -253,17 +253,17 @@ def test_each_cause_candidate_gets_its_own_adjustment_set():
         season=..., ice_cream=cause, sunscreen=cause, heat=..., drowning=...
     )
     query.causes_effect(query.drowning == 1)
-    parameters = UnderspecifiedParameters(query)
+    parameters = UnderspecifiedParameters(statement=query)
     backend = ProbabilisticBackend(
         causal_structures=summer_structures(true_summer_edges())
     )
 
-    backend.choose_adjustment_sets(parameters, query)
+    backend.choose_adjustment_sets(parameters=parameters, expression=query)
 
     assert {
         cause_variable.name: [
             variable.name
-            for variable in parameters.adjustment_variables_of(cause_variable)
+            for variable in parameters.adjustment_variables_of(cause_variable=cause_variable)
         ]
         for cause_variable in parameters.search_cause_variables
     } == {
@@ -277,36 +277,36 @@ def test_each_cause_candidate_gets_its_own_adjustment_set():
 
 def test_declared_invalid_confounder_is_refused():
     mediated = summer_structures(
-        [FieldEdge("ice_cream", "season"), FieldEdge("season", "drowning")]
+        [FieldEdge(first="ice_cream", second="season"), FieldEdge(first="season", second="drowning")]
     )
     query = ice_cream_query(declares_the_season=True)
 
     with pytest.raises(InvalidAdjustmentSet):
         ProbabilisticBackend(causal_structures=mediated).choose_adjustment_sets(
-            UnderspecifiedParameters(query), query
+            parameters=UnderspecifiedParameters(statement=query), expression=query
         )
 
 
 def test_partially_identified_effect_raises_effect_not_identified():
     undecided = summer_structures(
         [
-            FieldEdge("season", "drowning"),
-            FieldEdge("ice_cream", "drowning"),
-            FieldEdge("season", "ice_cream", directed=False),
+            FieldEdge(first="season", second="drowning"),
+            FieldEdge(first="ice_cream", second="drowning"),
+            FieldEdge(first="season", second="ice_cream", directed=False),
         ]
     )
     query = ice_cream_query(declares_the_season=False)
 
     with pytest.raises(EffectNotIdentified):
         ProbabilisticBackend(causal_structures=undecided).choose_adjustment_sets(
-            UnderspecifiedParameters(query), query
+            parameters=UnderspecifiedParameters(statement=query), expression=query
         )
 
 
 # %% the relational path
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedEdgesLearner(CausalStructureLearner):
     """
     Learns the given edges between the nodes it is asked about, whatever the rows say.
@@ -319,7 +319,7 @@ class FixedEdgesLearner(CausalStructureLearner):
 
     def learn(
         self,
-        rows: pd.DataFrame,
+        *, rows: pd.DataFrame,
         nodes: list[GraphNode],
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
@@ -358,22 +358,22 @@ def test_derived_count_survives_the_relational_trim(fitted_circuit, scenario, re
     circuit = request.getfixturevalue(fitted_circuit)
     count = circuit.exchangeable_distribution_templates["objects"].latent_variables[0]
     query = room_query()
-    parameters = UnderspecifiedParameters(query)
+    parameters = UnderspecifiedParameters(statement=query)
     [x] = parameters.search_cause_variables
     [y] = parameters.effect_variables_from_causes_effect
     learner = RelationalCausalStructureLearner(
-        ClassDiagram([SceneRoom, SceneObject, KRROODPosition, KRROODOrientation]),
-        FixedEdgesLearner({x.name: [count.name], y.name: [count.name]}),
+        ClassDiagram(classes=[SceneRoom, SceneObject, KRROODPosition, KRROODOrientation]),
+        FixedEdgesLearner(parent_names={x.name: [count.name], y.name: [count.name]}),
     )
     backend = ProbabilisticBackend(
         causal_structures={SceneRoom: learner.learn(circuit, list(scenario))}
     )
 
-    backend.choose_adjustment_sets(parameters, query)
+    backend.choose_adjustment_sets(parameters=parameters, expression=query)
     np.random.seed(0)
     causal_circuit = RelationalCircuitRegistry(
         relational_probabilistic_circuit=circuit
-    ).get_model(parameters)
+    ).get_model(parameters=parameters)
 
     assert count.name in {
         variable.name for variable in causal_circuit.probabilistic_circuit.variables
@@ -406,20 +406,20 @@ def test_range_spans_the_answers_of_each_candidate():
     registry = summer_circuit_registry(["ice_cream", "season"])
     undecided = summer_structures(
         [
-            FieldEdge("season", "drowning"),
-            FieldEdge("ice_cream", "drowning"),
-            FieldEdge("season", "ice_cream", directed=False),
+            FieldEdge(first="season", second="drowning"),
+            FieldEdge(first="ice_cream", second="drowning"),
+            FieldEdge(first="season", second="ice_cream", directed=False),
         ]
     )
     query = ice_cream_query(declares_the_season=False)
     [answer] = ProbabilisticBackend(
         model_registry=registry, causal_structures=undecided
-    ).interventional_range(query)
+    ).interventional_range(expression=query)
     causal_circuit = registry.circuits[SummerDay]
     [ice_cream, season] = causal_circuit.causal_variables
     [drowning] = causal_circuit.effect_variables
     effect_event = UnderspecifiedParameters(
-        query
+        statement=query
     ).truncation_assignments_from_where_conditions
     candidates = [
         causal_circuit.backdoor_adjustment(ice_cream, drowning, adjustment)
@@ -467,8 +467,8 @@ def test_effect_only_ranking_equals_marking_every_possible_ancestor():
         causal_structures=summer_structures(true_summer_edges()),
     )
 
-    effect_only = backend.rank_causes(drowning_query())
-    marked = backend.rank_causes(drowning_query(season=cause, heat=cause))
+    effect_only = backend.rank_causes(expression=drowning_query())
+    marked = backend.rank_causes(expression=drowning_query(season=cause, heat=cause))
 
     assert [
         (candidate.cause_variable.name, candidate.effect_probability_given_region)
@@ -483,4 +483,4 @@ def test_effect_only_ranking_without_a_learned_structure_raises():
     with pytest.raises(NoCauseVariablesForRanking):
         ProbabilisticBackend(
             model_registry=summer_circuit_registry(["season", "heat"])
-        ).rank_causes(drowning_query())
+        ).rank_causes(expression=drowning_query())

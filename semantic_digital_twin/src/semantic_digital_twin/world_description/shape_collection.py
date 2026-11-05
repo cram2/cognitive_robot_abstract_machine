@@ -202,7 +202,7 @@ class ShapeCollection(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         """
         The collection belongs to the frame all its shapes are expressed in, which is the
         entity it was written from, such as a body whose shapes are replaced.

@@ -231,7 +231,7 @@ def _session_class_diagram() -> ClassDiagram:
     # SymbolGraph singleton reset below only needs to drop per-test instance state, not
     # this class-level graph.
     return ClassDiagram(
-        recursive_subclasses(Symbol) + [World],
+        classes=recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
 

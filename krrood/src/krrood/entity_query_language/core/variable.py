@@ -57,7 +57,7 @@ The type of the domain used for the variable.
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
     """
     A superclass for variables that can have a domain source.
@@ -81,7 +81,7 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Variable(CanHaveDomainSource[T]):
     """
     An atomic expression of EQL that has a domain of possible values.
@@ -111,9 +111,9 @@ class Variable(CanHaveDomainSource[T]):
     def __post_init__(self):
         super().__post_init__()
 
-        self._update_domain_(self._domain_)
+        self._update_domain_(domain=self._domain_)
 
-    def _update_domain_(self, domain):
+    def _update_domain_(self, *, domain):
         """
         Set the domain and ensure it is a lazy re-enterable iterable.
         """
@@ -122,11 +122,11 @@ class Variable(CanHaveDomainSource[T]):
             return
         if not is_iterable(domain):
             domain = [domain]
-        self._re_enterable_domain_generator_.set_iterable(domain)
+        self._re_enterable_domain_generator_.set_iterable(iterable=domain)
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Fetch values from the domain values and yield an OperationResult for
@@ -134,12 +134,12 @@ class Variable(CanHaveDomainSource[T]):
         """
         for v in self._re_enterable_domain_generator_:
             bindings = sources.bindings | {self._id_: v}
-            yield self._build_operation_result_(bindings, sources)
+            yield self._build_operation_result_(bindings=bindings, child_result=sources)
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
-        raise NoChildToReplace(self, old_child, new_child)
+        raise NoChildToReplace(expression=self, old_child=old_child, new_child=new_child)
 
     @cached_property
     def _name_(self) -> str:
@@ -152,7 +152,7 @@ class Variable(CanHaveDomainSource[T]):
             return f"{self.__class__.__name__}()"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Literal(Variable[T]):
     """
     Literals are variables that do not necessarily have a type but they must
@@ -191,7 +191,7 @@ class Literal(Variable[T]):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct,
     CanHaveDomainSource[T],
@@ -250,11 +250,11 @@ class InstantiatedVariable(
         if self._declared_factory_ is None:
             self._declared_factory_ = self._factory_
         if self._type_ is None:
-            self._type_ = self._type_built_by_(self._factory_)
+            self._type_ = self._type_built_by_(factory=self._factory_)
         if self._type_ is None:
-            raise ResultTypeCannotBeDetermined(self._factory_)
+            raise ResultTypeCannotBeDetermined(factory=self._factory_)
         if not isinstance(self._type_, type):
-            raise ResultTypeIsNotAType(self._type_)
+            raise ResultTypeIsNotAType(result_type=self._type_)
         self._update_child_variables_from_kwargs_()
         self._operation_children_ = tuple(self._child_variables_.values())
         # This is done here as it uses `_operation_children_`
@@ -265,22 +265,22 @@ class InstantiatedVariable(
         Set the child variables from the kwargs dictionary.
         """
         for name, value in self._kwargs_.items():
-            self._child_variables_[name] = SymbolicExpression._as_operand_(value, name)
+            self._child_variables_[name] = SymbolicExpression._as_operand_(value=value, name=name)
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        yield from self._instantiate_using_child_variables_and_yield_results_(sources)
+        yield from self._instantiate_using_child_variables_and_yield_results_(sources=sources)
 
     def _instantiate_using_child_variables_and_yield_results_(
-        self, sources: OperationResult
+        self, *, sources: OperationResult
     ) -> Iterator[OperationResult]:
         """
         Create new instances of the variable type and using as keyword
         arguments the child variables values.
         """
-        for child_result in self._evaluate_product_(sources):
+        for child_result in self._evaluate_product_(sources=sources):
             # An argument without a binding is left out, so its default applies.
             arguments = {
                 name: child_result.bindings[child._id_]
@@ -299,12 +299,12 @@ class InstantiatedVariable(
             instance = bind(**arguments)
 
             bindings = {self._id_: instance} | child_result.bindings
-            result = self._build_operation_result_(bindings, child_result)
+            result = self._build_operation_result_(bindings=bindings, child_result=child_result)
             result.previous_operation_result = child_result
             yield result
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         MultiArityExpressionThatPerformsACartesianProduct._replace_child_field_(
             self, old_child, new_child
@@ -328,7 +328,7 @@ class InstantiatedVariable(
         return self._factory_(*args, **kwargs)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class ExternallySetVariable(CanHaveDomainSource[T]):
     """
     A variable that is externally set by another expression or another part of
@@ -336,11 +336,11 @@ class ExternallySetVariable(CanHaveDomainSource[T]):
     """
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         raise ValueError(f"class {self.__class__} does not have children")
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
         As this variable is externally set, it does not produce any results on
         its own, it just yields from an empty list to indicate that it has no

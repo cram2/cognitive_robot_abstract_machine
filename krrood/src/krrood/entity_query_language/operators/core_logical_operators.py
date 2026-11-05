@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class LogicalOperator(TruthValuedExpression, TruthValueOperator, ABC):
     """
     A symbolic operation that can be used to combine multiple symbolic expressions using
@@ -42,7 +42,7 @@ class LogicalOperator(TruthValuedExpression, TruthValueOperator, ABC):
         return self.__class__.__name__
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Not(LogicalOperator, UnaryExpression):
     """
     The logical negation of a symbolic expression.
@@ -54,39 +54,39 @@ class Not(LogicalOperator, UnaryExpression):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
-        for child_result in self._evaluate_child_as_condition_(self._child_, sources):
+        for child_result in self._evaluate_child_as_condition_(child=self._child_, sources=sources):
             # Include child_result as previous so the satisfaction-tracking chain extends
             # through the negated child's evaluation, keeping ancestor conditions
             # reachable in the result chain.
             yield self._build_operation_result_with_truth_(
-                child_result.is_false, child_result.bindings, child_result
+                truth=child_result.is_false, bindings=child_result.bindings, child_result=child_result
             )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class LogicalBinaryOperator(LogicalOperator, BinaryExpression, ABC):
     """
     Abstract base class for logical operators that take two operands (i.e. have two
     children) only.
     """
 
-    def evaluate_right(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def evaluate_right(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
         Evaluate the right operand.
 
         :param sources: The current OperationResult to use during evaluation.
         :return: The new bindings after evaluating the right operand.
         """
-        for right_value in self._evaluate_child_as_condition_(self.right, sources):
+        for right_value in self._evaluate_child_as_condition_(child=self.right, sources=sources):
             yield self._build_operation_result_with_truth_(
-                right_value.is_true, right_value.bindings, right_value
+                truth=right_value.is_true, bindings=right_value.bindings, child_result=right_value
             )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class AND(LogicalBinaryOperator):
     """
     A symbolic AND operation that can be used to combine multiple symbolic expressions.
@@ -94,26 +94,26 @@ class AND(LogicalBinaryOperator):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
         yielded: bool = False
-        for left_value in self._evaluate_child_as_condition_(self.left, sources):
+        for left_value in self._evaluate_child_as_condition_(child=self.left, sources=sources):
             yielded = True
             if left_value.is_false:
                 yield self._build_operation_result_with_truth_(
-                    False, left_value.bindings, left_value
+                    truth=False, bindings=left_value.bindings, child_result=left_value
                 )
             else:
-                yield from self.evaluate_right(left_value)
+                yield from self.evaluate_right(sources=left_value)
         if not yielded:
             # Negation as failure: no variable value satisfied the condition. So the whole condition is False.
             yield self._build_operation_result_with_truth_(
-                False, sources.bindings, sources
+                truth=False, bindings=sources.bindings, child_result=sources
             )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class OR(LogicalBinaryOperator):
     """
     A logical OR operator that evaluates the right operand only when the left operand is
@@ -124,7 +124,7 @@ class OR(LogicalBinaryOperator):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the left operand, if it is False, then evaluate the right operand.
@@ -134,18 +134,18 @@ class OR(LogicalBinaryOperator):
             operand).
         """
         yielded: bool = False
-        for left_value in self._evaluate_child_as_condition_(self.left, sources):
+        for left_value in self._evaluate_child_as_condition_(child=self.left, sources=sources):
             yielded = True
             if left_value.is_false:
-                yield from self.evaluate_right(left_value)
+                yield from self.evaluate_right(sources=left_value)
             else:
                 yield self._build_operation_result_with_truth_(
-                    True, left_value.bindings, left_value
+                    truth=True, bindings=left_value.bindings, child_result=left_value
                 )
         if not yielded:
             # Negation as failure: no variable value satisfied the condition. So the whole condition is False.
             yield self._build_operation_result_with_truth_(
-                False, sources.bindings, sources
+                truth=False, bindings=sources.bindings, child_result=sources
             )
 
 

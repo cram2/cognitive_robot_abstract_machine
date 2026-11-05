@@ -10,7 +10,7 @@ from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class BindingPlan:
     """
     One field binding of an InstantiatedVariable (number decided up front).
@@ -32,7 +32,7 @@ class BindingPlan:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class InstantiatedPlan:
     """
     Complete decomposition of an InstantiatedVariable (the plan).
@@ -49,7 +49,7 @@ class InstantiatedPlan:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
     """
     Decompose an instantiated variable (a *"a TypeName where the field of the TypeName is …"*
@@ -102,7 +102,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         ]
 
     @staticmethod
-    def has_fragment(node: InstantiatedVariable) -> bool:
+    def has_fragment(*, node: InstantiatedVariable) -> bool:
         """
         :param node: The instantiated variable.
         :return: ``True`` when *node*'s type implements ``Verbalizable`` and overrides

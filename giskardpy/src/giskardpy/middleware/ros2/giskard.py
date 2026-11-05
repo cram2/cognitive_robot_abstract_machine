@@ -268,7 +268,7 @@ class Giskard:
             String,
             child_choices_topic(node.get_name()),
             lambda message: chooser.receive(
-                ChildChoiceMessage.from_json(json.loads(message.data))
+                ChildChoiceMessage.from_json(data=json.loads(message.data))
             ),
             10,
         )

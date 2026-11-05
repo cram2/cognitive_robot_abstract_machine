@@ -30,7 +30,7 @@ from semantic_digital_twin.world import World
 class TestExternalCollisionExpressionManager:
     def test_simple(self, cylinder_bot_world):
         float_variable_data = FloatVariableData()
-        float_variable_data.register_expression(FloatVariable("muh"))
+        float_variable_data.register_expression(expression=FloatVariable("muh"))
 
         env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
         env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
@@ -110,7 +110,7 @@ class TestExternalCollisionExpressionManager:
         assert len(variables) == external_collisions.block_size * 2 + 1
         expression = Vector(variables)
         compiled_expression = expression.compile(
-            VariableParameters.from_lists(variables)
+            parameters=VariableParameters.from_lists(variables)
         )
         result = compiled_expression(external_collisions.float_variable_data.data)
         assert np.allclose(result, external_collisions.float_variable_data.data)
@@ -135,7 +135,7 @@ class TestExternalCollisionExpressionManager:
 class TestSelfCollisionExpressionManager:
     def test_simple(self, self_collision_bot_world):
         float_variable_data = FloatVariableData()
-        float_variable_data.register_expression(FloatVariable("muh"))
+        float_variable_data.register_expression(expression=FloatVariable("muh"))
 
         r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_tip")
         l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_tip")
@@ -206,7 +206,7 @@ class TestSelfCollisionExpressionManager:
         assert len(variables) == self_collisions.block_size + 1
         expression = Vector(variables)
         compiled_expression = expression.compile(
-            VariableParameters.from_lists(variables)
+            parameters=VariableParameters.from_lists(variables)
         )
         result = compiled_expression(self_collisions.float_variable_data.data)
         assert np.allclose(result, self_collisions.float_variable_data.data)
@@ -224,7 +224,7 @@ class TestSelfCollisionExpressionManager:
 
     def test_reset(self, self_collision_bot_world):
         float_variable_data = FloatVariableData()
-        float_variable_data.register_expression(FloatVariable("muh"))
+        float_variable_data.register_expression(expression=FloatVariable("muh"))
 
         r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_tip")
         l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_tip")
@@ -251,8 +251,8 @@ class TestSelfCollisionExpressionManager:
         self_collisions.register_groups_of_body_combination(root, r_tip)
         # insert a variable between the collision entries to possibly mess with the internal indexing
         v = FloatVariable("muh2")
-        float_variable_data.register_expression(v)
-        float_variable_data.set_value(v, 23)
+        float_variable_data.register_expression(expression=v)
+        float_variable_data.set_value(expression=v, value=23)
         self_collisions.register_groups_of_body_combination(l_tip, r_tip)
 
         self_collisions.reset_collision_data()

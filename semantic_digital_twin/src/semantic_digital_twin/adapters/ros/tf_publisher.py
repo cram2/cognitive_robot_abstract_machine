@@ -166,7 +166,7 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
             published[(connection.parent.id, connection.child.id)] = expression
 
     def compile_tf_expression(self):
-        tf = Matrix.vstack([pose for pose in self.connections_to_expression.values()])
+        tf = Matrix.vstack(list_of_matrices=[pose for pose in self.connections_to_expression.values()])
         self.compiled_tf = tf.compile(
             parameters=VariableParameters.from_lists(
                 self._world.state.position_float_variables
@@ -174,7 +174,7 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
         )
         if self.compiled_tf.is_result_empty():
             return
-        self.compiled_tf.bind_args_to_memory_view(0, self._world.state.positions)
+        self.compiled_tf.bind_args_to_memory_view(arg_idx=0, numpy_array=self._world.state.positions)
 
     def init_tf_message(self):
         """

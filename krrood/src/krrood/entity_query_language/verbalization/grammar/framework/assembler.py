@@ -19,7 +19,7 @@ from krrood.entity_query_language.verbalization.grammar.framework.planner import
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     """
     Realise an EQL *node* into a fragment, planning it first via the paired planner.
@@ -41,7 +41,7 @@ class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
     The paired planner (set per family); ``None`` for realisation-only assemblers.
     """
 
-    def plan(self, node: TSymbolicExpression) -> TPlan | None:
+    def plan(self, *, node: TSymbolicExpression) -> TPlan | None:
         """
         :param node: The node to plan.
         :return: The plan from the paired planner via the shared read model (computed once per
@@ -49,19 +49,19 @@ class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
         """
         if self.planner is None:
             return None
-        return self.context.microplan.plan_for(node, self.planner)
+        return self.context.microplan.plan_for(node=node, planner=self.planner)
 
-    def assemble(self, node: TSymbolicExpression) -> VerbalizationFragment:
+    def assemble(self, *, node: TSymbolicExpression) -> VerbalizationFragment:
         """
         Plan *node*, then realise the plan.
 
         :param node: The node to assemble.
         :return: The fragment for *node*.
         """
-        return self.realize(node, self.plan(node))
+        return self.realize(node=node, plan=self.plan(node=node))
 
     @abstractmethod
-    def realize(self, node: TSymbolicExpression, plan: TPlan) -> VerbalizationFragment:
+    def realize(self, *, node: TSymbolicExpression, plan: TPlan) -> VerbalizationFragment:
         """
         :param node: The node to realise.
         :param plan: The plan computed for *node* (``None`` for realisation-only assemblers).

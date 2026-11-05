@@ -56,7 +56,7 @@ class VectorBoundCap(BoundCap):
 
     def cap_bound(self, bound: Scalar, reachable_change: Scalar) -> Scalar:
         scale = sm.min(
-            1, reachable_change.safe_division(self.vector_bounds.norm(), if_nan=1)
+            1, reachable_change.safe_division(other=self.vector_bounds.norm(), if_nan=1)
         )
         return bound * scale
 

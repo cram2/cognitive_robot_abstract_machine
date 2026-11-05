@@ -26,7 +26,7 @@ from krrood.entity_query_language.verbalization.relational_attributes import (
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ChainPlan:
     """
     A ``MappedVariable`` chain analysed once into the values its rendering needs: the
@@ -67,7 +67,7 @@ class ChainPlan:
             and isinstance(self.chain[0], Attribute)
         )
 
-    def renders_as_plural_attribute(self, number: GrammaticalNumber) -> bool:
+    def renders_as_plural_attribute(self, *, number: GrammaticalNumber) -> bool:
         """
         The chain precedence policy in one place: a single attribute on a variable,
         asked for in the plural, renders as the bare-plural noun phrase *"attributes of
@@ -83,7 +83,7 @@ class ChainPlan:
         return number is GrammaticalNumber.PLURAL and self.is_single_variable_attribute
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChainPlanner(Planner[MappedVariable, ChainPlan]):
     """
     Analyse a ``MappedVariable`` chain into a ``ChainPlan``: its root, the display path-

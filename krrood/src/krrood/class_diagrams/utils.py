@@ -191,7 +191,7 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
     # Final fallback if hierarchy fails
     source_path = inspect.getsourcefile(start_object)
     raise CouldNotResolveType(
-        name,
+        type_name=name,
         extra_information=f"Could not find {name} in the hierarchy of {start_object} (starting from {source_path}).",
     )
 
@@ -199,7 +199,7 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeHintResolutionResult:
     """
     Represents the result of resolving generic type hints of an object using a
@@ -254,15 +254,15 @@ def resolve_type(
     if isinstance(type_to_resolve, (TypeVar, TypeVarTuple)):
         type_to_resolve_key = ensure_hashable(type_to_resolve)
         if type_to_resolve_key not in substitution:
-            return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
+            return TypeHintResolutionResult(resolved_type=type_to_resolve, resolved=False, type_hint=type_to_resolve)
         return TypeHintResolutionResult(
-            substitution[type_to_resolve_key], True, type_to_resolve
+            resolved_type=substitution[type_to_resolve_key], resolved=True, type_hint=type_to_resolve
         )
 
     # If the type itself can be indexed (like List[T] or Optional[T])
     parameters = getattr(type_to_resolve, "__parameters__", None)
     if not (hasattr(type_to_resolve, "__getitem__") and parameters):
-        return TypeHintResolutionResult(type_to_resolve, False, type_to_resolve)
+        return TypeHintResolutionResult(resolved_type=type_to_resolve, resolved=False, type_hint=type_to_resolve)
 
     new_parameters = []
     resolved: bool = False
@@ -282,7 +282,7 @@ def resolve_type(
         new_parameters[0] if len(new_parameters) == 1 else tuple(new_parameters)
     )
     return TypeHintResolutionResult(
-        type_to_resolve[subscript_parameter], resolved, type_to_resolve
+        resolved_type=type_to_resolve[subscript_parameter], resolved=resolved, type_hint=type_to_resolve
     )
 
 
@@ -320,7 +320,7 @@ def get_type_hints_of_object(
                 f" hint that cannot be resolved."
             )
             raise CouldNotResolveType(
-                repr(object_),
+                type_name=repr(object_),
                 extra_information=f"Could not get type hints for {object_} due to TypeError: {type_error}. This may be"
                 f" caused by a type hint that cannot be resolved.",
             ) from type_error
@@ -430,7 +430,7 @@ def get_object_by_name_from_another_object_in_same_module(
     source_path = inspect.getsourcefile(object_)
     if source_path is None:
         raise CouldNotResolveType(
-            name, extra_information=f"Could not find source file for {object_}"
+            type_name=name, extra_information=f"Could not find source file for {object_}"
         )
     scope = _cached_scope_from_imports(source_path)
     if name in scope:
@@ -451,7 +451,7 @@ def get_object_by_name_from_another_object_in_same_module(
         scope.update(fresh_scope)
         return fresh_scope[name]
     raise CouldNotResolveType(
-        name,
+        type_name=name,
         extra_information=f"Could not find {name} in {source_path}, could be a deprecated import statement or "
         f"a type defined in a module that is not imported in the source file.",
     )

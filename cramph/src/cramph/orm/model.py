@@ -118,7 +118,7 @@ class StatechartMapping(AlternativeMapping[Statechart]):
     """
 
     @classmethod
-    def from_domain_object(cls, obj: Statechart) -> Self:
+    def from_domain_object(cls, *, obj: Statechart) -> Self:
         return cls(
             context=obj.context,
             pass_limit=obj.pass_limit,
@@ -132,7 +132,7 @@ class StatechartMapping(AlternativeMapping[Statechart]):
     def to_domain_object(self) -> Statechart:
         world = self.context.world
         statechart = Statechart.from_json(
-            json.loads(self.structure),
+            data=json.loads(self.structure),
             context=self.context,
             world=world,
             **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),

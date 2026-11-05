@@ -14,7 +14,7 @@ from krrood.utils import ensure_hashable, is_hashable
 # %% call arguments
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(kw_only=True, frozen=True, eq=False)
 class CallArguments:
     """
     The positional and keyword arguments of one call.
@@ -44,9 +44,9 @@ class CallArguments:
         :return: What identifies these arguments, each compared by
             :meth:`hashable_form`.
         """
-        return self.key_by(self.hashable_form)
+        return self.key_by(value_form=lambda value: self.hashable_form(value=value))
 
-    def key_by(self, value_form: Callable[[Any], Hashable]) -> tuple[Hashable, ...]:
+    def key_by(self, *, value_form: Callable[[Any], Hashable]) -> tuple[Hashable, ...]:
         """
         :param value_form: What one argument is compared by.
         :return: The positional arguments in order, followed by the keyword arguments
@@ -60,7 +60,7 @@ class CallArguments:
         )
 
     @classmethod
-    def hashable_form(cls, value: Any) -> Hashable:
+    def hashable_form(cls, *, value: Any) -> Hashable:
         """
         :param value: One argument.
         :return: What the argument is compared by: the value itself where it can be
@@ -70,12 +70,12 @@ class CallArguments:
         if is_hashable(value):
             return value
         if type(value) in (tuple, list):
-            return type(value), tuple(cls.hashable_form(element) for element in value)
+            return type(value), tuple(cls.hashable_form(value=element) for element in value)
         if type(value) is set:
             return set, frozenset(value)
         if type(value) is dict:
             return dict, frozenset(
-                (key, cls.hashable_form(element)) for key, element in value.items()
+                (key, cls.hashable_form(value=element)) for key, element in value.items()
             )
         return ensure_hashable(value)
 

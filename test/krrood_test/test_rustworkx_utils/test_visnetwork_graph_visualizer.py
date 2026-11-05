@@ -12,7 +12,7 @@ from krrood.rustworkx_utils.visualization.visnetwork_graph_visualizer import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NamedPayload:
     """A payload whose name is shown as the node label and detail line."""
 
@@ -23,7 +23,7 @@ class NamedPayload:
 def chain_graph(names: list[str]) -> rx.PyDiGraph:
     """Build a directed chain of :class:`NamedPayload` nodes."""
     graph = rx.PyDiGraph(multigraph=False)
-    indices = [graph.add_node(NamedPayload(name)) for name in names]
+    indices = [graph.add_node(NamedPayload(name=name)) for name in names]
     for parent, child in zip(indices, indices[1:]):
         graph.add_edge(parent, child, None)
     return graph
@@ -131,27 +131,27 @@ class TestLayout:
     def test_layered_layout_maps_to_a_hierarchical_layout(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
-        options = VisNetworkGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = VisNetworkGraphVisualizer.layout_options.get_options(layout=visualizer.layout)
         assert options["layout"]["hierarchical"]["direction"] == "UD"
         assert options["physics"]["enabled"] is False
 
     def test_physics_layout_keeps_the_simulation_running(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = VisNetworkGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = VisNetworkGraphVisualizer.layout_options.get_options(layout=visualizer.layout)
         assert options["physics"]["enabled"] is True
         assert options["physics"]["stabilization"]["enabled"] is False
 
     def test_spring_layout_stabilizes_and_stops(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.SPRING)
 
-        options = VisNetworkGraphVisualizer.layout_options.get_options(visualizer.layout)
+        options = VisNetworkGraphVisualizer.layout_options.get_options(layout=visualizer.layout)
         assert options["physics"]["enabled"] is True
         assert options["physics"]["stabilization"]["enabled"] is True
 
 
 class TestCheckDependencies:
-    def test_raises_when_flask_is_missing(self, monkeypatch):
+    def test_raises_when_flask_is_missing(self, *, monkeypatch):
         original_find_spec = importlib.util.find_spec
 
         def find_spec_without_flask(name, *args, **kwargs):

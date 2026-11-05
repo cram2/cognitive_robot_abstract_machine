@@ -366,7 +366,7 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             semantic_annotation_json=data["semantic_annotation_json"],
             semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
@@ -411,7 +411,7 @@ class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerial
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
             semantic_annotation_json=data["semantic_annotation_json"],
@@ -676,7 +676,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         **kwargs,
     ):
         diff.apply_to_list(
-            current_value,
+            items=current_value,
             removed_items=[
                 self._resolve_item(world, from_json(raw_json, **kwargs))
                 for raw_json in diff.removed_values
@@ -705,7 +705,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             entity_id=from_json(data["entity_id"], **kwargs),
             updated_kwargs_json_list=from_json(

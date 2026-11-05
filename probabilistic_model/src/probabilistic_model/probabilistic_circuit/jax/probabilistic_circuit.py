@@ -57,11 +57,11 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         variables = SortedSet(
             from_json(variable, **kwargs) for variable in data["variables"]
         )
-        root = DifferentiableLayer.from_json(data["root"], **kwargs)
+        root = DifferentiableLayer.from_json(data=data["root"], **kwargs)
         return cls(variables, root)
 
     def fit(

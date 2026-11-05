@@ -39,7 +39,7 @@ from krrood.entity_query_language.rdr.exceptions import (
 from krrood.symbol_graph.helpers import get_wrapped_field
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RippleDownRulesMatchParser:
     """
     Reads an underspecified :class:`Match` for RDR-based attribute inference.
@@ -79,17 +79,17 @@ class RippleDownRulesMatchParser:
             if attribute_match.is_assigned_to_ellipsis
         ]
         for target in targets:
-            self._guard_single_valued(target)
+            self._guard_single_valued(target=target)
         return targets
 
     def single_target(self) -> AttributeMatch:
         """:return: The sole inference target, enforcing the single-class invariant."""
         targets = self.inference_targets
         if not targets:
-            raise NoInferenceTarget(self.case_type)
+            raise NoInferenceTarget(case_type=self.case_type)
         if len(targets) > 1:
             raise MultipleInferenceTargets(
-                [target.attribute_name for target in targets]
+                attribute_names=[target.attribute_name for target in targets]
             )
         return targets[0]
 
@@ -123,7 +123,7 @@ class RippleDownRulesMatchParser:
             conditions.append(attribute == leaf.assigned_variable._value_)
         return conditions
 
-    def _guard_single_valued(self, target: AttributeMatch) -> None:
+    def _guard_single_valued(self, *, target: AttributeMatch) -> None:
         """
         :raises UndeclaredInferenceTarget: If ``target`` is not a declared field of the
             case type.
@@ -131,6 +131,6 @@ class RippleDownRulesMatchParser:
         """
         wrapped_field = get_wrapped_field(self.case_type, target.attribute_name)
         if wrapped_field is None:
-            raise UndeclaredInferenceTarget(self.case_type, target.attribute_name)
+            raise UndeclaredInferenceTarget(case_type=self.case_type, attribute_name=target.attribute_name)
         if wrapped_field.holds_collection:
-            raise UnsupportedInferenceTarget(self.case_type, target.attribute_name)
+            raise UnsupportedInferenceTarget(case_type=self.case_type, attribute_name=target.attribute_name)

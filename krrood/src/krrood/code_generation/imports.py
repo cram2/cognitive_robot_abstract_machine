@@ -21,7 +21,7 @@ from krrood.utils import (
 # Callable inspection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ImportData:
     """Import data required to reference a symbol from generated source."""
 

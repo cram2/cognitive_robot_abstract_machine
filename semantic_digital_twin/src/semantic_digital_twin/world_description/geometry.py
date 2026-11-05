@@ -625,7 +625,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             **{
                 field_.name: from_json(data[field_.name], **kwargs)
@@ -1556,7 +1556,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         intervals = self._ordered_intervals
         lower = np.array([interval.lower for interval in intervals], dtype=np.float64)
         upper = np.array([interval.upper for interval in intervals], dtype=np.float64)
-        return CoordinateBounds(lower, upper)
+        return CoordinateBounds(lower=lower, upper=upper)
 
     @classmethod
     def from_array_bounds(

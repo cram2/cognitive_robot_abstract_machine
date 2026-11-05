@@ -60,7 +60,7 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
 
     planner = GroupedByPlanner
 
-    def realize(self, node: Query, plan: GroupPlan) -> VerbalizationFragment:
+    def realize(self, *, node: Query, plan: GroupPlan) -> VerbalizationFragment:
         """
         :param node: The query being rendered.
         :param plan: The group plan (always carries keys — :meth:`clause` gates on their presence).
@@ -71,11 +71,11 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
         set-of report in the class example, the query assembler fronts that key as the leading *"For
         each department, report"* frame and drops this trailing clause as redundant.
         """
-        groups_phrase = self._keys_phrase(plan.keys)
+        groups_phrase = self._keys_phrase(variables=plan.keys)
         if plan.aggregated and plan.weaves_aggregated:
             aggregated_phrase = oxford_comma(
                 [
-                    self.context.child(expression, number=GrammaticalNumber.PLURAL)
+                    self.context.child(node=expression, number=GrammaticalNumber.PLURAL)
                     for expression in plan.aggregated
                 ],
                 Conjunctions.AND.as_fragment(),
@@ -92,7 +92,7 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
             )
         return PhraseFragment(parts=[Keywords.GROUPED_BY.as_fragment(), groups_phrase])
 
-    def clause(self, node: Query) -> VerbalizationFragment | None:
+    def clause(self, *, node: Query) -> VerbalizationFragment | None:
         """
         :param node: The query being rendered.
         :return: The in-query GROUP BY clause, or ``None`` when there are no group keys.
@@ -107,11 +107,11 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
         ... )
         'For each department, report all Employees'
         """
-        plan = self.plan(node)
-        return self.realize(node, plan) if plan.has_keys else None
+        plan = self.plan(node=node)
+        return self.realize(node=node, plan=plan) if plan.has_keys else None
 
     def _keys_phrase(
-        self, variables: list[SymbolicExpression]
+        self, *, variables: list[SymbolicExpression]
     ) -> VerbalizationFragment:
         """
         :param variables: The group-by key expressions.
@@ -128,7 +128,7 @@ class GroupedByAssembler(Assembler[Query, GroupPlan]):
         'For each department and name, report the sum of salaries of Employees'
         """
         return PhraseFragment(
-            parts=[self.context.child(variable) for variable in variables],
+            parts=[self.context.child(node=variable) for variable in variables],
             separator=Separator.COMMA,
         )
 
@@ -143,7 +143,7 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
     """
 
     def realize(
-        self, node: OrderedByBuilder, plan: None = None
+        self, *, node: OrderedByBuilder, plan: None = None
     ) -> VerbalizationFragment:
         """
         :param node: The ordered-by builder (exposing ``.variable`` and ``.descending``).
@@ -161,12 +161,12 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
         return PhraseFragment(
             parts=[
                 Keywords.ORDERED_BY.as_fragment(),
-                self.context.child(node.variable),
+                self.context.child(node=node.variable),
                 _ORDERING_RANGE_WORDS[direction].as_fragment(),
             ]
         )
 
-    def clause(self, query: Query) -> VerbalizationFragment | None:
+    def clause(self, *, query: Query) -> VerbalizationFragment | None:
         """
         :param query: The query being rendered.
         :return: The in-query ORDER BY clause, or ``None`` when the query is unordered.
@@ -179,7 +179,7 @@ class OrderedByAssembler(Assembler[OrderedByBuilder, None]):
         'Report Employees ordered by their salaries from lowest to highest'
         """
         builder = query._ordered_by_builder_
-        return self.realize(builder) if builder is not None else None
+        return self.realize(node=builder) if builder is not None else None
 
 
 class HavingAssembler(Assembler[Query, None]):
@@ -192,7 +192,7 @@ class HavingAssembler(Assembler[Query, None]):
     aggregation value (*"the sum … among <population> … where …"*).
     """
 
-    def realize(self, node: Query, plan: None = None) -> VerbalizationFragment:
+    def realize(self, *, node: Query, plan: None = None) -> VerbalizationFragment:
         """
         :param node: The query whose HAVING condition to render.
         :param plan: Unused (this assembler has no plan).
@@ -200,13 +200,13 @@ class HavingAssembler(Assembler[Query, None]):
             sum is greater than 30000"*), rather than a bare *"having …"* participle that misparses as
             modifying the population.
         """
-        having_fragment = self.context.child(node._having_expression_.condition)
+        having_fragment = self.context.child(node=node._having_expression_.condition)
         return PhraseFragment(parts=[Keywords.WHERE.as_fragment(), having_fragment])
 
-    def clause(self, query: Query) -> VerbalizationFragment | None:
+    def clause(self, *, query: Query) -> VerbalizationFragment | None:
         """
         :param query: The query being rendered.
         :return: The trailing *"where <condition>"* HAVING clause, or ``None`` when there is no
             HAVING.
         """
-        return self.realize(query) if query._having_expression_ is not None else None
+        return self.realize(node=query) if query._having_expression_ is not None else None

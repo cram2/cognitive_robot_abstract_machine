@@ -86,14 +86,14 @@ def observation_for(
     substituted = DerivedConditionVariable.substitute_in(
         Scalar(artifacts.observation)
     ).substitute(
-        [
+        old_variables=[
             goal.monitored_node.observation_variable,
             goal.monitored_node.last_observation,
             goal.monitored_node.life_cycle_variable,
             goal.monitor.observation_variable,
             goal.monitor.last_observation,
         ],
-        [
+        new_variables=[
             monitored_observation,
             monitored_observation,
             monitored_life_cycle,

@@ -22,12 +22,12 @@ import pytest
 from krrood.entity_query_language.factories import entity, inference, variable_from
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Inner:
     value: int
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Outer:
     inner: Inner
 

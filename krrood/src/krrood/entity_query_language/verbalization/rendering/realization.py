@@ -81,7 +81,7 @@ def realize_tree(
     ]
     realised = fragment
     for realisation_pass in pipeline:
-        realised = realisation_pass.process(realised)
+        realised = realisation_pass.process(fragment=realised)
     return realised
 
 

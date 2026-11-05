@@ -104,12 +104,12 @@ class GraspsByCloseness(SymbolicFunction):
         return grasps_by_closeness[: self.number_of_grasps]
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the grasps by closeness of <graspable> and <standing
             position>"*.
         """
         return FunctionVerbalizationTemplates.possessive(
-            cls, fields["graspable"], fields["standing_position"]
+            fields["graspable"], fields["standing_position"], function_class=cls
         )

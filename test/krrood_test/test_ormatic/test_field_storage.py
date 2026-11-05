@@ -13,7 +13,7 @@ from ..dataset.field_storage_classes import FieldsOfEveryStorage, StorageLeaf
 
 @pytest.fixture
 def ormatic() -> ORMatic:
-    return ORMatic(ClassDiagram([StorageLeaf, FieldsOfEveryStorage]))
+    return ORMatic(class_dependency_graph=ClassDiagram(classes=[StorageLeaf, FieldsOfEveryStorage]))
 
 
 def field_named(ormatic: ORMatic, name: str) -> WrappedField:
@@ -21,7 +21,7 @@ def field_named(ormatic: ORMatic, name: str) -> WrappedField:
     :return: The field of :class:`FieldsOfEveryStorage` with the given name.
     """
     wrapped_class = ormatic.class_dependency_graph.get_wrapped_class(
-        FieldsOfEveryStorage
+        clazz=FieldsOfEveryStorage
     )
     return next(f for f in wrapped_class.fields if f.field.name == name)
 
@@ -58,4 +58,4 @@ def test_classification_logs_how_the_field_is_stored(ormatic, caplog):
     with caplog.at_level(logging.INFO, logger="krrood.ormatic.field_storage"):
         ormatic.field_classifier.classify(day)
 
-    assert CustomTypeRule.describe(FieldToStore(day, ormatic)) in caplog.messages
+    assert CustomTypeRule.describe(field_to_store=FieldToStore(wrapped_field=day, ormatic=ormatic)) in caplog.messages

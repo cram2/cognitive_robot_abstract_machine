@@ -23,7 +23,7 @@ def test_typevar_field_to_dao(session, database):
     """
     to_dao should persist TypeVar-typed fields correctly.
     """
-    pos = KRROODPosition(1.0, 2.0, 3.0)
+    pos = KRROODPosition(x=1.0, y=2.0, z=3.0)
     holder = TypeVarFieldHolder(typed_field=pos, name="test")
 
     holder_dao: TypeVarFieldHolderDAO = to_dao(holder)
@@ -44,7 +44,7 @@ def test_typevar_field_from_dao(session, database):
     """
     from_dao should reconstruct TypeVar-typed fields correctly.
     """
-    pos = KRROODPosition(4.0, 5.0, 6.0)
+    pos = KRROODPosition(x=4.0, y=5.0, z=6.0)
     holder = TypeVarFieldHolder(typed_field=pos, name="roundtrip")
 
     holder_dao = to_dao(holder)

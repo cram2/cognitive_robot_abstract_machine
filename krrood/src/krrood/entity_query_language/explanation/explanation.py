@@ -70,7 +70,7 @@ def _build_type_existence_condition(
     return exists(
         node_variable,
         and_(
-            HasType(node_variable, Selectable),
+            HasType(variable=node_variable, types_=Selectable),
             node_type_variable != None,
             is_class(node_type_variable),
             issubclass_(node_type_variable, type_),
@@ -217,7 +217,7 @@ def _format_stack_trace(stack: CallStack, focus_package: str | None) -> str:
     return "".join(formatted[:10])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConditionAndBindings:
     """
     Represents a condition and its associated bindings in the inference process.
@@ -240,7 +240,7 @@ class ConditionAndBindings:
             return f"{self.condition} ({','.join(str(child) for child in self.condition._children_)})"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InferenceExplanation(Symbol):
     """
     Explanation of how an instance was created through inference.
@@ -342,7 +342,7 @@ class InferenceExplanation(Symbol):
             if isinstance(condition_expr, (LogicalOperator,)):
                 continue
             satisfied_conditions.append(
-                ConditionAndBindings(condition_expr, self.operation_result.all_bindings)
+                ConditionAndBindings(condition=condition_expr, bindings=self.operation_result.all_bindings)
             )
         return satisfied_conditions
 
@@ -360,12 +360,12 @@ class InferenceExplanation(Symbol):
         if self.query_root is None or not self.satisfied_condition_ids:
             return None
         return QueryGraph(
-            self.query_root,
+            query=self.query_root,
             satisfied_condition_ids=self.satisfied_condition_ids,
         )
 
     def as_string(
-        self, focus_package: str | ModuleType | None = None, show_trace: bool = False
+        self, *, focus_package: str | ModuleType | None = None, show_trace: bool = False
     ) -> str:
         """
         Convert an InferenceExplanation into a human-readable string.
@@ -445,7 +445,7 @@ class InferenceExplanation(Symbol):
         """
         return self.stack.functions()
 
-    def root_frame_in(self, package: str) -> StackFrame | None:
+    def root_frame_in(self, *, package: str) -> StackFrame | None:
         """
         Find the outermost :class:`~krrood.entity_query_language._stack.StackFrame`
         whose ``module_name`` contains *package*.
@@ -457,7 +457,7 @@ class InferenceExplanation(Symbol):
         :param package: Substring matched against ``StackFrame.module_name``.
         :return: The outermost matching frame, or ``None`` if no frame matches.
         """
-        return self.stack.root_frame_in(package)
+        return self.stack.root_frame_in(package=package)
 
     def get_satisfied_condition_expressions_for_the_instance(
         self,
@@ -466,7 +466,7 @@ class InferenceExplanation(Symbol):
         :return: An entity containing condition expressions that were satisfied during the inference of the instance.
         """
         explanation = self.create_explanation_variable()
-        node = self.create_query_node_variable(explanation)
+        node = self.create_query_node_variable(explanation_variable=explanation)
         return (
             entity(node)
             .where(
@@ -477,7 +477,7 @@ class InferenceExplanation(Symbol):
         )
 
     def get_values_of_variable_nodes_of_given_type(
-        self, type_: type
+        self, *, type_: type
     ) -> Entity[SymbolicExpression]:
         """
         :param type_: The type of the variable nodes to retrieve.
@@ -485,7 +485,7 @@ class InferenceExplanation(Symbol):
         """
         explanation = self.create_explanation_variable()
         node = self.get_variable_nodes_of_given_type(
-            type_, self.create_query_node_variable(explanation)
+            type_=type_, node_variable=self.create_query_node_variable(explanation_variable=explanation)
         )
         operation_result = explanation.operation_result
         node_identifier = node_id(node)
@@ -496,19 +496,19 @@ class InferenceExplanation(Symbol):
         )
 
     def get_variable_nodes_of_given_type(
-        self, type_: type, node_variable: SymbolicExpression | None = None
+        self, *, type_: type, node_variable: SymbolicExpression | None = None
     ) -> Entity[SymbolicExpression] | SymbolicExpression:
         """
         :return: An entity containing instances that participated in the inference of this instance.
         """
         if node_variable is None:
             node_variable = self.create_query_node_variable(
-                self.create_explanation_variable()
+                explanation_variable=self.create_explanation_variable()
             )
         return (
             entity(node_variable)
             .where(
-                HasType(node_variable, Selectable),
+                HasType(variable=node_variable, types_=Selectable),
                 (node_type_ := node_type(node_variable)) != None,
                 is_class(node_type_),
                 issubclass_(node_type_, type_),
@@ -523,7 +523,7 @@ class InferenceExplanation(Symbol):
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
         return (
-            entity(condition_node).where(HasType(condition_node, Comparator)).distinct()
+            entity(condition_node).where(HasType(variable=condition_node, types_=Comparator)).distinct()
         )
 
     def get_satisfied_comparator_conditions_between_attributes(
@@ -537,15 +537,15 @@ class InferenceExplanation(Symbol):
         return (
             entity(condition_node)
             .where(
-                HasType(condition_node, Comparator),
-                HasType(condition_node.left, Attribute),
-                HasType(condition_node.right, Attribute),
+                HasType(variable=condition_node, types_=Comparator),
+                HasType(variable=condition_node.left, types_=Attribute),
+                HasType(variable=condition_node.right, types_=Attribute),
             )
             .distinct()
         )
 
     def get_conditions_that_relate_the_variables_of_type(
-        self, type_: type
+        self, *, type_: type
     ) -> Entity[SymbolicExpression]:
         """
         :return: An entity containing condition expressions that relate the participating instances in the inference of this instance.
@@ -568,7 +568,7 @@ class InferenceExplanation(Symbol):
         return (
             entity(condition_node)
             .where(
-                HasType(condition_node, (Comparator, InstantiatedVariable)),
+                HasType(variable=condition_node, types_=(Comparator, InstantiatedVariable)),
                 node_id(child1) != node_id(child2),
                 _build_type_existence_condition(child1_with_descendants, type_),
                 _build_type_existence_condition(child2_with_descendants, type_),
@@ -577,7 +577,7 @@ class InferenceExplanation(Symbol):
         )
 
     def get_conditions_that_relate_variables_of_types(
-        self, type_a: type, type_b: type
+        self, *, type_a: type, type_b: type
     ) -> Entity[SymbolicExpression]:
         """
         Generalisation of :meth:`get_conditions_that_relate_the_variables_of_type` for
@@ -600,7 +600,7 @@ class InferenceExplanation(Symbol):
         return (
             entity(condition_node)
             .where(
-                HasType(condition_node, (Comparator, InstantiatedVariable)),
+                HasType(variable=condition_node, types_=(Comparator, InstantiatedVariable)),
                 node_id(desc_a) != node_id(desc_b),
                 _build_type_existence_condition(desc_a, type_a),
                 _build_type_existence_condition(desc_b, type_b),
@@ -610,7 +610,7 @@ class InferenceExplanation(Symbol):
 
     @staticmethod
     def create_query_node_variable(
-        explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
+        *, explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
     ) -> FlatVariable[SymbolicExpression] | SymbolicExpression:
         """
         Build a flat variable ranging over all descendant nodes of the explanation's
@@ -656,13 +656,13 @@ def register_inference(
     """
     if not isinstance(instance, Symbol):
         return
-    if not monitored.is_monitored(type(variable_node)):
+    if not monitored.is_monitored(target=type(variable_node)):
         return
 
     satisfied_ids = result.satisfied_condition_ids if result else None
     explanation = InferenceExplanation(
         query_node=variable_node,
-        stack=monitored.get_stack(variable_node) or CallStack([]),
+        stack=monitored.get_stack(instance=variable_node) or CallStack(frames=[]),
         query_root=variable_node._evaluation_root_query_,
         satisfied_condition_ids=satisfied_ids,
         operation_result=result,

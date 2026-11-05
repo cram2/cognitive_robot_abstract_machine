@@ -54,7 +54,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 # %% Robots & missions (the quick-start + cross-variable examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Robot:
     """
     An example autonomous robot.
@@ -72,7 +72,7 @@ class Robot:
     """Whether the robot is operational (a boolean terminal for predicative chains)."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Mission:
     """
     A task assigned to a :class:`Robot`, with a numeric priority.
@@ -90,7 +90,7 @@ class Mission:
 # %% Boolean & list attributes (predicative / indexed-attribute examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Task:
     """
     A unit of work with a boolean completion flag.
@@ -105,7 +105,7 @@ class Task:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Worker:
     """
     A worker holding an ordered list of :class:`Task` objects.
@@ -123,7 +123,7 @@ class Worker:
 # %% Money (aggregation, nested-attribute, and date-range examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmountDetails:
     """
     A monetary amount, nested inside a :class:`BankTransaction`.
@@ -133,7 +133,7 @@ class AmountDetails:
     """The amount of money."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BankTransaction:
     """
     A bank transaction with a nested amount and a booking date.
@@ -151,7 +151,7 @@ class BankTransaction:
 # %% Employees (same-type disambiguation, grouping, having examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Employee:
     """
     An employee record with numeric salary fields used in grouping examples.
@@ -177,7 +177,7 @@ class Employee:
 # %% Custom predicates (fragment-built verbalization examples)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Location:
     """
     A named place, used as the location of the :class:`IsReachable` predicate.
@@ -189,7 +189,7 @@ class Location:
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsReachable(Predicate):
     """
     Two-field custom predicate: *"<location> is reachable for <body>"*.
@@ -210,18 +210,18 @@ class IsReachable(Predicate):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
         return clause(
-            Noun(fields["location"]),
+            Noun(content=fields["location"]),
             Copula(),
-            Adjective("reachable"),
+            Adjective(word="reachable"),
             Prepositions.FOR,
-            Noun(fields["body"]),
+            Noun(content=fields["body"]),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Department:
     """
     A department, used as the second field of :class:`WorksIn`.
@@ -233,7 +233,7 @@ class Department:
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StaffMember:
     """
     A staff member belonging to a :class:`Department`.
@@ -250,7 +250,7 @@ class StaffMember:
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class WorksIn(Predicate):
     """
     Multi-field custom predicate: *"<employee> works in <department>"*.
@@ -271,20 +271,20 @@ class WorksIn(Predicate):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
         return clause(
-            Noun(fields["employee"]),
-            Verb("work"),
+            Noun(content=fields["employee"]),
+            Verb(lemma="work"),
             Prepositions.IN,
-            Noun(fields["department"]),
+            Noun(content=fields["department"]),
         )
 
 
 # %% Birds (rule-tree / inference verbalization examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Bird:
     """
     An example bird.
@@ -296,7 +296,7 @@ class Bird:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LoveBirds:
     """
     A pair of :class:`Bird` objects with a strength-of-bond flag.
@@ -318,7 +318,7 @@ class LoveBirds:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BirdView(Symbol):
     """
     A perceived view over a :class:`Bird` (the base of the inferred bird symbols).
@@ -330,14 +330,14 @@ class BirdView(Symbol):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StrongLoveBird(BirdView):
     """
     A bird inferred to be in a strong-love pairing.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WeakLoveBird(BirdView):
     """
     A bird inferred to be in a weak-love pairing.
@@ -347,7 +347,7 @@ class WeakLoveBird(BirdView):
 # %% Furniture (deeply nested chains + aggregated-antecedent rule examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Handle:
     """
     A handle attached to a container.
@@ -359,7 +359,7 @@ class Handle:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Container:
     """
     A container that may hold handles and nest inside other containers.
@@ -371,7 +371,7 @@ class Container:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedConnection:
     """
     A rigid connection between a container and a handle.
@@ -388,7 +388,7 @@ class FixedConnection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrismaticConnection:
     """
     A sliding connection between two containers (a drawer-in-cabinet joint).
@@ -405,7 +405,7 @@ class PrismaticConnection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Drawer:
     """
     A drawer inferred from a container plus a handle.
@@ -422,7 +422,7 @@ class Drawer:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cabinet:
     """
     A cabinet inferred from a container plus a set of drawers.
@@ -442,7 +442,7 @@ class Cabinet:
 # %% Causal queries (do() / causes_effect() examples)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pick:
     """
     A robot's attempt to grasp an object, whose success may hinge on where its arm was

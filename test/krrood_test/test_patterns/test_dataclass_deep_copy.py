@@ -19,13 +19,13 @@ from ..dataset.deep_copied_classes import (
 
 @pytest.fixture
 def metre() -> UnitOfMeasurement:
-    return UnitOfMeasurement("m")
+    return UnitOfMeasurement(symbol="m")
 
 
 @pytest.fixture
 def measurements(metre: UnitOfMeasurement) -> AnnotatedMeasurements:
     return AnnotatedMeasurements(
-        [1.0, 2.0], metre, source="laser", notes=["calibrated"]
+        values=[1.0, 2.0], unit=metre, source="laser", notes=["calibrated"]
     )
 
 
@@ -73,8 +73,8 @@ def test_a_deep_copy_derives_fields_the_constructor_does_not_take(
 
 
 def test_a_deep_copy_copies_an_object_reached_twice_once(metre: UnitOfMeasurement):
-    shared = Measurements([1.0], metre)
-    copied = copy.deepcopy(PairOfMeasurements(shared, shared))
+    shared = Measurements(values=[1.0], unit=metre)
+    copied = copy.deepcopy(PairOfMeasurements(first=shared, second=shared))
     assert copied.first is copied.second
     assert copied.first is not shared
 
@@ -83,7 +83,7 @@ def test_a_deep_copy_copies_an_object_reached_twice_once(metre: UnitOfMeasuremen
 
 
 def test_the_mixin_keeps_identity_equality_hashable():
-    reading = SensorReading(1.0)
+    reading = SensorReading(value=1.0)
     assert {reading: "first"}[reading] == "first"
 
 

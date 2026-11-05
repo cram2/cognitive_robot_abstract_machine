@@ -58,22 +58,22 @@ def test_multi_generic_through_inheritance():
     T = TypeVar("T")
     U = TypeVar("U")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class A(Generic[T], SubClassSafeGeneric):
         a: T
 
-    @dataclass
+    @dataclass(kw_only=True)
     class B(A[int]): ...
 
-    @dataclass
+    @dataclass(kw_only=True)
     class C(B, Generic[U], SubClassSafeGeneric):
         b: U
 
-    @dataclass
+    @dataclass(kw_only=True)
     class D(C[str]): ...
 
-    class_diagram = ClassDiagram([A, B, C, D])
-    D_wrapped = class_diagram.get_wrapped_class(D)
+    class_diagram = ClassDiagram(classes=[A, B, C, D])
+    D_wrapped = class_diagram.get_wrapped_class(clazz=D)
     for f in D_wrapped.fields:
         if f.name == "a":
             assert f.type_endpoint is int
@@ -203,11 +203,11 @@ def test_update_field_kwargs_finds_field_via_full_mro_not_only_nearest_ancestor(
     T_local = TypeVar("T_local")
     U_local = TypeVar("U_local")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Inner(Generic[T_local], SubClassSafeGeneric):
         inner_items: list = dataclass_field(default_factory=list, kw_only=True)
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Unrelated:
         unrelated: int = 0
 
@@ -215,7 +215,7 @@ def test_update_field_kwargs_finds_field_via_full_mro_not_only_nearest_ancestor(
     # Before @dataclass runs, fields(_Combo) returns _Unrelated.__dataclass_fields__
     # which doesn't contain 'inner_items'.  SubClassSafeGeneric must still find
     # it via the full MRO search.
-    @dataclass
+    @dataclass(kw_only=True)
     class _Combo(_Unrelated, _Inner[int]):
         pass
 
@@ -241,7 +241,7 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
 
     T_local = TypeVar("T_local")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Storage(Generic[T_local], SubClassSafeGeneric):
         items: list = dataclass_field(default_factory=list, kw_only=True)
         required: T_local = dataclass_field(kw_only=True)
@@ -252,7 +252,7 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
     )
     with patch(target, side_effect=ImportError("simulated circular-import failure")):
 
-        @dataclass
+        @dataclass(kw_only=True)
         class _IntStorage(_Storage[int]):
             pass
 
@@ -276,7 +276,7 @@ def test_subclass_safe_generic_propagates_non_transient_resolution_errors():
 
     T_local = TypeVar("T_local")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Storage(Generic[T_local], SubClassSafeGeneric):
         required: T_local = dataclass_field(kw_only=True)
 
@@ -287,7 +287,7 @@ def test_subclass_safe_generic_propagates_non_transient_resolution_errors():
     with patch(target, side_effect=ValueError("genuine bug")):
         with pytest.raises(ValueError):
 
-            @dataclass
+            @dataclass(kw_only=True)
             class _IntStorage(_Storage[int]):
                 pass
 
@@ -300,7 +300,7 @@ def test_subclass_safe_generic_flags_a_lost_concrete_binding():
     T_local = TypeVar("T_local")
 
     assert (
-        SubClassSafeGeneric._substitutions_bind_a_concrete_type({T_local: int}) is True
+        SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={T_local: int}) is True
     )
 
 
@@ -313,10 +313,10 @@ def test_subclass_safe_generic_does_not_flag_a_typevar_only_rename():
     Renamed = TypeVar("Renamed")
 
     assert (
-        SubClassSafeGeneric._substitutions_bind_a_concrete_type({T_local: Renamed})
+        SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={T_local: Renamed})
         is False
     )
-    assert SubClassSafeGeneric._substitutions_bind_a_concrete_type({}) is False
+    assert SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={}) is False
 
 
 def test_subclass_safe_generic_inherited_default_factory_survives_type_update():
@@ -329,12 +329,12 @@ def test_subclass_safe_generic_inherited_default_factory_survives_type_update():
     """
     T_local = TypeVar("T_local")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Container(Generic[T_local], SubClassSafeGeneric):
         objects: list = dataclass_field(default_factory=list, kw_only=True)
         key: T_local = dataclass_field(kw_only=True)
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _IntContainer(_Container[int]):
         pass
 
@@ -392,16 +392,16 @@ def test_multiple_generic_parameters_specialization():
     is expected to fail here because it only maps the first parameter of the first base.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class MultiBase(Generic[T, T2], SubClassSafeGeneric):
         attr1: T
         attr2: T2
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Intermediate(Generic[U], MultiBase[U, int]):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Intermediate[str]):
         pass
 
@@ -415,15 +415,15 @@ def test_deep_inheritance_substitution():
     Test that substitutions are correctly propagated through deep inheritance.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T], SubClassSafeGeneric):
         attr: T
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Intermediate(Generic[U], Base[U]):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Intermediate[int]):
         pass
 
@@ -438,15 +438,15 @@ def test_transitive_resolution_complex():
     If T -> U and U -> int, then List[T] should become List[int].
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T], SubClassSafeGeneric):
         attr: List[T]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Intermediate(Generic[U], Base[U]):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Intermediate[int]):
         pass
 
@@ -466,19 +466,19 @@ def test_multiple_generic_bases_map_failure():
     """
     from krrood.utils import ensure_hashable
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base1(Generic[T, T2], SubClassSafeGeneric):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base2(Generic[V], SubClassSafeGeneric):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Combined(Generic[U, W], Base1[U, int], Base2[W]):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Combined[str, bool]):
         pass
 
@@ -503,15 +503,15 @@ def test_transitive_map_failure():
     If T -> U and U -> int, resolving List[T] should give List[int].
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T], SubClassSafeGeneric):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Intermediate(Generic[U], Base[U]):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Intermediate[int]):
         pass
 
@@ -538,11 +538,11 @@ def test_complex_type_resolution(type_hint, expected_resolved):
     Test that complex types are correctly resolved when bound in a subclass.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T, U, V], SubClassSafeGeneric):
         attribute: type_hint
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[int, str, float]):
         pass
 
@@ -560,13 +560,13 @@ def test_circular_reference_resolution():
 
     # Direct cycle: T -> U, U -> T
     substitutions = {T_local: U_local, U_local: T_local}
-    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions)
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions=substitutions)
     assert resolved[T_local] in {T_local, U_local}
     assert resolved[U_local] in {T_local, U_local}
 
     # Indirect cycle: T -> List[U], U -> T
     substitutions = {T_local: List[U_local], U_local: T_local}
-    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions)
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions=substitutions)
     assert resolved[T_local] is not None
     assert resolved[U_local] is not None
 
@@ -579,11 +579,11 @@ def test_typevartuple_basic_substitution():
     Test that TypeVarTuple is correctly substituted when bound in a subclass.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[Unpack[Ts]]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[int, str]):
         pass
 
@@ -596,11 +596,11 @@ def test_typevartuple_mixed_with_typevar():
     Test that TypeVarTuple mixed with normal TypeVar is correctly substituted.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T, Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[T, Unpack[Ts]]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[float, int, str]):
         pass
 
@@ -613,15 +613,15 @@ def test_typevartuple_multiple_subclasses():
     Test that TypeVarTuple resolution works through multiple levels of inheritance.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[Unpack[Ts]]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Intermediate(Generic[T, Unpack[Ts]], Base[Unpack[Ts]]):
         other: T
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Intermediate[bool, int, str]):
         pass
 
@@ -635,11 +635,11 @@ def test_typevartuple_unpack_in_different_positions():
     Test Unpack[Ts] in different positions within a Tuple or other generic.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         attribute: Tuple[int, Unpack[Ts], float]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[str, bool]):
         pass
 
@@ -653,12 +653,12 @@ def test_typevartuple_at_start():
     Test TypeVarTuple at the start of Generic declaration.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[Unpack[Ts], T], SubClassSafeGeneric):
         first: Tuple[Unpack[Ts]]
         last: T
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[int, str, float]):
         pass
 
@@ -672,13 +672,13 @@ def test_typevartuple_in_middle():
     Test TypeVarTuple in the middle of Generic declaration.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T, Unpack[Ts], U], SubClassSafeGeneric):
         first: T
         middle: Tuple[Unpack[Ts]]
         last: U
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[int, str, float, bool]):
         pass
 
@@ -693,13 +693,13 @@ def test_typevartuple_empty_middle():
     Test TypeVarTuple in the middle with empty arguments for it.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[T, Unpack[Ts], U], SubClassSafeGeneric):
         first: T
         middle: Tuple[Unpack[Ts]]
         last: U
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[int, bool]):
         pass
 
@@ -714,12 +714,12 @@ def test_typevartuple_multiple_usage_in_fields():
     Test that TypeVarTuple can be used in multiple fields.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Base(Generic[Unpack[Ts]], SubClassSafeGeneric):
         first: Tuple[Unpack[Ts]]
         second: List[Tuple[Unpack[Ts]]]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Final(Base[int, str]):
         pass
 
@@ -739,15 +739,15 @@ def test_a_parameter_an_intermediate_class_bound_is_read_back():
     ContentType = TypeVar("ContentType")
     LabelType = TypeVar("LabelType")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Container(Generic[ContentType], SubClassSafeGeneric):
         content: ContentType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class LabelledContainer(Container[str], Generic[LabelType], SubClassSafeGeneric):
         label: LabelType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class CountingContainer(LabelledContainer[int]):
         pass
 
@@ -762,7 +762,7 @@ def test_a_parameter_nothing_bound_is_rejected():
     """
     ContentType = TypeVar("ContentType")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Container(Generic[ContentType], SubClassSafeGeneric):
         content: ContentType
 
@@ -778,11 +778,11 @@ def test_a_parameter_only_renamed_by_a_subclass_is_rejected():
     ContentType = TypeVar("ContentType")
     OtherType = TypeVar("OtherType")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Container(Generic[ContentType], SubClassSafeGeneric):
         content: ContentType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class RenamingContainer(
         Container[OtherType], Generic[OtherType], SubClassSafeGeneric
     ):
@@ -799,15 +799,15 @@ def test_sibling_classes_each_read_back_their_own_binding():
     """
     ContentType = TypeVar("ContentType")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Container(Generic[ContentType], SubClassSafeGeneric):
         content: ContentType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class TextContainer(Container[str]):
         pass
 
-    @dataclass
+    @dataclass(kw_only=True)
     class NumberContainer(Container[int]):
         pass
 
@@ -823,11 +823,11 @@ def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
     """
     ContentType = TypeVar("ContentType")
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Container(Generic[ContentType], SubClassSafeGeneric):
         content: ContentType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class TextContainer(Container[str]):
         pass
 
@@ -854,13 +854,13 @@ def test_an_attribute_an_interface_declares_is_not_made_a_field():
     class Region(Generic[CornerType], SubClassSafeGeneric, Interface):
         lower: CornerType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class ShiftedRegion(Region[CornerType]):
         @property
         def lower(self) -> CornerType:
             return self.offset
 
-    @dataclass
+    @dataclass(kw_only=True)
     class IntegerShiftedRegion(ShiftedRegion[int]):
         offset: int
 
@@ -868,7 +868,7 @@ def test_an_attribute_an_interface_declares_is_not_made_a_field():
     assert [region_field.name for region_field in fields(IntegerShiftedRegion)] == [
         "offset"
     ]
-    assert IntegerShiftedRegion(shift).lower == shift
+    assert IntegerShiftedRegion(offset=shift).lower == shift
 
 
 def test_a_field_redeclaring_an_interface_attribute_is_narrowed():
@@ -877,11 +877,11 @@ def test_a_field_redeclaring_an_interface_attribute_is_narrowed():
     class Region(Generic[CornerType], SubClassSafeGeneric, Interface):
         lower: CornerType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class StoredRegion(Region[CornerType]):
         lower: CornerType
 
-    @dataclass
+    @dataclass(kw_only=True)
     class IntegerStoredRegion(StoredRegion[int]): ...
 
     [lower_field] = fields(IntegerStoredRegion)

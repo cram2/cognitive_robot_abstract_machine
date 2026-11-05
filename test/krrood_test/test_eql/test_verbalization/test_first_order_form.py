@@ -36,14 +36,14 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 # %% mimic domain
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Igniter:
     """
     A stand-in operand type whose class name is unremarkable.
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Kindled(Predicate):
     """
     A two-operand predicate used to exercise the first-order/value-using pairing and the
@@ -59,17 +59,17 @@ class Kindled(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["fuel"]),
+            Noun(content=fields["fuel"]),
             Copula(),
-            Adjective("lit"),
+            Adjective(word="lit"),
             Prepositions.WITH,
-            Noun(fields["catalyst"]),
+            Noun(content=fields["catalyst"]),
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Fastener(ABC):
     """
     A stand-in abstract operand type with a small, nameable family of concrete
@@ -80,19 +80,19 @@ class Fastener(ABC):
     def grip(self) -> float: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Bolt(Fastener):
     def grip(self) -> float:
         return 0.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Screw(Fastener):
     def grip(self) -> float:
         return 0.0
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Fastened(Predicate):
     """
     A single-operand predicate whose field is typed with an abstract base.
@@ -104,11 +104,11 @@ class Fastened(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["item"]), Copula(), Adjective("secure"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["item"]), Copula(), Adjective(word="secure"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Gauge(Predicate):
     """
     A two-operand predicate whose ``unit`` field is never bound to a symbolic operand in
@@ -124,13 +124,13 @@ class Gauge(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["sensor"]),
+            Noun(content=fields["sensor"]),
             Copula(),
-            Adjective("calibrated"),
+            Adjective(word="calibrated"),
             Prepositions.IN,
-            Noun(fields["unit"]),
+            Noun(content=fields["unit"]),
         )
 
     @classmethod
@@ -174,7 +174,7 @@ def test_first_order_form_and_value_using_form_agree_when_types_match():
     variables (an `Igniter` and an untyped `object`), matching what `first_order_form`
     itself builds, so the two renderings agree exactly.
     """
-    bound_instance = Kindled(variable(Igniter, []), variable(object, []))
+    bound_instance = Kindled(fuel=variable(Igniter, []), catalyst=variable(object, []))
     assert first_order_form(Kindled) == verbalize_expression(bound_instance)
 
 
@@ -193,12 +193,12 @@ def test_first_order_form_ignores_a_class_example_operand_values_override():
 
 def test_snapshot_placeholder_operands_applies_a_class_example_operand_values_override():
     snapshot = VerbalizationResultsOfPackage(package=krrood, results=())
-    assert snapshot.placeholder_operands(Gauge)["unit"] == "kPa"
+    assert snapshot.placeholder_operands(cls=Gauge)["unit"] == "kPa"
 
 
 def test_snapshot_rendered_result_applies_a_class_example_operand_values_override():
     snapshot = VerbalizationResultsOfPackage(package=krrood, results=())
-    assert snapshot.rendered_result(Gauge) == "a sensor is calibrated in 'kPa'"
+    assert snapshot.rendered_result(cls=Gauge) == "a sensor is calibrated in 'kPa'"
 
 
 # %% VerbalizationResultsOfPackage layers operand_overrides on top -- a snapshot-testing
@@ -211,7 +211,7 @@ def test_snapshot_placeholder_operands_lets_a_registered_override_overwrite_a_fi
         results=(),
         operand_overrides={Kindled: {"catalyst": "ash"}},
     )
-    assert snapshot.placeholder_operands(Kindled)["catalyst"] == "ash"
+    assert snapshot.placeholder_operands(cls=Kindled)["catalyst"] == "ash"
 
 
 def test_snapshot_rendered_result_respects_a_registered_override():
@@ -225,5 +225,5 @@ def test_snapshot_rendered_result_respects_a_registered_override():
         results=(),
         operand_overrides={Kindled: {"catalyst": "ash"}},
     )
-    assert snapshot.rendered_result(Kindled) == "an Igniter is lit with 'ash'"
-    assert snapshot.rendered_result(Kindled) != first_order_form(Kindled)
+    assert snapshot.rendered_result(cls=Kindled) == "an Igniter is lit with 'ash'"
+    assert snapshot.rendered_result(cls=Kindled) != first_order_form(Kindled)

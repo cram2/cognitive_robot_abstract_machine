@@ -19,7 +19,7 @@ def drawer() -> Drawer:
     """
     A drawer opened by its own handle.
     """
-    return Drawer(handle=Handle("handle"), container=Container("container"))
+    return Drawer(handle=Handle(name="handle"), container=Container(name="container"))
 
 
 # %% building a triple from its subject and object
@@ -28,7 +28,7 @@ def drawer() -> Drawer:
 def test_a_triple_takes_its_subject_and_object_whatever_order_its_fields_are_declared_in(
     drawer: Drawer,
 ):
-    relation = TripleDeclaringItsObjectFirst.from_subject_object(drawer.handle, drawer)
+    relation = TripleDeclaringItsObjectFirst.from_subject_object(subject=drawer.handle, object_=drawer)
 
     assert relation.subject is drawer.handle
     assert relation.object is drawer
@@ -37,13 +37,13 @@ def test_a_triple_takes_its_subject_and_object_whatever_order_its_fields_are_dec
 def test_a_triple_built_from_its_subject_and_object_answers_whether_it_holds(
     drawer: Drawer,
 ):
-    assert TripleDeclaringItsObjectFirst.from_subject_object(drawer.handle, drawer)()
+    assert TripleDeclaringItsObjectFirst.from_subject_object(subject=drawer.handle, object_=drawer)()
 
 
 def test_a_triple_built_from_a_symbolic_subject_is_symbolic(drawer: Drawer):
     handles = variable(Handle, [drawer.handle])
 
-    relation = TripleDeclaringItsObjectFirst.from_subject_object(handles, drawer)
+    relation = TripleDeclaringItsObjectFirst.from_subject_object(subject=handles, object_=drawer)
 
     assert isinstance(relation, InstantiatedVariable)
 

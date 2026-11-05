@@ -40,8 +40,8 @@ def example_scenario():
     obj4 = SceneObject(type=...)
     obj5 = SceneObject(type=...)
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[obj1, obj2, obj3, obj4, obj5],
     )
     return room
@@ -66,7 +66,7 @@ def test_single_aggregation(example_scenario):
 
 def test_feature_extraction_with_aggregation_statistics(example_scenario):
     room = example_scenario
-    extractor = FeatureExtractor.from_instances([room])
+    extractor = FeatureExtractor.from_instances(instances=[room])
 
     agg_features = [f for f in extractor.features if isinstance(f, Call)]
     assert len(agg_features) == 3
@@ -75,7 +75,7 @@ def test_feature_extraction_with_aggregation_statistics(example_scenario):
     assert any("table" in n for n in names)
     assert any("chair" in n for n in names)
 
-    values = extractor.apply_mapping(room)
+    values = extractor.apply_mapping(instance=room)
     assert 1 in values
 
 
@@ -83,20 +83,20 @@ def test_multiple_exchangeable_parts():
     obj1 = SceneObject(type=SceneObjectType.TABLE)
     obj2 = SceneObject(type=SceneObjectType.CHAIR)
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[obj1, obj2],
     )
     room2 = SceneRoom(
-        position=KRROODPosition(1, 1, 1),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=1, y=1, z=1),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[obj1],
     )
     scene = SceneWithExchangeableParts(objects=[obj1, obj2], rooms=[room, room2])
 
-    extractor = FeatureExtractor.from_instances([scene])
+    extractor = FeatureExtractor.from_instances(instances=[scene])
     assert len([f for f in extractor.features if isinstance(f, Call)]) == 4
-    assert extractor.apply_mapping(scene) == [1, 1, 2, 2]
+    assert extractor.apply_mapping(instance=scene) == [1, 1, 2, 2]
 
 
 def test_aggregation_count_values(example_scenario):
@@ -110,11 +110,11 @@ def test_aggregation_count_values(example_scenario):
 
 
 def test_only_marked_methods_are_statistics():
-    @dataclass
+    @dataclass(kw_only=True)
     class Owner:
         items: list[SceneObject]
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class PartiallyMarkedAggregations(AggregationStatistic[Owner]):
         @aggregation_statistic(variable(Owner).items)
         def marked_statistic(self) -> int:
@@ -131,21 +131,21 @@ def test_only_marked_methods_are_statistics():
 
 
 def test_registry_is_isolated_between_unrelated_subclasses():
-    @dataclass
+    @dataclass(kw_only=True)
     class OwnerA:
         items: list[SceneObject]
 
-    @dataclass
+    @dataclass(kw_only=True)
     class OwnerB:
         items: list[SceneObject]
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class AggregationsA(AggregationStatistic[OwnerA]):
         @aggregation_statistic(variable(OwnerA).items)
         def count_a(self) -> int:
             return len(self.items)
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class AggregationsB(AggregationStatistic[OwnerB]):
         @aggregation_statistic(variable(OwnerB).items)
         def count_b(self) -> int:
@@ -161,17 +161,17 @@ def test_registry_is_isolated_between_unrelated_subclasses():
 
 
 def test_inherited_statistics_are_visible_in_subclass():
-    @dataclass
+    @dataclass(kw_only=True)
     class Owner:
         items: list[SceneObject]
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class BaseAggregations(AggregationStatistic[Owner]):
         @aggregation_statistic(variable(Owner).items)
         def base_stat(self) -> int:
             return len(self.items)
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class DerivedAggregations(BaseAggregations):
         pass
 
@@ -180,17 +180,17 @@ def test_inherited_statistics_are_visible_in_subclass():
 
 
 def test_own_registry_contains_only_directly_defined_methods():
-    @dataclass
+    @dataclass(kw_only=True)
     class Owner:
         items: list[SceneObject]
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class BaseAggregations(AggregationStatistic[Owner]):
         @aggregation_statistic(variable(Owner).items)
         def base_stat(self) -> int:
             return len(self.items)
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class DerivedAggregations(BaseAggregations):
         @aggregation_statistic(variable(Owner).items)
         def derived_stat(self) -> int:
@@ -213,11 +213,11 @@ def test_aggregation_class_discovered_for_concrete_subclasses():
 
 def test_feature_extraction_over_empty_exchangeable_part_does_not_raise():
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
-    extractor = FeatureExtractor.from_instances([room])
+    extractor = FeatureExtractor.from_instances(instances=[room])
     assert extractor is not None
     assert all(not isinstance(feature, Call) for feature in extractor.features)
 
@@ -231,8 +231,8 @@ def test_scene_room_aggregations_exposes_correct_feature_names_for_objects_field
     SceneObjectAggregationBase for the 'objects' field.
     """
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     instance = SceneRoomAggregations(role_taker=room, field_name="objects")
@@ -260,8 +260,8 @@ def test_base_class_statistics_are_not_duplicated_in_scene_room_aggregations():
     paths.
     """
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     instance = SceneRoomAggregations(role_taker=room, field_name="objects")
@@ -289,8 +289,8 @@ def test_scene_room_aggregations_has_no_features_for_rooms_field():
     SceneWithExchangeablePartsAggregations.
     """
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     instance = SceneRoomAggregations(role_taker=room, field_name="rooms")
@@ -354,13 +354,13 @@ def test_room_count_computes_correct_number_of_rooms():
     return the exact number of SceneRoom instances in the 'rooms' field.
     """
     room1 = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     room2 = SceneRoom(
-        position=KRROODPosition(1, 1, 1),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=1, y=1, z=1),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     scene = SceneWithExchangeableParts(objects=[], rooms=[room1, room2])
@@ -377,8 +377,8 @@ def test_symbolic_features_are_derivable_without_a_domain_object():
     model that was persisted without its training data can still evaluate them.
     """
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     instance = SceneRoomAggregations(role_taker=room, field_name="objects")
@@ -390,8 +390,8 @@ def test_symbolic_features_are_derivable_without_a_domain_object():
 
 def test_symbolic_aggregation_features_require_a_field_name():
     room = SceneRoom(
-        position=KRROODPosition(0, 0, 0),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=0, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
         objects=[],
     )
     with pytest.raises(MissingFieldNameError):
@@ -406,7 +406,7 @@ def test_aggregation_statistic_is_a_role_of_its_domain_object(example_scenario):
     aggregation = SceneRoomAggregations(role_taker=room, field_name="objects")
     assert isinstance(aggregation, Role)
     assert aggregation.role_taker is room
-    assert Role.roles_for(room, AggregationStatistic) == [aggregation]
+    assert Role.roles_for(role_taker=room, role_type=AggregationStatistic) == [aggregation]
 
 
 def test_aggregation_statistic_is_a_distinct_object_from_its_domain_object(
@@ -431,12 +431,12 @@ def test_aggregation_statistic_role_taker_type_is_the_bound_domain_type():
 
 
 def test_statistics_are_registered_under_the_field_of_the_given_variable():
-    @dataclass
+    @dataclass(kw_only=True)
     class Owner:
         items: list[SceneObject]
         rooms: list[SceneRoom]
 
-    @dataclass(eq=False)
+    @dataclass(kw_only=True, eq=False)
     class TwoFieldAggregations(AggregationStatistic[Owner]):
         @aggregation_statistic(variable(Owner).items)
         def item_statistic(self) -> int:
@@ -448,11 +448,11 @@ def test_statistics_are_registered_under_the_field_of_the_given_variable():
 
     assert [
         function.__name__
-        for function in TwoFieldAggregations.aggregation_features_of_field("items")
+        for function in TwoFieldAggregations.aggregation_features_of_field(field_name="items")
     ] == [TwoFieldAggregations.item_statistic.__name__]
     assert [
         function.__name__
-        for function in TwoFieldAggregations.aggregation_features_of_field("rooms")
+        for function in TwoFieldAggregations.aggregation_features_of_field(field_name="rooms")
     ] == [TwoFieldAggregations.room_statistic.__name__]
 
 
@@ -462,7 +462,7 @@ def test_aggregation_statistic_rejects_a_field_name_string():
 
 
 def test_aggregation_statistic_rejects_a_variable_that_is_not_an_attribute():
-    @dataclass
+    @dataclass(kw_only=True)
     class Owner:
         items: list[SceneObject]
 
@@ -471,7 +471,7 @@ def test_aggregation_statistic_rejects_a_variable_that_is_not_an_attribute():
 
 
 def test_aggregation_statistic_rejects_an_attribute_of_an_attribute():
-    @dataclass
+    @dataclass(kw_only=True)
     class Owner:
         items: list[SceneObject]
 

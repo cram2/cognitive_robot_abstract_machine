@@ -28,7 +28,7 @@ class TestToCamelCase:
             ("", ""),
         ],
     )
-    def test_converts_snake_to_camel(self, input_string: str, expected: str) -> None:
+    def test_converts_snake_to_camel(self, *, input_string: str, expected: str) -> None:
         """Every underscore-separated segment is title-cased."""
         assert to_camel_case(input_string) == expected
 
@@ -53,7 +53,7 @@ class TestToSnakeCase:
             ("XMLParser", "xml_parser"),
         ],
     )
-    def test_converts_camel_to_snake(self, input_string: str, expected: str) -> None:
+    def test_converts_camel_to_snake(self, *, input_string: str, expected: str) -> None:
         assert to_snake_case(input_string) == expected
 
 
@@ -69,5 +69,5 @@ class TestCamelCaseToLowerCamelCase:
             ("", ""),
         ],
     )
-    def test_lowercases_first_character(self, input_string: str, expected: str) -> None:
+    def test_lowercases_first_character(self, *, input_string: str, expected: str) -> None:
         assert camel_case_to_lower_camel_case(input_string) == expected

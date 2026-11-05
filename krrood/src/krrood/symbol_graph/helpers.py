@@ -99,7 +99,7 @@ def get_wrapped_field(owner_class: type, field_name: str) -> WrappedField | None
     except ParseError:
         data_class_field = get_dataclass_field(owner_class, field_name)
         return (
-            WrappedField(wrapped_class, data_class_field) if data_class_field else None
+            WrappedField(clazz=wrapped_class, field=data_class_field) if data_class_field else None
         )
 
 
@@ -125,8 +125,8 @@ def get_wrapped_class(owner_class: type) -> WrappedClass | None:
     if not is_dataclass(owner_class):
         return None
     try:
-        return SymbolGraph().class_diagram.get_wrapped_class(owner_class)
+        return SymbolGraph().class_diagram.get_wrapped_class(clazz=owner_class)
     except ClassIsUnMappedInClassDiagram:
-        wrapped_cls = WrappedClass(owner_class)
+        wrapped_cls = WrappedClass(clazz=owner_class)
         wrapped_cls._class_diagram = SymbolGraph().class_diagram
         return wrapped_cls

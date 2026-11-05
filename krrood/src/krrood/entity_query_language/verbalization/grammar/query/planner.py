@@ -80,7 +80,7 @@ class RankingKeyRelation(Enum):
     """The order key roots at a different variable — no clean noun-relative form."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RankingPlan:
     """The *what to say* decomposition of a query's ``limit`` (with optional ordering): how many,
     in which direction, and how the order key relates to the selection. Present only when the query
@@ -100,7 +100,7 @@ class RankingPlan:
     """The ``ordered_by`` key expression, or ``None`` for a bare ``limit``."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RestrictionPlan:
     """A subject's WHERE condition decomposed into its conjuncts — the *content* of the restriction.
 
@@ -113,7 +113,7 @@ class RestrictionPlan:
     """The subject's WHERE conjuncts (an ``AND`` flattened to a list, not range-folded)."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AggregationData:
     """A collapsed aggregation subquery (*"the maximum amount among …"*)."""
 
@@ -130,7 +130,7 @@ class AggregationData:
     """The chain-root source variable aggregated over, or ``None``."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ReportPlan:
     """A query that *presents* its results — a report/listing — rather than *searching* for a match.
 
@@ -160,7 +160,7 @@ class ReportPlan:
         return bool(self.group_keys)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class QueryPlan:
     """Complete *what to say* decomposition of a query (the plan)."""
 
@@ -202,7 +202,7 @@ class QueryPlan:
     plain *"Find …"* search)."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QueryPlanner(Planner[Query, QueryPlan]):
     """
     Decompose an entity or set-of query into a ``QueryPlan`` (the *what to say* decisions): the
@@ -235,10 +235,10 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             aggregation_data=self._aggregation_data(),
             ranking=ranking,
             discourse_root=self._discourse_root(),
-            report=self._report(ranking),
+            report=self._report(ranking=ranking),
         )
 
-    def _report(self, ranking: RankingPlan | None) -> ReportPlan | None:
+    def _report(self, *, ranking: RankingPlan | None) -> ReportPlan | None:
         """:return: The report decomposition when the query *presents* results rather than searching
         — a set-of computing aggregates, any grouped query, or any query with an ``ordered_by``
         listing — else ``None``.
@@ -274,7 +274,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return list(grouped.variables_to_group_by) if grouped is not None else []
 
     def _columns_without_keys(
-        self, keys: list[SymbolicExpression]
+        self, *, keys: list[SymbolicExpression]
     ) -> list[SymbolicExpression]:
         """:return: the selected expressions with the group keys removed (so a key is named once, in
         the *"For each …"* frame, not restated as a reported column)."""
@@ -292,7 +292,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return ReportPlan(
             kind=ReportKind.AGGREGATION,
             group_keys=keys,
-            columns=self._columns_without_keys(keys),
+            columns=self._columns_without_keys(keys=keys),
         )
 
     def _grouping_report(self) -> ReportPlan | None:
@@ -305,7 +305,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return ReportPlan(
             kind=ReportKind.GROUPING,
             group_keys=keys,
-            columns=self._columns_without_keys(keys),
+            columns=self._columns_without_keys(keys=keys),
         )
 
     # %% selection shape
@@ -346,7 +346,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
         'Robot'
         """
-        return FallbackNouns.ENTITY.name_of(self._selected)
+        return FallbackNouns.ENTITY.name_of(node=self._selected)
 
     # %% subject restriction (WHERE partition)
 
@@ -406,11 +406,11 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return RankingPlan(
             limit_number=limit,
             direction=direction,
-            relation=self._key_relation(builder.variable),
+            relation=self._key_relation(order_key=builder.variable),
             order_key=builder.variable,
         )
 
-    def _key_relation(self, order_key: SymbolicExpression) -> RankingKeyRelation:
+    def _key_relation(self, *, order_key: SymbolicExpression) -> RankingKeyRelation:
         """:return: How *order_key* relates to the selected variable — ``SELF`` (the key is the
         selection), ``ATTRIBUTE`` (a chain on it), or ``OTHER`` (a different root)."""
         chain, root = walk_chain(order_key)

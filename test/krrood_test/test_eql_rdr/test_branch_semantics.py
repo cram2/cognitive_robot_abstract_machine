@@ -34,7 +34,7 @@ from krrood.entity_query_language.rules.conclusion_selector import (
 )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Animal:
     """
     Minimal classification target used only by this test module.
@@ -71,7 +71,7 @@ def _identified_guards(
 # %% test-only selectors, defined here so no production selector gains a rival semantics
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PrioritySelector(Alternative):
     """
     A selector refining ``Alternative`` so specificity ranking has something to rank.
@@ -81,55 +81,55 @@ class PrioritySelector(Alternative):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class UnclaimedSelector(Alternative):
     """
     A selector whose only semantics are two deliberately colliding ones.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrioritySelectorBranchSemantics(SelectorBranchSemantics[PrioritySelector]):
     """
     Right-first branch order and a left-only sibling guard -- unlike ``Alternative``.
     """
 
     @classmethod
-    def sibling_guards(cls, selector, negated, decompose) -> list[GuardCondition]:
+    def sibling_guards(cls, *, selector, negated, decompose) -> list[GuardCondition]:
         return decompose(selector.left, negated)
 
     @classmethod
-    def branches(cls, selector, decompose) -> list[GuardedBranch]:
-        return [GuardedBranch(selector.right, ()), GuardedBranch(selector.left, ())]
+    def branches(cls, *, selector, decompose) -> list[GuardedBranch]:
+        return [GuardedBranch(child_expression=selector.right, entry_guards=()), GuardedBranch(child_expression=selector.left, entry_guards=())]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FirstCollidingSemantics(SelectorBranchSemantics[UnclaimedSelector]):
     """
     One of two equally specific semantics for :class:`UnclaimedSelector`.
     """
 
     @classmethod
-    def sibling_guards(cls, selector, negated, decompose) -> list[GuardCondition]:
+    def sibling_guards(cls, *, selector, negated, decompose) -> list[GuardCondition]:
         raise NotImplementedError
 
     @classmethod
-    def branches(cls, selector, decompose) -> list[GuardedBranch]:
+    def branches(cls, *, selector, decompose) -> list[GuardedBranch]:
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SecondCollidingSemantics(SelectorBranchSemantics[UnclaimedSelector]):
     """
     The other equally specific semantics for :class:`UnclaimedSelector`.
     """
 
     @classmethod
-    def sibling_guards(cls, selector, negated, decompose) -> list[GuardCondition]:
+    def sibling_guards(cls, *, selector, negated, decompose) -> list[GuardCondition]:
         raise NotImplementedError
 
     @classmethod
-    def branches(cls, selector, decompose) -> list[GuardedBranch]:
+    def branches(cls, *, selector, decompose) -> list[GuardedBranch]:
         raise NotImplementedError
 
 
@@ -141,19 +141,19 @@ def test_each_production_selector_resolves_to_its_own_semantics():
 
     assert (
         SelectorBranchSemantics.most_specific_for(
-            Refinement(animal.has_fur, animal.can_fly)
+            expression=Refinement(left=animal.has_fur, right=animal.can_fly)
         )
         is RefinementBranchSemantics
     )
     assert (
         SelectorBranchSemantics.most_specific_for(
-            Alternative(animal.has_fur, animal.can_fly)
+            expression=Alternative(left=animal.has_fur, right=animal.can_fly)
         )
         is AlternativeBranchSemantics
     )
     assert (
         SelectorBranchSemantics.most_specific_for(
-            Next((animal.has_fur, animal.can_fly))
+            expression=Next(_operation_children_=(animal.has_fur, animal.can_fly))
         )
         is NextBranchSemantics
     )
@@ -165,7 +165,7 @@ def test_a_non_selector_expression_has_no_branch_semantics():
     """
     animal = variable(Animal, domain=[])
 
-    assert SelectorBranchSemantics.most_specific_for(animal.has_fur) is None
+    assert SelectorBranchSemantics.most_specific_for(expression=animal.has_fur) is None
 
 
 # %% refinement
@@ -177,9 +177,9 @@ def test_refinement_sibling_guard_is_its_base_condition_only():
     away fallback is a separate subtree, not part of the guard.
     """
     animal = variable(Animal, domain=[])
-    selector = Refinement(animal.has_fur, animal.can_fly)
+    selector = Refinement(left=animal.has_fur, right=animal.can_fly)
 
-    guards = RefinementBranchSemantics.sibling_guards(selector, False, _leaf_guards)
+    guards = RefinementBranchSemantics.sibling_guards(selector=selector, negated=False, decompose=_leaf_guards)
 
     assert len(guards) == 1
     assert guards[0].original_expression is animal.has_fur
@@ -188,9 +188,9 @@ def test_refinement_sibling_guard_is_its_base_condition_only():
 
 def test_refinement_branches_exclude_each_other():
     animal = variable(Animal, domain=[])
-    selector = Refinement(animal.has_fur, animal.can_fly)
+    selector = Refinement(left=animal.has_fur, right=animal.can_fly)
 
-    branches = RefinementBranchSemantics.branches(selector, _leaf_guards)
+    branches = RefinementBranchSemantics.branches(selector=selector, decompose=_leaf_guards)
 
     assert [branch.child_expression._id_ for branch in branches] == [
         animal.has_fur._id_,
@@ -209,9 +209,9 @@ def test_refinement_branches_exclude_each_other():
 
 def test_alternative_negated_sibling_guard_is_de_morgan_over_both_sides():
     animal = variable(Animal, domain=[])
-    selector = Alternative(animal.has_fur, animal.lays_eggs)
+    selector = Alternative(left=animal.has_fur, right=animal.lays_eggs)
 
-    guards = AlternativeBranchSemantics.sibling_guards(selector, True, _leaf_guards)
+    guards = AlternativeBranchSemantics.sibling_guards(selector=selector, negated=True, decompose=_leaf_guards)
 
     assert _identified_guards(guards) == [
         (animal.has_fur._id_, True),
@@ -221,9 +221,9 @@ def test_alternative_negated_sibling_guard_is_de_morgan_over_both_sides():
 
 def test_alternative_branches_guard_the_second_against_the_first():
     animal = variable(Animal, domain=[])
-    selector = Alternative(animal.has_fur, animal.lays_eggs)
+    selector = Alternative(left=animal.has_fur, right=animal.lays_eggs)
 
-    branches = AlternativeBranchSemantics.branches(selector, _leaf_guards)
+    branches = AlternativeBranchSemantics.branches(selector=selector, decompose=_leaf_guards)
 
     assert [branch.child_expression._id_ for branch in branches] == [
         animal.has_fur._id_,
@@ -238,9 +238,9 @@ def test_alternative_branches_guard_the_second_against_the_first():
 
 def test_next_branches_are_independent_and_carry_no_cross_guards():
     animal = variable(Animal, domain=[])
-    selector = Next((animal.has_fur, animal.can_fly, animal.lays_eggs))
+    selector = Next(_operation_children_=(animal.has_fur, animal.can_fly, animal.lays_eggs))
 
-    branches = NextBranchSemantics.branches(selector, _leaf_guards)
+    branches = NextBranchSemantics.branches(selector=selector, decompose=_leaf_guards)
 
     assert [branch.child_expression._id_ for branch in branches] == [
         animal.has_fur._id_,
@@ -252,9 +252,9 @@ def test_next_branches_are_independent_and_carry_no_cross_guards():
 
 def test_next_sibling_guard_covers_every_child_at_the_requested_polarity():
     animal = variable(Animal, domain=[])
-    selector = Next((animal.has_fur, animal.can_fly))
+    selector = Next(_operation_children_=(animal.has_fur, animal.can_fly))
 
-    guards = NextBranchSemantics.sibling_guards(selector, True, _leaf_guards)
+    guards = NextBranchSemantics.sibling_guards(selector=selector, negated=True, decompose=_leaf_guards)
 
     assert _identified_guards(guards) == [
         (animal.has_fur._id_, True),
@@ -274,7 +274,7 @@ def test_a_new_selector_is_decomposed_without_editing_the_traversal():
     rather than a hard-coded branch.
     """
     animal = variable(Animal, domain=[])
-    selector = PrioritySelector(animal.has_fur, animal.lays_eggs)
+    selector = PrioritySelector(left=animal.has_fur, right=animal.lays_eggs)
 
     guards = _leaf_guards(selector, negated=False)
 
@@ -295,7 +295,7 @@ def test_a_new_selector_directs_the_path_walk_without_editing_the_traversal():
         add(animal.species, Species.BIRD)
 
     paths = list(
-        _collect_rule_paths(PrioritySelector(first_condition, second_condition), [])
+        _collect_rule_paths(PrioritySelector(left=first_condition, right=second_condition), [])
     )
 
     # Right-first, per PrioritySelectorBranchSemantics.branches.
@@ -309,7 +309,7 @@ def test_a_more_specific_selector_outranks_the_semantics_it_refines():
     animal = variable(Animal, domain=[])
 
     semantics = SelectorBranchSemantics.most_specific_for(
-        PrioritySelector(animal.has_fur, animal.lays_eggs)
+        expression=PrioritySelector(left=animal.has_fur, right=animal.lays_eggs)
     )
 
     assert semantics is PrioritySelectorBranchSemantics
@@ -320,7 +320,7 @@ def test_equally_specific_semantics_collide_rather_than_picking_one_silently():
 
     with pytest.raises(AmbiguousBranchSemanticsError) as collision:
         SelectorBranchSemantics.most_specific_for(
-            UnclaimedSelector(animal.has_fur, animal.lays_eggs)
+            expression=UnclaimedSelector(left=animal.has_fur, right=animal.lays_eggs)
         )
 
     message = str(collision.value)

@@ -29,12 +29,12 @@ def generate_interface(tmp_path) -> ModuleType:
     :param tmp_path: The directory to write the interface into.
     :return: The imported interface.
     """
-    instance = ORMatic(ClassDiagram([LabelledIntervals, HolderOfSpecializedGeneric]))
+    instance = ORMatic(class_dependency_graph=ClassDiagram(classes=[LabelledIntervals, HolderOfSpecializedGeneric]))
     instance.make_all_tables()
 
     interface_file = tmp_path / "specialized_generic_interface.py"
     with open(interface_file, "w") as file:
-        instance.to_sqlalchemy_file(file)
+        instance.to_sqlalchemy_file(file=file)
 
     spec = importlib.util.spec_from_file_location(
         "specialized_generic_interface", interface_file

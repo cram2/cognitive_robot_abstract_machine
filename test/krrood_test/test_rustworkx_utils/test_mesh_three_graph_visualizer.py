@@ -100,22 +100,22 @@ class TestMeshGlbCaching:
     def test_mesh_is_only_exported_once(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
-        first = visualizer._mesh_glb(0)
-        second = visualizer._mesh_glb(0)
+        first = visualizer._mesh_glb(node_index=0)
+        second = visualizer._mesh_glb(node_index=0)
 
         assert first is second
 
     def test_exported_bytes_are_a_valid_glb_header(self):
         visualizer = named_visualizer(body_graph(body_with_visual_sphere("a")))
 
-        glb_bytes = visualizer._mesh_glb(0)
+        glb_bytes = visualizer._mesh_glb(node_index=0)
 
         assert glb_bytes[:4] == b"glTF"
 
     def test_missing_mesh_is_cached_as_none(self):
         visualizer = named_visualizer(body_graph(body_without_visual("a")))
 
-        assert visualizer._mesh_glb(0) is None
+        assert visualizer._mesh_glb(node_index=0) is None
         assert 0 in visualizer._mesh_glb_cache
 
     def test_concurrent_requests_export_the_same_mesh_only_once(self):
@@ -242,7 +242,7 @@ class TestExtraScript:
 class TestCheckDependencies:
     @pytest.mark.parametrize("missing_module", ["flask", "trimesh"])
     def test_raises_when_a_required_module_is_missing(
-        self, monkeypatch, missing_module
+        self, *, monkeypatch, missing_module
     ):
         original_find_spec = importlib.util.find_spec
 

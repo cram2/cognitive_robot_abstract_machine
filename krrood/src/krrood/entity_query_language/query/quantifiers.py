@@ -22,7 +22,7 @@ from krrood.entity_query_language.exceptions import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ResultQuantificationConstraint(ABC):
     """
     A base class that represents a constraint for quantification.
@@ -31,7 +31,7 @@ class ResultQuantificationConstraint(ABC):
     @abstractmethod
     def assert_satisfaction(
         self,
-        number_of_solutions: int,
+        *, number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
@@ -50,7 +50,7 @@ class ResultQuantificationConstraint(ABC):
     def __repr__(self): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SingleValueQuantificationConstraint(ResultQuantificationConstraint, ABC):
     """
     A class that represents a single value constraint on the result quantification.
@@ -66,7 +66,7 @@ class SingleValueQuantificationConstraint(ResultQuantificationConstraint, ABC):
             raise NegativeQuantificationError()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Exactly(SingleValueQuantificationConstraint):
     """
     A class that represents an exact constraint on the result quantification.
@@ -77,21 +77,21 @@ class Exactly(SingleValueQuantificationConstraint):
 
     def assert_satisfaction(
         self,
-        number_of_solutions: int,
+        *, number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         if number_of_solutions > self.value:
             raise GreaterThanExpectedNumberOfSolutions(
-                quantified_expression, self.value
+                expression=quantified_expression, expected_number=self.value
             )
         elif done and number_of_solutions < self.value:
             raise LessThanExpectedNumberOfSolutions(
-                quantified_expression, self.value, number_of_solutions
+                expression=quantified_expression, expected_number=self.value, found_number=number_of_solutions
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExactlyOne(Exactly):
     """
     A definite single-result constraint. Unlike :class:`Exactly`, it raises the definite-result
@@ -106,17 +106,17 @@ class ExactlyOne(Exactly):
 
     def assert_satisfaction(
         self,
-        number_of_solutions: int,
+        *, number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         if number_of_solutions > self.value:
-            raise MultipleSolutionFound(quantified_expression)
+            raise MultipleSolutionFound(expression=quantified_expression)
         if done and number_of_solutions < self.value:
-            raise NoSolutionFound(quantified_expression)
+            raise NoSolutionFound(expression=quantified_expression)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AtLeast(SingleValueQuantificationConstraint):
     """
     A class that specifies a minimum number of results as a quantification constraint.
@@ -127,17 +127,17 @@ class AtLeast(SingleValueQuantificationConstraint):
 
     def assert_satisfaction(
         self,
-        number_of_solutions: int,
+        *, number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         if done and number_of_solutions < self.value:
             raise LessThanExpectedNumberOfSolutions(
-                quantified_expression, self.value, number_of_solutions
+                expression=quantified_expression, expected_number=self.value, found_number=number_of_solutions
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AtMost(SingleValueQuantificationConstraint):
     """
     A class that specifies a maximum number of results as a quantification constraint.
@@ -148,17 +148,17 @@ class AtMost(SingleValueQuantificationConstraint):
 
     def assert_satisfaction(
         self,
-        number_of_solutions: int,
+        *, number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         if number_of_solutions > self.value:
             raise GreaterThanExpectedNumberOfSolutions(
-                quantified_expression, self.value
+                expression=quantified_expression, expected_number=self.value
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Range(ResultQuantificationConstraint):
     """
     A class that represents a range constraint on the result quantification.
@@ -178,26 +178,26 @@ class Range(ResultQuantificationConstraint):
         Validate quantification constraints are consistent.
         """
         if self.at_most.value < self.at_least.value:
-            raise InvalidQuantificationRangeError(self.at_least, self.at_most)
+            raise InvalidQuantificationRangeError(at_least=self.at_least, at_most=self.at_most)
 
     def assert_satisfaction(
         self,
-        number_of_solutions: int,
+        *, number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         self.at_least.assert_satisfaction(
-            number_of_solutions, quantified_expression, done
+            number_of_solutions=number_of_solutions, quantified_expression=quantified_expression, done=done
         )
         self.at_most.assert_satisfaction(
-            number_of_solutions, quantified_expression, done
+            number_of_solutions=number_of_solutions, quantified_expression=quantified_expression, done=done
         )
 
     def __repr__(self):
         return f"{self.at_least}<=n<={self.at_most}"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ResultQuantifier(ABC):
     """
     Marker for the kind of result quantification a query requests (e.g. :class:`An`, :class:`The`).
@@ -215,12 +215,12 @@ class ResultQuantifier(ABC):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class An(ResultQuantifier):
     """Quantifier that accepts all matching results."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class The(ResultQuantifier):
     """Quantifier that requires exactly one result."""
 

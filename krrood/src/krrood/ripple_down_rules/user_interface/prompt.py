@@ -37,7 +37,7 @@ class UserPrompt:
 
     def prompt_user_for_expression(
         self,
-        case_query: CaseQuery,
+        *, case_query: CaseQuery,
         prompt_for: PromptFor,
         prompt_str: str | None = None,
     ) -> tuple[str | None, CallableExpression | None]:
@@ -56,7 +56,7 @@ class UserPrompt:
             callable_expression: CallableExpression | None = None
             while True:
                 user_input, expression_tree = self.prompt_user_about_case(
-                    case_query, prompt_for, prompt_str, code_to_modify=prev_user_input
+                    case_query=case_query, prompt_for=prompt_for, prompt_str=prompt_str, code_to_modify=prev_user_input
                 )
                 if user_input is None:
                     if prompt_for == PromptFor.Conclusion:
@@ -106,7 +106,7 @@ class UserPrompt:
 
     def prompt_user_about_case(
         self,
-        case_query: CaseQuery,
+        *, case_query: CaseQuery,
         prompt_for: PromptFor,
         prompt_str: str | None = None,
         code_to_modify: str | None = None,
@@ -134,7 +134,7 @@ class UserPrompt:
         prompt_for_str = prompt_for_str.replace(":", f" {case_query.name}:")
         prompt_str = f"{Fore.WHITE}{initial_prompt_str}{Fore.MAGENTA}{prompt_for_str}"
         prompt_str = self.construct_prompt_str_for_shell(
-            case_query, prompt_for, prompt_str
+            case_query=case_query, prompt_for=prompt_for, prompt_str=prompt_str
         )
         shell = IPythonShell(
             header=prompt_str,
@@ -150,7 +150,7 @@ class UserPrompt:
 
     def build_prompt_str_for_ai(
         self,
-        case_query: CaseQuery,
+        *, case_query: CaseQuery,
         prompt_for: PromptFor,
         initial_prompt_str: str | None = None,
     ) -> str:
@@ -168,7 +168,7 @@ class UserPrompt:
 
     def construct_prompt_str_for_shell(
         self,
-        case_query: CaseQuery,
+        *, case_query: CaseQuery,
         prompt_for: PromptFor,
         prompt_str: str | None = None,
     ) -> str:
@@ -193,7 +193,7 @@ class UserPrompt:
         return prompt_str
 
     def prompt_user_input_and_parse_to_expression(
-        self, shell: IPythonShell | None = None, user_input: str | None = None
+        self, *, shell: IPythonShell | None = None, user_input: str | None = None
     ) -> tuple[str | None, ast.AST | None]:
         """
         Prompt the user for input.
@@ -225,7 +225,7 @@ class UserPrompt:
                 user_input = None
 
     def start_shell_and_get_user_input(
-        self, shell: IPythonShell | None = None
+        self, *, shell: IPythonShell | None = None
     ) -> str | None:
         """
         Start the shell and get user input.

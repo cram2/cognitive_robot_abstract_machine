@@ -321,10 +321,10 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
             grounding.
         """
         grasp = move_and_pick_up.pick_up.grasp.apply_mapping_on_external_root(
-            move_and_pick_up
+            instance=move_and_pick_up
         )
         arm = move_and_pick_up.pick_up.arm.apply_mapping_on_external_root(
-            move_and_pick_up
+            instance=move_and_pick_up
         )
         if not isinstance(arm, Arm):
             return None

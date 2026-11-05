@@ -42,7 +42,7 @@ from krrood.entity_query_language.verbalization.relational_attributes import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalBindingFold:
     """
     A subject→entity relational binding collapsed with the entity's own restrictions.

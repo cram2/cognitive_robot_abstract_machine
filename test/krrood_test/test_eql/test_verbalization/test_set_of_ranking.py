@@ -19,29 +19,29 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 from ...dataset.department_and_employee import Department, Employee
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Bound:
     month: int
     year: int = 0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Period:
     begin: Bound
     end: Bound
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Money:
     amount: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Revenue:
     money: Money
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProfitAndLossStatement:
     period: Period
     revenue: Revenue

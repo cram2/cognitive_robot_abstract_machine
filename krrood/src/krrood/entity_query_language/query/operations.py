@@ -46,7 +46,7 @@ A tuple representing values of variables that are used in the grouped_by clause.
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Where(Filter, UnaryExpression):
     """
     A symbolic expression that represents the `where()` statement of `QueryObjectDescriptor`. It is used to filter
@@ -57,15 +57,15 @@ class Where(Filter, UnaryExpression):
     def condition(self) -> SymbolicExpression:
         return self._child_
 
-    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterator[OperationResult]:
         yield from (
             result
-            for result in self._evaluate_child_as_condition_(self._child_, sources)
+            for result in self._evaluate_child_as_condition_(child=self._child_, sources=sources)
             if result.is_true
         )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Having(Filter, BinaryExpression):
     """
     A symbolic having expression that can be used to filter the grouped results of a query.
@@ -92,16 +92,16 @@ class Having(Filter, BinaryExpression):
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
             self._build_operation_result_with_truth_(
-                annotated_result.is_true,
-                grouping_result.bindings | annotated_result.bindings,
+                truth=annotated_result.is_true,
+                bindings=grouping_result.bindings | annotated_result.bindings,
             )
-            for grouping_result in self.grouped_by._evaluate_(sources)
+            for grouping_result in self.grouped_by._evaluate_(sources=sources)
             for annotated_result in self._evaluate_child_as_condition_(
-                self.condition, grouping_result
+                child=self.condition, sources=grouping_result
             )
             if annotated_result.is_true
         )
@@ -113,7 +113,7 @@ A dictionary for grouped bindings which maps a group key to its corresponding bi
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
     """
     This operation groups the results of a query by specific variables. This is useful for aggregating results
@@ -130,7 +130,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
     """
 
     def _evaluate__(
-        self, sources: OperationResult | None = None
+        self, *, sources: OperationResult | None = None
     ) -> Iterator[OperationResult]:
         """
         Generate results grouped by the specified variables in the grouped_by clause.
@@ -143,9 +143,9 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
             not isinstance(var, Count)
             for var in self.aggregators_of_grouped_by_variables
         ):
-            raise UnsupportedAggregationOfAGroupedByVariable(self)
+            raise UnsupportedAggregationOfAGroupedByVariable(grouped_by=self)
 
-        groups, group_key_count = self.get_groups_and_group_key_count(sources)
+        groups, group_key_count = self.get_groups_and_group_key_count(sources=sources)
 
         for group_key, group in groups.items():
             if self.count_occurrences_of_group_keys:
@@ -158,7 +158,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         yield from groups.values()
 
     def get_groups_and_group_key_count(
-        self, sources: OperationResult | None
+        self, *, sources: OperationResult | None
     ) -> tuple[GroupBindings, dict[GroupKey, int]]:
         """
         Create a dictionary of groups and a dictionary of group keys to their corresponding counts starting from the
@@ -169,10 +169,10 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         :return: A tuple containing the dictionary of groups and the dictionary of group keys to their corresponding counts.
         """
 
-        groups = defaultdict(lambda: OperationResult({}, self))
+        groups = defaultdict(lambda: OperationResult(bindings={}, operand=self))
         group_key_count = defaultdict(lambda: 0)
 
-        for res in self._evaluate_product_(sources):
+        for res in self._evaluate_product_(sources=sources):
 
             group_key = tuple(
                 ensure_hashable(res[var._id_]) for var in self.variables_to_group_by
@@ -181,7 +181,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
             res[self._id_] = res.bindings
             group_key_count[group_key] += 1
 
-            self.update_group_from_bindings(groups[group_key], res.bindings)
+            self.update_group_from_bindings(group=groups[group_key], results=res.bindings)
 
         if len(groups) == 0:
             # if there are no groups, add one empty group with an empty list for each aggregated
@@ -195,14 +195,14 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         return groups, group_key_count
 
     @lru_cache
-    def get_group_key(self, result_values: frozenset[uuid.UUID]) -> GroupKey:
+    def get_group_key(self, *, result_values: frozenset[uuid.UUID]) -> GroupKey:
         """
         :param result_values: The values of the variables to group by in the current result.
         :return: A tuple of the values of the variables to group by representing a group key.
         """
         return tuple(ensure_hashable(value) for value in result_values)
 
-    def update_group_from_bindings(self, group: OperationResult, results: Bindings):
+    def update_group_from_bindings(self, *, group: OperationResult, results: Bindings):
         """
         Updates the group with the given results.
 
@@ -212,7 +212,7 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         for id_, val in results.items():
             if id_ in self.ids_of_variables_to_group_by:
                 group[id_] = val
-            elif self.is_already_grouped(id_):
+            elif self.is_already_grouped(var_id=id_):
                 group[id_] = val if is_iterable(val) else [val]
             else:
                 if id_ not in group:
@@ -220,8 +220,8 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
                 group[id_].append(val)
 
     @memoize
-    def is_already_grouped(self, var_id: uuid.UUID) -> bool:
-        expression = self._get_expression_by_id_(var_id)
+    def is_already_grouped(self, *, var_id: uuid.UUID) -> bool:
+        expression = self._get_expression_by_id_(id_=var_id)
         return (
             len(self.variables_to_group_by) == 1
             and isinstance(expression, MappedVariable)

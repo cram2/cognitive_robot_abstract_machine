@@ -38,8 +38,8 @@ def _realised(np: NounPhrase) -> str:
     """
     Lower the DP then run morphology — the verbalizer's determiner→morphology order.
     """
-    lowered = DeterminerProcessor().process(np)
-    return flatten_fragment_to_plain_text(MorphologyProcessor().process(lowered))
+    lowered = DeterminerProcessor().process(fragment=np)
+    return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment=lowered))
 
 
 # ── the concord table, cell by cell ──────────────────────────────────────────────
@@ -121,11 +121,11 @@ def test_pass_lowers_nested_noun_phrases_inside_a_phrase():
 
 def test_pass_is_a_noop_on_a_noun_phrase_free_tree():
     leaf = RoleFragment(text="Robot", role=SemanticRole.VARIABLE)
-    assert DeterminerProcessor().process(leaf) is leaf
+    assert DeterminerProcessor().process(fragment=leaf) is leaf
 
 
 def test_pass_is_idempotent():
     np = NounPhrase(head=_noun("Robot"), definiteness=Definiteness.DEFINITE)
-    once = DeterminerProcessor().process(np)
-    twice = DeterminerProcessor().process(once)
+    once = DeterminerProcessor().process(fragment=np)
+    twice = DeterminerProcessor().process(fragment=once)
     assert flatten_fragment_to_plain_text(twice) == "the Robot"

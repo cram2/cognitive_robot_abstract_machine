@@ -45,7 +45,7 @@ class MorphologyProcessor(RewritePass):
     Reference: :cite:t:`gatt2009simplenlg` — the MorphologyProcessor realisation stage.
     """
 
-    def rewrite(self, leaf: VerbalizationFragment) -> VerbalizationFragment:
+    def rewrite(self, *, leaf: VerbalizationFragment) -> VerbalizationFragment:
         """:return: *leaf* with number and polarity realised, then reset; a leaf with no realisable
         feature is returned unchanged.
 
@@ -57,9 +57,9 @@ class MorphologyProcessor(RewritePass):
         if not isinstance(leaf, (WordFragment, RoleFragment)):
             return leaf
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.VERB:
-            return self._realize_verb(leaf)
+            return self._realize_verb(leaf=leaf)
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.OPERATOR:
-            return self._realize_copula(leaf)
+            return self._realize_copula(leaf=leaf)
         if leaf.number is not GrammaticalNumber.PLURAL:
             return leaf
         return replace(
@@ -69,7 +69,7 @@ class MorphologyProcessor(RewritePass):
         )
 
     @staticmethod
-    def _realize_verb(leaf: RoleFragment) -> RoleFragment:
+    def _realize_verb(*, leaf: RoleFragment) -> RoleFragment:
         """:return: the ``VERB`` leaf's lemma realised — present 3rd-person singular (*"works"*),
         bare plural (*"work"*), or do-support negation (*"does not work"* / *"do not work"*).
 
@@ -87,7 +87,7 @@ class MorphologyProcessor(RewritePass):
         )
 
     @staticmethod
-    def _realize_copula(leaf: RoleFragment) -> RoleFragment:
+    def _realize_copula(*, leaf: RoleFragment) -> RoleFragment:
         """:return: an ``OPERATOR`` leaf with copula negation then plural suppletion applied; a
         non-copula operator (*"greater than"*) is returned unchanged but for its reset features.
 

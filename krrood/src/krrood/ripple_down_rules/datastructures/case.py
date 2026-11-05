@@ -57,7 +57,7 @@ class Case(UserDict):
 
     @classmethod
     def from_obj(
-        cls, obj: Any, obj_name: str | None = None, max_recursion_idx: int = 3
+        cls, *, obj: Any, obj_name: str | None = None, max_recursion_idx: int = 3
     ) -> Case:
         """
         Create a case from an object.
@@ -132,7 +132,7 @@ class Case(UserDict):
         return new_case
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseAttributeValue:
     """
     Encapsulates a single value of a case attribute, it adds an id to the value.
@@ -167,7 +167,7 @@ class CaseAttribute(list):
     """
 
     @classmethod
-    def from_obj(cls, values: list[Any]) -> CaseAttribute:
+    def from_obj(cls, *, values: list[Any]) -> CaseAttribute:
         return cls(make_list(values))
 
     @property
@@ -179,7 +179,7 @@ class CaseAttribute(list):
         """
         return {self.__class__.__name__: self}
 
-    def filter_by(self, condition: CallableExpression) -> CaseAttribute:
+    def filter_by(self, *, condition: CallableExpression) -> CaseAttribute:
         """
         Filter the column by a condition.
 

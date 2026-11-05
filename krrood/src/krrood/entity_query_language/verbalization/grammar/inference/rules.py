@@ -30,7 +30,7 @@ class InferenceRuleRule(TopLevelEntityRule):
 
     enters_query_scope = False
 
-    def when(self, node: Entity, context: RuleContext) -> bool:
+    def when(self, *, node: Entity, context: RuleContext) -> bool:
         """:return: ``True`` for a top-level entity whose selected variable is an instantiated
         variable (an inference rule).
 
@@ -40,9 +40,9 @@ class InferenceRuleRule(TopLevelEntityRule):
         >>> verbalize_expression(entity(drawer)).startswith("If")
         True
         """
-        return super().when(node, context) and InferencePlanner.can_handle(node)
+        return super().when(node=node, context=context) and InferencePlanner.can_handle(entity=node)
 
-    def build(self, node: Entity, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Entity, context: RuleContext) -> VerbalizationFragment:
         """:return: the ``IF … THEN …`` block built by the inference assembler.
 
         >>> from krrood.entity_query_language.factories import inference
@@ -53,4 +53,4 @@ class InferenceRuleRule(TopLevelEntityRule):
         ...     "If there's a FixedConnection")
         True
         """
-        return InferenceAssembler(context).assemble(node)
+        return InferenceAssembler(context=context).assemble(node=node)

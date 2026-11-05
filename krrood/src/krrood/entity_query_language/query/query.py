@@ -90,7 +90,7 @@ A function that maps the results of a query to a new set of results.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CachedResultStream:
     """
     A lazily-filled, replayable view over a source iterator.
@@ -156,7 +156,7 @@ def modifies_query_structure(modifier):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Query(
     Evaluable,
     HasQueryModifiers[T],
@@ -242,7 +242,7 @@ class Query(
 
     def __post_init__(self):
         self._selected_variables_ = tuple(
-            self._as_operand_(selected) for selected in self._selected_variables_
+            self._as_operand_(value=selected) for selected in self._selected_variables_
         )
         self._operation_children_ = tuple(self._selected_variables_)
         MultiArityExpressionThatPerformsACartesianProduct.__post_init__(self)
@@ -250,7 +250,7 @@ class Query(
         self._var_ = self
         Selectable.__post_init__(self)
 
-        self._quantifier_builder_ = QuantifierBuilder(self)
+        self._quantifier_builder_ = QuantifierBuilder(query=self)
 
     def _mark_dirty_(self) -> None:
         """
@@ -264,7 +264,7 @@ class Query(
         self.__dict__.pop("_group_", None)
         self.__dict__.pop("_distinct_on_ids_", None)
 
-    def evaluate(self, backend: QueryBackend | None = None) -> Iterator:
+    def evaluate(self, *, backend: QueryBackend | None = None) -> Iterator:
         """
         Evaluate the query using the given backend, returning an iterator over
         the results.
@@ -277,7 +277,7 @@ class Query(
             evaluation).
         """
         self.build()
-        return super().evaluate(backend)
+        return super().evaluate(backend=backend)
 
     def _evaluate_natively_(self) -> Iterator:
         """
@@ -306,9 +306,9 @@ class Query(
         :return: The conditions, with every chain rooted at this query re-rooted onto its
             selection.
         """
-        return tuple(self._reroot_condition_(condition) for condition in conditions)
+        return tuple(self._reroot_condition_(condition=condition) for condition in conditions)
 
-    def _reroot_condition_(self, condition: ConditionType) -> ConditionType:
+    def _reroot_condition_(self, *, condition: ConditionType) -> ConditionType:
         """
         Re-root every attribute chain that one condition takes from this query.
 
@@ -321,8 +321,8 @@ class Query(
         """
         if not isinstance(condition, SymbolicExpression):
             return condition
-        if self._is_attribute_of_self_(condition):
-            return self._rerooted_on_selection_(condition)
+        if self._is_attribute_of_self_(expression=condition):
+            return self._rerooted_on_selection_(chain=condition)
         visited: set[uuid.UUID] = set()
         pending = [condition]
         while pending:
@@ -331,19 +331,19 @@ class Query(
                 continue
             visited.add(expression._id_)
             for child in tuple(expression._children_):
-                if self._is_attribute_of_self_(child):
+                if self._is_attribute_of_self_(expression=child):
                     expression._replace_child_(
-                        child, self._rerooted_on_selection_(child)
+                        old_child=child, new_child=self._rerooted_on_selection_(chain=child)
                     )
-                elif self._is_self_(child):
+                elif self._is_self_(expression=child):
                     expression._replace_child_(
-                        child, self._selection_standing_for_self_()
+                        old_child=child, new_child=self._selection_standing_for_self_()
                     )
                 elif not isinstance(child, Query):
                     pending.append(child)
         return condition
 
-    def _is_self_(self, expression: SymbolicExpression) -> bool:
+    def _is_self_(self, *, expression: SymbolicExpression) -> bool:
         """
         :param expression: An expression appearing in this query's conditions.
         :return: Whether the expression is this query itself, rather than a nested
@@ -360,10 +360,10 @@ class Query(
             stands for no single one.
         """
         if len(self._selected_variables_) != 1:
-            raise AmbiguousQuerySubject(self)
+            raise AmbiguousQuerySubject(query=self)
         return self._selected_variables_[0]
 
-    def _is_attribute_of_self_(self, expression: SymbolicExpression) -> bool:
+    def _is_attribute_of_self_(self, *, expression: SymbolicExpression) -> bool:
         """
         .. note::
             Attaching a chain to a query, and compiling a query into its product, both copy
@@ -379,7 +379,7 @@ class Query(
         return isinstance(base, Query) and base._id_ == self._id_
 
     def _rerooted_on_selection_(
-        self, attribute: MappedVariable
+        self, *, chain: MappedVariable
     ) -> CanBehaveLikeAVariable:
         """
         :param attribute: A mapping chain based on this query.
@@ -388,15 +388,15 @@ class Query(
             variables nor belongs to a query that selects a single one, so it has no
             subject to follow.
         """
-        first_step = attribute._access_path_[0]
-        indexed_selection = self._selection_indexed_by_(first_step)
+        first_step = chain._access_path_[0]
+        indexed_selection = self._selection_indexed_by_(step=first_step)
         if indexed_selection is not None:
-            return attribute._reroot_on_(indexed_selection, first_step)
+            return chain._reroot_on_(root=indexed_selection, replaced=first_step)
         if len(self._selected_variables_) != 1:
-            raise AmbiguousQueryAttribute(self, attribute)
-        return attribute._reroot_on_(self._selected_variables_[0], self)
+            raise AmbiguousQueryAttribute(query=self, attribute=chain)
+        return chain._reroot_on_(root=self._selected_variables_[0], replaced=self)
 
-    def _selection_indexed_by_(self, step: MappedVariable) -> Selectable | None:
+    def _selection_indexed_by_(self, *, step: MappedVariable) -> Selectable | None:
         """
         A query stands for the value its selection takes, so indexing it indexes that
         value rather than naming a variable.
@@ -443,7 +443,7 @@ class Query(
     @modifies_query_structure
     def ordered_by(
         self,
-        variable: Selectable[T] | Any,
+        *, variable: Selectable[T] | Any,
         descending: bool = False,
         key: Callable | None = None,
     ) -> Self:
@@ -458,7 +458,7 @@ class Query(
             value.
         """
         self._ordered_by_builder_ = OrderedByBuilder(
-            self, variable, descending=descending, key=key
+            query=self, variable=variable, descending=descending, key=key
         )
         return self
 
@@ -475,7 +475,7 @@ class Query(
         """
         self._distinct_on = on if on else self._selected_variables_
         self._seen_results = SeenSet(keys=tuple(v._id_ for v in self._distinct_on))
-        self._results_mapping.append(self._get_distinct_results_)
+        self._results_mapping.append(lambda results_gen: self._get_distinct_results_(results_gen=results_gen))
         return self
 
     @modifies_query_structure
@@ -487,11 +487,11 @@ class Query(
             by.
         :return: This query.
         """
-        self._grouped_by_builder_ = GroupedByBuilder(self, variables_to_group_by)
+        self._grouped_by_builder_ = GroupedByBuilder(query=self, variables_to_group_by=variables_to_group_by)
         return self
 
     @modifies_query_structure
-    def limit(self, n: int) -> Self:
+    def limit(self, *, n: int) -> Self:
         """
         Limit the number of results to n.
 
@@ -500,13 +500,13 @@ class Query(
         """
         self._limit_ = n
         if not isinstance(self._limit_, int) or self._limit_ <= 0:
-            raise NonPositiveLimitValue(self._limit_)
+            raise NonPositiveLimitValue(wrong_limit_value=self._limit_)
         return self
 
     @modifies_query_structure
     def _quantify_(
         self,
-        quantifier_type: type[ResultQuantifier] = An,
+        *, quantifier_type: type[ResultQuantifier] = An,
         quantification_constraint: ResultQuantificationConstraint | None = None,
     ) -> Self:
         """
@@ -519,7 +519,7 @@ class Query(
         :return: This query.
         """
         self._quantifier_builder_ = QuantifierBuilder(
-            self, quantifier_type, quantification_constraint
+            query=self, type=quantifier_type, quantification_constraint=quantification_constraint
         )
         return self
 
@@ -580,14 +580,14 @@ class Query(
         if self._ordered_by_builder_ is not None:
             ordering = self._ordered_by_builder_
             product.ordered_by(
-                ordering.variable, descending=ordering.descending, key=ordering.key
+                variable=ordering.variable, descending=ordering.descending, key=ordering.key
             )
         if self._distinct_on:
             product.distinct(*self._distinct_on)
         if self._limit_ is not None:
-            product.limit(self._limit_)
+            product.limit(n=self._limit_)
         quantifier = self._quantifier_builder_
-        product._quantify_(quantifier.type, quantifier.quantification_constraint)
+        product._quantify_(quantifier_type=quantifier.type, quantification_constraint=quantifier.quantification_constraint)
         product._wire_in_place_()
         return product
 
@@ -629,7 +629,7 @@ class Query(
         :return: The chain head, or ``None`` if the query is unfiltered/ungrouped.
         """
         if self._group_ and self._grouped_by_builder_ is None:
-            self._grouped_by_builder_ = GroupedByBuilder(self)
+            self._grouped_by_builder_ = GroupedByBuilder(query=self)
 
         if self._having_builder_ is not None:
             self._having_builder_.grouped_by = self._grouped_by_builder_.expression
@@ -642,7 +642,7 @@ class Query(
 
     def _evaluate__(
         self,
-        sources: OperationResult,
+        *, sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the query by constraining values, updating conclusions,
@@ -658,23 +658,23 @@ class Query(
         """
         if not self._is_compiled_product_:
             self.build()
-            yield from self._expression_._evaluate__(sources)
+            yield from self._expression_._evaluate__(sources=sources)
             return
 
         evaluation_context = get_evaluation_context()
         if evaluation_context is None or not self._is_nested_subquery_(
-            evaluation_context
+            evaluation_context=evaluation_context
         ):
-            yield from self._produce_results_(sources)
+            yield from self._produce_results_(sources=sources)
             return
 
         cached_stream = evaluation_context.subquery_result_cache.get_or_create(
-            self._id_,
-            lambda: CachedResultStream(self._produce_results_(OperationResult({}))),
+            query_id=self._id_,
+            factory=lambda: CachedResultStream(_source=self._produce_results_(sources=OperationResult(bindings={}))),
         )
         yield from cached_stream
 
-    def _is_nested_subquery_(self, evaluation_context) -> bool:
+    def _is_nested_subquery_(self, *, evaluation_context) -> bool:
         """
         :param evaluation_context: The active evaluation context.
         :return: Whether this compiled query is evaluating as a nested subquery rather than as the
@@ -683,7 +683,7 @@ class Query(
         """
         return evaluation_context.outermost_query.is_nested(self)
 
-    def _produce_results_(self, sources: OperationResult) -> Iterator[OperationResult]:
+    def _produce_results_(self, *, sources: OperationResult) -> Iterator[OperationResult]:
         """
         Produce this product's results: the projected, result-mapped rows of its cartesian product.
 
@@ -691,13 +691,13 @@ class Query(
         :return: An iterator over the query's result rows.
         """
         results = (
-            self._get_operation_result_(result)
+            self._get_operation_result_(child_result=result)
             for result in self._apply_results_mapping_(
-                self._evaluate_product_(sources),
+                results=self._evaluate_product_(sources=sources),
             )
         )
         for transformer in self._result_transformers_:
-            results = transformer.transform(results)
+            results = transformer.transform(results=results)
         yield from results
 
         if self._seen_results is not None:
@@ -741,7 +741,7 @@ class Query(
         self.build()
         return self._expression_._result_transformers_
 
-    def _result_is_false_(self, result: OperationResult) -> bool:
+    def _result_is_false_(self, *, result: OperationResult) -> bool:
         """
         :param result: A result this query produced.
         :return: ``False`` always.
@@ -752,15 +752,15 @@ class Query(
         """
         return False
 
-    def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(self, *, child_result: OperationResult) -> OperationResult:
         """
         :param child_result: The child result to construct the operation result from.
         :return: The operation result.
         """
         return OperationResult(
-            {v._id_: child_result[v._id_] for v in self._selected_variables_},
-            self,
-            child_result,
+            bindings={v._id_: child_result[v._id_] for v in self._selected_variables_},
+            operand=self,
+            previous_operation_result=child_result,
         )
 
     @property
@@ -794,7 +794,7 @@ class Query(
         return tuple(k._id_ for k in self._distinct_on)
 
     def _get_distinct_results_(
-        self, results_gen: Iterator[OperationResult]
+        self, *, results_gen: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
         """
         Apply distinctness constraint to the query results.
@@ -804,13 +804,13 @@ class Query(
         """
         for result in results_gen:
             bindings = copy(result.bindings)
-            self._update_res_with_distinct_on_variables_(bindings)
-            if self._seen_results.check(bindings):
+            self._update_res_with_distinct_on_variables_(res=bindings)
+            if self._seen_results.check(assignment=bindings):
                 continue
-            self._seen_results.add(bindings)
+            self._seen_results.add(assignment=bindings)
             yield result
 
-    def _update_res_with_distinct_on_variables_(self, res: dict[int, Any]):
+    def _update_res_with_distinct_on_variables_(self, *, res: dict[int, Any]):
         """
         Update the result dictionary with values from distinct-on variables if
         not already present.
@@ -820,7 +820,7 @@ class Query(
         for i, id_ in enumerate(self._distinct_on_ids_):
             if id_ in res:
                 continue
-            var_value = self._distinct_on[i]._evaluate_(OperationResult(copy(res)))
+            var_value = self._distinct_on[i]._evaluate_(sources=OperationResult(bindings=copy(res)))
             res[id_] = next(var_value).value
 
     @cached_property
@@ -882,7 +882,7 @@ class Query(
         return aggregated_variables, non_aggregated_variables
 
     def aggregated_selections(
-        self, group_key_root_ids: set[uuid.UUID]
+        self, *, group_key_root_ids: set[uuid.UUID]
     ) -> list[SymbolicExpression]:
         """
         :param group_key_root_ids: The chain-root variable ids of the GROUP BY keys (see
@@ -897,7 +897,7 @@ class Query(
         ]
 
     def _apply_results_mapping_(
-        self, results: Iterator[OperationResult]
+        self, *, results: Iterator[OperationResult]
     ) -> Iterable[OperationResult]:
         """
         Process and transform an iterable of results based on predefined
@@ -916,7 +916,7 @@ class Query(
             results = result_mapping(results)
         return results
 
-    def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
+    def _as_embeddable_child_(self, *, parent: SymbolicExpression) -> SymbolicExpression:
         """
         Embed this query's compiled product when it becomes an operand of another expression.
 
@@ -1012,14 +1012,14 @@ class Query(
         UnaryExpression._parent_.__set__(self, parent)
 
     def _invert_(self):
-        raise UnsupportedNegation(self.__class__)
+        raise UnsupportedNegation(operation_type=self.__class__)
 
     @property
     def _name_(self) -> str:
         return f"({', '.join(var._name_ for var in self._selected_variables_)})"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class SetOf(Query):
     """
     A query over a set of variables.
@@ -1033,11 +1033,11 @@ class SetOf(Query):
         :raises UnselectedQueryVariable: If the key is not one of the selected
             variables, since a row holds nothing else.
         """
-        if self._selection_named_by_(key) is None:
-            raise UnselectedQueryVariable(self, key)
+        if self._selection_named_by_(key=key) is None:
+            raise UnselectedQueryVariable(query=self, key=key)
         return super().__getitem__(key)
 
-    def _selection_indexed_by_(self, step: MappedVariable) -> Selectable | None:
+    def _selection_indexed_by_(self, *, step: MappedVariable) -> Selectable | None:
         """
         Indexing a query over several variables by one of them names that variable, the
         same way indexing one of the query's results does.
@@ -1048,9 +1048,9 @@ class SetOf(Query):
         """
         if not isinstance(step, Index):
             return None
-        return self._selection_named_by_(step._key_)
+        return self._selection_named_by_(key=step._key_)
 
-    def _selection_named_by_(self, key: Any) -> Selectable | None:
+    def _selection_named_by_(self, *, key: Any) -> Selectable | None:
         """
         :param key: Something this query was indexed by.
         :return: The selected variable it names, or ``None`` if it names none of them.
@@ -1066,7 +1066,7 @@ class SetOf(Query):
             None,
         )
 
-    def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(self, *, child_result: OperationResult) -> OperationResult:
         """
         Update the result bindings with this operation's bindings.
         """
@@ -1079,13 +1079,13 @@ class SetOf(Query):
         return operation_result
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Entity(Query[T]):
     """
     A query over a single variable.
     """
 
-    def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(self, *, child_result: OperationResult) -> OperationResult:
         """
         Update the result bindings with this operation's bindings.
         """
@@ -1128,7 +1128,7 @@ class Entity(Query[T]):
         return var if isinstance(var, Aggregator) else None
 
     def aggregated_selections(
-        self, group_key_root_ids: set[uuid.UUID]
+        self, *, group_key_root_ids: set[uuid.UUID]
     ) -> list[SymbolicExpression]:
         """
         When the selection is an :class:`InstantiatedVariable`, its aggregated

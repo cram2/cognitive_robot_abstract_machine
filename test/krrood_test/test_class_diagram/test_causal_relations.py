@@ -12,7 +12,7 @@ from ..dataset.example_classes import KRROODPosition, SceneObject, SceneRoom
 
 @pytest.fixture
 def class_diagram() -> ClassDiagram:
-    return ClassDiagram([SceneRoom, SceneObject, KRROODPosition])
+    return ClassDiagram(classes=[SceneRoom, SceneObject, KRROODPosition])
 
 
 # %% attributes reached through fields
@@ -22,7 +22,7 @@ def test_an_attribute_is_named_as_its_symbolic_attribute(class_diagram):
     attribute = variable(SceneRoom, []).position.x
 
     assert (
-        AttributeEndpoint.along(class_diagram, attribute._access_path_).name
+        AttributeEndpoint.along(class_diagram=class_diagram, access_path=attribute._access_path_).name
         == attribute._name_
     )
 
@@ -30,7 +30,7 @@ def test_an_attribute_is_named_as_its_symbolic_attribute(class_diagram):
 def test_the_fields_to_an_attribute_start_at_the_class(class_diagram):
     attribute = variable(SceneRoom, []).position.x
 
-    assert AttributeEndpoint.along(class_diagram, attribute._access_path_).fields == (
+    assert AttributeEndpoint.along(class_diagram=class_diagram, access_path=attribute._access_path_).fields == (
         class_diagram.get_wrapped_class(SceneRoom).get_field("position"),
         class_diagram.get_wrapped_class(KRROODPosition).get_field("x"),
     )

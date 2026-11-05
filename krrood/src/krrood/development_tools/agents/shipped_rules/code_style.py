@@ -4,6 +4,7 @@ The rules on code style and naming.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 from enum import Enum
 
@@ -58,9 +59,10 @@ class CodeStyleRules(Section):
     KEYWORD_ONLY_METHOD_PARAMETERS = (
         "Every parameter of a method after `self` or `cls` is keyword-only: a `*` "
         "comes before them, as in `def move_to(self, *, target: Pose)`. Dunder "
-        "methods, property setters and deleters, and overrides of a method that a "
-        "standard library or third-party base class defines are exempt, since "
-        "Python or that library passes their arguments positionally",
+        "methods, property setters and deleters, and methods that a standard "
+        "library or third-party base class defines or dispatches to by name, such "
+        f"as the `visit_` methods of {CodeReference(ast.NodeVisitor).path}, are "
+        "exempt, since Python or that library passes their arguments positionally",
         (),
         PositionalParametersChecker(),
     )

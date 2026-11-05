@@ -17,6 +17,6 @@ def test_definite_query_operand_is_recognised():
     indefinite_operand = an(entity(variable(int, [1, 2, 3])))
     plain_operand = variable(int, [1, 2, 3])
 
-    assert Comparator._operand_contains_definite_query_(definite_operand)
-    assert not Comparator._operand_contains_definite_query_(indefinite_operand)
-    assert not Comparator._operand_contains_definite_query_(plain_operand)
+    assert Comparator._operand_contains_definite_query_(operand=definite_operand)
+    assert not Comparator._operand_contains_definite_query_(operand=indefinite_operand)
+    assert not Comparator._operand_contains_definite_query_(operand=plain_operand)

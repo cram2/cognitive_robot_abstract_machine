@@ -203,11 +203,11 @@ def test_the_quantifier(session, database):
 def test_equal(session, database):
     # Create the world with its bodies and connections
     world = World(
-        1,
-        [Body("Container1"), Body("Container2"), Body("Handle1"), Body("Handle2")],
+        id=1,
+        bodies=[Body(name="Container1"), Body(name="Container2"), Body(name="Handle1"), Body(name="Handle2")],
     )
-    c1_c2 = PrismaticConnection(world.bodies[0], world.bodies[1])
-    c2_h2 = FixedConnection(world.bodies[1], world.bodies[3])
+    c1_c2 = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
+    c2_h2 = FixedConnection(parent=world.bodies[1], child=world.bodies[3])
     world.connections = [c1_c2, c2_h2]
 
     dao = to_dao(world)
@@ -253,17 +253,17 @@ def test_complicated_equal(session, database):
     correctly and returns the same result as EQL evaluation.
     """
     world = World(
-        1,
-        [
-            Container("Container1"),
-            Container("Container2"),
-            Handle("Handle1"),
-            Handle("Handle2"),
+        id=1,
+        bodies=[
+            Container(name="Container1"),
+            Container(name="Container2"),
+            Handle(name="Handle1"),
+            Handle(name="Handle2"),
         ],
     )
-    c1_c2 = PrismaticConnection(world.bodies[0], world.bodies[1])
-    c2_h2 = FixedConnection(world.bodies[1], world.bodies[3])
-    c1_h2_fixed = FixedConnection(world.bodies[0], world.bodies[3])
+    c1_c2 = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
+    c2_h2 = FixedConnection(parent=world.bodies[1], child=world.bodies[3])
+    c1_h2_fixed = FixedConnection(parent=world.bodies[0], child=world.bodies[3])
     world.connections = [c1_c2, c2_h2, c1_h2_fixed]
 
     dao = to_dao(world)
@@ -791,9 +791,9 @@ def test_set_of_with_join(session):
 
 
 def test_set_of_multi_variable(session, database):
-    world = World(1, [Container("Container1"), Handle("Handle1")])
-    fc = FixedConnection(world.bodies[0], world.bodies[1])
-    pc = PrismaticConnection(world.bodies[0], world.bodies[1])
+    world = World(id=1, bodies=[Container(name="Container1"), Handle(name="Handle1")])
+    fc = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
+    pc = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
     world.connections = [fc, pc]
 
     dao = to_dao(world)
@@ -915,14 +915,14 @@ def test_set_of_same_table_twice(session):
     This uses two KRROODPose variables to test the same pattern.
     """
     world = World(
-        1,
-        [
-            Container("Container1"),
-            Container("Container2"),
+        id=1,
+        bodies=[
+            Container(name="Container1"),
+            Container(name="Container2"),
         ],
     )
-    fc1 = FixedConnection(world.bodies[0], world.bodies[1])
-    fc2 = FixedConnection(world.bodies[1], world.bodies[0])
+    fc1 = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
+    fc2 = FixedConnection(parent=world.bodies[1], child=world.bodies[0])
     world.connections = [fc1, fc2]
 
     fc_pick = variable(FixedConnection, domain=world.connections)
@@ -955,14 +955,14 @@ def test_plan_like_query(session):
     Uses MoveAction/GraspConfig to simulate PickUpAction/NavigateAction pattern.
     """
     world = World(
-        1,
-        [
-            Container("StartPos"),
-            Container("EndPos"),
+        id=1,
+        bodies=[
+            Container(name="StartPos"),
+            Container(name="EndPos"),
         ],
     )
-    fc1 = FixedConnection(world.bodies[0], world.bodies[1])
-    fc2 = FixedConnection(world.bodies[1], world.bodies[0])
+    fc1 = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
+    fc2 = FixedConnection(parent=world.bodies[1], child=world.bodies[0])
     world.connections = [fc1, fc2]
 
     move_pick = variable(type_=MoveAction, domain=[])
@@ -1009,13 +1009,13 @@ def test_set_of_multi_variable_evaluate(session, database):
     Verify that evaluate() for set_of with multiple variables returns dicts.
     """
     world = World(
-        1,
-        [
-            Container("Container1"),
-            Handle("Handle1"),
+        id=1,
+        bodies=[
+            Container(name="Container1"),
+            Handle(name="Handle1"),
         ],
     )
-    fc = FixedConnection(world.bodies[0], world.bodies[1])
+    fc = FixedConnection(parent=world.bodies[0], child=world.bodies[1])
     world.connections = [fc]
 
     dao = to_dao(world)

@@ -14,7 +14,7 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Date:
     """
     A calendar point used as a nested attribute in the period example.
@@ -24,7 +24,7 @@ class Date:
     year: int
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Period:
     """
     A span whose ``begin`` field verbalizes as *"beginning"* via a display-name
@@ -39,21 +39,21 @@ def test_display_name_overrides_attribute_name():
     """
     The registered display name replaces the raw field name in the surface word.
     """
-    assert RoleFragment.for_attribute(Period, "begin").text == "beginning"
+    assert RoleFragment.for_attribute(owner=Period, attribute_name="begin").text == "beginning"
 
 
 def test_absent_display_name_keeps_attribute_name():
     """
     A field with no display-name override keeps its attribute name.
     """
-    assert RoleFragment.for_attribute(Period, "end").text == "end"
+    assert RoleFragment.for_attribute(owner=Period, attribute_name="end").text == "end"
 
 
 def test_explicit_text_override_wins_over_display_name():
     """
     An explicit *text* argument takes precedence over any registered display name.
     """
-    assert RoleFragment.for_attribute(Period, "begin", text="start").text == "start"
+    assert RoleFragment.for_attribute(owner=Period, attribute_name="begin", text="start").text == "start"
 
 
 def test_display_name_renders_in_a_verbalized_query():

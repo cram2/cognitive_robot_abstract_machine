@@ -32,7 +32,7 @@ from krrood.entity_query_language.operators.set_operations import (
 from krrood.entity_query_language.utils import T
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class ArithmeticOperation(
     BinaryExpression, PerformsCartesianProduct, CanBehaveLikeAVariable[T]
 ):
@@ -67,16 +67,16 @@ class ArithmeticOperation(
     def _name_(self) -> str:
         return f"({self.left._name_} {self.math_operator.symbol} {self.right._name_})"
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
         Apply the operator to every combination of the operands' values.
         """
         yield from (
-            self._operation_result_(child_result)
-            for child_result in self._evaluate_product_(sources)
+            self._operation_result_(child_result=child_result)
+            for child_result in self._evaluate_product_(sources=sources)
         )
 
-    def _operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _operation_result_(self, *, child_result: OperationResult) -> OperationResult:
         """
         Compute the operation for one product result and bind its value.
 
@@ -84,16 +84,16 @@ class ArithmeticOperation(
         :return: The result with this operation's value bound under its own id.
         """
         operands = (
-            self.left._process_result_(child_result),
-            self.right._process_result_(child_result),
+            self.left._process_result_(result=child_result),
+            self.right._process_result_(result=child_result),
         )
         value = self.math_operator.function(*operands)
         return self._build_operation_result_(
-            child_result.bindings | {self._id_: value}, child_result
+            bindings=child_result.bindings | {self._id_: value}, child_result=child_result
         )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class UnaryArithmeticOperation(UnaryExpression, CanBehaveLikeAVariable[T]):
     """
     A symbolic unary arithmetic operation (for example negation, ``-amount``).
@@ -117,23 +117,23 @@ class UnaryArithmeticOperation(UnaryExpression, CanBehaveLikeAVariable[T]):
     def _name_(self) -> str:
         return f"({self.math_operator.symbol}{self._child_._name_})"
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
         Apply the operator to every value produced by the child expression.
         """
         yield from (
             self._build_operation_result_(
-                child_result.bindings
-                | {self._id_: self._operation_value_(child_result)},
-                child_result,
+                bindings=child_result.bindings
+                | {self._id_: self._operation_value_(child_result=child_result)},
+                child_result=child_result,
             )
-            for child_result in self._child_._evaluate_(sources)
+            for child_result in self._child_._evaluate_(sources=sources)
         )
 
-    def _operation_value_(self, child_result: OperationResult) -> Any:
+    def _operation_value_(self, *, child_result: OperationResult) -> Any:
         """
         :param child_result: The result carrying the child's value.
         :return: The operator applied to the child's value.
         """
-        value = self._child_._process_result_(child_result)
+        value = self._child_._process_result_(result=child_result)
         return self.math_operator.function(value)

@@ -58,7 +58,7 @@ class Worker:
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SameTypePair(Predicate):
     """
     Two operands of the same type, told apart by the referring service rather than
@@ -72,11 +72,11 @@ class SameTypePair(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["point_1"]), Verb("face"), Noun(fields["point_2"]))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["point_1"]), Verb(lemma="face"), Noun(content=fields["point_2"]))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SameTypeTriple(Predicate):
     """
     Three operands of the same type, disambiguated by determiner then ordinals.
@@ -90,21 +90,21 @@ class SameTypeTriple(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
             ConjunctivePhrase(
-                [
-                    Noun(fields["point_1"]),
-                    Noun(fields["point_2"]),
-                    Noun(fields["point_3"]),
+                items=[
+                    Noun(content=fields["point_1"]),
+                    Noun(content=fields["point_2"]),
+                    Noun(content=fields["point_3"]),
                 ]
             ),
             Copula(),
-            Adjective("collinear"),
+            Adjective(word="collinear"),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class MetadataNamed(Predicate):
     """
     An operand whose type is uninformative (``object``), named by a grammatical-metadata
@@ -119,11 +119,11 @@ class MetadataNamed(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["burning_thing"]), Copula(), Adjective("lit"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["burning_thing"]), Copula(), Adjective(word="lit"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class DistinctRoles(Predicate):
     """
     Two same-type operands with distinct role names, kept distinct — no determiner
@@ -137,16 +137,16 @@ class DistinctRoles(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["subordinate"]),
-            Verb("report"),
+            Noun(content=fields["subordinate"]),
+            Verb(lemma="report"),
             Prepositions.TO,
-            Noun(fields["supervisor"]),
+            Noun(content=fields["supervisor"]),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SingleRole(Predicate):
     """
     A single-operand predicate used both standalone and as a query subject.
@@ -158,11 +158,11 @@ class SingleRole(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["surface"]), Copula(), Adjective("warm"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["surface"]), Copula(), Adjective(word="warm"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class UntypedRole(Predicate):
     """
     A single-operand predicate whose field is typed ``object`` (uninformative) and
@@ -175,11 +175,11 @@ class UntypedRole(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["location"]), Copula(), Adjective("reachable"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["location"]), Copula(), Adjective(word="reachable"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RoleNamedReading(SymbolicFunction):
     """
     A value function whose operand is field-named inside a possessive noun phrase.
@@ -191,11 +191,13 @@ class RoleNamedReading(SymbolicFunction):
         return 0.0
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+    def _verbalization_fragment_(cls, *, fields):
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Shape(ABC):
     """
     A stand-in abstract operand type with a small, nameable family of concrete
@@ -206,7 +208,7 @@ class Shape(ABC):
     def area(self) -> float: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Circle(Shape):
     """
     One of two concrete alternatives naming a :class:`Shape`-typed operand.
@@ -216,7 +218,7 @@ class Circle(Shape):
         return 0.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Square(Shape):
     """
     The other of two concrete alternatives naming a :class:`Shape`-typed operand.
@@ -226,7 +228,7 @@ class Square(Shape):
         return 0.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Instrument(ABC):
     """
     A stand-in abstract operand type with a three-member family -- exercises the Oxford-
@@ -239,25 +241,25 @@ class Instrument(ABC):
     def play(self) -> None: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Drum(Instrument):
     def play(self) -> None:
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Flute(Instrument):
     def play(self) -> None:
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Harp(Instrument):
     def play(self) -> None:
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Polygon(ABC):
     """
     A stand-in abstract operand type whose concrete family is too large to spell out --
@@ -268,49 +270,49 @@ class Polygon(ABC):
     def sides(self) -> int: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Triangle(Polygon):
     def sides(self) -> int:
         return 3
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Quadrilateral(Polygon):
     def sides(self) -> int:
         return 4
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pentagon(Polygon):
     def sides(self) -> int:
         return 5
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Hexagon(Polygon):
     def sides(self) -> int:
         return 6
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Heptagon(Polygon):
     def sides(self) -> int:
         return 7
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Octagon(Polygon):
     def sides(self) -> int:
         return 8
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Nonagon(Polygon):
     def sides(self) -> int:
         return 9
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConcreteBase:
     """
     A stand-in *concrete* (non-abstract) operand type that nonetheless has subclasses --
@@ -319,7 +321,7 @@ class ConcreteBase:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConcreteBaseVariant(ConcreteBase):
     """
     A subclass of :class:`ConcreteBase`, present only to prove a concrete base with
@@ -327,7 +329,7 @@ class ConcreteBaseVariant(ConcreteBase):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sensor:
     """
     A stand-in operand type for the concrete counterpart alongside an abstract-typed
@@ -335,7 +337,7 @@ class Sensor:
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AbstractOperandRole(Predicate):
     """
     A single-operand predicate whose field is typed with an abstract base -- named by
@@ -348,11 +350,11 @@ class AbstractOperandRole(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["surface"]), Copula(), Adjective("warm"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["surface"]), Copula(), Adjective(word="warm"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class InstrumentRole(Predicate):
     """
     A single-operand predicate whose field is typed with a three-member abstract family
@@ -365,11 +367,11 @@ class InstrumentRole(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["surface"]), Copula(), Adjective("warm"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["surface"]), Copula(), Adjective(word="warm"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class VisibleFromSensor(Predicate):
     """
     Mirrors a real two-operand predicate whose one field is typed with an abstract base
@@ -384,17 +386,17 @@ class VisibleFromSensor(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["target"]),
+            Noun(content=fields["target"]),
             Copula(),
-            Adjective("visible"),
+            Adjective(word="visible"),
             Prepositions.FROM,
-            Noun(fields["sensor"]),
+            Noun(content=fields["sensor"]),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class LargeFamilyRole(Predicate):
     """
     A single-operand predicate whose field is typed with an abstract base whose concrete
@@ -407,11 +409,11 @@ class LargeFamilyRole(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["surface"]), Copula(), Adjective("warm"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["surface"]), Copula(), Adjective(word="warm"))
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ConcreteBaseRole(Predicate):
     """
     A single-operand predicate whose field is typed with a concrete (non-abstract) base.
@@ -423,8 +425,8 @@ class ConcreteBaseRole(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
-        return clause(Noun(fields["surface"]), Copula(), Adjective("warm"))
+    def _verbalization_fragment_(cls, *, fields):
+        return clause(Noun(content=fields["surface"]), Copula(), Adjective(word="warm"))
 
 
 # %% head-noun resolution (operand_head_noun)
@@ -439,20 +441,20 @@ def test_informative_type_wins_over_field_metadata():
     A concrete type always wins, even when the sole owning field declares metadata --
     metadata is a fallback for an uninformative type, not an override.
     """
-    parent = MetadataNamed(variable(Marker, []))
-    edges = [ParentEdge(parent, "burning_thing")]
+    parent = MetadataNamed(burning_thing=variable(Marker, []))
+    edges = [ParentEdge(parent=parent, field_name="burning_thing")]
     assert operand_head_noun(variable(Marker, []), edges) == "Marker"
 
 
 def test_uninformative_type_falls_through_to_field_metadata():
-    parent = MetadataNamed(variable(object, []))
-    edges = [ParentEdge(parent, "burning_thing")]
+    parent = MetadataNamed(burning_thing=variable(object, []))
+    edges = [ParentEdge(parent=parent, field_name="burning_thing")]
     assert operand_head_noun(variable(object, []), edges) == "torch"
 
 
 def test_uninformative_type_falls_through_to_field_name():
-    parent = UntypedRole(variable(object, []))
-    edges = [ParentEdge(parent, "location")]
+    parent = UntypedRole(location=variable(object, []))
+    edges = [ParentEdge(parent=parent, field_name="location")]
     assert operand_head_noun(variable(object, []), edges) == "location"
 
 
@@ -466,8 +468,8 @@ def test_reused_operand_ignores_field_context():
     it never reads a field name or metadata -- only its type (or "object" as the last
     resort) applies.
     """
-    parent = UntypedRole(variable(object, []))
-    edges = [ParentEdge(parent, "location"), ParentEdge(parent, "location")]
+    parent = UntypedRole(location=variable(object, []))
+    edges = [ParentEdge(parent=parent, field_name="location"), ParentEdge(parent=parent, field_name="location")]
     assert operand_head_noun(variable(object, []), edges) == "object"
 
 
@@ -476,35 +478,35 @@ def test_reused_operand_ignores_field_context():
 
 def test_same_type_pair_uses_the_indefinite_alternative_on_first_mention():
     assert verbalize_expression(
-        SameTypePair(variable(Marker, []), variable(Marker, []))
+        SameTypePair(point_1=variable(Marker, []), point_2=variable(Marker, []))
     ) == ("a Marker faces another Marker")
 
 
 def test_same_type_triple_uses_ordinals_with_a_plural_copula():
     assert verbalize_expression(
-        SameTypeTriple(variable(Marker, []), variable(Marker, []), variable(Marker, []))
+        SameTypeTriple(point_1=variable(Marker, []), point_2=variable(Marker, []), point_3=variable(Marker, []))
     ) == ("a Marker, a second Marker, and a third Marker are collinear")
 
 
 def test_distinct_role_names_are_kept_distinct():
     assert verbalize_expression(
-        DistinctRoles(variable(Worker, []), variable(Worker, []))
+        DistinctRoles(subordinate=variable(Worker, []), supervisor=variable(Worker, []))
     ) == ("a Worker reports to another Worker")
 
 
 def test_metadata_named_pair_shares_one_noun_and_is_disambiguated():
-    assert verbalize_expression(MetadataNamed(variable(object, []))) == "a torch is lit"
+    assert verbalize_expression(MetadataNamed(burning_thing=variable(object, []))) == "a torch is lit"
 
 
 # %% reused operand keeps ordinary referring rendering
 
 
 def test_single_operand_is_named_by_its_type_when_informative():
-    assert verbalize_expression(SingleRole(variable(Marker, []))) == "a Marker is warm"
+    assert verbalize_expression(SingleRole(surface=variable(Marker, []))) == "a Marker is warm"
 
 
 def test_single_operand_falls_back_to_field_name_when_untyped():
-    assert verbalize_expression(UntypedRole(variable(object, []))) == (
+    assert verbalize_expression(UntypedRole(location=variable(object, []))) == (
         "a location is reachable"
     )
 
@@ -513,26 +515,26 @@ def test_reused_operand_pronominalises_as_the_query_subject():
     """A variable that is also the query subject keeps its ordinary referring rendering and
     pronominalises -- it is not treated as an anonymous operand."""
     subject = variable(Marker, [])
-    assert verbalize_expression(an(entity(subject).where(SingleRole(subject)))) == (
+    assert verbalize_expression(an(entity(subject).where(SingleRole(surface=subject)))) == (
         "Find a Marker such that it is warm"
     )
 
 
 def test_reused_operand_agrees_with_a_plural_population():
     subject = variable(Marker, [])
-    assert verbalize_expression(for_all(subject, SingleRole(subject))) == (
+    assert verbalize_expression(for_all(subject, SingleRole(surface=subject))) == (
         "for all Markers, they are warm"
     )
 
 
 def test_function_operand_is_named_by_its_type_when_informative():
-    assert verbalize_expression(RoleNamedReading(variable(Marker, []))) == (
+    assert verbalize_expression(RoleNamedReading(sensor=variable(Marker, []))) == (
         "the role named reading of a Marker"
     )
 
 
 def test_function_operand_falls_back_to_field_name_when_untyped():
-    assert verbalize_expression(RoleNamedReading(variable(object, []))) == (
+    assert verbalize_expression(RoleNamedReading(sensor=variable(object, []))) == (
         "the role named reading of a sensor"
     )
 
@@ -598,13 +600,13 @@ def test_concrete_base_with_subclasses_is_named_directly_by_head_noun():
 
 
 def test_abstract_operand_reads_as_a_disjunctive_noun_phrase():
-    assert verbalize_expression(AbstractOperandRole(variable(Shape, []))) == (
+    assert verbalize_expression(AbstractOperandRole(surface=variable(Shape, []))) == (
         "a Circle or a Square is warm"
     )
 
 
 def test_three_member_family_reads_with_an_oxford_comma():
-    assert verbalize_expression(InstrumentRole(variable(Instrument, []))) == (
+    assert verbalize_expression(InstrumentRole(surface=variable(Instrument, []))) == (
         "a Drum, a Flute, or a Harp is warm"
     )
 
@@ -612,20 +614,20 @@ def test_three_member_family_reads_with_an_oxford_comma():
 def test_abstract_operand_alongside_a_concrete_one_reads_naturally():
     assert (
         verbalize_expression(
-            VisibleFromSensor(variable(Shape, []), variable(Sensor, []))
+            VisibleFromSensor(target=variable(Shape, []), sensor=variable(Sensor, []))
         )
         == "a Circle or a Square is visible from a Sensor"
     )
 
 
 def test_large_concrete_family_falls_back_to_naming_the_abstract_type():
-    assert verbalize_expression(LargeFamilyRole(variable(Polygon, []))) == (
+    assert verbalize_expression(LargeFamilyRole(surface=variable(Polygon, []))) == (
         "a Polygon is warm"
     )
 
 
 def test_concrete_base_with_subclasses_is_named_directly():
-    assert verbalize_expression(ConcreteBaseRole(variable(ConcreteBase, []))) == (
+    assert verbalize_expression(ConcreteBaseRole(surface=variable(ConcreteBase, []))) == (
         "a ConcreteBase is warm"
     )
 
@@ -638,7 +640,7 @@ def test_reused_abstract_operand_pronominalises_as_the_query_subject():
     """
     subject = variable(Shape, [])
     assert (
-        verbalize_expression(an(entity(subject).where(AbstractOperandRole(subject))))
+        verbalize_expression(an(entity(subject).where(AbstractOperandRole(surface=subject))))
         == "Find a Circle or a Square such that it is warm"
     )
 
@@ -652,7 +654,7 @@ def test_reused_abstract_operand_reads_as_a_definite_disjunction_on_repeat_menti
     """
     shape, sensor = variable(Shape, []), variable(Sensor, [])
     assert verbalize_expression(
-        and_(AbstractOperandRole(shape), VisibleFromSensor(shape, sensor))
+        and_(AbstractOperandRole(surface=shape), VisibleFromSensor(target=shape, sensor=sensor))
     ) == (
         "a Circle or a Square is warm, and the Circle or the Square is visible from a Sensor"
     )
@@ -669,7 +671,7 @@ def test_reused_abstract_operand_pronominalises_on_every_mention_within_its_scop
     assert verbalize_expression(
         an(
             entity(subject).where(
-                and_(AbstractOperandRole(subject), VisibleFromSensor(subject, sensor))
+                and_(AbstractOperandRole(surface=subject), VisibleFromSensor(target=subject, sensor=sensor))
             )
         )
     ) == (

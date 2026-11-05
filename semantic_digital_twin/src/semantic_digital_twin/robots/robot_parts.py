@@ -181,7 +181,7 @@ class HasRobotParts(ABC):
             seen.add(self.id)
             robot_parts.append(self)
 
-        for field_ in introspector.discover(self.__class__):
+        for field_ in introspector.discover(owner_cls=self.__class__):
             value = getattr(self, field_.public_name)
 
             if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
@@ -201,7 +201,7 @@ class HasRobotParts(ABC):
         """
         introspector = DataclassOnlyIntrospector()
 
-        for attr in introspector.discover(self.__class__):
+        for attr in introspector.discover(owner_cls=self.__class__):
             field_name = attr.public_name
             field_type = attr.field.type
 

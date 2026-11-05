@@ -4,9 +4,9 @@ from dataclasses import dataclass
 import krrood.symbol_graph.symbol_graph
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InMemoryClass(krrood.symbol_graph.symbol_graph.Symbol): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InMemoryChildClass(InMemoryClass): ...

@@ -93,7 +93,7 @@ class ComparatorRule(PhraseRule):
 
     construct = Comparator
 
-    def build(self, node: Comparator, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Comparator, context: RuleContext) -> VerbalizationFragment:
         """
         Say the comparator as a standalone predicate.
 
@@ -104,7 +104,7 @@ class ComparatorRule(PhraseRule):
         >>> verbalize_expression(variable(Robot, []).battery > 50)
         'the battery of a Robot is greater than 50'
         """
-        return ConditionAssembler(context).predicate(node)
+        return ConditionAssembler(context=context).predicate(comparator=node)
 
 
 class AndRule(PhraseRule):
@@ -124,7 +124,7 @@ class AndRule(PhraseRule):
 
     construct = AND
 
-    def build(self, node: AND, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: AND, context: RuleContext) -> VerbalizationFragment:
         """Say the flattened conjuncts, comma-joined with a trailing *"and"*.
 
         It owns the *, and* coordination between the two conjuncts of the example; the conjunct
@@ -139,8 +139,8 @@ class AndRule(PhraseRule):
         operands = flatten_operands(node, AND)
         shared_subject = fold_shared_subject_conjunction(operands)
         if shared_subject is not None:
-            return context.child(shared_subject)
-        parts = ConditionAssembler(context).as_statements(operands)
+            return context.child(node=shared_subject)
+        parts = ConditionAssembler(context=context).as_statements(conditions=operands)
         if len(parts) == 1:
             return parts[0]
         # Conjuncts are independent clauses, so a two-clause coordination keeps its comma.
@@ -162,7 +162,7 @@ class RangeFoldRule(PhraseRule):
 
     construct = RangeFold
 
-    def build(self, node: RangeFold, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: RangeFold, context: RuleContext) -> VerbalizationFragment:
         """Say the folded pair as *"<chain> is between low and high"*.
 
         It owns the *is between 10 and 90* span, emitting the *between … and …* frame over the fold's
@@ -173,9 +173,9 @@ class RangeFoldRule(PhraseRule):
         'the battery of a Robot is between 10 and 90'
         """
         return build_between(
-            context.child(node.chain_expression),
-            context.child(node.lower_expression),
-            context.child(node.upper_expression),
+            context.child(node=node.chain_expression),
+            context.child(node=node.lower_expression),
+            context.child(node=node.upper_expression),
             compact=False,
         )
 
@@ -197,7 +197,7 @@ class CoindexedFoldRule(PhraseRule):
 
     construct = CoindexedFold
 
-    def build(self, node: CoindexedFold, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: CoindexedFold, context: RuleContext) -> VerbalizationFragment:
         """Say the factored clause once — the natural *"have the same"* form over sibling prefixes.
 
         Detecting sibling prefixes selects the natural branch here (the faithful branch would instead
@@ -211,13 +211,13 @@ class CoindexedFoldRule(PhraseRule):
         'the bird_1 and bird_2 of a LoveBirds have the same name'
         """
         terminals = oxford_comma(
-            [self._attribute(pair) for pair in node.terminals],
+            [self._attribute(pair=pair) for pair in node.terminals],
             Conjunctions.AND.as_fragment(),
         )
         natural = coindexed_natural_parts(node)
         if natural is not None:
             hops = oxford_comma(
-                [self._attribute(natural.left_hop), self._attribute(natural.right_hop)],
+                [self._attribute(pair=natural.left_hop), self._attribute(pair=natural.right_hop)],
                 Conjunctions.AND.as_fragment(),
             )
             return PhraseFragment(
@@ -225,7 +225,7 @@ class CoindexedFoldRule(PhraseRule):
                     Articles.THE.as_fragment(),
                     hops,
                     Prepositions.OF.as_fragment(),
-                    context.child(natural.shared_prefix_expression),
+                    context.child(node=natural.shared_prefix_expression),
                     CoindexedPhrases.HAVE_THE_SAME.as_fragment(),
                     terminals,
                 ]
@@ -235,15 +235,15 @@ class CoindexedFoldRule(PhraseRule):
                 Articles.THE.as_fragment(),
                 terminals,
                 Prepositions.OF.as_fragment(),
-                context.child(node.left_prefix_expression),
+                context.child(node=node.left_prefix_expression),
                 coindexed_operator(node.operation),
                 CoindexedPhrases.THOSE_OF.as_fragment(),
-                context.child(node.right_prefix_expression),
+                context.child(node=node.right_prefix_expression),
             ]
         )
 
     @staticmethod
-    def _attribute(pair: tuple) -> RoleFragment:
+    def _attribute(*, pair: tuple) -> RoleFragment:
         """:return: The role-tagged attribute fragment for a ``(name, owner)`` hop.
 
         It supplies just one attribute noun such as *name*; :meth:`build` calls it per hop to build
@@ -256,7 +256,7 @@ class CoindexedFoldRule(PhraseRule):
         'name'
         """
         name, owner = pair
-        return RoleFragment.for_attribute(owner, name)
+        return RoleFragment.for_attribute(owner=owner, attribute_name=name)
 
 
 class SharedSubjectComparisonsRule(PhraseRule):
@@ -279,7 +279,7 @@ class SharedSubjectComparisonsRule(PhraseRule):
     construct = SharedSubjectComparisons
 
     def build(
-        self, node: SharedSubjectComparisons, context: RuleContext
+        self, *, node: SharedSubjectComparisons, context: RuleContext
     ) -> VerbalizationFragment:
         """
         Say the factored disjunction — subject and copula once, tails coordinated under
@@ -290,24 +290,24 @@ class SharedSubjectComparisonsRule(PhraseRule):
         tail (*greater than 50*), so the disjuncts read as one clause rather than
         repeating the subject per disjunct.
         """
-        tails = [self._tail(comparator, context) for comparator in node.comparators]
+        tails = [self._tail(comparator=comparator, context=context) for comparator in node.comparators]
         return PhraseFragment(
             parts=[
-                context.child(node.subject_expression),
+                context.child(node=node.subject_expression),
                 copula_with("", GrammaticalNumber.SINGULAR),
                 oxford_comma(tails, Conjunctions.OR.as_fragment()),
             ]
         )
 
     @staticmethod
-    def _tail(comparator: Comparator, context: RuleContext) -> VerbalizationFragment:
+    def _tail(*, comparator: Comparator, context: RuleContext) -> VerbalizationFragment:
         """:return: a comparator's copula-less operator-and-value tail (*"greater than 50"*) — the
         differing piece coordinated under the shared subject. A bare equality has an empty operator
         core (*"is 30"* → *"30"*), so only the value is kept."""
         operator = comparator_operator(
             comparator, context.services, compact=False, copula=False
         )
-        value = context.child(comparator.right, as_value=True)
+        value = context.child(node=comparator.right, as_value=True)
         if not flatten_fragment_to_plain_text(operator).strip():
             return value
         return PhraseFragment(parts=[operator, value])
@@ -330,7 +330,7 @@ class SharedSubjectConjunctionRule(PhraseRule):
     construct = SharedSubjectConjunction
 
     def build(
-        self, node: SharedSubjectConjunction, context: RuleContext
+        self, *, node: SharedSubjectConjunction, context: RuleContext
     ) -> VerbalizationFragment:
         """Say the factored conjunction — subject once, the lead copula carried by the first tail, the
         tails coordinated Oxford-style.
@@ -340,18 +340,18 @@ class SharedSubjectConjunctionRule(PhraseRule):
         'an Integer is greater than 5 and not 5'
         """
         tails = [
-            self._tail(tail, context, lead=index == 0)
+            self._tail(tail=tail, context=context, lead=index == 0)
             for index, tail in enumerate(node.tails)
         ]
         return PhraseFragment(
             parts=[
-                context.child(node.subject_expression),
+                context.child(node=node.subject_expression),
                 oxford_comma(tails, Conjunctions.AND.as_fragment()),
             ]
         )
 
     @classmethod
-    def _tail(cls, tail, context: RuleContext, *, lead: bool) -> VerbalizationFragment:
+    def _tail(cls, *, tail, context: RuleContext, lead: bool) -> VerbalizationFragment:
         """:return: one relative-clause tail. A folded :class:`RangeFold` reads *"between low and
         high"* (with the lead copula when it leads); a :class:`Comparator` reads its
         operator-and-value tail. The lead tail carries the clause's copula (*"is greater than 1"*); a
@@ -361,14 +361,14 @@ class SharedSubjectConjunctionRule(PhraseRule):
         (*"less than 10"*)."""
         if isinstance(tail, RangeFold):
             return between_phrase(
-                context.child(tail.lower_expression),
-                context.child(tail.upper_expression),
+                context.child(node=tail.lower_expression),
+                context.child(node=tail.upper_expression),
                 compact=not lead,
             )
-        value = context.child(tail.right, as_value=True)
+        value = context.child(node=tail.right, as_value=True)
         core = comparator_operator(tail, context.services, compact=False, copula=False)
         if not lead and tail.operation is operator.ne:
-            return cls._negated_tail(core, value)
+            return cls._negated_tail(core=core, value=value)
         keeps_copula = lead or not flatten_fragment_to_plain_text(core).strip()
         if keeps_copula:
             copular = comparator_operator(
@@ -379,7 +379,7 @@ class SharedSubjectConjunctionRule(PhraseRule):
 
     @staticmethod
     def _negated_tail(
-        core: VerbalizationFragment, value: VerbalizationFragment
+        *, core: VerbalizationFragment, value: VerbalizationFragment
     ) -> VerbalizationFragment:
         """:return: a non-lead ``!=`` tail as *"not <core> <value>"* — the negation word is kept while
         the shared lead copula is dropped, so *"is not 5"* reduces to *"not 5"* and the temporal
@@ -408,7 +408,7 @@ class OrRule(PhraseRule):
 
     construct = OR
 
-    def build(self, node: OR, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: OR, context: RuleContext) -> VerbalizationFragment:
         """
         Say the flattened disjuncts as *"a, b, or c"*, or the factored *"… is … or …"*
         when they share a subject.
@@ -421,8 +421,8 @@ class OrRule(PhraseRule):
         operands = flatten_operands(node, OR)
         shared_subject = fold_shared_subject_comparisons(operands)
         if shared_subject is not None:
-            return context.child(shared_subject)
-        parts = [context.child(conjunct) for conjunct in operands]
+            return context.child(node=shared_subject)
+        parts = [context.child(node=conjunct) for conjunct in operands]
         if len(parts) == 1:
             return parts[0]
         # "a, b, or c": the head items are comma-joined, then a trailing comma that the
@@ -448,14 +448,14 @@ class NotRule(PhraseRule):
 
     construct = Not
 
-    def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Not, context: RuleContext) -> VerbalizationFragment:
         """
         Wrap the child in *"not (<child>)"* via the orthography pass.
 
         It owns the *not (…)* wrapper of the class example — the leading *not* and the
         parentheses — around the disjunction child the recursion renders.
         """
-        return _negation_wrap(context.child(node._child_))
+        return _negation_wrap(context.child(node=node._child_))
 
 
 def _negation_wrap(child_fragment: VerbalizationFragment) -> VerbalizationFragment:
@@ -491,7 +491,7 @@ class NotVerbalizablePredicateRule(PhraseRule):
 
     construct = Not
 
-    def when(self, node: Not, context: RuleContext) -> bool:
+    def when(self, *, node: Not, context: RuleContext) -> bool:
         """
         Fires when the negation wraps a predicate that builds its own verbalization
         fragment.
@@ -502,9 +502,9 @@ class NotVerbalizablePredicateRule(PhraseRule):
         """
         return isinstance(
             node._child_, InstantiatedVariable
-        ) and InstantiatedPlanner.has_fragment(node._child_)
+        ) and InstantiatedPlanner.has_fragment(node=node._child_)
 
-    def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Not, context: RuleContext) -> VerbalizationFragment:
         """
         Say the predicate with its head verb / copula negated, or wrap it when it has
         neither.
@@ -513,7 +513,7 @@ class NotVerbalizablePredicateRule(PhraseRule):
         work in* / *is not reachable*; a clause with no such head has nothing to negate,
         so it falls back to the *not (…)* wrapper.
         """
-        clause = context.child(node._child_)
+        clause = context.child(node=node._child_)
         negated = negate_clause(clause)
         return negated if negated is not None else _negation_wrap(clause)
 
@@ -528,7 +528,7 @@ class NotComparatorRule(PhraseRule):
 
     construct = Not
 
-    def when(self, node: Not, context: RuleContext) -> bool:
+    def when(self, *, node: Not, context: RuleContext) -> bool:
         """
         Fires when the negation wraps a comparator.
 
@@ -541,7 +541,7 @@ class NotComparatorRule(PhraseRule):
         """
         return isinstance(node._child_, Comparator)
 
-    def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Not, context: RuleContext) -> VerbalizationFragment:
         """
         Say the inner comparator with the negation folded into the operator.
 
@@ -551,7 +551,7 @@ class NotComparatorRule(PhraseRule):
         >>> verbalize_expression(Not(variable(Robot, []).battery > 50))
         'the battery of a Robot is not greater than 50'
         """
-        return ConditionAssembler(context).predicate(node._child_, negated=True)
+        return ConditionAssembler(context=context).predicate(comparator=node._child_, negated=True)
 
 
 class NotBooleanAttributeRule(PhraseRule):
@@ -565,7 +565,7 @@ class NotBooleanAttributeRule(PhraseRule):
 
     construct = Not
 
-    def when(self, node: Not, context: RuleContext) -> bool:
+    def when(self, *, node: Not, context: RuleContext) -> bool:
         """
         Fires when the negation wraps a boolean-attribute chain.
 
@@ -578,7 +578,7 @@ class NotBooleanAttributeRule(PhraseRule):
         """
         return is_boolean_attribute_chain(node._child_)
 
-    def build(self, node: Not, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Not, context: RuleContext) -> VerbalizationFragment:
         """
         Say the negated predicative *"<nav> is not <attribute>"*.
 
@@ -588,8 +588,8 @@ class NotBooleanAttributeRule(PhraseRule):
         >>> verbalize_expression(Not(variable(Task, []).completed))
         'a Task is not completed'
         """
-        plan = context.microplan.plan_for(node._child_, ChainPlanner)
-        return ChainAssembler(context).boolean_predicative(plan, negated=True)
+        plan = context.microplan.plan_for(node=node._child_, planner=ChainPlanner)
+        return ChainAssembler(context=context).boolean_predicative(plan=plan, negated=True)
 
 
 class ForAllRule(PhraseRule):
@@ -602,7 +602,7 @@ class ForAllRule(PhraseRule):
 
     construct = ForAll
 
-    def build(self, node: ForAll, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: ForAll, context: RuleContext) -> VerbalizationFragment:
         """Say *"for all <plural var>, <condition>"*.
 
         It owns the *for all Robots,* prefix — rendering the variable as plural and joining it to the
@@ -616,9 +616,9 @@ class ForAllRule(PhraseRule):
         'for all Robots, their batteries are greater than 0'
         """
         variable_fragment = context.child(
-            node.variable, number=GrammaticalNumber.PLURAL
+            node=node.variable, number=GrammaticalNumber.PLURAL
         )
-        condition_fragment = context.child(node.condition)
+        condition_fragment = context.child(node=node.condition)
         return PhraseFragment(
             parts=[
                 Logicals.FOR_ALL.as_fragment(),
@@ -639,7 +639,7 @@ class ExistsRule(PhraseRule):
 
     construct = Exists
 
-    def build(self, node: Exists, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Exists, context: RuleContext) -> VerbalizationFragment:
         """Say *"there exists <variable> such that <condition>"*.
 
         It owns the *there exists a Robot such that* framing around the condition; the condition
@@ -651,8 +651,8 @@ class ExistsRule(PhraseRule):
         >>> verbalize_expression(exists(robot, robot.battery > 0))
         'there exists a Robot such that its battery is greater than 0'
         """
-        variable_fragment = context.child(node.variable)
-        condition_fragment = context.child(node.condition)
+        variable_fragment = context.child(node=node.variable)
+        condition_fragment = context.child(node=node.condition)
         return PhraseFragment(
             parts=[
                 Logicals.THERE_EXISTS.as_fragment(),
@@ -673,7 +673,7 @@ class FilterRule(PhraseRule):
 
     construct = Filter
 
-    def build(self, node: Filter, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Filter, context: RuleContext) -> VerbalizationFragment:
         """Delegate transparently to the wrapped condition.
 
         It adds no surface text of its own — unwrapping the Where/Having node so the *whose battery
@@ -683,7 +683,7 @@ class FilterRule(PhraseRule):
         >>> verbalize_expression(an(entity(robot).where(robot.battery > 50)))
         'Find a Robot whose battery is greater than 50'
         """
-        return context.child(node.condition)
+        return context.child(node=node.condition)
 
 
 def _causal_effect_clause(
@@ -709,9 +709,9 @@ def _causal_effect_clause(
         return _boolean_causal_effect_clause(condition, context)
     return PhraseFragment(
         parts=[
-            context.child(condition.left),
+            context.child(node=condition.left),
             Keywords.TO_BE.as_fragment(),
-            context.child(condition.right, as_value=True),
+            context.child(node=condition.right, as_value=True),
         ]
     )
 
@@ -736,13 +736,13 @@ def _boolean_causal_effect_clause(
     terminal = condition.left
     predicate = resolve_boolean_predicate(terminal)
     parts = [
-        context.child(terminal._child_, inline=True),
+        context.child(node=terminal._child_, inline=True),
         Prepositions.TO.as_fragment(),
     ]
     if not condition.right._value_:
         parts.append(Logicals.NOT.as_fragment())
     parts.append(predicate.bare_head())
-    predicate_object = predicate.predicate_object(terminal)
+    predicate_object = predicate.predicate_object(attribute=terminal)
     if predicate_object is not None:
         parts.append(predicate_object)
     return PhraseFragment(parts=parts)
@@ -764,7 +764,7 @@ class CausesEffectRule(PhraseRule):
 
     construct = CausesEffect
 
-    def build(self, node: CausesEffect, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: CausesEffect, context: RuleContext) -> VerbalizationFragment:
         """
         Prefix the effect condition with *"<cause attribute> causes"*, rendering each
         equality comparator through :func:`_causal_effect_clause` -- *"<attribute> to be
@@ -780,9 +780,9 @@ class CausesEffectRule(PhraseRule):
                 parts=[Keywords.WHAT_CAUSES.as_fragment(), effect_clause]
             )
         cause_nouns = [
-            Noun(context.child(attribute)) for attribute in node.cause_attributes
+            Noun(content=context.child(node=attribute)) for attribute in node.cause_attributes
         ]
         subject = (
-            cause_nouns[0] if len(cause_nouns) == 1 else ConjunctivePhrase(cause_nouns)
+            cause_nouns[0] if len(cause_nouns) == 1 else ConjunctivePhrase(items=cause_nouns)
         )
-        return clause(subject, Verb("cause"), effect_clause)
+        return clause(subject, Verb(lemma="cause"), effect_clause)

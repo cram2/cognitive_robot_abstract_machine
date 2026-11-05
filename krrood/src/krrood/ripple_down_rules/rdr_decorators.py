@@ -26,7 +26,7 @@ from krrood.ripple_down_rules.helpers import (
 )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class RDRDecorator:
     models_dir: str
     """
@@ -136,13 +136,13 @@ class RDRDecorator:
 
             if len(self.parsed_output_type) == 0:
                 self.parsed_output_type = self.parse_output_type(
-                    func, self.output_type, *args
+                    *args, func=func, output_type=self.output_type
                 )
                 if self.origin_type:
                     self.parsed_output_type.append(self.origin_type)
 
             if self.model_name is None:
-                self.initialize_rdr_model_name_and_load(func)
+                self.initialize_rdr_model_name_and_load(func=func)
 
             func_output = {self.output_name: func(*args, **kwargs)}
 
@@ -168,7 +168,7 @@ class RDRDecorator:
                     case_dict=case_dict,
                 )
                 output = self.rdr.fit_case(
-                    case_query,
+                    case_query=case_query,
                     expert=self.expert,
                     update_existing_rules=self.update_existing_rules,
                     ask_now=self.ask_now,
@@ -183,18 +183,18 @@ class RDRDecorator:
                     if self.generated_classifier is None:
                         model_path = os.path.join(self.models_dir, self.model_name)
                         self.generated_classifier = (
-                            self.rdr.get_rdr_classifier_from_python_file(model_path)
+                            self.rdr.get_rdr_classifier_from_python_file(package_name=model_path)
                         )
                     output = self.generated_classifier(case)
                 else:
-                    output = self.rdr.classify(case)
+                    output = self.rdr.classify(case=case)
                     if self.generate_dot_file:
                         eval_rule_tree = self.rdr.get_evaluated_rule_tree()
                         if not self._not_none_output_found or (
                             eval_rule_tree and len(eval_rule_tree) > 1
                         ):
                             self.rdr.render_evaluated_rule_tree(
-                                self.models_dir + f"/{self.model_name}",
+                                filename=self.models_dir + f"/{self.model_name}",
                                 show_full_tree=True,
                             )
                         if eval_rule_tree and len(eval_rule_tree) > 1:
@@ -211,13 +211,15 @@ class RDRDecorator:
 
         return wrapper
 
-    def initialize_rdr_model_name_and_load(self, func: Callable) -> None:
+    def initialize_rdr_model_name_and_load(self, *, func: Callable) -> None:
         self.model_name = get_func_rdr_model_name(func, include_file_name=True)
         self.load()
         if self.regenerate_model:
-            self.rdr.save(self.models_dir, self.model_name)
+            self.rdr.save(save_dir=self.models_dir, model_name=self.model_name)
 
-    def parse_output_type(self, func: Callable, output_type: Any, *args) -> list[type]:
+    def parse_output_type(
+        self, *args, func: Callable, output_type: Any
+    ) -> list[type]:
         parsed_output_type = []
         for ot in make_set(output_type):
             ot = get_arg_type_of_function_output(

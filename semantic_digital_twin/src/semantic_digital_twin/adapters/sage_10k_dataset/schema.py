@@ -111,7 +111,7 @@ class HasXYZ(Sage10kBase):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(x=data["x"], y=data["y"], z=data["z"])
 
 
@@ -183,7 +183,7 @@ class Sage10kSize(Sage10kBase):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(height=data["height"], length=data["length"], width=data["width"])
 
 
@@ -209,7 +209,7 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(
-        cls, data: dict[str, Any], **kwargs
+        cls, *, data: dict[str, Any], **kwargs
     ) -> Sage10kPhysicallyBasedRendering:
         return cls(metallic=data["metallic"], roughness=data["roughness"])
 
@@ -261,11 +261,11 @@ class Sage10kWall(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kWall:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Sage10kWall:
         return cls(
             id=data["id"],
-            start_point=Sage10kPosition._from_json(data["start_point"], **kwargs),
-            end_point=Sage10kPosition._from_json(data["end_point"], **kwargs),
+            start_point=Sage10kPosition._from_json(data=data["start_point"], **kwargs),
+            end_point=Sage10kPosition._from_json(data=data["end_point"], **kwargs),
             material=data["material"],
             height=data["height"],
             thickness=data["thickness"],
@@ -493,7 +493,7 @@ class Sage10kObject(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kObject:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Sage10kObject:
         place_guidance = data["place_guidance"]
         if isinstance(place_guidance, dict):
             import json
@@ -510,11 +510,11 @@ class Sage10kObject(Sage10kWithID):
             place_id=data["place_id"],
             place_guidance=place_guidance,
             mass=data["mass"],
-            position=Sage10kPosition._from_json(data["position"], **kwargs),
-            rotation=Sage10kRotation._from_json(data["rotation"], **kwargs),
-            dimensions=Sage10kSize._from_json(data["dimensions"], **kwargs),
+            position=Sage10kPosition._from_json(data=data["position"], **kwargs),
+            rotation=Sage10kRotation._from_json(data=data["rotation"], **kwargs),
+            dimensions=Sage10kSize._from_json(data=data["dimensions"], **kwargs),
             pbr_parameters=Sage10kPhysicallyBasedRendering._from_json(
-                data["pbr_parameters"], **kwargs
+                data=data["pbr_parameters"], **kwargs
             ),
         )
 
@@ -582,7 +582,7 @@ class Sage10kDoor(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kDoor:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Sage10kDoor:
         return cls(
             id=data["id"],
             wall_id=data["wall_id"],
@@ -915,16 +915,16 @@ class Sage10kRoom(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kRoom:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Sage10kRoom:
         return cls(
             id=data["id"],
             room_type=data["room_type"],
-            dimensions=Sage10kSize._from_json(data["dimensions"], **kwargs),
-            position=Sage10kPosition._from_json(data["position"], **kwargs),
+            dimensions=Sage10kSize._from_json(data=data["dimensions"], **kwargs),
+            position=Sage10kPosition._from_json(data=data["position"], **kwargs),
             floor_material=data["floor_material"],
-            objects=[Sage10kObject._from_json(d, **kwargs) for d in data["objects"]],
-            walls=[Sage10kWall._from_json(w, **kwargs) for w in data["walls"]],
-            doors=[Sage10kDoor._from_json(d, **kwargs) for d in data["doors"]],
+            objects=[Sage10kObject._from_json(data=d, **kwargs) for d in data["objects"]],
+            walls=[Sage10kWall._from_json(data=w, **kwargs) for w in data["walls"]],
+            doors=[Sage10kDoor._from_json(data=d, **kwargs) for d in data["doors"]],
         )
 
 
@@ -980,14 +980,14 @@ class Sage10kScene(Sage10kWithID):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Sage10kScene:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Sage10kScene:
         return cls(
             id=data["id"],
             building_style=data["building_style"],
             description=data["description"],
             created_from_text=data["created_from_text"],
             total_area=data["total_area"],
-            rooms=[Sage10kRoom._from_json(r, **kwargs) for r in data["rooms"]],
+            rooms=[Sage10kRoom._from_json(data=r, **kwargs) for r in data["rooms"]],
         )
 
     def create_world(self) -> World:

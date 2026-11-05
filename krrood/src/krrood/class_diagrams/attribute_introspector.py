@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from krrood.patterns.field_metadata import JSONMetadata
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DiscoveredAttribute:
     """
     Attribute discovered on a class.
@@ -38,7 +38,7 @@ class DiscoveredAttribute:
         return hash(self.field)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AttributeIntrospector(ABC):
     """
     Strategy that discovers class attributes for diagramming.
@@ -48,7 +48,7 @@ class AttributeIntrospector(ABC):
     """
 
     @abstractmethod
-    def discover(self, owner_cls: type) -> list[DiscoveredAttribute]:
+    def discover(self, *, owner_cls: type) -> list[DiscoveredAttribute]:
         """
         Return discovered attributes for `owner_cls`.
 
@@ -58,23 +58,23 @@ class AttributeIntrospector(ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataclassOnlyIntrospector(AttributeIntrospector):
     """
     Discover only public dataclass fields (no leading underscore).
     """
 
-    def discover(self, owner_cls: type) -> list[DiscoveredAttribute]:
+    def discover(self, *, owner_cls: type) -> list[DiscoveredAttribute]:
         if is_dataclass(owner_cls):
             return [
                 DiscoveredAttribute(public_name=f.name, field=f)
                 for f in dc_fields(owner_cls)
-                if not self.skip_field(f)
+                if not self.skip_field(field_=f)
             ]
         else:
             return []
 
-    def skip_field(self, field_: Field) -> bool:
+    def skip_field(self, *, field_: Field) -> bool:
         json_metadata = field_.metadata.get(JSONMetadata)
         if json_metadata is not None:
             return not json_metadata.serialize

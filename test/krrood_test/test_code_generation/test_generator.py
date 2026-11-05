@@ -29,7 +29,7 @@ class TestCodeGenerator:
 
             gen = CodeGenerator(template_directory=tmpdir)
             output = gen.render(
-                "test.py.jinja", docstring="Test module", var_name="x", value=42
+                template_name="test.py.jinja", docstring="Test module", var_name="x", value=42
             )
             assert '"""Test module"""' in output
             assert "x = 42" in output
@@ -42,7 +42,7 @@ class TestCodeGenerator:
                 f.write("")
 
             gen = CodeGenerator(template_directory=tmpdir)
-            output = gen.render("empty.py.jinja")
+            output = gen.render(template_name="empty.py.jinja")
             assert output.strip() == ""
 
     def test_template_not_found(self):
@@ -52,4 +52,4 @@ class TestCodeGenerator:
         with tempfile.TemporaryDirectory() as tmpdir:
             gen = CodeGenerator(template_directory=tmpdir)
             with pytest.raises(jinja2.TemplateNotFound):
-                gen.render("nonexistent.py.jinja")
+                gen.render(template_name="nonexistent.py.jinja")

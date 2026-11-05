@@ -32,7 +32,7 @@ from krrood.entity_query_language.testing.result_verification import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VerbalizationResultGenerator:
     """
     Renders the Python source of a ``results`` snapshot module for a
@@ -63,7 +63,7 @@ class VerbalizationResultGenerator:
         return tuple(
             cls
             for cls in self.snapshot.discovered_callables()
-            if self.snapshot.has_fragment(cls)
+            if self.snapshot.has_fragment(cls=cls)
         )
 
     def covered_results(self) -> tuple[VerbalizationResult, ...]:
@@ -74,12 +74,12 @@ class VerbalizationResultGenerator:
             from the snapshot's own rendering.
         """
         return tuple(
-            VerbalizationResult(cls, self.snapshot.rendered_result(cls))
+            VerbalizationResult(callable_class=cls, sentence=self.snapshot.rendered_result(cls=cls))
             for cls in self.covered_callables()
         )
 
     @staticmethod
-    def _entry(result: VerbalizationResult) -> dict[str, Any]:
+    def _entry(*, result: VerbalizationResult) -> dict[str, Any]:
         return {
             "class_name": result.callable_class.__qualname__,
             "sentence": value_to_source(result.sentence),
@@ -95,12 +95,12 @@ class VerbalizationResultGenerator:
                 *(result.callable_class for result in results),
             ]
         )
-        entries = [self._entry(result) for result in results]
+        entries = [self._entry(result=result) for result in results]
         return self.code_generator.render(
-            "verbalization_results.py.jinja", imports=imports, entries=entries
+            template_name="verbalization_results.py.jinja", imports=imports, entries=entries
         )
 
-    def write(self, path: str | Path) -> None:
+    def write(self, *, path: str | Path) -> None:
         """
         Render :meth:`generate` to *path* and format it with Ruff.
 
@@ -133,5 +133,5 @@ def regenerate_verbalization_results(
         "w", dir=destination.parent, suffix=".py.tmp", delete=False
     ) as temporary_file:
         temporary_path = Path(temporary_file.name)
-    generator.write(temporary_path)
+    generator.write(path=temporary_path)
     temporary_path.replace(destination)

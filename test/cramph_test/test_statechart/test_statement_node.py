@@ -182,7 +182,7 @@ def test_a_statement_yields_no_more_candidates_than_the_default_limit() -> None:
 
 
 def test_the_limit_of_a_statement_outranks_the_default_limit() -> None:
-    statement = _statement_of_names(["first", "second"]).limit(2)
+    statement = _statement_of_names(["first", "second"]).limit(n=2)
     node = StatementNode(statement=statement)
 
     node.next_candidate(

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing_extensions import Any, Protocol
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CanBehaveLikeDataclassException(Protocol):
     """
     A structural template that indicates the matching class is an exception or can be treated as one.
@@ -26,7 +26,7 @@ class CanBehaveLikeDataclassException(Protocol):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
     """
     A base exception class for dataclass-based exceptions.
@@ -60,14 +60,14 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
         return Exception.__str__(self)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputError(DataclassException, ABC):
     """
     Raised when there is an error with user input.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
     """
     Raised when the number of generic parameters does not match the number of resolved types.
@@ -100,7 +100,7 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundGenericParameter(DataclassException):
     """
     Raised when a generic type parameter is read back from a class that binds it to no
@@ -127,7 +127,7 @@ class UnboundGenericParameter(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
     """
     Raised when the current module is not given and/or not found for relative import conversion.
@@ -152,7 +152,7 @@ class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSourceDataToParseImportsFrom(InputError):
     """
     Raised when there is no source data given to parse imports from.
@@ -182,7 +182,7 @@ class NoSourceDataToParseImportsFrom(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoModuleSourceProvided(InputError):
     """
     Raised when there is no source module data given to parse imports from.
@@ -207,7 +207,7 @@ class NoModuleSourceProvided(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDefaultValueFound(DataclassException):
     """
     Raised when no default value for a given field in a dataclass is found.
@@ -229,7 +229,7 @@ class NoDefaultValueFound(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PackageNameNotFoundError(DataclassException):
     """
     Raised when a package name is not found in a given path.
@@ -251,7 +251,7 @@ class PackageNameNotFoundError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PathMissingRequiredPartsError(DataclassException):
     """
     Raised when a path does not contain all required parts.
@@ -274,7 +274,7 @@ class PathMissingRequiredPartsError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubprocessExecutionError(DataclassException):
     """
     Raised when a subprocess execution fails.
@@ -307,7 +307,7 @@ class SubprocessExecutionError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SourceDataNotProvided(InputError):
     """
     Raised when no source data is provided.

@@ -80,7 +80,7 @@ class SurfacePosition(Enum):
     """Not attachable to the subject noun — said as its own clause (*"such that …"* / *"where …"*)."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Placement:
     """The request a :class:`ConditionForm` reads: one condition to say relative to a subject."""
 
@@ -100,7 +100,7 @@ class Placement:
     keeps the full *"whose … is …"* clause."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Placed:
     """A rendered condition together with the position it occupies, for the caller to position."""
 
@@ -144,7 +144,7 @@ class ConditionForm(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """
         :param request: The condition and the subject it may attach to.
         :return: ``True`` when this form renders *request*.
@@ -156,7 +156,7 @@ class ConditionForm(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """
         :param request: The condition and its subject.
         :param context: The per-node context (recursion and services).
@@ -180,7 +180,7 @@ class StandaloneForm(ConditionForm):
     position = SurfacePosition.STANDALONE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """A self-referential comparator folds onto no subject noun, so it falls here.
 
         Returning ``True`` unconditionally, it is the catch-all gate that claims the comparator no
@@ -190,14 +190,14 @@ class StandaloneForm(ConditionForm):
         return True
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render the residual condition as its own clause via the normal recursion.
 
         Deferring to the recursion is what supplies the whole *its salary is greater than its
         starting_salary* clause; this form contributes only the decision to render it standalone (its
         :attr:`position` is :attr:`SurfacePosition.STANDALONE`), so the caller frames it with *such that*.
         """
-        return context.child(request.item)
+        return context.child(node=request.item)
 
 
 class SuperlativeForm(StandaloneForm):
@@ -217,7 +217,7 @@ class SuperlativeForm(StandaloneForm):
     position = SurfacePosition.SELECTION_MODIFIER
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on ``subject.<chain> == max/min(over the same-type population)``.
 
         Recognising the equality-against-an-aggregate shape is the gate that selects this form over
@@ -227,14 +227,14 @@ class SuperlativeForm(StandaloneForm):
         return superlative_aggregation(request.item, request.subject) is not None
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render the post-nominal superlative modifier *"with the maximum/minimum <leaf>"*.
 
         It owns the entire *with the maximum amount* span of the class example, reading the aggregator
         to choose *minimum* or *maximum* and naming the leaf attribute.
         """
-        return ConditionAssembler(context).superlative_modifier(
-            request.item, request.subject
+        return ConditionAssembler(context=context).superlative_modifier(
+            comparator=request.item, subject=request.subject
         )
 
 
@@ -251,7 +251,7 @@ class WhoseRangeForm(StandaloneForm):
     position = SurfacePosition.WHOSE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires when a lower/upper bound pair on a single-hop subject attribute has folded.
 
         Detecting the folded :class:`RangeFold` is the gate that selects this form over two separate
@@ -265,14 +265,14 @@ class WhoseRangeForm(StandaloneForm):
         )
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render the *"<attribute> is between low and high"* whose-modifier.
 
         It owns the *salary is between 100 and 200* span — naming the attribute and emitting the
         *between … and …* frame over the two bounds — which the *whose* envelope then wraps.
         """
-        return ConditionAssembler(context).range_modifier(
-            request.item, request.subject, request.number
+        return ConditionAssembler(context=context).range_modifier(
+            range_fold=request.item, subject=request.subject, number=request.number
         )
 
 
@@ -288,7 +288,7 @@ class WhosePredicateForm(StandaloneForm):
     position = SurfacePosition.WHOSE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a single-hop, non-boolean subject attribute compared to a subject-free value.
 
         Passing this guard is what selects the *whose* form for ``robot.battery > 50``, so the
@@ -309,15 +309,15 @@ class WhosePredicateForm(StandaloneForm):
         return not references(item.right, subject)
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render the bare *"<attribute> <operator> <value>"* the *"whose"* envelope wraps.
 
         It owns the *battery is greater than 50* span of the class example — the attribute noun,
         operator, and value with the subject dropped — leaving only the *whose* header for the
         envelope to add.
         """
-        return ConditionAssembler(context).attribute_modifier(
-            request.item, request.subject, request.number
+        return ConditionAssembler(context=context).attribute_modifier(
+            comparator=request.item, subject=request.subject, number=request.number
         )
 
 
@@ -335,7 +335,7 @@ class AbsenceForm(StandaloneForm):
     position = SurfacePosition.STANDALONE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a non-negated ``<chain> == None`` comparison.
 
         Recognising the ``== None`` shape is the gate that selects this form over
@@ -350,7 +350,7 @@ class AbsenceForm(StandaloneForm):
         )
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render the standalone absence predicate *"<owner> has no <attribute>"*.
 
         It owns the *the Mission has no priority* span, flipping owner and attribute into the *has
@@ -379,22 +379,22 @@ class WithAttributeForm(WhosePredicateForm):
     position = SurfacePosition.SELECTION_MODIFIER
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a compact placement of a single-hop order comparison — the refinement over
         :class:`WhosePredicateForm` that routes it to the compact *"with …"* modifier.
         """
         return (
             request.compact
-            and super().applies(request)
+            and super().applies(request=request)
             and isinstance(request.item, Comparator)
             and request.item.operation in _ORDER_OPERATORS
         )
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render the compact *"with <attribute> <comparison>"* modifier."""
-        return ConditionAssembler(context).with_attribute_modifier(
-            request.item, request.subject
+        return ConditionAssembler(context=context).with_attribute_modifier(
+            comparator=request.item, subject=request.subject
         )
 
 
@@ -414,12 +414,12 @@ class RelationalBindingForm(StandaloneForm):
     position = SurfacePosition.RELATIVE_CLAUSE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a :class:`RelationalBindingFold` — the artifact grouping produces."""
         return isinstance(request.item, RelationalBindingFold)
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
         """Render *"that is <participle> <preposition> <entity-with-restrictions>"*."""
         fold = request.item
         nested = as_subject_restrictions(
@@ -458,14 +458,14 @@ def place(request: Placement, context: RuleContext) -> Placed:
     >>> verbalize_expression(an(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
     """
-    form = ConditionForm.most_applicable(request)
+    form = ConditionForm.most_applicable(request=request)
     return Placed(position=form.position, fragment=form.render(request, context))
 
 
 # %% placing a whole subject restriction
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RestrictionFragments:
     """The placed pieces of a subject's WHERE, for the caller to position — each goes to a different
     sentence position, so they are kept apart rather than pre-joined."""

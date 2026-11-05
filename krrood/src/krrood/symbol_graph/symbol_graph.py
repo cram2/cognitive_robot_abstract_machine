@@ -54,7 +54,7 @@ class GraphType(StrEnum):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Symbol:
     """Base class for things that can be cached in the symbol graph."""
 
@@ -75,14 +75,14 @@ class Symbol:
         """
         instance = super().__new__(cls)
         if cls._cache_instances_:
-            SymbolGraph().add_node(WrappedInstance(instance))
+            SymbolGraph().add_node(wrapped_instance=WrappedInstance(instance=instance))
         return instance
 
 
 TSymbol = TypeVar("TSymbol", bound=Symbol)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
     """
     Edge data representing a predicate-based relation between two wrapped instances.
@@ -108,8 +108,8 @@ class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
     """
 
     def __post_init__(self):
-        self.source = SymbolGraph().ensure_wrapped_instance(self.source)
-        self.target = SymbolGraph().ensure_wrapped_instance(self.target)
+        self.source = SymbolGraph().ensure_wrapped_instance(instance=self.source)
+        self.target = SymbolGraph().ensure_wrapped_instance(instance=self.target)
 
     def add_to_graph(self) -> bool:
         """
@@ -117,7 +117,7 @@ class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
 
         :return: True if the relation was newly added, False if it already existed.
         """
-        return SymbolGraph().add_relation(self)
+        return SymbolGraph().add_relation(relation=self)
 
     def __str__(self):
         """Return the predicate type name for labeling the edge."""
@@ -136,7 +136,7 @@ class PredicateClassRelation(Generic[TSymbol], SubClassSafeGeneric):
         return hash(self) == hash(other)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedInstance(Generic[TSymbol], SubClassSafeGeneric):
     """
     A node wrapper around a concrete Symbol instance used in the instance graph.
@@ -206,7 +206,7 @@ class WrappedInstance(Generic[TSymbol], SubClassSafeGeneric):
         return id(self.instance)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SymbolGraph(metaclass=SingletonMeta):
     """
     A singleton combination of a class and instance diagram.
@@ -284,13 +284,13 @@ class SymbolGraph(metaclass=SingletonMeta):
     def _build_class_diagram(self) -> ClassDiagram:
         """Build a class diagram from the currently known ``Symbol`` subclasses."""
         classes = self._collect_symbol_classes()
-        return ClassDiagram(classes, introspector=DescriptorAwareIntrospector())
+        return ClassDiagram(classes=classes, introspector=DescriptorAwareIntrospector())
 
     @property
     def class_diagram(self) -> ClassDiagram:
         return self._class_diagram
 
-    def add_node(self, wrapped_instance: WrappedInstance):
+    def add_node(self, *, wrapped_instance: WrappedInstance):
         """
         Add a wrapped instance to the cache.
 
@@ -303,7 +303,7 @@ class SymbolGraph(metaclass=SingletonMeta):
             wrapped_instance.index
         ] = wrapped_instance
 
-    def remove_node(self, wrapped_instance: WrappedInstance) -> None:
+    def remove_node(self, *, wrapped_instance: WrappedInstance) -> None:
         """
         Remove a wrapped instance from the cache.
 
@@ -318,9 +318,9 @@ class SymbolGraph(metaclass=SingletonMeta):
     def remove_dead_instances(self):
         for node in self._instance_graph.nodes():
             if node.instance is None:
-                self.remove_node(node)
+                self.remove_node(wrapped_instance=node)
 
-    def get_instances_of_type(self, type_: type) -> Iterable:
+    def get_instances_of_type(self, *, type_: type) -> Iterable:
         """
         Get all wrapped instances of the given type and all its subclasses.
 
@@ -333,12 +333,12 @@ class SymbolGraph(metaclass=SingletonMeta):
             for instance in list(self._class_to_wrapped_instances[cls].values())
         )
 
-    def get_wrapped_instance(self, instance: Any) -> WrappedInstance | None:
+    def get_wrapped_instance(self, *, instance: Any) -> WrappedInstance | None:
         if isinstance(instance, WrappedInstance):
             return instance
         return self._instance_index.get(id(instance), None)
 
-    def ensure_wrapped_instance(self, instance: Any) -> WrappedInstance:
+    def ensure_wrapped_instance(self, *, instance: Any) -> WrappedInstance:
         """
         Ensures that the given instance is wrapped into a `WrappedInstance`. If the
         instance is not already wrapped, creates a new `WrappedInstance` object and
@@ -347,10 +347,10 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param instance: The object to be checked and wrapped if necessary.:
         :return: WrappedInstance: The wrapped object.
         """
-        wrapped_instance = self.get_wrapped_instance(instance)
+        wrapped_instance = self.get_wrapped_instance(instance=instance)
         if wrapped_instance is None:
-            wrapped_instance = WrappedInstance(instance)
-            self.add_node(wrapped_instance)
+            wrapped_instance = WrappedInstance(instance=instance)
+            self.add_node(wrapped_instance=wrapped_instance)
         return wrapped_instance
 
     @classmethod
@@ -360,17 +360,17 @@ class SymbolGraph(metaclass=SingletonMeta):
         cls.clear_instance()
 
     # Adapters to align with ORM alternative mapping expectations
-    def add_instance(self, wrapped_instance: WrappedInstance) -> None:
+    def add_instance(self, *, wrapped_instance: WrappedInstance) -> None:
         """Add a wrapped instance to the graph.
 
         This is an adapter that delegates to add_node to keep API compatibility with
         SymbolGraphMapping.create_from_dao.
         """
-        self.add_node(wrapped_instance)
+        self.add_node(wrapped_instance=wrapped_instance)
 
-    def add_relation(self, relation: PredicateClassRelation) -> bool:
+    def add_relation(self, *, relation: PredicateClassRelation) -> bool:
         """Add a relation edge to the instance graph."""
-        if self.relation_exists(relation):
+        if self.relation_exists(relation=relation):
             return False
         self._instance_graph.add_edge(
             relation.source.index, relation.target.index, relation
@@ -382,7 +382,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         )
         return True
 
-    def relation_exists(self, relation: PredicateClassRelation) -> bool:
+    def relation_exists(self, *, relation: PredicateClassRelation) -> bool:
         return (
             relation.source.index,
             relation.target.index,
@@ -411,7 +411,7 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def get_incoming_relations_with_type(
         self,
-        wrapped_instance: WrappedInstance,
+        *, wrapped_instance: WrappedInstance,
         relation_type: type[PredicateClassRelation[TSymbol]],
     ) -> Iterator[PredicateClassRelation[TSymbol]]:
         """
@@ -421,12 +421,12 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param relation_type: The type of the relation to filter for.
         """
         yield from self.get_incoming_relations_with_condition(
-            wrapped_instance, lambda edge: isinstance(edge, relation_type)
+            wrapped_instance=wrapped_instance, edge_condition=lambda edge: isinstance(edge, relation_type)
         )
 
     def get_incoming_relations_with_condition(
         self,
-        wrapped_instance: WrappedInstance,
+        *, wrapped_instance: WrappedInstance,
         edge_condition: Callable[[PredicateClassRelation], bool],
     ) -> Iterator[PredicateClassRelation]:
         """
@@ -435,18 +435,18 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param wrapped_instance: The wrapped instance to get the relations from.
         :param edge_condition: The condition to filter for.
         """
-        yield from filter(edge_condition, self.get_incoming_relations(wrapped_instance))
+        yield from filter(edge_condition, self.get_incoming_relations(wrapped_instance=wrapped_instance))
 
     def get_incoming_relations(
         self,
-        wrapped_instance: WrappedInstance,
+        *, wrapped_instance: WrappedInstance,
     ) -> Iterator[PredicateClassRelation]:
         """
         Get all relations incoming to the given wrapped instance.
 
         :param wrapped_instance: The wrapped instance to get the relations from.
         """
-        wrapped_instance = self.get_wrapped_instance(wrapped_instance)
+        wrapped_instance = self.get_wrapped_instance(instance=wrapped_instance)
         if not wrapped_instance:
             return
         if wrapped_instance.index is None:
@@ -457,7 +457,7 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def get_outgoing_relations_with_type(
         self,
-        wrapped_instance: WrappedInstance,
+        *, wrapped_instance: WrappedInstance,
         relation_type: type[PredicateClassRelation],
     ) -> Iterable[PredicateClassRelation]:
         """
@@ -467,12 +467,12 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param relation_type: The type of the relation to filter for.
         """
         yield from self.get_outgoing_relations_with_condition(
-            wrapped_instance, lambda edge: isinstance(edge, relation_type)
+            wrapped_instance=wrapped_instance, edge_condition=lambda edge: isinstance(edge, relation_type)
         )
 
     def get_outgoing_relations_with_condition(
         self,
-        wrapped_instance: WrappedInstance,
+        *, wrapped_instance: WrappedInstance,
         edge_condition: Callable[[PredicateClassRelation], bool],
     ) -> Iterable[PredicateClassRelation]:
         """
@@ -481,18 +481,18 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param wrapped_instance: The wrapped instance to get the relations from.
         :param edge_condition: The condition to filter for.
         """
-        yield from filter(edge_condition, self.get_outgoing_relations(wrapped_instance))
+        yield from filter(edge_condition, self.get_outgoing_relations(wrapped_instance=wrapped_instance))
 
     def get_outgoing_relations(
         self,
-        wrapped_instance: WrappedInstance,
+        *, wrapped_instance: WrappedInstance,
     ) -> Iterable[PredicateClassRelation]:
         """
         Get all relations outgoing from the given wrapped instance.
 
         :param wrapped_instance: The wrapped instance to get the relations from.
         """
-        wrapped_instance = self.get_wrapped_instance(wrapped_instance)
+        wrapped_instance = self.get_wrapped_instance(instance=wrapped_instance)
         if not wrapped_instance:
             return
         yield from (
@@ -502,7 +502,7 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def to_dot(
         self,
-        filepath: str,
+        *, filepath: str,
         format_="svg",
         graph_type: GraphType = GraphType.INSTANCE,
         without_inherited_associations: bool = True,
@@ -518,7 +518,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         if graph_type == GraphType.CLASS:
             if without_inherited_associations:
                 graph = self.class_diagram.to_subdiagram_without_inherited_associations(
-                    True
+                    include_field_name=True
                 )._dependency_graph
             else:
                 graph = self.class_diagram._dependency_graph

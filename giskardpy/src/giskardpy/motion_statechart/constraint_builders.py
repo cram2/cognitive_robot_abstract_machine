@@ -123,7 +123,7 @@ class GeometricConstraintBuilder:
         angle = sm.safe_acos(frame_V_current.dot(frame_V_goal))
         # avoid singularity by staying away from pi
         angle_limited = sm.min(sm.max(angle, -reference_velocity), reference_velocity)
-        angle_limited = angle_limited.safe_division(angle)
+        angle_limited = angle_limited.safe_division(other=angle)
         root_V_goal_normal_intermediate = frame_V_current.slerp(
             frame_V_goal, angle_limited
         )

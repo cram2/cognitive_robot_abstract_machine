@@ -5,6 +5,7 @@ next to the definitions the keyword-only rules accept or exempt.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import logging
 from dataclasses import dataclass
@@ -151,3 +152,14 @@ class LibraryHandler(logging.Handler):
         A method no base class defines, taking a parameter positionally.
         """
         return value
+
+
+class NodeNames(ast.NodeVisitor):
+    """
+    A class whose visiting method the standard library base class dispatches to by name.
+    """
+
+    def visit_Name(self, node: ast.Name) -> None:
+        """
+        A method the base class calls with a positional argument.
+        """

@@ -43,7 +43,7 @@ def test_enum_domain():
             TestEnum, [TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C]
         ),
     )
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
 
     assert len(variables) == 2
@@ -58,7 +58,7 @@ def test_invalid_ellipsis():
         ),
     )
     with pytest.raises(InvalidEllipsis):
-        parameters = UnderspecifiedParameters(prob_q)
+        parameters = UnderspecifiedParameters(statement=prob_q)
 
 
 def test_assignments_for_conditioning():
@@ -66,7 +66,7 @@ def test_assignments_for_conditioning():
     Test that assignments_for_conditioning returns only literal facts.
     """
     prob_q = a(KRROODPosition)(x=1.0, y=..., z=variable(float, domain=[2.0, 3.0]))
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     assignments = parameters.conditioning_assignments_from_literal_values
 
     variables = parameters.variables
@@ -83,7 +83,7 @@ def test_union_types_easy():
     prob_q.where(
         prob_q.x < 5.0,
     )
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
     assert variables["KRROODPosition.x"].domain == reals()
 
@@ -92,7 +92,7 @@ def test_union_types():
     prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[10, 20]))
     prob_q.where(prob_q.x < 5.0)
 
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
     assert variables["KRROODPosition.x"].domain == reals()
 
@@ -108,7 +108,7 @@ def test_domain_object_with_exchangeable_parts_but_no_aggregation_mixin_is_skipp
     prob_q = an(ActionWithMissingAggregationsMixin)(
         domain_object=variable(Cabinet, [cabinet])
     )
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     assert not any("drawers" in name for name in parameters.variables)
 
 
@@ -130,12 +130,12 @@ def test_iterable_of_primitives_produces_indexed_variables():
     compatible_types)``.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class FloatMeasurements:
         readings: list[Any]
 
     prob_q = a(FloatMeasurements)(readings=[1.0, 2.0, 3.0])
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
 
     assert "FloatMeasurements.readings[0]" in parameters.variables
     assert "FloatMeasurements.readings[1]" in parameters.variables
@@ -156,7 +156,7 @@ def test_list_of_enum_field_produces_indexed_variables():
     ``_extract_variables_from_iterable_literal``.
     """
     prob_q = a(ListOfEnum)(list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B])
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
 
     assert "ListOfEnum.list_of_enum[0]" in parameters.variables
     assert "ListOfEnum.list_of_enum[1]" in parameters.variables
@@ -169,19 +169,19 @@ def test_variable_of_nested_attribute_is_the_variable_its_literal_conditions():
     x = 1.0
     y = 2.0
     pose = a(KRROODPose)(position=a(KRROODPosition)(x=x, y=y, z=...))
-    parameters = UnderspecifiedParameters(pose)
+    parameters = UnderspecifiedParameters(statement=pose)
     conditions = parameters.conditioning_assignments_from_literal_values
 
-    assert conditions[parameters.variable_of(pose.position.x)] == x
-    assert conditions[parameters.variable_of(pose.position.y)] == y
+    assert conditions[parameters.variable_of(attribute=pose.position.x)] == x
+    assert conditions[parameters.variable_of(attribute=pose.position.y)] == y
 
 
 def test_variable_of_attribute_missing_from_the_pattern_raises():
     position = a(KRROODPosition)(x=1.0, y=...)
-    parameters = UnderspecifiedParameters(position)
+    parameters = UnderspecifiedParameters(statement=position)
 
     with pytest.raises(AttributeNotParameterized):
-        parameters.variable_of(position.z)
+        parameters.variable_of(attribute=position.z)
 
 
 # %% translating between model samples and bindings
@@ -189,27 +189,27 @@ def test_variable_of_attribute_missing_from_the_pattern_raises():
 
 def test_model_sample_from_bindings_inverts_bindings_from_model_samples():
     query = an(EnumAction)(obj=Body(name="body"), enum=...)
-    parameters = UnderspecifiedParameters(query)
+    parameters = UnderspecifiedParameters(statement=query)
     model = parameters.resolve_conditioned_and_truncated_model(
-        FullyFactorizedRegistry().get_model(parameters)
+        model=FullyFactorizedRegistry().get_model(parameters=parameters)
     )
     samples = model.sample(1)
-    [bindings] = parameters.bindings_from_model_samples(model.variables, samples)
+    [bindings] = parameters.bindings_from_model_samples(variables=model.variables, samples=samples)
     assert (
-        parameters.model_sample_from_bindings(model.variables, bindings).tolist()
+        parameters.model_sample_from_bindings(variables=model.variables, bindings=bindings).tolist()
         == samples.tolist()
     )
 
 
 def test_model_sample_from_bindings_rejects_an_unbound_model_variable():
     query = an(EnumAction)(obj=Body(name="body"), enum=...)
-    parameters = UnderspecifiedParameters(query)
-    model = FullyFactorizedRegistry().get_model(parameters)
+    parameters = UnderspecifiedParameters(statement=query)
+    model = FullyFactorizedRegistry().get_model(parameters=parameters)
     with pytest.raises(ModelVariableNotBound):
-        parameters.model_sample_from_bindings(model.variables, {})
+        parameters.model_sample_from_bindings(variables=model.variables, bindings={})
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseOverPositions:
     """
     A pose pattern whose position is a variable ranging over positions.
@@ -236,13 +236,13 @@ def pose_over_two_positions() -> PoseOverPositions:
     """
     :return: A pose pattern whose position ranges over two positions.
     """
-    positions = [KRROODPosition(1.0, 2.0, 3.0), KRROODPosition(4.0, 5.0, 6.0)]
+    positions = [KRROODPosition(x=1.0, y=2.0, z=3.0), KRROODPosition(x=4.0, y=5.0, z=6.0)]
     position = variable(KRROODPosition, positions)
     return PoseOverPositions(
         positions=positions,
         position=position,
         query=a(KRROODPose)(
-            position=position, orientation=KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+            position=position, orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0)
         ),
     )
 
@@ -252,12 +252,12 @@ def test_model_sample_from_bindings_derives_the_features_of_a_bound_domain_objec
 ):
     positions = pose_over_two_positions.positions
     position = pose_over_two_positions.position
-    parameters = UnderspecifiedParameters(pose_over_two_positions.query)
+    parameters = UnderspecifiedParameters(statement=pose_over_two_positions.query)
     model = parameters.resolve_conditioned_and_truncated_model(
-        FullyFactorizedRegistry().get_model(parameters)
+        model=FullyFactorizedRegistry().get_model(parameters=parameters)
     )
     bindings = {position._id_: positions[1]}
-    samples = parameters.model_sample_from_bindings(model.variables, bindings)
+    samples = parameters.model_sample_from_bindings(variables=model.variables, bindings=bindings)
     [sample] = samples
     sample_values = {
         model_variable.name: value
@@ -268,7 +268,7 @@ def test_model_sample_from_bindings_derives_the_features_of_a_bound_domain_objec
         sample_values["KRROODPose.position.y"],
         sample_values["KRROODPose.position.z"],
     ] == [positions[1].x, positions[1].y, positions[1].z]
-    assert list(parameters.bindings_from_model_samples(model.variables, samples)) == [
+    assert list(parameters.bindings_from_model_samples(variables=model.variables, samples=samples)) == [
         bindings
     ]
 
@@ -280,12 +280,12 @@ def test_model_sample_from_bindings_refuses_an_object_outside_the_domain(
     pose_over_two_positions,
 ):
     position = pose_over_two_positions.position
-    parameters = UnderspecifiedParameters(pose_over_two_positions.query)
+    parameters = UnderspecifiedParameters(statement=pose_over_two_positions.query)
     identifier = parameters.variables["KRROODPose.position"]
-    outside_position = KRROODPosition(7.0, 8.0, 9.0)
+    outside_position = KRROODPosition(x=7.0, y=8.0, z=9.0)
     with pytest.raises(ValueOutsideVariableDomain) as error:
         parameters.model_sample_from_bindings(
-            [identifier], {position._id_: outside_position}
+            variables=[identifier], bindings={position._id_: outside_position}
         )
     assert error.value.variable == identifier
     assert error.value.value is outside_position
@@ -295,12 +295,12 @@ def test_model_sample_from_bindings_refuses_a_feature_of_an_object_outside_the_d
     pose_over_two_positions,
 ):
     position = pose_over_two_positions.position
-    parameters = UnderspecifiedParameters(pose_over_two_positions.query)
+    parameters = UnderspecifiedParameters(statement=pose_over_two_positions.query)
     feature = parameters.variables["KRROODPose.position.x"]
-    outside_position = KRROODPosition(7.0, 8.0, 9.0)
+    outside_position = KRROODPosition(x=7.0, y=8.0, z=9.0)
     with pytest.raises(ValueOutsideVariableDomain) as error:
         parameters.model_sample_from_bindings(
-            [feature], {position._id_: outside_position}
+            variables=[feature], bindings={position._id_: outside_position}
         )
     assert error.value.variable == feature
     assert error.value.value is outside_position
@@ -308,14 +308,14 @@ def test_model_sample_from_bindings_refuses_a_feature_of_an_object_outside_the_d
 
 def test_model_sample_from_bindings_refuses_a_value_that_is_no_element_of_a_symbolic_variable():
     query = an(EnumAction)(obj=Body(name="body"), enum=...)
-    parameters = UnderspecifiedParameters(query)
+    parameters = UnderspecifiedParameters(statement=query)
     enum = parameters.variables["EnumAction.enum"]
     with pytest.raises(ValueOutsideVariableDomain) as error:
         parameters.model_sample_from_bindings(
-            [enum],
-            {
+            variables=[enum],
+            bindings={
                 query._find_assigned_variable_(
-                    "EnumAction.enum"
+                    access_path_name="EnumAction.enum"
                 )._id_: TestEnum.OPTION_A.value
             },
         )

@@ -57,7 +57,7 @@ class ClauseElement(ABC):
         """:return: the fragment this element contributes to the clause."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Noun(ClauseElement):
     """
     A noun constituent — a predicate
@@ -95,25 +95,25 @@ class Noun(ClauseElement):
         return self.content.as_fragment()
 
     @classmethod
-    def the(cls, head: str) -> Noun:
+    def the(cls, *, head: str) -> Noun:
         """:return: a definite literal noun (*"the name"*).
 
         >>> Noun.the("name").as_fragment().definiteness
         <Definiteness.DEFINITE: 'definite'>
         """
-        return cls(head, definiteness=Definiteness.DEFINITE)
+        return cls(content=head, definiteness=Definiteness.DEFINITE)
 
     @classmethod
-    def bare(cls, head: str) -> Noun:
+    def bare(cls, *, head: str) -> Noun:
         """:return: a bare literal noun with no article (*"of type"*, not *"of a type"*).
 
         >>> Noun.bare("type").as_fragment().definiteness
         <Definiteness.BARE: 'bare'>
         """
-        return cls(head, definiteness=Definiteness.BARE)
+        return cls(content=head, definiteness=Definiteness.BARE)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Verb(ClauseElement):
     """
     A lexical verb given as its lemma.
@@ -142,7 +142,7 @@ class Verb(ClauseElement):
         return RoleFragment(text=self.lemma, role=SemanticRole.VERB, number=self.number)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Adjective(ClauseElement):
     """
     A predicative adjective complement after a copula (*"is **reachable**"*).
@@ -162,7 +162,7 @@ class Adjective(ClauseElement):
         return WordFragment(text=self.word)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Copula(ClauseElement):
     """
     The copula *"is"* of a predicative clause — realised for number (*"is"* / *"are"*)
@@ -184,7 +184,7 @@ class Copula(ClauseElement):
         return Copulas.IS.as_fragment()
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class OneOf(ClauseElement):
     """
     A bounded membership set — *"one of A, B, or C"* — over a collection of admissible
@@ -224,7 +224,7 @@ class OneOf(ClauseElement):
         )
         listed = one_of(
             [
-                RoleFragment.for_value(member)
+                RoleFragment.for_value(value=member)
                 for member in members[: MAX_SET_MEMBERS + 1]
             ]
         )
@@ -242,7 +242,7 @@ class OneOf(ClauseElement):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class DisjunctivePhrase(ClauseElement):
     """
     A disjunctive coordination of admissible values — *"A, B, or C"* — over a
@@ -278,11 +278,11 @@ class DisjunctivePhrase(ClauseElement):
             else self.members
         )
         if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
-            return Noun(self.members).as_fragment()
-        return disjunctive_phrase([RoleFragment.for_value(member) for member in value])
+            return Noun(content=self.members).as_fragment()
+        return disjunctive_phrase([RoleFragment.for_value(value=member) for member in value])
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ConjunctivePhrase(ClauseElement):
     """
     A conjunctive coordination of clause constituents — *"A, B, and C"* — the
@@ -376,7 +376,7 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     coordinated = isinstance(leading, ConjunctivePhrase)
     if coordinated:
         items = list(leading.items)
-        constituents = (ConjunctivePhrase(items), *constituents[1:])
+        constituents = (ConjunctivePhrase(items=items), *constituents[1:])
     parts = [constituent.as_fragment() for constituent in constituents]
     if coordinated and len(items) >= 2 and len(parts) > 1:
         parts[1] = apply_subject_verb_agreement(parts[1], GrammaticalNumber.PLURAL)
@@ -420,7 +420,7 @@ class FunctionVerbalizationTemplates:
 
     @staticmethod
     def possessive(
-        function_class: type, *operands: ClauseConstituent
+        *operands: ClauseConstituent, function_class: type
     ) -> VerbalizationFragment:
         """
         Build *"the <noun> of <operands>"* — the operands read as a possessive genitive
@@ -440,26 +440,26 @@ class FunctionVerbalizationTemplates:
         ...     realize_tree,
         ... )
         >>> flatten_fragment_to_plain_text(realize_tree(
-        ...     FunctionVerbalizationTemplates.possessive(type("GetQuarter", (), {}))
+        ...     FunctionVerbalizationTemplates.possessive(function_class=type("GetQuarter", (), {}))
         ... ))
         'quarter'
         >>> flatten_fragment_to_plain_text(realize_tree(
         ...     FunctionVerbalizationTemplates.possessive(
-        ...         type("RemainingLoad", (), {}), Noun.the("capacity")
+        ...         Noun.the("capacity"), function_class=type("RemainingLoad", (), {})
         ...     )
         ... ))
         'the remaining load of the capacity'
         """
         noun = function_as_noun(function_class.__name__)
         if not operands:
-            return Noun.bare(noun).as_fragment()
+            return Noun.bare(head=noun).as_fragment()
         return possessive_path(
-            [PathStep(noun)], ConjunctivePhrase(operands).as_fragment()
+            [PathStep(name=noun)], ConjunctivePhrase(items=operands).as_fragment()
         )
 
     @staticmethod
     def custom_relation(
-        function_class: type, relation: ClauseConstituent, *operands: ClauseConstituent
+        *operands: ClauseConstituent, function_class: type, relation: ClauseConstituent
     ) -> VerbalizationFragment:
         """
         Build *"the <noun> <relation> <operands...>"* — the general value noun
@@ -483,19 +483,19 @@ class FunctionVerbalizationTemplates:
         ... )
         >>> flatten_fragment_to_plain_text(realize_tree(
         ...     FunctionVerbalizationTemplates.custom_relation(
-        ...         type("InheritancePathLength", (), {}),
-        ...         Prepositions.BETWEEN,
         ...         Noun.the("begin"),
         ...         Noun.the("end"),
+        ...         function_class=type("InheritancePathLength", (), {}),
+        ...         relation=Prepositions.BETWEEN,
         ...     )
         ... ))
         'the inheritance path length between the begin and the end'
         """
         return PhraseFragment(
             parts=[
-                Noun.the(function_as_noun(function_class.__name__)).as_fragment(),
+                Noun.the(head=function_as_noun(function_class.__name__)).as_fragment(),
                 relation.as_fragment(),
-                ConjunctivePhrase(operands).as_fragment(),
+                ConjunctivePhrase(items=operands).as_fragment(),
             ]
         )
 
@@ -556,17 +556,17 @@ def predicate_clause(
     is_copular = morphology.verb_lemma(head) == Copula.lemma
     if is_copular and objects and (not rest or rest[-1] not in Prepositions.texts()):
         operands = ConjunctivePhrase(
-            [Noun(subject), *(Noun(obj) for obj in objects)]
+            items=[Noun(content=subject), *(Noun(content=obj) for obj in objects)]
         ).as_fragment()
         return clause(
-            Noun(PhraseFragment(parts=complement)),
-            Verb("hold"),
+            Noun(content=PhraseFragment(parts=complement)),
+            Verb(lemma="hold"),
             WordFragment(text="given"),
             operands,
         )
     predicate = (
         [Copula(), *complement]
         if is_copular
-        else [Verb(morphology.verb_lemma(head)), *complement]
+        else [Verb(lemma=morphology.verb_lemma(head)), *complement]
     )
-    return clause(Noun(subject), *predicate, *(Noun(obj) for obj in objects))
+    return clause(Noun(content=subject), *predicate, *(Noun(content=obj) for obj in objects))

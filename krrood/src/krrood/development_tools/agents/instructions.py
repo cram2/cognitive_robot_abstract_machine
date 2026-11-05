@@ -89,8 +89,8 @@ class AgentsInstructions:
         The content ``AGENTS.md`` must have: the rules of :attr:`sections`, under their
         headings, in the order they are declared.
         """
-        return CodeGenerator(str(TemplateFile.AGENTS.parent)).render(
-            TemplateFile.AGENTS.name,
+        return CodeGenerator(template_directory=str(TemplateFile.AGENTS.parent)).render(
+            template_name=TemplateFile.AGENTS.name,
             sections=self.sections,
             check_command=Subcommand.CHECK.invocation,
         )

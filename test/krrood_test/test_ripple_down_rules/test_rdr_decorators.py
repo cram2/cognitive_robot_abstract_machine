@@ -6,9 +6,9 @@ class RDRDecoratorsTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.robot = Robot("Robot1", parts=[Part("Part1"), Part("Part2")])
-        cls.physical_object = PhysicalObject("Object1", [cls.robot])
-        cls.part_3 = Part("Part3")
+        cls.robot = Robot(name="Robot1", parts=[Part(name="Part1"), Part(name="Part2")])
+        cls.physical_object = PhysicalObject(name="Object1", _contained_objects=[cls.robot])
+        cls.part_3 = Part(name="Part3")
 
     def test_is_a_robot(self):
         self.physical_object._is_a_robot_rdr.fit = False
@@ -18,7 +18,7 @@ class RDRDecoratorsTestCase(unittest.TestCase):
     def test_select_objects_that_are_parts_of_robots(self):
         self.physical_object._select_parts_rdr.fit = False
         selected_parts = self.physical_object.select_objects_that_are_parts_of_robot(
-            [self.part_3, self.robot, *self.robot.parts], self.robot
+            objects=[self.part_3, self.robot, *self.robot.parts], robot=self.robot
         )
         for part in selected_parts:
             self.assertIn(part, self.robot.parts)

@@ -17,7 +17,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 from krrood.patterns.role import Role
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsSameSemanticEntity(Predicate):
     """
     Predicate asserting that two operands refer to the same underlying entity.
@@ -44,23 +44,23 @@ class IsSameSemanticEntity(Predicate):
     """
 
     def __call__(self) -> bool:
-        return self._root_of(self.first_entity) is self._root_of(self.second_entity)
+        return self._root_of(value=self.first_entity) is self._root_of(value=self.second_entity)
 
     @staticmethod
-    def _root_of(value: Any) -> Any:
+    def _root_of(*, value: Any) -> Any:
         """
         :return: ``value``'s root persistent entity when it is a role, otherwise ``value``.
         """
         return value.root_persistent_entity if isinstance(value, Role) else value
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
         """:return: the clause *"<first_entity> is the same semantic entity as
         <second_entity>"*."""
         return clause(
-            Noun(fields["first_entity"]),
+            Noun(content=fields["first_entity"]),
             Copula(),
-            Noun.the("same semantic entity"),
+            Noun.the(head="same semantic entity"),
             Prepositions.AS,
-            Noun(fields["second_entity"]),
+            Noun(content=fields["second_entity"]),
         )

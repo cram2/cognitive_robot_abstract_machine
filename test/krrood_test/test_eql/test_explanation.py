@@ -38,12 +38,12 @@ from ..dataset.semantic_world_like_classes import (
 )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Person(Symbol):
     name: str
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Item(Symbol):
     value: int
 
@@ -266,9 +266,9 @@ def test_variable_stack_tracking():
 
     v = variable_from([1, 2, 3])
 
-    assert monitored.is_monitored(v)
-    assert isinstance(monitored.get_stack(v), CallStack)
-    filenames = [f.filename for f in monitored.get_stack(v)]
+    assert monitored.is_monitored(target=v)
+    assert isinstance(monitored.get_stack(instance=v), CallStack)
+    filenames = [f.filename for f in monitored.get_stack(instance=v)]
     assert any("test_explanation.py" in f for f in filenames)
 
 
@@ -782,7 +782,7 @@ def test_query_graph_marks_a_shared_bare_condition_satisfied_from_its_own_query(
     result = true_results[0]
 
     query_graph = QueryGraph(
-        query, satisfied_condition_ids=result.satisfied_condition_ids
+        query=query, satisfied_condition_ids=result.satisfied_condition_ids
     )
     flag_node = query_graph.expression_node_map[flag]
     assert flag_node.is_satisfied, (
@@ -822,7 +822,7 @@ def test_query_graph_marks_a_node_reused_at_two_positions_satisfied_regardless_o
     )
 
     query_graph = QueryGraph(
-        query, satisfied_condition_ids=result.satisfied_condition_ids
+        query=query, satisfied_condition_ids=result.satisfied_condition_ids
     )
     flag_node = query_graph.expression_node_map[flag]
     assert flag_node.is_satisfied, (
@@ -847,12 +847,12 @@ def test_query_graph_satisfaction_colors():
     assert explanation is not None
 
     qg = QueryGraph(
-        explanation.query_root,
+        query=explanation.query_root,
         satisfied_condition_ids=explanation.satisfied_condition_ids,
     )
 
     original_colors = {
-        id(node.data): ColorLegend.from_expression(node.data).color
+        id(node.data): ColorLegend.from_expression(expression=node.data).color
         for node in qg.expression_node_map.values()
     }
 
@@ -889,7 +889,7 @@ def test_query_graph_faded_subtree_propagation():
     explanation = explain_inference(results[0])
 
     qg = QueryGraph(
-        explanation.query_root,
+        query=explanation.query_root,
         satisfied_condition_ids=explanation.satisfied_condition_ids,
     )
 
@@ -926,12 +926,12 @@ def test_query_graph_satisfaction_colors_all_satisfied():
     assert explanation is not None
 
     qg = QueryGraph(
-        explanation.query_root,
+        query=explanation.query_root,
         satisfied_condition_ids=explanation.satisfied_condition_ids,
     )
 
     original_colors = {
-        id(node.data): ColorLegend.from_expression(node.data).color
+        id(node.data): ColorLegend.from_expression(expression=node.data).color
         for node in qg.expression_node_map.values()
     }
 
@@ -1028,7 +1028,7 @@ def test_explanation_lifecycle_tied_to_instance():
         prismatic_connection = variable(PrismaticConnection, world.connections)
         fixed_connection = a(FixedConnection)(
             parent=prismatic_connection.child, child=handle
-        ).from_(world.connections)
+        ).from_(domain=world.connections)
         drawers = inference(Drawer)(
             container=fixed_connection.parent,
             handle=fixed_connection.child,
@@ -1066,7 +1066,7 @@ def drawer_rule(doors_and_drawers_world):
     prismatic_connection = variable(PrismaticConnection, world.connections)
     fixed_connection = a(FixedConnection)(
         parent=prismatic_connection.child, child=handle
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     return inference(Drawer)(
         container=fixed_connection.parent,
         handle=fixed_connection.child,

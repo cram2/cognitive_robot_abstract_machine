@@ -137,7 +137,7 @@ class ClientFollowingTheStates(InputSynchronizer):
             return
         for choice in self.child_choice_client.answer(feedback):
             self.server_chooser.receive(
-                ChildChoiceMessage.from_json(json.loads(json.dumps(choice.to_json())))
+                ChildChoiceMessage.from_json(data=json.loads(json.dumps(choice.to_json())))
             )
 
 

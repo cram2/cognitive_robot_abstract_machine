@@ -9,7 +9,7 @@ from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.utils import classes_of_module
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OrmaticInterfaceInformation:
     """
     Classes, alternative mappings, type mappings, and externally-mapped classes read
@@ -72,7 +72,7 @@ def get_classes_of_ormatic_interface(
         dao_class = mapper.class_
         if issubclass(dao_class, DataAccessObject):
             ORMatic.register_externally_mapped_class(
-                dao_class, information.externally_mapped_classes
+                dao_class=dao_class, externally_mapped_classes=information.externally_mapped_classes
             )
 
     # every interface shares one Base, so its type_mappings already include everything upstream

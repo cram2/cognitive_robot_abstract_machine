@@ -20,7 +20,7 @@ from krrood.symbolic_math.symbolic_math import (
 hidden_index_name = "__FLOAT_VARIABLE_INDEX__"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoundArgument:
     """
     One argument of a compiled function that reads a managed value array.
@@ -36,16 +36,16 @@ class BoundArgument:
     Index of the argument holding the values.
     """
 
-    def point_at(self, data: npt.NDArray) -> None:
+    def point_at(self, *, data: npt.NDArray) -> None:
         """
         Make the argument read `data` from now on.
 
         :param data: The array holding the values.
         """
-        self.function.bind_args_to_memory_view(self.argument_index, data)
+        self.function.bind_args_to_memory_view(arg_idx=self.argument_index, numpy_array=data)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FloatVariableData:
     """
     Stores float variables and their values in a single flat numpy array.
@@ -75,7 +75,7 @@ class FloatVariableData:
     """
 
     def bind_argument(
-        self, compiled_function: CompiledFunction, argument_index: int
+        self, *, compiled_function: CompiledFunction, argument_index: int
     ) -> None:
         """
         Let one argument of a compiled function read the managed values.
@@ -89,9 +89,9 @@ class FloatVariableData:
             function=compiled_function, argument_index=argument_index
         )
         self._bound_arguments.append(bound_argument)
-        bound_argument.point_at(self.data)
+        bound_argument.point_at(data=self.data)
 
-    def register_expression(self, expression: SymbolicMathType):
+    def register_expression(self, *, expression: SymbolicMathType):
         """
         Add an expression to the data.
 
@@ -106,7 +106,7 @@ class FloatVariableData:
             raise NoFreeVariablesError()
 
         if hasattr(expression, hidden_index_name):
-            raise SymbolicMathExpressionAlreadyRegisteredError(expression)
+            raise SymbolicMathExpressionAlreadyRegisteredError(expression=expression)
 
         for variable in free_variables:
             if variable.resolve is not None:
@@ -119,7 +119,7 @@ class FloatVariableData:
         self.variables.extend(free_variables)
         self.data = np.concatenate((self.data, np.zeros(len(free_variables))))
         for bound_argument in self._bound_arguments:
-            bound_argument.point_at(self.data)
+            bound_argument.point_at(data=self.data)
 
         # define resolvers for the variables to make `.evaluate()` work
         for i, variable in enumerate(free_variables):
@@ -131,7 +131,7 @@ class FloatVariableData:
             variable.resolve = resolve_variable
 
     def set_value(
-        self, expression: SymbolicMathType, value: float | list[float] | npt.NDArray
+        self, *, expression: SymbolicMathType, value: float | list[float] | npt.NDArray
     ):
         """
         Set the managed values of free variables in an expression.
@@ -141,7 +141,7 @@ class FloatVariableData:
         :param value: The new value(s) for the expression's free variables.
         """
         if not hasattr(expression, hidden_index_name):
-            raise SymbolicMathExpressionNotRegisteredError(expression)
+            raise SymbolicMathExpressionNotRegisteredError(expression=expression)
 
         variable_index = getattr(expression, hidden_index_name)
         if isinstance(value, (int, float)):
@@ -149,7 +149,7 @@ class FloatVariableData:
         else:
             self.data[variable_index : variable_index + len(value)] = value
 
-    def get_value(self, variable: FloatVariable) -> float:
+    def get_value(self, *, variable: FloatVariable) -> float:
         """
         Read the managed value of a single free variable.
 
@@ -159,7 +159,7 @@ class FloatVariableData:
         :return: The value currently stored for the variable.
         """
         if not hasattr(variable, hidden_index_name):
-            raise SymbolicMathExpressionNotRegisteredError(variable)
+            raise SymbolicMathExpressionNotRegisteredError(expression=variable)
 
         return self.data[getattr(variable, hidden_index_name)]
 

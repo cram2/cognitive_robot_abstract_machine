@@ -52,7 +52,7 @@ def test_noun_for_parts_returns_first_mention_form_and_records():
     refer = ReferringExpressions()
     var = variable(Robot, domain=[])
 
-    noun_form = refer.noun_for_parts(var)
+    noun_form = refer.noun_for_parts(variable=var)
     assert (noun_form.definiteness, noun_form.label) == (
         Definiteness.INDEFINITE,
         "Robot",
@@ -61,7 +61,7 @@ def test_noun_for_parts_returns_first_mention_form_and_records():
 
     # The subsequent-mention downgrade now lives in the CoreferenceProcessor, so
     # noun_for_parts keeps returning the first-mention (indefinite) form.
-    noun_form = refer.noun_for_parts(var)
+    noun_form = refer.noun_for_parts(variable=var)
     assert (noun_form.definiteness, noun_form.label) == (
         Definiteness.INDEFINITE,
         "Robot",
@@ -77,7 +77,7 @@ def test_noun_for_parts_uses_the_precomputed_head_noun():
     var = variable(Robot, domain=[])
     refer = ReferringExpressions(head_nouns={var._id_: "gripper"})
 
-    noun_form = refer.noun_for_parts(var)
+    noun_form = refer.noun_for_parts(variable=var)
     assert (noun_form.definiteness, noun_form.label) == (
         Definiteness.INDEFINITE,
         "gripper",
@@ -88,7 +88,7 @@ def test_noun_for_parts_records_the_mention():
     refer = ReferringExpressions()
     var = variable(Robot, domain=[])
     assert var._id_ not in refer.seen
-    refer.noun_for_parts(var)  # records the mention (for cross-build seeding)
+    refer.noun_for_parts(variable=var)  # records the mention (for cross-build seeding)
     assert var._id_ in refer.seen
 
 
@@ -98,23 +98,23 @@ def test_noun_for_parts_records_the_mention():
 def test_binding_scope_frame_collects_deferred_in_order():
     scope = BindingScope()
     scope.push_constraint_frame()
-    scope.defer_constraint("a")
-    scope.defer_constraint("b")
+    scope.defer_constraint(expression="a")
+    scope.defer_constraint(expression="b")
     assert scope.pop_constraint_frame() == ["a", "b"]
 
 
 def test_binding_scope_defer_without_frame_is_noop():
     scope = BindingScope()
-    scope.defer_constraint("a")  # no frame open
+    scope.defer_constraint(expression="a")  # no frame open
     assert scope.pop_constraint_frame() == []
 
 
 def test_binding_scope_frames_nest():
     scope = BindingScope()
     scope.push_constraint_frame()
-    scope.defer_constraint("outer")
+    scope.defer_constraint(expression="outer")
     scope.push_constraint_frame()
-    scope.defer_constraint("inner")
+    scope.defer_constraint(expression="inner")
     assert scope.pop_constraint_frame() == ["inner"]
     assert scope.pop_constraint_frame() == ["outer"]
 
@@ -137,7 +137,7 @@ def test_query_depth_scope_increments_and_restores():
 
 
 def test_build_between_standard_and_compact_forms():
-    left, lo, hi = WordFragment("x"), WordFragment("1"), WordFragment("10")
+    left, lo, hi = WordFragment(text="x"), WordFragment(text="1"), WordFragment(text="10")
 
     standard = build_between(left, lo, hi, compact=False)
     assert (
@@ -154,31 +154,31 @@ def test_build_between_standard_and_compact_forms():
 
 def test_has_pair_false_without_complementary_bounds():
     assert has_pair([]) is False
-    assert has_pair([WordFragment("not a comparator")]) is False
+    assert has_pair([WordFragment(text="not a comparator")]) is False
 
 
 # ── Co-indexed folding ───────────────────────────────────────────────────────
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Date:
     month: int
     year: int
     day: int
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Period:
     begin: _Date
     end: _Date
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Inner:
     z: _Date
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Outer:
     x: _Date
     y: _Inner
