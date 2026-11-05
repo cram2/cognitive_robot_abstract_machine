@@ -23,6 +23,7 @@ from krrood.entity_query_language.ground_term import (
     GroundTerm,
     LiveTermReader,
     TermReader,
+    TermValue,
 )
 
 if TYPE_CHECKING:
@@ -56,19 +57,6 @@ def set_evaluation_context(
         :meth:`contextvars.ContextVar.reset` to restore the previous value.
     """
     return _evaluation_context_var.set(evaluation_context)
-
-
-def values_in_current_context(term: GroundTerm) -> Iterator[Any]:
-    """
-    :param term: The ground term to read.
-    :return: The value of *term* as the current evaluation context's
-        :attr:`EvaluationContext.term_reader` reads it, or its live value outside an
-        evaluation.
-    """
-    evaluation_context = get_evaluation_context()
-    if evaluation_context is None:
-        return term.live_values()
-    return evaluation_context.term_reader.values_of(term)
 
 
 class EvaluationObserver(ABC):
@@ -396,6 +384,18 @@ class EvaluationContext:
             yield
         finally:
             _evaluation_context_var.reset(context_token)
+
+    @classmethod
+    def current_value_of(cls, term: GroundTerm) -> TermValue | None:
+        """
+        :param term: The ground term to read.
+        :return: The value of *term* as the current evaluation context's
+            :attr:`term_reader` reads it, or its live value outside an evaluation.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return term.live_term_value()
+        return evaluation_context.term_reader.value_of(term)
 
     @classmethod
     def iterate_reading_from(

@@ -38,6 +38,18 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class TermValue:
+    """
+    The value a ground term has, where it has one.
+    """
+
+    value: Any
+    """
+    The value, which may itself be ``None``.
+    """
+
+
+@dataclass(frozen=True)
 class FunctionKey:
     """
     What identifies the function of a ground term, independently of its arguments.
@@ -133,12 +145,13 @@ class GroundTerm(ABC):
             :meth:`has_live_value` holds.
         """
 
-    def live_values(self) -> Iterator[Any]:
+    def live_term_value(self) -> TermValue | None:
         """
-        :return: The value this ground term currently has, or nothing when it has none.
+        :return: The value this ground term currently has, or ``None`` when it has none.
         """
-        if self.has_live_value():
-            yield self.live_value()
+        if not self.has_live_value():
+            return None
+        return TermValue(self.live_value())
 
 
 @dataclass(frozen=True, eq=False)
@@ -362,10 +375,10 @@ class TermReader(Interface):
     """
 
     @abstractmethod
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+    def value_of(self, term: GroundTerm) -> TermValue | None:
         """
         :param term: The ground term to read.
-        :return: The value of *term*, or nothing when it has none.
+        :return: The value of *term*, or ``None`` when it has none.
         """
 
 
@@ -375,15 +388,16 @@ class LiveTermReader(TermReader):
     Reads the value a ground term currently has on the live objects.
     """
 
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
-        return term.live_values()
+    def value_of(self, term: GroundTerm) -> TermValue | None:
+        return term.live_term_value()
 
 
 @dataclass
 class CallResults(TermReader):
     """
-    Reads ground terms with another reader, reusing the value a call read for every
-    later call that passes equal arguments the same way.
+    Reads ground terms with another reader, and reads each call once: a later call of
+    the same callee that passes equal arguments the same way gets the value the first
+    one read.
 
     .. warning:: A live object that changes while the calls are being read is not seen
         by the calls already made.
@@ -394,25 +408,29 @@ class CallResults(TermReader):
     Reads every ground term whose value is not reused.
     """
 
-    values: dict[Hashable, dict[CallArguments, tuple[Any, ...]]] = field(
+    values: dict[Hashable, dict[CallArguments, TermValue | None]] = field(
         default_factory=dict
     )
     """
-    The values read for each callee, by the arguments as they were passed. A call that
-    passes its arguments another way, such as leaving out a default, is read again.
+    The value read for each callee, by the arguments as they were passed, or ``None``
+    where the call had none. A call that passes its arguments another way, such as
+    leaving out a default, is read again.
     """
 
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+    def value_of(self, term: GroundTerm) -> TermValue | None:
         """
-        A call that does not :meth:`CallTerm.depends_only_on_arguments`, or whose value
-        is an iterator its reader consumes, is never reused.
+        Reads *term* with :attr:`term_reader`, reusing the value read before for the
+        same callee and equal arguments. Never reused are a call that does not
+        :meth:`CallTerm.depends_only_on_arguments`, and a value that is an iterator,
+        which whoever reads it first consumes.
         """
         if not isinstance(term, CallTerm) or not term.depends_only_on_arguments():
-            return self.term_reader.values_of(term)
+            return self.term_reader.value_of(term)
         values_by_arguments = self.values.setdefault(term.function, {})
-        if term.arguments not in values_by_arguments:
-            values = tuple(self.term_reader.values_of(term))
-            if any(isinstance(value, Iterator) for value in values):
-                return iter(values)
-            values_by_arguments[term.arguments] = values
-        return iter(values_by_arguments[term.arguments])
+        if term.arguments in values_by_arguments:
+            return values_by_arguments[term.arguments]
+        term_value = self.term_reader.value_of(term)
+        if term_value is not None and isinstance(term_value.value, Iterator):
+            return term_value
+        values_by_arguments[term.arguments] = term_value
+        return term_value
