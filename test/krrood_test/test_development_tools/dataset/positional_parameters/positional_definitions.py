@@ -11,6 +11,11 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+from typing_extensions import Callable
+
+from krrood.patterns import called_positionally as marker_module
+from krrood.patterns.called_positionally import called_positionally
+
 # %% dataclasses
 
 
@@ -163,3 +168,23 @@ class NodeNames(ast.NodeVisitor):
         """
         A method the base class calls with a positional argument.
         """
+
+
+class PositionalDecorator:
+    """
+    A class whose methods are applied as decorators and marked as called positionally.
+    """
+
+    @called_positionally
+    def decorate(self, function: Callable) -> Callable:
+        """
+        A method Python calls with the decorated function.
+        """
+        return function
+
+    @marker_module.called_positionally
+    def decorate_through_module(self, function: Callable) -> Callable:
+        """
+        A method marked through the marker's module.
+        """
+        return function

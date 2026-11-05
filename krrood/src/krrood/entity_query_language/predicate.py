@@ -101,8 +101,8 @@ def symbolic_callable_to_function(
     unchanged -- the logic moves into the class's :meth:`__call__` and the name just constructs it.
     """
 
-    def call(*args: Any, **kwargs: Any) -> Any:
-        result = symbolic_callable(*args, **kwargs)
+    def call(**kwargs: Any) -> Any:
+        result = symbolic_callable(**kwargs)
         return result() if isinstance(result, symbolic_callable) else result
 
     return call
@@ -232,8 +232,8 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     Instances are not cached -- they do not persist.
     """
 
-    def __new__(cls, *args, **kwargs):
-        all_kwargs = CallSignature.of(callee=cls).keyword_arguments(*args, **kwargs)
+    def __new__(cls, **kwargs: Any) -> SymbolicCallable | InstantiatedVariable:
+        all_kwargs = CallSignature.of(callee=cls).keyword_arguments(**kwargs)
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _type_=cls._bound_value_type_,

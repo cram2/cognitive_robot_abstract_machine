@@ -66,8 +66,8 @@ def test_a_dataclass_of_an_unimportable_module_is_reported() -> None:
 def test_positional_methods_are_reported_and_exempt_methods_are_not() -> None:
     """
     Positional methods and static methods are reported, overrides of the repository's
-    own methods too; dunder methods, setters and overrides of a standard library method
-    are not.
+    own methods too; dunder methods, setters, overrides of a standard library method
+    and methods marked as called positionally are not.
     """
     assert reported_first_lines(
         PositionalParametersChecker(),

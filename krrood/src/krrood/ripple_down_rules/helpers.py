@@ -21,6 +21,7 @@ from krrood.ripple_down_rules.utils import (
     make_set,
     update_case_in_case_query,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 if TYPE_CHECKING:
     from .rdr import RippleDownRules
@@ -224,6 +225,7 @@ class MockRDRDecorator:
     def __init__(self, models_dir: str):
         self.models_dir = models_dir
 
+    @called_positionally
     def decorator(self, func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any | None:

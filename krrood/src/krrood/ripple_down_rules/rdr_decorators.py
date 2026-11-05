@@ -24,6 +24,7 @@ from krrood.ripple_down_rules.helpers import (
     create_case_from_method,
     create_case_query_from_method,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 
 @dataclass(kw_only=True, unsafe_hash=True)
@@ -124,6 +125,7 @@ class RDRDecorator:
     The generated classifier file of the rdr model, this is used when `use_generated_classifier` is set to `True`.
     """
 
+    @called_positionally
     def decorator(self, func: Callable) -> Callable:
 
         @wraps(func)

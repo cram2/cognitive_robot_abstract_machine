@@ -9,6 +9,7 @@ import dataclasses
 from enum import Enum
 
 
+from krrood.patterns.called_positionally import called_positionally
 from krrood.development_tools.agents.positional_parameters import (
     PositionalFieldsChecker,
     PositionalParametersChecker,
@@ -61,8 +62,11 @@ class CodeStyleRules(Section):
         "comes before them, as in `def move_to(self, *, target: Pose)`. Dunder "
         "methods, property setters and deleters, and methods that a standard "
         "library or third-party base class defines or dispatches to by name, such "
-        f"as the `visit_` methods of {CodeReference(ast.NodeVisitor).path}, are "
-        "exempt, since Python or that library passes their arguments positionally",
+        f"as the `visit_` methods of {CodeReference(target=ast.NodeVisitor).path}, are "
+        "exempt, since Python or that library passes their arguments positionally. "
+        "Mark any other method a caller outside our control calls positionally, "
+        "such as a method applied as a decorator, with "
+        f"{CodeReference(target=called_positionally).path}",
         (),
         PositionalParametersChecker(),
     )

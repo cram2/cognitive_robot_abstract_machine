@@ -57,33 +57,33 @@ class PositionalDefinitionsLine(IntEnum):
     Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.PositionalParametersSnippet.POSITIONAL_DEFINITIONS`.
     """
 
-    POSITIONAL_DATACLASS = 16
+    POSITIONAL_DATACLASS = 22
     """
     The decorator of the dataclass declared without ``kw_only``.
     """
 
-    POSITIONAL_FROZEN_DATACLASS = 28
+    POSITIONAL_FROZEN_DATACLASS = 34
     """
     The decorator of the frozen dataclass declared through the module without
     ``kw_only``.
     """
 
-    POSITIONAL_METHOD = 81
+    POSITIONAL_METHOD = 87
     """
     The method taking a parameter positionally.
     """
 
-    POSITIONAL_STATIC_METHOD = 88
+    POSITIONAL_STATIC_METHOD = 94
     """
     The static method taking a parameter positionally.
     """
 
-    POSITIONAL_OVERRIDE = 132
+    POSITIONAL_OVERRIDE = 138
     """
     The positional override of a method the repository defines.
     """
 
-    POSITIONAL_METHOD_OF_LIBRARY_SUBCLASS = 149
+    POSITIONAL_METHOD_OF_LIBRARY_SUBCLASS = 155
     """
     The positional method that no base class of the standard library subclass defines.
     """

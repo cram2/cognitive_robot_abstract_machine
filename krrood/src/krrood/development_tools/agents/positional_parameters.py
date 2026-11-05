@@ -17,6 +17,7 @@ from krrood.development_tools.agents.imported_module import (
     ImportedModule,
     InstalledCode,
 )
+from krrood.patterns.called_positionally import called_positionally
 from krrood.utils import recursive_subclasses
 
 # %% the source vocabulary
@@ -229,8 +230,9 @@ class PositionalParametersChecker(CodeRuleChecker):
     Finds the methods taking a parameter besides ``self`` or ``cls`` that can be passed
     positionally.
 
-    Dunder methods, property setters and deleters, and overrides of a method an
-    installed base class defines are exempt, since their callers pass positionally.
+    Dunder methods, property setters and deleters, overrides of a method an installed
+    base class defines, and methods marked with :func:`called_positionally` are exempt,
+    since their callers pass positionally.
     """
 
     installed_code: InstalledCode = field(default_factory=InstalledCode)
@@ -297,12 +299,17 @@ class PositionalParametersChecker(CodeRuleChecker):
         """
         if method.name.startswith("__") and method.name.endswith("__"):
             return True
-        if any(
-            isinstance(decorator, ast.Attribute)
-            and decorator.attr in list(PositionallyCalledAccessor)
-            for decorator in method.decorator_list
-        ):
-            return True
+        for decorator in method.decorator_list:
+            if isinstance(decorator, ast.Attribute) and (
+                decorator.attr in list(PositionallyCalledAccessor)
+                or decorator.attr == called_positionally.__name__
+            ):
+                return True
+            if (
+                isinstance(decorator, ast.Name)
+                and decorator.id == called_positionally.__name__
+            ):
+                return True
         if not definition.node.bases:
             return False
         if cls is None:
