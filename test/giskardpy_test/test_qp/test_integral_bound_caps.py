@@ -51,7 +51,7 @@ class FarAwayFloor(Task):
         position = self.degree_of_freedom.variables.position
         artifacts.constraints.add_inequality_constraint(
             cruise_velocity=self.CRUISE_VELOCITY,
-            velocity_unit=self.degree_of_freedom.limits.upper.velocity,
+            velocity_scale=self.degree_of_freedom.limits.upper.velocity,
             lower_error=self.FLOOR_POSITION - position,
             upper_error=float("inf"),
             quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
@@ -88,7 +88,7 @@ class Ceiling(Task):
         position = self.degree_of_freedom.variables.position
         artifacts.constraints.add_inequality_constraint(
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=self.degree_of_freedom.limits.upper.velocity,
+            velocity_scale=self.degree_of_freedom.limits.upper.velocity,
             lower_error=-float("inf"),
             upper_error=self.ceiling_position - position,
             quadratic_weight=self.weight,
@@ -320,7 +320,7 @@ def pull_of_a_violated_lower_bound(cruise_velocity: float) -> float:
     collection = ConstraintCollection()
     collection.add_inequality_constraint(
         cruise_velocity=cruise_velocity,
-        velocity_unit=degree_of_freedom.limits.upper.velocity,
+        velocity_scale=degree_of_freedom.limits.upper.velocity,
         lower_error=5.0,
         upper_error=float("inf"),
         quadratic_weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,

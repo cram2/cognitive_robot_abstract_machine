@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import EmptyGoalStateError
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.graph_node import ConvergingTask
@@ -69,8 +69,8 @@ class JointPositionList(ConvergingTask):
             artifacts.constraints.add_equality_constraint(
                 name=str(connection.name),
                 cruise_velocity=self.cruise_velocity,
-                velocity_unit=min(
-                    connection.dof.limits.upper.velocity, VelocityUnit.JOINT
+                velocity_scale=min(
+                    connection.dof.limits.upper.velocity, VelocityScale.JOINT
                 ),
                 equality_bound=error,
                 quadratic_weight=self.weight,
@@ -98,7 +98,7 @@ class JointVelocityLimit(Task):
     The joint-space equivalent of
     :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`:
     enforcement is performed by adding a real inequality constraint to the optimizer
-    for each given joint, not by tuning a cruise velocity or a velocity unit.
+    for each given joint, not by tuning a cruise velocity or a velocity scale.
     """
 
     connections: list[ActiveConnection1DOF]
@@ -133,7 +133,7 @@ class JointVelocityLimit(Task):
                 lower_velocity_limit=-self.max_velocity,
                 quadratic_weight=self.weight,
                 task_expression=position,
-                velocity_unit=connection.dof.limits.upper.velocity,
+                velocity_scale=connection.dof.limits.upper.velocity,
                 name=str(connection.name),
             )
             velocities.append(connection.dof.variables.velocity)

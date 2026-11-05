@@ -8,7 +8,7 @@ import pytest
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from cramph.data_types import ObservationStateValues, LifeCycleValues
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from cramph.composites import Sequence, Parallel
@@ -2500,7 +2500,7 @@ class TestVelocityTasks:
     @pytest.mark.parametrize(
         "limit_type", ["position", "rotation"], ids=["position", "rotation"]
     )
-    def test_a_velocity_limit_measures_its_violation_in_a_velocity_unit(
+    def test_a_velocity_limit_measures_its_violation_in_a_velocity_scale(
         self, pr2_world_state_reset: World, limit_type: str
     ):
         world = pr2_world_state_reset
@@ -2510,12 +2510,12 @@ class TestVelocityTasks:
             limit = CartesianPositionVelocityLimit(
                 root_link=root, tip_link=tip, max_linear_velocity=0.05
             )
-            velocity_unit = VelocityUnit.TRANSLATION
+            velocity_scale = VelocityScale.TRANSLATION
         else:
             limit = CartesianRotationVelocityLimit(
                 root_link=root, tip_link=tip, max_angular_velocity=0.1
             )
-            velocity_unit = VelocityUnit.ROTATION
+            velocity_scale = VelocityScale.ROTATION
         executor = StatechartExecutor(
             context=StatechartContext(world=world), extensions=[MotionControl()]
         )
@@ -2524,9 +2524,9 @@ class TestVelocityTasks:
         executor.compile(statechart=motion_statechart)
 
         assert [
-            constraint.velocity_unit
+            constraint.velocity_scale
             for constraint in limit.constraint_collection.inequality_constraints
-        ] == [velocity_unit]
+        ] == [velocity_scale]
 
 
 class TestDebugExpressions:

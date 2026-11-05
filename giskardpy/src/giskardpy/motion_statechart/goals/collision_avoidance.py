@@ -13,7 +13,7 @@ from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
     UnexpectedWorldEntityCountError,
     CollisionViolatedError,
@@ -255,7 +255,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
                 cruise_velocity=self.cruise_velocity,
-                velocity_unit=VelocityUnit.TRANSLATION,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -577,7 +577,7 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
             artifacts.constraints.add_inequality_constraint(
                 name=f"{group_a.root.name}/{group_b.root.name}/{contact.rank}",
                 cruise_velocity=self.cruise_velocity,
-                velocity_unit=VelocityUnit.TRANSLATION,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),

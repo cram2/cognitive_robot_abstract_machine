@@ -6,7 +6,7 @@ import numpy as np
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.ormatic.utils import classproperty
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint import LargeNumber
 from giskardpy.qp.constraint_collection import ConstraintCollection
@@ -80,7 +80,7 @@ class GeometricConstraintBuilder:
                 equality_bound=frame_V_error[i],
                 quadratic_weight=quadratic_weight,
                 cruise_velocity=cruise_velocity,
-                velocity_unit=VelocityUnit.TRANSLATION,
+                velocity_scale=VelocityScale.TRANSLATION,
                 name=self._indexed_constraint_name(name, i),
                 bound_cap=error_cap,
             )
@@ -90,7 +90,7 @@ class GeometricConstraintBuilder:
         expression_current: sm.SymbolicScalar,
         expression_goal: sm.ScalarData,
         cruise_velocity: sm.ScalarData,
-        velocity_unit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         name: str | None = None,
     ) -> None:
@@ -102,14 +102,14 @@ class GeometricConstraintBuilder:
             should depend on active dofs.
         :param expression_goal: a symbolic expression describing a 3D point
         :param cruise_velocity: the speed the error is closed at
-        :param velocity_unit: the speed at which expression_current typically
+        :param velocity_scale: the speed at which expression_current typically
             changes
         :param quadratic_weight: name relative to other constraints
         """
         error = expression_goal - expression_current
         self.collection.add_equality_constraint(
             cruise_velocity=cruise_velocity,
-            velocity_unit=velocity_unit,
+            velocity_scale=velocity_scale,
             equality_bound=error,
             quadratic_weight=quadratic_weight,
             task_expression=expression_current,
@@ -135,9 +135,9 @@ class GeometricConstraintBuilder:
         :param cruise_velocity: rad/s
         """
         angle = sm.safe_acos(frame_V_current.dot(frame_V_goal))
-        # step at most one rotational velocity unit, read as an angle, towards the goal,
+        # step at most VelocityScale.ROTATION, read as an angle, towards the goal,
         # so the error stays tangential and away from the singularity at pi
-        angle_limited = sm.min(angle, VelocityUnit.ROTATION)
+        angle_limited = sm.min(angle, VelocityScale.ROTATION)
         angle_limited = angle_limited.safe_division(angle)
         root_V_goal_normal_intermediate = frame_V_current.slerp(
             frame_V_goal, angle_limited
@@ -149,7 +149,7 @@ class GeometricConstraintBuilder:
                 task_expression=frame_V_current[i],
                 equality_bound=error[i],
                 cruise_velocity=cruise_velocity,
-                velocity_unit=VelocityUnit.ROTATION,
+                velocity_scale=VelocityScale.ROTATION,
                 quadratic_weight=quadratic_weight,
                 name=self._indexed_constraint_name(name, i),
             )
@@ -186,7 +186,8 @@ class GeometricConstraintBuilder:
                 * self.quaternion_error_per_radian,
                 name=self._indexed_constraint_name(name, i),
                 bound_cap=error_cap,
-                velocity_unit=VelocityUnit.ROTATION * self.quaternion_error_per_radian,
+                velocity_scale=VelocityScale.ROTATION
+                * self.quaternion_error_per_radian,
             )
 
     def add_yaw_goal_constraint(
@@ -222,7 +223,7 @@ class GeometricConstraintBuilder:
             bound_cap=RotationBoundCap(
                 quaternion_error_bounds=sm.Vector([-quaternion_error.z])
             ),
-            velocity_unit=VelocityUnit.ROTATION * self.quaternion_error_per_radian,
+            velocity_scale=VelocityScale.ROTATION * self.quaternion_error_per_radian,
         )
 
     @staticmethod
@@ -273,7 +274,7 @@ class GeometricConstraintBuilder:
             lower_velocity_limit=-max_velocity,
             quadratic_weight=quadratic_weight,
             task_expression=translation_error,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             lower_slack_limit=-max_violation,
             upper_slack_limit=max_violation,
             name=name,
@@ -302,7 +303,7 @@ class GeometricConstraintBuilder:
             lower_velocity_limit=-max_velocity,
             quadratic_weight=quadratic_weight,
             task_expression=angle_error,
-            velocity_unit=VelocityUnit.ROTATION,
+            velocity_scale=VelocityScale.ROTATION,
             lower_slack_limit=-max_violation,
             upper_slack_limit=max_violation,
             name=name,

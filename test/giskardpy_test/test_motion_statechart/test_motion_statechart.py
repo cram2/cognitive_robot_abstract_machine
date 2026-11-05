@@ -558,7 +558,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
     for i in range(3):
         col.add_equality_constraint(
             cruise_velocity=0.1 * i,
-            velocity_unit=0.1 * i,
+            velocity_scale=0.1 * i,
             equality_bound=0.0,
             quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
             task_expression=expr,
@@ -567,7 +567,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
     col.add_inequality_constraint(
         name="same_name",
         cruise_velocity=0.2,
-        velocity_unit=0.2,
+        velocity_scale=0.2,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         task_expression=expr,
         lower_error=0.1,
@@ -578,7 +578,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         col.add_equality_constraint(
             name="same_name",
             cruise_velocity=0.2,
-            velocity_unit=0.2,
+            velocity_scale=0.2,
             equality_bound=0.0,
             quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
             task_expression=expr,
@@ -588,7 +588,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
     col2.add_equality_constraint(
         name="same_name",
         cruise_velocity=0.2,
-        velocity_unit=0.2,
+        velocity_scale=0.2,
         equality_bound=0.0,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         task_expression=expr,
@@ -604,7 +604,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
     col3.add_equality_constraint(
         name="same_name",
         cruise_velocity=0.2,
-        velocity_unit=0.2,
+        velocity_scale=0.2,
         equality_bound=0.0,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         task_expression=expr,
@@ -613,7 +613,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
         name="same_name",
         expression=expr,
         cruise_velocity=0.1,
-        velocity_unit=0.1,
+        velocity_scale=0.1,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         lower_slack_limit=-float("inf"),
         upper_slack_limit=float("inf"),

@@ -37,10 +37,10 @@ class DefaultWeights(FloatEnum):
     """
 
 
-# %% velocity units
+# %% velocity scales
 
 
-class VelocityUnit(FloatEnum):
+class VelocityScale(FloatEnum):
     """
     The speeds at which quantities typically change. A constraint on such a quantity
     that is violated by this speed for the whole control horizon costs its weight,

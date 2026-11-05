@@ -19,7 +19,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointVelocityLimit,
 )
 from cramph.nodes_for_testing import ConstTrueNode
-from giskardpy.motion_statechart.weights import VelocityUnit
+from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import (
     shortest_angular_distance,
@@ -365,7 +365,7 @@ def test_daisy_arm_reaches_its_park_state(
     assert park_state.is_achieved()
 
 
-# %% velocity units of joint velocity limits
+# %% velocity scales of joint velocity limits
 
 
 def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_the_joint(
@@ -382,7 +382,7 @@ def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_th
     executor.compile(statechart=statechart)
 
     assert [
-        constraint.velocity_unit
+        constraint.velocity_scale
         for constraint in limit.constraint_collection.inequality_constraints
     ] == [head_pan_joint.dof.limits.upper.velocity]
 
@@ -413,7 +413,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     assert abs(head_pan_joint.position - start_position) < joint_goal.threshold
 
 
-# %% velocity units of joint goals
+# %% velocity scales of joint goals
 
 
 def world_with_revolute_joints(
@@ -446,9 +446,9 @@ def world_with_revolute_joints(
     return world, joints
 
 
-def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and_the_joint_velocity_unit():
-    fast_speed = 2 * VelocityUnit.JOINT
-    slow_speed = VelocityUnit.JOINT / 2
+def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and_the_joint_velocity_scale():
+    fast_speed = 2 * VelocityScale.JOINT
+    slow_speed = VelocityScale.JOINT / 2
     world, joints = world_with_revolute_joints([fast_speed, slow_speed])
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
@@ -462,6 +462,6 @@ def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and
     executor.compile(statechart=statechart)
 
     assert [
-        constraint.velocity_unit
+        constraint.velocity_scale
         for constraint in goal.constraint_collection.equality_constraints
-    ] == [VelocityUnit.JOINT, slow_speed]
+    ] == [VelocityScale.JOINT, slow_speed]

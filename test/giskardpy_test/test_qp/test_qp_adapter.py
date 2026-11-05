@@ -264,7 +264,7 @@ def test_integral_strategy_with_equality_constraints(prismatic_bot2):
         equality_bound=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
     )
     eq_constraint_model = IntegralStrategy(
         degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
@@ -300,7 +300,7 @@ def test_integral_strategy_with_inequality_constraints(prismatic_bot2):
         upper_error=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
     )
     ineq_constraint_model = IntegralStrategy(
         degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
@@ -344,7 +344,7 @@ def _integral_inequality_strategy(
             upper_error=upper_error,
             quadratic_weight=1,
             cruise_velocity=1,
-            velocity_unit=1,
+            velocity_scale=1,
             name=f"inequality{index}",
         )
     return IntegralStrategy(
@@ -404,7 +404,7 @@ def test_velocity_strategy_builds_inequality_blocks(prismatic_bot2):
         lower_velocity_limit=-0.5,
         upper_velocity_limit=0.5,
         quadratic_weight=1,
-        velocity_unit=0.5,
+        velocity_scale=0.5,
         name="velocity_constraint",
     )
     velocity_strategy = VelocityStrategy(
@@ -432,7 +432,7 @@ def test_inequality_bounds_on_equality_strategy_raise(prismatic_bot2):
         equality_bound=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
     )
     strategy = IntegralStrategy(
         degrees_of_freedom=prismatic_bot2.active_degrees_of_freedom,
@@ -477,7 +477,7 @@ def test_qp_data_symbolic(prismatic_bot2):
         equality_bound=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         name="position_constraint",
     )
     constraints.add_equality_constraint(
@@ -485,7 +485,7 @@ def test_qp_data_symbolic(prismatic_bot2):
         equality_bound=1,
         quadratic_weight=0,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         name="0 weight constraint",
     )
     constraints.add_inequality_constraint(
@@ -494,7 +494,7 @@ def test_qp_data_symbolic(prismatic_bot2):
         upper_error=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         name="ineq constraint",
     )
     qp_data_symbolic = QPDataSymbolic(
@@ -535,7 +535,7 @@ def _build_qp_data_symbolic(prismatic_bot2) -> QPDataSymbolic:
         equality_bound=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         name="position_constraint",
     )
     constraints.add_inequality_constraint(
@@ -544,7 +544,7 @@ def _build_qp_data_symbolic(prismatic_bot2) -> QPDataSymbolic:
         upper_error=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         name="ineq constraint",
     )
     return QPDataSymbolic(
@@ -614,7 +614,7 @@ def test_constraint_collection_groups_constraints_by_enforcement_strategy(
         equality_bound=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         name="eq",
     )
     constraints.add_velocity_constraint(
@@ -622,7 +622,7 @@ def test_constraint_collection_groups_constraints_by_enforcement_strategy(
         upper_velocity_limit=1,
         quadratic_weight=1,
         task_expression=dof.variables.position,
-        velocity_unit=1,
+        velocity_scale=1,
         name="vel",
     )
 
@@ -642,7 +642,7 @@ def test_integral_strategy_bounds_slack_by_the_slack_limits_of_the_constraint(
         upper_error=1,
         quadratic_weight=1,
         cruise_velocity=1,
-        velocity_unit=1,
+        velocity_scale=1,
         lower_slack_limit=-0.1,
         upper_slack_limit=0.2,
     )

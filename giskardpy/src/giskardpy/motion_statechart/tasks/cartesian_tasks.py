@@ -16,7 +16,7 @@ from giskardpy.motion_statechart.binding_policy import (
     ForwardKinematicsBinding,
 )
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.error_signals import (
     joint_position_and_velocity_variables,
     time_derivative_from_joint_motion,
@@ -237,7 +237,7 @@ class DistanceAlongAxis(ConvergingTask):
         current_distance = (root_P_tip - root_P_reference) @ self.axis
         artifacts.constraints.add_equality_constraint(
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             equality_bound=self.distance - current_distance,
             quadratic_weight=self.weight,
             task_expression=current_distance,
@@ -605,7 +605,7 @@ class CartesianPositionStraight(CartesianTask):
             expression_current=line_V_travelled[0],
             expression_goal=line_length,
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             quadratic_weight=self.weight,
             name="line/progress",
         )
@@ -613,7 +613,7 @@ class CartesianPositionStraight(CartesianTask):
             expression_current=line_V_travelled[1],
             expression_goal=0,
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             quadratic_weight=lateral_weight,
             name="line/y",
         )
@@ -621,7 +621,7 @@ class CartesianPositionStraight(CartesianTask):
             expression_current=line_V_travelled[2],
             expression_goal=0,
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             quadratic_weight=lateral_weight,
             name="line/z",
         )
@@ -933,14 +933,14 @@ class RigidCoupling(Task):
         self._keep_at_rest(
             artifacts,
             root_T_tip.position,
-            VelocityUnit.TRANSLATION,
+            VelocityScale.TRANSLATION,
             "position",
         )
         self._keep_at_rest(
-            artifacts, root_R_tip.x_vector(), VelocityUnit.ROTATION, "x_axis"
+            artifacts, root_R_tip.x_vector(), VelocityScale.ROTATION, "x_axis"
         )
         self._keep_at_rest(
-            artifacts, root_R_tip.y_vector(), VelocityUnit.ROTATION, "y_axis"
+            artifacts, root_R_tip.y_vector(), VelocityScale.ROTATION, "y_axis"
         )
         artifacts.observation = sm.Scalar.const_true()
         return artifacts
@@ -949,7 +949,7 @@ class RigidCoupling(Task):
         self,
         artifacts: MotionNodeArtifacts,
         vector: Point3 | Vector3,
-        velocity_unit: float,
+        velocity_scale: float,
         name: str,
     ) -> None:
         """
@@ -961,7 +961,7 @@ class RigidCoupling(Task):
                 velocity_goal=0,
                 quadratic_weight=self.weight,
                 task_expression=vector[index],
-                velocity_unit=velocity_unit,
+                velocity_scale=velocity_scale,
                 name=f"{name}/{index}",
             )
 

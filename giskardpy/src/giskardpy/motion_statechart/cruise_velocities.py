@@ -7,7 +7,8 @@ from cramph.data_types import FloatEnum
 
 class DefaultCruiseVelocity(FloatEnum):
     """
-    The speeds at which tasks approach their Cartesian goals unless told otherwise.
+    The speeds Cartesian tasks hold on the way to their goals, until they slow down
+    close to them, unless told otherwise.
     """
 
     TRANSLATION = 0.4

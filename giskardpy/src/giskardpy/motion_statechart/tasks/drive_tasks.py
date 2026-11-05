@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
-from giskardpy.motion_statechart.weights import VelocityUnit
+from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
@@ -107,7 +107,7 @@ class BasePosition(DrivenBaseTask):
                 expression_current=base_coordinate,
                 expression_goal=goal_coordinate,
                 cruise_velocity=self.cruise_velocity,
-                velocity_unit=VelocityUnit.TRANSLATION,
+                velocity_scale=VelocityScale.TRANSLATION,
                 quadratic_weight=self.weight,
             )
         parent_V_base_to_goal = parent_P_goal - parent_P_base

@@ -10,7 +10,7 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityUnit
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
@@ -164,7 +164,7 @@ class AlignPerpendicular(FeatureFunctionGoal):
 
         artifacts.constraints.add_equality_constraint(
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.ROTATION,
+            velocity_scale=VelocityScale.ROTATION,
             equality_bound=0 - expr,
             quadratic_weight=self.weight,
             task_expression=expr,
@@ -226,7 +226,7 @@ class HeightGoal(FeatureFunctionGoal):
 
         artifacts.constraints.add_inequality_constraint(
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -290,7 +290,7 @@ class DistanceGoal(FeatureFunctionGoal):
 
         artifacts.constraints.add_inequality_constraint(
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.TRANSLATION,
+            velocity_scale=VelocityScale.TRANSLATION,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -302,7 +302,7 @@ class DistanceGoal(FeatureFunctionGoal):
         for i, axis_name in enumerate(["x", "y", "z"]):
             artifacts.constraints.add_inequality_constraint(
                 cruise_velocity=self.cruise_velocity,
-                velocity_unit=VelocityUnit.TRANSLATION,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=0,
                 upper_error=0,
                 quadratic_weight=self.weight,
@@ -415,7 +415,7 @@ class AngleGoal(FeatureFunctionGoal):
 
         artifacts.constraints.add_inequality_constraint(
             cruise_velocity=self.cruise_velocity,
-            velocity_unit=VelocityUnit.ROTATION,
+            velocity_scale=VelocityScale.ROTATION,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
             quadratic_weight=self.weight,

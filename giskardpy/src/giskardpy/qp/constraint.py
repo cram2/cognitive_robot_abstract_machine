@@ -50,7 +50,7 @@ class GiskardConstraint(ABC):
     It is only here for completeness, no use case has been found for it yet.
     """
 
-    velocity_unit: sm.ScalarData
+    velocity_scale: sm.ScalarData
     """
     The speed at which the expression typically changes in its space, such as the
     velocity limit of a joint.

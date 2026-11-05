@@ -148,7 +148,7 @@ class ConstraintCollection:
         equality_bound: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         cruise_velocity: sm.ScalarData,
-        velocity_unit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -162,7 +162,7 @@ class ConstraintCollection:
         optimization problem and is therefore faster.
         :param cruise_velocity: used by Giskard to limit the error, will not be
             strictly enforced.
-        :param velocity_unit: the speed at which task_expression typically
+        :param velocity_scale: the speed at which task_expression typically
             changes, which scales quadratic_weight
         :param task_expression: defines the task function
         :param equality_bound: goal for the derivative of task_expression
@@ -191,7 +191,7 @@ class ConstraintCollection:
             bound=equality_bound,
             bound_cap=bound_cap if bound_cap is not None else ScalarBoundCap(),
             cruise_velocity=cruise_velocity,
-            velocity_unit=velocity_unit,
+            velocity_scale=velocity_scale,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
@@ -203,7 +203,7 @@ class ConstraintCollection:
     def add_inequality_constraint(
         self,
         cruise_velocity: sm.ScalarData,
-        velocity_unit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         lower_error: sm.ScalarData,
         upper_error: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
@@ -223,7 +223,7 @@ class ConstraintCollection:
             bound that demands motion (a positive lower or a negative upper error) to what
             is reachable at this velocity. A bound that only permits motion is not capped.
             Will not be strictly enforced.
-        :param velocity_unit: the speed at which task_expression typically
+        :param velocity_scale: the speed at which task_expression typically
             changes, which scales quadratic_weight
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
@@ -248,7 +248,7 @@ class ConstraintCollection:
             name=name,
             expression=task_expression,
             cruise_velocity=cruise_velocity,
-            velocity_unit=velocity_unit,
+            velocity_scale=velocity_scale,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
@@ -265,7 +265,7 @@ class ConstraintCollection:
         upper_velocity_limit: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
-        velocity_unit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -279,7 +279,7 @@ class ConstraintCollection:
         :param upper_velocity_limit:
         :param quadratic_weight:
         :param task_expression:
-        :param velocity_unit: the speed at which task_expression typically changes,
+        :param velocity_scale: the speed at which task_expression typically changes,
             which scales quadratic_weight
         :param name:
         :param lower_slack_limit:
@@ -292,7 +292,7 @@ class ConstraintCollection:
             lower_bound=lower_velocity_limit,
             upper_bound=upper_velocity_limit,
             quadratic_weight=quadratic_weight,
-            velocity_unit=velocity_unit,
+            velocity_scale=velocity_scale,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
@@ -304,7 +304,7 @@ class ConstraintCollection:
         velocity_goal: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
-        velocity_unit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -317,7 +317,7 @@ class ConstraintCollection:
         :param velocity_goal:
         :param quadratic_weight:
         :param task_expression:
-        :param velocity_unit: the speed at which task_expression typically changes,
+        :param velocity_scale: the speed at which task_expression typically changes,
             which scales quadratic_weight
         :param name:
         :param lower_slack_limit:
@@ -329,7 +329,7 @@ class ConstraintCollection:
             expression=task_expression,
             bound=velocity_goal,
             quadratic_weight=quadratic_weight,
-            velocity_unit=velocity_unit,
+            velocity_scale=velocity_scale,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,

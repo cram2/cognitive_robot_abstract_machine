@@ -8,7 +8,7 @@ from krrood_spatial_math.spatial_types import AxisAngle, Point3, RotationMatrix,
 
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
-from giskardpy.motion_statechart.weights import VelocityUnit
+from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -327,8 +327,8 @@ def test_a_quaternion_error_is_normalized_by_how_fast_it_changes_with_the_angle(
     )
 
     expected = (
-        VelocityUnit.ROTATION * GeometricConstraintBuilder.quaternion_error_per_radian
+        VelocityScale.ROTATION * GeometricConstraintBuilder.quaternion_error_per_radian
     )
-    assert [c.velocity_unit for c in collection.equality_constraints] == [
+    assert [c.velocity_scale for c in collection.equality_constraints] == [
         pytest.approx(expected)
     ] * len(collection.equality_constraints)
