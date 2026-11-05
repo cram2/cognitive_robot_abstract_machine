@@ -13,13 +13,12 @@ pytest.importorskip(
     reason="needs the GPU build of the ROS package robokudo_foundation_pose_tensorrt",
 )
 
-from robokudo.annotators.foundation_pose_annotator import (  # noqa: E402
+from robokudo.annotators.foundation_pose_estimator import (  # noqa: E402
+    FoundationPoseEstimator,
+)
+from robokudo.annotators.object_observation import (  # noqa: E402
     ObjectObservation,
 )
-from robokudo.annotators.tensorrt_foundation_pose import (  # noqa: E402
-    TensorRTFoundationPose,
-)
-
 
 # %% Scene
 
@@ -41,8 +40,8 @@ class PlateOnPlane:
     Thickness of the plate, in meters.
     """
 
-    observation: ObjectObservation = field(
-        default_factory=lambda: TensorRTFoundationPose.warm_up_observation
+    object_observation: ObjectObservation = field(
+        default_factory=lambda: FoundationPoseEstimator.warm_up_object_observation
     )
     """
     The plane with the plate's mask.
@@ -52,11 +51,11 @@ class PlateOnPlane:
         """
         Write the plate mesh, sized to cover the mask on the plane.
         """
-        region = self.observation.mask_region
+        region = self.object_observation.mask_region
         size = (
             region.width
             * self.plane_depth
-            / self.observation.frame.camera_model.focal_length_x
+            / self.object_observation.frame.camera_model.focal_length_x
         )
         trimesh.creation.box(extents=(size, size, self.thickness)).export(
             self.mesh_file
@@ -67,23 +66,25 @@ class PlateOnPlane:
         """
         Distance of the plane from the camera, in meters.
         """
-        region = self.observation.mask_region
-        return float(self.observation.frame.depth_image[region.pos.y, region.pos.x])
+        region = self.object_observation.mask_region
+        return float(
+            self.object_observation.frame.depth_image[region.pos.y, region.pos.x]
+        )
 
 
 # %% Fixtures
 
 
 @pytest.fixture(scope="module")
-def estimator() -> TensorRTFoundationPose:
+def estimator() -> FoundationPoseEstimator:
     """
     The estimator with the default engines, shared by all tests of the module.
     """
-    return TensorRTFoundationPose()
+    return FoundationPoseEstimator()
 
 
 @pytest.fixture
-def plate(estimator: TensorRTFoundationPose, tmp_path: Path) -> PlateOnPlane:
+def plate(estimator: FoundationPoseEstimator, tmp_path: Path) -> PlateOnPlane:
     """
     A plate whose mesh the estimator has loaded and selected.
     """
@@ -97,20 +98,24 @@ def plate(estimator: TensorRTFoundationPose, tmp_path: Path) -> PlateOnPlane:
 
 
 def test_plate_is_posed_on_the_plane_at_its_mask(
-    estimator: TensorRTFoundationPose, plate: PlateOnPlane
+    estimator: FoundationPoseEstimator, plate: PlateOnPlane
 ):
-    pose = estimator.estimate_pose(plate.observation)
+    pose = estimator.estimate_pose(plate.object_observation)
 
     numpy.testing.assert_allclose(
-        pose[:3, 3], [0.0, 0.0, plate.plane_depth + plate.thickness / 2], atol=0.01
+        pose.position.to_np()[:3],
+        [0.0, 0.0, plate.plane_depth + plate.thickness / 2],
+        atol=0.01,
     )
 
 
 def test_tracking_an_unmoved_plate_keeps_its_position(
-    estimator: TensorRTFoundationPose, plate: PlateOnPlane
+    estimator: FoundationPoseEstimator, plate: PlateOnPlane
 ):
-    pose = estimator.estimate_pose(plate.observation)
+    pose = estimator.estimate_pose(plate.object_observation)
 
-    tracked_pose = estimator.track_pose(plate.observation, pose)
+    tracked_pose = estimator.track_pose(plate.object_observation, pose)
 
-    numpy.testing.assert_allclose(tracked_pose[:3, 3], pose[:3, 3], atol=0.005)
+    numpy.testing.assert_allclose(
+        tracked_pose.position.to_np(), pose.position.to_np(), atol=0.005
+    )
