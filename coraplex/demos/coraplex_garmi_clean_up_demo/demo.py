@@ -430,12 +430,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     *self._take_hold_of_the_milk_and_the_handle(
                         milk_grasp, handle_grasp, left_arm, right_arm
                     ),
-                    # The left hand opens the drawer and lets go of the handle while the
-                    # right one puts the milk in and withdraws from it. The left hand
-                    # stays at the handle throughout, so it may touch it all along.
-                    # Once the drawer is open, the left hand is kept where it is for as
-                    # long as the right one is still busy, or GARMI's body, following
-                    # the right arm, would carry it off.
+
+                    # Left hand opens the drawer while the right hands drops the milk in the open
+                    # drawer. the gripper is kept at the handle of the drawer the whole time
                     Parallel(
                         nodes=[
                             Sequence(
@@ -475,10 +472,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                             UpdateTemporaryCollisionRules.for_end_effector(left_hand),
                         ]
                     ),
-                    # The left hand, still at the handle, closes the drawer while the
-                    # right arm parks, and may stay on the handle once the drawer is
-                    # closed, while the right arm, and with it GARMI's body, may still be
-                    # moving.
+                    # Left hand closes the drawer while the right arm is parked
                     Parallel(
                         nodes=[
                             ParkArmsAction(arms=[right_arm]),
