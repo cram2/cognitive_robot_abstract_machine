@@ -351,7 +351,7 @@ class SymbolicFunction(SymbolicCallable, ABC):
         :raises ResultTypeCannotBeDetermined: If :meth:`__call__`'s return annotation
             names no type.
         """
-        return_type = InstantiatedVariable._type_built_by_(cls.__call__)
+        return_type = InstantiatedVariable._type_built_by_(factory=cls.__call__)
         if return_type is None:
             raise ResultTypeCannotBeDetermined(factory=cls.__call__)
         return return_type
