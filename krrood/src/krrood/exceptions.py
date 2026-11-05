@@ -32,36 +32,12 @@ class CanBehaveLikeDataclassException(Protocol):
 
 
 @dataclass
-class ExceptionChainLink(DataclassFieldDescriptor, ABC):
-    """
-    A link from an exception to another one in its chain, as a dataclass field so that
-    it can be given at construction and is persisted and serialized with the exception.
-
-    .. note:: Writing the cause also suppresses the context in tracebacks, which is why
-        writing the value a link already has must do nothing.
-    """
-
-    @abstractmethod
-    def read(self, instance: BaseException) -> BaseException | None:
-        """
-        :param instance: The exception the link starts at.
-        :return: The exception the link points to, if any.
-        """
-
-    @abstractmethod
-    def write(self, instance: BaseException, value: BaseException | None) -> None:
-        """
-        Let the link of the exception point to another exception.
-
-        :param instance: The exception the link starts at.
-        :param value: The exception the link points to.
-        """
-
-
-@dataclass
-class CauseLink(ExceptionChainLink):
+class CauseLink(DataclassFieldDescriptor):
     """
     The link to the exception that an exception was raised from with ``raise ... from``.
+
+    .. note:: Writing the cause also suppresses the context in tracebacks, so a freshly
+        constructed exception must not get its default written.
     """
 
     def read(self, instance: BaseException) -> BaseException | None:
@@ -72,7 +48,7 @@ class CauseLink(ExceptionChainLink):
 
 
 @dataclass
-class ContextLink(ExceptionChainLink):
+class ContextLink(DataclassFieldDescriptor):
     """
     The link to the exception that was being handled when an exception was raised,
     recorded whether or not ``raise ... from`` was used.
