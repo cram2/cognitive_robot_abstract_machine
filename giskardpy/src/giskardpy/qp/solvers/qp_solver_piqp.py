@@ -1,3 +1,7 @@
+"""
+Solving giskardpy's explicit QPs with piqp.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,6 +16,10 @@ from giskardpy.qp.solvers.qp_solver import QPSolver
 
 @dataclass
 class QPSolverPIQP(QPSolver[QPDataExplicit]):
+    """
+    Solves explicit QPs with piqp's sparse proximal interior point solver.
+    """
+
     solver: piqp.SparseSolver = field(default_factory=piqp.SparseSolver)
     """
     The solver object of piqp.
@@ -43,6 +51,12 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
     fraction to boundary from 0.8 to 0.99; 10 is not enough.
     """
 
+    primal_infeasibility_tolerance: float = 1e-6
+    """
+    Relative tolerance of piqp's certificate of primal infeasibility: piqp reports a
+    problem as infeasible only once a certificate meets it.
+    """
+
     big_ball_mode: bool = False
     """
     If the QP is known to be feasible, ignore non-SOLVED solver statuses and return the
@@ -52,7 +66,10 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
         when you are certain the problem is feasible.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """
+        Configure :attr:`solver` with this solver's tolerances and step settings.
+        """
         self.solver.settings.eps_abs = 1e-6
         self.solver.settings.eps_rel = 1e-7
         self.solver.settings.eps_duality_gap_abs = 1e-5
@@ -60,6 +77,7 @@ class QPSolverPIQP(QPSolver[QPDataExplicit]):
         self.solver.settings.reg_lower_limit = 1e-11
         self.solver.settings.tau = self.fraction_to_boundary
         self.solver.settings.infeasibility_threshold = self.infeasibility_threshold
+        self.solver.settings.eps_primal_inf = self.primal_infeasibility_tolerance
 
     def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
         weight_matrix = qp_data.hessian
