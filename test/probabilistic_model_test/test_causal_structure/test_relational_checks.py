@@ -75,7 +75,7 @@ def test_attribute_driving_parts_directly_is_a_dependence():
     assert (
         dependence.example_attribute,
         dependence.part_attribute,
-        dependence.part,
+        dependence.part_collection,
     ) == (
         "Room.warm",
         "wet",

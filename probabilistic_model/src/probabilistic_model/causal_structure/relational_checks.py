@@ -24,7 +24,8 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
 class ExampleToPartDependence:
     """
     An instance attribute that the data says depends on a part attribute even given the
-    aggregation statistics.
+    aggregation statistics. A part is one of the objects an instance holds in a
+    one-to-many attribute, such as one of the objects of a room.
     """
 
     example_attribute: str
@@ -37,9 +38,10 @@ class ExampleToPartDependence:
     The name of the part attribute, as its part's table names it.
     """
 
-    part: str
+    part_collection: str
     """
-    The exchangeable part the attribute belongs to.
+    The name of the instance's one-to-many attribute that holds the parts, such as
+    ``objects``.
     """
 
     probability: float
@@ -56,8 +58,9 @@ class ExampleToPartDependence:
 class ExampleToPartCheck:
     """
     Tests every instance attribute against every part attribute given the aggregation
-    statistics, with a G² statistic whose null distribution comes from permuting the
-    instance attribute across whole instances that share the statistics' values.
+    statistics, with a likelihood-ratio statistic (G²) whose null distribution comes from
+    permuting the instance attribute among the instances with the same aggregation
+    statistics.
     """
 
     significance_level: float = 0.05
@@ -91,16 +94,18 @@ class ExampleToPartCheck:
         """
         return [
             dependence
-            for part, table in tables.part_tables.items()
-            for dependence in self.dependences_of_part(tables.example_rows, part, table)
+            for part_collection, table in tables.part_tables.items()
+            for dependence in self.dependences_of_part(
+                tables.example_rows, part_collection, table
+            )
         ]
 
     def dependences_of_part(
-        self, example_rows: pd.DataFrame, part: str, table: PartTrainingTable
+        self, example_rows: pd.DataFrame, part_collection: str, table: PartTrainingTable
     ) -> list[ExampleToPartDependence]:
         """
         :param example_rows: One row per instance.
-        :param part: The name of the exchangeable part.
+        :param part_collection: The name of the instance's attribute that holds the parts.
         :param table: The part's training table.
         :return: The dependences between an instance attribute and one of the part's
             attributes, given the part's aggregation statistics.
@@ -117,8 +122,8 @@ class ExampleToPartCheck:
         )
         part_codes = self.discretizer.fit_transform(table.rows[part_attributes])
         positions = np.asarray(table.example_positions)
-        strata = (
-            self.strata_of(example_codes[statistics])
+        groups = (
+            self.group_of_each_row(example_codes[statistics])
             if statistics
             else np.zeros(len(example_rows), dtype=int)
         )
@@ -129,7 +134,7 @@ class ExampleToPartCheck:
             if len(np.unique(values)) < 2:
                 continue
             permutations = [
-                self.permuted_within(values, strata, random_state)[positions]
+                self.permuted_within_groups(values, groups, random_state)[positions]
                 for _ in range(self.permutation_count)
             ]
             for part_attribute in part_attributes:
@@ -137,12 +142,15 @@ class ExampleToPartCheck:
                 if len(np.unique(part_values)) < 2:
                     continue
                 probability = self.permutation_probability(
-                    values[positions], permutations, part_values, strata[positions]
+                    values[positions], permutations, part_values, groups[positions]
                 )
                 if probability < self.significance_level:
                     dependences.append(
                         ExampleToPartDependence(
-                            example_attribute, part_attribute, part, probability
+                            example_attribute,
+                            part_attribute,
+                            part_collection,
+                            probability,
                         )
                     )
         return dependences
@@ -152,26 +160,27 @@ class ExampleToPartCheck:
         example_values: np.ndarray,
         permutations: list[np.ndarray],
         part_values: np.ndarray,
-        strata: np.ndarray,
+        groups: np.ndarray,
     ) -> float:
         """
         :param example_values: Per part row, its instance's level of the instance
             attribute.
         :param permutations: The same levels after each permutation of the instances.
         :param part_values: Per part row, its level of the part attribute.
-        :param strata: Per part row, its instance's stratum.
+        :param groups: Per part row, the group of instances with the same aggregation
+            statistics its instance belongs to.
         :return: The share of permutations, counting the observed levels as one, whose
             G² statistic is at least the observed one.
         """
-        observed = self.g_squared(example_values, part_values, strata)
+        observed = self.likelihood_ratio_statistic(example_values, part_values, groups)
         exceeding = sum(
-            self.g_squared(permuted, part_values, strata) >= observed
+            self.likelihood_ratio_statistic(permuted, part_values, groups) >= observed
             for permuted in permutations
         )
         return (1 + exceeding) / (1 + len(permutations))
 
     @staticmethod
-    def strata_of(codes: pd.DataFrame) -> np.ndarray:
+    def group_of_each_row(codes: pd.DataFrame) -> np.ndarray:
         """
         :param codes: Integer columns.
         :return: One integer per row, the same for rows with the same values.
@@ -179,32 +188,36 @@ class ExampleToPartCheck:
         return pd.factorize(pd.MultiIndex.from_frame(codes))[0]
 
     @staticmethod
-    def permuted_within(
-        values: np.ndarray, strata: np.ndarray, random_state: np.random.Generator
+    def permuted_within_groups(
+        values: np.ndarray, groups: np.ndarray, random_state: np.random.Generator
     ) -> np.ndarray:
         """
         :param values: One value per instance.
-        :param strata: One stratum per instance.
+        :param groups: Per instance, the group of instances with the same aggregation
+            statistics it belongs to.
         :param random_state: Source of randomness.
-        :return: The values shuffled among the instances of each stratum.
+        :return: The values shuffled among the instances of each group.
         """
         permuted = values.copy()
-        for stratum in np.unique(strata):
-            members = np.flatnonzero(strata == stratum)
+        for group in np.unique(groups):
+            members = np.flatnonzero(groups == group)
             permuted[members] = values[random_state.permutation(members)]
         return permuted
 
     @staticmethod
-    def g_squared(first: np.ndarray, second: np.ndarray, strata: np.ndarray) -> float:
+    def likelihood_ratio_statistic(
+        first: np.ndarray, second: np.ndarray, groups: np.ndarray
+    ) -> float:
         """
         :param first: Integer levels.
         :param second: Integer levels.
-        :param strata: Integer strata.
-        :return: The G² statistic of the two given the strata, summed over the strata.
+        :param groups: Integer groups the rows fall into.
+        :return: The likelihood-ratio statistic (G²) of the two within each group, summed
+            over the groups.
         """
         statistic = 0.0
-        for stratum in np.unique(strata):
-            members = strata == stratum
+        for group in np.unique(groups):
+            members = groups == group
             observed = pd.crosstab(first[members], second[members]).to_numpy(float)
             expected = (
                 observed.sum(axis=1, keepdims=True)
