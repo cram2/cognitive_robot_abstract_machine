@@ -71,6 +71,10 @@ from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
+from semantic_digital_twin.robots.robot_part_mixins import (
+    HasMobileBase,
+    TGenericMobileBase,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -508,7 +512,7 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    robot_semantic_annotation: type[AbstractRobot],
+    robot_semantic_annotation: type[HasMobileBase],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
     robot_localization_pose: HomogeneousTransformationMatrix | None = None,
@@ -517,7 +521,9 @@ def world_with_urdf_factory(
     Builds this tree:
     map -> odom_combined -> "urdf tree"
     """
-    drive_connection_type = robot_semantic_annotation.get_drive_connection_type()
+    drive_connection_type = robot_semantic_annotation.get_type_of_generic_parameter(
+        TGenericMobileBase
+    ).get_drive_connection_type()
     urdf_parser = URDFParser.from_file(
         file_path=robot_semantic_annotation.get_ros_file_path(),
         path_resolver=urdf_path_resolver,

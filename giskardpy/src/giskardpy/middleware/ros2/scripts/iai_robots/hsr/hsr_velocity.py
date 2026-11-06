@@ -4,10 +4,12 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
     HSRVelocityInterface,
-    WorldWithHSRConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
 def create_giskard() -> Giskard:
@@ -19,7 +21,13 @@ def create_giskard() -> Giskard:
         read from its topic.
     """
     return Giskard(
-        world_config=WorldWithHSRConfig(urdf=get_robot_description()),
+        world_source=WorldSpecification(
+            robots=[
+                RobotSpecification.specify_real_robot(
+                    HSRB, urdf=get_robot_description()
+                )
+            ]
+        ),
         robot_interface_config=HSRVelocityInterface(),
         server_config=GiskardServerConfig(debug_mode=False),
         qp_controller_config=QPControllerConfig(

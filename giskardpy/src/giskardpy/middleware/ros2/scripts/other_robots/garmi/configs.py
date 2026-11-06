@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from giskardpy.middleware.ros2.command_publishing import (
@@ -13,9 +13,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     RootTipPair,
 )
-from giskardpy.model.world_config import WorldWithMobileRobot
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.garmi import Garmi, GarmiJoint
+from semantic_digital_twin.robots.garmi import GarmiJoint
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     OmniDrive,
@@ -32,23 +30,6 @@ class GarmiInteractiveMarkerChain(Enum):
 
 
 @dataclass
-class WorldWithGarmiConfig(WorldWithMobileRobot):
-    """
-    World configuration for the GARMI robot.
-
-    Builds a map -> odom -> GARMI kinematic tree using an omni-drive base.
-    """
-
-    odometry_body_name: PrefixedName = field(
-        default_factory=lambda: PrefixedName("odom")
-    )
-    robot_class: type[Garmi] = field(kw_only=True, default=Garmi, init=False)
-    """
-    The robot class that is applied to the parsed description.
-    """
-
-
-@dataclass
 class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Closed-loop velocity interface for the real GARMI robot.
@@ -62,7 +43,7 @@ class GarmiVelocityInterface(ClosedLoopRobotInterfaceConfig):
         self.sync_6dof_joint_with_tf_frame(
             joint=self.world.get_connections_by_type(Connection6DoF)[0],
             tf_parent_frame="map",
-            tf_child_frame="odom",
+            tf_child_frame=self.robot.mobile_base.odometry_body_name,
         )
         omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
         self.sync_odometry_topic("/r100_0603/platform/odom/filtered", omni_drive)

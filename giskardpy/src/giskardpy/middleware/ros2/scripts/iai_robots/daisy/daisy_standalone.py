@@ -3,12 +3,14 @@ import argparse
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyInteractiveMarkerChain,
-    WorldWithDAiSyConfig,
 )
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     InteractiveMarkerNode,
 )
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
 def create_giskard() -> Giskard:
@@ -17,7 +19,9 @@ def create_giskard() -> Giskard:
     declares.
     """
     return Giskard.standalone(
-        world_config=WorldWithDAiSyConfig(),
+        world_source=WorldSpecification(
+            robots=[RobotSpecification.specify_real_robot(DAiSy)]
+        ),
         qp_controller_config=QPControllerConfig(target_frequency=33),
     )
 

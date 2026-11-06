@@ -10,6 +10,7 @@ from semantic_digital_twin.exceptions import UsageError
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.input_source import InputSource
     from semantic_digital_twin.robots.robot_part_mixins import RobotPartMixin
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 # %% assumptions a robot part makes about what is attached to it
 
@@ -290,3 +291,50 @@ class InvalidRobotAnnotation(UsageError):
 
     def suggest_correction(self) -> str:
         return "Restore consistent world entities, a default camera and robot part ownership."
+
+
+# %% a robot without a description
+
+
+@dataclass
+class RobotDescriptionMissingError(UsageError):
+    """
+    Raised when a robot is read from its description, but its class declares no
+    description file.
+    """
+
+    robot_class: type[AbstractRobot]
+    """
+    The robot class that declares no description file.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.robot_class.__name__} declares no description file."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Give the robot specification a parser of the robot's description, or "
+            "use a robot class that declares its description file."
+        )
+
+
+@dataclass
+class StartPoseWithoutMobileBaseError(UsageError):
+    """
+    Raised when a robot without a mobile base is given a start pose relative to an
+    odometry frame it does not have.
+    """
+
+    robot_class: type[AbstractRobot]
+    """
+    The robot class without a mobile base.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.robot_class.__name__} has no mobile base, so it has no odometry "
+            f"frame a start pose could be relative to."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Place the robot with its localization pose instead."

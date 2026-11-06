@@ -11,24 +11,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
     StandAloneRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDAiSyConfig,
-)
-from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
-    WorldWithHSRConfig,
-)
-from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    WorldWithPR2Config,
-)
-from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    WorldWithStretchConfigDiffDrive,
-)
-from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
-    WorldWithTracyConfig,
-)
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.model.world_config import EmptyWorld, WorldConfig
 from semantic_digital_twin.adapters.ros.input_synchronization import (
     LatestJointPositionSource,
     PendingJointPositionSource,
@@ -36,12 +19,10 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
 )
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from semantic_digital_twin.robots.input_source import SimulatedJointPositionSource
-from semantic_digital_twin.robots.daisy import DAiSy
-from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_source import WorldSource
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     DifferentialDrive,
@@ -78,7 +59,7 @@ def test_attaching_lets_the_interface_reach_the_server_config():
     server_config = GiskardServerConfig()
     interface = StandAloneRobotInterfaceConfig()
     giskard = Giskard(
-        world_config=EmptyWorld(),
+        world_source=WorldSpecification(),
         server_config=server_config,
         robot_interface_config=interface,
         qp_controller_config=QPControllerConfig(target_frequency=50),
@@ -117,12 +98,12 @@ def controlled_joint_names(world: World) -> set[str]:
     }
 
 
-def set_up_standalone(world_config: WorldConfig) -> Giskard:
+def set_up_standalone(world_source: WorldSource) -> Giskard:
     """
-    A Giskard that simulates the robot of ``world_config`` and is ready for goals.
+    A Giskard that simulates the robot of ``world_source`` and is ready for goals.
     """
     giskard = Giskard(
-        world_config=world_config,
+        world_source=world_source,
         robot_interface_config=StandAloneRobotInterfaceConfig(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),
@@ -131,99 +112,75 @@ def set_up_standalone(world_config: WorldConfig) -> Giskard:
     return giskard
 
 
-def test_standalone_controls_the_joints_tracy_declares(init_rospy, tracy_world) -> None:
-    giskard = set_up_standalone(
-        WorldWithTracyConfig(urdf=load_xacro(Tracy.get_ros_file_path()))
-    )
+def test_standalone_controls_the_joints_tracy_declares(
+    init_rospy, tracy_world, tracy_world_specification
+) -> None:
+    giskard = set_up_standalone(tracy_world_specification)
 
-    assert controlled_joint_names(giskard.world_config.world) == (
+    assert controlled_joint_names(giskard.world) == (
         controlled_joint_names(tracy_world)
     )
 
 
-def test_standalone_controls_the_joints_daisy_declares(init_rospy, daisy_world) -> None:
-    giskard = set_up_standalone(
-        WorldWithDAiSyConfig(urdf=load_xacro(DAiSy.get_ros_file_path()))
-    )
+def test_standalone_controls_the_joints_daisy_declares(
+    init_rospy, daisy_world, daisy_world_specification
+) -> None:
+    giskard = set_up_standalone(daisy_world_specification)
 
-    assert controlled_joint_names(giskard.world_config.world) == (
+    assert controlled_joint_names(giskard.world) == (
         controlled_joint_names(daisy_world)
     )
 
 
 def test_standalone_controls_the_joints_the_pr2_declares(
-    init_rospy, pr2_world_copy
+    init_rospy, pr2_world_copy, pr2_world_specification
 ) -> None:
-    giskard = set_up_standalone(
-        WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path()))
-    )
+    giskard = set_up_standalone(pr2_world_specification)
 
-    assert controlled_joint_names(giskard.world_config.world) == (
+    assert controlled_joint_names(giskard.world) == (
         controlled_joint_names(pr2_world_copy)
     )
 
 
 def test_standalone_controls_the_joints_the_hsr_declares(
-    init_rospy, _hsr_world_setup
+    init_rospy, _hsr_world_setup, hsr_world_specification
 ) -> None:
-    giskard = set_up_standalone(
-        WorldWithHSRConfig(urdf=load_xacro(HSRB.get_ros_file_path()))
-    )
+    giskard = set_up_standalone(hsr_world_specification)
 
-    assert controlled_joint_names(giskard.world_config.world) == (
+    assert controlled_joint_names(giskard.world) == (
         controlled_joint_names(_hsr_world_setup)
     )
 
 
 def test_standalone_controls_the_joints_stretch_declares(
-    init_rospy, stretch_world_copy
+    init_rospy, stretch_world_copy, stretch_world_specification
 ) -> None:
-    giskard = set_up_standalone(
-        WorldWithStretchConfigDiffDrive(urdf=load_xacro(Stretch.get_ros_file_path()))
-    )
+    giskard = set_up_standalone(stretch_world_specification)
 
-    assert controlled_joint_names(giskard.world_config.world) == (
+    assert controlled_joint_names(giskard.world) == (
         controlled_joint_names(stretch_world_copy)
     )
 
 
-# %% the world config flags the drive it creates
+# %% the world specification flags the drive it creates
 
 
-def test_a_world_with_an_omni_drive_robot_controls_its_drive() -> None:
-    world_config = WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path()))
-    with world_config.world.modify_world():
-        world_config.setup_world()
+def test_a_world_with_an_omni_drive_robot_controls_its_drive(
+    pr2_world_specification,
+) -> None:
+    world = pr2_world_specification.create_world()
 
-    [drive] = world_config.world.get_connections_by_type(OmniDrive)
+    [drive] = world.get_connections_by_type(OmniDrive)
     assert drive.is_controlled
 
 
-def test_a_world_with_a_differential_drive_robot_controls_its_drive() -> None:
-    world_config = WorldWithStretchConfigDiffDrive(
-        urdf=load_xacro(Stretch.get_ros_file_path())
-    )
-    with world_config.world.modify_world():
-        world_config.setup_world()
+def test_a_world_with_a_differential_drive_robot_controls_its_drive(
+    stretch_world_specification,
+) -> None:
+    world = stretch_world_specification.create_world()
 
-    [drive] = world_config.world.get_connections_by_type(DifferentialDrive)
+    [drive] = world.get_connections_by_type(DifferentialDrive)
     assert drive.is_controlled
-
-
-def test_a_world_with_a_drive_limits_the_velocity_of_its_drive() -> None:
-    world_config = WorldWithPR2Config(
-        urdf=load_xacro(PR2.get_ros_file_path()),
-        translation_velocity_limit=0.4,
-        rotation_velocity_limit=0.7,
-    )
-    with world_config.world.modify_world():
-        world_config.setup_world()
-
-    [drive] = world_config.world.get_connections_by_type(OmniDrive)
-    assert drive.x_velocity.limits.upper.velocity == (
-        world_config.translation_velocity_limit
-    )
-    assert drive.yaw.limits.upper.velocity == world_config.rotation_velocity_limit
 
 
 # %% in closed loop only commanded joints are controlled
@@ -246,12 +203,15 @@ class GroupCommandingInterface(ClosedLoopRobotInterfaceConfig):
         )
 
 
-def closed_loop_pr2(interface: ClosedLoopRobotInterfaceConfig) -> Giskard:
+def closed_loop_pr2(
+    interface: ClosedLoopRobotInterfaceConfig,
+    pr2_world_specification: WorldSpecification,
+) -> Giskard:
     """
     A Giskard that commands a PR2 through ``interface``, not set up yet.
     """
     return Giskard(
-        world_config=WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path())),
+        world_source=pr2_world_specification,
         robot_interface_config=interface,
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),
@@ -260,32 +220,40 @@ def closed_loop_pr2(interface: ClosedLoopRobotInterfaceConfig) -> Giskard:
 
 def test_a_closed_loop_interface_that_commands_nothing_controls_no_joint(
     init_rospy,
+    pr2_world_specification,
 ) -> None:
-    giskard = closed_loop_pr2(GroupCommandingInterface(joint_names=[]))
+    giskard = closed_loop_pr2(
+        GroupCommandingInterface(joint_names=[]), pr2_world_specification
+    )
 
     with pytest.raises(NoControlledJointsError):
         giskard.setup()
 
 
-def test_closed_loop_controls_exactly_the_commanded_joints(init_rospy) -> None:
+def test_closed_loop_controls_exactly_the_commanded_joints(
+    init_rospy, pr2_world_specification
+) -> None:
     interface = GroupCommandingInterface(
         joint_names=[PR2Joint.HEAD_PAN, PR2Joint.HEAD_TILT]
     )
-    giskard = closed_loop_pr2(interface)
+    giskard = closed_loop_pr2(interface, pr2_world_specification)
 
     giskard.setup()
 
-    assert controlled_joint_names(giskard.world_config.world) == set(
-        interface.joint_names
+    assert controlled_joint_names(giskard.world) == set(interface.joint_names)
+
+
+def test_closed_loop_does_not_control_a_drive_nothing_commands(
+    init_rospy, pr2_world_specification
+) -> None:
+    giskard = closed_loop_pr2(
+        GroupCommandingInterface(joint_names=[PR2Joint.HEAD_PAN]),
+        pr2_world_specification,
     )
 
-
-def test_closed_loop_does_not_control_a_drive_nothing_commands(init_rospy) -> None:
-    giskard = closed_loop_pr2(GroupCommandingInterface(joint_names=[PR2Joint.HEAD_PAN]))
-
     giskard.setup()
 
-    [drive] = giskard.world_config.world.get_connections_by_type(OmniDrive)
+    [drive] = giskard.world.get_connections_by_type(OmniDrive)
     assert not drive.is_controlled
 
 
@@ -304,21 +272,23 @@ class DriveCommandingInterface(ClosedLoopRobotInterfaceConfig):
 
 def test_a_drive_command_without_a_drive_commands_the_only_drive_of_the_world(
     init_rospy,
+    pr2_world_specification,
 ) -> None:
-    giskard = closed_loop_pr2(DriveCommandingInterface())
+    giskard = closed_loop_pr2(DriveCommandingInterface(), pr2_world_specification)
 
     giskard.setup()
 
-    [drive] = giskard.world_config.world.get_connections_by_type(OmniDrive)
+    [drive] = giskard.world.get_connections_by_type(OmniDrive)
     [publisher] = giskard.motion_server.control_loop.command_publishers
     assert publisher.connection is drive
 
 
 def test_a_drive_command_without_a_drive_in_a_world_without_a_drive_raises(
     init_rospy,
+    tracy_world_specification,
 ) -> None:
     giskard = Giskard(
-        world_config=WorldWithTracyConfig(urdf=load_xacro(Tracy.get_ros_file_path())),
+        world_source=tracy_world_specification,
         robot_interface_config=DriveCommandingInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),
@@ -344,12 +314,12 @@ class PartReadingInterface(GroupCommandingInterface):
 
 
 @pytest.fixture()
-def pr2_reading_its_own_parts(init_rospy) -> Giskard:
+def pr2_reading_its_own_parts(init_rospy, pr2_world_specification) -> Giskard:
     """
     A closed-loop Giskard whose PR2 is read from what the robot publishes.
     """
     giskard = Giskard(
-        world_config=WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path())),
+        world_source=pr2_world_specification,
         robot_interface_config=PartReadingInterface(joint_names=[PR2Joint.HEAD_PAN]),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),
@@ -425,12 +395,12 @@ class BaseReadingInterface(GroupCommandingInterface):
 
 
 @pytest.fixture()
-def pr2_reading_only_its_base(init_rospy) -> Giskard:
+def pr2_reading_only_its_base(init_rospy, pr2_world_specification) -> Giskard:
     """
     A closed-loop Giskard whose PR2 reads only its base from what the robot publishes.
     """
     giskard = Giskard(
-        world_config=WorldWithPR2Config(urdf=load_xacro(PR2.get_ros_file_path())),
+        world_source=pr2_world_specification,
         robot_interface_config=BaseReadingInterface(joint_names=[PR2Joint.HEAD_PAN]),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=25),

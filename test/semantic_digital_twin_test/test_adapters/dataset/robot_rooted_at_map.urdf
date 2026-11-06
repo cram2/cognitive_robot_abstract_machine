@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot name="robot_rooted_at_map">
+  <link name="map"/>
+  <link name="base_link"/>
+  <joint name="map_to_base" type="fixed">
+    <parent link="map"/>
+    <child link="base_link"/>
+  </joint>
+</robot>

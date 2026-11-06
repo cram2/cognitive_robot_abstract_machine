@@ -190,3 +190,20 @@ class DriveServos:
     How hard the servo on yaw turns the base towards its commanded angular velocity,
     in newton metre per radian per second.
     """
+
+
+@dataclass
+class DriveVelocityLimits:
+    """
+    How fast a drive may move a mobile base across the floor.
+    """
+
+    translation: float
+    """
+    The fastest the base may move along the floor, in meter per second.
+    """
+
+    rotation: float
+    """
+    The fastest the base may turn about its yaw, in radian per second.
+    """
