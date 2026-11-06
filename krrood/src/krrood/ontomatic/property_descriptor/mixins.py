@@ -135,7 +135,7 @@ class HasChainAxioms(ABC):
 
 
 @dataclass
-class IsBaseClass(ABC):
+class OntologyBaseClass(ABC):
     """
     A mixin for the class every class of a generated ontology module inherits from.
     """
