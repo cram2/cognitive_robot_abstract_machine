@@ -79,16 +79,19 @@ class NamingRules(Section):
     )
 
     NO_LEADING_PREPOSITIONS = (
-        "Never begin a function or method name with a preposition such as "
+        "Never begin a function or method name with one of the prepositions "
         + ", ".join(
             f"`{preposition.text}_`"
             for preposition in LeadingPrepositionChecker.leading_prepositions
         )
-        + ": the phrase it starts is only finished by the class name in front of "
-        "it. The exception is an alternative constructor or a conversion named "
-        "`from_<source>` or `to_<target>`, such as `from_json` or `to_json`",
+        + ": the phrase it starts is only finished by the class name in front of it",
         (),
         LeadingPrepositionChecker(),
+    )
+
+    RESERVE_FROM_AND_TO_FOR_CONVERSIONS = (
+        "Begin a function or method name with `from_` or `to_` only for an "
+        "alternative constructor or a conversion, such as `from_json` or `to_json`"
     )
 
     USE_PLAIN_WORDS = (
