@@ -217,6 +217,16 @@ def variable(
     )
 
 
+def literal(value: T) -> Union[T, Literal[T]]:
+    """
+    Declare an expression whose only value is *value*.
+
+    :param value: The value the expression stands for.
+    :return: A literal of *value* that can be used inside queries.
+    """
+    return Literal(_value_=value, _type_=type(value))
+
+
 def deduced_variable(
     type_: type[T] | None = None,
 ) -> Union[type[T], ExternallySetVariable[T]]:

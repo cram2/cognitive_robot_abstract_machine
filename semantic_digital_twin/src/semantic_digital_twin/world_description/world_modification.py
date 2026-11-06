@@ -296,7 +296,6 @@ class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
 
 @dataclass
 class RemoveDegreeOfFreedomModification(WorldModification):
-
     degree_of_freedom_id: UUID
 
     degree_of_freedom: DegreeOfFreedom | None = field(default=None, repr=False)
@@ -375,7 +374,6 @@ class AddSemanticAnnotationModification(WorldModification, SubclassJSONSerialize
 
 @dataclass
 class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerializer):
-
     semantic_annotation_id: UUID
 
     semantic_annotation_json: JSONData | None = field(default=None)
@@ -556,9 +554,9 @@ class SetDofHasHardwareInterface(WorldModification):
 
     def apply(self, world: World):
         for dof_id in self.degree_of_freedom_ids:
-            world.get_degree_of_freedom_by_id(dof_id).has_hardware_interface = (
-                self.value
-            )
+            world.get_degree_of_freedom_by_id(
+                dof_id
+            ).has_hardware_interface = self.value
 
     def revert(self, world: World):
         dofs_by_previous_value: dict[bool, list[DegreeOfFreedom]] = {}
@@ -729,6 +727,8 @@ def synchronized_attribute_modification(func):
 
     @wraps(func)
     def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
+        if not self._world._model_manager._active_world_model_update_context_manager_ids:
+            raise MissingWorldModificationContextError(func)
 
         object_before_change = to_json(self)
         result = func(self, *args, **kwargs)
@@ -744,11 +744,6 @@ def synchronized_attribute_modification(func):
         current_model_modification_block = (
             self._world.get_world_model_manager().current_model_modification_block
         )
-        if (
-            not self._world._model_manager._active_world_model_update_context_manager_ids
-        ):
-            raise MissingWorldModificationContextError(func)
-
         current_model_modification_block.append(
             AttributeUpdateModification.from_kwargs(
                 {

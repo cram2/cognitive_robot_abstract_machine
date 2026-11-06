@@ -140,3 +140,54 @@ class FunctionMapping(AlternativeMapping[FunctionType]):
             return getattr(getattr(module, self.class_name), self.function_name)
         else:
             return getattr(module, self.function_name)
+
+
+@dataclass(eq=False)
+class ExceptionMapping(AlternativeMapping[Exception]):
+    """
+    Alternative mapping for exceptions, which keeps the exceptions they are chained to
+    as rows of their own.
+    """
+
+    exception_type: type[Exception]
+    """
+    The class of the exception.
+    """
+
+    message: str
+    """
+    What the exception says: its only argument as text, or its text form if it has any
+    other number of arguments.
+
+    A plain exception is rebuilt with it.
+    """
+
+    raised_from: Exception | None = None
+    """
+    The exception this one was raised from with ``raise ...
+
+    from``, if any.
+    """
+
+    raised_while_handling: Exception | None = None
+    """
+    The exception that was being handled when this one was raised, if any.
+    """
+
+    @classmethod
+    def from_domain_object(cls, obj: Exception) -> Self:
+        return cls(
+            exception_type=type(obj),
+            message=str(obj.args[0]) if len(obj.args) == 1 else str(obj),
+            raised_from=obj.__cause__,
+            raised_while_handling=obj.__context__,
+        )
+
+    def to_domain_object(self) -> Exception:
+        # allocated without __init__, so a subclass with a constructor of its own, such
+        # as a dataclass exception, is not called with the message
+        exception = self.exception_type.__new__(self.exception_type, self.message)
+        exception.__context__ = self.raised_while_handling
+        if self.raised_from is not None:
+            exception.__cause__ = self.raised_from
+        return exception
