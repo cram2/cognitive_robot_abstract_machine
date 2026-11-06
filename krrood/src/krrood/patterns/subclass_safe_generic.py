@@ -484,14 +484,14 @@ class SubClassSafeGeneric(ABC):
         :param base: The base to resolve.
         :return: A tuple of the origin class and its generic arguments.
         """
+        # Not issubclass: it corrupts the ABC caches of the class being created.
         origin = get_origin(base)
         if origin is None:
-            if isclass(base) and issubclass(base, SubClassSafeGeneric):
+            if isclass(base) and SubClassSafeGeneric in base.__mro__:
                 return base, ()
             return None, ()
 
-        # Ensure origin is a class before calling issubclass
-        if isclass(origin) and issubclass(origin, SubClassSafeGeneric):
+        if isclass(origin) and SubClassSafeGeneric in origin.__mro__:
             return origin, get_args(base)
 
         return None, ()

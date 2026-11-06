@@ -77,6 +77,8 @@ try:
     from probabilistic_model.causal_structure.identification import (
         AdjustmentSelector,
         AdjustmentSet,
+        DeclaredAdjustmentPolicy,
+        InvalidDeclaredAdjustmentRefusal,
     )
     from probabilistic_model.causal_structure.learning import LearnedCausalStructure
 except ImportError as e:
@@ -95,6 +97,8 @@ except ImportError as e:
     NodeReference = NoneType
     NodeLevel = NoneType
     AdjustmentSelector = NoneType
+    DeclaredAdjustmentPolicy = NoneType
+    InvalidDeclaredAdjustmentRefusal = NoneType
     LearnedCausalStructure = NoneType
 
 T = TypeVar("T")
@@ -356,6 +360,14 @@ class ProbabilisticBackend(GenerativeBackend):
     alone, unchecked.
     """
 
+    declared_adjustment_policy: DeclaredAdjustmentPolicy = field(
+        kw_only=True, default_factory=InvalidDeclaredAdjustmentRefusal
+    )
+    """
+    What a causal query about a class in :attr:`causal_structures` does with the
+    variables marked ``confounder`` when the learned structure finds them invalid.
+    """
+
     def evaluate(self, expression: Evaluable) -> Iterable[T]:
         if isinstance(expression, ProbabilisticQuery):
             yield expression._resolve_(self.model_registry)
@@ -570,10 +582,10 @@ class ProbabilisticBackend(GenerativeBackend):
     ) -> None:
         """
         Let the causal structure learned for the queried class choose, for every cause
-        candidate, the variables its intervention adjusts for (see
-        :meth:`adjustment_candidates`); or check the variables marked ``confounder``
-        against it. Does nothing for a class without a structure in
-        :attr:`causal_structures`, or a query without a ``cause``.
+        candidate, the variables its intervention adjusts for, or settle the variables
+        marked ``confounder`` (see :meth:`adjustment_candidates`). Does nothing for a
+        class without a structure in :attr:`causal_structures`, or a query without a
+        ``cause``.
 
         :param parameters: The parameters extracted from *expression*, which record the
             chosen variables.
@@ -581,7 +593,8 @@ class ProbabilisticBackend(GenerativeBackend):
         :raises VariableNotInCausalGraph: If the cause or the effect has no node in the
             learned graph.
         :raises InvalidAdjustmentSet: If the variables marked ``confounder`` fail the
-            adjustment criterion in the learned graph.
+            adjustment criterion in the learned graph and
+            :attr:`declared_adjustment_policy` refuses them.
         :raises EffectNotIdentified: If the learned graph identifies the effect by no
             set of the variables the query names; :meth:`interventional_range` answers
             an effect it identifies up to a few candidate sets.
@@ -592,20 +605,6 @@ class ProbabilisticBackend(GenerativeBackend):
         cause_effect = self._resolve_cause_and_effect_variables(parameters, expression)
         selector = structure.selector
         for cause_variable in cause_effect.cause_variables:
-            if parameters.search_confounder_variables:
-                selector.check_declared(
-                    self._reference_in(selector.graph, cause_variable).node,
-                    self._reference_in(
-                        selector.graph, cause_effect.effect_variable
-                    ).node,
-                    AdjustmentSet(
-                        frozenset(
-                            self._reference_in(selector.graph, variable).node
-                            for variable in parameters.search_confounder_variables
-                        )
-                    ),
-                )
-                continue
             candidates = self.adjustment_candidates(
                 parameters,
                 structure,
@@ -659,9 +658,10 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         Ask the learned structure what intervening on one cause adjusts for, among the
         variables the query names and the aggregation statistics a relational grounding
-        keeps. A chosen statistic the query does not name is added to its parameters'
-        variables. A part attribute's node stands for the copy on the part the cause, or
-        else the effect, sits on.
+        keeps; the variables marked ``confounder`` are settled by
+        :attr:`declared_adjustment_policy`. A chosen statistic the query does not name is
+        added to its parameters' variables. A part attribute's node stands for the copy
+        on the part the cause, or else the effect, sits on.
 
         :param parameters: The query's parameters.
         :param structure: The structure learned for the queried class.
@@ -670,8 +670,8 @@ class ProbabilisticBackend(GenerativeBackend):
         :param cause_variable: The cause.
         :param effect_variable: The effect.
         :return: What the structure says, with the variables of every candidate set.
-        :raises VariableNotInCausalGraph: If the cause or the effect has no node in the
-            learned graph.
+        :raises VariableNotInCausalGraph: If the cause, the effect or a variable marked
+            ``confounder`` has no node in the learned graph.
         """
         cause = self._reference_in(selector.graph, cause_variable)
         effect = self._reference_in(selector.graph, effect_variable)
@@ -680,8 +680,25 @@ class ProbabilisticBackend(GenerativeBackend):
             parameters,
             cause.part_index if cause.part_index is not None else effect.part_index,
         )
-        identification = selector.identify(
-            cause.node, effect.node, set(eligible), structure.training_rows
+        declared = AdjustmentSet(
+            frozenset(
+                self._reference_in(selector.graph, variable).node
+                for variable in parameters.search_confounder_variables
+            )
+        )
+        identification = (
+            self.declared_adjustment_policy.identify(
+                selector,
+                cause.node,
+                effect.node,
+                declared,
+                set(eligible),
+                structure.training_rows,
+            )
+            if declared.nodes
+            else selector.identify(
+                cause.node, effect.node, set(eligible), structure.training_rows
+            )
         )
         return AdjustmentCandidates(
             cause_variable=cause_variable,
