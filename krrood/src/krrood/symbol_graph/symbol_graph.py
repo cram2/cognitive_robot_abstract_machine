@@ -500,22 +500,6 @@ class SymbolGraph(metaclass=SingletonMeta):
             for _, _, edge in self._instance_graph.out_edges(wrapped_instance.index)
         )
 
-    def subgraph_of_relations_of_fields(
-        self, condition: Callable[[WrappedField], bool]
-    ) -> PyDiGraph[WrappedInstance, PredicateClassRelation]:
-        """
-        :param condition: Whether the relations of a field belong to the subgraph.
-        :return: The subgraph of the instance graph made of the relations of the fields that meet the condition and of
-            the instances they relate.
-        """
-        return self._instance_graph.edge_subgraph(
-            [
-                (relation.source.index, relation.target.index)
-                for relation in self.relations()
-                if condition(relation.wrapped_field)
-            ]
-        )
-
     def to_dot(
         self,
         filepath: str,

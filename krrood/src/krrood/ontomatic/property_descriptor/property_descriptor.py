@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field, fields
 from functools import cached_property, lru_cache
 
-from typing_extensions import ClassVar, Any, Iterable, Iterator, Dict, List
+from typing_extensions import ClassVar, Any, Iterable, Dict, List
 
 from krrood.ontomatic.property_descriptor.mixins import HasChainAxioms
 from krrood.ontomatic.property_descriptor.monitored_container import (
@@ -18,10 +18,7 @@ from krrood.ontomatic.property_descriptor.monitored_container import (
 from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
     PropertyDescriptorRelation,
 )
-from krrood.ontomatic.failures import (
-    DescriptorNotDeclaredForDomain,
-    UnMonitoredContainerTypeForDescriptor,
-)
+from krrood.ontomatic.failures import UnMonitoredContainerTypeForDescriptor
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,
     Association,
@@ -29,7 +26,6 @@ from krrood.class_diagrams.class_diagram import (
 )
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.predicate import Symbol
-from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import (
     SymbolGraph,
 )
@@ -230,54 +226,20 @@ class PropertyDescriptor(Symbol):
 
     def _update_domain_and_range(self):
         """
-        Update the domain and range sets and the domain-range map for this descriptor type.
-        """
-        self._register_for_domain(self.domain)
-
-    def _register_for_domain(self, domain: SymbolType):
-        """
-        Register this descriptor instance as the one managing the field for instances of the domain, and the domain
-        as a domain of this descriptor type and its super descriptor types.
+        Update the domain and range sets and the domain-range map for this descriptor type, and register this
+        descriptor instance as the one managing the field for instances of its domain.
         """
         range_type = self.wrapped_field.type_endpoint
         assert issubclass(range_type, Symbol)
-        self.domain_range_map[self.__class__][domain] = range_type
-        self.descriptor_instances_by_domain_type[self.__class__][domain] = self
+        self.domain_range_map[self.__class__][self.domain] = range_type
+        self.descriptor_instances_by_domain_type[self.__class__][self.domain] = self
         for super_class in self.__class__.__mro__:
             if (super_class is PropertyDescriptor) or not issubclass(
                 super_class, PropertyDescriptor
             ):
                 continue
-            self.all_domains[super_class].add(domain)
+            self.all_domains[super_class].add(self.domain)
             self.all_ranges[super_class].add(range_type)
-
-    @classmethod
-    def get_descriptor_instance_for_domain_type(
-        cls, domain_type: SymbolType
-    ) -> PropertyDescriptor:
-        """
-        :param domain_type: A class whose instances have the field this descriptor type manages.
-        :return: The descriptor instance declared for the class, or else for the nearest class it inherits the field
-            from, its role takers' classes included.
-        :raises DescriptorNotDeclaredForDomain: If neither the class nor a class it inherits from declares it.
-        """
-        descriptors = cls.descriptor_instances_by_domain_type[cls]
-        for inherited_type in cls._types_a_domain_inherits_fields_from(domain_type):
-            if inherited_type in descriptors:
-                return descriptors[inherited_type]
-        raise DescriptorNotDeclaredForDomain(cls, domain_type)
-
-    @staticmethod
-    def _types_a_domain_inherits_fields_from(domain_type: type) -> Iterator[type]:
-        """
-        :return: The classes of the method resolution order of the domain type, followed by those of the role-taker
-            type when the domain type is a role.
-        """
-        yield from domain_type.__mro__
-        if issubclass(domain_type, Role) and domain_type is not Role:
-            yield from PropertyDescriptor._types_a_domain_inherits_fields_from(
-                domain_type.get_role_taker_type()
-            )
 
     @cached_property
     def range(self) -> SymbolType:
