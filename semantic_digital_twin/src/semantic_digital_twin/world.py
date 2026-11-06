@@ -2072,9 +2072,7 @@ class World(HasSimulatorProperties):
                 new_world.add_degree_of_freedom(dof)
                 new_world.state[dof.id] = branch_state[dof.id]
 
-            # connections go before their entities: removing a node makes rustworkx drop
-            # its edges, so a connection removed afterwards is recorded against entities
-            # its own history has already dropped, and can no longer be replayed
+            # connections first: one removed after its entities cannot be replayed
             self.remove_connection(root_connection)
             for connection in child_body_parent_connections:
                 self.remove_connection(connection)
