@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field, fields
 from functools import cached_property, lru_cache
 
-from typing_extensions import ClassVar, Any, Iterable, Dict, List
+from typing_extensions import TYPE_CHECKING, ClassVar, Any, Iterable, Dict, List, Self
 
 from krrood.ontomatic.property_descriptor.mixins import HasChainAxioms
 from krrood.ontomatic.property_descriptor.monitored_container import (
@@ -33,6 +33,9 @@ from krrood.entity_query_language.utils import make_set
 from krrood.patterns.caching import memoize
 from krrood.utils import recursive_subclasses
 
+if TYPE_CHECKING:
+    from krrood.entity_query_language.core.mapped_variable import Attribute
+
 SymbolType = type[Symbol]
 """
 Type alias for symbol types.
@@ -54,9 +57,19 @@ class PropertyChain:
     The descriptor classes of the chain, in order.
     """
 
+    def positions_of(self, descriptor_class: type[PropertyDescriptor]) -> list[int]:
+        """
+        :return: The indices at which the descriptor class appears in the chain.
+        """
+        return [
+            index
+            for index, chain_descriptor_class in enumerate(self.properties)
+            if chain_descriptor_class is descriptor_class
+        ]
+
 
 @dataclass(frozen=True)
-class ChainPosition:
+class PropertyChainPosition:
     """
     The place of a descriptor class in a property chain that implies another descriptor class.
     """
@@ -169,19 +182,27 @@ class PropertyDescriptor(Symbol):
         self._update_domain_and_range()
 
     @classmethod
-    def chain_positions(cls) -> list[ChainPosition]:
+    def from_eql_attribute(cls, attribute: Attribute) -> Self:
+        """
+        :param attribute: The field as an attribute of a symbolic variable of its class,
+            e.g. ``a(Person).parent_of``.
+        :return: A descriptor of this class managing that field of that class.
+        """
+        return cls(attribute._owner_class_, attribute._attribute_name_)
+
+    @classmethod
+    def chain_positions(cls) -> list[PropertyChainPosition]:
         """
         :return: The positions this descriptor class takes in the property chains that imply descriptor classes.
         """
         return [
-            ChainPosition(implied_descriptor, chain, index)
+            PropertyChainPosition(implied_descriptor, chain, index)
             for implied_descriptor in dict.fromkeys(
                 recursive_subclasses(PropertyDescriptor)
             )
             if issubclass(implied_descriptor, HasChainAxioms)
             for chain in implied_descriptor.get_chain_axioms()
-            for index, descriptor_class in enumerate(chain.properties)
-            if descriptor_class is cls
+            for index in chain.positions_of(cls)
         ]
 
     @cached_property

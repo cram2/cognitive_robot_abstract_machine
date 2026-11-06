@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Set
 
+from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ontomatic.property_descriptor.mixins import HasChainAxioms
 from krrood.ontomatic.property_descriptor.property_descriptor import (
@@ -58,5 +59,9 @@ class AncestorOf(PropertyDescriptor, HasChainAxioms):
         ]
 
 
-PersonWithAncestors.parent_of = ParentOf(PersonWithAncestors, "parent_of")
-PersonWithAncestors.ancestor_of = AncestorOf(PersonWithAncestors, "ancestor_of")
+PersonWithAncestors.parent_of = ParentOf.from_eql_attribute(
+    a(PersonWithAncestors).parent_of
+)
+PersonWithAncestors.ancestor_of = AncestorOf.from_eql_attribute(
+    a(PersonWithAncestors).ancestor_of
+)
