@@ -6,9 +6,32 @@ the object it belongs to.
 from __future__ import annotations
 
 from krrood.class_diagrams.call_arguments import CallArguments
-from krrood.entity_query_language.ground_term import CallTerm
+from krrood.entity_query_language.ground_term import CallTerm, ObjectIdentity
 
 from ..dataset.objects_compared_by_value import PointComparedByValue
+
+# %% object identities
+
+
+def test_identity_of_an_object_differs_from_the_object_itself():
+    point = PointComparedByValue(1.0)
+
+    assert ObjectIdentity(point) != point
+    assert point != ObjectIdentity(point)
+
+
+def test_identities_of_one_object_are_equal_and_hash_alike():
+    point = PointComparedByValue(1.0)
+
+    assert ObjectIdentity(point) == ObjectIdentity(point)
+    assert hash(ObjectIdentity(point)) == hash(ObjectIdentity(point))
+
+
+def test_identities_of_equal_objects_differ():
+    assert ObjectIdentity(PointComparedByValue(1.0)) != ObjectIdentity(
+        PointComparedByValue(1.0)
+    )
+
 
 # %% method receivers
 
