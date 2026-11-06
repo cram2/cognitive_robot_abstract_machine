@@ -441,8 +441,7 @@ class CartesianPositionTrajectory(CartesianTask):
         distances = np.linalg.norm(
             remaining_points - goal_reference_frame_P_tip_np, axis=1
         )
-        local_closest_index = np.argmin(distances)
-        self.current_index += local_closest_index
+        self.current_index += int(np.argmin(distances))
 
     def _compute_target_point(
         self, goal_reference_frame_P_tip_np: np.ndarray

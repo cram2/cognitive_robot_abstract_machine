@@ -586,6 +586,30 @@ class TestCartesianPositionTrajectory:
             atol=move_away.threshold + cartesian_trajectory.threshold,
         )
 
+    def test_current_index_stays_a_python_int(self, cylinder_bot_world: World):
+        """
+        The index advanced while following the trajectory keeps its declared type, so
+        database drivers and JSON encoders that reject numpy scalars can store it.
+        """
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        points = [Point3(0, y, 0, reference_frame=tip) for y in np.linspace(0, 0.2, 21)]
+
+        executor = StatechartExecutor(
+            context=StatechartContext(world=cylinder_bot_world),
+            extensions=[MotionControl()],
+        )
+        motion_statechart = Statechart(context=executor.context)
+        cartesian_trajectory = CartesianPositionTrajectory(
+            root_link=cylinder_bot_world.root, tip_link=tip, goal_points=points
+        )
+        motion_statechart.add_node(cartesian_trajectory)
+        motion_statechart.add_node(EndMotion.when_true(cartesian_trajectory))
+
+        executor.compile(statechart=motion_statechart)
+        executor.tick_until_end()
+
+        assert type(cartesian_trajectory.current_index) is int
+
     def test_cartesian_position_trajectory_spiral_pr2(
         self, pr2_world_state_reset: World, better_pr2_pose
     ):
