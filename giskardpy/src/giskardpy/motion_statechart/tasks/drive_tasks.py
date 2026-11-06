@@ -16,13 +16,13 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )

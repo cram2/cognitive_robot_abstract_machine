@@ -29,8 +29,8 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -363,6 +363,8 @@ def physically_simulated_block_context(stationary_block_context):
     The block world with a box narrow enough for the gripper standing on the table, and
     its physics running, so a plan performed in it is carried out by the robot's own
     servos.
+
+    The robot starts with its arms parked, as a real one is switched on.
     """
     world, view, extensions = stationary_block_context
     if not isinstance(view, Tracy):
@@ -387,6 +389,9 @@ def physically_simulated_block_context(stationary_block_context):
             )
         )
         world.add_semantic_annotations([HasGraspCandidates(root=narrow_box)])
+    for arm in view.all_arms:
+        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+    world.notify_state_change()
     # Under the default pyramidal friction cone, a held box creeps down in the grip.
     simulation = MujocoSim(
         world=world,

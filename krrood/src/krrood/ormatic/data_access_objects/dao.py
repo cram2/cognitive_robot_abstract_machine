@@ -1227,6 +1227,13 @@ class DataAccessObject(HasGeneric[T]):
         if not _uses_alternative_mapping(base_clazz):
             return
 
+        # a mapping that extends the parent's mapping already holds the parent's fields
+        if issubclass(
+            self.constructable_original_class(),
+            base_clazz.constructable_original_class(),
+        ):
+            return
+
         # The cache key uses id(self) because synthetic parent DAOs are only valid
         # for the lifetime of this specific DAO instance and are scoped to the
         # current conversion state to ensure identity consistency between discovery

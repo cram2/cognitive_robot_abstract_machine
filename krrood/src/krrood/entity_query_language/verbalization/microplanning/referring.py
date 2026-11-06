@@ -252,7 +252,7 @@ def operand_head_noun(node: Variable, edges: list[ParentEdge]) -> str:
     sole_field = _sole_predicate_field(edges)
     if sole_field is None:
         return "object"
-    predicate_class = sole_field.parent._type_
+    predicate_class = sole_field.parent._factory_
     metadata = GrammarMetadata.of_field(predicate_class, sole_field.field_name)
     if metadata is not None and metadata.display_name is not None:
         return metadata.display_name

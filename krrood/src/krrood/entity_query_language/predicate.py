@@ -34,22 +34,26 @@ if TYPE_CHECKING:
         VerbalizationFragment,
     )
 
-from krrood.entity_query_language.utils import T, merge_args_and_kwargs
+from krrood.class_diagrams.call_signature import CallSignature
+from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.variable import (
     Variable,
     InstantiatedVariable,
     Literal,
 )
 from krrood.entity_query_language.core.base_expressions import (
+    Operand,
     Selectable,
     SymbolicExpression,
 )
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
+from krrood.entity_query_language.exceptions import ResultTypeCannotBeDetermined
 from krrood.patterns.code_parsing_utils import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
+from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -69,12 +73,15 @@ def symbolic_function(
     :return: The decorated function.
     """
 
+    signature = CallSignature.of(function)
+
     @wraps(function)
     def wrapper(*args, **kwargs) -> Any | None:
-        all_kwargs = merge_args_and_kwargs(function, args, kwargs)
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        all_kwargs = signature.keyword_arguments(*args, **kwargs)
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
-                _type_=function,
+                _factory_=function,
+                _declared_factory_=wrapper,
                 _kwargs_=all_kwargs,
             )
         return function(*args, **kwargs)
@@ -226,15 +233,22 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """
 
     def __new__(cls, *args, **kwargs):
-        all_kwargs = merge_args_and_kwargs(
-            cls.__init__, args, kwargs, ignore_first=True
-        )
-        if _any_of_the_kwargs_is_a_variable(all_kwargs):
+        all_kwargs = CallSignature.of(cls).keyword_arguments(*args, **kwargs)
+        if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
-                _type_=cls,
+                _type_=cls._bound_value_type_,
+                _factory_=cls,
                 _kwargs_=all_kwargs,
             )
         return super().__new__(cls)
+
+    @classproperty
+    def _bound_value_type_(cls) -> type:
+        """
+        The type of the value :meth:`_bound_value_` contributes to a query result, the
+        class itself by default.
+        """
+        return cls
 
     @classmethod
     def _construct_normally_(cls, **kwargs) -> SymbolicCallable:
@@ -328,6 +342,19 @@ class SymbolicFunction(SymbolicCallable, ABC):
         what it computes (exactly as a ``@symbolic_function`` is called), not the instance.
         """
         return cls._construct_normally_(**kwargs)()
+
+    @classproperty
+    def _bound_value_type_(cls) -> type:
+        """
+        The return type of :meth:`__call__`.
+
+        :raises ResultTypeCannotBeDetermined: If :meth:`__call__`'s return annotation
+            names no type.
+        """
+        return_type = InstantiatedVariable._type_built_by_(cls.__call__)
+        if return_type is None:
+            raise ResultTypeCannotBeDetermined(cls.__call__)
+        return return_type
 
     @abstractmethod
     def __call__(self) -> Any:
@@ -558,12 +585,13 @@ call).
 """
 
 
-def _any_of_the_kwargs_is_a_variable(bindings: dict[str, Any]) -> bool:
+def _any_argument_is_an_operand(arguments: dict[str, Any]) -> bool:
     """
-    :param bindings: A kwarg like dict mapping strings to objects
-    :return: ``True`` if any value in ``bindings`` is a :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression`, ``False`` otherwise.
+    :param arguments: The arguments of a call, by parameter name.
+    :return: Whether any of *arguments* stands for an expression, such as a variable or
+        a match, so that the call has to be built as an expression instead of computed.
     """
-    return any(isinstance(binding, SymbolicExpression) for binding in bindings.values())
+    return any(isinstance(argument, Operand) for argument in arguments.values())
 
 
 @dataclass(eq=False)

@@ -30,7 +30,7 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
 from coraplex.plans.context_extensions import RobotAccess
@@ -110,7 +110,7 @@ def build_world() -> World:
                 parent_T_self=PICK_POSE.homogeneous_matrix,
             )
         ],
-    ).to_domain_object()
+    ).create_world()
     # The parcel stands in for any graspable object; the plan only needs an annotation
     # to name it by, not a particular kind of object.
     with world.modify_world():

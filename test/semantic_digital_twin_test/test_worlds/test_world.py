@@ -28,7 +28,7 @@ from semantic_digital_twin.exceptions import (
     DofNotInWorldStateError,
     WrongWorldModelVersion,
     NonMonotonicTimeError,
-    BrokenWorldModificationHistoryError,
+    PartiallyAppliedWorldModificationError,
     WorldEntityNotFoundError,
     WorldEntityWithIDBelongsToAnotherWorld,
     AlreadyBelongsToAWorldError,
@@ -41,11 +41,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Drawer,
 )
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.world_description.derivatives import (
+    Derivatives,
+    DerivativeMap,
+)
 
-# from semantic_digital_twin.spatial_types.math import rotation_matrix_from_rpy
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose2D,
     RotationMatrix,
@@ -75,6 +77,8 @@ from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithID,
 )
 from semantic_digital_twin.world_description.world_modification import (
+    AddConnectionModification,
+    AddKinematicStructureEntityModification,
     AttributeUpdateModification,
 )
 from semantic_digital_twin.world_description.world_state import (
@@ -975,7 +979,7 @@ def test_copy_world(world_setup):
 def test_copy_big_world():
     pr2_world = URDFParser.from_file(
         file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    ).parse()
+    ).create_world()
     PR2.from_world(pr2_world)
     apartment_world = URDFParser.from_file(
         os.path.join(
@@ -988,7 +992,7 @@ def test_copy_big_world():
             "worlds",
             "apartment.urdf",
         )
-    ).parse()
+    ).create_world()
 
     apartment_world.merge_world(pr2_world)
     apartment_world_copy = deepcopy(apartment_world)
@@ -2725,14 +2729,12 @@ def test_reset_state_context_restores_state_on_exception(world_setup):
     assert connection.position == pytest.approx(0.0)
 
 
-def test_broken_world_modification_history_after_exception_in_modification_block_is_raised():
+def test_exception_after_a_modification_raises_partially_applied_world_modification_error():
     """
-    world.py:205-219: when an exception escapes a modify_world block, the current
-    modification block is discarded but the already-applied modifications are not rolled
-    back.
+    When an exception escapes a modify_world block, the current modification block is
+    discarded but the already-applied modifications are not rolled back.
 
-    Replay-based operations (deepcopy, sync) then produce a different world than the
-    original.
+    The error names those modifications and is caused by the exception that escaped.
     """
     world = World()
     body_1 = Body(name=PrefixedName("body_1", prefix="review"))
@@ -2740,11 +2742,18 @@ def test_broken_world_modification_history_after_exception_in_modification_block
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
 
-    with pytest.raises(BrokenWorldModificationHistoryError):
+    user_error = RuntimeError("simulated user error")
+    with pytest.raises(PartiallyAppliedWorldModificationError) as error_info:
         with world.modify_world():
             world.add_kinematic_structure_entity(body_2)
             world.add_connection(FixedConnection(parent=body_1, child=body_2))
-            raise RuntimeError("simulated user error")
+            raise user_error
+
+    assert error_info.value.cause is user_error
+    assert error_info.value.__cause__ is user_error
+    assert [
+        type(modification) for modification in error_info.value.applied_modifications
+    ] == [AddKinematicStructureEntityModification, AddConnectionModification]
 
 
 def test_memoized_queries_match_graph_after_exception():
@@ -2754,7 +2763,7 @@ def test_memoized_queries_match_graph_after_exception():
     with world.modify_world():
         world.add_kinematic_structure_entity(body_1)
 
-    with pytest.raises(BrokenWorldModificationHistoryError):
+    with pytest.raises(PartiallyAppliedWorldModificationError):
         with world.modify_world():
             world.add_kinematic_structure_entity(body_2)
             raise RuntimeError("simulated user error")
@@ -2762,6 +2771,48 @@ def test_memoized_queries_match_graph_after_exception():
     graph_names = {b.name.name for b in world.kinematic_structure.nodes()}
     memoized_names = {b.name.name for b in world.bodies}
     assert memoized_names == graph_names
+
+
+def test_world_accepts_modification_block_after_a_partially_applied_one():
+    world = World()
+    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body_1)
+
+    with pytest.raises(PartiallyAppliedWorldModificationError):
+        with world.modify_world():
+            world.add_connection(FixedConnection(parent=body_1, child=body_2))
+            raise RuntimeError("simulated user error")
+
+    assert not world.world_is_being_modified
+    with world.modify_world(publish_changes=False):
+        pass
+
+
+def test_modification_block_after_a_partially_applied_one_records_only_its_own_modifications():
+    world = World()
+    body_1 = Body(name=PrefixedName("body_1", prefix="review"))
+    body_2 = Body(name=PrefixedName("body_2", prefix="review"))
+    body_3 = Body(name=PrefixedName("body_3", prefix="review"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body_1)
+
+    with pytest.raises(PartiallyAppliedWorldModificationError):
+        with world.modify_world():
+            world.add_connection(FixedConnection(parent=body_1, child=body_2))
+            raise RuntimeError("simulated user error")
+
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body_3)
+        world.add_connection(FixedConnection(parent=body_1, child=body_3))
+
+    added_entity_ids = [
+        modification.kinematic_structure_entity.id
+        for modification in world.modification_history[-1].modifications
+        if isinstance(modification, AddKinematicStructureEntityModification)
+    ]
+    assert added_entity_ids == [body_3.id]
 
 
 def test_is_kinematic_structure_entity_in_world_by_name(world_setup):
@@ -3139,3 +3190,39 @@ def test_replace_with_clears_other_world():
     assert other_world.root is None
     assert len(other_world.kinematic_structure_entities) == 0
     assert len(other_world.connections) == 0
+
+
+# %% descendants of a kinematic structure entity
+
+
+def create_chain_world(length: int) -> tuple[World, list[Body]]:
+    """
+    Builds a world whose bodies hang off each other in a single chain.
+
+    :param length: The number of bodies in the chain.
+    :return: The world and its bodies from the root down.
+    """
+    world = World()
+    bodies = [Body(name=PrefixedName(f"link_{index}")) for index in range(length)]
+    with world.modify_world():
+        for body in bodies:
+            world.add_kinematic_structure_entity(body)
+        for parent, child in zip(bodies, bodies[1:]):
+            world.add_connection(FixedConnection(parent=parent, child=child))
+    return world, bodies
+
+
+def test_descendants_are_each_listed_once():
+    world, bodies = create_chain_world(length=6)
+
+    descendants = world.compute_descendent_child_kinematic_structure_entities(bodies[0])
+
+    assert descendants == bodies[1:]
+
+
+def test_computing_descendants_leaves_the_children_unchanged():
+    world, bodies = create_chain_world(length=4)
+
+    world.compute_descendent_child_kinematic_structure_entities(bodies[0])
+
+    assert world.compute_child_kinematic_structure_entities(bodies[0]) == [bodies[1]]

@@ -108,7 +108,7 @@ class SelfCollisionMatrixInterface:
             self.world.add_body(Body(name=PrefixedName("map")))
 
     def load_urdf(self, urdf_path: str):
-        robot_world = URDFParser.from_file(urdf_path).parse()
+        robot_world = URDFParser.from_file(urdf_path).create_world()
         self.self_collision_matrix_rule = SelfCollisionMatrixRule()
         with self.world.modify_world():
             self.world.clear()

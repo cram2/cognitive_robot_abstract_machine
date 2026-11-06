@@ -23,7 +23,10 @@ from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.qp.pos_in_vel_limits import BrakingProfile, SlowdownProfile
 from krrood.symbolic_math.symbolic_math import Scalar, FloatVariable
-from semantic_digital_twin.spatial_types.derivatives import Derivatives, DerivativeMap
+from semantic_digital_twin.world_description.derivatives import (
+    Derivatives,
+    DerivativeMap,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,

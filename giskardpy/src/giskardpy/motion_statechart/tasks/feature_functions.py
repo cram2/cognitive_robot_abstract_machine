@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,

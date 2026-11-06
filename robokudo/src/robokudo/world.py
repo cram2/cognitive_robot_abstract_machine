@@ -17,9 +17,7 @@ from robokudo.utils.transform import (
     get_quaternion_from_transform_matrix,
     get_translation_from_transform_matrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 import trimesh.creation
 from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 import sys

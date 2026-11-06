@@ -4,11 +4,11 @@ from functools import wraps
 
 from typing_extensions import Any, Self, TYPE_CHECKING
 
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
     shallow_diff_json,
     JSONAttributeDiff,
-    list_like_classes,
     JSONData,
     to_json,
     from_json,
@@ -634,7 +634,7 @@ class AttributeUpdateModification(WorldModification, SubclassJSONSerializer):
         entity = world.get_world_entity_with_id_by_id(self.entity_id)
         for diff in self.updated_kwargs_json_list:
             current_value = getattr(entity, diff.attribute_name)
-            if isinstance(current_value, list_like_classes):
+            if isinstance(current_value, CollectionKind.ELEMENT_SEQUENCE.value):
                 self._apply_to_list(world, current_value, diff, **kwargs)
             else:
                 obj = self._resolve_item(

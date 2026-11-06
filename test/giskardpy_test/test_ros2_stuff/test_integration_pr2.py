@@ -40,9 +40,7 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from krrood.symbolic_math import symbolic_math as sm
 from semantic_digital_twin.robots.pr2 import PR2Joint
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )

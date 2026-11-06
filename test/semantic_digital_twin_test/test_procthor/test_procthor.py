@@ -4,11 +4,16 @@ import unittest
 from dataclasses import asdict
 
 import numpy as np
+import pytest
 from importlib.resources import files
 from pathlib import Path
 from sqlalchemy.orm import Session
 
 from krrood.ormatic.utils import create_engine
+from semantic_digital_twin.adapters.procthor.exceptions import (
+    ProcthorDoorWallNotFound,
+    UnpairedProcthorWalls,
+)
 from semantic_digital_twin.adapters.procthor.procthor_parser import (
     ProcTHORParser,
     ProcthorRoom,
@@ -26,16 +31,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Door,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Region, Body
 
 
 class ProcTHORTestCase(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -355,7 +357,7 @@ class ProcTHORTestCase(unittest.TestCase):
 
         world = ProcTHORParser(
             "test_house", house=self.house_json, session=session
-        ).parse()
+        ).create_world()
 
         world.merge_world(obj_world)
 
@@ -369,7 +371,7 @@ class ProcTHORTestCase(unittest.TestCase):
                 "procthor_json",
                 "house_0.json",
             )
-        ).parse()
+        ).create_world()
 
         assert world is not None
 
@@ -383,6 +385,21 @@ class ProcTHORTestCase(unittest.TestCase):
 
         resolved_string = resolver.resolve("whitebread_a_slice_8_mesh")
         self.assertEqual(Bread, resolved_string)
+
+
+def test_odd_number_of_walls_without_door_is_rejected():
+    with pytest.raises(UnpairedProcthorWalls) as error:
+        ProcTHORParser._build_procthor_wall_from_polygon([{"id": "wall|0"}])
+    assert error.value.wall_count == 1
+
+
+def test_door_referring_to_missing_wall_is_rejected():
+    door = {"id": "door|0", "wall0": "wall|0", "wall1": "wall|1"}
+    with pytest.raises(ProcthorDoorWallNotFound) as error:
+        ProcTHORParser._build_procthor_wall_from_door(
+            walls=[{"id": "wall|0"}], doors=[door]
+        )
+    assert error.value.wall_id == door["wall1"]
 
 
 if __name__ == "__main__":
