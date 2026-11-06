@@ -563,7 +563,7 @@ class HomogeneousTransformationMatrix(
             if isinstance(other, HomogeneousTransformationMatrix):
                 result.child_frame = other.child_frame
             return result
-        raise UnsupportedOperationError("dot", self, other)
+        raise UnsupportedOperationError(operation="dot", left=self, right=other)
 
     def __matmul__(self, other: GenericSpatialType) -> GenericSpatialType:
         return self.dot(other)
@@ -877,7 +877,7 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             result = type(other).from_casadi_sx(casadi_sx=result_sx)
             result.reference_frame = self.reference_frame
             return result
-        raise UnsupportedOperationError("dot", self, other)
+        raise UnsupportedOperationError(operation="dot", left=self, right=other)
 
     def __matmul__(
         self, other: GenericRotatableSpatialType
@@ -2300,8 +2300,8 @@ class Quaternion(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         sin_half_theta = sm.sqrt(1.0 - cos_half_theta * cos_half_theta)
         if2 = 0.001 - abs(sin_half_theta)
 
-        ratio_a = (sm.sin((1.0 - t) * half_theta)).safe_division(sin_half_theta)
-        ratio_b = sm.sin(t * half_theta).safe_division(sin_half_theta)
+        ratio_a = (sm.sin((1.0 - t) * half_theta)).safe_division(other=sin_half_theta)
+        ratio_b = sm.sin(t * half_theta).safe_division(other=sin_half_theta)
 
         mid_quaternion = Quaternion.from_iterable(
             self.generic_vector * 0.5 + other.generic_vector * 0.5

@@ -94,5 +94,5 @@ class CartesianFrame3DReference(ObjectReference):
         if not resolvers:
             raise MissingCartesianFrame3DResolver(frame_id_key=self.id_key)
         return resolvers[0].get(
-            from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
+            key=from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
         )

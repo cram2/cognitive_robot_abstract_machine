@@ -412,7 +412,10 @@ class QPProblem:
         slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
 
         self.quadratic_weights = Matrix(dof_weights + slack_weights)
-        self.linear_weights = Matrix.zeros(*self.quadratic_weights.shape)
+        self.linear_weights = Matrix.zeros(
+            rows=self.quadratic_weights.shape[0],
+            columns=self.quadratic_weights.shape[1],
+        )
 
     def _compile_functions(self):
         """

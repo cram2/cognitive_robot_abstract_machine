@@ -315,7 +315,7 @@ def _get_satisfied_names(ids, condition_root):
     """
     return {
         expression._name_
-        for expression in condition_root._subtree_expressions_with_ids_(ids)
+        for expression in condition_root._subtree_expressions_with_ids_(ids=ids)
     }
 
 

@@ -44,7 +44,7 @@ def _first(expr, sources=None):
 
 
 def _all(expr, sources=None):
-    return list(expr._evaluate_(sources))
+    return list(expr._evaluate_(sources=sources))
 
 
 def _chain(result):
