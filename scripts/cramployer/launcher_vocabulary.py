@@ -157,12 +157,12 @@ class DockerArgument(StrEnum):
 
 
 class DeploymentName(StrEnum):
-    """Container names and paths shared by deployment operations."""
+    """Docker image references, container settings, and deployment paths."""
 
-    BASE_IMAGE = "cramployer-base:local"
-    """ROS base image tag."""
-    IMAGE = "cramployer:local"
-    """Development image tag."""
+    BASE_IMAGE_REFERENCE = "cramployer-base:local"
+    """Repository name and tag of the ROS base image."""
+    DEVELOPMENT_IMAGE_REFERENCE = "cramployer:local"
+    """Repository name and tag of the development image."""
     SERVICE = "cram"
     """Development service name."""
     ROOT = "root"

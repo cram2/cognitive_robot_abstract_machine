@@ -56,7 +56,7 @@ class SourceContainer(
             [
                 Executable.DOCKER,
                 DockerArgument.CREATE,
-                DeploymentName.BASE_IMAGE,
+                DeploymentName.BASE_IMAGE_REFERENCE,
                 Executable.BASH,
             ],
             capture_output=True,

@@ -179,7 +179,7 @@ class EnvironmentSetup(DeploymentCommand):
                 Executable.DOCKER,
                 DockerArgument.BUILD,
                 DockerArgument.TAG,
-                DeploymentName.BASE_IMAGE,
+                DeploymentName.BASE_IMAGE_REFERENCE,
                 str(configuration.source_checkout / self.base_image_directory),
             ]
         )
@@ -196,7 +196,7 @@ class EnvironmentSetup(DeploymentCommand):
             if not container.matches_sources():
                 print(
                     f"Warning: ROS sources at {self.configuration.robot_workspace_sources} "
-                    f"differ from {DeploymentName.BASE_IMAGE}:{DeploymentName.SOURCE_ARCHIVE}. "
+                    f"differ from {DeploymentName.BASE_IMAGE_REFERENCE}:{DeploymentName.SOURCE_ARCHIVE}. "
                     "Local sources are preserved and will overlay the image. "
                     "Review local changes, or select a fresh ROS_SOURCE and VOLUME_PREFIX "
                     "in .env and rerun setup to use the updated image sources.",
@@ -221,7 +221,7 @@ class EnvironmentSetup(DeploymentCommand):
             DockerArgument.BUILD,
             DockerArgument.LOAD,
             DockerArgument.TAG,
-            DeploymentName.IMAGE,
+            DeploymentName.DEVELOPMENT_IMAGE_REFERENCE,
             DockerArgument.BUILD_CONTEXT,
             f"{DeploymentName.REPOSITORY_CONTEXT}{configuration.source_checkout}",
         ]
