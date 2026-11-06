@@ -7,7 +7,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from typing_extensions import Generic, TypeVar
+
 from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
+from krrood.patterns.field_metadata import JSONMetadata
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 
 # %% storage
@@ -33,17 +37,22 @@ class Storage:
 # %% descriptor backed field
 
 
-@dataclass
+@dataclass(eq=False)
 class ValueKeptInStorage(DataclassFieldDescriptor):
     """
-    A field whose value lives in the :attr:`HolderOfValueKeptInStorage.storage` of its
-    owner.
+    A field whose value lives in the storage of its owner.
     """
 
-    def read(self, instance: HolderOfValueKeptInStorage) -> int | None:
+    def read(
+        self, instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage
+    ) -> int | None:
         return instance.storage.value
 
-    def write(self, instance: HolderOfValueKeptInStorage, value: int | None) -> None:
+    def write(
+        self,
+        instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage,
+        value: int | None,
+    ) -> None:
         instance.storage.value = value
         instance.storage.number_of_writes += 1
 
@@ -59,7 +68,72 @@ class HolderOfValueKeptInStorage:
     Where :attr:`value` is kept.
     """
 
-    value: int | None = ValueKeptInStorage()
+    value: int | None = field(
+        default=None, kw_only=True, metadata=JSONMetadata(serialize=False).as_dict()
+    )
     """
     The value kept in :attr:`storage`.
+    """
+
+
+HolderOfValueKeptInStorage.value = ValueKeptInStorage()
+
+
+# %% subclasses of the holder
+
+
+@dataclass
+class SubclassOfHolder(HolderOfValueKeptInStorage):
+    """
+    A subclass that inherits the descriptor backed field unchanged.
+    """
+
+    other_value: int = 0
+    """
+    A field of the subclass's own.
+    """
+
+
+@dataclass
+class SubclassDeclaringTheFieldAgain(HolderOfValueKeptInStorage):
+    """
+    A subclass that declares the descriptor backed field again without a default.
+    """
+
+    value: int | None
+    """
+    The value kept in :attr:`storage`.
+    """
+
+
+ValueType = TypeVar("ValueType")
+"""
+The type of the value of :class:`GenericHolderOfValueKeptInStorage`.
+"""
+
+
+@dataclass
+class GenericHolderOfValueKeptInStorage(Generic[ValueType], SubClassSafeGeneric):
+    """
+    A generic dataclass with a field kept in its storage whose type is the parameter.
+    """
+
+    storage: Storage = field(default_factory=Storage)
+    """
+    Where :attr:`value` is kept.
+    """
+
+    value: ValueType | None = field(default=None, kw_only=True)
+    """
+    The value kept in :attr:`storage`.
+    """
+
+
+GenericHolderOfValueKeptInStorage.value = ValueKeptInStorage()
+
+
+@dataclass
+class IntegerHolderOfValueKeptInStorage(GenericHolderOfValueKeptInStorage[int]):
+    """
+    A subclass that narrows the type of the descriptor backed field.
     """

@@ -23,6 +23,7 @@ from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
+from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
 from krrood.patterns.interface import Interface
 from krrood.exceptions import (
     MismatchingNumberOfGenericParametersAndResolvedTypes,
@@ -190,10 +191,9 @@ class SubClassSafeGeneric(ABC):
 
         # Check if we should update an existing attribute or field on the current class
         target_field = None
-        if hasattr(cls, name):
-            attr = getattr(cls, name)
-            if isinstance(attr, Field):
-                target_field = attr
+        attr = getattr(cls, name, None)
+        if isinstance(attr, Field):
+            target_field = attr
 
         # If no direct field, but we found one in MRO, we might need to copy it
         if target_field is None and existing_field is not None:
@@ -203,6 +203,10 @@ class SubClassSafeGeneric(ABC):
             new_field = copy(target_field)
             for key, value in kwargs.items():
                 setattr(new_field, key, value)
+            if isinstance(attr, DataclassFieldDescriptor):
+                new_field = DataclassFieldDescriptor.without_class_level_default(
+                    new_field
+                )
             setattr(cls, name, new_field)
 
         # Update annotations
