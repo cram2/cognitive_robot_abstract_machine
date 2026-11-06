@@ -291,7 +291,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
         )
     return RelationalCircuitRegistry(
         RelationalProbabilisticCircuit(
-            learning_method=JointProbabilityTree(min_samples_per_leaf=20)
+            learning_method=JointProbabilityTree(minimum_samples_per_leaf=20)
         ).fit(grasps, SurfaceGrasp)
     )
 

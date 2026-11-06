@@ -215,7 +215,7 @@ class TreeSetting(Setting):
         return Method.JOINT_PROBABILITY_TREE
 
     def learning_method(self) -> LearningMethod:
-        return self.method.value(min_samples_per_leaf=self.minimum_leaf_share)
+        return self.method.value(minimum_samples_per_leaf=self.minimum_leaf_share)
 
     def __str__(self) -> str:
         return f"leaves of at least {self.minimum_leaf_share:.0%} of the rows"

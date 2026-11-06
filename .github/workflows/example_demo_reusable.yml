@@ -20,6 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ inputs.repo_lowercase }}
+    env:
+      # The CPU only torch build, as in ci_reusable.yml: the CUDA build exhausts the runner disk.
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
     steps:
       - uses: actions/checkout@v4
         with:
