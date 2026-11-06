@@ -27,11 +27,11 @@ class State(TermReader):
     A valuation of ground terms that differs from the live objects only where it assigns a
     value.
 
-    A ground term (:class:`~krrood.entity_query_language.ground_term.GroundTerm`) is an
-    attribute of an instance, an indexed element, or the result of a call, a symbolic
-    function or a predicate for concrete arguments. A query evaluated with this state
-    reads the assigned value of every assigned ground term, and the live value of every
-    other. The live objects are never changed.
+    A *fluent* is a ground term
+    (:class:`~krrood.entity_query_language.ground_term.GroundTerm`) whose value a state
+    can change, and the :class:`~krrood.entity_query_language.ground_term.FunctionKey` it
+    applies is its fluent symbol. A query evaluated with this state reads the assigned
+    value of every assigned fluent and the live value of every other.
 
     >>> from dataclasses import dataclass
     >>> from krrood.entity_query_language.factories import a, literal

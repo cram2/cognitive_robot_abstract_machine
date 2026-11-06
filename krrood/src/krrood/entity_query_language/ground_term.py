@@ -60,10 +60,9 @@ class ObjectIdentity:
     """
 
     def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, ObjectIdentity)
-            and self.identified_object is other.identified_object
-        )
+        if not isinstance(other, ObjectIdentity):
+            return NotImplemented
+        return self.identified_object is other.identified_object
 
     def __hash__(self) -> int:
         return id(self.identified_object)
@@ -95,8 +94,8 @@ class GroundTerm(ABC):
     Two ground terms are equal when they apply the same function to the same arguments,
     however the arguments were passed and including defaults that were left out. The
     object a ground term belongs to - an attribute's instance, an index's container, a
-    method's receiver - is compared by identity, other hashable arguments by value and
-    all others by identity.
+    method's receiver - is compared by identity. Every other argument is compared with
+    ``==`` where it is hashable, and by identity where it is not.
 
     >>> def area(width: float, height: float = 1.0) -> float:
     ...     return width * height
@@ -325,11 +324,11 @@ class CallTerm(GroundTerm):
         """
         arguments = CallSignature.from_callable(self.callee).bind(self.arguments)
         normalized = arguments.key_by(ensure_hashable)
-        if not self._is_method_of_first_argument(arguments):
+        if not self._first_argument_is_receiver(arguments):
             return normalized
         return ObjectIdentity(arguments.positional[0]), *normalized[1:]
 
-    def _is_method_of_first_argument(self, arguments: CallArguments) -> bool:
+    def _first_argument_is_receiver(self, arguments: CallArguments) -> bool:
         """
         :param arguments: The arguments of the call, bound to the signature.
         :return: Whether :attr:`callee` is a method the class of the first argument

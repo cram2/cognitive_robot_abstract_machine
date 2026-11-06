@@ -305,7 +305,7 @@ def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term
     ],
     ids=["slot", "frozen dataclass", "read-only property", "immutable container"],
 )
-def test_assigning_a_ground_term_that_is_only_stored_is_accepted(ground_term):
+def test_assigning_a_ground_term_whose_setting_runs_no_code_is_accepted(ground_term):
     expression = ground_term()
     state = State().with_facts(expression == 5.0)
 
