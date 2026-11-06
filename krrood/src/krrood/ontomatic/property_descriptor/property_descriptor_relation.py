@@ -63,74 +63,10 @@ class InferredThrough(Enum):
     """
     The relations of a property chain. Premises: the relations of the chain, in order.
     """
-    SYMMETRIC_TRANSITIVE_COMPONENT = "symmetric_transitive_component"
-    """
-    A component of the relation graph of a symmetric and transitive property. Premises: the property's name, the
-    component's identifier and size.
-    """
     HAS_VALUE = "has_value"
     """
     The subject belongs to a class that is a ``hasValue`` restriction (OWL 2 RL rule cls-hv1). Premise: the class.
     """
-
-
-@dataclass(eq=False)
-class SymmetricTransitiveComponent:
-    """
-    A weakly connected component of the relation graph of a property that is both symmetric and transitive: the
-    property relates every two members, and each member to itself unless it is irreflexive.
-    """
-
-    property_descriptor_class: type[PropertyDescriptor]
-    """
-    The symmetric and transitive property.
-    """
-    identifier: int
-    """
-    The index of the component among the components of the property.
-    """
-    members: dict[int, WrappedInstance]
-    """
-    The members of the component by their index in the symbol graph.
-    """
-    reflexive: bool
-    """
-    Whether the property relates each member to itself.
-    """
-
-    def relates(self, source: WrappedInstance, target: WrappedInstance) -> bool:
-        """
-        :return: Whether the component entails that the property relates the source to the target.
-        """
-        return (
-            self.members.get(source.index) is source
-            and self.members.get(target.index) is target
-            and (self.reflexive or source is not target)
-        )
-
-    def relation(
-        self, source: WrappedInstance, target: WrappedInstance
-    ) -> PropertyDescriptorRelation:
-        """
-        :return: The relation from the source to the target the component explains, not added to the symbol graph.
-        """
-        wrapped_field = (
-            self.property_descriptor_class.get_descriptor_instance_for_domain_type(
-                source.instance_type
-            ).wrapped_field
-        )
-        return PropertyDescriptorRelation(
-            source,
-            target,
-            wrapped_field,
-            inferred=True,
-            inference_explanation=(
-                InferredThrough.SYMMETRIC_TRANSITIVE_COMPONENT,
-                self.property_descriptor_class.__name__,
-                self.identifier,
-                len(self.members),
-            ),
-        )
 
 
 # %% relations
@@ -158,14 +94,6 @@ class PropertyDescriptorRelation(PredicateClassRelation):
     """
     Whether relations of symmetric and transitive properties are closed relation by relation while they are added,
     instead of once after loading from the components of their relation graph.
-    """
-
-    symmetric_transitive_components: ClassVar[
-        dict[tuple[str, int], SymmetricTransitiveComponent]
-    ] = {}
-    """
-    The components whose facts are stored only in the fields of their members, by the field name and the index of
-    each member. :meth:`find` explains these facts with them.
     """
 
     same_individual_role_takers: ClassVar[dict[Any, list[Any]]] = {}
@@ -409,10 +337,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         Infer the relation back from the target to the source if the property is symmetric.
         """
-        if self.rule in (
-            InferredThrough.SYMMETRY,
-            InferredThrough.SYMMETRIC_TRANSITIVE_COMPONENT,
-        ):
+        if self.rule is InferredThrough.SYMMETRY:
             return
         if issubclass(self.property_descriptor_cls, SymmetricProperty):
             self.add_inferred_relation(
@@ -666,8 +591,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         :param source_instance: The object that holds the field.
         :param field_name: The name of the field.
         :param target_instance: The value.
-        :return: The relation in the symbol graph for the fact, or the relation a symmetric and transitive component
-            entails; None if neither exists.
+        :return: The relation in the symbol graph for the fact; None if there is none.
         """
         source = SymbolGraph().get_wrapped_instance(source_instance)
         if source is None:
@@ -678,12 +602,4 @@ class PropertyDescriptorRelation(PredicateClassRelation):
                 and relation.target.instance is target_instance
             ):
                 return relation
-        component = cls.symmetric_transitive_components.get((field_name, source.index))
-        target = SymbolGraph().get_wrapped_instance(target_instance)
-        if (
-            component is not None
-            and target is not None
-            and component.relates(source, target)
-        ):
-            return component.relation(source, target)
         return None
