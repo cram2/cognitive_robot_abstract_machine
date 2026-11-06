@@ -403,7 +403,7 @@ class TermReader(Interface):
     """
 
     @abstractmethod
-    def value_of(self, term: GroundTerm) -> TermValue | None:
+    def value_of_term(self, term: GroundTerm) -> TermValue | None:
         """
         :param term: The ground term to read.
         :return: The value of *term*, or ``None`` when it has none.
@@ -416,5 +416,5 @@ class LiveTermReader(TermReader):
     Reads the value a ground term currently has on the live objects.
     """
 
-    def value_of(self, term: GroundTerm) -> TermValue | None:
+    def value_of_term(self, term: GroundTerm) -> TermValue | None:
         return term.live_term_value()

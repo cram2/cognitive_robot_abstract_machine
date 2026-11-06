@@ -86,7 +86,7 @@ class State(TermReader):
             assignments |= Fact.from_condition(fact).assignments()
         return State(assignments=assignments)
 
-    def value_of(self, term: GroundTerm) -> TermValue | None:
+    def value_of_term(self, term: GroundTerm) -> TermValue | None:
         if term.function_key in self.assigned_functions and term in self.assignments:
             return TermValue(self.assignments[term])
         return term.live_term_value()

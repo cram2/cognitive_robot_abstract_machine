@@ -392,7 +392,7 @@ class EvaluationContext:
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
             return term.live_term_value()
-        return evaluation_context.term_reader.value_of(term)
+        return evaluation_context.term_reader.value_of_term(term)
 
     @classmethod
     def iterate_reading_from(
