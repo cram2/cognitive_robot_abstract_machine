@@ -1496,6 +1496,32 @@ class Line3:
     """
 
 
+@dataclass(eq=False)
+class LineSegment3:
+    """
+    A straight line in 3D space between two points.
+    """
+
+    start: Point3
+    """
+    The point the segment runs from.
+    """
+
+    end: Point3
+    """
+    The point the segment runs to, in the same reference frame as :attr:`start`.
+    """
+
+    @property
+    def direction(self) -> Vector3:
+        """
+        :return: The unit vector from :attr:`start` towards :attr:`end`.
+        """
+        direction = self.end - self.start
+        direction.scale(1)
+        return direction
+
+
 @dataclass(frozen=True)
 class OrthogonalProjection:
     """
@@ -2447,6 +2473,100 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The rotation this axis angle describes.
         """
         return RotationMatrix.from_axis_angle(self)
+
+
+@dataclass(eq=False, init=False, repr=False)
+class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    How a rigid body moved: a translation and a rotation vector, both along the axes of
+    its reference frame.
+    """
+
+    def __init__(
+        self,
+        translation: Vector3 | None = None,
+        rotation_vector: Vector3 | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+    ):
+        """
+        :param translation: How far and in which direction the body moved, in meters.
+            Defaults to no translation.
+        :param rotation_vector: The axis the body turned around, scaled by the angle it
+            turned by in radians. Defaults to no rotation.
+        :param reference_frame: The frame along whose axes the body moved.
+        """
+        if translation is None:
+            translation = Vector3()
+        if rotation_vector is None:
+            rotation_vector = Vector3()
+        self.casadi_sx = sm.to_sx(
+            [
+                translation.x,
+                translation.y,
+                translation.z,
+                rotation_vector.x,
+                rotation_vector.y,
+                rotation_vector.z,
+            ]
+        )
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (6, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            translation=Vector3(*data["translation"]),
+            rotation_vector=Vector3(*data["rotation_vector"]),
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            "translation": self.translation.to_np()[:3].tolist(),
+            "rotation_vector": self.rotation_vector.to_np()[:3].tolist(),
+        }
+
+    @classmethod
+    def from_transformation(cls, start_T_end: HomogeneousTransformationMatrix) -> Twist:
+        """
+        :param start_T_end: Where the body ended up, relative to where it started.
+        :return: The motion from the start to the end, in the reference frame of
+            ``start_T_end``, turning by an angle in [0, pi].
+        """
+        rotation = start_T_end.axis_angle
+        return cls(
+            translation=Vector3.from_iterable(start_T_end.position),
+            rotation_vector=rotation.axis * rotation.angle,
+            reference_frame=start_T_end.reference_frame,
+        )
+
+    @property
+    def translation(self) -> Vector3:
+        """
+        :return: How far and in which direction the body moved, in meters.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def rotation_vector(self) -> Vector3:
+        """
+        :return: The axis the body turned around, scaled by the angle it turned by in
+            radians.
+        """
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
 
 
 @dataclass(eq=False, init=False, repr=False)

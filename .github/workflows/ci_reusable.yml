@@ -18,13 +18,34 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Fails a job that is still running after an hour. A runner that runs out of disk or memory
+    # stops responding, and its job would otherwise only end at GitHub's six-hour limit.
+    timeout-minutes: 60
     container:
       image: ${{ inputs.repo_lowercase }}
+      # The host's root, so free_runner_disk.sh can delete what the runner image installs and
+      # show_runner_resources.sh can measure the disk the job shares with it. Writable, since
+      # the runner's machine is discarded after the job.
+      options: --volume /:/host
+    env:
+      # The tests never run on a GPU, so torch (pulled in through robokudo -> ultralytics) is
+      # installed from the CPU only PyTorch index. The CUDA build from PyPI adds several GB of
+      # nvidia wheels and exhausts the runner disk ("No space left on device").
+      # unsafe-best-match lets every other package still come from PyPI, since the PyTorch index
+      # also mirrors outdated versions of common packages such as packaging.
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
     steps:
       - uses: actions/checkout@v4
         with:
           path: cognitive_robot_abstract_machine
           submodules: recursive
+
+      - name: Free disk space
+        run: cognitive_robot_abstract_machine/scripts/free_runner_disk.sh
+
+      - name: Show runner resources
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Install dependencies
         env:
@@ -65,11 +86,6 @@ jobs:
           bazel build //test:test_all
           bazel test //test:test_all
 
-      # The runners differ in CPU model, which can change the rounding of numeric results;
-      # the log records which one ran, to trace a failure that only one runner shows.
-      - name: Show CPU
-        run: lscpu
-
       - name: Check the generated rules in AGENTS.md
         # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
         # edit or a forgotten regeneration fails here.
@@ -102,6 +118,11 @@ jobs:
           else
             python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
           fi
+
+      - name: Show runner resources after the job
+        # Runs after a failure too, so a job that ran out of disk shows what filled it.
+        if: always()
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Save cache
         uses: actions/cache/save@v4

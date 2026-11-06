@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
@@ -46,9 +47,9 @@ class AlignPlanes(ConvergingTask):
     Angle in radians below which the planes are considered aligned.
     """
 
-    reference_velocity: float = 0.5
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
@@ -96,7 +97,7 @@ class AlignPlanes(ConvergingTask):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_root_normal,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)

@@ -11,6 +11,7 @@ from typing_extensions import TYPE_CHECKING
 if TYPE_CHECKING:
     from probabilistic_model.causal_structure.graph import GraphNode
     from probabilistic_model.causal_structure.identification import (
+        AdjustmentSet,
         InvalidAdjustmentReason,
     )
 
@@ -73,13 +74,13 @@ class CyclicGraph(ProbabilisticModelException):
     Raised when a graph whose edges are all directed has a directed cycle.
     """
 
-    cycle: list[str]
+    cycle: list[GraphNode]
     """
-    The names of the nodes on one cycle, in order.
+    The nodes on one cycle, in order.
     """
 
     def error_message(self) -> str:
-        return f"The graph has the directed cycle {' -> '.join(self.cycle)}."
+        return f"The graph has the directed cycle {' -> '.join(node.name for node in self.cycle)}."
 
     def suggest_correction(self) -> str:
         return "Reverse or remove an edge on the cycle."
@@ -147,19 +148,19 @@ class InvalidAdjustmentSet(ProbabilisticModelException):
     the effect in a graph the causal graph stands for.
     """
 
-    cause: str
+    cause: GraphNode
     """
-    The name of the cause.
-    """
-
-    effect: str
-    """
-    The name of the effect.
+    The cause.
     """
 
-    declared: frozenset[str]
+    effect: GraphNode
     """
-    The names in the declared adjustment set.
+    The effect.
+    """
+
+    declared: AdjustmentSet
+    """
+    The declared adjustment set.
     """
 
     reason: InvalidAdjustmentReason
@@ -174,8 +175,9 @@ class InvalidAdjustmentSet(ProbabilisticModelException):
 
     def error_message(self) -> str:
         return (
-            f"Adjusting for {sorted(self.declared)} does not identify the effect of "
-            f"'{self.cause}' on '{self.effect}': {self.reason} in member graph "
+            f"Adjusting for {self.declared.names} does not "
+            f"identify the effect of '{self.cause.name}' on '{self.effect.name}': "
+            f"{self.reason} in member graph "
             f"{self.member_index}."
         )
 
