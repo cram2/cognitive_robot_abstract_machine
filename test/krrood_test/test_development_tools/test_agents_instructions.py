@@ -13,6 +13,7 @@ from krrood.development_tools.agents.repository_files import (
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.development_tools.agents.rule_module import RuleModule
+from krrood.development_tools.agents.shipped_rules.code_style import CodeStyleRules
 from krrood.development_tools.agents.shipped_rules.documentation import (
     DocumentationRules,
 )
@@ -121,6 +122,7 @@ def test_the_checkers_of_a_section_include_those_of_its_subsections() -> None:
 
 def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
     assert RuleModule(shipped_rules).checkers == (
+        CodeStyleRules.NO_HAND_WRITTEN_FIELD_ACCESSORS.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_PROSE.checker,
     )

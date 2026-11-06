@@ -8,6 +8,7 @@ from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
+from .dataset.field_accessors import hand_written_accessors
 from .dataset.missing_docstrings import (
     documented_module,
     no_module_docstring,
@@ -125,4 +126,16 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+
+class FieldAccessorSnippet(PathEnumeration):
+    """
+    The Python sources the hand written field accessor check reads.
+    """
+
+    HAND_WRITTEN_ACCESSORS = Path(hand_written_accessors.__file__)
+    """
+    A module with a hand written data descriptor and a dataclass property setter, next
+    to a plain class property setter and a descriptor built on the base, which pass.
     """
