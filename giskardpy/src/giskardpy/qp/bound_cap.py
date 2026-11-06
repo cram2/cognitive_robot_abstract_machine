@@ -79,5 +79,5 @@ class RotationBoundCap(BoundCap):
         angle = 2 * sm.atan2(sine_of_half_angle, cosine_of_half_angle)
         capped_angle = sm.min(angle, 2 * reachable_change)
         capped_sine_change = sine_of_half_angle - sm.sin((angle - capped_angle) / 2)
-        scale = capped_sine_change.safe_division(sine_of_half_angle, if_nan=1)
+        scale = capped_sine_change.safe_division(other=sine_of_half_angle, if_nan=1)
         return bound * scale

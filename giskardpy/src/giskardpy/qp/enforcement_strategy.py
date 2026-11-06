@@ -255,7 +255,11 @@ class IntegralStrategy(ExpressionEnforcementStrategy):
         )
         return sm.hstack(
             [jacobian for _ in range(self.qp_controller_config.control_horizon)]
-            + [sm.Matrix.zeros(rows=jacobian.shape[0], columns=self.number_of_jerk_columns)]
+            + [
+                sm.Matrix.zeros(
+                    rows=jacobian.shape[0], columns=self.number_of_jerk_columns
+                )
+            ]
         )
 
     def create_slack_matrix(self) -> Matrix:
@@ -414,7 +418,7 @@ class VelocityStrategy(ExpressionEnforcementStrategy):
         eye = sm.Matrix.eye(size=self.qp_controller_config.prediction_horizon)[
             :-2, : self.qp_controller_config.prediction_horizon - missing_variables
         ]
-        J_vel_limit_block = eye.kron(jacobian)
+        J_vel_limit_block = eye.kron(other=jacobian)
 
         return sm.hstack(
             [
