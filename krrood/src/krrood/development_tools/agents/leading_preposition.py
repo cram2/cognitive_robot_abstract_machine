@@ -6,27 +6,13 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 
 from typing_extensions import Iterator, override
 
 from krrood.development_tools.agents.checker import CodeRuleChecker, CodeRuleViolation
-
-# %% prepositions
-
-
-class LeadingPreposition(StrEnum):
-    """
-    The prepositions that start a phrase only the class name in front of a method
-    finishes.
-    """
-
-    AS = "as"
-    FOR = "for"
-    WITH = "with"
-    OF = "of"
-
+from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
+from krrood.ormatic.utils import classproperty
 
 # %% the check
 
@@ -34,17 +20,26 @@ class LeadingPreposition(StrEnum):
 @dataclass(frozen=True)
 class LeadingPrepositionChecker(CodeRuleChecker):
     """
-    Finds every function and method whose first word, leading underscores aside, is a
-    :class:`LeadingPreposition`.
+    Finds every function and method whose first word, leading underscores aside, is one
+    of the :attr:`leading_prepositions`.
     """
+
+    @classproperty
+    def leading_prepositions(cls) -> tuple[Prepositions, ...]:
+        """
+        The prepositions that start a phrase only the class name in front of a method
+        finishes.
+        """
+        return Prepositions.AS, Prepositions.FOR, Prepositions.WITH, Prepositions.OF
 
     @override
     def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+        leading_words = {preposition.text for preposition in self.leading_prepositions}
         for node in ast.walk(ast.parse(path.read_text())):
             if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 continue
             first_word = node.name.lstrip("_").split("_")[0]
-            if first_word not in LeadingPreposition:
+            if first_word not in leading_words:
                 continue
             yield CodeRuleViolation(
                 path,
