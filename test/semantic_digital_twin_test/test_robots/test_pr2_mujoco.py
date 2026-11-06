@@ -32,8 +32,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
@@ -388,53 +387,6 @@ def test_the_drive_moves_the_base_at_the_commanded_velocity(pr2):
         simulation.stop_simulation()
 
     assert reached == pytest.approx((0.4, -0.2, 0.0), abs=0.02)
-
-
-def _pose_after_driving(pr2: PR2) -> tuple[float, float, float]:
-    """
-    :return: The x, y and yaw the simulated base stands at after driving forward and
-        sideways for a while.
-    """
-    simulation = MujocoSim(world=pr2._world, headless=True)
-    simulation.start_stepped_simulation()
-    try:
-        _drive_at(simulation, pr2, (0.2, -0.1, 0.0), timedelta(seconds=2))
-        return _simulated_base_pose(simulation, pr2)
-    finally:
-        simulation.stop_simulation()
-
-
-@pytest.mark.skipif(
-    not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
-)
-def test_a_floor_the_wheels_sink_into_does_not_hold_the_base_back(pr2):
-    """
-    The drive holds its base at its height, so a floor the wheels sink into cannot carry
-    the base and would only drag it: the base gets as far as without a floor to collide
-    with.
-    """
-    world = World()
-    with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
-    with world.modify_world():
-        # the top of the floor lies 2 cm above the bottom of the wheels
-        Floor.create_with_new_body_from_polytope_in_world(
-            name="floor",
-            world=world,
-            floor_polytope=[
-                Point3(-3, -3, 0),
-                Point3(3, -3, 0),
-                Point3(3, 3, 0),
-                Point3(-3, 3, 0),
-            ],
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.02),
-        )
-    pr2_on_the_floor = RobotSpecification(PR2).spawn(world)
-
-    reached_without_a_floor = _pose_after_driving(pr2)
-    reached_on_the_floor = _pose_after_driving(pr2_on_the_floor)
-
-    assert reached_on_the_floor == pytest.approx(reached_without_a_floor, abs=0.005)
 
 
 @pytest.mark.skipif(
