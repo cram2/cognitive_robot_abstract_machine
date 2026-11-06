@@ -6,16 +6,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING, cast
+from typing_extensions import TYPE_CHECKING, Self, cast
 
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.exceptions import StartPoseWithoutMobileBaseError
-from semantic_digital_twin.robots.robot_parts import HasMobileBase
+from semantic_digital_twin.robots.exceptions import (
+    RobotDescriptionMissingError,
+    StartPoseWithoutMobileBaseError,
+)
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
+)
+from semantic_digital_twin.specifications.exceptions import (
+    RobotNamesTakenError,
+    VisualCollisionBackupDisabledError,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_source import WorldModelParser
@@ -29,13 +37,11 @@ if TYPE_CHECKING:
 @dataclass
 class RobotSpecification:
     """
-    World-independent description of a robot placed into a world: which robot, where it
-    is localized, and where a robot with a mobile base starts relative to its odometry
-    frame.
+    World-independent description of a robot placed into a world.
 
-    Materialized via :meth:`spawn`, which merges a robot with a mobile base as
-    ``world.root -> localization -> odometry -> drive -> robot`` and any other robot as
-    ``world.root -> localization -> robot``.
+    :meth:`spawn` merges a robot with a mobile base as ``world.root -> localization ->
+    odometry -> drive -> robot`` and any other robot as ``world.root -> localization ->
+    robot``.
     """
 
     semantic_annotation_type: type[AbstractRobot]
@@ -79,6 +85,9 @@ class RobotSpecification:
         """
         :raises StartPoseWithoutMobileBaseError: If a start pose is given for a robot
             without a mobile base.
+        :raises VisualCollisionBackupDisabledError: If the robot needs its visual
+            geometry as collision backup and the :attr:`description_parser` does not use
+            it.
         """
         if self.odometry_T_robot_start is not None and not issubclass(
             self.semantic_annotation_type, HasMobileBase
@@ -86,6 +95,53 @@ class RobotSpecification:
             raise StartPoseWithoutMobileBaseError(
                 robot_class=self.semantic_annotation_type
             )
+        if (
+            self.description_parser is not None
+            and self.semantic_annotation_type.uses_visual_as_collision_backup
+            and not self.description_parser.use_visual_as_collision_backup
+        ):
+            raise VisualCollisionBackupDisabledError(
+                robot_class=self.semantic_annotation_type
+            )
+
+    @classmethod
+    def specify_real_robot(
+        cls, semantic_annotation_type: type[AbstractRobot], urdf: str | None = None
+    ) -> Self:
+        """
+        :param semantic_annotation_type: The robot to create.
+        :param urdf: The description the real robot publishes. If None, the robot is
+            read from the description file its class declares.
+        :return: The robot with exactly the names of its description, which its tf
+            frames and joint states carry, localized by a movable connection if it has
+            a mobile base and by a fixed one otherwise.
+        :raises RobotDescriptionMissingError: If no ``urdf`` is given and the robot
+            class declares no description file.
+        """
+        description_file_path = semantic_annotation_type.get_ros_file_path()
+        if urdf is None and not description_file_path:
+            raise RobotDescriptionMissingError(robot_class=semantic_annotation_type)
+        uses_backup = semantic_annotation_type.uses_visual_as_collision_backup
+        parser = (
+            URDFParser.from_file(
+                description_file_path,
+                prefix="",
+                use_visual_as_collision_backup=uses_backup,
+            )
+            if urdf is None
+            else URDFParser(
+                urdf=urdf, prefix="", use_visual_as_collision_backup=uses_backup
+            )
+        )
+        return cls(
+            semantic_annotation_type=semantic_annotation_type,
+            description_parser=parser,
+            localization_connection_type=(
+                Connection6DoF
+                if issubclass(semantic_annotation_type, HasMobileBase)
+                else FixedConnection
+            ),
+        )
 
     def spawn(self, world: World) -> AbstractRobot:
         """
@@ -99,8 +155,11 @@ class RobotSpecification:
         :return: The semantic annotation of the merged robot.
         :raises RobotDescriptionMissingError: If no :attr:`description_parser` is given
             and the robot class declares no description file.
+        :raises RobotNamesTakenError: If ``world`` already holds an entity with a name
+            of the robot or of its odometry body.
         """
         described_robot = self._create_described_robot()
+        self._reject_taken_names(world, described_robot)
         robot_id = described_robot.id
         if isinstance(described_robot, HasMobileBase):
             self._merge_behind_its_odometry(world, described_robot)
@@ -118,6 +177,29 @@ class RobotSpecification:
         return self.semantic_annotation_type.from_world(
             self.description_parser.create_world()
         )
+
+    def _reject_taken_names(self, world: World, described_robot: AbstractRobot) -> None:
+        """
+        :param world: The world the robot is about to be merged into.
+        :param described_robot: The robot, in the world it was read into.
+        :raises RobotNamesTakenError: If ``world`` already holds an entity with a name
+            of the robot or of its odometry body.
+        """
+        robot_names = {
+            entity.name
+            for entity in described_robot._world.kinematic_structure_entities
+        }
+        if isinstance(described_robot, HasMobileBase):
+            robot_names.add(self._odometry_body_name(described_robot))
+        taken_names = [
+            entity.name
+            for entity in world.kinematic_structure_entities
+            if entity.name in robot_names
+        ]
+        if taken_names:
+            raise RobotNamesTakenError(
+                robot_class=self.semantic_annotation_type, taken_names=taken_names
+            )
 
     def _merge_at_its_localization(
         self, world: World, described_robot: AbstractRobot
@@ -149,7 +231,7 @@ class RobotSpecification:
         """
         robot_world = described_robot._world
         with world.modify_world():
-            odometry_body = self._create_odometry_body(described_robot)
+            odometry_body = Body(name=self._odometry_body_name(described_robot))
             localization = self._create_localization(world, odometry_body)
             world.add_connection(localization)
             drive = described_robot.mobile_base.create_drive(
@@ -167,17 +249,15 @@ class RobotSpecification:
         if self.odometry_T_robot_start is not None:
             drive.origin = self.odometry_T_robot_start
 
-    def _create_odometry_body(self, robot: HasMobileBase) -> Body:
+    @staticmethod
+    def _odometry_body_name(robot: HasMobileBase) -> PrefixedName:
         """
-        :param robot: The robot whose odometry body is created.
-        :return: The odometry body, named as the robot's mobile base declares, with the
-            prefix of the robot's own names.
+        :param robot: The robot whose odometry body is named.
+        :return: The name its mobile base declares, with the prefix of the robot's own
+            names.
         """
-        return Body(
-            name=PrefixedName(
-                name=robot.mobile_base.odometry_body_name,
-                prefix=robot.root.name.prefix,
-            )
+        return PrefixedName(
+            name=robot.mobile_base.odometry_body_name, prefix=robot.root.name.prefix
         )
 
     def _create_localization(
@@ -195,7 +275,7 @@ class RobotSpecification:
             parent=cast(Body, world.root),
             child=localized_body,
             parent_T_connection_expression=(
-                self._localization_pose_in_frames_of(world, localized_body)
+                self._reframe_localization_pose(world, localized_body)
                 if is_fixed
                 else None
             ),
@@ -217,11 +297,9 @@ class RobotSpecification:
             or self.localization_pose is None
         ):
             return
-        localization.origin = self._localization_pose_in_frames_of(
-            world, localization.child
-        )
+        localization.origin = self._reframe_localization_pose(world, localization.child)
 
-    def _localization_pose_in_frames_of(
+    def _reframe_localization_pose(
         self, world: World, localized_body: Body
     ) -> HomogeneousTransformationMatrix | None:
         """

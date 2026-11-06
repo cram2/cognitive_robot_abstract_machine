@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from typing_extensions import Self
 
+from krrood.ormatic.utils import classproperty
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.connections import (
@@ -27,6 +28,10 @@ from semantic_digital_twin.specifications.kinematic_structure_entities import (
 from semantic_digital_twin.specifications.semantic_annotations import (
     SemanticAnnotationWithRootSpecification,
 )
+from semantic_digital_twin.specifications.exceptions import (
+    RobotNamesTakenError,
+    VisualCollisionBackupDisabledError,
+)
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.predefined_maps.apartment_environment import (
@@ -40,6 +45,7 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 import semantic_digital_twin.orm.ormatic_interface  # registers the DAOs to_dao looks up
 
 from .test_adapters.test_mjcf import VISUAL_ONLY_GEOM_SCENE
+from .test_adapters.test_urdf import VISUAL_ONLY_LINK_URDF
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -770,6 +776,52 @@ def test_world_specification_with_several_robots():
     np.testing.assert_allclose(odometry_positions, [-1.0, 1.0])
 
 
+def test_a_robot_whose_names_the_world_already_holds_is_rejected(empty_world):
+    """
+    Every name the second robot shares with the first is reported, so the caller sees
+    which prefix to change.
+    """
+    RobotSpecification(
+        semantic_annotation_type=MinimalRobot,
+        description_parser=_parser_of_robot_rooted_at_map(),
+    ).spawn(empty_world)
+    described_names = {
+        entity.name
+        for entity in _parser_of_robot_rooted_at_map()
+        .create_world()
+        .kinematic_structure_entities
+    }
+
+    with pytest.raises(RobotNamesTakenError) as raised:
+        RobotSpecification(
+            semantic_annotation_type=MinimalRobot,
+            description_parser=_parser_of_robot_rooted_at_map(),
+        ).spawn(empty_world)
+
+    assert raised.value.robot_class is MinimalRobot
+    assert set(raised.value.taken_names) == described_names
+
+
+def test_two_robots_read_from_their_default_description_clash_at_their_odometry_body(
+    empty_world,
+):
+    """
+    Robots read with the same prefix name their odometry bodies alike, so the clash
+    covers the localization frame as well.
+    """
+    try:
+        first_robot = RobotSpecification(semantic_annotation_type=PR2).spawn(
+            empty_world
+        )
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
+
+    with pytest.raises(RobotNamesTakenError) as raised:
+        RobotSpecification(semantic_annotation_type=PR2).spawn(empty_world)
+
+    assert first_robot.mobile_base.drive.parent.name in raised.value.taken_names
+
+
 # %% robot specifications: a movable localization
 
 
@@ -923,6 +975,105 @@ def test_a_start_pose_is_rejected_for_a_robot_without_a_mobile_base():
         )
 
     assert raised.value.robot_class is MinimalRobot
+
+
+# %% robot specifications: a robot whose description leaves parts without collision
+
+
+@dataclass(eq=False)
+class RobotWithVisualOnlyCovers(MinimalRobot):
+    """
+    A robot whose description draws a cover without describing it for contact.
+    """
+
+    @classmethod
+    def get_ros_file_path(cls) -> str:
+        """
+        A description whose cover link has only visual geometry.
+        """
+        return VISUAL_ONLY_LINK_URDF
+
+    @classproperty
+    def uses_visual_as_collision_backup(cls) -> bool:
+        """
+        True, unlike :meth:`AbstractRobot.uses_visual_as_collision_backup`, so the cover
+        collides.
+        """
+        return True
+
+
+def test_a_parser_without_the_collision_backup_its_robot_needs_is_rejected():
+    """
+    The robot class asks for the backup, so a parser leaving it out is refused before
+    anything is read.
+    """
+    with pytest.raises(VisualCollisionBackupDisabledError) as raised:
+        RobotSpecification(
+            semantic_annotation_type=RobotWithVisualOnlyCovers,
+            description_parser=URDFParser.from_file(VISUAL_ONLY_LINK_URDF),
+        )
+
+    assert raised.value.robot_class is RobotWithVisualOnlyCovers
+
+
+# %% robot specifications: a robot as it runs on the real robot
+
+
+def test_a_real_robot_keeps_the_names_of_its_description(empty_world):
+    """
+    The names carry no prefix, so they match the frames the robot publishes.
+    """
+    urdf = _adapter_dataset_file("robot_rooted_at_map.urdf").read_text()
+
+    robot = RobotSpecification.specify_real_robot(MinimalRobot, urdf=urdf).spawn(
+        empty_world
+    )
+
+    assert str(robot.root.name) == "map"
+
+
+def test_a_real_robot_is_read_from_its_own_description_by_default(empty_world):
+    """
+    Without a published description, the file the robot class declares is read.
+    """
+    robot = RobotSpecification.specify_real_robot(RobotWithVisualOnlyCovers).spawn(
+        empty_world
+    )
+
+    assert {str(body.name) for body in robot.bodies_of_branch} == {
+        "base_link",
+        "cover_link",
+    }
+
+
+def test_a_real_robot_collides_with_the_visuals_its_class_asks_for(empty_world):
+    """
+    A part the description draws without collision geometry collides with its visual.
+    """
+    RobotSpecification.specify_real_robot(RobotWithVisualOnlyCovers).spawn(empty_world)
+
+    assert empty_world.get_body_by_name("cover_link").has_collision()
+
+
+def test_a_real_robot_without_a_mobile_base_is_localized_by_a_fixed_connection():
+    """
+    A robot that cannot drive stays where it is placed.
+    """
+    specification = RobotSpecification.specify_real_robot(RobotWithVisualOnlyCovers)
+
+    assert specification.localization_connection_type is FixedConnection
+
+
+def test_a_real_robot_with_a_mobile_base_is_localized_by_a_movable_connection():
+    """
+    The localization of a driving robot is updated while it runs.
+    """
+    try:
+        specification = RobotSpecification.specify_real_robot(PR2)
+    except ParsingError as error:
+        pytest.skip(f"PR2 URDF not available: {error}")
+
+    assert specification.localization_connection_type is Connection6DoF
 
 
 # %% robot specifications: the odometry body

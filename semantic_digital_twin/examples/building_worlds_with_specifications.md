@@ -679,6 +679,10 @@ A few more fields cover robots whose world has to line up with a running system:
   keeps the names the parser gives it, so a parser with an empty `prefix` leaves them
   unprefixed and matching the frames the robot publishes.
 
+`RobotSpecification.specify_real_robot` sets both for a robot as it runs on the real system:
+it keeps the names of the description, and it localizes a robot with a mobile base by a
+`Connection6DoF` and any other robot by a fixed connection.
+
 ```{code-cell} ipython3
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.robots.pr2 import PR2
@@ -699,7 +703,8 @@ Because `robots` is a list, a world can hold several of them, each with its own 
 including several instances of the same robot. Names are not unique in a world, so each robot is
 annotated while it still owns the world it was parsed into. Its odometry body takes the prefix of
 the robot's own names, so robots read with different prefixes keep their localization frames
-apart.
+apart. A robot whose names the world already holds is rejected with a `RobotNamesTakenError`, so
+each further instance of the same robot is read by a parser with a prefix of its own.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.adapters.urdf import URDFParser

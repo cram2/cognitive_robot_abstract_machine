@@ -21,7 +21,6 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    Connection6DoF,
     OmniDrive,
     FixedConnection,
 )
@@ -271,15 +270,7 @@ class StretchTester(GiskardTester):
     def setup_giskard(self) -> Giskard:
         return Giskard(
             world_source=WorldSpecification(
-                robots=[
-                    RobotSpecification(
-                        semantic_annotation_type=Stretch,
-                        description_parser=URDFParser.from_file(
-                            Stretch.get_ros_file_path(), prefix=""
-                        ),
-                        localization_connection_type=Connection6DoF,
-                    )
-                ]
+                robots=[RobotSpecification.specify_real_robot(Stretch)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(debug_mode=True),

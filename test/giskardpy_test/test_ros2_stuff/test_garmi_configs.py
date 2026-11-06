@@ -9,10 +9,8 @@ from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.connections import OmniDrive
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.world_description.connections import Connection6DoF
 
 # %% base weighting
 
@@ -20,15 +18,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 def test_garmi_giskard_weights_the_velocity_of_its_base(init_rospy):
     giskard = GarmiGiskard(
         world_source=WorldSpecification(
-            robots=[
-                RobotSpecification(
-                    semantic_annotation_type=Garmi,
-                    description_parser=URDFParser.from_file(
-                        Garmi.get_ros_file_path(), prefix=""
-                    ),
-                    localization_connection_type=Connection6DoF,
-                )
-            ]
+            robots=[RobotSpecification.specify_real_robot(Garmi)]
         ),
         robot_interface_config=GarmiVelocityInterface(),
         server_config=GiskardServerConfig(),

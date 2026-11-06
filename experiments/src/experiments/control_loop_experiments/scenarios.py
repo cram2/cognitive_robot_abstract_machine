@@ -52,7 +52,6 @@ from krrood.utils import recursive_subclasses
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.adapters.ros import rospy
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
@@ -60,7 +59,6 @@ from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -209,15 +207,7 @@ class BenchmarkRobot(GiskardTester):
         records_trajectory = self.plotter_mode.records_trajectory
         return Giskard(
             world_source=WorldSpecification(
-                robots=[
-                    RobotSpecification(
-                        semantic_annotation_type=PR2,
-                        description_parser=URDFParser.from_file(
-                            PR2.get_ros_file_path(), prefix=""
-                        ),
-                        localization_connection_type=Connection6DoF,
-                    )
-                ]
+                robots=[RobotSpecification.specify_real_robot(PR2)]
             ),
             robot_interface_config=RealTimeStandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(

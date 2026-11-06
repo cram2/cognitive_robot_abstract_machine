@@ -46,11 +46,9 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 from .test_client_presence import wait_until
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.world_description.connections import Connection6DoF
 
 
 @dataclass
@@ -85,13 +83,7 @@ class PR2Tester(GiskardTester):
         )
         return Giskard(
             world_source=WorldSpecification(
-                robots=[
-                    RobotSpecification(
-                        semantic_annotation_type=PR2,
-                        description_parser=URDFParser(urdf=robot_desc, prefix=""),
-                        localization_connection_type=Connection6DoF,
-                    )
-                ]
+                robots=[RobotSpecification.specify_real_robot(PR2, urdf=robot_desc)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(

@@ -41,7 +41,7 @@ class StretchVelocityInterface(ClosedLoopRobotInterfaceConfig):
         self.sync_6dof_joint_with_tf_frame(
             joint=self.world.get_connections_by_type(Connection6DoF)[0],
             tf_parent_frame="map",
-            tf_child_frame="odom",
+            tf_child_frame=self.robot.mobile_base.odometry_body_name,
         )
 
         self.sync_robot_parts()

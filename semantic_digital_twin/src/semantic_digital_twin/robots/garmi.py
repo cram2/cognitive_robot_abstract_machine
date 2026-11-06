@@ -671,6 +671,10 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
 
     @classproperty
     def drive_velocity_limits(cls) -> DriveVelocityLimits:
+        """
+        GARMI's drive is limited to 0.1 m/s and 0.1 rad/s instead of the limits of
+        :meth:`MobileBase.drive_velocity_limits`.
+        """
         return DriveVelocityLimits(translation=0.1, rotation=0.1)
 
     def setup_hardware_interfaces(self) -> None:

@@ -39,13 +39,13 @@ to be listed by hand.
 :language: python
 ```
 
-- The `RobotSpecification` reads the robot description and annotates everything in it
-  as a `MinimalRobot`. Without a mobile base, the robot is attached directly to the root
-  of the world, `map`, so it suits an arm that is bolted down. The description is read from the
-  `/robot_description` topic, so Giskard uses the same model as the driver. The
-  `prefix=""` keeps the names of the description, which the tf frames and joint states
-  of the robot use. The section "Where the robot description comes from" below says when
-  to read it from a file instead.
+- `RobotSpecification.specify_real_robot` reads the robot description and annotates
+  everything in it as a `MinimalRobot`. Without a mobile base, the robot is attached
+  directly to the root of the world, `map`, so it suits an arm that is bolted down. The
+  description is read from the `/robot_description` topic, so Giskard uses the same model
+  as the driver. The robot keeps the names of the description, which the tf frames and
+  joint states of the robot use. The section "Where the robot description comes from"
+  below says when to read it from a file instead.
 - `ControllerManagerInterface` asks the controller manager for its active controllers.
   It reads the joint states from the broadcaster and sends velocities to the velocity
   controller.
@@ -102,10 +102,10 @@ this:
 :pyobject: create_giskard
 ```
 
-| Field | What it decides |
-|---|---|
-| `description_parser` | Reads the robot description. |
-| `localization_connection_type` | `Connection6DoF` lets the localization, the pose of the odometry body in the root, move. |
+`specify_real_robot` attaches the odometry body of a robot with a mobile base to the
+root with a `Connection6DoF`, so the localization, the pose of the odometry body in the
+root, can move.
+
 The interface then says where the pose of the base is read from and where its velocity is
 sent. For the HSR:
 
@@ -133,8 +133,9 @@ always applied first.
 - On a real robot, Giskard reads the description from `/robot_description` with
   `get_robot_description()`, so it uses the same model as the robot. It waits until the
   description is published.
-- In standalone mode, there is no robot to publish it. Giskard reads the file the robot
-  class declares instead, with `URDFParser.from_file(Tracy.get_ros_file_path(), prefix="")`.
+- In standalone mode, there is no robot to publish it. Without a `urdf`,
+  `RobotSpecification.specify_real_robot(Tracy)` reads the file the robot class
+  declares instead.
 
 ## Running it
 

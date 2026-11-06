@@ -6,7 +6,7 @@ from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.robots.stretch import StretchJoint
+from semantic_digital_twin.robots.stretch import StretchJoint, StretchMobileBase
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     DifferentialDrive,
@@ -64,3 +64,29 @@ def test_velocity_interface_sets_up_against_the_robot_description(
     assert world.get_connections_by_type(DifferentialDrive)
     for joint_name in StretchVelocityInterface().velocity_controlled_joint_names():
         assert world.get_connection_by_name(joint_name) is not None
+
+
+def test_velocity_interface_reads_the_localization_relative_to_the_odometry_frame_of_its_mobile_base(
+    init_rospy, stretch_world_specification, monkeypatch
+):
+    """
+    The localization is read from tf as the frame the mobile base reports its odometry
+    relative to, so a base naming another frame is still localized.
+    """
+    monkeypatch.setattr(StretchMobileBase, "odometry_body_name", "base_odometry")
+    interface = StretchVelocityInterface()
+    giskard = Giskard(
+        world_source=stretch_world_specification,
+        robot_interface_config=interface,
+        server_config=GiskardServerConfig(),
+        qp_controller_config=QPControllerConfig(
+            target_frequency=25, braking_time=timedelta(seconds=1.15)
+        ),
+    )
+
+    giskard.setup()
+
+    [(_, tf_child_frame)] = (
+        interface.tf_frame_synchronizer.connection_to_frames.values()
+    )
+    assert tf_child_frame == StretchMobileBase.odometry_body_name

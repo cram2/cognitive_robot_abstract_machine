@@ -641,6 +641,10 @@ class PR2Torso(
 class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseLidar]):
     @classproperty
     def odometry_body_name(cls) -> str:
+        """
+        The PR2 reports its odometry relative to ``odom_combined`` instead of the
+        ``odom`` of :meth:`MobileBase.odometry_body_name`.
+        """
         return "odom_combined"
 
     @classproperty

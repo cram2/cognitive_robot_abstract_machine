@@ -18,7 +18,6 @@ from cramph.statechart import (
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
@@ -63,12 +62,7 @@ class DAiSyTester(GiskardTester):
         )
         return Giskard(
             world_source=WorldSpecification(
-                robots=[
-                    RobotSpecification(
-                        semantic_annotation_type=DAiSy,
-                        description_parser=URDFParser(urdf=robot_desc, prefix=""),
-                    )
-                ]
+                robots=[RobotSpecification.specify_real_robot(DAiSy, urdf=robot_desc)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(

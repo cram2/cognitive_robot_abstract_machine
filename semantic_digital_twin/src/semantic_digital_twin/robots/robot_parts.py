@@ -16,7 +16,6 @@ from typing_extensions import (
     TypeVar,
     Union,
     Unpack,
-    cast,
     get_args,
     get_origin,
 )
@@ -78,7 +77,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
     HasInputSource,
     HasLeftRightArm,
-    HasMobileBase,
     HasSensors,
     RobotPartMixin,
     TGenericEndEffector,
@@ -1323,21 +1321,6 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         Returns the name of the root body of the robot in the world, which serves as the
         entry point for traversing the robot's kinematic structure.
         """
-
-    @classmethod
-    def get_drive_connection_type(cls) -> type[Connection]:
-        """
-        The connection type attaching this robot to its ``odom`` frame.
-
-        :return: The mobile base's drive connection type, or :class:`FixedConnection`
-            when the robot has no mobile base and is therefore rigidly attached.
-        """
-        if not issubclass(cls, HasMobileBase):
-            return FixedConnection
-        mobile_base_type = cast(
-            MobileBase, get_generic_type_parameters(cls, HasMobileBase)[0]
-        )
-        return mobile_base_type.get_drive_connection_type()
 
     def setup_robot_part_semantic_annotations(self) -> None:
         """

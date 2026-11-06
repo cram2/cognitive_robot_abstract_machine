@@ -20,11 +20,9 @@ from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.world_description.connections import Connection6DoF
 
 
 @pytest.fixture()
@@ -48,13 +46,7 @@ class HSRTester(GiskardTester):
         robot_desc = load_xacro("package://hsr_description/robots/hsrb4s.urdf.xacro")
         return Giskard(
             world_source=WorldSpecification(
-                robots=[
-                    RobotSpecification(
-                        semantic_annotation_type=HSRB,
-                        description_parser=URDFParser(urdf=robot_desc, prefix=""),
-                        localization_connection_type=Connection6DoF,
-                    )
-                ]
+                robots=[RobotSpecification.specify_real_robot(HSRB, urdf=robot_desc)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(

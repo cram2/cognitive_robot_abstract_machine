@@ -8,7 +8,6 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
@@ -36,11 +35,8 @@ def create_giskard() -> Giskard:
     return Giskard(
         world_source=WorldSpecification(
             robots=[
-                RobotSpecification(
-                    semantic_annotation_type=MinimalRobot,
-                    description_parser=URDFParser(
-                        urdf=get_robot_description(), prefix=""
-                    ),
+                RobotSpecification.specify_real_robot(
+                    MinimalRobot, urdf=get_robot_description()
                 )
             ]
         ),
