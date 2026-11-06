@@ -973,7 +973,8 @@ class TestFactories(unittest.TestCase):
             cup = Cup.create_with_new_body_in_world(name="cup", world=world2)
 
         with self.assertRaises(MismatchingWorld):
-            cabinet.add_object(cup)
+            with world1.modify_world():
+                cabinet.add_object(cup)
 
     def test_double_door_view_point(self):
         world = World.create_with_root_body("root")

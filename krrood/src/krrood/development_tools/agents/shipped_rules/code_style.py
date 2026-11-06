@@ -11,6 +11,9 @@ from enum import Enum
 from krrood.development_tools.agents.field_accessor_definition import (
     HandWrittenFieldAccessorChecker,
 )
+from krrood.development_tools.agents.leading_preposition import (
+    LeadingPrepositionChecker,
+)
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.dataclass_field_descriptor import (
@@ -90,12 +93,36 @@ class NamingRules(Section):
     )
 
     NAMES_READ_ON_THEIR_OWN = (
-        "A name stays correct and understandable when read on its own, without its "
-        "class or a keyword argument next to it - after `value = "
-        "instance.attribute`, in a log line, in a traceback, or when passed on "
-        "positionally. A `Pipe` field `size` says nothing once it leaves the "
-        "class; `inner_diameter` does. A generic word that would fit anything "
-        "never passes this test"
+        "The name of a field, method or function stays correct and understandable "
+        "when read on its own, without its class or a keyword argument next to it "
+        "- after `value = instance.attribute`, in a log line, in a traceback, or "
+        "when passed on positionally. A `Pipe` field `size` says nothing once it "
+        "leaves the class; `inner_diameter` does. A `Pipe` method `check` says "
+        "nothing in a traceback, which never shows `Pipe.check`; `check_for_leaks` "
+        "does. A generic word that would fit anything never passes this test"
+    )
+
+    NO_LEADING_PREPOSITIONS = (
+        "Never begin a function or method name with one of the prepositions "
+        + ", ".join(
+            f"`{preposition.text}_`"
+            for preposition in LeadingPrepositionChecker.leading_prepositions
+        )
+        + ": the phrase it starts is only finished by the class name in front of it",
+        (),
+        LeadingPrepositionChecker(),
+    )
+
+    NO_TRAILING_PREPOSITIONS = (
+        "Never end a function or method name with a preposition that only its first "
+        "argument finishes, such as `bottom_of(body)`: name what it returns or does, "
+        "such as `bottom_height(body)`. A preposition that belongs to the verb, as "
+        "in `look_for` or `is_contained_in`, is part of the name"
+    )
+
+    RESERVE_FROM_AND_TO_FOR_CONVERSIONS = (
+        "Begin a function or method name with `from_` or `to_` only for an "
+        "alternative constructor or a conversion, such as `from_json` or `to_json`"
     )
 
     USE_PLAIN_WORDS = (

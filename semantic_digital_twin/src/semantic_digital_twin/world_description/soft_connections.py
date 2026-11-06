@@ -90,6 +90,7 @@ class PiecewiseConstantCurvatureConnection(Connection):
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -299,6 +300,7 @@ class CosseratRodConnection(Connection):
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
