@@ -430,7 +430,7 @@ class QPProblem:
             parameters=VariableParameters.from_lists(*variable_args)
         )
         self.linear_weights_f = self.linear_weights.compile(
-            VariableParameters.from_lists(*variable_args)
+            parameters=VariableParameters.from_lists(*variable_args)
         )
 
     def evaluate_at_state(self, solver_state) -> QPMatrices:
