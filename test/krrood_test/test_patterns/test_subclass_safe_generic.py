@@ -1,4 +1,5 @@
 import sys
+from abc import ABCMeta
 from dataclasses import fields, field as dataclass_field
 import pytest
 from dataclasses import fields, dataclass
@@ -899,3 +900,31 @@ def test_a_subclass_compared_by_identity_is_hashable():
     instance = CombinedClass()
 
     assert instance in {instance}
+
+
+# %% metaclass that carries annotations of its own
+
+
+class MetaclassWithAnnotations(ABCMeta):
+    """
+    A metaclass whose own ``__annotations__`` exist, as they do on :class:`abc.ABCMeta`
+    once anything has read them.
+    """
+
+
+def test_narrowing_a_field_of_a_class_without_annotations_keeps_the_base_unchanged():
+    T = TypeVar("T")
+    MetaclassWithAnnotations.__annotations__
+
+    @dataclass
+    class Container(
+        Generic[T], SubClassSafeGeneric, metaclass=MetaclassWithAnnotations
+    ):
+        content: T
+
+    @dataclass
+    class IntegerContainer(Container[int]): ...
+
+    [content_field] = fields(IntegerContainer)
+    assert content_field.type is int
+    assert Container.__annotations__ == {"content": T}
