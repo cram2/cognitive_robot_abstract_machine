@@ -1,0 +1,10 @@
+# %% X11 and XWayland windows
+services:
+  cram:
+    environment:
+      DISPLAY: ${DISPLAY:?Run GUI commands from your desktop session}
+      XAUTHORITY: /tmp/cram.xauthority
+      QT_X11_NO_MITSHM: "1"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - ./.state/Xauthority:/tmp/cram.xauthority:ro

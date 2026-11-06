@@ -1,0 +1,10 @@
+# %% Local configuration and display credentials
+.env
+.state/
+__pycache__/
+.pytest_cache/
+/container.env
+
+# %% Build dependencies
+!apt-packages.txt
+!command-help.txt

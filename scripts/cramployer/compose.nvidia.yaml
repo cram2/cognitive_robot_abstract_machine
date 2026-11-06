@@ -1,0 +1,12 @@
+# %% NVIDIA compute and graphics
+services:
+  cram:
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,display
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
