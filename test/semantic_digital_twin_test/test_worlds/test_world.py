@@ -1758,6 +1758,18 @@ def test_missing_world_modification_context(world_setup):
         world.add_semantic_annotation(Handle(root=l1))
 
 
+def test_attribute_change_without_world_modification_context_leaves_entity_unchanged():
+    world = World()
+    body = Body(name=PrefixedName("body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+
+    with pytest.raises(MissingWorldModificationContextError):
+        body.update_name(PrefixedName("renamed"))
+
+    assert body.name == PrefixedName("body")
+
+
 def test_dof_removal_simple():
     world = World()
     body1 = Body(name=PrefixedName("body1"))
