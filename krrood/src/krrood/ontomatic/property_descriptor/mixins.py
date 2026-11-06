@@ -4,21 +4,33 @@ Mixins that give property descriptors the characteristics of OWL properties.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from abc import abstractmethod
+
 from typing_extensions import TYPE_CHECKING
+
+from krrood.patterns.mixin import Mixin
 
 if TYPE_CHECKING:
     from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyChain,
         PropertyDescriptor,
     )
+
+
+# %% properties
+
+
+class OntologyProperty(Mixin):
+    """
+    A mixin for descriptors that are properties of an ontology, with the characteristics
+    and the relations to other properties OWL gives them.
+    """
 
 
 # %% property characteristics
 
 
-@dataclass
-class TransitiveProperty:
+class TransitiveProperty(OntologyProperty):
     """
     A mixin for descriptors that are transitive.
     """
@@ -26,8 +38,7 @@ class TransitiveProperty:
     ...
 
 
-@dataclass
-class SymmetricProperty(ABC):
+class SymmetricProperty(OntologyProperty):
     """
     A mixin for descriptors that relate the object of every statement back to its
     subject.
@@ -36,8 +47,7 @@ class SymmetricProperty(ABC):
     ...
 
 
-@dataclass
-class ASymmetricProperty(ABC):
+class ASymmetricProperty(OntologyProperty):
     """
     A mixin for descriptors that never relate the object of a statement back to its
     subject.
@@ -46,8 +56,7 @@ class ASymmetricProperty(ABC):
     ...
 
 
-@dataclass
-class ReflexiveProperty(ABC):
+class ReflexiveProperty(OntologyProperty):
     """
     A mixin for descriptors that relate every individual to itself.
     """
@@ -55,8 +64,7 @@ class ReflexiveProperty(ABC):
     ...
 
 
-@dataclass
-class IrreflexiveProperty(ABC):
+class IrreflexiveProperty(OntologyProperty):
     """
     A mixin for descriptors that never relate an individual to itself.
     """
@@ -67,8 +75,7 @@ class IrreflexiveProperty(ABC):
 # %% properties related to other properties
 
 
-@dataclass
-class HasInverseProperty(ABC):
+class HasInverseProperty(OntologyProperty):
     """
     A mixin for descriptors that have an inverse property.
     """
@@ -82,8 +89,7 @@ class HasInverseProperty(ABC):
         ...
 
 
-@dataclass
-class HasEquivalentProperties(ABC):
+class HasEquivalentProperties(OntologyProperty):
     """
     A mixin for descriptors whose statements are also statements of other properties,
     and the other way round.
@@ -98,8 +104,7 @@ class HasEquivalentProperties(ABC):
         ...
 
 
-@dataclass
-class HasDisjointProperties(ABC):
+class HasDisjointProperties(OntologyProperty):
     """
     A mixin for descriptors that never relate the same two individuals as certain other
     properties.
@@ -114,8 +119,7 @@ class HasDisjointProperties(ABC):
         ...
 
 
-@dataclass
-class HasChainAxioms(ABC):
+class HasChainAxioms(OntologyProperty):
     """
     A mixin for descriptors implied by chains of properties: a statement of each
     property of a chain, each starting where the previous one ends, implies a statement
@@ -124,7 +128,7 @@ class HasChainAxioms(ABC):
 
     @classmethod
     @abstractmethod
-    def get_chain_axioms(cls) -> list[tuple[type[PropertyDescriptor], ...]]:
+    def get_chain_axioms(cls) -> list[PropertyChain]:
         """
         The chains of properties that imply this property.
         """
@@ -134,8 +138,7 @@ class HasChainAxioms(ABC):
 # %% classes
 
 
-@dataclass
-class OntologyBaseClass(ABC):
+class OntologyBaseClass(Mixin):
     """
     A mixin for the class every class of a generated ontology module inherits from.
     """

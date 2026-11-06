@@ -12,6 +12,7 @@ from typing_extensions import Set
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ontomatic.property_descriptor.mixins import HasChainAxioms
 from krrood.ontomatic.property_descriptor.property_descriptor import (
+    PropertyChain,
     PropertyDescriptor,
 )
 
@@ -50,8 +51,11 @@ class AncestorOf(PropertyDescriptor, HasChainAxioms):
     """
 
     @classmethod
-    def get_chain_axioms(cls) -> list[tuple[type[PropertyDescriptor], ...]]:
-        return [(ParentOf, ParentOf), (ParentOf, AncestorOf)]
+    def get_chain_axioms(cls) -> list[PropertyChain]:
+        return [
+            PropertyChain((ParentOf, ParentOf)),
+            PropertyChain((ParentOf, AncestorOf)),
+        ]
 
 
 PersonWithAncestors.parent_of = ParentOf(PersonWithAncestors, "parent_of")

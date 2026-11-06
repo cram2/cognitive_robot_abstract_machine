@@ -333,10 +333,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         Infer the relations implied by every property chain this relation completes, together with the relations
         before and after it in the graph.
         """
-        chain_positions = self.property_descriptor_cls.chains_with_descriptor[
-            self.property_descriptor_cls
-        ]
-        for chain_position in list(chain_positions):
+        for chain_position in self.property_descriptor_cls.chain_positions():
             for chain_start, relations_before in self.paths_to(
                 self.source, chain_position.descriptors_before
             ):

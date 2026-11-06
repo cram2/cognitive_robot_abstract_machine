@@ -31,6 +31,7 @@ from krrood.symbol_graph.symbol_graph import (
 )
 from krrood.entity_query_language.utils import make_set
 from krrood.patterns.caching import memoize
+from krrood.utils import recursive_subclasses
 
 SymbolType = type[Symbol]
 """
@@ -43,6 +44,18 @@ Type alias for the domain-range map.
 
 
 @dataclass(frozen=True)
+class PropertyChain:
+    """
+    Properties whose statements follow each other, each starting where the previous one ends.
+    """
+
+    properties: tuple[type[PropertyDescriptor], ...]
+    """
+    The descriptor classes of the chain, in order.
+    """
+
+
+@dataclass(frozen=True)
 class ChainPosition:
     """
     The place of a descriptor class in a property chain that implies another descriptor class.
@@ -52,9 +65,9 @@ class ChainPosition:
     """
     The descriptor class the chain implies.
     """
-    chain: tuple[type[PropertyDescriptor], ...]
+    chain: PropertyChain
     """
-    The descriptor classes of the chain, in order.
+    The chain.
     """
     index: int
     """
@@ -66,14 +79,14 @@ class ChainPosition:
         """
         The descriptor classes of the chain that come before this position.
         """
-        return self.chain[: self.index]
+        return self.chain.properties[: self.index]
 
     @property
     def descriptors_after(self) -> tuple[type[PropertyDescriptor], ...]:
         """
         The descriptor classes of the chain that come after this position.
         """
-        return self.chain[self.index + 1 :]
+        return self.chain.properties[self.index + 1 :]
 
 
 @dataclass
@@ -155,12 +168,6 @@ class PropertyDescriptor(Symbol):
     """
     For each descriptor class, the descriptor instance managing the field of each of its domain types.
     """
-    chains_with_descriptor: ClassVar[
-        defaultdict[type[PropertyDescriptor], set[ChainPosition]]
-    ] = defaultdict(set)
-    """
-    For each descriptor class, the positions it takes in the property chains that imply other descriptor classes.
-    """
 
     @classmethod
     def super_classes(cls) -> tuple[type[PropertyDescriptor], ...]:
@@ -174,24 +181,25 @@ class PropertyDescriptor(Symbol):
         )
 
     def __post_init__(self):
-        """
-        Register the descriptor for its domain, and the chains that imply its class.
-        """
         self._validate_non_redundant_domain()
         self._update_wrapped_field()
         self._update_domain_and_range()
-        if isinstance(self, HasChainAxioms):
-            self._register_chain_axioms()
 
-    def _register_chain_axioms(self):
+    @classmethod
+    def chain_positions(cls) -> list[ChainPosition]:
         """
-        Register the position of every descriptor class of every chain that implies this descriptor class.
+        :return: The positions this descriptor class takes in the property chains that imply descriptor classes.
         """
-        for chain in self.get_chain_axioms():
-            for index, descriptor_class in enumerate(chain):
-                self.chains_with_descriptor[descriptor_class].add(
-                    ChainPosition(type(self), chain, index)
-                )
+        return [
+            ChainPosition(implied_descriptor, chain, index)
+            for implied_descriptor in dict.fromkeys(
+                recursive_subclasses(PropertyDescriptor)
+            )
+            if issubclass(implied_descriptor, HasChainAxioms)
+            for chain in implied_descriptor.get_chain_axioms()
+            for index, descriptor_class in enumerate(chain.properties)
+            if descriptor_class is cls
+        ]
 
     @cached_property
     def private_attr_name(self) -> str:
