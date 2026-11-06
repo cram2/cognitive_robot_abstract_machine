@@ -90,6 +90,17 @@ class SubClassSafeGeneric(ABC):
         """
         Automatically updates the field types that use the generic type parameters with
         the new specified types, before the class is initialized.
+
+        The base classes' own subclass hooks run afterwards, so they see the updated
+        fields.
+        """
+        cls._narrow_fields_to_bound_types()
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def _narrow_fields_to_bound_types(cls) -> None:
+        """
+        Update the type of every field that uses a type parameter this class binds.
         """
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
