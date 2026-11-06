@@ -291,7 +291,7 @@ def branching_workspace(tmp_path: Path) -> WorkspaceOrmInterfaces:
     )
 
 
-def package_names_of(workspace: WorkspaceOrmInterfaces) -> list[str]:
+def package_names_of_workspace(workspace: WorkspaceOrmInterfaces) -> list[str]:
     """
     :return: The names of the packages whose interfaces the workspace holds, in build
         order.
@@ -305,9 +305,9 @@ def test_a_package_needs_its_interface_and_every_one_it_builds_on(
     """
     The interfaces a package builds on come along, through every level, in build order.
     """
-    needed = branching_workspace.needed_by(BranchingPackage.TOP)
+    needed = branching_workspace.interfaces_needed_by_package(BranchingPackage.TOP)
 
-    assert package_names_of(needed) == [
+    assert package_names_of_workspace(needed) == [
         BranchingPackage.BASE,
         BranchingPackage.MIDDLE,
         BranchingPackage.TOP,
@@ -320,9 +320,12 @@ def test_a_package_does_not_need_the_interfaces_of_another_branch(
     """
     An interface building on the same base, but not on the package, stays out.
     """
-    needed = branching_workspace.needed_by(BranchingPackage.SIDE)
+    needed = branching_workspace.interfaces_needed_by_package(BranchingPackage.SIDE)
 
-    assert package_names_of(needed) == [BranchingPackage.BASE, BranchingPackage.SIDE]
+    assert package_names_of_workspace(needed) == [
+        BranchingPackage.BASE,
+        BranchingPackage.SIDE,
+    ]
 
 
 def test_a_package_building_on_nothing_needs_only_its_own_interface(
@@ -331,9 +334,9 @@ def test_a_package_building_on_nothing_needs_only_its_own_interface(
     """
     The interfaces built on a package are not needed to read it.
     """
-    needed = branching_workspace.needed_by(BranchingPackage.BASE)
+    needed = branching_workspace.interfaces_needed_by_package(BranchingPackage.BASE)
 
-    assert package_names_of(needed) == [BranchingPackage.BASE]
+    assert package_names_of_workspace(needed) == [BranchingPackage.BASE]
 
 
 def test_a_package_without_an_interface_is_rejected(
@@ -344,7 +347,7 @@ def test_a_package_without_an_interface_is_rejected(
     empty build.
     """
     with pytest.raises(UnknownOrmPackageError):
-        branching_workspace.needed_by("package_without_an_interface")
+        branching_workspace.interfaces_needed_by_package("package_without_an_interface")
 
 
 # %% what a build lets through to the terminal

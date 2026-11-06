@@ -169,7 +169,9 @@ def regenerate_orm_interfaces(package_name: str) -> bool:
     """
     if os.environ.get(PytestEnvironmentVariable.XDIST_WORKER):
         return False
-    needed_interfaces = WORKSPACE_ORM_INTERFACES.needed_by(package_name)
+    needed_interfaces = WORKSPACE_ORM_INTERFACES.interfaces_needed_by_package(
+        package_name
+    )
     if not OrmBuild.requested().builds(needed_interfaces):
         return False
     needed_interfaces.regenerate()

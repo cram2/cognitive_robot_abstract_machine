@@ -336,7 +336,7 @@ class WorkspaceOrmInterfaces:
     The interfaces in the order they are built, which follows their dependencies.
     """
 
-    def needed_by(self, package_name: str) -> WorkspaceOrmInterfaces:
+    def interfaces_needed_by_package(self, package_name: str) -> WorkspaceOrmInterfaces:
         """
         :param package_name: The package whose ORM model is read.
         :return: The package's interface and every interface it builds on, in build
