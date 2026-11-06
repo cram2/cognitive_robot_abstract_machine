@@ -70,6 +70,9 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
   - required and forbidden edges;
   - deterministic copies, which the tests skip and the graph restores as children of
     their source.
+- `relational_checks.ExampleToPartCheck.dependences(tables)` tests the independence a relational circuit
+  assumes: an instance's attributes reach its parts' attributes only through the
+  aggregation statistics.
 
 ## Using it from a query
 
@@ -99,7 +102,7 @@ Learning the structure from observational data has limits:
   recorded.
 - **The relational assumption.** A relational circuit lets an instance's attributes
   affect its parts only through the aggregation statistics, and the relational learner
-  follows it.
+  follows it. `ExampleToPartCheck` reports where the data disagrees.
 - **Interventions on counts.** Setting an aggregation statistic is ambiguous once it
   has parents among the part attributes, since many configurations of the parts give
   the same count (Spirtes and Scheines, 2004).
