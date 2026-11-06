@@ -383,7 +383,7 @@ class EvaluationContext:
             _evaluation_context_var.reset(context_token)
 
     @classmethod
-    def current_value_of(cls, term: GroundTerm) -> TermValue | None:
+    def current_value_of_term(cls, term: GroundTerm) -> TermValue | None:
         """
         :param term: The ground term to read.
         :return: The value of *term* as the current evaluation context's

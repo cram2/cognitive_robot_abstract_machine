@@ -606,7 +606,7 @@ class SingleValueMapping(MappedVariable[T], GroundTermExpression[GroundTermType]
     def _apply_mapping_(
         self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
-        term_value = EvaluationContext.current_value_of(self._ground_term_(value))
+        term_value = EvaluationContext.current_value_of_term(self._ground_term_(value))
         if term_value is not None:
             yield term_value.value
 
@@ -769,7 +769,7 @@ class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
             yield value[self._key_]
             return
         for key in self._key_._evaluate_(sources):
-            term_value = EvaluationContext.current_value_of(
+            term_value = EvaluationContext.current_value_of_term(
                 self._ground_term_(value, key.value)
             )
             if term_value is not None:
