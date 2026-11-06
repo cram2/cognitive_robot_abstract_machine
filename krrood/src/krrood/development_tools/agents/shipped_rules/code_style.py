@@ -8,6 +8,10 @@ import dataclasses
 from enum import Enum
 
 
+from krrood.development_tools.agents.leading_preposition import (
+    LeadingPreposition,
+    LeadingPrepositionChecker,
+)
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.ormatic.utils import classproperty
 
@@ -70,8 +74,19 @@ class NamingRules(Section):
         "class or a keyword argument next to it - after `value = "
         "instance.attribute`, in a log line, in a traceback, or when passed on "
         "positionally. A `Pipe` field `size` says nothing once it leaves the "
-        "class; `inner_diameter` does. A generic word that would fit anything "
-        "never passes this test"
+        "class; `inner_diameter` does. This holds for methods as much as for "
+        "fields: a traceback shows `for_hot_water`, never `Pipe.for_hot_water`. A "
+        "generic word that would fit anything never passes this test"
+    )
+
+    NO_LEADING_PREPOSITIONS = (
+        "Never begin a function or method name with a preposition such as "
+        + ", ".join(f"`{preposition}_`" for preposition in LeadingPreposition)
+        + ": the phrase it starts is only finished by the class name in front of "
+        "it. The exception is an alternative constructor or a conversion named "
+        "`from_<source>` or `to_<target>`, such as `from_json` or `to_json`",
+        (),
+        LeadingPrepositionChecker(),
     )
 
     USE_PLAIN_WORDS = (

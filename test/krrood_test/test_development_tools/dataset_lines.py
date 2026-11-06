@@ -74,6 +74,32 @@ class CommentBlocksLine(IntEnum):
     """
 
 
+class PrepositionalNamesLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.MethodNameSnippet.PREPOSITIONAL_NAMES`.
+    """
+
+    CLASSMETHOD = 14
+    """
+    The factory classmethod beginning with ``for``.
+    """
+
+    METHOD = 20
+    """
+    The method beginning with ``as``.
+    """
+
+    PRIVATE_METHOD = 26
+    """
+    The private method beginning with ``with`` after its underscore.
+    """
+
+    FUNCTION = 33
+    """
+    The function beginning with ``of``.
+    """
+
+
 # %% how long the prose is
 
 

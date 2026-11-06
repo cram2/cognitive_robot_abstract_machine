@@ -8,6 +8,7 @@ from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
+from .dataset.leading_prepositions import prepositional_names, verb_phrase_names
 from .dataset.missing_docstrings import (
     documented_module,
     no_module_docstring,
@@ -125,4 +126,22 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+
+class MethodNameSnippet(PathEnumeration):
+    """
+    The Python sources the leading preposition check reads.
+    """
+
+    PREPOSITIONAL_NAMES = Path(prepositional_names.__file__)
+    """
+    A module whose classmethod, method, private method and function each begin their
+    name with a preposition.
+    """
+
+    VERB_PHRASE_NAMES = Path(verb_phrase_names.__file__)
+    """
+    A module whose method names are verb phrases, an alternative constructor and a
+    conversion.
     """
