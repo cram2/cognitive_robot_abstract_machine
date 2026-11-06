@@ -15,6 +15,8 @@ from ..dataset.dataclass_field_descriptors import (
     HolderOfValueKeptInStorage,
     IntegerHolderOfValueKeptInStorage,
     SubclassDeclaringTheFieldAgain,
+    SubclassDeclaringTheFieldAgainWithDefault,
+    SubclassDeclaringTheFieldAgainWithField,
     SubclassOfHolder,
     ValueKeptInStorage,
 )
@@ -97,8 +99,48 @@ def test_narrowed_field_has_the_bound_type():
     assert value_field.type == int | None
 
 
-def test_field_declared_again_without_default_keeps_the_value_in_storage():
+@pytest.mark.parametrize(
+    "holder_type",
+    [
+        SubclassDeclaringTheFieldAgain,
+        SubclassDeclaringTheFieldAgainWithDefault,
+        SubclassDeclaringTheFieldAgainWithField,
+    ],
+)
+def test_field_declared_again_keeps_the_value_in_storage(holder_type: type):
     value = 3
-    holder = SubclassDeclaringTheFieldAgain(value=value)
+    holder = holder_type(value=value)
     assert holder.storage.value == value
     assert "value" not in vars(holder)
+
+
+@pytest.mark.parametrize(
+    "holder_type",
+    [
+        SubclassDeclaringTheFieldAgainWithDefault,
+        SubclassDeclaringTheFieldAgainWithField,
+    ],
+)
+def test_default_of_field_declared_again_is_kept_in_storage(holder_type: type):
+    [value_field] = [field_ for field_ in fields(holder_type) if field_.name == "value"]
+    holder = holder_type()
+    assert holder.storage.value == value_field.default_factory()
+    assert "value" not in vars(holder)
+
+
+def test_field_declared_again_without_default_is_required():
+    with pytest.raises(TypeError):
+        SubclassDeclaringTheFieldAgain()
+
+
+@pytest.mark.parametrize(
+    "holder_type, base_type",
+    [
+        (SubclassDeclaringTheFieldAgain, HolderOfValueKeptInStorage),
+        (SubclassDeclaringTheFieldAgainWithDefault, HolderOfValueKeptInStorage),
+        (SubclassDeclaringTheFieldAgainWithField, HolderOfValueKeptInStorage),
+        (IntegerHolderOfValueKeptInStorage, GenericHolderOfValueKeptInStorage),
+    ],
+)
+def test_subclass_keeps_the_inherited_descriptor(holder_type: type, base_type: type):
+    assert holder_type.value is base_type.value

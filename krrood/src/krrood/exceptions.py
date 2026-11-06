@@ -6,7 +6,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing_extensions import Any, Protocol
 
-from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
+from krrood.patterns.dataclass_field_descriptor import (
+    DataclassFieldDescriptor,
+    DataclassFieldDescriptorOwner,
+)
 
 
 @dataclass
@@ -67,7 +70,9 @@ class ContextLink(DataclassFieldDescriptor):
 
 
 @dataclass
-class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
+class DataclassException(
+    Exception, CanBehaveLikeDataclassException, DataclassFieldDescriptorOwner, ABC
+):
     """
     A base exception class for dataclass-based exceptions.
     Subclasses implement error_message() and suggest_correction(); both are evaluated at

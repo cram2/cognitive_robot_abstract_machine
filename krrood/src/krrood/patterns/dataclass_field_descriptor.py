@@ -5,11 +5,12 @@ Dataclass fields whose value is kept somewhere other than the instance's own att
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from copy import copy
-from dataclasses import MISSING, Field, dataclass
+from dataclasses import MISSING, Field, dataclass, field
 from itertools import repeat
 
 from typing_extensions import Any
+
+from krrood.patterns.mixin import Mixin
 
 
 # %% dataclass field descriptor
@@ -23,10 +24,9 @@ class DataclassFieldDescriptor(ABC):
 
     The field stays an ordinary dataclass field, declared with any default and
     :func:`dataclasses.field` arguments. Assign the descriptor to the field's name on
-    the class once the class is created, e.g. ``Owner.value = KeptInStorage()``.
-
-    .. warning:: A subclass that declares the field again with a default of its own
-        replaces the descriptor with that default, so the value is no longer managed.
+    the class once the class is created, e.g. ``Owner.value = KeptInStorage()``. The
+    class inherits :class:`DataclassFieldDescriptorOwner`, so its subclasses keep the
+    descriptor.
     """
 
     @abstractmethod
@@ -55,24 +55,59 @@ class DataclassFieldDescriptor(ABC):
 
     def __set__(self, instance: Any, value: Any) -> None:
         """
-        Write the value of the field, unless the value is a descriptor, which a subclass
-        that declares the field again without a default takes as the field's default.
+        Write the value of the field.
         """
-        if isinstance(value, DataclassFieldDescriptor):
-            return
         self.write(instance, value)
 
-    @staticmethod
-    def without_class_level_default(field_: Field) -> Field:
+
+# %% owner of descriptor managed fields
+
+
+class DataclassFieldDescriptorOwner(Mixin):
+    """
+    A dataclass whose fields :class:`DataclassFieldDescriptor` instances may manage.
+
+    A subclass may declare such a field again, with a default of its own, without one,
+    or with a narrower type, and the field stays managed by the inherited descriptor.
+    """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         """
-        :param field_: A field of a subclass that a descriptor manages on a base class.
-        :return: A copy of the field with its default given by a factory, so that
-            :func:`dataclasses.dataclass` does not set the default on the subclass over
-            the inherited descriptor.
+        Turn every field this subclass declares over an inherited descriptor into a
+        :class:`~dataclasses.Field` that leaves no class attribute in its place.
         """
-        if field_.default is MISSING:
-            return field_
-        result = copy(field_)
-        result.default_factory = repeat(field_.default).__next__
-        result.default = MISSING
-        return result
+        super().__init_subclass__(**kwargs)
+        for name in vars(cls).get("__annotations__", {}):
+            if not isinstance(
+                cls._inherited_attribute(name), DataclassFieldDescriptor
+            ) or isinstance(vars(cls).get(name), DataclassFieldDescriptor):
+                continue
+            setattr(cls, name, cls._field_without_class_attribute(name))
+
+    @classmethod
+    def _inherited_attribute(cls, name: str) -> Any:
+        """
+        :param name: The name of an attribute.
+        :return: The attribute the nearest base class defines under the name, or
+            ``None`` if no base class does.
+        """
+        return next(
+            (vars(base)[name] for base in cls.__mro__[1:] if name in vars(base)),
+            None,
+        )
+
+    @classmethod
+    def _field_without_class_attribute(cls, name: str) -> Field:
+        """
+        :param name: The name of a field this class declares.
+        :return: The field's declaration with its default given by a factory, which
+            :func:`dataclasses.dataclass` does not set as a class attribute.
+        """
+        declaration = vars(cls).get(name, MISSING)
+        if not isinstance(declaration, Field):
+            declaration = field(default=declaration)
+        if declaration.default is MISSING:
+            return declaration
+        declaration.default_factory = repeat(declaration.default).__next__
+        declaration.default = MISSING
+        return declaration

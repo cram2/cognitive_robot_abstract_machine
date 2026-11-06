@@ -9,7 +9,10 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Generic, TypeVar
 
-from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
+from krrood.patterns.dataclass_field_descriptor import (
+    DataclassFieldDescriptor,
+    DataclassFieldDescriptorOwner,
+)
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -58,7 +61,7 @@ class ValueKeptInStorage(DataclassFieldDescriptor):
 
 
 @dataclass
-class HolderOfValueKeptInStorage:
+class HolderOfValueKeptInStorage(DataclassFieldDescriptorOwner):
     """
     A dataclass with a field kept in its storage.
     """
@@ -100,7 +103,32 @@ class SubclassDeclaringTheFieldAgain(HolderOfValueKeptInStorage):
     A subclass that declares the descriptor backed field again without a default.
     """
 
-    value: int | None
+    value: int | None = field(kw_only=True)
+    """
+    The value kept in :attr:`storage`.
+    """
+
+
+@dataclass
+class SubclassDeclaringTheFieldAgainWithDefault(HolderOfValueKeptInStorage):
+    """
+    A subclass that declares the descriptor backed field again with a default of its own.
+    """
+
+    value: int | None = 7
+    """
+    The value kept in :attr:`storage`.
+    """
+
+
+@dataclass
+class SubclassDeclaringTheFieldAgainWithField(HolderOfValueKeptInStorage):
+    """
+    A subclass that declares the descriptor backed field again through
+    :func:`dataclasses.field`.
+    """
+
+    value: int | None = field(default=7, kw_only=True)
     """
     The value kept in :attr:`storage`.
     """
@@ -113,7 +141,9 @@ The type of the value of :class:`GenericHolderOfValueKeptInStorage`.
 
 
 @dataclass
-class GenericHolderOfValueKeptInStorage(Generic[ValueType], SubClassSafeGeneric):
+class GenericHolderOfValueKeptInStorage(
+    Generic[ValueType], SubClassSafeGeneric, DataclassFieldDescriptorOwner
+):
     """
     A generic dataclass with a field kept in its storage whose type is the parameter.
     """

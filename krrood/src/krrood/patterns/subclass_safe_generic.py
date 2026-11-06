@@ -23,7 +23,6 @@ from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
-from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
 from krrood.patterns.interface import Interface
 from krrood.exceptions import (
     MismatchingNumberOfGenericParametersAndResolvedTypes,
@@ -91,6 +90,17 @@ class SubClassSafeGeneric(ABC):
         """
         Automatically updates the field types that use the generic type parameters with
         the new specified types, before the class is initialized.
+
+        The base classes' own subclass hooks run afterwards, so they see the updated
+        fields.
+        """
+        cls._narrow_fields_to_bound_types()
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def _narrow_fields_to_bound_types(cls) -> None:
+        """
+        Update the type of every field that uses a type parameter this class binds.
         """
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
@@ -191,9 +201,10 @@ class SubClassSafeGeneric(ABC):
 
         # Check if we should update an existing attribute or field on the current class
         target_field = None
-        attr = getattr(cls, name, None)
-        if isinstance(attr, Field):
-            target_field = attr
+        if hasattr(cls, name):
+            attr = getattr(cls, name)
+            if isinstance(attr, Field):
+                target_field = attr
 
         # If no direct field, but we found one in MRO, we might need to copy it
         if target_field is None and existing_field is not None:
@@ -203,10 +214,6 @@ class SubClassSafeGeneric(ABC):
             new_field = copy(target_field)
             for key, value in kwargs.items():
                 setattr(new_field, key, value)
-            if isinstance(attr, DataclassFieldDescriptor):
-                new_field = DataclassFieldDescriptor.without_class_level_default(
-                    new_field
-                )
             setattr(cls, name, new_field)
 
         # Update annotations
