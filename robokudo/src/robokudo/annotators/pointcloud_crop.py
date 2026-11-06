@@ -12,18 +12,22 @@ This module provides an annotator for:
    Cropping can be done in either sensor coordinates (default) or world coordinates.
 """
 
-# %% Imports
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
 import open3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.utils.annotator_helper import (
     transform_cloud_from_camera_to_world,
     transform_cloud_from_world_to_camera,
@@ -35,8 +39,52 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-# %% Point cloud cropping
-class PointcloudCropAnnotator(BaseAnnotator):
+# %% PointcloudCrop parameters
+
+
+@dataclass(kw_only=True)
+class PointcloudCropParameters(AnnotatorParameters):
+    """Parameters for configuring point cloud cropping."""
+
+    min_x: float = -2.0
+    """Minimum X coordinate"""
+
+    min_y: float = -2.0
+    """Minimum Y coordinate"""
+
+    min_z: float = -9.0
+    """Minimum Z coordinate"""
+
+    max_x: float = 2.0
+    """Maximum X coordinate"""
+
+    max_y: float = 2.0
+    """Maximum Y coordinate"""
+
+    max_z: float = 3.0
+    """Maximum Z coordinate"""
+
+    relative_to_world: bool = False
+    """Whether to crop the PC in camera/sensor coordinates or whether it shoudl be transformed to world coordinates beforehand."""
+
+
+# %% PointcloudCrop descriptor
+
+
+@dataclass(kw_only=True)
+class PointcloudCropDescriptor(AnnotatorDescriptor[PointcloudCropParameters]):
+    """Declarative configuration of :class:`PointcloudCropAnnotator`."""
+
+    parameters: PointcloudCropParameters = field(
+        default_factory=PointcloudCropParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% PointcloudCrop annotator
+
+
+class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
     """
     Point cloud cropping using axis-aligned bounding boxes.
 
@@ -47,59 +95,15 @@ class PointcloudCropAnnotator(BaseAnnotator):
        When using world coordinates, requires valid camera-to-world transform in CAS.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for point cloud cropping.
-        """
-
-        class Parameters:
-            """
-            Parameters for configuring point cloud cropping.
-            """
-
-            def __init__(self) -> None:
-                self.min_x: float = -2.0
-                """
-                Minimum X coordinate
-                """
-
-                self.min_y: float = -2.0
-                """
-                Minimum Y coordinate
-                """
-
-                self.min_z: float = -9.0
-                """
-                Minimum Z coordinate
-                """
-
-                self.max_x: float = 2.0
-                """
-                Maximum X coordinate
-                """
-
-                self.max_y: float = 2.0
-                """
-                Maximum Y coordinate
-                """
-
-                self.max_z: float = 3.0
-                """
-                Maximum Z coordinate
-                """
-
-                self.relative_to_world: bool = False
-                """
-                Whether to crop the PC in camera/sensor coordinates or whether it shoudl be transformed to world coordinates beforehand.
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[PointcloudCropDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return PointcloudCropDescriptor
 
     def __init__(
         self,
         name: str = "PointcloudCropAnnotator",
-        descriptor: PointcloudCropAnnotator.Descriptor | None = None,
+        descriptor: PointcloudCropDescriptor | None = None,
     ) -> None:
         """
         Initialize the point cloud cropper.

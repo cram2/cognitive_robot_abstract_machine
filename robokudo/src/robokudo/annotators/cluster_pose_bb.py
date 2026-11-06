@@ -20,18 +20,23 @@ The module uses:
 
 from __future__ import annotations
 
+# %% Imports
 import copy
 import math
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
 import numpy.linalg
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import BoundingBox3DAnnotation, PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
@@ -48,7 +53,37 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class ClusterPoseBBAnnotator(BaseAnnotator):
+# %% ClusterPoseBB parameters
+
+
+@dataclass(kw_only=True)
+class ClusterPoseBBParameters(AnnotatorParameters):
+    """Parameters for configuring pose estimation."""
+
+    align_x_axis_by_max_bbox_extent: bool = False
+    """Whether to align x-axis with longest box side. The default behaviour of this Annotator orients the z-axis such that it always points up w.r.t the world frame. By setting this parameter to True, this behaviour will be overwritten. In that case, x will always point in the direction of the largest side (extent) of the bounding box"""
+
+    bounding_box_visualization_color: tuple[int, int, int] = (0, 0, 0)
+    """RGB color for box visualization"""
+
+
+# %% ClusterPoseBB descriptor
+
+
+@dataclass(kw_only=True)
+class ClusterPoseBBDescriptor(AnnotatorDescriptor[ClusterPoseBBParameters]):
+    """Declarative configuration of :class:`ClusterPoseBBAnnotator`."""
+
+    parameters: ClusterPoseBBParameters = field(
+        default_factory=ClusterPoseBBParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ClusterPoseBB annotator
+
+
+class ClusterPoseBBAnnotator(BaseAnnotator[ClusterPoseBBDescriptor]):
     """3D pose estimation using oriented bounding boxes.
 
     This annotator:
@@ -63,32 +98,15 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
        Default behavior aligns z-axis with world frame up direction.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for pose estimation."""
-
-        class Parameters:
-            """Parameters for configuring pose estimation."""
-
-            def __init__(self) -> None:
-                self.align_x_axis_by_max_bbox_extent: bool = False
-                """
-                Whether to align x-axis with longest box side.
-                
-                The default behaviour of this Annotator orients the z-axis such that it always points up w.r.t the
-                world frame. By setting this parameter to True, this behaviour will be overwritten.
-                In that case, x will always point in the direction of the largest side (extent) of the bounding box
-                """
-
-                self.bounding_box_visualization_color: tuple[int, int, int] = (0, 0, 0)
-                """RGB color for box visualization"""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ClusterPoseBBDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ClusterPoseBBDescriptor
 
     def __init__(
         self,
         name: str = "ClusterPoseBBAnnotator",
-        descriptor: ClusterPoseBBAnnotator.Descriptor | None = None,
+        descriptor: ClusterPoseBBDescriptor | None = None,
     ) -> None:
         """Initialize the pose estimator.
 

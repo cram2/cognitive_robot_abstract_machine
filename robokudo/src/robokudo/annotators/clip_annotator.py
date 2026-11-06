@@ -1,14 +1,25 @@
+"""Clip annotator configuration and annotation behavior."""
+
 from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass, field
 
 import faiss
 import numpy as np
 import torch
+from krrood.ormatic.utils import classproperty
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.zero_shot_classification_annotator import (
+    ClassificationDescriptor,
     ZeroShotClassificationAnnotator,
+    ZeroShotClassificationParameters,
+)
+from robokudo.datastructures.torch_device import (
+    TorchDeviceJSONSerializer as TorchDeviceJSONSerializer,
 )
 from robokudo.types.annotation import Classification
 
@@ -16,48 +27,59 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class CLIPAnnotator(ZeroShotClassificationAnnotator):
+# %% CLIP parameters
+
+
+@dataclass(kw_only=True)
+class CLIPParameters(ZeroShotClassificationParameters):
+    """Model selection and vocabulary formatting for CLIP classification."""
+
+    device: torch.device = field(
+        default_factory=lambda: torch.device(
+            "cuda:0" if torch.cuda.is_available() else "cpu"
+        )
+    )
+    """Torch device to be used by the annotator."""
+
+    model_name: str = "openai/clip-vit-large-patch14"
+    """Name of the CLIP to use for feature extraction."""
+
+    vocabulary_template: str = "A photo of a {}"
+    """A template string that each vocabulary word is inserted into."""
+
+    use_softmax: bool = True
+    """Whether to apply softmax to the results of the analyzed image or hypothesis or not."""
+
+
+# %% CLIP descriptor
+
+
+@dataclass(kw_only=True)
+class CLIPDescriptor(ClassificationDescriptor[CLIPParameters]):
+    """Declarative configuration of :class:`CLIPAnnotator`."""
+
+    parameters: CLIPParameters = field(default_factory=CLIPParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% CLIP annotator
+
+
+class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
     """
     Zero-shot classification by the similarity of CLIP's image embedding to the CLIP
     text embedding of each vocabulary entry.
     """
 
-    class Descriptor(ZeroShotClassificationAnnotator.Descriptor):
-        """
-        Descriptor for the CLIPAnnotator.
-        """
-
-        class Parameters(ZeroShotClassificationAnnotator.Descriptor.Parameters):
-            """
-            Parameters for the Descriptor.
-            """
-
-            def __init__(self) -> None:
-                super().__init__()
-                self.device = torch.device(
-                    "cuda:0" if torch.cuda.is_available() else "cpu"
-                )
-                """
-                Torch device to be used by the annotator.
-                """
-                self.model_name = "openai/clip-vit-large-patch14"
-                """
-                Name of the CLIP to use for feature extraction.
-                """
-                self.vocabulary_template: str = "A photo of a {}"
-                """
-                A template string that each vocabulary word is inserted into.
-                """
-                self.use_softmax: bool = True
-                """
-                Whether to apply softmax to the results of the analyzed image or
-                hypothesis or not.
-                """
+    @classproperty
+    def Descriptor(cls) -> type[CLIPDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return CLIPDescriptor
 
     def __init__(
         self,
         name: str = "CLIPAnnotator",
-        descriptor: CLIPAnnotator.Descriptor | None = None,
+        descriptor: CLIPDescriptor | None = None,
     ) -> None:
         super().__init__(name=name, descriptor=descriptor)
 

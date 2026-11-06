@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # %% Imports
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from timeit import default_timer
@@ -10,14 +11,18 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
+from krrood.ormatic.utils import classproperty
+from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
+from semantic_digital_twin.world_description.geometry import Color
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.exceptions import ImageContourMissing
 from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
-from semantic_digital_twin.world_description.geometry import Color
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
@@ -70,10 +75,115 @@ class ImageClusters:
     """Color visualization of the last selected contour's depth mask."""
 
 
-# %% Image cluster annotator
+# %% Color segmentation ranges
 
 
-class ImageClusterExtractor(BaseAnnotator):
+@dataclass(kw_only=True)
+class ColorRange(Mapping[ColorRangeBound, Color]):
+    """Normalized color bounds addressable by their existing enum keys."""
+
+    lower: Color
+    """Inclusive lower hue, saturation, and value limits."""
+
+    upper: Color
+    """Inclusive upper limits, with a lower hue selecting the hue seam."""
+
+    def __getitem__(self, bound: ColorRangeBound) -> Color:
+        return {ColorRangeBound.LOWER: self.lower, ColorRangeBound.UPPER: self.upper}[
+            bound
+        ]
+
+    def __iter__(self) -> Iterator[ColorRangeBound]:
+        return iter(ColorRangeBound)
+
+    def __len__(self) -> int:
+        return len(ColorRangeBound)
+
+
+# %% ImageClusterExtractor parameters
+
+
+@dataclass(kw_only=True)
+class ImageClusterExtractorParameters(AnnotatorParameters):
+    """Segmentation thresholds and point-cloud extraction settings."""
+
+    minimum_hue_saturation_value: Color = field(
+        default_factory=lambda: Color.from_opencv_hue_saturation_value_full(
+            hue=150, saturation=130, value=85
+        )
+    )
+    """Lower normalized hue, saturation, and value bound for color segmentation."""
+
+    maximum_hue_saturation_value: Color = field(
+        default_factory=lambda: Color.from_opencv_hue_saturation_value_full(
+            hue=200, saturation=255, value=255
+        )
+    )
+    """Upper normalized hue, saturation, and value bound for color segmentation."""
+
+    erosion_iterations: int = 2
+    """Number of erosion passes applied to the segmented image mask."""
+
+    contour_min_size: int = 1000
+    """Minimum contour area in pixels retained for object extraction."""
+
+    color_ranges: dict[ColorName, ColorRange] = field(
+        init=False, metadata=JSONMetadata(serialize=True).as_dict()
+    )
+    """Named segmentation presets with normalized color bounds."""
+
+    outlier_removal: bool = True
+    """Whether statistical outliers are removed from extracted point clouds."""
+
+    outlier_removal_nb_neighbors: int = 20
+    """Neighbors considered by statistical point-cloud outlier removal."""
+
+    outlier_removal_std_ratio: float = 2.0
+    """Standard-deviation multiplier used to reject point-cloud outliers."""
+
+    num_of_objects: int = 2
+    """Maximum number of largest image contours extracted as objects."""
+
+    min_points_threshold: int = 62
+    """Minimum point count required to retain an extracted object cloud."""
+
+    def __post_init__(self) -> None:
+        """Initialize values derived from the configured processing settings."""
+        self.color_ranges = {
+            ColorName.BLUE: ColorRange(
+                lower=self.minimum_hue_saturation_value,
+                upper=self.maximum_hue_saturation_value,
+            ),
+            ColorName.RED: ColorRange(
+                lower=Color.from_opencv_hue_saturation_value_full(
+                    hue=245, saturation=150, value=95
+                ),
+                upper=Color.from_opencv_hue_saturation_value_full(
+                    hue=15, saturation=255, value=255
+                ),
+            ),
+        }
+
+
+# %% ImageClusterExtractor descriptor
+
+
+@dataclass(kw_only=True)
+class ImageClusterExtractorDescriptor(
+    AnnotatorDescriptor[ImageClusterExtractorParameters]
+):
+    """Declarative configuration of :class:`ImageClusterExtractor`."""
+
+    parameters: ImageClusterExtractorParameters = field(
+        default_factory=ImageClusterExtractorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ImageClusterExtractor annotator
+
+
+class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
     """
     Extract object clusters from images using color segmentation.
 
@@ -104,79 +214,15 @@ class ImageClusterExtractor(BaseAnnotator):
         Show depth mask of detected objects.
         """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for ImageClusterExtractor.
-
-        Parameters:
-
-        * hue, saturation, and value thresholding ranges
-        * Contour filtering parameters
-        * Point cloud generation settings
-        * Color name to hue, saturation, and value range mappings
-        * Outlier removal parameters
-        """
-
-        class Parameters:
-            """
-            Parameter class containing all configurable settings.
-            """
-
-            def __init__(self) -> None:
-                """
-                Initialize default parameter values.
-                """
-                self.minimum_hue_saturation_value: Color = (
-                    Color.from_opencv_hue_saturation_value_full(
-                        hue=150, saturation=130, value=85
-                    )
-                )
-                """Lower normalized hue, saturation, and value bound for color segmentation."""
-                self.maximum_hue_saturation_value: Color = (
-                    Color.from_opencv_hue_saturation_value_full(
-                        hue=200, saturation=255, value=255
-                    )
-                )
-                """Upper normalized hue, saturation, and value bound for color segmentation."""
-                self.erosion_iterations: int = 2
-
-                # This parameter controls the filtering of the initial list of contours.
-                # It is used to avoid very small contours when calculating 3d points etc.
-                self.contour_min_size: int = 1000
-
-                self.color_ranges: dict[ColorName, dict[ColorRangeBound, Color]] = (
-                    dict()
-                )
-                self.color_ranges[ColorName.BLUE] = {
-                    ColorRangeBound.LOWER: self.minimum_hue_saturation_value,
-                    ColorRangeBound.UPPER: self.maximum_hue_saturation_value,
-                }
-                # A lower hue above the upper hue selects both sides of the hue seam.
-                self.color_ranges[ColorName.RED] = {
-                    ColorRangeBound.LOWER: Color.from_opencv_hue_saturation_value_full(
-                        hue=245, saturation=150, value=95
-                    ),
-                    ColorRangeBound.UPPER: Color.from_opencv_hue_saturation_value_full(
-                        hue=15, saturation=255, value=255
-                    ),
-                }
-
-                self.outlier_removal: bool = True
-                self.outlier_removal_nb_neighbors: int = 20
-                self.outlier_removal_std_ratio: float = 2.0
-                self.num_of_objects: int = 2
-
-                # The minimal amount of 3D points of the object's pointcloud
-                # This check is applied AFTER self.contour_min_size
-                self.min_points_threshold: int = 62
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ImageClusterExtractorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ImageClusterExtractorDescriptor
 
     def __init__(
         self,
         name: str = "ImageClusterExtractor",
-        descriptor: ImageClusterExtractor.Descriptor | None = None,
+        descriptor: ImageClusterExtractorDescriptor | None = None,
     ) -> None:
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

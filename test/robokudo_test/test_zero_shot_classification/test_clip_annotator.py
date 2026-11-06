@@ -8,20 +8,20 @@ without downloading model weights.
 
 from __future__ import annotations
 
+# %% Imports
 import math
 from dataclasses import dataclass, field
 
 import numpy as np
 import pytest
+import robokudo.annotators.clip_annotator
 import torch
 from PIL import Image
+from robokudo.annotators.clip_annotator import CLIPAnnotator, CLIPDescriptor
+from robokudo.types.annotation import Classification
 from transformers import BatchEncoding
 from transformers.modeling_outputs import BaseModelOutputWithPooling
 from typing_extensions import Sequence
-
-import robokudo.annotators.clip_annotator
-from robokudo.annotators.clip_annotator import CLIPAnnotator
-from robokudo.types.annotation import Classification
 
 from ._color_scenes import COLOR_BY_WORD, COLOR_VOCABULARY, rgb, solid_image
 
@@ -213,7 +213,7 @@ def color_embedding_clip(monkeypatch) -> ColorEmbeddingClip:
 # %% classification setup
 
 
-def _color_descriptor() -> CLIPAnnotator.Descriptor:
+def _color_descriptor() -> CLIPDescriptor:
     """
     :return: A descriptor classifying against the color vocabulary on the CPU.
     """

@@ -1,25 +1,24 @@
 from __future__ import annotations
-from collections.abc import Iterator
-from dataclasses import dataclass, field
-from unittest.mock import Mock
-from geometry_msgs.msg import TransformStamped
-from rclpy.time import Time as ROSClockTime
-from tf2_ros import LookupException
+
+# %% Imports
 import logging
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field
 from threading import Lock
+from unittest.mock import Mock
 
 import cv2
 import numpy as np
 import pytest
-from builtin_interfaces.msg import Time
-from py_trees.common import Status
-from sensor_msgs.msg import CameraInfo
-
 import robokudo.world as robokudo_world
+from builtin_interfaces.msg import Time
+from geometry_msgs.msg import TransformStamped
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from py_trees.common import Status
+from rclpy.time import Time as ROSClockTime
+from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.static_camera_transform import StaticCameraTransformAnnotator
-from robokudo.types.cv import ColorToDepthRatio
 from robokudo.cas import CAS
-from robokudo.types.image import ImageRotation
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.io.camera_interface import (
@@ -34,6 +33,8 @@ from robokudo.io.camera_without_depth_interface import (
 from robokudo.io.ros_camera_without_depth_interface import (
     ROSCameraWithoutDepthInterface,
 )
+from robokudo.types.cv import ColorToDepthRatio
+from robokudo.types.image import ImageRotation
 from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortionModel,
     CameraModality,
@@ -44,10 +45,11 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
+from sensor_msgs.msg import CameraInfo
+from tf2_ros import LookupException
 
 
 @dataclass
@@ -123,11 +125,6 @@ class OpenCVCameraTestConfig:
     color_to_depth_ratio: ColorToDepthRatio = field(default_factory=ColorToDepthRatio)
     """
     Scale from color resolution to optional depth resolution.
-    """
-
-    update_global_with_depth_parameter: bool = False
-    """
-    Whether to change the process-wide depth setting.
     """
 
 
@@ -805,14 +802,11 @@ def test_rgbd_high_resolution_crop_updates_effective_resolution(
     assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
 
 
-def test_opencv_reader_stores_camera_observation(
-    runtime_world: World,
+@pytest.fixture
+def opencv_camera_interface(
     camera_info: CameraInfo,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """
-    The physical OpenCV reader publishes the common camera metadata contract.
-    """
+) -> OpenCVCameraWithoutDepthInterface:
+    """Provide one captured frame without opening a camera or video file."""
     interface = object.__new__(OpenCVCameraWithoutDepthInterface)
     interface.camera_config = OpenCVCameraTestConfig(camera_info=camera_info)
     interface.video_capture = SeekableImageSequence()
@@ -824,6 +818,19 @@ def test_opencv_reader_stores_camera_observation(
     )
     interface._has_new_data = True
     interface.rk_logger = logging.getLogger("robokudo-opencv-camera-test")
+    return interface
+
+
+def test_opencv_reader_stores_camera_observation(
+    runtime_world: World,
+    camera_info: CameraInfo,
+    monkeypatch: pytest.MonkeyPatch,
+    opencv_camera_interface: OpenCVCameraWithoutDepthInterface,
+) -> None:
+    """
+    The physical OpenCV reader publishes the common camera metadata contract.
+    """
+    interface = opencv_camera_interface
     cas = CAS()
     timestamp_nanoseconds = 123_456_789
     monkeypatch.setattr(
@@ -842,6 +849,21 @@ def test_opencv_reader_stores_camera_observation(
     assert cas.camera_observation.world_T_camera is None
     assert cas.camera_observation.timestamp_nanoseconds == timestamp_nanoseconds
     assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
+
+
+@pytest.mark.parametrize("with_depth", [False, True])
+def test_opencv_acquisition_preserves_global_configuration(
+    runtime_world: World,
+    opencv_camera_interface: OpenCVCameraWithoutDepthInterface,
+    monkeypatch: pytest.MonkeyPatch,
+    with_depth: bool,
+) -> None:
+    """A color-only frame does not reconfigure application processing defaults."""
+    defaults = AnnotatorPredefinedParameters()
+    monkeypatch.setattr(defaults, "global_with_depth", with_depth)
+    configured = asdict(defaults)
+    opencv_camera_interface.set_data(CAS())
+    assert asdict(defaults) == configured
 
 
 # %% Camera-root world binding

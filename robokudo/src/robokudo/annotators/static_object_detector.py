@@ -13,24 +13,24 @@ from __future__ import annotations
 
 # %% Imports
 import copy
+from dataclasses import dataclass, field
 from enum import Enum
 from timeit import default_timer
 
 import cv2
 import numpy as np
-from py_trees.common import Status
+from krrood.ormatic.utils import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import TYPE_CHECKING
 
 import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.annotators.exceptions import InvalidAnalysisData
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.exceptions import (
-    CameraObservationMissing,
-    CameraPoseMissing,
-    ColorToDepthRatioMissing,
     UnknownMode,
 )
 from robokudo.types.annotation import (
@@ -48,9 +48,9 @@ from robokudo.utils.cv_helper import (
 )
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import (
+    create_oriented_bounding_box,
     get_2d_bounding_rect_from_3d_bb,
     get_cloud_from_rgb_depth_and_mask,
-    create_oriented_bounding_box,
 )
 from robokudo.utils.transform import (
     get_quaternion_from_rotation_matrix,
@@ -59,10 +59,10 @@ from robokudo.utils.transform import (
 from robokudo.world_descriptor import PredefinedObject
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
-    from semantic_digital_twin.world_description.shape_collection import ShapeCollection
     import numpy.typing as npt
     import open3d
+    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+    from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 
 class StaticObjectMode(Enum):
@@ -70,7 +70,63 @@ class StaticObjectMode(Enum):
     WORLD_DESCRIPTOR = "world_descriptor"
 
 
-class StaticObjectDetectorAnnotator(BaseAnnotator):
+# %% StaticObjectDetector parameters
+
+
+@dataclass(kw_only=True)
+class StaticObjectDetectorParameters(AnnotatorParameters):
+    """Parameters controlling the static object detection behavior."""
+
+    bounding_box_x: int = 1
+    """Left edge of the manually configured image region in pixels."""
+
+    bounding_box_y: int = 1
+    """Top edge of the manually configured image region in pixels."""
+
+    bounding_box_width: int = 10
+    """Horizontal extent of the manually configured image region in pixels."""
+
+    bounding_box_height: int = 10
+    """Vertical extent of the manually configured image region in pixels."""
+
+    mode: StaticObjectMode = StaticObjectMode.BOUNDING_BOX
+    """Defines the mode which mainly decide which sources of information are used to generate the Object Hypothesis"""
+
+    class_name: str = "unknown"
+    """Define the class_name which is used for the object of interest Only used for StaticObjectMode.BOUNDING_BOX"""
+
+    class_names: list[str] = field(default_factory=list)
+    """Used for StaticObjectMode.WORLD_DESCRIPTOR"""
+
+    create_pose_annotation: bool = False
+    """If True a Pose will be created for the object. Pose is relative to the camera frame by default."""
+
+    create_bounding_box_annotation: bool = False
+    """If True a BoundingBox will be created for the object."""
+
+    create_mask: bool = True
+    """If this is a true, a mask based on the ROI will be generated that marks every pixel as ON"""
+
+
+# %% StaticObjectDetector descriptor
+
+
+@dataclass(kw_only=True)
+class StaticObjectDetectorDescriptor(
+    AnnotatorDescriptor[StaticObjectDetectorParameters]
+):
+    """Declarative configuration of :class:`StaticObjectDetectorAnnotator`."""
+
+    parameters: StaticObjectDetectorParameters = field(
+        default_factory=StaticObjectDetectorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% StaticObjectDetector annotator
+
+
+class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor]):
     """
     Find a cluster based on a preconfigured Bounding Box, Pose and Class name.
 
@@ -86,75 +142,15 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
        Parameters can be dynamically reconfigured through ROS dynamic reconfigure.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for the StaticObjectDetectorAnnotator.
-
-        Defines all configurable parameters including:
-
-        * Bounding box dimensions and position
-        * Object knowledge database settings
-        * Pose generation options
-        * Coordinate frame settings
-        """
-
-        class Parameters:
-            """
-            Parameters controlling the static object detection behavior.
-            """
-
-            def __init__(self) -> None:
-                self.bounding_box_x: int = 1
-                self.bounding_box_y: int = 1
-                self.bounding_box_width: int = 10
-                self.bounding_box_height: int = 10
-
-                self.mode: StaticObjectMode = StaticObjectMode.BOUNDING_BOX
-                """
-                Defines the mode which mainly decide which sources of information are used to generate the Object Hypothesis
-                """
-
-                # # If setting this to True, we detect a certain object stored in the ObjectKnowledgeBase
-                # # This allows us to automatically infer the BoundingBox coordinates
-                # self.detect_object_from_object_knowledge = False
-
-                self.class_name: str = "unknown"
-                """
-                Define the class_name which is used for the object of interest
-                Only used for StaticObjectMode.BOUNDING_BOX
-                """
-
-                self.class_names: list[str] = []
-                """
-                Used for StaticObjectMode.WORLD_DESCRIPTOR
-                """
-
-                self.create_pose_annotation: bool = False
-                """
-                If True a Pose will be created for the object. Pose is relative to the camera frame by default.
-
-                Only effective in Mode=StaticObjectDetectorAnnotator.Mode.WORLD_DESCRIPTOR
-                """
-
-                self.create_bounding_box_annotation: bool = False
-                """
-                If True a BoundingBox will be created for the object.
-
-                Only effective in Mode=StaticObjectDetectorAnnotator.Mode.WORLD_DESCRIPTOR
-                """
-
-                self.create_mask: bool = True
-                """
-                If this is a true, a mask based on the ROI will be generated that marks every pixel as ON
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[StaticObjectDetectorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return StaticObjectDetectorDescriptor
 
     def __init__(
         self,
         name: str = "StaticObjectDetector",
-        descriptor: StaticObjectDetectorAnnotator.Descriptor | None = None,
+        descriptor: StaticObjectDetectorDescriptor | None = None,
     ) -> None:
         """
         Default construction. Minimal one-time init!

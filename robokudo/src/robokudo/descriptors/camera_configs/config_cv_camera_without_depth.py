@@ -5,10 +5,10 @@ This is the camera config for a openCV camera without depth information.
 from __future__ import annotations
 
 # %% Imports
-from krrood.ormatic.utils import classproperty
 from dataclasses import dataclass, field
 
 import cv2
+from krrood.ormatic.utils import classproperty
 from sensor_msgs.msg import CameraInfo
 from typing_extensions import TYPE_CHECKING
 
@@ -80,10 +80,6 @@ class OpenCVCameraConfig(BaseCameraConfig):
     depth: npt.NDArray | None = None
     """
     Static depth image, which is used as depth image for all rgb images.
-    """
-    update_global_with_depth_parameter: bool = True
-    """
-    Flag to update global depth parameters.
     """
     camera_info: CameraInfo | None = None
     """

@@ -23,18 +23,51 @@ from __future__ import annotations
 # %% Imports
 import copy
 import json
+from dataclasses import dataclass, field
 from timeit import default_timer
 
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from typing_extensions import Any
 
 import robokudo.world
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.io.storage import Storage, StorageDocumentField
 
+# %% StorageWriter parameters
 
-class StorageWriter(BaseAnnotator):
+
+@dataclass(kw_only=True)
+class StorageWriterParameters(AnnotatorParameters):
+    """Parameter container for storage configuration."""
+
+    db_name: str = "rk_scenes"
+    """Database name"""
+
+    drop_database_on_storage: bool = True
+    """Whether to clear database before recording"""
+
+
+# %% StorageWriter descriptor
+
+
+@dataclass(kw_only=True)
+class StorageWriterDescriptor(AnnotatorDescriptor[StorageWriterParameters]):
+    """Declarative configuration of :class:`StorageWriter`."""
+
+    parameters: StorageWriterParameters = field(
+        default_factory=StorageWriterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% StorageWriter annotator
+
+
+class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     """
     Annotator for storing sensor data in MongoDB.
 
@@ -42,34 +75,15 @@ class StorageWriter(BaseAnnotator):
     allowing for data recording and offline processing without using ROS bag files.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for storage writer.
-        """
-
-        class Parameters:
-            """
-            Parameter container for storage configuration.
-            """
-
-            def __init__(self) -> None:
-                self.db_name: str = "rk_scenes"
-                """
-                Database name
-                """
-
-                self.drop_database_on_storage: bool = True
-                """
-                Whether to clear database before recording
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[StorageWriterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return StorageWriterDescriptor
 
     def __init__(
         self,
         name: str = "StorageWriter",
-        descriptor: StorageWriter.Descriptor | None = None,
+        descriptor: StorageWriterDescriptor | None = None,
     ) -> None:
         """
         Initialize the storage writer. Minimal one-time init!

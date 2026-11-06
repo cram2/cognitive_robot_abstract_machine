@@ -1,17 +1,24 @@
+"""Zero shot classification annotator configuration and annotation behavior."""
+
 from __future__ import annotations
 
+# %% Imports
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.field_metadata import JSONMetadata
 from PIL import Image
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, Callable
+from typing_extensions import TYPE_CHECKING, Callable, Generic, TypeVar
 
 from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 
@@ -19,52 +26,84 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
+# %% ZeroShotClassification parameters
+
+
+@dataclass(kw_only=True)
+class ZeroShotClassificationParameters(AnnotatorParameters):
+    """Vocabulary and processing choices for image classification."""
+
+    vocabulary: list[str] = field(
+        default_factory=lambda: [
+            "Milk Container",
+            "Box of Cornflakes",
+            "Pancake Batter",
+            "Instant Coffee",
+            "Crepe Pan",
+            "Dish Soap",
+        ]
+    )
+    """The vocabulary used for object classification."""
+
+    analysis_scope: CASViews | type[ObjectHypothesis] = CASViews.COLOR_IMAGE
+    """Select the whole color image or individual object hypotheses for classification."""
+
+    filter_fn: Callable[[ObjectHypothesis], bool] | None = None
+    """An optional filter function used to filter object hypotheses before analyzing them."""
+
+    save_top_k: int = field(init=False, metadata=JSONMetadata(serialize=True).as_dict())
+    """How many annotations to create per analyzed image or hypothesis."""
+
+    def __post_init__(self) -> None:
+        """Initialize values derived from the configured processing settings."""
+        self.save_top_k: int = min(5, len(self.vocabulary))
+
+
+# %% ZeroShotClassification descriptor
+
+ClassificationParametersType = TypeVar(
+    "ClassificationParametersType", bound=ZeroShotClassificationParameters
+)
+"""Concrete vocabulary and model settings handled by a classification annotator."""
+
+
+@dataclass(kw_only=True)
+class ClassificationDescriptor(
+    AnnotatorDescriptor[ClassificationParametersType],
+    Generic[ClassificationParametersType],
+):
+    """Configuration shared by classifiers with vocabulary-based parameters."""
+
+
+@dataclass(kw_only=True)
+class ZeroShotClassificationDescriptor(
+    ClassificationDescriptor[ZeroShotClassificationParameters]
+):
+    """Declarative configuration of :class:`ZeroShotClassificationAnnotator`."""
+
+    parameters: ZeroShotClassificationParameters = field(
+        default_factory=ZeroShotClassificationParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ZeroShotClassification annotator
+
+
+class ZeroShotClassificationAnnotator(
+    ThreadedAnnotator[ClassificationDescriptor[ClassificationParametersType]],
+    Generic[ClassificationParametersType],
+    ABC,
+):
     """
     Classifies the whole image or each object hypothesis against a freely chosen
     vocabulary of class names, without training on those classes.
     """
 
-    class Descriptor(ThreadedAnnotator.Descriptor):
-        """
-        Descriptor for the ZeroShotClassificationAnnotator.
-        """
-
-        class Parameters:
-            """
-            Parameters for the Descriptor.
-            """
-
-            def __init__(self) -> None:
-                self.vocabulary: list[str] = [
-                    "Milk Container",
-                    "Box of Cornflakes",
-                    "Pancake Batter",
-                    "Instant Coffee",
-                    "Crepe Pan",
-                    "Dish Soap",
-                ]
-                """
-                The vocabulary used for object classification.
-                """
-                self.analysis_scope = CASViews.COLOR_IMAGE
-                """
-                The analysis scope of the annotator.
-
-                Possible values:
-
-                * CASViews.COLOR_IMAGE: Analyze the entire color image at once.
-                * ObjectHypothesis: Analyze each object hypothesis individually.
-                """
-                self.filter_fn: Callable[[ObjectHypothesis], bool] | None = None
-                """
-                An optional filter function used to filter object hypotheses before
-                analyzing them.
-                """
-                self.save_top_k: int = min(5, len(self.vocabulary))
-                """
-                How many annotations to create per analyzed image or hypothesis.
-                """
+    @classproperty
+    def Descriptor(cls) -> type[ClassificationDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ZeroShotClassificationDescriptor
 
     @classproperty
     def visualization_font(cls) -> int:

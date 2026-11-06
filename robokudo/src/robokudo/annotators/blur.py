@@ -13,21 +13,54 @@ blur exceeds a threshold.
 
 from __future__ import annotations
 
+# %% Imports
 import copy
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class BlurAnnotator(BaseAnnotator):
+# %% Blur parameters
+
+
+@dataclass(kw_only=True)
+class BlurParameters(AnnotatorParameters):
+    """Parameters for configuring blur detection behavior."""
+
+    blur_threshold: float = 100.0
+    """Threshold for acceptable blur level"""
+
+    return_failure_above_threshold: bool = True
+    """Let this behaviour return failure to stop the advancement of the current pipeline"""
+
+
+# %% Blur descriptor
+
+
+@dataclass(kw_only=True)
+class BlurDescriptor(AnnotatorDescriptor[BlurParameters]):
+    """Declarative configuration of :class:`BlurAnnotator`."""
+
+    parameters: BlurParameters = field(default_factory=BlurParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Blur annotator
+
+
+class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
     """Annotator for calculating and visualizing image blur metrics.
 
     This annotator:
@@ -41,26 +74,15 @@ class BlurAnnotator(BaseAnnotator):
        advancement when the blur threshold is exceeded.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for blur detection."""
-
-        class Parameters:
-            """Parameters for configuring blur detection behavior."""
-
-            def __init__(self) -> None:
-                self.blur_threshold: float = 100.0
-                """Threshold for acceptable blur level"""
-
-                self.return_failure_above_threshold: bool = True
-                """Let this behaviour return failure to stop the advancement of the current pipeline"""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[BlurDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return BlurDescriptor
 
     def __init__(
         self,
         name: str = "BlurAnnotator",
-        descriptor: BlurAnnotator.Descriptor | None = None,
+        descriptor: BlurDescriptor | None = None,
     ) -> None:
         """Initialize the blur annotator. Minimal one-time init!
 

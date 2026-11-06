@@ -19,13 +19,49 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
+
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Callable
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+
+# %% Filter parameters
 
 
-class FilterAnnotator(BaseAnnotator):
+@dataclass(kw_only=True)
+class FilterParameters(AnnotatorParameters):
+    """Parameter container for filter configuration."""
+
+    func: Callable | None = None
+    """Filter function to apply"""
+
+    func_args: tuple | None = None
+    """Positional arguments for filter function"""
+
+    func_kwargs: dict | None = None
+    """Keyword arguments for filter function"""
+
+
+# %% Filter descriptor
+
+
+@dataclass(kw_only=True)
+class FilterDescriptor(AnnotatorDescriptor[FilterParameters]):
+    """Declarative configuration of :class:`FilterAnnotator`."""
+
+    parameters: FilterParameters = field(default_factory=FilterParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Filter annotator
+
+
+class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     """
     Annotator for applying filter conditions to annotations.
 
@@ -33,34 +69,15 @@ class FilterAnnotator(BaseAnnotator):
     annotations, modifying the annotation list in-place based on the filter results.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for filter annotator.
-
-        :ivar parameters: Filter parameters
-        :type parameters: FilterAnnotator.Descriptor.Parameters
-        """
-
-        class Parameters:
-            """Parameter container for filter configuration."""
-
-            def __init__(self) -> None:
-                self.func: Callable | None = None
-                """Filter function to apply"""
-
-                self.func_args: tuple | None = None
-                """Positional arguments for filter function"""
-
-                self.func_kwargs: dict | None = None
-                """Keyword arguments for filter function"""
-
-        # overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[FilterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return FilterDescriptor
 
     def __init__(
         self,
         name: str = "FilterAnnotator",
-        descriptor: FilterAnnotator.Descriptor | None = None,
+        descriptor: FilterDescriptor | None = None,
     ) -> None:
         """Initialize the filter annotator.
 

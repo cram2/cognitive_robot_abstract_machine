@@ -18,13 +18,18 @@ The module is used for:
 * Asynchronous data exchange
 """
 
+from __future__ import annotations
+
+# %% Imports
 import logging
 import queue
 import time
+from dataclasses import dataclass, field
 from threading import Event
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
+from krrood.ormatic.utils import classproperty
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.action import CancelResponse, GoalResponse
@@ -36,6 +41,8 @@ from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.defs import LOGGING_IDENTIFIER_QUERY, PACKAGE_NAME
 from robokudo.identifier import BBIdentifier
 from robokudo.types.annotation import (
@@ -136,9 +143,9 @@ class QueryAnnotator(BaseAnnotator):
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert (
-            self.action_server is not None
-        ), "Action server should be initialized by now."
+        assert self.action_server is not None, (
+            "Action server should be initialized by now."
+        )
         query = self.action_server.new_query
         self.rk_logger.debug(f"self.action_server.new_query: {query}")
 
@@ -280,7 +287,34 @@ class QueryReply(BaseAnnotator):
         return Status.SUCCESS
 
 
-class GenerateQueryResult(BaseAnnotator):
+# %% GenerateQueryResult parameters
+
+
+@dataclass(kw_only=True)
+class GenerateQueryResultParameters(AnnotatorParameters):
+    """Settings specific to this annotation operation."""
+
+    filter_by_query: bool = False
+    """Only return ObjectHypotheses matching requested query attributes."""
+
+
+# %% GenerateQueryResult descriptor
+
+
+@dataclass(kw_only=True)
+class GenerateQueryResultDescriptor(AnnotatorDescriptor[GenerateQueryResultParameters]):
+    """Declarative configuration of :class:`GenerateQueryResult`."""
+
+    parameters: GenerateQueryResultParameters = field(
+        default_factory=GenerateQueryResultParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% GenerateQueryResult annotator
+
+
+class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
     """
     This class reads in the annotations done by the previous Annotators and generates
     Object Designators from them.
@@ -289,16 +323,15 @@ class GenerateQueryResult(BaseAnnotator):
     pick the information up and send it as a query reply.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        class Parameters:
-            def __init__(self) -> None:
-                self.filter_by_query: bool = False
-                """Only return ObjectHypotheses matching requested query attributes."""
-
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[GenerateQueryResultDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return GenerateQueryResultDescriptor
 
     def __init__(
-        self, name: str = "GenerateQueryResult", descriptor: Descriptor | None = None
+        self,
+        name: str = "GenerateQueryResult",
+        descriptor: GenerateQueryResultDescriptor | None = None,
     ) -> None:
         """Initialize query result generator.
 

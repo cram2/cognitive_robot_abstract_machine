@@ -23,20 +23,19 @@ from __future__ import annotations
 # %% Imports
 import time
 
+import cv2
+from semantic_digital_twin.datastructures.camera_model import CameraModality
 from typing_extensions import TYPE_CHECKING, Any
 
-from robokudo.io.camera_interface import CameraInterface
 from robokudo.cas import CASViews
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.exceptions import CameraDataMissing, InvalidCameraObservation
-from semantic_digital_twin.datastructures.camera_model import CameraModality
+from robokudo.io.camera_interface import CameraInterface
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 
-import cv2
-
 if TYPE_CHECKING:
-    from robokudo.cas import CAS
     import numpy.typing as npt
+
+    from robokudo.cas import CAS
 
 
 TYPE_VIDEO: int = 0
@@ -216,8 +215,6 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
                     f"{image_width}x{image_height}"
                 )
             )
-        if self.camera_config.update_global_with_depth_parameter:
-            AnnotatorPredefinedParameters.global_with_depth = depth is not None
 
         cas.set(CASViews.COLOR_IMAGE, color)
         cas.set(CASViews.DEPTH_IMAGE, depth)

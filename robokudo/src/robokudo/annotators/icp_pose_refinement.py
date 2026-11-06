@@ -21,17 +21,22 @@ The module uses:
 
 from __future__ import annotations
 
+# %% Imports
 import copy
 import math
+from dataclasses import dataclass, field
 from pathlib import Path
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.file_loader import FileLoader
@@ -42,8 +47,37 @@ from robokudo.utils.transform import (
     get_translation_from_transform_matrix,
 )
 
+# %% ICPPoseRefinement parameters
 
-class ICPPoseRefinementAnnotator(ThreadedAnnotator):
+
+@dataclass(kw_only=True)
+class ICPPoseRefinementParameters(AnnotatorParameters):
+    """Parameters for configuring model loading."""
+
+    ros_pkg_path: str | None = None
+    """If set, use use data_path as a relative path to self.ros_pkg_path"""
+
+    data_path: str | None = None
+    """Relative Path to the folder containing the models"""
+
+
+# %% ICPPoseRefinement descriptor
+
+
+@dataclass(kw_only=True)
+class ICPPoseRefinementDescriptor(AnnotatorDescriptor[ICPPoseRefinementParameters]):
+    """Declarative configuration of :class:`ICPPoseRefinementAnnotator`."""
+
+    parameters: ICPPoseRefinementParameters = field(
+        default_factory=ICPPoseRefinementParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ICPPoseRefinement annotator
+
+
+class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor]):
     """Pose refinement using iterative closest point (ICP).
 
     This annotator:
@@ -62,26 +96,15 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
        Currently limited to refining against a single pre-loaded model.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for ICP refinement."""
-
-        class Parameters:
-            """Parameters for configuring model loading."""
-
-            def __init__(self) -> None:
-                self.ros_pkg_path: str | None = None
-                """If set, use use data_path as a relative path to self.ros_pkg_path"""
-
-                self.data_path: str | None = None
-                """Relative Path to the folder containing the models"""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ICPPoseRefinementDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ICPPoseRefinementDescriptor
 
     def __init__(
         self,
         name: str = "ICPPoseRefinementAnnotator",
-        descriptor: ICPPoseRefinementAnnotator.Descriptor | None = None,
+        descriptor: ICPPoseRefinementDescriptor | None = None,
     ) -> None:
         """Initialize the ICP pose refiner.
 

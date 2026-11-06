@@ -28,7 +28,7 @@ from robokudo.annotators.image_cluster_extractor import (
 )
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
+from robokudo.annotators.query import GenerateQueryResult, QueryAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -165,9 +165,6 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # Left unconfigured so that filtering by query stays off: it compares the
                 # requested type against Classification annotations, which this pipeline
                 # does not produce, so filtering a typed query would discard every object.
-                # ..warning:: `GenerateQueryResult.Descriptor.parameters` is a class
-                #     attribute shared by every instance, so overriding it here would
-                #     change the setting for other pipelines in the same process too.
                 GenerateQueryResult(),
             ]
         )

@@ -23,18 +23,51 @@ from __future__ import annotations
 
 # %% Imports
 import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from timeit import default_timer
 
 import cv2
+from krrood.adapters.json_serializer import to_json
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
-from krrood.adapters.json_serializer import to_json
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+
+# %% FileWriter parameters
 
 
-class FileWriter(BaseAnnotator):
+@dataclass(kw_only=True)
+class FileWriterParameters(AnnotatorParameters):
+    """Parameters for configuring file storage."""
+
+    target_dir: str = "/tmp/"
+    """Directory to store files in"""
+
+    filename_prefix: str = "rk_"
+    """Prefix for generated filenames, make sure that this matches the FileReader filename_prefix"""
+
+
+# %% FileWriter descriptor
+
+
+@dataclass(kw_only=True)
+class FileWriterDescriptor(AnnotatorDescriptor[FileWriterParameters]):
+    """Declarative configuration of :class:`FileWriter`."""
+
+    parameters: FileWriterParameters = field(
+        default_factory=FileWriterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% FileWriter annotator
+
+
+class FileWriter(BaseAnnotator[FileWriterDescriptor]):
     """
     Sensor data storage to filesystem.
 
@@ -46,37 +79,15 @@ class FileWriter(BaseAnnotator):
        Target directory must exist and be writable.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for file writer.
-        """
-
-        class Parameters:
-            """
-            Parameters for configuring file storage.
-
-            .. note::
-               filename_prefix should match FileReader configuration.
-            """
-
-            def __init__(self) -> None:
-                self.target_dir: str = "/tmp/"
-                """
-                Directory to store files in
-                """
-
-                self.filename_prefix: str = "rk_"
-                """
-                Prefix for generated filenames, make sure that this matches the FileReader filename_prefix
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[FileWriterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return FileWriterDescriptor
 
     def __init__(
         self,
         name: str = "FileWriter",
-        descriptor: FileWriter.Descriptor | None = None,
+        descriptor: FileWriterDescriptor | None = None,
     ) -> None:
         """
         Initialize the file writer.

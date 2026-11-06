@@ -9,19 +9,22 @@ empty class label, and an empty pose frame -- exactly the shape ``stretch_demo``
 ``tiago_demo`` shipped with.
 """
 
+# %% Imports
 import importlib
 import pkgutil
 import signal
 from contextlib import contextmanager
 from dataclasses import dataclass
 from types import FrameType
-from typing_extensions import Any, Iterator
 
 import pytest
-
-from robokudo.annotators.collection_reader import CollectionReaderAnnotator
-from robokudo.annotators.query import GenerateQueryResult, QueryReply
 import robokudo.descriptors.analysis_engines as analysis_engines_package
+from robokudo.annotators.collection_reader import (
+    CollectionReaderAnnotator,
+    CollectionReaderDescriptor,
+    CollectionReaderParameters,
+)
+from robokudo.annotators.query import GenerateQueryResult, QueryReply
 from robokudo.descriptors.analysis_engines.stretch_demo import (
     AnalysisEngine as StretchDemoAnalysisEngine,
 )
@@ -32,6 +35,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.pipeline import Pipeline
+from typing_extensions import Any, Iterator
 
 BUILD_TIMEOUT_SECONDS = 5
 """
@@ -91,6 +95,9 @@ class FakeCameraInterface:
     Camera interface for composition tests that only inspect pipeline nodes.
     """
 
+    camera_config: FakeCameraConfig
+    """Configuration retained while constructing a pipeline without acquisition."""
+
     interface_type: str = "FakeCameraInterface"
     """Camera-interface identifier expected by the collection reader."""
 
@@ -108,13 +115,15 @@ class FakeCameraInterface:
 
 def create_fake_collection_reader_descriptor(
     camera: str, **kwargs: Any
-) -> CollectionReaderAnnotator.Descriptor:
+) -> CollectionReaderDescriptor:
     """
     Create a collection-reader descriptor without live ROS subscriptions.
     """
     return CollectionReaderAnnotator.Descriptor(
-        camera_config=FakeCameraConfig(),
-        camera_interface=FakeCameraInterface(),
+        parameters=CollectionReaderParameters.from_defaults(
+            camera_config=FakeCameraConfig(),
+            camera_interface_type=FakeCameraInterface,
+        ),
     )
 
 

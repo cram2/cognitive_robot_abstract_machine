@@ -20,22 +20,21 @@ The module is primarily used for:
 
 from __future__ import annotations
 
-from krrood.ormatic.utils import classproperty
-
 # %% Imports
 import json
 from dataclasses import dataclass
 from datetime import timedelta
 from time import perf_counter
-from typing_extensions import Any, TYPE_CHECKING
 from uuid import UUID
 
+from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.world import World
+from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo import world as rk_world
 from robokudo.cas import CAS, CASViews
@@ -43,8 +42,6 @@ from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
     MongoReplayMode,
 )
-
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.exceptions import (
     CameraObservationMissing,
     InvalidCameraObservation,
@@ -306,7 +303,3 @@ class StorageReaderInterface(CameraInterface):
         # Restore annotations
         if self.camera_config.restore_annotations:
             self.storage.load_annotations_from_mongo_in_cas(cas_frame, cas)
-
-        if cas.depth_image is None:
-            # no depth image available
-            AnnotatorPredefinedParameters.global_with_depth = False

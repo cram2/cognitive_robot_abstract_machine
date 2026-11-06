@@ -20,51 +20,73 @@ The annotator supports:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.exceptions import PointCloudThresholdError, PointCloudThresholdRelation
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
+# %% PointcloudCheck parameters
 
-class PointcloudCheckAnnotator(BaseAnnotator):
+
+@dataclass(kw_only=True)
+class PointcloudCheckParameters(AnnotatorParameters):
+    """Parameters for configuring point cloud validation."""
+
+    point_threshold: int = 100
+    """Decision boundary for: if CASViews.CLOUD has less than this amount of points"""
+
+    status_below_threshold: Status = Status.FAILURE
+    """Status when below threshold"""
+
+    status_above_threshold: Status = Status.SUCCESS
+    """Status when above threshold"""
+
+    raise_on_failure: bool = True
+    """Whether to raise exception on failure"""
+
+
+# %% PointcloudCheck descriptor
+
+
+@dataclass(kw_only=True)
+class PointcloudCheckDescriptor(AnnotatorDescriptor[PointcloudCheckParameters]):
+    """Declarative configuration of :class:`PointcloudCheckAnnotator`."""
+
+    parameters: PointcloudCheckParameters = field(
+        default_factory=PointcloudCheckParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% PointcloudCheck annotator
+
+
+class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
     """Check if the CASViews.Cloud contains more than X points.
 
     .. warning::
        Will raise exception if point cloud not found in CAS.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for point cloud checking."""
-
-        class Parameters:
-            """Parameters for configuring point cloud validation."""
-
-            def __init__(self) -> None:
-                #
-                self.point_threshold: int = 100
-                """Decision boundary for: if CASViews.CLOUD has less than this amount of points"""
-
-                self.status_below_threshold: Status = Status.FAILURE
-                """Status when below threshold"""
-
-                self.status_above_threshold: Status = Status.SUCCESS
-                """Status when above threshold"""
-
-                self.raise_on_failure: bool = True
-                """Whether to raise exception on failure"""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[PointcloudCheckDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return PointcloudCheckDescriptor
 
     def __init__(
         self,
         name: str = "PointcloudcloudCheckAnnotator",
-        descriptor: PointcloudCheckAnnotator.Descriptor | None = None,
+        descriptor: PointcloudCheckDescriptor | None = None,
     ) -> None:
         """Initialize the point cloud checker.
 

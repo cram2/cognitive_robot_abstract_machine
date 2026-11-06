@@ -16,16 +16,15 @@ serving as a starting point for more complex video processing applications.
     modified to use other video sources by changing the device parameter.
 """
 
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
-
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
-
-from robokudo.idioms import pipeline_init
-from robokudo.pipeline import Pipeline
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -80,8 +79,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             "opencv",
             device=device,
             loop_mode=1,
-            update_global_with_depth_parameter=True,
         )
+
+        cv_config.parameters.global_with_depth = False
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

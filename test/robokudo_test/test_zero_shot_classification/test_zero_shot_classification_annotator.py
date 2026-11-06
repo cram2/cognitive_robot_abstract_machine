@@ -5,13 +5,15 @@ the CAS, independent of the model that classifies them.
 
 from __future__ import annotations
 
+# %% Imports
 import numpy as np
 import pytest
 from PIL import Image
 from py_trees.common import Status
-
 from robokudo.annotators.zero_shot_classification_annotator import (
     ZeroShotClassificationAnnotator,
+    ZeroShotClassificationDescriptor,
+    ZeroShotClassificationParameters,
 )
 from robokudo.cas import CASViews
 from robokudo.pipeline import Pipeline
@@ -33,7 +35,9 @@ pytestmark = pytest.mark.usefixtures("annotator_output_buffer")
 # %% channel mean classifier
 
 
-class ChannelMeanClassificationAnnotator(ZeroShotClassificationAnnotator):
+class ChannelMeanClassificationAnnotator(
+    ZeroShotClassificationAnnotator[ZeroShotClassificationParameters]
+):
     """
     Ranks each color word of the vocabulary by how strongly the image shows the color it
     names.
@@ -61,7 +65,7 @@ class ChannelMeanClassificationAnnotator(ZeroShotClassificationAnnotator):
         return classifications[: self.descriptor.parameters.save_top_k]
 
 
-def _color_descriptor() -> ZeroShotClassificationAnnotator.Descriptor:
+def _color_descriptor() -> ZeroShotClassificationDescriptor:
     """
     :return: A descriptor classifying against the color vocabulary.
     """
@@ -71,14 +75,14 @@ def _color_descriptor() -> ZeroShotClassificationAnnotator.Descriptor:
     return descriptor
 
 
-def _object_hypothesis_descriptor() -> ZeroShotClassificationAnnotator.Descriptor:
+def _object_hypothesis_descriptor() -> ZeroShotClassificationDescriptor:
     descriptor = _color_descriptor()
     descriptor.parameters.analysis_scope = ObjectHypothesis
     return descriptor
 
 
 def _annotator_in_pipeline(
-    descriptor: ZeroShotClassificationAnnotator.Descriptor, color_image: np.ndarray
+    descriptor: ZeroShotClassificationDescriptor, color_image: np.ndarray
 ) -> ChannelMeanClassificationAnnotator:
     """
     :return: An annotator whose CAS holds the given color image.
@@ -152,8 +156,8 @@ def test_object_hypothesis_scope_classifies_each_hypothesis_by_its_region():
 def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
     descriptor = _object_hypothesis_descriptor()
     rejected_object = object_hypothesis(x=0, y=0, width=10, height=10)
-    descriptor.parameters.filter_fn = (
-        lambda hypothesis: hypothesis is not rejected_object
+    descriptor.parameters.filter_fn = lambda hypothesis: (
+        hypothesis is not rejected_object
     )
     annotator = _annotator_in_pipeline(descriptor, two_color_scene())
     accepted_object = object_hypothesis(x=30, y=0, width=10, height=10)

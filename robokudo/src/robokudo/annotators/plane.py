@@ -24,14 +24,18 @@ from __future__ import annotations
 # %% Imports
 from collections.abc import Iterator
 from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
 import open3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Plane
 from robokudo.utils.transform import get_transform_from_plane_equation
 
@@ -60,7 +64,41 @@ def _deterministic_ransac(seed: int) -> Iterator[None]:
         open3d.utility.set_max_threads(previous_max_threads)
 
 
-class PlaneAnnotator(ThreadedAnnotator):
+# %% Plane parameters
+
+
+@dataclass(kw_only=True)
+class PlaneParameters(AnnotatorParameters):
+    """Parameters for configuring plane detection."""
+
+    visualize_plane_model: bool = True
+    """Show plane model mesh"""
+
+    distance_threshold: float = 0.02
+    """"""
+
+    num_iterations: int = 50
+    """"""
+
+    random_seed: int | None = None
+    """Seed for the random samples RANSAC draws, so that the same cloud gives the same plane every time; ``None`` leaves the samples unseeded."""
+
+
+# %% Plane descriptor
+
+
+@dataclass(kw_only=True)
+class PlaneDescriptor(AnnotatorDescriptor[PlaneParameters]):
+    """Declarative configuration of :class:`PlaneAnnotator`."""
+
+    parameters: PlaneParameters = field(default_factory=PlaneParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Plane annotator
+
+
+class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
     """
     Plane detector and visualizer for point clouds.
 
@@ -75,45 +113,15 @@ class PlaneAnnotator(ThreadedAnnotator):
        Uses Open3D's plane segmentation with configurable parameters.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for plane detection.
-        """
-
-        class Parameters:
-            """
-            Parameters for configuring plane detection.
-            """
-
-            def __init__(self) -> None:
-                self.visualize_plane_model: bool = True
-                """
-                Show plane model mesh
-                """
-
-                self.distance_threshold: float = 0.02
-                """
-
-                """
-
-                self.num_iterations: int = 50
-                """
-
-                """
-
-                self.random_seed: int | None = None
-                """
-                Seed for the random samples RANSAC draws, so that the same cloud gives
-                the same plane every time; ``None`` leaves the samples unseeded.
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[PlaneDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return PlaneDescriptor
 
     def __init__(
         self,
         name: str = "PlaneAnnotator",
-        descriptor: PlaneAnnotator.Descriptor | None = None,
+        descriptor: PlaneDescriptor | None = None,
     ) -> None:
         """
         Initialize the plane detector.

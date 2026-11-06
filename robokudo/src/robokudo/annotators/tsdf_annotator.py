@@ -1,18 +1,23 @@
+"""Tsdf annotator configuration and annotation behavior."""
+
 from __future__ import annotations
 
 # %% Imports
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 import cv2
 import numpy as np
 import open3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Any
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.io.camera_model_adapters import Open3DCameraModelAdapter
 from robokudo.types.annotation import PoseAnnotation, TSDFAnnotation
 from robokudo.types.cv import Rect
@@ -56,7 +61,46 @@ class TSDFAnnotatorVisualizationModes(Enum):
     VOXEL_POINTCLOUD = "voxel_pointcloud"
 
 
-class TSDFAnnotator(ThreadedAnnotator):
+# %% TSDF parameters
+
+
+@dataclass(kw_only=True)
+class TSDFParameters(AnnotatorParameters):
+    """Parameters for configuring the TSDF annotator."""
+
+    voxel_length: float = 0.005
+    """Voxel length for the TSDF volume of each object."""
+
+    signed_distance_truncation: float = 0.04
+    """Signed distance truncation for the TSDF volume of each object."""
+
+    depth_scale: float = 1000.0
+    """Depth scale for the TSDF volume integration."""
+
+    depth_truncation: float = 3.0
+    """Depth truncation distance for the TSDF volume integration."""
+
+    geometry_visualization_mode: TSDFAnnotatorVisualizationModes = (
+        TSDFAnnotatorVisualizationModes.MESH
+    )
+    """Whether to visualize the TSDF as a mesh or a point cloud."""
+
+
+# %% TSDF descriptor
+
+
+@dataclass(kw_only=True)
+class TSDFDescriptor(AnnotatorDescriptor[TSDFParameters]):
+    """Declarative configuration of :class:`TSDFAnnotator`."""
+
+    parameters: TSDFParameters = field(default_factory=TSDFParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% TSDF annotator
+
+
+class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
     """
     Annotator for per-object TSDF volume integration.
 
@@ -65,51 +109,15 @@ class TSDFAnnotator(ThreadedAnnotator):
         To segment objects out of the image a mask is required too. Higher quality masks yield better results.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for the TSDF annotator.
-        """
-
-        class Parameters(BaseAnnotator.Descriptor.Parameters):
-            """
-            Parameters for configuring the TSDF annotator.
-            """
-
-            def __init__(self) -> None:
-                self.voxel_length: float = 0.005
-                """
-                Voxel length for the TSDF volume of each object.
-                """
-
-                self.signed_distance_truncation: float = 0.04
-                """
-                Signed distance truncation for the TSDF volume of each object.
-                """
-
-                self.depth_scale: float = 1000.0
-                """
-                Depth scale for the TSDF volume integration.
-                """
-
-                self.depth_truncation: float = 3.0
-                """
-                Depth truncation distance for the TSDF volume integration.
-                """
-
-                self.geometry_visualization_mode: TSDFAnnotatorVisualizationModes = (
-                    TSDFAnnotatorVisualizationModes.MESH
-                )
-                """
-                Whether to visualize the TSDF as a mesh or a point cloud.
-                """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[TSDFDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return TSDFDescriptor
 
     def __init__(
         self,
         name: str = "TSDFAnnotator",
-        descriptor: TSDFAnnotator.Descriptor | None = None,
+        descriptor: TSDFDescriptor | None = None,
     ) -> None:
         super().__init__(name, descriptor)
 

@@ -20,14 +20,19 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 from typing_extensions import TYPE_CHECKING
 
 import robokudo.world as rk_world
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import LocationAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import get_world_to_camera_transform_matrix
@@ -40,7 +45,40 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class LocationAnnotator(ThreadedAnnotator):
+# %% Location parameters
+
+
+@dataclass(kw_only=True)
+class LocationParameters(AnnotatorParameters):
+    """Parameter container for location configuration."""
+
+    percentage: int = 50
+    """Threshold percentage for an object to be considered in a region"""
+
+    world_frame_name: str = "map"
+    """Name of the world coordinate frame"""
+
+    desired_regions: list[str] = field(default_factory=lambda: ["kitchen_island"])
+    """List of region names to consider. Leave empty to include all regions."""
+
+
+# %% Location descriptor
+
+
+@dataclass(kw_only=True)
+class LocationDescriptor(AnnotatorDescriptor[LocationParameters]):
+    """Declarative configuration of :class:`LocationAnnotator`."""
+
+    parameters: LocationParameters = field(
+        default_factory=LocationParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Location annotator
+
+
+class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
     """Determine object locations within semantic regions.
 
     The purpose of this location annotator is to receive a list of intriguing regions and incorporate the
@@ -56,29 +94,15 @@ class LocationAnnotator(ThreadedAnnotator):
     * Handles coordinate frame transformations
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for location annotator."""
-
-        class Parameters:
-            """Parameter container for location configuration."""
-
-            def __init__(self) -> None:
-                self.percentage: int = 50
-                """Threshold percentage for an object to be considered in a region"""
-
-                self.world_frame_name: str = "map"
-                """Name of the world coordinate frame"""
-
-                self.desired_regions: list[str] = ["kitchen_island"]
-                """List of region names to consider. Leave empty to include all regions."""
-
-        # overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[LocationDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return LocationDescriptor
 
     def __init__(
         self,
         name: str = "LocationAnnotator",
-        descriptor: LocationAnnotator.Descriptor | None = None,
+        descriptor: LocationDescriptor | None = None,
     ) -> None:
         """Initialize the location annotator.
 
@@ -155,7 +179,6 @@ class LocationAnnotator(ThreadedAnnotator):
         object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
 
         for region_name, region in active_regions.items():
-
             if len(self.descriptor.parameters.desired_regions) == 0:
                 self.add_location_in_object_hypotheses(
                     region,

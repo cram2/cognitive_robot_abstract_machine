@@ -7,18 +7,55 @@ masks by a specified pixel offset.
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
 from timeit import default_timer
 
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import adjust_image_roi, adjust_mask
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
+# %% ROIAdjuster parameters
 
-class ROIAdjusterAnnotator(BaseAnnotator):
+
+@dataclass(kw_only=True)
+class ROIAdjusterParameters(AnnotatorParameters):
+    """Parameters for configuring ROI adjustment behavior."""
+
+    offset_pixel: int = 20
+    """Pixels to add/subtract from ROI sides (positive grows, negative shrinks)"""
+
+    analysis_scope: type = ObjectHypothesis
+    """Type of annotations to process."""
+
+    fill_value_mask: int = 0
+    """Value to fill new mask areas when growing ROIs"""
+
+
+# %% ROIAdjuster descriptor
+
+
+@dataclass(kw_only=True)
+class ROIAdjusterDescriptor(AnnotatorDescriptor[ROIAdjusterParameters]):
+    """Declarative configuration of :class:`ROIAdjusterAnnotator`."""
+
+    parameters: ROIAdjusterParameters = field(
+        default_factory=ROIAdjusterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ROIAdjuster annotator
+
+
+class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
     """Annotator for adjusting ROI sizes of object hypotheses.
 
     This annotator can grow or shrink ROIs (Regions of Interest) on object
@@ -26,29 +63,15 @@ class ROIAdjusterAnnotator(BaseAnnotator):
     and their associated masks, ensuring proper adjustment of both.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for ROI adjustment."""
-
-        class Parameters:
-            """Parameters for configuring ROI adjustment behavior."""
-
-            def __init__(self) -> None:
-                self.offset_pixel: int = 20
-                """Pixels to add/subtract from ROI sides (positive grows, negative shrinks)"""
-
-                self.analysis_scope: type = ObjectHypothesis
-                """Type of annotations to process."""
-
-                self.fill_value_mask: int = 0
-                """Value to fill new mask areas when growing ROIs"""
-
-        # overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ROIAdjusterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ROIAdjusterDescriptor
 
     def __init__(
         self,
         name: str = "ROIAdjusterAnnotator",
-        descriptor: ROIAdjusterAnnotator.Descriptor | None = None,
+        descriptor: ROIAdjusterDescriptor | None = None,
     ) -> None:
         """Initialize the ROI adjuster.
 

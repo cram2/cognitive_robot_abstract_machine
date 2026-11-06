@@ -6,15 +6,19 @@ shape models to segmented object point clouds.
 
 from __future__ import annotations
 
+# %% Imports
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import open3d as o3d
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Any
 
-from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
+from robokudo.annotators.core import ThreadedAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Shape
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.shape_estimator_adapters import (
@@ -48,7 +52,157 @@ class CylinderAxisCandidate:
     fit: CylinderFit
 
 
-class ShapeEstimatorAnnotator(ThreadedAnnotator):
+# %% ShapeEstimator parameters
+
+
+@dataclass(kw_only=True)
+class ShapeEstimatorParameters(AnnotatorParameters):
+    """Parameter container for shape estimation."""
+
+    minimum_point_count: int = 80
+    """Minimum number of points required for fitting."""
+
+    distance_threshold: float = 0.01
+    """Inlier threshold used for all shape residuals."""
+
+    robust_loss: str = "soft_l1"
+    """Robust loss used for non-linear least squares."""
+
+    minimum_inlier_ratio: float = 0.5
+    """Minimum inlier ratio required for publishing a shape."""
+
+    remove_statistical_outliers: bool = False
+    """Whether statistical outlier removal is applied before fitting."""
+
+    outlier_neighbor_count: int = 30
+    """Neighbor count for statistical outlier removal."""
+
+    outlier_standard_deviation_ratio: float = 2.0
+    """Standard deviation ratio for statistical outlier removal."""
+
+    fit_sphere: bool = False
+    """Whether sphere fitting is enabled."""
+
+    max_sphere_radius_meters: float = 0.4
+    """Maximum allowed sphere radius."""
+
+    max_sphere_radius_to_bbox_diagonal_ratio: float = 1.0
+    """Maximum allowed ratio between sphere radius and point cloud diagonal."""
+
+    max_sphere_radius_to_observed_extent_ratio: float = 0.8
+    """Maximum allowed ratio between sphere radius and observed cloud extent."""
+
+    max_sphere_center_distance_to_bbox_diagonal_ratio: float = 0.9
+    """Maximum allowed ratio between center offset and point cloud diagonal."""
+
+    fit_cylinder: bool = True
+    """Whether cylinder fitting is enabled."""
+
+    cylinder_minimum_inlier_ratio: float = 0.87
+    """Minimum inlier ratio required for cylinder candidates."""
+
+    max_cylinder_radius_meters: float = 0.4
+    """Maximum allowed cylinder radius."""
+
+    max_cylinder_height_meters: float = 1.0
+    """Maximum allowed cylinder height."""
+
+    max_cylinder_radius_to_bbox_diagonal_ratio: float = 1.0
+    """Maximum allowed ratio between cylinder radius and cloud diagonal."""
+
+    max_cylinder_radius_to_cross_section_extent_ratio: float = 0.95
+    """Maximum allowed ratio between cylinder radius and observed cross-section extent."""
+
+    max_cylinder_center_distance_to_bbox_diagonal_ratio: float = 0.8
+    """Maximum allowed ratio between axis center offset and cloud diagonal."""
+
+    cylinder_max_initializations: int = 12
+    """Maximum number of cylinder initialization hypotheses for multi-start optimization."""
+
+    cylinder_consensus_trials: int = 30
+    """Number of random axis hypotheses used to seed cylinder multi-start optimization."""
+
+    cylinder_inlier_polishing_iterations: int = 0
+    """Number of post-optimization inlier-only polishing iterations for cylinder fitting."""
+
+    stabilize_cylinder_axis_with_principal_axis: bool = True
+    """Whether cylinder axis should be stabilized using point principal axis."""
+
+    cylinder_axis_stabilization_trigger_degrees: float = 8.0
+    """Minimum axis deviation angle required to trigger cylinder stabilization."""
+
+    cylinder_axis_stabilization_max_score_drop: float = 0.08
+    """Maximum tolerated score drop for accepting stabilized cylinder."""
+
+    prefer_upright_cylinder_axis: bool = True
+    """Whether an upright preferred axis should be favored when scores are close."""
+
+    preferred_cylinder_axis_direction: tuple[float, float, float] = (0.0, 0.0, 1.0)
+    """Preferred global cylinder axis direction used as stabilization prior."""
+
+    upright_cylinder_axis_score_tolerance: float = 0.05
+    """Maximum score gap for preferring a more upright cylinder axis."""
+
+    fit_cuboid: bool = True
+    """Whether cuboid fitting is enabled."""
+
+    max_cuboid_extent_meters: float = 0.6
+    """Maximum allowed cuboid edge length for any axis."""
+
+    cuboid_distance_threshold: float = 0.015
+    """Inlier threshold used specifically for cuboid fitting."""
+
+    cuboid_minimum_inlier_ratio: float = 0.35
+    """Minimum inlier ratio required for cuboid candidates."""
+
+    selection_score_tolerance: float = 0.05
+    """Maximum score gap for considering two fits equivalent."""
+
+    prefer_cuboid_when_score_close: bool = True
+    """Whether cuboids should be preferred when scores are close."""
+
+    cuboid_preference_score_margin: float = 0.06
+    """Maximum score gap to still prefer a box-like cuboid candidate."""
+
+    cuboid_preference_inlier_ratio_tolerance: float = 0.05
+    """Maximum inlier-ratio gap to still prefer a cuboid."""
+
+    cuboid_box_like_cross_section_asymmetry_threshold: float = 0.12
+    """Minimum cross-section asymmetry to classify a cuboid as box-like."""
+
+    cuboid_box_like_cube_axis_similarity_tolerance: float = 0.12
+    """Maximum axis spread ratio to classify a cuboid as cube-like."""
+
+    stabilize_ambiguous_cuboid_orientation: bool = True
+    """Whether ambiguous cuboid in-plane orientation should be stabilized."""
+
+    cuboid_ambiguous_in_plane_extent_relative_difference: float = 0.3
+    """Maximum relative in-plane extent difference treated as orientation-ambiguous."""
+
+    log_candidate_metrics: bool = True
+    """Whether candidate metrics are logged on debug level."""
+
+    log_rejection_reasons: bool = True
+    """Whether shape rejection reasons are logged when metrics logging is enabled."""
+
+
+# %% ShapeEstimator descriptor
+
+
+@dataclass(kw_only=True)
+class ShapeEstimatorDescriptor(AnnotatorDescriptor[ShapeEstimatorParameters]):
+    """Declarative configuration of :class:`ShapeEstimatorAnnotator`."""
+
+    parameters: ShapeEstimatorParameters = field(
+        default_factory=ShapeEstimatorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ShapeEstimator annotator
+
+
+class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
     """Estimate one primitive shape per object hypothesis point cloud.
 
     Overview:
@@ -83,149 +237,15 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
     objects.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for shape estimation."""
-
-        class Parameters:
-            """Parameter container for shape estimation."""
-
-            def __init__(self) -> None:
-                self.minimum_point_count: int = 80
-                """Minimum number of points required for fitting."""
-
-                self.distance_threshold: float = 0.01
-                """Inlier threshold used for all shape residuals."""
-
-                self.robust_loss: str = "soft_l1"
-                """Robust loss used for non-linear least squares."""
-
-                self.minimum_inlier_ratio: float = 0.5
-                """Minimum inlier ratio required for publishing a shape."""
-
-                self.remove_statistical_outliers: bool = False
-                """Whether statistical outlier removal is applied before fitting."""
-
-                self.outlier_neighbor_count: int = 30
-                """Neighbor count for statistical outlier removal."""
-
-                self.outlier_standard_deviation_ratio: float = 2.0
-                """Standard deviation ratio for statistical outlier removal."""
-
-                self.fit_sphere: bool = False
-                """Whether sphere fitting is enabled."""
-
-                self.max_sphere_radius_meters: float = 0.4
-                """Maximum allowed sphere radius."""
-
-                self.max_sphere_radius_to_bbox_diagonal_ratio: float = 1.0
-                """Maximum allowed ratio between sphere radius and point cloud diagonal."""
-
-                self.max_sphere_radius_to_observed_extent_ratio: float = 0.8
-                """Maximum allowed ratio between sphere radius and observed cloud extent."""
-
-                self.max_sphere_center_distance_to_bbox_diagonal_ratio: float = 0.9
-                """Maximum allowed ratio between center offset and point cloud diagonal."""
-
-                self.fit_cylinder: bool = True
-                """Whether cylinder fitting is enabled."""
-
-                self.cylinder_minimum_inlier_ratio: float = 0.87
-                """Minimum inlier ratio required for cylinder candidates."""
-
-                self.max_cylinder_radius_meters: float = 0.4
-                """Maximum allowed cylinder radius."""
-
-                self.max_cylinder_height_meters: float = 1.0
-                """Maximum allowed cylinder height."""
-
-                self.max_cylinder_radius_to_bbox_diagonal_ratio: float = 1.0
-                """Maximum allowed ratio between cylinder radius and cloud diagonal."""
-
-                self.max_cylinder_radius_to_cross_section_extent_ratio: float = 0.95
-                """Maximum allowed ratio between cylinder radius and observed cross-section extent."""
-
-                self.max_cylinder_center_distance_to_bbox_diagonal_ratio: float = 0.8
-                """Maximum allowed ratio between axis center offset and cloud diagonal."""
-
-                self.cylinder_max_initializations: int = 12
-                """Maximum number of cylinder initialization hypotheses for multi-start optimization."""
-
-                self.cylinder_consensus_trials: int = 30
-                """Number of random axis hypotheses used to seed cylinder multi-start optimization."""
-
-                self.cylinder_inlier_polishing_iterations: int = 0
-                """Number of post-optimization inlier-only polishing iterations for cylinder fitting."""
-
-                self.stabilize_cylinder_axis_with_principal_axis: bool = True
-                """Whether cylinder axis should be stabilized using point principal axis."""
-
-                self.cylinder_axis_stabilization_trigger_degrees: float = 8.0
-                """Minimum axis deviation angle required to trigger cylinder stabilization."""
-
-                self.cylinder_axis_stabilization_max_score_drop: float = 0.08
-                """Maximum tolerated score drop for accepting stabilized cylinder."""
-
-                self.prefer_upright_cylinder_axis: bool = True
-                """Whether an upright preferred axis should be favored when scores are close."""
-
-                self.preferred_cylinder_axis_direction: tuple[float, float, float] = (
-                    0.0,
-                    0.0,
-                    1.0,
-                )
-                """Preferred global cylinder axis direction used as stabilization prior."""
-
-                self.upright_cylinder_axis_score_tolerance: float = 0.05
-                """Maximum score gap for preferring a more upright cylinder axis."""
-
-                self.fit_cuboid: bool = True
-                """Whether cuboid fitting is enabled."""
-
-                self.max_cuboid_extent_meters: float = 0.6
-                """Maximum allowed cuboid edge length for any axis."""
-
-                self.cuboid_distance_threshold: float = 0.015
-                """Inlier threshold used specifically for cuboid fitting."""
-
-                self.cuboid_minimum_inlier_ratio: float = 0.35
-                """Minimum inlier ratio required for cuboid candidates."""
-
-                self.selection_score_tolerance: float = 0.05
-                """Maximum score gap for considering two fits equivalent."""
-
-                self.prefer_cuboid_when_score_close: bool = True
-                """Whether cuboids should be preferred when scores are close."""
-
-                self.cuboid_preference_score_margin: float = 0.06
-                """Maximum score gap to still prefer a box-like cuboid candidate."""
-
-                self.cuboid_preference_inlier_ratio_tolerance: float = 0.05
-                """Maximum inlier-ratio gap to still prefer a cuboid."""
-
-                self.cuboid_box_like_cross_section_asymmetry_threshold: float = 0.12
-                """Minimum cross-section asymmetry to classify a cuboid as box-like."""
-
-                self.cuboid_box_like_cube_axis_similarity_tolerance: float = 0.12
-                """Maximum axis spread ratio to classify a cuboid as cube-like."""
-
-                self.stabilize_ambiguous_cuboid_orientation: bool = True
-                """Whether ambiguous cuboid in-plane orientation should be stabilized."""
-
-                self.cuboid_ambiguous_in_plane_extent_relative_difference: float = 0.3
-                """Maximum relative in-plane extent difference treated as orientation-ambiguous."""
-
-                self.log_candidate_metrics: bool = True
-                """Whether candidate metrics are logged on debug level."""
-
-                self.log_rejection_reasons: bool = True
-                """Whether shape rejection reasons are logged when metrics logging is enabled."""
-
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ShapeEstimatorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ShapeEstimatorDescriptor
 
     def __init__(
         self,
         name: str = "ShapeEstimatorAnnotator",
-        descriptor: ShapeEstimatorAnnotator.Descriptor | None = None,
+        descriptor: ShapeEstimatorDescriptor | None = None,
     ) -> None:
         """Initialize the shape estimator annotator."""
         super().__init__(name=name, descriptor=descriptor)

@@ -7,24 +7,30 @@ downloaded.
 
 from __future__ import annotations
 
+# %% Imports
 from dataclasses import astuple, dataclass, field
 from pathlib import Path
 
 import cv2
 import numpy as np
 import pytest
-from py_trees.common import Status
-
-import robokudo
 import robokudo.annotators.human_and_pose
+from py_trees.common import Status
 from robokudo.annotators.exceptions import NotAPoseModelException
-from robokudo.annotators.human_and_pose import HumanAndPoseAnnotator, PoseKeypoint
+from robokudo.annotators.human_and_pose import (
+    HumanAndPoseAnnotator,
+    HumanAndPoseDescriptor,
+    PoseKeypoint,
+)
 from robokudo.cas import CASViews
 from robokudo.types.annotation import Classification, CloudAnnotation
 from robokudo.types.core import Annotation
 from robokudo.types.cv import Rect
 from robokudo.types.human import KeypointAnnotation, KeypointKind
 from robokudo.types.scene import HumanHypothesis
+
+import robokudo
+
 from ._black_wall_scene import BlackWallScene
 from ._yolo_mock import (
     MockDetection,
@@ -44,7 +50,9 @@ class PersonScene(BlackWallScene):
     """
 
     person_class_name: str = field(
-        default_factory=lambda: HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+        default_factory=lambda: (
+            HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+        )
     )
     """
     Name of the class the mock pose model reports persons as.
@@ -130,7 +138,7 @@ class PersonScene(BlackWallScene):
             y2=box.pos.y + box.height - vertical_margin,
         )
 
-    def descriptor(self) -> HumanAndPoseAnnotator.Descriptor:
+    def descriptor(self) -> HumanAndPoseDescriptor:
         """
         :return: A descriptor loading the model from the scene's models directory,
             ignoring depth and skipping the warmup.
@@ -141,7 +149,7 @@ class PersonScene(BlackWallScene):
         descriptor.parameters.global_with_depth = False
         return descriptor
 
-    def depth_descriptor(self) -> HumanAndPoseAnnotator.Descriptor:
+    def depth_descriptor(self) -> HumanAndPoseDescriptor:
         """
         :return: A descriptor like :meth:`descriptor` that builds point clouds.
         """
@@ -151,7 +159,7 @@ class PersonScene(BlackWallScene):
 
     def annotator_in_pipeline(
         self,
-        descriptor: HumanAndPoseAnnotator.Descriptor,
+        descriptor: HumanAndPoseDescriptor,
         color_to_depth_ratio: float = 1.0,
     ) -> HumanAndPoseAnnotator:
         """

@@ -6,13 +6,16 @@ This module provides an annotator for visualizing object hypotheses in both
 
 from __future__ import annotations
 
+# %% Imports
 import copy
+from dataclasses import dataclass, field
 from pathlib import Path
 from timeit import default_timer
 
 import cv2
 import open3d as o3d
 import trimesh
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
@@ -20,6 +23,8 @@ from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
     Classification,
@@ -29,8 +34,8 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import (
-    draw_mesh_wireframe_on_image,
     draw_bounding_box_wireframe,
+    draw_mesh_wireframe_on_image,
     trimesh_to_o3d_mesh,
 )
 from robokudo.utils.type_conversion import (
@@ -43,7 +48,39 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class ObjectHypothesisVisualizer(BaseAnnotator):
+# %% ObjectHypothesisVisualizer parameters
+
+
+@dataclass(kw_only=True)
+class ObjectHypothesisVisualizerParameters(AnnotatorParameters):
+    """Parameters for configuring visualization behavior."""
+
+    query_aware: bool = True
+    """If set to true, only visualize an Object that matches the 'object.type' from the Query."""
+
+    visualize_full_cloud: bool = False
+    """If set to true, the scene cloud will be shown and the individual objects will be colored."""
+
+
+# %% ObjectHypothesisVisualizer descriptor
+
+
+@dataclass(kw_only=True)
+class ObjectHypothesisVisualizerDescriptor(
+    AnnotatorDescriptor[ObjectHypothesisVisualizerParameters]
+):
+    """Declarative configuration of :class:`ObjectHypothesisVisualizer`."""
+
+    parameters: ObjectHypothesisVisualizerParameters = field(
+        default_factory=ObjectHypothesisVisualizerParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ObjectHypothesisVisualizer annotator
+
+
+class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescriptor]):
     """Annotator for visualizing object hypotheses in the CAS.
 
     This annotator creates visualizations of detected objects by:
@@ -53,26 +90,15 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
     * Optionally filtering objects based on query type
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for object hypothesis visualization."""
-
-        class Parameters:
-            """Parameters for configuring visualization behavior."""
-
-            def __init__(self) -> None:
-                self.query_aware: bool = True
-                """If set to true, only visualize an Object that matches the 'object.type' from the Query."""
-
-                self.visualize_full_cloud: bool = False
-                """If set to true, the scene cloud will be shown and the individual objects will be colored."""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ObjectHypothesisVisualizerDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ObjectHypothesisVisualizerDescriptor
 
     def __init__(
         self,
         name: str = "ObjectHypothesisVisualizer",
-        descriptor: ObjectHypothesisVisualizer.Descriptor | None = None,
+        descriptor: ObjectHypothesisVisualizerDescriptor | None = None,
     ) -> None:
         """Initialize the object hypothesis visualizer.
 

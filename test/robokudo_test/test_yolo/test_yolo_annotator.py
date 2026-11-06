@@ -7,29 +7,31 @@ weights are downloaded.
 
 from __future__ import annotations
 
+# %% Imports
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 import pytest
-from py_trees.common import Status
-from ultralytics.utils.plotting import colors
-
-import robokudo
 import robokudo.annotators.yolo_annotator
-from robokudo.annotators.yolo_annotator import YoloAnnotator
+from py_trees.common import Status
+from robokudo.annotators.yolo_annotator import YoloAnnotator, YoloDescriptor
 from robokudo.exceptions import DetectionModelNotConfigured
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import HumanHypothesis, ObjectHypothesis
 from robokudo.utils.annotator_helper import draw_bounding_boxes_from_object_hypotheses
 from robokudo.utils.file_loader import FileLoader
+from ultralytics.utils.plotting import colors
+
+import robokudo
+
 from ._black_wall_scene import BlackWallScene
 from ._yolo_mock import (
-    NormalizedBox,
     MockDetection,
     MockDetectionModel,
     MockModelLoader,
+    NormalizedBox,
 )
 
 # %% scene setup
@@ -77,7 +79,7 @@ class CupScene(BlackWallScene):
         """
         return [int(corner) for corner in self.cup_box.corners_in(self.color_image())]
 
-    def descriptor(self) -> YoloAnnotator.Descriptor:
+    def descriptor(self) -> YoloDescriptor:
         """
         :return: A descriptor loading the pretrained model and ignoring depth.
         """
@@ -89,7 +91,7 @@ class CupScene(BlackWallScene):
         return descriptor
 
     def annotator_in_pipeline(
-        self, descriptor: YoloAnnotator.Descriptor, color_to_depth_ratio: float = 1.0
+        self, descriptor: YoloDescriptor, color_to_depth_ratio: float = 1.0
     ) -> YoloAnnotator:
         """
         :param color_to_depth_ratio: Size of the depth image relative to the color
@@ -140,7 +142,7 @@ def model_loader(monkeypatch, scene: CupScene) -> MockModelLoader:
     return model_loader
 
 
-def _depth_descriptor(scene: CupScene) -> YoloAnnotator.Descriptor:
+def _depth_descriptor(scene: CupScene) -> YoloDescriptor:
     descriptor = scene.descriptor()
     descriptor.parameters.global_with_depth = True
     return descriptor
@@ -341,7 +343,7 @@ def test_mask_fills_bounding_box_without_precision_mode(model_loader, scene):
     )
 
 
-def _precision_descriptor(scene: CupScene) -> YoloAnnotator.Descriptor:
+def _precision_descriptor(scene: CupScene) -> YoloDescriptor:
     descriptor = scene.descriptor()
     descriptor.parameters.precision_mode = True
     return descriptor
@@ -454,14 +456,14 @@ def test_region_detected_on_smaller_depth_resolution_is_in_color_pixels(
 # %% existing hypotheses
 
 
-def _existing_hypothesis_descriptor(scene: CupScene) -> YoloAnnotator.Descriptor:
+def _existing_hypothesis_descriptor(scene: CupScene) -> YoloDescriptor:
     descriptor = scene.descriptor()
     descriptor.parameters.classify_existing_hypotheses = True
     return descriptor
 
 
 def _annotator_with_existing_hypothesis(
-    scene: CupScene, descriptor: YoloAnnotator.Descriptor, existing: ObjectHypothesis
+    scene: CupScene, descriptor: YoloDescriptor, existing: ObjectHypothesis
 ) -> YoloAnnotator:
     annotator = scene.annotator_in_pipeline(descriptor)
     annotator.get_cas().annotations.append(existing)

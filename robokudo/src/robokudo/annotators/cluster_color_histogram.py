@@ -18,29 +18,67 @@ The module uses:
 """
 
 from __future__ import annotations
-from py_trees.common import Status
 
-from robokudo.annotators.core import BaseAnnotator
-from robokudo.types.annotation import ColorHistogram
-from robokudo.types.scene import ObjectHypothesis
+# %% Imports
 import copy
 import math
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
 import numpy as np
+from krrood.ormatic.utils import classproperty
 from matplotlib import pyplot as plt
-from typing_extensions import List, Tuple, TYPE_CHECKING
+from py_trees.common import Status
+from typing_extensions import TYPE_CHECKING
 
-from robokudo.annotators.cluster_color import Color
+from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
-from robokudo.types.cv import Rect
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+from robokudo.types.annotation import ColorHistogram
+from robokudo.types.scene import ObjectHypothesis
 
 if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-class ClusterColorHistogramAnnotator(BaseAnnotator):
+# %% ClusterColorHistogram parameters
+
+
+@dataclass(kw_only=True)
+class ClusterColorHistogramParameters(AnnotatorParameters):
+    """Parameters for configuring histogram calculation."""
+
+    histogram_cols: int = 16
+    """Number of histogram columns (hue bins)"""
+
+    histogram_rows: int = 16
+    """Number of histogram rows (saturation bins)"""
+
+    generate_plot_output: bool = False
+    """Whether to generate histogram plots. Plotting takes a lot of time in matplotlib (200-500ms)"""
+
+
+# %% ClusterColorHistogram descriptor
+
+
+@dataclass(kw_only=True)
+class ClusterColorHistogramDescriptor(
+    AnnotatorDescriptor[ClusterColorHistogramParameters]
+):
+    """Declarative configuration of :class:`ClusterColorHistogramAnnotator`."""
+
+    parameters: ClusterColorHistogramParameters = field(
+        default_factory=ClusterColorHistogramParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ClusterColorHistogram annotator
+
+
+class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescriptor]):
     """Hue and saturation histogram analysis for object hypotheses with RGB ROI and Mask.
 
     This annotator:
@@ -54,29 +92,15 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
        Histogram plotting can significantly impact performance (200-500ms).
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for color histogram analysis."""
-
-        class Parameters:
-            """Parameters for configuring histogram calculation."""
-
-            def __init__(self) -> None:
-                self.histogram_cols: int = 16
-                """Number of histogram columns (hue bins)"""
-
-                self.histogram_rows: int = 16
-                """Number of histogram rows (saturation bins)"""
-
-                self.generate_plot_output: bool = False
-                """Whether to generate histogram plots. Plotting takes a lot of time in matplotlib (200-500ms)"""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ClusterColorHistogramDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ClusterColorHistogramDescriptor
 
     def __init__(
         self,
         name: str = "ClusterColorHistogramAnnotator",
-        descriptor: ClusterColorHistogramAnnotator.Descriptor | None = None,
+        descriptor: ClusterColorHistogramDescriptor | None = None,
     ) -> None:
         """Initialize the color histogram analyzer. Minimal one-time init!
 

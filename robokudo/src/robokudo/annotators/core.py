@@ -22,25 +22,30 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections import defaultdict  # noqa: B027ons import defaultdict
+from collections import defaultdict
 from concurrent.futures import Future
+from dataclasses import dataclass
 
+from krrood.ormatic.utils import classproperty
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.time import Time
 from sensor_msgs.msg import JointState
-from typing_extensions import Any, Callable
+from typing_extensions import Any, Callable, Generic, TypeVar
 
 import robokudo.pipeline  # Work around circular import
+from robokudo.annotators.exceptions import EmptyAnalysisScope
 from robokudo.annotators.outputs import (
-    AnnotatorOutputPerPipelineMap,
     AnnotatorOutputs,
     AnnotatorOutputStruct,
 )
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
-from robokudo.annotators.exceptions import InvalidAnalysisData, EmptyAnalysisScope
 from robokudo.cas import CAS, CASViews
+from robokudo.datastructures.annotator_descriptor import (
+    AnnotatorDescriptor,
+    BaseAnnotatorDescriptor,
+)
 from robokudo.defs import PACKAGE_NAME
 from robokudo.types.core import Annotation
 from robokudo.utils.tree import find_parent_of_type
@@ -53,7 +58,14 @@ The threaded annotator provides functionality to call long-running annotators wi
 """
 
 
-class BaseAnnotator(Behaviour):
+# %% Annotator configuration types
+DescriptorType = TypeVar("DescriptorType", bound=AnnotatorDescriptor)
+"""Concrete descriptor carried by an annotator family member."""
+
+
+# %% Base annotator
+@dataclass(init=False, eq=False)
+class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """
     Base class for all RoboKudo annotators.
 
@@ -67,73 +79,15 @@ class BaseAnnotator(Behaviour):
     context.
     """
 
-    class Descriptor:
-        """
-        Configuration descriptor for annotator parameters and capabilities.
-
-        This class defines the structure for specifying annotator parameters and
-        capabilities.
-        """
-
-        class Parameters:
-            """
-            Container for annotator parameters.
-
-            Subclasses declare the parameters of their annotation operation.
-            """
-
-            None
-
-        class Capabilities:
-            """
-            Defines the input and output capabilities of an annotator.
-            """
-
-            def __init__(self) -> None:
-                """
-                Initialize capabilities with empty input/output definitions.
-                """
-                self.inputs = None
-                """
-                Input types accepted by the annotator.
-                """
-                self.outputs = None
-                """
-                Output types produced by the annotator.
-                """
-
-        def __init__(self) -> None:
-            """
-            Initialize the descriptor with parameters and capabilities.
-            """
-            param_class = self.Parameters
-
-            # overwrite __getattr__ in current 'Parameters' class
-            def get_attr_with_predefined_parameters(self, name: str) -> Any:
-                """
-                Custom attribute getter for accessing global parameters.
-
-                :param name: Name of the parameter to access
-                :return: Value of the global parameter
-                :raises AttributeError: If parameter name is unknown
-                """
-                if name.startswith("global_"):
-                    return getattr(
-                        AnnotatorPredefinedParameters,
-                        name,
-                    )
-                else:
-                    raise AttributeError(f"Unknown parameter with name <{name}>.")
-
-            param_class.__getattr__ = get_attr_with_predefined_parameters
-
-            self.parameters = param_class()
-            self.capabilities = self.Capabilities()
+    @classproperty
+    def Descriptor(cls) -> type[AnnotatorDescriptor]:
+        """Configuration constructor for annotators with common parameters only."""
+        return BaseAnnotatorDescriptor
 
     def __init__(
         self,
         name: str = "Annotator",
-        descriptor: BaseAnnotator.Descriptor | None = None,
+        descriptor: DescriptorType | None = None,
         ros_pkg_name: str = PACKAGE_NAME,
     ) -> None:
         """
@@ -154,7 +108,8 @@ class BaseAnnotator(Behaviour):
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         # self.rk_logger.debug("%s" % (get_line_context(self)))
-        self.descriptor = descriptor
+        self.descriptor: DescriptorType = descriptor
+        """Concrete configuration supplied to this annotator instance."""
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -495,7 +450,9 @@ class Worker(object):
             self._callback(self.future.result())
 
 
-class ThreadedAnnotator(BaseAnnotator):
+# %% Threaded annotator
+@dataclass(init=False, eq=False)
+class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     """
     Base class for annotators that perform long-running operations.
 
@@ -507,7 +464,7 @@ class ThreadedAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ThreadedAnnotator",
-        descriptor: BaseAnnotator.Descriptor | None = None,
+        descriptor: DescriptorType | None = None,
     ) -> None:
         """
         Initialize the ThreadedAnnotator.

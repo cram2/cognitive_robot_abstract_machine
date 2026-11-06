@@ -19,13 +19,51 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
+from dataclasses import dataclass, field
+
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Callable
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
+
+# %% LambdaFunction parameters
 
 
-class LambdaFunctionAnnotator(BaseAnnotator):
+@dataclass(kw_only=True)
+class LambdaFunctionParameters(AnnotatorParameters):
+    """Parameter container for function configuration."""
+
+    func: Callable | None = None
+    """Configured callable, or None to perform no operation."""
+
+    func_args: tuple | None = None
+    """Positional arguments passed to the configured callable."""
+
+    func_kwargs: dict | None = None
+    """Keyword arguments passed to the configured callable."""
+
+
+# %% LambdaFunction descriptor
+
+
+@dataclass(kw_only=True)
+class LambdaFunctionDescriptor(AnnotatorDescriptor[LambdaFunctionParameters]):
+    """Declarative configuration of :class:`LambdaFunctionAnnotator`."""
+
+    parameters: LambdaFunctionParameters = field(
+        default_factory=LambdaFunctionParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% LambdaFunction annotator
+
+
+class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     """
     Annotator for executing arbitrary functions.
 
@@ -33,32 +71,15 @@ class LambdaFunctionAnnotator(BaseAnnotator):
     for dynamic behavior definition without creating new annotator classes.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for lambda function annotator.
-        """
-
-        class Parameters:
-            """
-            Parameter container for function configuration.
-
-            :type func: callable
-            :type func_args: tuple
-            :type func_kwargs: dict
-            """
-
-            def __init__(self) -> None:
-                self.func: Callable | None = None
-                self.func_args: tuple | None = None
-                self.func_kwargs: dict | None = None
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[LambdaFunctionDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return LambdaFunctionDescriptor
 
     def __init__(
         self,
         name: str = "LambdaFunctionAnnotator",
-        descriptor: LambdaFunctionAnnotator.Descriptor | None = None,
+        descriptor: LambdaFunctionDescriptor | None = None,
     ):
         """
         Initialize the lambda function annotator.

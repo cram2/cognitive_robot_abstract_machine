@@ -5,47 +5,72 @@ This module provides annotators for writing and publishing annotations.
 
 from __future__ import annotations
 
+# %% Imports
 import json
 import os
 import shutil
+from dataclasses import dataclass, field
 from timeit import default_timer
 
+from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from rclpy.publisher import Publisher
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from std_msgs.msg import String
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.io.cas_annotation_codecs import serialize_annotations
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+
+# %% AnnotationStorageWriter parameters
 
 
-class AnnotationStorageWriter(BaseAnnotator):
+@dataclass(kw_only=True)
+class AnnotationStorageWriterParameters(AnnotatorParameters):
+    """Parameters for configuring annotation storage."""
+
+    basic_path: str = "annotations"
+    """Base directory for storing annotations"""
+
+    suffix: str = "json"
+    """File extension for annotation files"""
+
+
+# %% AnnotationStorageWriter descriptor
+
+
+@dataclass(kw_only=True)
+class AnnotationStorageWriterDescriptor(
+    AnnotatorDescriptor[AnnotationStorageWriterParameters]
+):
+    """Declarative configuration of :class:`AnnotationStorageWriter`."""
+
+    parameters: AnnotationStorageWriterParameters = field(
+        default_factory=AnnotationStorageWriterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% AnnotationStorageWriter annotator
+
+
+class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     """Annotator for writing annotations to storage in JSON format.
 
     This annotator writes the current CAS annotations to files in a specified
     directory, using JSON serialization.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for annotation storage writer."""
-
-        class Parameters:
-            """Parameters for configuring annotation storage."""
-
-            def __init__(self) -> None:
-                self.basic_path: str = "annotations"
-                """Base directory for storing annotations"""
-
-                self.suffix: str = "json"
-                """File extension for annotation files"""
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[AnnotationStorageWriterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return AnnotationStorageWriterDescriptor
 
     def __init__(
         self,
         name: str = "AnnotationStorageWriter",
-        descriptor: AnnotationStorageWriter.Descriptor | None = None,
+        descriptor: AnnotationStorageWriterDescriptor | None = None,
     ) -> None:
         """Initialize the annotation storage writer. Minimal one-time init!
 
@@ -92,30 +117,51 @@ class AnnotationStorageWriter(BaseAnnotator):
         return Status.SUCCESS
 
 
-class AnnotationPublisherWriter(BaseAnnotator):
+# %% AnnotationPublisherWriter parameters
+
+
+@dataclass(kw_only=True)
+class AnnotationPublisherWriterParameters(AnnotatorParameters):
+    """Parameters for configuring annotation publishing."""
+
+    topic_name: str = "/annotations"
+    """Name of the ROS topic to publish on"""
+
+
+# %% AnnotationPublisherWriter descriptor
+
+
+@dataclass(kw_only=True)
+class AnnotationPublisherWriterDescriptor(
+    AnnotatorDescriptor[AnnotationPublisherWriterParameters]
+):
+    """Declarative configuration of :class:`AnnotationPublisherWriter`."""
+
+    parameters: AnnotationPublisherWriterParameters = field(
+        default_factory=AnnotationPublisherWriterParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% AnnotationPublisherWriter annotator
+
+
+class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescriptor]):
     """Annotator for publishing annotations via ROS topics.
 
     This annotator publishes the current CAS annotations as JSON-encoded
     strings over a ROS topic.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Configuration descriptor for annotation publisher."""
-
-        class Parameters:
-            """Parameters for configuring annotation publishing."""
-
-            def __init__(self) -> None:
-                self.topic_name: str = "/annotations"
-                """Name of the ROS topic to publish on"""
-
-        # overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[AnnotationPublisherWriterDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return AnnotationPublisherWriterDescriptor
 
     def __init__(
         self,
         name: str = "AnnotationPublisherWriter",
-        descriptor: AnnotationPublisherWriter.Descriptor | None = None,
+        descriptor: AnnotationPublisherWriterDescriptor | None = None,
     ) -> None:
         """Initialize the annotation publisher. Minimal one-time init!
 

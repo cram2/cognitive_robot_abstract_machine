@@ -20,18 +20,23 @@ The module is used for:
 
 from __future__ import annotations
 
+# %% Imports
 import copy
-import time
 import datetime
+import time
+from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
+from krrood.ormatic.utils import classproperty
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CAS, CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
@@ -284,7 +289,34 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
         )
 
 
-class ScopedAnnotator(BaseAnnotator):
+# %% Scoped parameters
+
+
+@dataclass(kw_only=True)
+class ScopedParameters(AnnotatorParameters):
+    """Parameter class for the ScopedAnnotator."""
+
+    analysis_scope: list[CASViews] = field(
+        default_factory=lambda: [CASViews.COLOR_IMAGE, CASViews.CLOUD]
+    )
+    """List of data types to analyze"""
+
+
+# %% Scoped descriptor
+
+
+@dataclass(kw_only=True)
+class ScopedDescriptor(AnnotatorDescriptor[ScopedParameters]):
+    """Declarative configuration of :class:`ScopedAnnotator`."""
+
+    parameters: ScopedParameters = field(default_factory=ScopedParameters.from_defaults)
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% Scoped annotator
+
+
+class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
     """
     Demonstrates the usage of analysis scopes in annotators.
 
@@ -304,24 +336,15 @@ class ScopedAnnotator(BaseAnnotator):
         This is primarily a demonstration annotator for educational purposes.
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """Descriptor class defining the annotator's parameters."""
-
-        class Parameters:
-            """Parameter class for the ScopedAnnotator."""
-
-            def __init__(self) -> None:
-                """Initialize parameters with default analysis scope."""
-                self.analysis_scope = [CASViews.COLOR_IMAGE, CASViews.CLOUD]
-                """ List of data types to analyze """
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ScopedDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ScopedDescriptor
 
     def __init__(
         self,
         name: str = "ScopedAnnotator",
-        descriptor: ScopedAnnotator.Descriptor | None = None,
+        descriptor: ScopedDescriptor | None = None,
     ) -> None:
         """
         Initialize the scoped annotator.

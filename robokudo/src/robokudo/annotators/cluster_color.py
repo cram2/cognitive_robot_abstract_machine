@@ -11,7 +11,9 @@ using HSV color space segmentation.
 
 from __future__ import annotations
 
+# %% Imports
 import copy
+from dataclasses import dataclass, field
 from enum import Enum
 from timeit import default_timer
 
@@ -19,11 +21,15 @@ import cv2
 import numba
 import numpy as np
 import numpy.ma
+from krrood.ormatic.utils import classproperty
+from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import SemanticColor
 from robokudo.types.cv import Rect
 from robokudo.types.scene import AnalyzableAnnotation
@@ -54,7 +60,64 @@ class Color(Enum):
     # COUNT # Use len(Color) instead
 
 
-class ClusterColorAnnotator(BaseAnnotator):
+# %% ClusterColor parameters
+
+
+@dataclass(kw_only=True)
+class ClusterColorParameters(AnnotatorParameters):
+    """Parameters for color analysis configuration."""
+
+    num_of_colors: int = 6
+    """Number of chromatic categories dividing the hue interval."""
+
+    color_range: float = field(
+        init=False, metadata=JSONMetadata(serialize=True).as_dict()
+    )
+    """Hue interval assigned to each chromatic category."""
+
+    jit_compile_on_init: bool = False
+    """Whether to compile the pixel-counting kernel during construction."""
+
+    min_value_color: int = 60
+    """Value threshold a pixel must exceed to be classified as chromatic."""
+
+    min_saturation_color: int = 60
+    """Saturation threshold a pixel must exceed to be classified as chromatic."""
+
+    max_value_black: int = 60
+    """Largest pixel value classified as black."""
+
+    min_value_white: int = 120
+    """Value threshold an achromatic pixel must exceed to be classified as white."""
+
+    ratio_annotation_threshold: float = 0.2
+    """Minimum fraction of classified pixels required for a color annotation."""
+
+    analysis_scope: type = AnalyzableAnnotation
+    """Annotation type whose image regions are analyzed."""
+
+    def __post_init__(self) -> None:
+        """Initialize values derived from the configured processing settings."""
+        self.color_range: float = 256 / self.num_of_colors
+
+
+# %% ClusterColor descriptor
+
+
+@dataclass(kw_only=True)
+class ClusterColorDescriptor(AnnotatorDescriptor[ClusterColorParameters]):
+    """Declarative configuration of :class:`ClusterColorAnnotator`."""
+
+    parameters: ClusterColorParameters = field(
+        default_factory=ClusterColorParameters.from_defaults
+    )
+    """Effective settings initialized from application and annotator defaults."""
+
+
+# %% ClusterColor annotator
+
+
+class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     """
     Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB
     ROI and a Mask.
@@ -73,35 +136,10 @@ class ClusterColorAnnotator(BaseAnnotator):
     * Value thresholds for black/white/grey
     """
 
-    class Descriptor(BaseAnnotator.Descriptor):
-        """
-        Configuration descriptor for the ClusterColorAnnotator.
-
-        Defines parameters that control the color analysis behavior:
-
-        * Number of color divisions in hue space
-        * Thresholds for color classification
-        * Minimum ratio for color annotation
-        """
-
-        class Parameters:
-            """
-            Parameters for color analysis configuration.
-            """
-
-            def __init__(self) -> None:
-                self.num_of_colors: int = 6
-                self.color_range: float = 256 / self.num_of_colors
-                self.jit_compile_on_init: bool = False
-                self.min_value_color: int = 60
-                self.min_saturation_color: int = 60
-                self.max_value_black: int = 60
-                self.min_value_white: int = 120
-                self.ratio_annotation_threshold: float = 0.2
-                self.analysis_scope: type = AnalyzableAnnotation
-
-        # Overwrite the parameters explicitly to enable auto-completion
-        parameters = Parameters()
+    @classproperty
+    def Descriptor(cls) -> type[ClusterColorDescriptor]:
+        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
+        return ClusterColorDescriptor
 
     # To easily define this, we use RGB here and then flip it. OpenCV in python uses BGR per default.
     # Please note, that this color will not be used for the segmentation!
@@ -121,7 +159,7 @@ class ClusterColorAnnotator(BaseAnnotator):
     def __init__(
         self,
         name: str = "ClusterColorAnnotator",
-        descriptor: ClusterColorAnnotator.Descriptor | None = None,
+        descriptor: ClusterColorDescriptor | None = None,
     ) -> None:
         """
         Default construction.
