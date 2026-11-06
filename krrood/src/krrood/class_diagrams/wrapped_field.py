@@ -131,19 +131,39 @@ class WrappedField:
 
     def _build_initial_namespace(self) -> dict:
         """
-        Build the initial namespace for type resolution from the class diagram.
+        Build the fallback namespace for resolving the class's annotations.
+
+        It holds the class diagram's classes whose names the declaring modules do not
+        bind, such as names imported only for type checking, so that a module's own
+        binding wins over a same-named class from another module.
         """
         class_diagram = self.clazz._class_diagram
         if class_diagram is None:
             return {}
+        names_bound_by_declaring_modules = self._names_bound_by_declaring_modules_()
         namespace = {}
         for cls in class_diagram.wrapped_classes:
             # Only add to namespace if it's a real type.
             # Specialized generics (which have _GenericAlias as clazz) are skipped
             # to avoid shadowing the origin classes.
-            if isinstance(cls.clazz, type):
+            if (
+                isinstance(cls.clazz, type)
+                and cls.name not in names_bound_by_declaring_modules
+            ):
                 namespace[cls.name] = cls.clazz
         return namespace
+
+    def _names_bound_by_declaring_modules_(self) -> set[str]:
+        """
+        :return: The global names of the modules of the introspected class and its base
+            classes, whose annotations the type resolution evaluates.
+        """
+        names = set()
+        for base in getattr(self.clazz.class_to_introspect, "__mro__", ()):
+            module = sys.modules.get(base.__module__)
+            if module is not None:
+                names.update(vars(module))
+        return names
 
     def _find_class_by_name(self, class_name: str) -> type:
         """
@@ -170,8 +190,8 @@ class WrappedField:
     def holds_collection(self) -> bool:
         """
         Whether the field's value is a collection of any
-        :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union such as
-        ``Optional``, whether any member of the union is.
+        :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union
+        such as ``Optional``, whether any member of the union is.
         """
         annotations = (
             get_args(self.resolved_type)

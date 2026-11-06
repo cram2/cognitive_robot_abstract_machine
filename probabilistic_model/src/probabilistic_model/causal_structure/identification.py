@@ -8,7 +8,7 @@ acyclic graph the causal graph stands for.
 from __future__ import annotations
 
 import itertools
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
@@ -156,6 +156,29 @@ class Identification(ABC):
     What a causal graph says about the effect of a cause on an effect.
     """
 
+    @property
+    @abstractmethod
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        """
+        :return: Every set the effect may be identified by adjusting for; none if the
+            effect is not identified.
+        """
+
+    @property
+    def is_identified(self) -> bool:
+        """
+        :return: Whether a single set identifies the effect.
+        """
+        return False
+
+    @property
+    def includes_no_effect(self) -> bool:
+        """
+        :return: Whether, in some graph the causal graph stands for, the cause has no
+            effect on the effect at all.
+        """
+        return False
+
 
 @dataclass
 class IdentifiedEffect(Identification):
@@ -168,6 +191,14 @@ class IdentifiedEffect(Identification):
     The nodes to adjust for.
     """
 
+    @property
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        return [self.adjustment]
+
+    @property
+    def is_identified(self) -> bool:
+        return True
+
 
 @dataclass
 class PartiallyIdentifiedEffect(Identification):
@@ -176,7 +207,7 @@ class PartiallyIdentifiedEffect(Identification):
     effect is one of several, one per parent set (Maathuis, Kalisch and Bühlmann, 2009).
     """
 
-    candidate_adjustments: list[AdjustmentSet]
+    parent_sets: list[AdjustmentSet]
     """
     Each distinct parent set of the cause that does not hold the effect, the smallest
     first.
@@ -187,6 +218,14 @@ class PartiallyIdentifiedEffect(Identification):
     Whether the effect is a parent of the cause in some member graph, where the cause
     has no effect on it at all.
     """
+
+    @property
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        return self.parent_sets
+
+    @property
+    def includes_no_effect(self) -> bool:
+        return self.includes_member_without_causal_path
 
 
 class UnidentifiedReason(StrEnum):
@@ -223,6 +262,10 @@ class UnidentifiedEffect(Identification):
     """
     Why.
     """
+
+    @property
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        return []
 
 
 # %% choosing an adjustment set
@@ -384,7 +427,7 @@ class AdjustmentSelector:
         if not all(candidate.nodes <= eligible for candidate in candidates):
             return UnidentifiedEffect(UnidentifiedReason.PARENT_SET_NOT_ELIGIBLE)
         return PartiallyIdentifiedEffect(
-            candidate_adjustments=candidates,
+            parent_sets=candidates,
             includes_member_without_causal_path=any(
                 effect in parents for parents in parent_sets
             ),
