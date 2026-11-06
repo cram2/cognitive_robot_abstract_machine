@@ -469,14 +469,16 @@ class SubClassSafeGeneric(ABC):
         :param base: The base to resolve.
         :return: A tuple of the origin class and its generic arguments.
         """
+        # Read the MRO instead of calling issubclass: while a class is being created it
+        # still shares its first abstract base's ABC caches, and a failed check on that
+        # base would be cached there as the base not being a subclass of itself.
         origin = get_origin(base)
         if origin is None:
-            if isclass(base) and issubclass(base, SubClassSafeGeneric):
+            if isclass(base) and SubClassSafeGeneric in base.__mro__:
                 return base, ()
             return None, ()
 
-        # Ensure origin is a class before calling issubclass
-        if isclass(origin) and issubclass(origin, SubClassSafeGeneric):
+        if isclass(origin) and SubClassSafeGeneric in origin.__mro__:
             return origin, get_args(base)
 
         return None, ()
