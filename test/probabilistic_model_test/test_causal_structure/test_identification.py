@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from krrood.patterns.exceptions import InterfaceInstantiationError
 
 from probabilistic_model.causal_structure.exceptions import (
     InvalidAdjustmentSet,
@@ -12,6 +13,7 @@ from probabilistic_model.causal_structure.identification import (
     AdjustmentCheck,
     AdjustmentSet,
     AdjustmentSelector,
+    DeclaredAdjustmentPolicy,
     IdentifiedEffect,
     InvalidAdjustmentReason,
     InvalidDeclaredAdjustmentRefusal,
@@ -290,6 +292,11 @@ def test_a_repair_keeps_a_declared_set_as_far_as_the_graph_allows(
     )
 
     assert identification == IdentifiedEffect(adjustment_of(graph, kept))
+
+
+def test_the_declared_adjustment_policy_is_an_interface():
+    with pytest.raises(InterfaceInstantiationError):
+        DeclaredAdjustmentPolicy()
 
 
 def test_a_refusal_raises_for_an_invalid_declared_set():

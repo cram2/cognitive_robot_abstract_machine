@@ -15,6 +15,8 @@ from functools import cached_property
 
 import pandas as pd
 
+from krrood.patterns.interface import Interface
+
 from probabilistic_model.causal_structure.discretization import Discretizer
 from probabilistic_model.causal_structure.exceptions import (
     InvalidAdjustmentSet,
@@ -437,7 +439,7 @@ class AdjustmentSelector:
 # %% what to do with a declared adjustment set
 
 
-class DeclaredAdjustmentPolicy(ABC):
+class DeclaredAdjustmentPolicy(Interface):
     """
     What a causal graph's identification of an effect does with a set of nodes declared
     to adjust for.
