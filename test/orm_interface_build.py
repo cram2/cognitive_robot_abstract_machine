@@ -156,22 +156,21 @@ class OrmBuild(StrEnum):
 
 
 @cache
-def regenerate_orm_interfaces() -> bool:
+def regenerate_orm_interfaces(package_name: str) -> bool:
     """
-    Build the ORM interfaces of this checkout, as far as the run asked for, once per
-    process and never on a worker.
+    Build the ORM interfaces a package's tests read, as far as the run asked for, once
+    per package and process and never on a worker.
 
     The controller imports the conftests before it starts any worker, so building there
     leaves the interfaces on disk by the time a worker imports a mapped datastructure.
-    Letting the workers build too would set several processes writing the same files at
-    once, each paying for the whole build again. A run covering several packages asks
-    once per package, and every generator runs in the first of those calls.
 
+    :param package_name: The package whose tests run.
     :return: Whether this call built them.
     """
     if os.environ.get(PytestEnvironmentVariable.XDIST_WORKER):
         return False
-    if not OrmBuild.requested().builds(WORKSPACE_ORM_INTERFACES):
+    needed_interfaces = WORKSPACE_ORM_INTERFACES.needed_by(package_name)
+    if not OrmBuild.requested().builds(needed_interfaces):
         return False
-    WORKSPACE_ORM_INTERFACES.regenerate()
+    needed_interfaces.regenerate()
     return True

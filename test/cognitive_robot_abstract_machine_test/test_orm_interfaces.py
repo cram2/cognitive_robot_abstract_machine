@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from cognitive_robot_abstract_machine import orm_interfaces
 from cognitive_robot_abstract_machine.exceptions import (
     MissingORMGeneratorError,
     OrmGenerationFailedError,
+    UnknownOrmPackageError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
     INTERFACE_FILE_NAME,
@@ -242,6 +244,107 @@ def test_this_repository_ignores_a_generated_interface_outside_a_workspace_packa
     )
 
     assert git_ignores(REPOSITORY_ROOT, krrood_test_dataset_interface)
+
+
+# %% the interfaces a package needs
+
+
+class BranchingPackage(StrEnum):
+    """
+    Packages of a workspace whose interfaces build on one another along two branches.
+    """
+
+    BASE = "base"
+    """
+    A package whose interface builds on no other.
+    """
+
+    MIDDLE = "middle"
+    """
+    A package whose interface builds on :attr:`BASE`.
+    """
+
+    TOP = "top"
+    """
+    A package whose interface builds on :attr:`MIDDLE`.
+    """
+
+    SIDE = "side"
+    """
+    A package whose interface builds on :attr:`BASE`, beside :attr:`MIDDLE`.
+    """
+
+
+@pytest.fixture
+def branching_workspace(tmp_path: Path) -> WorkspaceOrmInterfaces:
+    """
+    The interfaces of :class:`BranchingPackage`, in an order that follows their
+    dependencies.
+    """
+    return WorkspaceOrmInterfaces(
+        (
+            OrmInterface(BranchingPackage.BASE, tmp_path),
+            OrmInterface(BranchingPackage.MIDDLE, tmp_path, (BranchingPackage.BASE,)),
+            OrmInterface(BranchingPackage.SIDE, tmp_path, (BranchingPackage.BASE,)),
+            OrmInterface(BranchingPackage.TOP, tmp_path, (BranchingPackage.MIDDLE,)),
+        )
+    )
+
+
+def package_names_of(workspace: WorkspaceOrmInterfaces) -> list[str]:
+    """
+    :return: The names of the packages whose interfaces the workspace holds, in build
+        order.
+    """
+    return [interface.package_name for interface in workspace.interfaces]
+
+
+def test_a_package_needs_its_interface_and_every_one_it_builds_on(
+    branching_workspace: WorkspaceOrmInterfaces,
+):
+    """
+    The interfaces a package builds on come along, through every level, in build order.
+    """
+    needed = branching_workspace.needed_by(BranchingPackage.TOP)
+
+    assert package_names_of(needed) == [
+        BranchingPackage.BASE,
+        BranchingPackage.MIDDLE,
+        BranchingPackage.TOP,
+    ]
+
+
+def test_a_package_does_not_need_the_interfaces_of_another_branch(
+    branching_workspace: WorkspaceOrmInterfaces,
+):
+    """
+    An interface building on the same base, but not on the package, stays out.
+    """
+    needed = branching_workspace.needed_by(BranchingPackage.SIDE)
+
+    assert package_names_of(needed) == [BranchingPackage.BASE, BranchingPackage.SIDE]
+
+
+def test_a_package_building_on_nothing_needs_only_its_own_interface(
+    branching_workspace: WorkspaceOrmInterfaces,
+):
+    """
+    The interfaces built on a package are not needed to read it.
+    """
+    needed = branching_workspace.needed_by(BranchingPackage.BASE)
+
+    assert package_names_of(needed) == [BranchingPackage.BASE]
+
+
+def test_a_package_without_an_interface_is_rejected(
+    branching_workspace: WorkspaceOrmInterfaces,
+):
+    """
+    Asking for a package the workspace holds no interface of is an error, not an
+    empty build.
+    """
+    with pytest.raises(UnknownOrmPackageError):
+        branching_workspace.needed_by("package_without_an_interface")
 
 
 # %% what a build lets through to the terminal
