@@ -69,13 +69,13 @@ class NamingRules(Section):
     )
 
     NAMES_READ_ON_THEIR_OWN = (
-        "A name stays correct and understandable when read on its own, without its "
-        "class or a keyword argument next to it - after `value = "
-        "instance.attribute`, in a log line, in a traceback, or when passed on "
-        "positionally. A `Pipe` field `size` says nothing once it leaves the "
-        "class; `inner_diameter` does. This holds for methods as much as for "
-        "fields: a traceback shows `for_hot_water`, never `Pipe.for_hot_water`. A "
-        "generic word that would fit anything never passes this test"
+        "The name of a field, method or function stays correct and understandable "
+        "when read on its own, without its class or a keyword argument next to it "
+        "- after `value = instance.attribute`, in a log line, in a traceback, or "
+        "when passed on positionally. A `Pipe` field `size` says nothing once it "
+        "leaves the class; `inner_diameter` does. A `Pipe` method `check` says "
+        "nothing in a traceback, which never shows `Pipe.check`; `check_for_leaks` "
+        "does. A generic word that would fit anything never passes this test"
     )
 
     NO_LEADING_PREPOSITIONS = (
