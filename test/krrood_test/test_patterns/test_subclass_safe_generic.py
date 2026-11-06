@@ -27,6 +27,10 @@ from krrood.exceptions import UnboundGenericParameter
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
+from ..dataset.abstract_class_with_generic_subclass import (
+    AbstractGoal,
+    GoalWithNumericTarget,
+)
 from ..dataset.classes_with_generic import (
     FirstGeneric,
     SubClassGenericThatUpdatesGenericTypeToBuiltInType,
@@ -899,3 +903,18 @@ def test_a_subclass_compared_by_identity_is_hashable():
     instance = CombinedClass()
 
     assert instance in {instance}
+
+
+# %% abstract bases of a class binding a generic mixin
+
+
+def test_an_abstract_base_stays_a_subclass_of_itself():
+    """
+    Creating :class:`GoalWithNumericTarget` leaves the subclass check of its abstract
+    first base intact, which the ABC caches of that base would otherwise remember wrong.
+    """
+    assert issubclass(AbstractGoal, AbstractGoal)
+
+
+def test_an_abstract_base_still_knows_its_generic_subclass():
+    assert issubclass(GoalWithNumericTarget, AbstractGoal)
