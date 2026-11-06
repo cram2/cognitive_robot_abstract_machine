@@ -74,6 +74,22 @@ class CommentBlocksLine(IntEnum):
     """
 
 
+class HandWrittenAccessorsLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.FieldAccessorSnippet.HAND_WRITTEN_ACCESSORS`.
+    """
+
+    DATA_DESCRIPTOR_SETTER = 25
+    """
+    The ``__set__`` of the hand written data descriptor.
+    """
+
+    DATACLASS_PROPERTY_SETTER = 50
+    """
+    The property setter of the dataclass.
+    """
+
+
 class PrepositionalNamesLine(IntEnum):
     """
     Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.MethodNameSnippet.PREPOSITIONAL_NAMES`.

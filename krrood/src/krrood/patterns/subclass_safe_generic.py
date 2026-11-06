@@ -90,6 +90,17 @@ class SubClassSafeGeneric(ABC):
         """
         Automatically updates the field types that use the generic type parameters with
         the new specified types, before the class is initialized.
+
+        The base classes' own subclass hooks run afterwards, so they see the updated
+        fields.
+        """
+        cls._narrow_fields_to_bound_types()
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def _narrow_fields_to_bound_types(cls) -> None:
+        """
+        Update the type of every field that uses a type parameter this class binds.
         """
         substitutions = cls._get_generic_type_substitutions()
         if not substitutions:
@@ -178,7 +189,7 @@ class SubClassSafeGeneric(ABC):
     @classmethod
     def _update_field_kwargs(
         cls, name: str, kwargs: dict[str, Any], type_: type | None = None
-    ):
+    ) -> None:
         """
         Update the field kwargs with the provided keyword arguments.
 
@@ -214,7 +225,11 @@ class SubClassSafeGeneric(ABC):
             resolved_type = existing_field.type
         else:
             resolved_type = Any
-        cls.__annotations__[name] = resolved_type
+        if "__annotations__" not in vars(cls):
+            # Without annotations of its own, ``cls.__annotations__`` may resolve to a
+            # base class's annotations, e.g. once :class:`abc.ABCMeta` has its own.
+            cls.__annotations__ = {}
+        vars(cls)["__annotations__"][name] = resolved_type
 
     @classmethod
     def _get_generic_type_substitutions(cls) -> dict[Any, ResolvableType]:

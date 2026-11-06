@@ -8,11 +8,18 @@ import dataclasses
 from enum import Enum
 
 
+from krrood.development_tools.agents.field_accessor_definition import (
+    HandWrittenFieldAccessorChecker,
+)
 from krrood.development_tools.agents.leading_preposition import (
     LeadingPrepositionChecker,
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.dataclass_field_descriptor import (
+    DataclassFieldDescriptor,
+    DataclassFieldDescriptorOwner,
+)
 
 
 class CodeStyleRules(Section):
@@ -45,6 +52,23 @@ class CodeStyleRules(Section):
     )
 
     NO_MUTABLE_DEFAULT_ARGUMENTS = "Never use mutable objects as default arguments"
+
+    BUILD_FIELD_DESCRIPTORS_ON_THE_BASE_CLASS = (
+        "A descriptor that manages a dataclass field subclasses "
+        f"{CodeReference(DataclassFieldDescriptor).path}, implementing "
+        f"{CodeReference(DataclassFieldDescriptor.read).name} and "
+        f"{CodeReference(DataclassFieldDescriptor.write).name}, and the owning class "
+        f"inherits {CodeReference(DataclassFieldDescriptorOwner).name} so its "
+        "subclasses keep the descriptor"
+    )
+
+    NO_HAND_WRITTEN_FIELD_ACCESSORS = (
+        f"Never define `__set__` in a class other than "
+        f"{CodeReference(DataclassFieldDescriptor).name}, and never manage a "
+        "dataclass field `value` or `_value` with a property setter `value`",
+        (),
+        HandWrittenFieldAccessorChecker(),
+    )
 
     NEVER_REIMPLEMENT = (
         "Never reimplement what the codebase or an existing dependency already "

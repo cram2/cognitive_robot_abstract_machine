@@ -15,6 +15,8 @@
 - Never duplicate code. Never put methods in a catch-all module such as `utils.py`; move them onto the class that owns the behaviour
 - Access attributes with `.`, never with `getattr`, and never wrap attribute access in try-except
 - Never use mutable objects as default arguments
+- A descriptor that manages a dataclass field subclasses `krrood.patterns.dataclass_field_descriptor.DataclassFieldDescriptor`, implementing `read` and `write`, and the owning class inherits `DataclassFieldDescriptorOwner` so its subclasses keep the descriptor
+- Never define `__set__` in a class other than `DataclassFieldDescriptor`, and never manage a dataclass field `value` or `_value` with a property setter `value` (checked by `krrood check`)
 - Never reimplement what the codebase or an existing dependency already provides. When searching for it, never cut off the output of grep or other searches; narrow the search instead
 
 ## Naming
