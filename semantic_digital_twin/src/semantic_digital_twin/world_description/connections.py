@@ -20,7 +20,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import MissingConnectionAxisError
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
@@ -166,6 +166,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         offset: float = 0.0,
         dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
+        dynamics: JointDynamics | None = None,
     ) -> Self:
         """
         Creates and returns an instance of the class with its single degree of freedom,
@@ -187,6 +188,8 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             0.0.
         :param dof_limits: Optional limits for the generated degree of freedom.
         :param axis: The axis vector defining the joint relation.
+        :param dynamics: The dynamic properties of the joint. Frictionless and undamped
+            if None.
         :return: An instance of the class representing the defined relationship with its
             DOF added to the world.
         """
@@ -205,6 +208,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
             multiplier=multiplier,
             offset=offset,
             raw_dof=dof,
+            dynamics=dynamics or JointDynamics(),
         )
         return connection
 
@@ -419,6 +423,7 @@ class ScrewConnection(ActiveConnection1DOF):
         offset: float = 0.0,
         dof_limits: DegreeOfFreedomLimits | None = None,
         axis: Vector3 | None = None,
+        dynamics: JointDynamics | None = None,
         screw_pitch: float,
     ) -> Self:
         """
@@ -444,6 +449,7 @@ class ScrewConnection(ActiveConnection1DOF):
             offset=offset,
             raw_dof=dof,
             screw_pitch=screw_pitch,
+            dynamics=dynamics or JointDynamics(),
         )
         return connection
 
@@ -641,7 +647,7 @@ class Connection6DoF(Connection):
 
         :param transformation: The desired parent-to-child origin. Must carry a
             reference frame (:meth:`World.transform` raises
-            :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
+            :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
             otherwise); does not need to already be expressed in the parent frame. Other
             spatial types (e.g. ``Pose``) must be converted with their own
             ``homogeneous_matrix`` before being assigned here.

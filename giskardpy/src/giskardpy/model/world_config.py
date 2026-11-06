@@ -75,7 +75,7 @@ class WorldWithRobot(WorldConfig, ABC):
         :return: A world of its own holding the described robot, with the robot class
             applied to it.
         """
-        world_with_robot = self.create_urdf_parser().parse()
+        world_with_robot = self.create_urdf_parser().create_world()
         self.robot_class.from_world(world_with_robot)
         return world_with_robot
 

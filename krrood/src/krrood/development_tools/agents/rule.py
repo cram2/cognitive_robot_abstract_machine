@@ -12,6 +12,7 @@ from types import ModuleType
 
 from typing_extensions import Any, Callable
 
+from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.ormatic.utils import classproperty
 
 # %% code named by rules
@@ -74,6 +75,12 @@ class AgentRule:
     The points that spell the rule out, rendered as a nested list below it.
     """
 
+    checker: CodeRuleChecker | None = None
+    """
+    The checker finding the code that breaks the rule; none for a rule no checker
+    enforces.
+    """
+
 
 # %% sections
 
@@ -117,6 +124,32 @@ class Section(AgentRule, Enum):
         return [
             section for section in Section.__subclasses__() if section.parent is cls
         ]
+
+    @classproperty
+    def descendants(cls) -> list[type[Section]]:
+        """
+        This section and every section nested under it, at any depth.
+        """
+        return [
+            cls,
+            *(
+                descendant
+                for subsection in cls.subsections
+                for descendant in subsection.descendants
+            ),
+        ]
+
+    @classproperty
+    def checkers(cls) -> tuple[CodeRuleChecker, ...]:
+        """
+        The checker of every rule in this section and the sections nested under it.
+        """
+        return tuple(
+            rule.checker
+            for section in cls.descendants
+            for rule in section
+            if rule.checker is not None
+        )
 
     @classproperty
     def depth(cls) -> int:

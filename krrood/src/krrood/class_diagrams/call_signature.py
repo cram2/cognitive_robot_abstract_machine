@@ -1,0 +1,121 @@
+"""
+The parameters a call passes its arguments to.
+"""
+
+from __future__ import annotations
+
+import inspect
+from dataclasses import dataclass
+
+from typing_extensions import Any, Callable
+
+from krrood.class_diagrams.call_arguments import CallArguments
+from krrood.class_diagrams.exceptions import ArgumentsPassableOnlyByPosition
+from krrood.ormatic.utils import classproperty
+from krrood.patterns.caching import memoize
+from krrood.utils import is_hashable
+
+# %% call signature
+
+
+@dataclass(frozen=True)
+class CallSignature:
+    """
+    The parameters a call to one callee passes its arguments to, as its caller writes
+    them: a class is called without ``self``, a method read from its class with it.
+
+    >>> CallSignature.of(divmod).accepts_keyword("x")
+    False
+    """
+
+    parameters: inspect.Signature
+    """
+    The parameters of the callee, in the order a call fills them.
+    """
+
+    @classmethod
+    def of(cls, callee: Callable[..., Any]) -> CallSignature:
+        """
+        :param callee: The function, method or class that is called.
+        :return: The signature of *callee*, read once for each callee that can be
+            hashed.
+        """
+        if not is_hashable(callee):
+            return cls(inspect.signature(callee))
+        return cls._of_hashable_callee_(callee)
+
+    @classmethod
+    @memoize
+    def _of_hashable_callee_(cls, callee: Callable[..., Any]) -> CallSignature:
+        """
+        :param callee: A callee that can be hashed.
+        :return: The signature of *callee*.
+        """
+        return cls(inspect.signature(callee))
+
+    @classproperty
+    def kinds_passed_by_name(cls) -> frozenset[inspect._ParameterKind]:
+        """
+        :return: The kinds of parameter that take one argument, by its name.
+        """
+        return frozenset(
+            {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY}
+        )
+
+    def bind(self, /, *positional: Any, **keyword: Any) -> CallArguments:
+        """
+        :param positional: The arguments passed by position.
+        :param keyword: The arguments passed by name.
+        :return: The arguments the callee receives, the same however they were passed
+            and including the defaults that were left out.
+        :raises TypeError: If the arguments do not fit the parameters.
+        """
+        bound_arguments = self.parameters.bind(*positional, **keyword)
+        bound_arguments.apply_defaults()
+        return CallArguments(bound_arguments.args, bound_arguments.kwargs)
+
+    def keyword_arguments(self, /, *positional: Any, **keyword: Any) -> dict[str, Any]:
+        """
+        :param positional: The arguments passed by position.
+        :param keyword: The arguments passed by name.
+        :return: Each argument that was passed, by the name it is passed by, so calling
+            the callee with these alone makes the same call. Defaults that were left out
+            are not included.
+        :raises ArgumentsPassableOnlyByPosition: If an argument goes to a parameter that
+            takes it only by position.
+        :raises TypeError: If the arguments do not fit the parameters.
+        """
+        passed = self.parameters.bind(*positional, **keyword).arguments
+        kinds = {name: self.parameters.parameters[name].kind for name in passed.keys()}
+        passed_only_by_position = tuple(
+            name
+            for name, kind in kinds.items()
+            if kind not in self.kinds_passed_by_name
+            and kind is not inspect.Parameter.VAR_KEYWORD
+        )
+        if passed_only_by_position:
+            raise ArgumentsPassableOnlyByPosition(
+                self.parameters, passed_only_by_position
+            )
+        keyword_arguments = {}
+        for name, value in passed.items():
+            if kinds[name] is inspect.Parameter.VAR_KEYWORD:
+                keyword_arguments.update(value)
+            else:
+                keyword_arguments[name] = value
+        return keyword_arguments
+
+    def accepts_keyword(self, keyword: str) -> bool:
+        """
+        :param keyword: The name of a keyword argument.
+        :return: Whether the callee takes *keyword*, as a parameter of that name or
+            through arbitrary keywords (a ``**kwargs`` parameter).
+        """
+        return any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            or (
+                parameter.name == keyword
+                and parameter.kind in self.kinds_passed_by_name
+            )
+            for parameter in self.parameters.parameters.values()
+        )

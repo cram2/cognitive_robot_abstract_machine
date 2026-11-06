@@ -62,7 +62,7 @@ from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
 
@@ -331,7 +331,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if (
             isinstance(grasp, FlatVariable)
             and isinstance(grasp._child_, InstantiatedVariable)
-            and grasp._child_._type_ is GraspsByCloseness
+            and grasp._child_._factory_ is GraspsByCloseness
         ):
             return PickUpTarget(graspable=grasp._child_._kwargs_["graspable"], arm=arm)
         grasps = grasp._domain_ if isinstance(grasp, Variable) else [grasp]

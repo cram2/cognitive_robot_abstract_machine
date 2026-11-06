@@ -9,9 +9,7 @@ from copy import deepcopy
 
 from krrood.symbolic_math.symbolic_math import CasadiLock
 
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 BLOCKED_WAIT_IN_SECONDS = 0.5
 """

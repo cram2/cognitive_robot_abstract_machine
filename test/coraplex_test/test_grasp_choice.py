@@ -8,8 +8,8 @@ from coraplex.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
 from cramph.composites import Sequence
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 
 from .conftest import expand
 

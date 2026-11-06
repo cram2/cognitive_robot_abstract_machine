@@ -16,7 +16,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, ServoedRobotPart
 from semantic_digital_twin.robots.tiago import TiagoMujoco
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
@@ -79,14 +79,14 @@ def _parse_urdf(robot_type: type[AbstractRobot]) -> World:
     """
     :return: The world ``robot_type``'s URDF describes, without any servo declared.
     """
-    return URDFParser.from_file(robot_type.get_ros_file_path()).parse()
+    return URDFParser.from_file(robot_type.get_ros_file_path()).create_world()
 
 
 def _parse_mjcf(robot_type: type[AbstractRobot]) -> World:
     """
     :return: The world ``robot_type``'s MJCF describes, without any servo declared.
     """
-    return MJCFParser(robot_type.get_ros_file_path()).parse()
+    return MJCFParser(robot_type.get_ros_file_path()).create_world()
 
 
 @pytest.mark.parametrize(

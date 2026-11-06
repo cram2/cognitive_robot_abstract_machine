@@ -9,11 +9,14 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any, Callable
 
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
+    import random_events.variable
+    from probabilistic_model.causal_structure.identification import Identification
+
     from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.query.query import (
         Query,
@@ -1345,6 +1348,46 @@ class MatchTypeCannotBeDetermined(DataclassException):
 
 
 @dataclass
+class ResultTypeIsNotAType(DataclassException):
+    """
+    Raised when an instantiated variable is given a result type that is not a type.
+    """
+
+    result_type: Any
+    """
+    The value given as the result type.
+    """
+
+    def error_message(self) -> str:
+        return f"The result type of an instantiated variable must be a type, got {self.result_type!r}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Pass the type of the built value as the result type, and a function or factory "
+            "method that builds it as the factory."
+        )
+
+
+@dataclass
+class ResultTypeCannotBeDetermined(DataclassException):
+    """
+    Raised when the type of the values an instantiated variable binds is neither given
+    nor named by the return annotation of the callable that builds them.
+    """
+
+    factory: Callable[..., Any]
+    """
+    The callable whose return annotation names no type.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot determine the type of the values {self.factory!r} builds: its return annotation names no type."
+
+    def suggest_correction(self) -> str:
+        return f"Annotate the return type of {self.factory!r} with the type it builds."
+
+
+@dataclass
 class ModelingError(DataclassException):
     """
     Exception raised when there's an error in the model (classes, functions, etc.)
@@ -1407,3 +1450,94 @@ class NoReturnStatementInProperty(ModelingError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class EffectNotIdentified(DataclassException):
+    """
+    Raised when the causal structure learned for a query's class does not identify the
+    effect of a cause on the query's effect by adjusting for the variables the query
+    names.
+    """
+
+    cause: random_events.variable.Variable
+    """
+    The cause variable.
+    """
+
+    effect: random_events.variable.Variable
+    """
+    The effect variable.
+    """
+
+    identification: Identification
+    """
+    What the learned structure says about the effect: a
+    :class:`~probabilistic_model.causal_structure.identification.PartiallyIdentifiedEffect`
+    or an
+    :class:`~probabilistic_model.causal_structure.identification.UnidentifiedEffect`.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure does not identify the effect of "
+            f"'{self.cause.name}' on '{self.effect.name}': {self.identification}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name more of the variables in the query, add domain causal knowledge that "
+            "orients the undirected edges, or mark the confounders yourself."
+        )
+
+
+@dataclass
+class VariableNotInCausalGraph(DataclassException):
+    """
+    Raised when a causal query's cause or effect has no node in the causal structure
+    learned for its class.
+    """
+
+    variable: random_events.variable.Variable
+    """
+    The variable.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure has no node for the variable "
+            f"'{self.variable.name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Learn the structure over the variables the query's model is fitted on."
+
+
+@dataclass
+class NoLearnedCausalStructure(DataclassException):
+    """
+    Raised when a causal query needs the learned causal structure of its class and the
+    backend has none for that class.
+    """
+
+    expression: Query
+    """
+    The query.
+    """
+
+    queried_class: type
+    """
+    The class the query asks about.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.expression} needs a learned causal structure, and the backend has "
+            f"none for {self.queried_class.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Learn the structure of the class and give it to the ProbabilisticBackend "
+            "in causal_structures."
+        )

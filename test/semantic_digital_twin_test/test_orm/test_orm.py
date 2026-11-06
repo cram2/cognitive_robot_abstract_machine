@@ -16,7 +16,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2, PR2RightArm
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import RevoluteConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -24,12 +24,10 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )

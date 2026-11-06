@@ -17,7 +17,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldHasMultipleTfPublishersError
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -225,7 +225,7 @@ def test_trimesh(rclpy_node):
             "stl",
             "milk.stl",
         )
-    ).parse()
+    ).create_world()
     visual: Mesh = world.root.visual.shapes[0]
     world.root.visual.shapes[0] = visual
     with world.modify_world():

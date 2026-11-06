@@ -13,8 +13,13 @@ can use the same conventions:
   With `--check` it writes nothing and exits non-zero when the file differs; run that in
   CI.
 
-Both commands exit with 1 when they modified a file, following pre-commit's convention
-for formatting hooks.
+- `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
+  enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
+  the staged change (`git diff --cached`) adds or changes are checked, because existing
+  code has many violations; `--all-lines` checks every line.
+
+`format` and `agents-md` exit with 1 when they modified a file, and `check` when it
+found a violation, following pre-commit's convention for hooks.
 
 ## Rules
 
@@ -22,7 +27,9 @@ The rules are code. A section is an enum subclassing `Section`, named for one to
 followed by `Rules`. Its members are its rules: each names one rule, and its value is
 the rule's statement, or the statement followed by the details that spell it out.
 Every member is an `AgentRule`, so `ExceptionModellingRules.NEVER_TRY_EXCEPT.statement`
-is one of the rules on modelling exceptions. A nested section names the section it is
+is one of the rules on modelling exceptions. A rule can carry a checker, a `CodeRuleChecker` that finds the code breaking it; give it
+as the third element of the member's value. When a script can check only part of a
+rule, split the rule so the checkable part carries the checker. A nested section names the section it is
 part of by overriding the `parent` classproperty. A section's heading is its topic in
 words, in sentence case (`ExternalServicesAndCIRules` becomes "External services and
 CI"). A rule that names code builds that name from the imported object with

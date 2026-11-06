@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
+from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
 
 
@@ -80,3 +81,12 @@ class RuleModule:
             and value.parent is None
         ]
         return sorted(sections, key=lambda section: section.title)
+
+    @property
+    def checkers(self) -> tuple[CodeRuleChecker, ...]:
+        """
+        The checker of every rule in :attr:`sections` and the sections nested in them.
+        """
+        return tuple(
+            checker for section in self.sections for checker in section.checkers
+        )
