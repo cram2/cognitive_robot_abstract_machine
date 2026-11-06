@@ -8,7 +8,7 @@ from typing_extensions import TYPE_CHECKING
 from krrood.singleton import SingletonMeta
 
 if TYPE_CHECKING:
-    from typing_extensions import Set, Type
+    pass
 
 
 @dataclass
@@ -22,14 +22,14 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
     single owned store rather than scattered across foreign function objects.
     """
 
-    names_by_owner: WeakKeyDictionary[Type, Set[str]] = field(
+    names_by_owner: WeakKeyDictionary[type, set[str]] = field(
         default_factory=WeakKeyDictionary
     )
     """
     Maps each declaring class to the factory-method names marked on its own body.
     """
 
-    def register(self, owner: Type, name: str) -> None:
+    def register(self, owner: type, name: str) -> None:
         """
         Record that ``owner`` declares ``name`` as a factory method.
 
@@ -38,7 +38,7 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
         """
         self.names_by_owner.setdefault(owner, set()).add(name)
 
-    def is_registered(self, cls: Type, name: str) -> bool:
+    def is_registered(self, cls: type, name: str) -> bool:
         """
         :param cls: The class to look the method up on.
         :param name: The attribute name to check.
@@ -46,12 +46,12 @@ class FactoryMethodRegistry(metaclass=SingletonMeta):
         """
         return any(name in self.names_by_owner.get(klass, ()) for klass in cls.__mro__)
 
-    def names_for(self, cls: Type) -> Set[str]:
+    def names_for(self, cls: type) -> set[str]:
         """
         :param cls: The class to inspect.
         :return: Every factory-method name marked on ``cls`` or any of its bases.
         """
-        names: Set[str] = set()
+        names: set[str] = set()
         for klass in cls.__mro__:
             names |= self.names_by_owner.get(klass, set())
         return names

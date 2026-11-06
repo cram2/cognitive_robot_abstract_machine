@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation
-from typing_extensions import TYPE_CHECKING, List, Optional
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.backends import ProbabilisticBackend
 from krrood.entity_query_language.factories import ConditionType, a
@@ -17,11 +17,8 @@ from krrood.parametrization.model_registries import (
 )
 from semantic_digital_twin.exceptions import SurfaceGraspNotOnSurfaceError
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
-from semantic_digital_twin.spatial_types.spatial_types import AxisAngle, Quaternion
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import AxisAngle, Quaternion
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
@@ -123,7 +120,7 @@ class SurfaceGrasp:
     How far the closing direction is turned about the direction of approach, in radians.
     """
 
-    result: Optional[GraspResult] = field(default=None)
+    result: GraspResult | None = field(default=None)
     """
     What happened when the grasp was tried; ``None`` while it has not been.
     """
@@ -170,7 +167,7 @@ class SurfaceGrasp:
 
     def _surface_point(
         self, graspable: HasGraspCandidates, outward: NDArray[np.float64]
-    ) -> Optional[NDArray[np.float64]]:
+    ) -> NDArray[np.float64] | None:
         """
         Cast a horizontal ray from outside the object towards its vertical axis.
 
@@ -261,7 +258,7 @@ def axis_angle_of(rotation: NDArray[np.float64]) -> AxisAngle:
     :param rotation: A rotation matrix.
     :return: The rotation as an angle in [0, pi] about a unit axis. No rotation is the
         angle zero about the z-axis, as
-        :meth:`~semantic_digital_twin.spatial_types.spatial_types.AxisAngle.from_quaternion`
+        :meth:`~krrood_spatial_math.spatial_types.AxisAngle.from_quaternion`
         reads it.
     """
     x, y, z, w = Rotation.from_matrix(rotation).as_quat(canonical=True)
@@ -275,7 +272,7 @@ def from_any_side(
     grasp: Match[SurfaceGrasp],
     largest_pitch: float = 1.2,
     largest_roll: float = math.pi / 4,
-) -> List[ConditionType]:
+) -> list[ConditionType]:
     """
     :param grasp: A statement's grasp.
     :param largest_pitch: How far the approach may tilt off vertical, in radians.
@@ -297,8 +294,8 @@ def from_any_side(
 def draw_surface_grasps(
     statement: Match[SurfaceGrasp],
     number_of_grasps: int,
-    model_registry: Optional[ModelRegistry] = None,
-) -> List[SurfaceGrasp]:
+    model_registry: ModelRegistry | None = None,
+) -> list[SurfaceGrasp]:
     """
     :param statement: A statement of where an object may be grasped.
     :param number_of_grasps: How many grasps to draw, as the statement's limit.

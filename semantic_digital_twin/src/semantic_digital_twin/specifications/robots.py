@@ -5,13 +5,12 @@ Specifications of robots placed into a world.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Type, cast
+from typing_extensions import TYPE_CHECKING, cast
 from uuid import uuid4
 
-from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import DriveVelocityLimitsOnUndrivenRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -38,7 +37,7 @@ class RobotSpecification:
     a mobile base.
     """
 
-    semantic_annotation_type: Type[AbstractRobot]
+    semantic_annotation_type: type[AbstractRobot]
     """
     The robot to merge into the world.
     """
@@ -73,8 +72,8 @@ class RobotSpecification:
 
     def spawn(self, world: World) -> AbstractRobot:
         """
-        Parse the robot from its own description and merge it into ``world`` as
-        ``world.root -> odom -> connection -> robot``.
+        Parse the robot from its own description, as the robot reads it, and merge it
+        into ``world`` as ``world.root -> odom -> connection -> robot``.
 
         The ``odom`` is fixed to the world root at the localization pose. The connection
         attaching the robot to it is the drive declared by the robot's mobile base, or a
@@ -95,13 +94,9 @@ class RobotSpecification:
         is_active = issubclass(connection_type, ActiveConnection)
         drive_velocity_limits = self._drive_velocity_limits(connection_type)
 
-        robot_world = URDFParser.from_file(
-            self.semantic_annotation_type.get_ros_file_path(),
-            use_visual_as_collision_backup=(
-                self.semantic_annotation_type.uses_visual_as_collision_backup
-            ),
-        ).parse()
-        robot_id = self.semantic_annotation_type.from_world(robot_world).id
+        described_robot = self.semantic_annotation_type.from_description()
+        robot_world = described_robot._world
+        robot_id = described_robot.id
 
         with world.modify_world():
             odom_body = self._create_odom_body()
@@ -143,7 +138,7 @@ class RobotSpecification:
         return robot
 
     def _drive_velocity_limits(
-        self, connection_type: Type[Connection]
+        self, connection_type: type[Connection]
     ) -> dict[str, float]:
         """
         Collect the velocity limits to create the drive connection with.

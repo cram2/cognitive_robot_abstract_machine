@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from typing_extensions import ClassVar, Dict, Optional, Type
+from typing_extensions import ClassVar
 
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody, HasRootRegion
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -152,13 +152,13 @@ class RoboCasaCategoryResolver:
     for those.
     """
 
-    category_to_annotation_class: ClassVar[Dict[str, Type[HasRootBody]]]
+    category_to_annotation_class: ClassVar[dict[str, type[HasRootBody]]]
     """
     Lookup table from registered RoboCasa category to the matching SemanticAnnotation
     subclass.
     """
 
-    def resolve(self, category: str) -> Optional[Type[HasRootBody]]:
+    def resolve(self, category: str) -> type[HasRootBody] | None:
         """
         Resolve a RoboCasa category to the matching SemanticAnnotation subclass.
 
@@ -169,7 +169,7 @@ class RoboCasaCategoryResolver:
         """
         category_tokens = _tokenize_category(category)
 
-        best_match: Optional[Type[HasRootBody]] = None
+        best_match: type[HasRootBody] | None = None
         best_match_token_count = 0
         for (
             registered_category,
@@ -193,7 +193,7 @@ class RoboCasaKitchenApplianceResolver(RoboCasaCategoryResolver):
     """
 
     category_to_annotation_class: ClassVar[
-        Dict[RoboCasaKitchenApplianceCategory, Type[HasRootBody]]
+        dict[RoboCasaKitchenApplianceCategory, type[HasRootBody]]
     ] = {
         RoboCasaKitchenApplianceCategory.CABINET: Cabinet,
         RoboCasaKitchenApplianceCategory.DRAWER: Drawer,
@@ -219,7 +219,7 @@ class RoboCasaObjectResolver(RoboCasaCategoryResolver):
     """
 
     category_to_annotation_class: ClassVar[
-        Dict[RoboCasaObjectCategory, Type[HasRootBody]]
+        dict[RoboCasaObjectCategory, type[HasRootBody]]
     ] = {
         RoboCasaObjectCategory.APPLE: Apple,
         RoboCasaObjectCategory.BANANA: Banana,

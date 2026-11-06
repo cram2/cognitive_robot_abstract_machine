@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import List
 
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -106,7 +105,7 @@ class AggregationValueAssembler(Assembler[Query, QueryPlan]):
             if source is not None
             else FallbackNouns.ENTITY.plural_fragment()
         )
-        parts: List[VerbalizationFragment] = [
+        parts: list[VerbalizationFragment] = [
             aggregate,
             Prepositions.AMONG.as_fragment(),
             source_fragment,

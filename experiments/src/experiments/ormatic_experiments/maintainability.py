@@ -9,7 +9,6 @@ It computes various metrics to understand the reduction of manual maintenance ef
 import ast
 import pathlib
 from dataclasses import dataclass
-from typing import List
 
 from radon.metrics import mi_rank, mi_visit
 
@@ -125,7 +124,7 @@ class MaintainabilityResult(ExperimentResult):
     """
 
 
-def _find_cram_model_files(repo_root: pathlib.Path) -> List[pathlib.Path]:
+def _find_cram_model_files(repo_root: pathlib.Path) -> list[pathlib.Path]:
     """
     Return ``*/orm/model.py`` files for coraplex and semantic_digital_twin only.
     """

@@ -18,8 +18,6 @@ the available parts and how a robot is composed from them can be found in the {d
 
 ## Motion Execution
 
-Motions are the components that actually control the robot. The default motions in {mod}`coraplex.robot_plans.motions`
-already suffice to control a new robot in simulation. If a robot needs a different implementation of a particular
-motion, you can provide a robot-specific override via {class}`~coraplex.alternative_motion_mapping.AlternativeMotion`
-(see the existing mappings in {mod}`coraplex.alternative_motion_mappings`). The {doc}`process_modules` page explains how
-motions are turned into giskard motion state charts and executed.
+The giskard goals and tasks in {mod}`giskardpy.motion_statechart` are what actually control the robot, and the ones
+an action already builds suffice to control a new robot in simulation. The {doc}`motion_execution` page explains how an
+action's goals are collected into a giskard motion state chart and executed.

@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.expression_structure import walk_chain
@@ -52,7 +51,7 @@ class RankingSurface:
     *modifiers* — e.g. ``"the"`` + ``"top three"`` + ``"Employees"`` + ``"by salary"``.
     """
 
-    pre_head: Optional[VerbalizationFragment]
+    pre_head: VerbalizationFragment | None
     """
     The qualifier between the determiner and the head (*"first two"* / *"top three"* /
     *"highest"*), or ``None`` (the attribute-superlative form carries it as a modifier
@@ -62,7 +61,7 @@ class RankingSurface:
     number: GrammaticalNumber
     """The head's grammatical number — ``SINGULAR`` for *n = 1*, ``PLURAL`` for *n > 1*."""
 
-    modifiers: List[VerbalizationFragment]
+    modifiers: list[VerbalizationFragment]
     """
     Post-nominal modifiers — *"with the highest salary"* / *"by salary"* — or empty.
     """

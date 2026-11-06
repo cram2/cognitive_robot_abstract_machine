@@ -44,7 +44,8 @@ Let us see what happens:
 
 ```{code-cell} ipython3
 evidence = SimpleEvent.from_data({variable: closed(0.5, 2)}).as_composite_set()
-conditional_distribution, evidence_probability = distribution.truncated(evidence)
+conditional_distribution = distribution.truncated(evidence).distribution
+
 fig = go.Figure(conditional_distribution.plot())
 fig.update_layout(title="Normal Distribution", xaxis_title=distribution.variable.name)
 fig.show()

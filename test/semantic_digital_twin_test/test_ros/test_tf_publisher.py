@@ -1,7 +1,6 @@
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 import pytest
-from typing_extensions import List, Set, Tuple
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
@@ -359,10 +358,106 @@ def test_double_tf_publisher(rclpy_node, pr2_world_state_reset):
     assert len(published_msg.transforms) == 0
 
 
+# %% listening to tf only while it is needed
+
+
+def test_a_stopped_tf_wrapper_no_longer_listens(rclpy_node) -> None:
+    subscriptions_before = list(rclpy_node.subscriptions)
+    tf_wrapper = TFWrapper(node=rclpy_node)
+
+    tf_wrapper.stop()
+
+    assert list(rclpy_node.subscriptions) == subscriptions_before
+
+
+def test_looking_for_existing_frames_leaves_no_listener_behind(
+    rclpy_node, pr2_world_state_reset
+) -> None:
+    """
+    The frames other publishers broadcast are only looked up once, so listening to every
+    tf message afterwards would only cost time.
+    """
+    subscriptions_before = list(rclpy_node.subscriptions)
+
+    tf_publisher = TFPublisher.create_with_ignore_existing_tf(
+        node=rclpy_node, world=pr2_world_state_reset, wait_for_existing_tf=0
+    )
+
+    assert list(rclpy_node.subscriptions) == subscriptions_before
+    tf_publisher.stop()
+
+
+# %% fixed transforms are published once
+
+
+def world_with_a_fixed_and_a_moving_body() -> tuple[World, Body, Body]:
+    """
+    Build a world whose root carries one body on a fixed connection and one on a
+    connection with degrees of freedom.
+    """
+    world, (fixed,) = world_with_bodies("table")
+    moving = Body(name=PrefixedName("cup"))
+    with world.modify_world():
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                world=world, parent=world.root, child=moving
+            )
+        )
+    return world, fixed, moving
+
+
+def test_only_moving_transforms_are_republished_on_a_state_change(
+    rclpy_node, ros_publishers
+) -> None:
+    world, fixed, moving = world_with_a_fixed_and_a_moving_body()
+
+    tf_publisher = ros_publishers.adopt(TFPublisher(node=rclpy_node, _world=world))
+
+    assert {
+        transform.child_frame_id
+        for transform in tf_publisher.tf_model_callback.tf_message.transforms
+    } == {str(moving.name)}
+
+
+def test_a_listener_joining_later_still_receives_the_fixed_transforms(
+    rclpy_node, ros_publishers
+) -> None:
+    world, fixed, moving = world_with_a_fixed_and_a_moving_body()
+    ros_publishers.adopt(TFPublisher(node=rclpy_node, _world=world))
+
+    tf_wrapper = TFWrapper(node=rclpy_node)
+
+    assert tf_wrapper.wait_for_transform(
+        str(world.root.name),
+        str(fixed.name),
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+    tf_wrapper.stop()
+
+
+def test_a_fixed_body_added_later_reaches_a_listener_joining_afterwards(
+    rclpy_node, ros_publishers
+) -> None:
+    world, fixed, moving = world_with_a_fixed_and_a_moving_body()
+    ros_publishers.adopt(TFPublisher(node=rclpy_node, _world=world))
+    shelf = attach_body(world, "shelf")
+
+    tf_wrapper = TFWrapper(node=rclpy_node)
+
+    assert tf_wrapper.wait_for_transform(
+        str(world.root.name),
+        str(shelf.name),
+        timeout=Duration(seconds=1.0),
+        time=Time(),
+    )
+    tf_wrapper.stop()
+
+
 # %% tf frame naming
 
 
-def world_with_bodies(*names: str) -> Tuple[World, List[Body]]:
+def world_with_bodies(*names: str) -> tuple[World, list[Body]]:
     """
     Build a world whose root carries one body per given name.
     """
@@ -453,18 +548,21 @@ def test_removing_a_body_leaves_the_frame_name_of_the_other_one_alone():
     assert frame_names.assign(second) == published
 
 
-def published_child_frames(tf_publisher: TFPublisher) -> Set[str]:
+def published_child_frames(tf_publisher: TFPublisher) -> set[str]:
     """
-    The tf frames the publisher broadcasts a transform for.
+    The tf frames the publisher broadcasts a transform for, on every state change or
+    once per model change.
     """
+    callback = tf_publisher.tf_model_callback
     return {
         transform.child_frame_id
-        for transform in tf_publisher.tf_model_callback.tf_message.transforms
+        for message in (callback.tf_message, callback.static_tf_message)
+        for transform in message.transforms
     }
 
 
 def publisher_ignoring_existing_frames(
-    world: World, node: Node, existing_frames: List[str]
+    world: World, node: Node, existing_frames: list[str]
 ) -> TFPublisher:
     """
     Build a publisher for a world whose tf tree already carries the given frames.

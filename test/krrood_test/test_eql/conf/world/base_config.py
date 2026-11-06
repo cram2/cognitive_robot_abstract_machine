@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from omegaconf import MISSING
-from typing_extensions import List, Callable, Any
+from typing_extensions import Callable, Any
 
 
 @dataclass
@@ -54,7 +54,7 @@ class DrawerConf(ViewConf):
 @dataclass
 class CabinetConf(ViewConf):
     container: ContainerConf = MISSING
-    drawers: List[DrawerConf] = field(default_factory=list)
+    drawers: list[DrawerConf] = field(default_factory=list)
 
 
 @dataclass
@@ -67,6 +67,6 @@ class CaseConf:
 
 @dataclass
 class WorldConf(CaseConf):
-    bodies: List[BodyConf] = field(default_factory=list)
-    connections: List[ConnectionConf] = field(default_factory=list)
-    views: List[ViewConf] = field(default_factory=list)
+    bodies: list[BodyConf] = field(default_factory=list)
+    connections: list[ConnectionConf] = field(default_factory=list)
+    views: list[ViewConf] = field(default_factory=list)

@@ -4,6 +4,7 @@ Grounding relational probabilistic circuits for queries, independent of the circ
 
 from __future__ import annotations
 
+import copy
 import enum
 import itertools
 from dataclasses import dataclass, field, replace
@@ -11,7 +12,7 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 from random_events.product_algebra import Event
 from sortedcontainers import SortedSet
-from typing_extensions import TYPE_CHECKING, Any, Generic, Optional, TypeVar
+from typing_extensions import TYPE_CHECKING, Any, Generic, TypeVar
 
 from krrood.parametrization.feature_extraction.aggregations import (
     compute_aggregation_statistics,
@@ -373,7 +374,9 @@ class ExchangeablePartGrounder(Generic[NodeType], SubClassSafeGeneric):
             raise UndeterminedLatentsNotPartitionedError(
                 list(self.undetermined_latents)
             )
-        branches = [proposal.truncated(region)[0] for region in branch_regions]
+        branches = [
+            proposal.truncated(region).distribution for region in branch_regions
+        ]
 
         # each node's weights must be read off the class circuit before the
         # undetermined latents are removed from it below
@@ -396,7 +399,7 @@ class ExchangeablePartGrounder(Generic[NodeType], SubClassSafeGeneric):
         return PartitionMixture(assignments, log_weights, branches)
 
     def _sample_undetermined_latents(
-        self, node: Optional[NodeType] = None
+        self, node: NodeType | None = None
     ) -> list[PartialPointType]:
         """
         :param node: A mounting node to sample below, instead of the whole class
@@ -525,8 +528,9 @@ class ExchangeablePartGrounder(Generic[NodeType], SubClassSafeGeneric):
         """
         values = {}
         for variable in undetermined_latents:
-            mode, _ = branch.marginal([variable]).log_mode(check_determinism=False)
+            mode = branch.marginal([variable]).log_mode(check_determinism=False).event
             region = mode.simple_sets[0][variable]
+
             values[variable] = (
                 region.simple_sets[0].lower
                 if isinstance(region, Interval)
@@ -567,7 +571,7 @@ class RelationalGrounding:
         relational_circuit = self.relational_circuit
         if relational_circuit.class_probabilistic_circuit is None:
             raise CircuitNotFittedError()
-        circuit = relational_circuit.class_probabilistic_circuit.__deepcopy__()
+        circuit = copy.deepcopy(relational_circuit.class_probabilistic_circuit)
         if not relational_circuit.exchangeable_distribution_templates:
             return circuit
         instance = query.construct_instance()

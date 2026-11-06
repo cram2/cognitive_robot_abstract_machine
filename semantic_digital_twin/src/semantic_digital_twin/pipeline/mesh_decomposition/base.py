@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from pygments.styles import vs
 
@@ -28,7 +28,7 @@ class MeshDecomposer(Step, ABC):
     """
 
     @abstractmethod
-    def apply_to_mesh(self, mesh: Mesh) -> List[Shape]:
+    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
         """
         Apply the mesh decomposition to a given mesh.
 
@@ -44,7 +44,7 @@ class MeshDecomposer(Step, ABC):
         """
         ...
 
-    def apply_to_shape(self, shape: Shape) -> List[Mesh]:
+    def apply_to_shape(self, shape: Shape) -> list[Mesh]:
         """
         Apply the mesh decomposition to a given shape.
 

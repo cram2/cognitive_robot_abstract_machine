@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
@@ -17,7 +17,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
-from semantic_digital_twin.spatial_types.spatial_types import SpatialType
+from krrood_spatial_math.spatial_types import SpatialType
 from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:

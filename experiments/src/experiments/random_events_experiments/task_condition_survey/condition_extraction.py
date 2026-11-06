@@ -32,7 +32,7 @@ import operator
 import pathlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import Any, Callable, ClassVar, Optional
+from typing_extensions import Any, Callable, ClassVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
@@ -72,7 +72,7 @@ class StatedOutcome(ABC):
     """
 
     @abstractmethod
-    def stated_by(self, returned: ast.expr) -> Optional[ast.expr]:
+    def stated_by(self, returned: ast.expr) -> ast.expr | None:
         """
         :param returned: The expression a condition method returns.
         :return: The part of it stating the outcome, or ``None`` when it states none.
@@ -85,7 +85,7 @@ class ReturnedValue(StatedOutcome):
     The outcome is the returned expression itself.
     """
 
-    def stated_by(self, returned: ast.expr) -> Optional[ast.expr]:
+    def stated_by(self, returned: ast.expr) -> ast.expr | None:
         return returned
 
 
@@ -101,7 +101,7 @@ class ReturnedEntry(StatedOutcome):
     Name of the entry stating the outcome.
     """
 
-    def stated_by(self, returned: ast.expr) -> Optional[ast.expr]:
+    def stated_by(self, returned: ast.expr) -> ast.expr | None:
         if isinstance(returned, ast.Dict):
             for name, value in zip(returned.keys, returned.values):
                 if isinstance(name, ast.Constant) and name.value == self.key:
@@ -811,7 +811,7 @@ class ConditionExtractor:
         ]
         return SceneObject.written_as(f"({', '.join(arguments)})")
 
-    def quantified_object_in(self, arguments: list[ast.expr]) -> Optional[Variable]:
+    def quantified_object_in(self, arguments: list[ast.expr]) -> Variable | None:
         """
         Finds the quantified object a call is applied to.
 
@@ -846,7 +846,7 @@ class ConditionExtractor:
         )
 
     @staticmethod
-    def truth_comparison_polarity(expression: ast.Compare) -> Optional[bool]:
+    def truth_comparison_polarity(expression: ast.Compare) -> bool | None:
         """
         Tells whether a comparison against a truth value asserts or denies its left
         side.
@@ -998,7 +998,7 @@ class TaskConditionReader(ABC):
         return conditions
 
     @abstractmethod
-    def condition_of_class(self, task: ast.ClassDef) -> Optional[StatedTaskCondition]:
+    def condition_of_class(self, task: ast.ClassDef) -> StatedTaskCondition | None:
         """
         :param task: A class that may define a task.
         :return: The condition it states, or ``None`` when it states none.
@@ -1049,7 +1049,7 @@ class ComputedConditionReader(TaskConditionReader):
         :return: Where in a return statement that method states its outcome.
         """
 
-    def condition_of_class(self, task: ast.ClassDef) -> Optional[StatedTaskCondition]:
+    def condition_of_class(self, task: ast.ClassDef) -> StatedTaskCondition | None:
         """
         :param task: A class that may define a task.
         :return: The condition its condition method states, or ``None`` when it defines no

@@ -5,7 +5,7 @@ The world reasoner's rules, each on the smallest world that shows what it decide
 from dataclasses import dataclass, field
 
 import pytest
-from typing_extensions import Dict, List, Self, Set
+from typing_extensions import List, Self
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -26,10 +26,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SideTable,
     Spoon,
 )
-from semantic_digital_twin.spatial_types import Vector3
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -56,7 +54,7 @@ class FurnitureUnderTest:
     The world the bodies live in.
     """
 
-    bodies: Dict[str, Body] = field(default_factory=dict)
+    bodies: dict[str, Body] = field(default_factory=dict)
     """
     Each body of the furniture, by the name it was built under.
     """
@@ -142,7 +140,7 @@ class FurnitureUnderTest:
                     self.world.add_semantic_annotation_recursively(annotation)
         return self
 
-    def root_names(self, *rules) -> Set[str]:
+    def root_names(self, *rules) -> set[str]:
         """
         The names of the bodies the given rules conclude something about.
         """

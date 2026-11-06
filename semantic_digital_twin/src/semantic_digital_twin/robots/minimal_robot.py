@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Self
+from typing_extensions import Self
 
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
@@ -48,6 +48,7 @@ class MinimalRobot(AbstractRobot):
             self.bodies_of_branch = world.get_kinematic_structure_entities_of_branch(
                 self.root
             )
+            self.setup_robot_part_semantic_annotations()
             world.add_semantic_annotation_recursively(self)
             self._setup_hardware_interfaces()
             self._setup_joint_states()

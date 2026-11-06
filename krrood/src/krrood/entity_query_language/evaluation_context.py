@@ -16,18 +16,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ordered_set import OrderedSet
-from typing_extensions import (
-    Any,
-    Callable,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Type,
-    TYPE_CHECKING,
-)
+from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import (
@@ -35,12 +24,12 @@ if TYPE_CHECKING:
         SymbolicExpression,
     )
 
-_evaluation_context_var: ContextVar[Optional[EvaluationContext]] = ContextVar(
+_evaluation_context_var: ContextVar[EvaluationContext | None] = ContextVar(
     "_evaluation_context", default=None
 )
 
 
-def get_evaluation_context() -> Optional[EvaluationContext]:
+def get_evaluation_context() -> EvaluationContext | None:
     """
     :return: The current :class:`EvaluationContext`, or ``None`` if called outside an active evaluation.
     """
@@ -48,7 +37,7 @@ def get_evaluation_context() -> Optional[EvaluationContext]:
 
 
 def set_evaluation_context(
-    evaluation_context: Optional[EvaluationContext],
+    evaluation_context: EvaluationContext | None,
 ):
     """
     Set or clear the current evaluation context and return the reset token.
@@ -66,7 +55,7 @@ class EvaluationObserver(ABC):
     """
 
     def on_evaluate_enter(
-        self, expression: SymbolicExpression, sources: Optional[OperationResult] = None
+        self, expression: SymbolicExpression, sources: OperationResult | None = None
     ) -> None:
         """
         Called when entering an expression's _evaluate_ method.
@@ -103,7 +92,7 @@ class ActiveConditionsRoot:
     nested evaluations within the same pass never reassign it.
     """
 
-    _root_id: Optional[uuid.UUID] = field(default=None, init=False)
+    _root_id: uuid.UUID | None = field(default=None, init=False)
     """
     Identifier of the active root, or ``None`` before one has been set this pass.
     """
@@ -152,7 +141,7 @@ class TruthValueOperatorChildren:
     the node's primary ``_parent_`` avoids that ambiguity.
     """
 
-    _ids: Set[uuid.UUID] = field(default_factory=set, init=False)
+    _ids: set[uuid.UUID] = field(default_factory=set, init=False)
     """
     Identifiers of the nodes evaluated as a direct child of a ``TruthValueOperator`` so
     far this pass.
@@ -183,7 +172,7 @@ class EvaluatedExpressionIds:
     The expression ids recorded as evaluated so far this pass.
     """
 
-    _snapshot: Optional[Tuple[int, OrderedSet]] = field(default=None, init=False)
+    _snapshot: tuple[int, OrderedSet] | None = field(default=None, init=False)
     """
     Cached ``(length, snapshot)`` pair.
 
@@ -228,7 +217,7 @@ class OutermostQuery:
     inside it.
     """
 
-    node: Optional[SymbolicExpression] = field(default=None, init=False)
+    node: SymbolicExpression | None = field(default=None, init=False)
     """
     The compiled query node holding the outermost role, or ``None`` before any node
     takes it.
@@ -258,7 +247,7 @@ class SubqueryResultCache:
     replayed to each of them, instead of recomputing it on every outer row.
     """
 
-    _streams: Dict[uuid.UUID, Any] = field(default_factory=dict, init=False)
+    _streams: dict[uuid.UUID, Any] = field(default_factory=dict, init=False)
     """
     Cached result stream keyed by the compiled query node's identifier.
     """
@@ -284,13 +273,13 @@ class EvaluationContext:
     Carries observer state through the evaluation pipeline.
     """
 
-    observers: List[EvaluationObserver] = field(default_factory=list)
+    observers: list[EvaluationObserver] = field(default_factory=list)
     """
     List of observers to notify of evaluation events.
     """
 
-    subtree_containment_cache: Dict[
-        Tuple[uuid.UUID, Type[SymbolicExpression]], bool
+    subtree_containment_cache: dict[
+        tuple[uuid.UUID, type[SymbolicExpression]], bool
     ] = field(default_factory=dict)
     """
     Memoizes, per ``(node id, expression type)``, whether a node's subtree contains a
@@ -299,7 +288,7 @@ class EvaluationContext:
     every step.
     """
 
-    expression_index_cache: Dict[
+    expression_index_cache: dict[
         uuid.UUID, weakref.WeakValueDictionary[uuid.UUID, SymbolicExpression]
     ] = field(default_factory=dict)
     """
@@ -333,7 +322,7 @@ class EvaluationContext:
     Tracks every expression id evaluated so far during the current evaluation pass.
     """
 
-    satisfied_condition_ids: Optional[OrderedSet] = field(default=None)
+    satisfied_condition_ids: OrderedSet | None = field(default=None)
     """
     The satisfied condition-expression ids for the current evaluation iteration, or
     ``None`` if unset.
@@ -350,6 +339,12 @@ class EvaluationContext:
     )
     """
     Caches each nested subquery's result stream for the current evaluation pass.
+    """
+
+    has_running_evaluation: bool = field(default=False, init=False)
+    """
+    Whether an evaluation is running in this context, from its first result until it is
+    exhausted or closed.
     """
 
     def is_child_of_truth_value_operator(self, expression: SymbolicExpression) -> bool:
@@ -387,6 +382,7 @@ class EvaluationContext:
         :return: The same results.
         """
         results_exhausted = object()
+        self.has_running_evaluation = True
         try:
             while True:
                 with self.as_current():
@@ -397,12 +393,13 @@ class EvaluationContext:
         finally:
             with self.as_current():
                 results.close()
+            self.has_running_evaluation = False
 
     def on_evaluate_enter(
         self,
         *,
         expression: SymbolicExpression,
-        sources: Optional[OperationResult] = None,
+        sources: OperationResult | None = None,
     ) -> None:
         """
         Notify all observers that evaluation of *expression* is about to begin.

@@ -22,8 +22,7 @@ from krrood.entity_query_language.verbalization.boolean_predicate import (
     AdjectivalPredicate,
 )
 from krrood.entity_query_language.verbalization.grammar_metadata import GrammarMetadata
-from typing import Any
-from typing_extensions import List
+from typing_extensions import Any
 
 import pytest
 
@@ -92,7 +91,7 @@ class _Task:
 class _Robot:
     name: str
     battery: int
-    tasks: List[_Task]
+    tasks: list[_Task]
 
 
 from ...dataset.semantic_world_like_classes import (

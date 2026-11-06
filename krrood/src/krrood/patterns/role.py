@@ -4,16 +4,7 @@ import sys
 from dataclasses import dataclass, field, fields
 from functools import lru_cache
 
-from typing_extensions import (
-    Any,
-    ClassVar,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-)
+from typing_extensions import Any, ClassVar, Iterator, TypeVar
 
 from krrood.class_diagrams.method_classifier import factory_method, is_factory_method
 from krrood.class_diagrams.utils import T
@@ -125,7 +116,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         return "role_taker"
 
     @classmethod
-    def get_role_taker_type(cls) -> Type[T]:
+    def get_role_taker_type(cls) -> type[T]:
         """
         :return: The concrete type of this role's role taker.
         """
@@ -144,7 +135,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     @lru_cache
-    def get_root_role_taker_type(cls) -> Type[T]:
+    def get_root_role_taker_type(cls) -> type[T]:
         """
         :return: The type of the non-role entity at the bottom of this role's taker chain.
         """
@@ -216,7 +207,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     @lru_cache
-    def _declared_field_names(cls) -> Tuple[str, ...]:
+    def _declared_field_names(cls) -> tuple[str, ...]:
         """
         :return: The names of the dataclass fields declared on the role class.
         """
@@ -243,7 +234,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     def has_role(
-        cls, role_taker: T, role_types: Type[Role] | Tuple[Type[Role], ...]
+        cls, role_taker: T, role_types: type[Role] | tuple[type[Role], ...]
     ) -> bool:
         """
         :param role_taker: The role taker instance to query.
@@ -254,8 +245,8 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     def roles_for(
-        cls, role_taker: T, role_type: Optional[Type[Role]] = None
-    ) -> List[Role]:
+        cls, role_taker: T, role_type: type[Role] | None = None
+    ) -> list[Role]:
         """
         :param role_taker: The role taker instance to query.
         :param role_type: The type of roles to check for.
@@ -265,7 +256,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         return list(cls.yield_taker_roles_of_type(role_taker, role_type))
 
     @property
-    def role_taker_roles(self) -> List[Role]:
+    def role_taker_roles(self) -> list[Role]:
         """
         :return: All roles of this role's role taker instance.
         """
@@ -273,8 +264,8 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     def get_taker_roles_of_type(
-        cls, role_taker: T, role_type: Type[Role[T]]
-    ) -> List[Role[T]]:
+        cls, role_taker: T, role_type: type[Role[T]]
+    ) -> list[Role[T]]:
         """
         :param role_taker: The role taker instance to query.
         :param role_type: The type of roles to return.
@@ -284,7 +275,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     def yield_taker_roles_of_type(
-        cls, role_taker: T, role_types: Type[Role[T]] | Tuple[Type[Role[T]], ...]
+        cls, role_taker: T, role_types: type[Role[T]] | tuple[type[Role[T]], ...]
     ) -> Iterator[Role[T]]:
         """
         :param role_taker: The role taker instance to query.
@@ -298,11 +289,11 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         )
 
     @property
-    def all_role_takers(self) -> List[Any]:
+    def all_role_takers(self) -> list[Any]:
         """
         :return: This role's taker and every transitive taker beneath it, ending at the root entity.
         """
-        takers: List[Any] = []
+        takers: list[Any] = []
         current = self.role_taker
         while True:
             takers.append(current)

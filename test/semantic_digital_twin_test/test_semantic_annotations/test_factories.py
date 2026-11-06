@@ -1,6 +1,5 @@
 import unittest
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -56,11 +55,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Toaster,
     CoffeeMachine,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -100,7 +96,7 @@ class TestFactories(unittest.TestCase):
             returned_handle = Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.2, 0.03), thickness=0.03
+                    scale=Scale(0.1, 0.03, 0.2), thickness=0.03
                 ),
             ).spawn(world)
         semantic_handle_annotations = world.get_semantic_annotations_by_type(Handle)
@@ -663,7 +659,12 @@ class TestFactories(unittest.TestCase):
             world.root
         ).bounding_box()
         np.testing.assert_allclose(
-            [surface_box.min_x, surface_box.max_x, surface_box.min_y, surface_box.max_y],
+            [
+                surface_box.min_x,
+                surface_box.max_x,
+                surface_box.min_y,
+                surface_box.max_y,
+            ],
             [table_box.min_x, table_box.max_x, table_box.min_y, table_box.max_y],
             atol=1e-9,
         )
@@ -744,7 +745,7 @@ class TestFactories(unittest.TestCase):
         )
         [object_variable, x_variable, y_variable] = sampler.variables
         for object in objects_of_interest:
-            conditional, _ = sampler.conditional({object_variable: object})
+            conditional = sampler.conditional({object_variable: object}).distribution
             expectation = conditional.expectation([x_variable, y_variable])
             surface_T_object = world.transform(
                 object.global_transform, table.supporting_surface
@@ -1192,11 +1193,11 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
     both.
     """
 
-    door: Optional[Door] = field(
+    door: Door | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
-    typed_door: Optional[DoorWithType] = field(
+    typed_door: DoorWithType | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )

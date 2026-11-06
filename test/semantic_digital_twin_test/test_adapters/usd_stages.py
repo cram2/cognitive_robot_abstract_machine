@@ -40,7 +40,8 @@ def build_single_joint_stage(
 ) -> Usd.Stage:
     """
     A minimal in-memory stage with a root link ("carcass") and a child link ("child")
-    connected by one joint of ``joint_type``, in the same shape ``USDParser.parse``
+    connected by one joint of ``joint_type``, in the same shape
+    :meth:`~semantic_digital_twin.adapters.usd.parser.USDParser.create_world`
     reads: ``Xform`` links each holding one ``Mesh``, and a joint prim with
     body0/body1 relationships and localPos/localRot/axis/limit attributes.
 
@@ -135,7 +136,8 @@ def build_stage_with_mesh_targeted_body0() -> Usd.Stage:
 
 def build_stage_with_textured_mesh(texture_file_path: str) -> Usd.Stage:
     """
-    A minimal in-memory stage with a single quad mesh, per-point ``st`` UV
+    A minimal in-memory stage with a single quad mesh, per-point ``st`` UV.
+
     coordinates, and a material whose ``diffuseColor`` is driven by a texture read
     from ``texture_file_path`` - the layout
     ``USDParser._diffuse_texture_path``/``_uv_coordinates`` read.

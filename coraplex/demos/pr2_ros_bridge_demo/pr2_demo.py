@@ -1,5 +1,8 @@
 """
-PR2 manipulation with CoraPlex and an optional ROS 1/2 bridge.
+PR2 manipulation through CoraPlex's standard executors.
+
+For ROS 1 hardware, ROS 2 Giskard needs PR2 controller interfaces connected through
+``ros1_bridge``. See the adjacent README for deployment and lab validation.
 """
 
 from __future__ import annotations
@@ -13,18 +16,23 @@ from pathlib import Path
 from enum import StrEnum
 from typing_extensions import TYPE_CHECKING
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.datastructures.enums import ExecutionType
 from coraplex.demonstrations import RobotDemonstration
-from coraplex.plans.factories import sequential
+from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
+from coraplex.plans.executors import (
+    KinematicallySimulatedPlanExecutor,
+    RealRobotPlanExecutor,
+    SimulatedPlanExecutor,
+)
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.actions.core.placing import PlaceAction
 from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkArmsAction
 from krrood.patterns.path_enumeration import PathEnumeration
+from cramph.composites import Sequence
+from cramph.statechart import Statechart
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cereal, Milk
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Pose,
@@ -40,7 +48,7 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 if TYPE_CHECKING:
-    from coraplex.plans.plan_node import PlanNode
+    from cramph.context import ContextExtension, StatechartContext
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
     from semantic_digital_twin.world import World
 
@@ -122,8 +130,9 @@ class PR2Demonstration(RobotDemonstration):
     """
 
     resource_directory: Path = field(
-        default_factory=lambda: Path(__file__).resolve().parents[2]
-        / DemonstrationResource.DIRECTORY
+        default_factory=lambda: (
+            Path(__file__).resolve().parents[2] / DemonstrationResource.DIRECTORY
+        )
     )
     """
     Directory holding the demo's apartment and object meshes.
@@ -185,22 +194,6 @@ class PR2Demonstration(RobotDemonstration):
             ),
         )
 
-    def build_simulated_world(self) -> World:
-        specification = self.scene_specification()
-        specification.robots.append(self.robot_specification())
-        return specification.to_domain_object()
-
-    def acquire_world(self) -> World:
-        """
-        Require the measured manipulation object before returning a controller world.
-
-        See :meth:`RobotDemonstration.acquire_world`.
-        """
-        world = super().acquire_world()
-        if self.execution_type is ExecutionType.REAL:
-            self.is_scene_populated(world)
-        return world
-
     def is_scene_populated(self, world: World) -> bool:
         """
         Require the measured cereal body for real manipulation; missing bodies raise the
@@ -210,7 +203,7 @@ class PR2Demonstration(RobotDemonstration):
         """
         if self.task is not DemonstrationTask.PICK_AND_PLACE:
             return True
-        if self.execution_type is ExecutionType.REAL:
+        if not issubclass(self.executor_type, SimulatedPlanExecutor):
             world.get_body_by_name(self.cereal_body_name)
             return True
         return any(body.name.name == self.cereal_body_name for body in world.bodies)
@@ -230,28 +223,30 @@ class PR2Demonstration(RobotDemonstration):
         with world.modify_world():
             world.add_semantic_annotation(Cereal(root=cereal_body))
 
-    def build_context(self, world: World) -> Context:
+    def build_context_extensions(self, world: World) -> list[ContextExtension]:
         self.populate_scene(world)
-        robots = world.get_semantic_annotations_by_type(PR2)
-        return Context(
-            world=world,
-            robot=robots[0] if robots else PR2.from_world(world),
-            ros_node=self.ros_node,
-            alternative_motion_mappings=self.alternative_motion_mappings,
-            _debug=self.debug,
-        )
+        robots = world.get_semantic_annotations_by_type(self.used_robot)
+        robot = robots[0] if robots else self.used_robot.from_world(world)
+        return [RobotAccess(robot), StatementGrounding()]
 
-    def build_plan(self, context: Context) -> PlanNode:
-        robot = context.robot
+    def build_statechart(self, context: StatechartContext) -> Statechart:
+        robot = context.require_extension(RobotAccess).robot
+        statechart = Statechart(context=context)
         if self.task is DemonstrationTask.TORSO:
-            return sequential(
-                [MoveTorsoAction(TorsoState.HIGH), MoveTorsoAction(TorsoState.LOW)],
-                context=context,
+            statechart.add_node(
+                Sequence(
+                    nodes=[
+                        MoveTorsoAction(torso_state=TorsoState.HIGH),
+                        MoveTorsoAction(torso_state=TorsoState.LOW),
+                    ]
+                )
             )
+            return statechart
         if self.task is DemonstrationTask.ARMS:
-            return sequential(
-                [ParkArmsAction(arms=list(robot.all_arms))], context=context
+            statechart.add_node(
+                Sequence(nodes=[ParkArmsAction(arms=list(robot.all_arms))])
             )
+            return statechart
 
         cereal_body = context.world.get_body_by_name(self.cereal_body_name)
         cereal = next(
@@ -269,19 +264,21 @@ class PR2Demonstration(RobotDemonstration):
             orientation=cereal_pose.orientation,
             reference_frame=context.world.root,
         )
-        return sequential(
-            [
-                ParkArmsAction(arms=list(robot.all_arms)),
-                MoveTorsoAction(self.pick_and_place_torso_state),
-                PickUpAction(
-                    grasp=cereal.grasp_candidates()[0],
-                    arm=robot.get_right_arm_if_specified(),
-                ),
-                PlaceAction(object_designator=cereal, target_location=place_pose),
-                ParkArmsAction(arms=list(robot.all_arms)),
-            ],
-            context=context,
+        statechart.add_node(
+            Sequence(
+                nodes=[
+                    ParkArmsAction(arms=list(robot.all_arms)),
+                    MoveTorsoAction(torso_state=self.pick_and_place_torso_state),
+                    PickUpAction(
+                        grasp=cereal.grasp_candidates()[0],
+                        arm=robot.get_right_arm_if_specified(),
+                    ),
+                    PlaceAction(object_designator=cereal, target_location=place_pose),
+                    ParkArmsAction(arms=list(robot.all_arms)),
+                ],
+            )
         )
+        return statechart
 
 
 # %% command line
@@ -316,10 +313,10 @@ def main() -> None:
     )
     demonstration = PR2Demonstration(
         task=arguments.task,
-        execution_type=(
-            ExecutionType.REAL
+        executor_type=(
+            RealRobotPlanExecutor
             if arguments.mode is ExecutionMode.HARDWARE
-            else ExecutionType.KINEMATICALLY_SIMULATED
+            else KinematicallySimulatedPlanExecutor
         ),
         collision_avoidance=arguments.collision_avoidance,
     )

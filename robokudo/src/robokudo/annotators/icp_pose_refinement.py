@@ -29,7 +29,6 @@ from timeit import default_timer
 import numpy as np
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import Optional
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CASViews
@@ -70,10 +69,10 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             """Parameters for configuring model loading."""
 
             def __init__(self) -> None:
-                self.ros_pkg_path: Optional[str] = None
+                self.ros_pkg_path: str | None = None
                 """If set, use use data_path as a relative path to self.ros_pkg_path"""
 
-                self.data_path: Optional[str] = None
+                self.data_path: str | None = None
                 """Relative Path to the folder containing the models"""
 
         # Overwrite the parameters explicitly to enable auto-completion
@@ -106,7 +105,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             self.class_name_to_ply_model["JeroenCup"] = ply_model
 
     # TODO Rewrite this so that we can load multiple files from the directory at once
-    def get_model_path(self, class_name: str = "") -> Optional[Path]:
+    def get_model_path(self, class_name: str = "") -> Path | None:
         """Get path to PLY model file.
 
         Resolves model path using:

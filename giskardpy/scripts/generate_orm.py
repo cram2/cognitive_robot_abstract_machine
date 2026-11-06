@@ -5,7 +5,7 @@ import numpy as np
 
 import giskardpy
 import giskardpy.qp.solvers
-import semantic_digital_twin.orm.ormatic_interface
+import cramph.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.custom_types import NumpyType
 from krrood.ormatic.ormatic import ORMatic
@@ -21,7 +21,7 @@ from krrood.ormatic.utils import classes_of_package
 ignored_classes = set(classes_of_package(giskardpy.qp.solvers))
 ignored_classes |= {SubclassJSONSerializer}
 
-dependencies = [semantic_digital_twin.orm.ormatic_interface]
+dependencies = [cramph.orm.ormatic_interface]
 
 type_mappings = {np.ndarray: NumpyType}
 

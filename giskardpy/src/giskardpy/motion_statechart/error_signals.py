@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import List, Tuple
 
 from krrood.symbolic_math.symbolic_math import Scalar, SymbolicMathType
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -13,7 +12,7 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 
 def joint_position_and_velocity_variables(
     expression: SymbolicMathType,
-) -> Tuple[List[PositionVariable], List[VelocityVariable]]:
+) -> tuple[list[PositionVariable], list[VelocityVariable]]:
     """
     Collect the joint positions `expression` depends on, paired with the velocity of the
     same degree of freedom.
@@ -27,7 +26,7 @@ def joint_position_and_velocity_variables(
     :param expression: The expression to inspect.
     :return: The joint position variables and their matching velocity variables.
     """
-    position_variables: List[PositionVariable] = [
+    position_variables: list[PositionVariable] = [
         variable
         for variable in expression.free_variables()
         if isinstance(variable, PositionVariable)

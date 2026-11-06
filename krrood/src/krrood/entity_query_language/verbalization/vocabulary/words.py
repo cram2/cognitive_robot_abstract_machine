@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing_extensions import ClassVar, Optional
+from typing_extensions import ClassVar
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     RoleFragment,
@@ -110,7 +110,7 @@ class AggregationWord(RoleWord):
     """
 
     _role_ = SemanticRole.AGGREGATION
-    child_form: Optional[GrammaticalNumber] = GrammaticalNumber.PLURAL
+    child_form: GrammaticalNumber | None = GrammaticalNumber.PLURAL
     """
     The grammatical number the child expression is rendered in (*"sum of amounts"* →
     plural, *"maximum of the amount"* → singular), or ``None`` for a childless aggregate

@@ -12,12 +12,14 @@ import pytest
 from ament_index_python.packages import get_packages_with_prefixes
 
 from coraplex.demonstrations import RobotDemonstrationRosSession
+from coraplex.plans.context_extensions import StatementGrounding
 from semantic_digital_twin.robots.garmi import Garmi
 
 DEMOS_ROOT = Path(__file__).resolve().parents[2] / "coraplex" / "demos"
 
 WRAPPER_PATHS = [
     DEMOS_ROOT / "coraplex_bullet_world_demo" / "test_demo.py",
+    DEMOS_ROOT / "coraplex_hsr_mujoco_demo" / "test_demo.py",
     DEMOS_ROOT / "coraplex_real_tracy" / "test_demo.py",
     DEMOS_ROOT / "coraplex_unitree_g1_warehouse_demo" / "test_demo.py",
 ]
@@ -133,7 +135,14 @@ def test_garmi_demonstration_pins_the_draws_its_locations_make(rclpy_node):
         demonstration.ros_node_name
     )
 
-    context = demonstration.build_context(demonstration.build_simulated_world())
+    extensions = demonstration.build_context_extensions(
+        demonstration.build_simulated_world()
+    )
     demonstration.ros_session.stop()
 
-    assert context.sampling_seed == demo_module.SamplingSeed.REPEATABLE
+    [grounding] = [
+        extension
+        for extension in extensions
+        if isinstance(extension, StatementGrounding)
+    ]
+    assert grounding.sampling_seed == StatementGrounding().sampling_seed

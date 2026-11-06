@@ -9,7 +9,7 @@ import uuid
 from abc import ABC
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Type, Any, List, Tuple, Optional
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.exceptions import DataclassException
 
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
         AttributeMatch,
     )
     from krrood.entity_query_language.operators.probabilistic_queries import (
+        Probability,
         ProbabilisticQuery,
     )
 
@@ -222,7 +223,7 @@ class UnsupportedExpressionTypeForDistinct(UsageError):
     :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    unsupported_expression_type: Type[SymbolicExpression]
+    unsupported_expression_type: type[SymbolicExpression]
 
     def error_message(self) -> str:
         return f"Distinct operation is not supported for expression type {self.unsupported_expression_type}"
@@ -299,7 +300,7 @@ class NotNumberLikeFieldError(UsageError):
     The attribute that was accessed.
     """
 
-    resolved_type: Optional[Type]
+    resolved_type: type | None
     """
     The attribute's resolved type, or None if it does not exist at all.
     """
@@ -474,7 +475,7 @@ class AggregationUsageError(UsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    query: Optional[Query] = field(default=None, kw_only=True)
+    query: Query | None = field(default=None, kw_only=True)
     """
     The query that contains the aggregation.
     """
@@ -519,12 +520,12 @@ class NonAggregatedSelectedVariablesError(AggregationUsageError):
     The builder class for the GroupedDataSource operation.
     """
 
-    non_aggregated_variables: List[Selectable]
+    non_aggregated_variables: list[Selectable]
     """
     The non-aggregated selected variables.
     """
 
-    aggregated_variables: List[Selectable]
+    aggregated_variables: list[Selectable]
     """
     The aggregated variables.
     """
@@ -548,7 +549,7 @@ class NonAggregatorInHavingConditionsError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    non_aggregators: Tuple[Selectable, ...]
+    non_aggregators: tuple[Selectable, ...]
 
     def error_message(self) -> str:
         return f"The having condition of the query {self.query} contains non-aggregators {self.non_aggregators}."
@@ -565,7 +566,7 @@ class AggregatorInWhereConditionsError(AggregationUsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    aggregators: Tuple[Aggregator, ...]
+    aggregators: tuple[Aggregator, ...]
     """
     The aggregators in the where condition.
     """
@@ -589,8 +590,8 @@ class WrongSelectableType(UsageError):
     :doc:`/krrood/doc/eql/writing_queries`.
     """
 
-    wrong_variable_type: Type
-    expected_types: List[Type]
+    wrong_variable_type: type
+    expected_types: list[type]
 
     def error_message(self) -> str:
         return f"Select expects one of {self.expected_types}, instead {self.wrong_variable_type} was given."
@@ -621,7 +622,7 @@ class LiteralConditionError(UsageError):
     The query that contains the literal condition.
     """
 
-    literal_conditions: List[Any]
+    literal_conditions: list[Any]
     """
     The literal conditions that are given to the query.
     """
@@ -646,7 +647,7 @@ class CannotProcessResultOfGivenChildType(UsageError):
     For further details, see :doc:`/krrood/doc/eql/result_processors`.
     """
 
-    unsupported_child_type: Type
+    unsupported_child_type: type
     """
     The unsupported child type.
     """
@@ -702,7 +703,7 @@ class UnSupportedOperand(UnsupportedOperation):
     :doc:`/krrood/doc/eql/comparators`.
     """
 
-    operation: Type[SymbolicExpression]
+    operation: type[SymbolicExpression]
     """
     The operation used.
     """
@@ -728,7 +729,7 @@ class UnsupportedNegation(UnsupportedOperation):
     :doc:`/krrood/doc/eql/logical_operators`.
     """
 
-    operation_type: Type[SymbolicExpression]
+    operation_type: type[SymbolicExpression]
     """
     The type of the operation that is being negated.
     """
@@ -815,12 +816,12 @@ class InvalidChildType(UsageError):
     For further details, see :doc:`/krrood/doc/eql/writing_queries`.
     """
 
-    invalid_child_type: Type
+    invalid_child_type: type
     """
     The invalid child type.
     """
 
-    correct_child_types: List[Type]
+    correct_child_types: list[type]
     """
     The list of valid child types.
     """
@@ -872,7 +873,7 @@ class NoneWrappedFieldError(ClassDiagramError):
     For further details, see :doc:`/krrood/doc/eql/domain_mapping`.
     """
 
-    clazz: Type
+    clazz: type
     attr_name: str
 
     def error_message(self) -> str:
@@ -988,7 +989,7 @@ class BackendCannotEvaluateCause(DataclassException):
     The match that has a ``Cause`` attribute.
     """
 
-    backend_type: Type[QueryBackend]
+    backend_type: type[QueryBackend]
     """
     The type of the backend that cannot evaluate the intervention causally.
     """
@@ -1033,6 +1034,30 @@ class BackendCannotEvaluateProbabilisticQuery(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Evaluate with a ProbabilisticBackend backed by a model registry, e.g. .evaluate(backend=ProbabilisticBackend(...))."
+
+
+@dataclass
+class EvidenceHasZeroProbability(DataclassException):
+    """
+    Raised when a
+    :class:`~krrood.entity_query_language.operators.probabilistic_queries.Probability`
+    is conditioned on evidence that has zero probability, which leaves the conditional
+    probability undefined.
+    """
+
+    expression: Probability
+    """
+    The probability query whose evidence has zero probability.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.expression} is undefined: its evidence has zero probability, so "
+            f"there is nothing to condition on."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Condition on evidence that the model or the domain can satisfy."
 
 
 @dataclass
@@ -1092,7 +1117,7 @@ class PositionalArgumentsInMatchPattern(DataclassException, TypeError):
     The match whose pattern was given positional arguments.
     """
 
-    arguments: Tuple[Any, ...]
+    arguments: tuple[Any, ...]
     """
     The positional arguments that were given.
     """
@@ -1155,6 +1180,61 @@ class UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
     def suggest_correction(self) -> str:
         return (
             "if you're looking for more flexible generations, try ProbabilisticBackend."
+        )
+
+
+@dataclass
+class UnboundPatternVariable(UsageError):
+    """
+    Raised when an instance is constructed from bindings that leave a variable of the
+    match's pattern without a value, and the pattern states none for it either.
+    """
+
+    attribute_match: AttributeMatch
+    """
+    The attribute match whose assigned variable the bindings do not bind.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The bindings give no value to the variable assigned to "
+            f"'{self.attribute_match}', so the instance cannot be constructed."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Bind every variable of the pattern, keyed by the identifier of the "
+            "variable assigned to its attribute."
+        )
+
+
+@dataclass
+class NoAttributeWithAccessPathName(UsageError):
+    """
+    Raised when a match's pattern assigns a variable to no attribute whose access path
+    has the requested name.
+    """
+
+    match: Match
+    """
+    The match whose pattern was searched.
+    """
+
+    access_path_name: str
+    """
+    The requested name of an attribute's access path.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The pattern of '{self.match}' assigns a variable to no attribute whose "
+            f"access path is named '{self.access_path_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name the access path from the matched class, e.g. 'Rectangle.width', and "
+            "leave the attribute open with '...' or give it a value in the pattern."
         )
 
 
@@ -1289,7 +1369,7 @@ class WrongPropertyReturnStatementImplementation(ModelingError):
     The reason for the wrong property.
     """
 
-    clazz: Optional[Type] = None
+    clazz: type | None = None
     """
     The class that has the property.
     """
@@ -1316,7 +1396,7 @@ class NoReturnStatementInProperty(ModelingError):
     The property that is wrongly implemented.
     """
 
-    clazz: Optional[Type] = None
+    clazz: type | None = None
     """
     The class that has the property.
     """

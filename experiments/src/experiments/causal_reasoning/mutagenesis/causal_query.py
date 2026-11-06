@@ -13,7 +13,6 @@ from krrood.entity_query_language.factories import a, cause, confounder, variabl
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.product_algebra import SimpleEvent
-from typing_extensions import List
 
 from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisAtom,
@@ -134,7 +133,7 @@ class MutagenesisCausalQueryResult:
     Whether verify_support_determinism passed on the grounded circuit.
     """
 
-    effects: List[BranchingAtomCountCausalEffect] = field(default_factory=list)
+    effects: list[BranchingAtomCountCausalEffect] = field(default_factory=list)
     """
     One row per branching-atom-count value the grounded circuit's support covers.
     """
@@ -150,7 +149,7 @@ class BranchingAtomCountCausalQuery:
 
     def run(
         self,
-        training_molecules: List[MutagenesisMolecule],
+        training_molecules: list[MutagenesisMolecule],
         atom_count: int = 2,
         bond_count: int = 1,
         random_seed: int = 0,
@@ -272,7 +271,7 @@ class BranchingAtomCountCausalQuery:
 
     @staticmethod
     def classify_by_branching_atom_count_and_indicator_1(
-        molecules: List[MutagenesisMolecule],
+        molecules: list[MutagenesisMolecule],
     ) -> ConfusionMatrix:
         """
         Classify each molecule as mutagenic exactly when most molecules sharing its
@@ -380,9 +379,10 @@ class BranchingAtomCountCausalQuery:
         event = SimpleEvent.from_data(
             {branching_atom_count_variable: float(branching_atom_count_value)}
         ).as_composite_set()
-        truncated_circuit, _ = interventional_circuit.truncated(
+        truncated_circuit = interventional_circuit.truncated(
             event.fill_missing_variables_pure(interventional_circuit.variables)
-        )
+        ).distribution
+
         true_event = (
             SimpleEvent.from_data({mutagenic_variable: True})
             .as_composite_set()

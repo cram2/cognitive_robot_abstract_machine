@@ -11,15 +11,7 @@ import operator
 from copy import copy
 from dataclasses import dataclass
 
-from typing_extensions import (
-    Callable,
-    Any,
-    ClassVar,
-    Dict,
-    Optional,
-    Tuple,
-    Iterable,
-)
+from typing_extensions import Callable, Any, ClassVar, Iterable
 
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
@@ -43,7 +35,7 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     left: Selectable
     right: Selectable
     operation: Callable[[Any, Any], bool]
-    operation_name_map: ClassVar[Dict[Any, str]] = {
+    operation_name_map: ClassVar[dict[Any, str]] = {
         operator.eq: "==",
         operator.ne: "!=",
         operator.lt: "<",
@@ -53,7 +45,7 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     }
 
     @property
-    def _product_operands_(self) -> Tuple[SymbolicExpression, ...]:
+    def _product_operands_(self) -> tuple[SymbolicExpression, ...]:
         return self.left, self.right
 
     @property
@@ -101,8 +93,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         )
 
     def _optimize_operands_order_(
-        self, sources: Optional[OperationResult]
-    ) -> Tuple[SymbolicExpression, SymbolicExpression]:
+        self, sources: OperationResult | None
+    ) -> tuple[SymbolicExpression, SymbolicExpression]:
         left_is_definite = self._operand_contains_definite_query_(self.left)
         right_is_definite = self._operand_contains_definite_query_(self.right)
         if left_is_definite and not right_is_definite:

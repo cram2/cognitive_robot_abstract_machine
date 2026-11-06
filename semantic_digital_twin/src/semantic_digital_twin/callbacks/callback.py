@@ -3,10 +3,9 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Self, TYPE_CHECKING
+from typing_extensions import Any, Self, TYPE_CHECKING
 
 import numpy as np
-from typing_extensions import Dict, List
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from semantic_digital_twin.world_description.world_entity import (
@@ -37,7 +36,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
 
     @classmethod
     @abstractmethod
-    def _all_callbacks_from_world(cls, world: World) -> List[Callback]:
+    def _all_callbacks_from_world(cls, world: World) -> list[Callback]:
         """
         The list a world notifies when the change this kind of callback reacts to
         happens.
@@ -53,7 +52,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
     @classmethod
-    def all_callbacks_of_this_type_from_world(cls, world: World) -> List[Self]:
+    def all_callbacks_of_this_type_from_world(cls, world: World) -> list[Self]:
         """
         The callbacks of this class that the given world still notifies.
 
@@ -93,11 +92,11 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
         """
         self._is_paused = False
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {**super().to_json(**kwargs), "is_paused": self._is_paused}
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
         instance = super()._from_json(data, **kwargs)
         instance._is_paused = data.get("is_paused", False)
         return instance
@@ -119,7 +118,7 @@ class StateChangeCallback(Callback, ABC):
         self.update_previous_world_state()
 
     @classmethod
-    def _all_callbacks_from_world(cls, world: World) -> List[Callback]:
+    def _all_callbacks_from_world(cls, world: World) -> list[Callback]:
         """
         :param world: The world whose state change callbacks are asked for.
         :return: everything the world notifies whenever its state changes.
@@ -159,7 +158,7 @@ class ModelChangeCallback(Callback, ABC):
         self._world.get_world_model_manager().model_change_callbacks.append(self)
 
     @classmethod
-    def _all_callbacks_from_world(cls, world: World) -> List[Callback]:
+    def _all_callbacks_from_world(cls, world: World) -> list[Callback]:
         """
         :param world: The world whose model change callbacks are asked for.
         :return: everything the world notifies whenever its model changes.

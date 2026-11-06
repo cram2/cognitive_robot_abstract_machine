@@ -6,7 +6,7 @@ import numpy.typing as npt
 import polytope
 from ortools.linear_solver import pywraplp
 from scipy.spatial import ConvexHull
-from typing_extensions import List, Self, Tuple
+from typing_extensions import Self
 
 from random_events.interval import closed_open
 from random_events.product_algebra import Event, SimpleEvent, Continuous
@@ -146,7 +146,7 @@ class Polytope(polytope.Polytope):
     def copy(self):
         return self.from_polytope(self.__copy__())
 
-    def split_on_axis_value(self, axis: int, value: np.ndarray) -> Tuple[Self, Self]:
+    def split_on_axis_value(self, axis: int, value: np.ndarray) -> tuple[Self, Self]:
         """
         Split the polytope on a specific axis and value.
 
@@ -210,7 +210,7 @@ class Polytope(polytope.Polytope):
     def _create_maximum_inner_box_constraints(
         self,
         solver: pywraplp.Solver,
-        dimension_variables: List[pywraplp.Variable],
+        dimension_variables: list[pywraplp.Variable],
         scale: pywraplp.Variable,
         scale_of_box: npt.NDArray[np.float64],
     ) -> None:

@@ -11,15 +11,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from typing_extensions import (
-    Any,
-    Callable,
-    Generic,
-    Optional,
-    Self,
-    TYPE_CHECKING,
-    Union,
-)
+from typing_extensions import Any, Callable, Generic, Self, TYPE_CHECKING
 
 from krrood.entity_query_language.utils import T
 
@@ -39,7 +31,7 @@ class HasQueryModifiers(Generic[T], ABC):
     """
 
     @abstractmethod
-    def where(self, *conditions: ConditionType) -> Union[T, Self]:
+    def where(self, *conditions: ConditionType) -> T | Self:
         """
         Constrain the described object by conditions, chained using AND.
 
@@ -49,7 +41,7 @@ class HasQueryModifiers(Generic[T], ABC):
         ...
 
     @abstractmethod
-    def having(self, *conditions: ConditionType) -> Union[T, Self]:
+    def having(self, *conditions: ConditionType) -> T | Self:
         """
         Constrain the grouped results by conditions, chained using AND.
 
@@ -61,10 +53,10 @@ class HasQueryModifiers(Generic[T], ABC):
     @abstractmethod
     def ordered_by(
         self,
-        variable: Union[Selectable[T], Any],
+        variable: Selectable[T] | Any,
         descending: bool = False,
-        key: Optional[Callable] = None,
-    ) -> Union[T, Self]:
+        key: Callable | None = None,
+    ) -> T | Self:
         """
         Order the results by the given expression.
 
@@ -76,7 +68,7 @@ class HasQueryModifiers(Generic[T], ABC):
         ...
 
     @abstractmethod
-    def distinct(self, *on: Union[Selectable, Any]) -> Union[T, Self]:
+    def distinct(self, *on: Selectable | Any) -> T | Self:
         """
         Keep only results that differ in the given expressions.
 
@@ -86,9 +78,7 @@ class HasQueryModifiers(Generic[T], ABC):
         ...
 
     @abstractmethod
-    def grouped_by(
-        self, *variables_to_group_by: Union[Selectable, Any]
-    ) -> Union[T, Self]:
+    def grouped_by(self, *variables_to_group_by: Selectable | Any) -> T | Self:
         """
         Group the results by the given expressions.
 
@@ -98,7 +88,7 @@ class HasQueryModifiers(Generic[T], ABC):
         ...
 
     @abstractmethod
-    def limit(self, n: int) -> Union[T, Self]:
+    def limit(self, n: int) -> T | Self:
         """
         Return at most ``n`` results.
 

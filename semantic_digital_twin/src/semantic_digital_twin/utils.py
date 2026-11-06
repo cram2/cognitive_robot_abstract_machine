@@ -7,7 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache, wraps
 from pathlib import Path
-from typing import List
+from typing_extensions import Any, ClassVar
 
 from krrood.class_diagrams.mocking import MockedModule, MockedClass
 from platformdirs import user_cache_dir
@@ -18,7 +18,6 @@ except ModuleNotFoundError:
     PackageNotFoundError = None
 from xml.etree import ElementTree as ET
 
-from typing_extensions import Any, Tuple, ClassVar, Type
 
 
 def create_cache_dir(folder_name: str) -> Path:
@@ -70,7 +69,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+    urdf: str, blacklist: tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -165,7 +164,7 @@ def type_string_to_type(type_string: str) -> type:
     return getattr(module, class_name)
 
 
-def camel_case_split(word: str) -> List[str]:
+def camel_case_split(word: str) -> list[str]:
     """
     :param word: The word to split
     :return: A set of strings where each string is a camel case split of the original word
@@ -195,7 +194,7 @@ class MockedNodeModule(MockedModule):
     Mocked module for rclpy.node.
     """
 
-    Node: Type[MockedNodeClass] = MockedNodeClass
+    Node: type[MockedNodeClass] = MockedNodeClass
     """
     A mocked Node class.
     """

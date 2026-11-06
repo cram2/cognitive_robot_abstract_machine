@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from krrood.exceptions import DataclassException
-from typing_extensions import Type
+from probabilistic_model.exceptions import ProbabilisticModelException
 
 
 @dataclass
-class CannotConvertError(DataclassException):
+class CannotConvertError(ProbabilisticModelException):
     """
     Raised when no converter handles an object.
     """
 
-    data_type: Type = field(kw_only=True)
+    data_type: type = field(kw_only=True)
     """
     The type of the object that could not be converted.
     """
@@ -28,18 +27,18 @@ class CannotConvertError(DataclassException):
 
 
 @dataclass
-class NoConversionPathError(DataclassException):
+class NoConversionPathError(ProbabilisticModelException):
     """
-    Raised when no chain of converters leads from the representation of a circuit to
-    the requested representation.
+    Raised when no chain of converters leads from the representation of a circuit to the
+    requested representation.
     """
 
-    circuit_type: Type = field(kw_only=True)
+    circuit_type: type = field(kw_only=True)
     """
     The type of the circuit that was to be converted.
     """
 
-    representation: Type = field(kw_only=True)
+    representation: type = field(kw_only=True)
     """
     The requested representation.
     """

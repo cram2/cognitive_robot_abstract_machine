@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.qp.bound_cap import BoundCap, ScalarBoundCap
 from krrood.symbolic_math.symbolic_math import Scalar
 
 if TYPE_CHECKING:
@@ -82,6 +83,11 @@ class GiskardEqualityConstraint(GiskardConstraint):
     bound: Scalar
     """
     The target value the expression should reach.
+    """
+
+    bound_cap: BoundCap = field(default_factory=ScalarBoundCap)
+    """
+    How the bound is limited to what may be demanded within the control horizon.
     """
 
 

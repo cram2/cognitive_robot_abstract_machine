@@ -17,8 +17,9 @@ from dataclasses import dataclass
 
 import rclpy
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import kinematically_simulated_robot
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
+from cramph.context import StatechartContext
 from demo import DemoRunner, ShapeSortingPlan
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -48,11 +49,13 @@ class RvizRunner(DemoRunner):
         VizMarkerPublisher(_world=world, node=node)
         world.notify_state_change()
 
-        context = Context(
-            world=world, robot=tracy, ros_node=node, evaluate_conditions=False
+        executor = KinematicallySimulatedPlanExecutor(
+            StatechartContext.with_extensions(world, [RobotAccess(tracy)]),
+            ros_node=node,
         )
-        with kinematically_simulated_robot:
-            ShapeSortingPlan(scene=self.scene).build(context).perform()
+        executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+        executor.execute()
+        executor.close()
 
 
 if __name__ == "__main__":

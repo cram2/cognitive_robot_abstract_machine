@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 
-from typing_extensions import List
 
 import mujoco
 import numpy as np
@@ -24,6 +23,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoFixedConnectionJoints,
     MujocoOmniDriveJoints,
     MujocoSim,
+    SimulatorModelNames,
 )
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
@@ -32,11 +32,14 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+    JointServo,
+    ServoGains,
+)
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
@@ -102,7 +105,7 @@ def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo
         arm.end_effector.thumb.root.parent_connection.raw_dof for arm in pr2.all_arms
     }
 
-    def driven_by(servo_type: type) -> List[str]:
+    def driven_by(servo_type: type) -> list[str]:
         return sorted(
             str(degree_of_freedom.name)
             for actuator in world.actuators
@@ -139,6 +142,23 @@ def test_the_drive_servos_have_the_gains_the_base_declares(pr2):
         drive_servos.translation_gains
     )
     assert gains_by_degree_of_freedom[drive.yaw] == drive_servos.rotation_gains
+
+
+def test_a_servo_that_states_no_dynamics_keeps_those_of_the_joint(pr2):
+    """
+    A description such as an MJCF states a joint's dynamics itself, and a servo that
+    states none leaves them as described.
+    """
+    connection = pr2.torso.active_connections[0]
+    described = JointDynamics(armature=0.25)
+    connection.dynamics = described
+
+    pr2.torso._declare_servo(
+        connection,
+        JointServo(gains=ServoGains(stiffness=1.0, damping=1.0, torque_limit=1.0)),
+    )
+
+    assert connection.dynamics is described
 
 
 def test_every_body_standing_on_the_base_carries_its_own_weight(pr2):
@@ -192,10 +212,19 @@ def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
         if isinstance(connection, FixedConnection)
     )
 
-    assert type(MujocoConnectionJoints.of(pr2.drive, world)) is MujocoOmniDriveJoints
-    assert type(MujocoConnectionJoints.of(revolute, world)) is MujocoConnectionJoint
-    assert type(MujocoConnectionJoints.of(fixed, world)) is (
-        MujocoFixedConnectionJoints
+    element_names = SimulatorModelNames()
+
+    assert (
+        type(MujocoConnectionJoints.of(pr2.drive, world, element_names))
+        is MujocoOmniDriveJoints
+    )
+    assert (
+        type(MujocoConnectionJoints.of(revolute, world, element_names))
+        is MujocoConnectionJoint
+    )
+    assert (
+        type(MujocoConnectionJoints.of(fixed, world, element_names))
+        is MujocoFixedConnectionJoints
     )
 
 
@@ -428,8 +457,8 @@ def test_the_odometry_is_where_the_simulated_base_got_to(pr2):
 )
 def test_a_base_too_weak_to_move_does_not_report_the_pose_it_was_commanded_to(pr2):
     """
-    A base whose servos cannot push it stays put when commanded to drive, as one held
-    up by an obstacle would, and the odometry says so instead of following the command.
+    A base whose servos cannot push it stays put when commanded to drive, as one held up
+    by an obstacle would, and the odometry says so instead of following the command.
     """
     world = pr2._world
     drive = pr2.drive

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 
-from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
@@ -97,7 +96,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
     # %% IF clause
 
-    def _if_items(self, structure: RuleStructure) -> List[VerbalizationFragment]:
+    def _if_items(self, structure: RuleStructure) -> list[VerbalizationFragment]:
         """
         :return: One item per antecedent — *"there's a <Type> whose …, and …"* — plus any unmatched
             conditions; *"true"* when there are none.
@@ -114,7 +113,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
         ...     "If there's a FixedConnection whose parent is a Container")
         True
         """
-        items: List[VerbalizationFragment] = [
+        items: list[VerbalizationFragment] = [
             self._antecedent(antecedent) for antecedent in structure.primary_antecedents
         ]
         items += [
@@ -150,7 +149,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
             if restriction.inline_modifiers
             else intro
         )
-        items: List[VerbalizationFragment] = []
+        items: list[VerbalizationFragment] = []
         if restriction.whose is not None:
             items.append(restriction.whose)
         if restriction.residual is not None:
@@ -186,7 +185,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
     @staticmethod
     def _antecedent_referent_id(
         antecedent: AntecedentInformation,
-    ) -> Optional[uuid.UUID]:
+    ) -> uuid.UUID | None:
         """
         :return: The antecedent's canonical referent id — the selected variable for an entity
             root, else the root's own id (matching the variable the THEN-clause chains reference).
@@ -210,7 +209,7 @@ class InferenceAssembler(Assembler[Entity, RuleStructure]):
 
     # %% THEN clause
 
-    def _then_items(self, structure: RuleStructure) -> List[VerbalizationFragment]:
+    def _then_items(self, structure: RuleStructure) -> list[VerbalizationFragment]:
         """:return: The consequent as a single entry — *"there's a <Consequent>"* head line with each
         field binding prefixed by its own *"whose"* (the same form a query subject restriction uses):
         *"whose <field> is <value>, and whose …"* inline / in paragraph, sub-points in hierarchical.

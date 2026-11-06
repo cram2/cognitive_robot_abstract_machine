@@ -5,9 +5,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing import Dict, Type
-
 from typing_extensions import TYPE_CHECKING
+
 
 from giskardpy.qp.exceptions import (
     BrakingTimeExceedsHorizonError,
@@ -16,8 +15,8 @@ from giskardpy.qp.exceptions import (
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 if TYPE_CHECKING:
     from giskardpy.qp.solvers.qp_solver import QPSolver
@@ -82,7 +81,7 @@ class QPControllerConfig:
     .. warning:: Minimum value is :attr:`minimum_prediction_horizon`.
     """
 
-    dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
+    dof_weights: dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
             lambda: DerivativeMap(None, 0.01, None, None)
         )
@@ -118,7 +117,7 @@ class QPControllerConfig:
     If True, prints config.
     """
 
-    qp_solver_class: Type[QPSolver] = field(default=QPSolverPIQP)
+    qp_solver_class: type[QPSolver] = field(default=QPSolverPIQP)
     """
     Reference to the resolved QP solver class.
     """
