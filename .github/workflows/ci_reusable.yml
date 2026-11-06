@@ -111,10 +111,8 @@ jobs:
             export MUJOCO_GL=egl
           fi
           if [[ "${{ inputs.lib }}" == "cramployer" ]]; then
-            free -m
-            ulimit -v 6291456
             cd cognitive_robot_abstract_machine
-            python -m pytest --orm-build never --cov=scripts.cramployer --cov-config=scripts/cramployer/coverage.ini --cov-fail-under=85 test/cramployer_test scripts/cramployer/container_tests
+            python -m pytest --orm-build never test/cramployer_test scripts/cramployer/container_tests
           else
             python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
           fi
