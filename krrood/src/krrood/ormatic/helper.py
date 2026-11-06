@@ -33,9 +33,9 @@ class OrmaticInterfaceInformation:
 
     externally_mapped_classes: dict[type, type] = field(default_factory=dict)
     """
-    Maps every domain class already mapped anywhere in this interface's dependency
-    chain to the :class:`DataAccessObject` subclass that maps it, so a dependent
-    interface can import and reuse that DAO instead of regenerating it.
+    Maps every domain class already mapped anywhere in this interface's dependency chain
+    to the :class:`DataAccessObject` subclass that maps it, so a dependent interface can
+    import and reuse that DAO instead of regenerating it.
     """
 
 
@@ -72,7 +72,8 @@ def get_classes_of_ormatic_interface(
         dao_class = mapper.class_
         if issubclass(dao_class, DataAccessObject):
             ORMatic.register_externally_mapped_class(
-                dao_class=dao_class, externally_mapped_classes=information.externally_mapped_classes
+                dao_class=dao_class,
+                externally_mapped_classes=information.externally_mapped_classes,
             )
 
     # every interface shares one Base, so its type_mappings already include everything upstream

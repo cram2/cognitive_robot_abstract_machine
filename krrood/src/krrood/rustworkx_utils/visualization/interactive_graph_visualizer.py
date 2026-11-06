@@ -54,7 +54,10 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
 
         positions = self.compute_positions()
         return go.Figure(
-            data=[self._edge_trace(positions=positions), self._node_trace(positions=positions)],
+            data=[
+                self._edge_trace(positions=positions),
+                self._node_trace(positions=positions),
+            ],
             layout=self._figure_layout(),
         )
 
@@ -116,7 +119,9 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
             hovertext=labels,
             hoverinfo="text",
             customdata=indices,
-            marker=dict(size=18, color=[self.node_color(node_index=index) for index in indices]),
+            marker=dict(
+                size=18, color=[self.node_color(node_index=index) for index in indices]
+            ),
         )
 
     def _edge_trace(self, *, positions: dict[int, NodePosition]) -> go.Scatter:

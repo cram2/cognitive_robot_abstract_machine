@@ -158,7 +158,9 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "three_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(layout=self.layout)),
+                layout_options_json=json.dumps(
+                    self.layout_options.get_options(layout=self.layout)
+                ),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
                 extra_head=self.extra_head(),
                 extra_script=self.extra_script(),

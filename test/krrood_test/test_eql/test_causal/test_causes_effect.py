@@ -27,7 +27,9 @@ def test_causes_effect_accepts_a_literal_comparator():
 
 def test_causes_effect_accepts_a_conjunction_of_literal_comparators():
     pick = a(Pick)(arm=..., status="idle")
-    CausesEffect(_child_=and_(pick.status == "SUCCESS", pick.arm == 0.3))  # does not raise
+    CausesEffect(
+        _child_=and_(pick.status == "SUCCESS", pick.arm == 0.3)
+    )  # does not raise
 
 
 def test_causes_effect_rejects_a_comparison_between_two_attributes():

@@ -40,7 +40,9 @@ class InferenceRuleRule(TopLevelEntityRule):
         >>> verbalize_expression(entity(drawer)).startswith("If")
         True
         """
-        return super().when(node=node, context=context) and InferencePlanner.can_handle(entity=node)
+        return super().when(node=node, context=context) and InferencePlanner.can_handle(
+            entity=node
+        )
 
     def build(self, *, node: Entity, context: RuleContext) -> VerbalizationFragment:
         """:return: the ``IF … THEN …`` block built by the inference assembler.

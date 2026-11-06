@@ -204,7 +204,12 @@ def test_equal(session, database):
     # Create the world with its bodies and connections
     world = World(
         id=1,
-        bodies=[Body(name="Container1"), Body(name="Container2"), Body(name="Handle1"), Body(name="Handle2")],
+        bodies=[
+            Body(name="Container1"),
+            Body(name="Container2"),
+            Body(name="Handle1"),
+            Body(name="Handle2"),
+        ],
     )
     c1_c2 = PrismaticConnection(parent=world.bodies[0], child=world.bodies[1])
     c2_h2 = FixedConnection(parent=world.bodies[1], child=world.bodies[3])
@@ -1383,9 +1388,9 @@ def test_count_all_derives_dao_from_where_clause(session, database):
 
 def test_order_by_aggregate(session, database):
     """
-    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c, descending=True)
-    raises an error because _apply_clauses calls translate_attribute() on a Count
-    aggregator instead of _translate_comparator_operand().
+    Prove bug: set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c,
+    descending=True) raises an error because _apply_clauses calls translate_attribute()
+    on a Count aggregator instead of _translate_comparator_operand().
 
     After the fix, the translator must emit: SELECT size, COUNT(*) FROM BodyDAO GROUP BY
     size ORDER BY COUNT(*) DESC and return rows ordered with the most-frequent size
@@ -1404,7 +1409,9 @@ def test_order_by_aggregate(session, database):
 
     b = variable(type_=Body, domain=[])
     c = count(b)
-    query = an(set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c, descending=True))
+    query = an(
+        set_of(b.size, c).grouped_by(b.size).ordered_by(variable=c, descending=True)
+    )
 
     translator = eql_to_sql(query, session)
     results = translator.evaluate()

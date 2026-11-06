@@ -411,7 +411,8 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def get_incoming_relations_with_type(
         self,
-        *, wrapped_instance: WrappedInstance,
+        *,
+        wrapped_instance: WrappedInstance,
         relation_type: type[PredicateClassRelation[TSymbol]],
     ) -> Iterator[PredicateClassRelation[TSymbol]]:
         """
@@ -421,12 +422,14 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param relation_type: The type of the relation to filter for.
         """
         yield from self.get_incoming_relations_with_condition(
-            wrapped_instance=wrapped_instance, edge_condition=lambda edge: isinstance(edge, relation_type)
+            wrapped_instance=wrapped_instance,
+            edge_condition=lambda edge: isinstance(edge, relation_type),
         )
 
     def get_incoming_relations_with_condition(
         self,
-        *, wrapped_instance: WrappedInstance,
+        *,
+        wrapped_instance: WrappedInstance,
         edge_condition: Callable[[PredicateClassRelation], bool],
     ) -> Iterator[PredicateClassRelation]:
         """
@@ -435,11 +438,15 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param wrapped_instance: The wrapped instance to get the relations from.
         :param edge_condition: The condition to filter for.
         """
-        yield from filter(edge_condition, self.get_incoming_relations(wrapped_instance=wrapped_instance))
+        yield from filter(
+            edge_condition,
+            self.get_incoming_relations(wrapped_instance=wrapped_instance),
+        )
 
     def get_incoming_relations(
         self,
-        *, wrapped_instance: WrappedInstance,
+        *,
+        wrapped_instance: WrappedInstance,
     ) -> Iterator[PredicateClassRelation]:
         """
         Get all relations incoming to the given wrapped instance.
@@ -457,7 +464,8 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def get_outgoing_relations_with_type(
         self,
-        *, wrapped_instance: WrappedInstance,
+        *,
+        wrapped_instance: WrappedInstance,
         relation_type: type[PredicateClassRelation],
     ) -> Iterable[PredicateClassRelation]:
         """
@@ -467,12 +475,14 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param relation_type: The type of the relation to filter for.
         """
         yield from self.get_outgoing_relations_with_condition(
-            wrapped_instance=wrapped_instance, edge_condition=lambda edge: isinstance(edge, relation_type)
+            wrapped_instance=wrapped_instance,
+            edge_condition=lambda edge: isinstance(edge, relation_type),
         )
 
     def get_outgoing_relations_with_condition(
         self,
-        *, wrapped_instance: WrappedInstance,
+        *,
+        wrapped_instance: WrappedInstance,
         edge_condition: Callable[[PredicateClassRelation], bool],
     ) -> Iterable[PredicateClassRelation]:
         """
@@ -481,11 +491,15 @@ class SymbolGraph(metaclass=SingletonMeta):
         :param wrapped_instance: The wrapped instance to get the relations from.
         :param edge_condition: The condition to filter for.
         """
-        yield from filter(edge_condition, self.get_outgoing_relations(wrapped_instance=wrapped_instance))
+        yield from filter(
+            edge_condition,
+            self.get_outgoing_relations(wrapped_instance=wrapped_instance),
+        )
 
     def get_outgoing_relations(
         self,
-        *, wrapped_instance: WrappedInstance,
+        *,
+        wrapped_instance: WrappedInstance,
     ) -> Iterable[PredicateClassRelation]:
         """
         Get all relations outgoing from the given wrapped instance.
@@ -502,7 +516,8 @@ class SymbolGraph(metaclass=SingletonMeta):
 
     def to_dot(
         self,
-        *, filepath: str,
+        *,
+        filepath: str,
         format_="svg",
         graph_type: GraphType = GraphType.INSTANCE,
         without_inherited_associations: bool = True,

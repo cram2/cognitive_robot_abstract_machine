@@ -19,9 +19,13 @@ def test_removing_an_instance_keeps_an_equal_one():
     """
     first, second = Label(text="a"), Label(text="a")
 
-    SymbolGraph().remove_node(wrapped_instance=SymbolGraph().get_wrapped_instance(instance=second))
+    SymbolGraph().remove_node(
+        wrapped_instance=SymbolGraph().get_wrapped_instance(instance=second)
+    )
 
-    remaining = {id(label) for label in SymbolGraph().get_instances_of_type(type_=Label)}
+    remaining = {
+        id(label) for label in SymbolGraph().get_instances_of_type(type_=Label)
+    }
     assert (id(first) in remaining, id(second) in remaining) == (True, False)
 
 

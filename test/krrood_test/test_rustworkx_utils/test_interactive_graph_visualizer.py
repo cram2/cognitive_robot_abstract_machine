@@ -14,14 +14,20 @@ from krrood.rustworkx_utils.visualization.interactive_graph_visualizer import (
 
 @dataclass(kw_only=True)
 class NamedPayload:
-    """A payload whose name is shown as the node label and detail line."""
+    """
+    A payload whose name is shown as the node label and detail line.
+    """
 
     name: str
-    """The identifier rendered for this node."""
+    """
+    The identifier rendered for this node.
+    """
 
 
 def chain_graph(names: list[str]) -> rx.PyDiGraph:
-    """Build a directed chain of :class:`NamedPayload` nodes."""
+    """
+    Build a directed chain of :class:`NamedPayload` nodes.
+    """
     graph = rx.PyDiGraph(multigraph=False)
     indices = [graph.add_node(NamedPayload(name=name)) for name in names]
     for parent, child in zip(indices, indices[1:]):
@@ -30,7 +36,9 @@ def chain_graph(names: list[str]) -> rx.PyDiGraph:
 
 
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> InteractiveGraphVisualizer:
-    """A visualizer that labels and describes nodes by their payload name."""
+    """
+    A visualizer that labels and describes nodes by their payload name.
+    """
     return InteractiveGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
@@ -102,7 +110,10 @@ class TestBuildFigure:
             color_getter=lambda payload: "red" if payload.name == "a" else "green",
         )
 
-        assert list(self._node_trace(visualizer=visualizer).marker.color) == ["red", "green"]
+        assert list(self._node_trace(visualizer=visualizer).marker.color) == [
+            "red",
+            "green",
+        ]
 
     def test_edges_are_rendered_as_a_separate_trace(self):
         visualizer = named_visualizer(chain_graph(["a", "b"]))

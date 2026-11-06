@@ -183,7 +183,9 @@ class ORMatic:
                 continue
 
             # check if the class has an alternative mapping
-            if alternative_mapping := self.get_alternative_mapping(wrapped_class=wrapped_clazz):
+            if alternative_mapping := self.get_alternative_mapping(
+                wrapped_class=wrapped_clazz
+            ):
                 # add the alternative mapping
                 self.wrapped_tables[wrapped_clazz] = WrappedTable(
                     wrapped_clazz=alternative_mapping, ormatic=self
@@ -361,7 +363,8 @@ class ORMatic:
     @classmethod
     def from_package(
         cls,
-        *, packages: list[ModuleType],
+        *,
+        packages: list[ModuleType],
         ormatic_interface_dependencies: list[ModuleType],
         ignored_classes: set[type],
         type_mappings: dict[type, type],
@@ -386,7 +389,8 @@ class ORMatic:
         for mapper in SharedBase.registry.mappers:
             if issubclass(mapper.class_, DataAccessObject):
                 cls.register_externally_mapped_class(
-                    dao_class=mapper.class_, externally_mapped_classes=all_externally_mapped_classes
+                    dao_class=mapper.class_,
+                    externally_mapped_classes=all_externally_mapped_classes,
                 )
 
         # classes already mapped by a dependency are kept in the class diagram but not

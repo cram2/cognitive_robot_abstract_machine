@@ -424,7 +424,8 @@ class CartesianPositionTrajectory(CartesianTask):
             arg_idx=0, numpy_array=self.context.world.state.positions
         )
         self.context.float_variable_data.bind_argument(
-            compiled_function=self._compiled_goal_reference_frame_P_tip, argument_index=1
+            compiled_function=self._compiled_goal_reference_frame_P_tip,
+            argument_index=1,
         )
 
     def _update_trajectory_index(self, goal_reference_frame_P_tip_np: np.ndarray):
@@ -491,11 +492,14 @@ class CartesianPositionTrajectory(CartesianTask):
         self._update_trajectory_index(goal_reference_frame_P_tip_np)
         target_point = self._compute_target_point(goal_reference_frame_P_tip_np)
         self.context.float_variable_data.set_value(
-            expression=self.goal_reference_frame_P_current_target_point, value=target_point
+            expression=self.goal_reference_frame_P_current_target_point,
+            value=target_point,
         )
         self.context.float_variable_data.set_value(
             expression=self.remaining_distance,
-            value=self._distance_left_from(self.current_index, goal_reference_frame_P_tip_np),
+            value=self._distance_left_from(
+                self.current_index, goal_reference_frame_P_tip_np
+            ),
         )
         return None
 

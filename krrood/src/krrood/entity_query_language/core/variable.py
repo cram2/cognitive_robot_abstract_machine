@@ -126,7 +126,8 @@ class Variable(CanHaveDomainSource[T]):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Fetch values from the domain values and yield an OperationResult for
@@ -139,7 +140,9 @@ class Variable(CanHaveDomainSource[T]):
     def _replace_child_field_(
         self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
-        raise NoChildToReplace(expression=self, old_child=old_child, new_child=new_child)
+        raise NoChildToReplace(
+            expression=self, old_child=old_child, new_child=new_child
+        )
 
     @cached_property
     def _name_(self) -> str:
@@ -265,13 +268,18 @@ class InstantiatedVariable(
         Set the child variables from the kwargs dictionary.
         """
         for name, value in self._kwargs_.items():
-            self._child_variables_[name] = SymbolicExpression._as_operand_(value=value, name=name)
+            self._child_variables_[name] = SymbolicExpression._as_operand_(
+                value=value, name=name
+            )
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        yield from self._instantiate_using_child_variables_and_yield_results_(sources=sources)
+        yield from self._instantiate_using_child_variables_and_yield_results_(
+            sources=sources
+        )
 
     def _instantiate_using_child_variables_and_yield_results_(
         self, *, sources: OperationResult
@@ -299,7 +307,9 @@ class InstantiatedVariable(
             instance = bind(**arguments)
 
             bindings = {self._id_: instance} | child_result.bindings
-            result = self._build_operation_result_(bindings=bindings, child_result=child_result)
+            result = self._build_operation_result_(
+                bindings=bindings, child_result=child_result
+            )
             result.previous_operation_result = child_result
             yield result
 

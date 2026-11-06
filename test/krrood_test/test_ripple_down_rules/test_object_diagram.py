@@ -37,7 +37,11 @@ class ObjectDiagramTestCase(unittest.TestCase):
     def setUpClass(cls):
         cls.cases, cls.targets = load_zoo_dataset(cache_file=CACHE_FILE)
         cls.cq = CaseQuery(
-            original_case=cls.cases[0], attribute_name="species", _attribute_types=(Species,), mutually_exclusive=True, _target=cls.targets[0]
+            original_case=cls.cases[0],
+            attribute_name="species",
+            _attribute_types=(Species,),
+            mutually_exclusive=True,
+            _target=cls.targets[0],
         )
         cls.person = Person("Ahmed", Address("Cairo"))
 

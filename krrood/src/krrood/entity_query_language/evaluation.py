@@ -59,7 +59,9 @@ def is_condition_participant(
         return isinstance(parent, TruthValueOperator)
     evaluation_context = get_evaluation_context()
     if evaluation_context is not None:
-        return evaluation_context.is_child_of_truth_value_operator(expression=expression)
+        return evaluation_context.is_child_of_truth_value_operator(
+            expression=expression
+        )
     structural_parent = expression._parent_
     return structural_parent is not None and isinstance(
         structural_parent, TruthValueOperator
@@ -83,7 +85,9 @@ class EvaluationTracker(EvaluationObserver):
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
             return
-        evaluation_context.evaluated_expression_ids.record(expression_id=expression._id_)
+        evaluation_context.evaluated_expression_ids.record(
+            expression_id=expression._id_
+        )
 
         if isinstance(sources, OperationResult) and sources.evaluated_expression_ids:
             evaluation_context.evaluated_expression_ids.merge(
@@ -154,7 +158,9 @@ class SatisfiedConditionTracker(EvaluationObserver):
         satisfied = OrderedSet()
         for evaluated_id in evaluated:
             try:
-                evaluated_expression = expression._get_expression_by_id_(id_=evaluated_id)
+                evaluated_expression = expression._get_expression_by_id_(
+                    id_=evaluated_id
+                )
             except NoExpressionFoundForGivenID:
                 continue
             if not is_condition_participant(evaluated_expression):
@@ -210,7 +216,9 @@ def evaluate_statements_of(condition: SymbolicExpression) -> list[OperationResul
         evaluated.
     """
     evaluation_context = create_default_evaluation_context()
-    results = list(condition._evaluate_in_new_context_(evaluation_context=evaluation_context))
+    results = list(
+        condition._evaluate_in_new_context_(evaluation_context=evaluation_context)
+    )
     steps = [
         step
         for result in results
@@ -230,7 +238,9 @@ def evaluate_statements_of(condition: SymbolicExpression) -> list[OperationResul
         and step.operand._id_ not in negated_ids
         and (
             step.operand._id_ == condition._id_
-            or evaluation_context.is_child_of_truth_value_operator(expression=step.operand)
+            or evaluation_context.is_child_of_truth_value_operator(
+                expression=step.operand
+            )
         )
     ]
 

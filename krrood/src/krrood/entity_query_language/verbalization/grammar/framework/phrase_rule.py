@@ -78,7 +78,8 @@ class RuleContext:
 
     def child(
         self,
-        *, node: FoldNode,
+        *,
+        node: FoldNode,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         inline: bool = False,
         as_value: bool = False,

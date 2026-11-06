@@ -241,7 +241,9 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         :param role_types: The type or tuple of types of roles to check for.
         :return: Whether the role taker has any of the given role type(s).
         """
-        return any(cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_types))
+        return any(
+            cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_types)
+        )
 
     @classmethod
     def roles_for(
@@ -253,7 +255,9 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         :return: All roles of the given type for the role taker instance.
         """
         role_type = role_type or Role
-        return list(cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_type))
+        return list(
+            cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_type)
+        )
 
     @property
     def role_taker_roles(self) -> list[Role]:
@@ -271,7 +275,9 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         :param role_type: The type of roles to return.
         :return: All roles of the given type for the role taker instance.
         """
-        return list(cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_type))
+        return list(
+            cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_type)
+        )
 
     @classmethod
     def yield_taker_roles_of_type(

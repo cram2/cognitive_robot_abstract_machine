@@ -113,7 +113,8 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
     @classmethod
     def for_variable(
         cls,
-        *, label: str,
+        *,
+        label: str,
         expression: SymbolicExpression,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> RoleFragment:
@@ -140,7 +141,8 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
     @classmethod
     def for_attribute(
         cls,
-        *, owner: type | None,
+        *,
+        owner: type | None,
         attribute_name: str,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         text: str | None = None,
@@ -163,13 +165,17 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         'battery'
         """
         surface_text = (
-            text if text is not None else cls._display_name(owner=owner, attribute_name=attribute_name)
+            text
+            if text is not None
+            else cls._display_name(owner=owner, attribute_name=attribute_name)
         )
         return cls(
             text=surface_text,
             role=SemanticRole.ATTRIBUTE,
             source_reference=(
-                SourceReference.for_attribute(owner=owner, attribute_name=attribute_name)
+                SourceReference.for_attribute(
+                    owner=owner, attribute_name=attribute_name
+                )
                 if owner is not None
                 else None
             ),
@@ -182,7 +188,9 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         *attribute_name*, else *attribute_name* unchanged."""
         if owner is None:
             return attribute_name
-        grammar_metadata = GrammarMetadata.of_field(clazz=owner, field_name=attribute_name)
+        grammar_metadata = GrammarMetadata.of_field(
+            clazz=owner, field_name=attribute_name
+        )
         if grammar_metadata is None or grammar_metadata.display_name is None:
             return attribute_name
         return grammar_metadata.display_name
@@ -190,7 +198,8 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
     @classmethod
     def for_type(
         cls,
-        *, type_: Any,
+        *,
+        type_: Any,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         text: str | None = None,
     ) -> RoleFragment:
@@ -214,7 +223,9 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
                 else (type_noun(type_) if is_class else str(type_))
             ),
             role=SemanticRole.VARIABLE,
-            source_reference=SourceReference.for_type(type_=type_) if is_class else None,
+            source_reference=SourceReference.for_type(type_=type_)
+            if is_class
+            else None,
             number=number,
         )
 
@@ -250,7 +261,9 @@ class RoleFragment(HasText, HasNumber, HasPolarity, VerbalizationFragment):
         '42'
         """
         return (
-            cls.for_type(type_=value) if isinstance(value, type) else cls.for_literal(value=value)
+            cls.for_type(type_=value)
+            if isinstance(value, type)
+            else cls.for_literal(value=value)
         )
 
     @classmethod

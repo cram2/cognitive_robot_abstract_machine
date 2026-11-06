@@ -14,8 +14,18 @@ def pytest_generate_tests(metafunc):
         all_cases, all_targets = load_zoo_dataset("./test_results/zoo")
 
         possible_case_queries = [
-            CaseQuery(original_case=all_cases[0], attribute_name="species", _attribute_types=(Species,), mutually_exclusive=True),
-            CaseQuery(original_case=all_cases[1], attribute_name="habitat", _attribute_types=(Habitat,), mutually_exclusive=False),
+            CaseQuery(
+                original_case=all_cases[0],
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+            ),
+            CaseQuery(
+                original_case=all_cases[1],
+                attribute_name="habitat",
+                _attribute_types=(Habitat,),
+                mutually_exclusive=False,
+            ),
         ]
         metafunc.parametrize("case_query", possible_case_queries)
 
@@ -53,7 +63,13 @@ def drawer_case_queries(handles_and_containers_world) -> List[CaseQuery]:
             view = Drawer(handle=handle, container=container, world=world)
             all_possible_drawers.append(view)
     case_queries = [
-        CaseQuery(original_case=possible_drawer, attribute_name="correct", _attribute_types=(bool,), mutually_exclusive=True, default_value=False)
+        CaseQuery(
+            original_case=possible_drawer,
+            attribute_name="correct",
+            _attribute_types=(bool,),
+            mutually_exclusive=True,
+            default_value=False,
+        )
         for possible_drawer in all_possible_drawers
     ]
     return case_queries
@@ -76,7 +92,15 @@ def view_rdr(
         expert.load_answers(path=filename)
     rdr = GeneralRDR()
     for view in views:
-        rdr.fit_case(case_query=CaseQuery(original_case=world, attribute_name="views", _attribute_types=(view,), mutually_exclusive=False), expert=expert)
+        rdr.fit_case(
+            case_query=CaseQuery(
+                original_case=world,
+                attribute_name="views",
+                _attribute_types=(view,),
+                mutually_exclusive=False,
+            ),
+            expert=expert,
+        )
     if save_answers:
         expert.save_answers(path=filename)
 
@@ -92,7 +116,12 @@ def view_case_query(world: World, view_type: type[View]) -> CaseQuery:
     """
     Create a CaseQuery for the given view type in the provided world.
     """
-    return CaseQuery(original_case=world, attribute_name="views", _attribute_types=(view_type,), mutually_exclusive=False)
+    return CaseQuery(
+        original_case=world,
+        attribute_name="views",
+        _attribute_types=(view_type,),
+        mutually_exclusive=False,
+    )
 
 
 @pytest.fixture

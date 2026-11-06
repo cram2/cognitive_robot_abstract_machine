@@ -103,7 +103,9 @@ class FeatureExtractor:
 
         first_instance = instances[0]
         root = variable(type(first_instance), [])
-        extracted = cls._extract_features(example_instance=first_instance, symbolic_root=root)
+        extracted = cls._extract_features(
+            example_instance=first_instance, symbolic_root=root
+        )
         return cls(extracted_features=extracted)
 
     @staticmethod
@@ -161,7 +163,8 @@ class FeatureExtractor:
 
             exchangeable_features.update(
                 FeatureExtractor._process_many_to_many(
-                    current_instance=current_instance, relationships=schema.collection_relationships
+                    current_instance=current_instance,
+                    relationships=schema.collection_relationships,
                 )
             )
             queue.extend(
@@ -173,11 +176,14 @@ class FeatureExtractor:
             )
 
         result.extend(itertools.chain.from_iterable(exchangeable_features.values()))
-        return ExtractedFeatures(features=result, exchangeable_features=exchangeable_features)
+        return ExtractedFeatures(
+            features=result, exchangeable_features=exchangeable_features
+        )
 
     @staticmethod
     def _process_attributes(
-        *, instance: Any,
+        *,
+        instance: Any,
         symbolic_root: Variable,
         data_access_object_class: type[DataAccessObject],
         column_names: tuple[str, ...],
@@ -254,7 +260,8 @@ class FeatureExtractor:
 
     @staticmethod
     def _process_many_to_one(
-        *, instance: Any,
+        *,
+        instance: Any,
         symbolic_root: Variable,
         relationships: tuple[SingleRelationship, ...],
     ) -> deque[Any]:
@@ -278,7 +285,8 @@ class FeatureExtractor:
 
     @staticmethod
     def _process_many_to_many(
-        *, current_instance: Any,
+        *,
+        current_instance: Any,
         relationships: tuple[CollectionRelationship, ...],
     ) -> dict[str, list[MappedVariable]]:
         """
@@ -323,7 +331,9 @@ class FeatureExtractor:
         for feature in self.features:
             if feature in aggregation_features:
                 result.append(
-                    feature.apply_mapping_on_external_root(instance=aggregation_instance)
+                    feature.apply_mapping_on_external_root(
+                        instance=aggregation_instance
+                    )
                 )
             else:
                 result.append(

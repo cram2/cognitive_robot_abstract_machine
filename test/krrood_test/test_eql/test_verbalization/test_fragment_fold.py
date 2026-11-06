@@ -39,7 +39,10 @@ def test_fold_word_and_role_are_leaves():
 
 def test_fold_phrase_recurses_and_joins_with_separator():
     phrase = PhraseFragment(
-        parts=[WordFragment(text="the"), RoleFragment(text="Robot", role=SemanticRole.VARIABLE)],
+        parts=[
+            WordFragment(text="the"),
+            RoleFragment(text="Robot", role=SemanticRole.VARIABLE),
+        ],
         separator=" ",
     )
     assert _to_text(phrase) == "the Robot"
@@ -67,7 +70,9 @@ def test_fold_passes_already_folded_children_to_phrase_handler():
 
 
 def test_fold_gives_block_handler_the_raw_block():
-    block = BlockFragment(header=WordFragment(text="If"), items=[WordFragment(text="a")])
+    block = BlockFragment(
+        header=WordFragment(text="If"), items=[WordFragment(text="a")]
+    )
     captured = {}
 
     def block_handler(b):
@@ -108,7 +113,9 @@ def test_flatten_matches_manual_fold():
     block = BlockFragment(
         header=WordFragment(text="Find a Robot"),
         items=[
-            PhraseFragment(parts=[WordFragment(text="whose"), WordFragment(text="battery")]),
+            PhraseFragment(
+                parts=[WordFragment(text="whose"), WordFragment(text="battery")]
+            ),
             WordFragment(text="is high"),
         ],
     )
@@ -119,5 +126,7 @@ def test_flatten_matches_manual_fold():
 
 
 def test_flatten_headerless_block_is_comma_joined_items():
-    block = BlockFragment(header=None, items=[WordFragment(text="a"), WordFragment(text="b")])
+    block = BlockFragment(
+        header=None, items=[WordFragment(text="a"), WordFragment(text="b")]
+    )
     assert flatten_fragment_to_plain_text(block) == "a, b"

@@ -116,7 +116,9 @@ def test_resolver_builds_real_autoapi_url_for_fields():
         ("BankTransaction", "amount_details"),
     ]:
         cls = getattr(example_domain, cls_name)
-        url = resolver.resolve(reference=SourceReference(owner_type=cls, attribute=field_name))
+        url = resolver.resolve(
+            reference=SourceReference(owner_type=cls, attribute=field_name)
+        )
         assert url is not None
         assert f"autoapi/{_MODULE_PATH}/index.html" in url
         assert url.endswith(f"#{_MODULE}.{cls_name}.{field_name}")
@@ -149,4 +151,6 @@ def test_predicates_build_a_verbalization_fragment(cls_name):
     fields = {
         field.name: WordFragment(text=field.name) for field in dataclasses.fields(cls)
     }
-    assert isinstance(cls._verbalization_fragment_(fields=fields), VerbalizationFragment)
+    assert isinstance(
+        cls._verbalization_fragment_(fields=fields), VerbalizationFragment
+    )

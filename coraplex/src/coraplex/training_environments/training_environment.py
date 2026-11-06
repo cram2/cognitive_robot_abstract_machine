@@ -269,7 +269,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         robot_y = parameters.variable_of(
             attribute=underspecified_action.target_pose_offset_robot.position.y
         )
-        hip_rotation = parameters.variable_of(attribute=underspecified_action.hip_rotation)
+        hip_rotation = parameters.variable_of(
+            attribute=underspecified_action.hip_rotation
+        )
         approach_clearance = parameters.variable_of(
             attribute=underspecified_action.approach_clearance
         )
@@ -286,7 +288,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         hip_rotation_condition.fill_missing_variables(distribution.variables)
         distribution.log_truncated_of_simple_event_in_place(hip_rotation_condition)
 
-        return ProbabilisticBackend(model_registry=DictRegistry(models={self.action_type: distribution}))
+        return ProbabilisticBackend(
+            model_registry=DictRegistry(models={self.action_type: distribution})
+        )
 
     def setup_backend_from_path(self, underspecified_action: Match):
         """
@@ -312,4 +316,6 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             distribution, distribution_for_variables_not_in_parameters
         )
 
-        return ProbabilisticBackend(model_registry=DictRegistry(models={self.action_type: distribution}))
+        return ProbabilisticBackend(
+            model_registry=DictRegistry(models={self.action_type: distribution})
+        )

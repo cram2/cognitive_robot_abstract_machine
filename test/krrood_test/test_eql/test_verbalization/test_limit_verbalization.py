@@ -113,7 +113,9 @@ def test_ordering_without_limit_reports_the_ordered_listing():
     population and keeps the ordered-by clause.
     """
     e = variable(Employee, [])
-    text = verbalize_expression(an(entity(e).ordered_by(variable=e.salary, descending=True)))
+    text = verbalize_expression(
+        an(entity(e).ordered_by(variable=e.salary, descending=True))
+    )
     assert text == "Report Employees ordered by their salaries from highest to lowest"
 
 
@@ -124,7 +126,9 @@ def test_conditioned_ordering_still_reports():
     its restriction.
     """
     e = variable(Employee, [])
-    text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(variable=e.salary)))
+    text = verbalize_expression(
+        an(entity(e).where(e.salary > 5).ordered_by(variable=e.salary))
+    )
     assert (
         text
         == "Report Employees whose salaries are greater than 5, ordered by their salaries from lowest to highest"
@@ -184,7 +188,9 @@ def test_ranking_hierarchical_rendering():
         .ordered_by(variable=e.starting_salary, descending=True)
         .limit(n=3)
     )
-    text = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=PlainFormatter())).verbalize(expression=q)
+    text = VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=PlainFormatter())
+    ).verbalize(expression=q)
     assert text == (
         "Find the top three Employees by starting_salary\n"
         "  - whose salaries are greater than 1000"

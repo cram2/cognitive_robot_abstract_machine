@@ -84,10 +84,14 @@ def test_features_extraction():
     fully_factorized_circuit = fully_factorized(parameters.variables.values())
     assert len(parameters.truncation_assignments_from_krrood_variables) == 0
 
-    probabilistic_registry = DictRegistry(models={NestedAction: fully_factorized_circuit})
+    probabilistic_registry = DictRegistry(
+        models={NestedAction: fully_factorized_circuit}
+    )
 
     np.random.seed(69)
-    backend = ProbabilisticBackend(model_registry=probabilistic_registry, number_of_samples=50)
+    backend = ProbabilisticBackend(
+        model_registry=probabilistic_registry, number_of_samples=50
+    )
     samples = list(backend.evaluate(expression=action))
 
     assert all(
@@ -158,7 +162,13 @@ def test_dataframe_preprocessing(scenario):
 
 
 def test_missing_inheritance_from_mixin():
-    instance = MissingBaseClass(objects=[ExampleInt(attribute=1), ExampleInt(attribute=1), ExampleInt(attribute=1)])
+    instance = MissingBaseClass(
+        objects=[
+            ExampleInt(attribute=1),
+            ExampleInt(attribute=1),
+            ExampleInt(attribute=1),
+        ]
+    )
     result = FeatureExtractor.from_instances(instances=[instance])
     assert result.features == []
 

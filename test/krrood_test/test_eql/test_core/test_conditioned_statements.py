@@ -37,7 +37,9 @@ def test_attributes_a_statement_takes_are_not_statements_of_it():
 def test_calculated_operands_of_a_statement_are_not_statements_of_it():
     position = variable(KRROODPosition, [KRROODPosition(x=0.0, y=1.0, z=0.0)])
 
-    statements = get_true_statements(IsGreaterThan(value=position.x + 1, bound=position.y + 1))
+    statements = get_true_statements(
+        IsGreaterThan(value=position.x + 1, bound=position.y + 1)
+    )
 
     assert statements == []
 
@@ -112,7 +114,12 @@ def test_what_a_negation_negates_is_not_a_true_statement():
 
 def test_nothing_inside_a_negation_is_a_statement():
     position = variable(KRROODPosition, [KRROODPosition(x=0.0, y=2.0, z=0.0)])
-    negation = not_(or_(IsGreaterThan(value=position.x, bound=1.0), IsGreaterThan(value=position.y, bound=1.0)))
+    negation = not_(
+        or_(
+            IsGreaterThan(value=position.x, bound=1.0),
+            IsGreaterThan(value=position.y, bound=1.0),
+        )
+    )
 
     statements = get_false_statements(negation)
 

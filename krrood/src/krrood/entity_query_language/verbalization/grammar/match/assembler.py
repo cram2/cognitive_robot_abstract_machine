@@ -136,7 +136,9 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         >>> verbalize_expression(a(Mission)(assigned_to=a(Robot)(battery=...)))
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
-        points = [self._predict_point(group=group, plan=plan) for group in predict_groups]
+        points = [
+            self._predict_point(group=group, plan=plan) for group in predict_groups
+        ]
         return BlockFragment(
             header=PhraseFragment(
                 parts=[Conjunctions.AND.as_fragment(), Keywords.PREDICT.as_fragment()]
@@ -156,7 +158,8 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
         return self._owned_attributes(
-            attributes=[assignment.attribute for assignment in group.predicted], owner=group.object
+            attributes=[assignment.attribute for assignment in group.predicted],
+            owner=group.object,
         )
 
     # %% given that
@@ -176,7 +179,9 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         for group in plan.groups:
             if group.concrete:
                 points += self._concrete_points(group=group)
-        points += ConditionAssembler(context=self.context).as_statements(conditions=plan.other_conditions)
+        points += ConditionAssembler(context=self.context).as_statements(
+            conditions=plan.other_conditions
+        )
         if not points:
             return None
         return BlockFragment(
@@ -320,7 +325,9 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """
         if not plan.where_conditions:
             return None
-        points = ConditionAssembler(context=self.context).as_statements(conditions=plan.where_conditions)
+        points = ConditionAssembler(context=self.context).as_statements(
+            conditions=plan.where_conditions
+        )
         return BlockFragment(
             header=Keywords.WHERE.as_fragment(),
             items=points,

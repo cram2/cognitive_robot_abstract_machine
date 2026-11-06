@@ -206,7 +206,9 @@ class CoreferenceProcessor(RealizationPass):
             case PhraseFragment(parts=[PossessiveChain(), *_]):
                 return self._predicate_clause(clause=fragment)
             case _:
-                rebuilt = map_structural_children(fragment, lambda fragment: self._walk(fragment=fragment))
+                rebuilt = map_structural_children(
+                    fragment, lambda fragment: self._walk(fragment=fragment)
+                )
                 return rebuilt if rebuilt is not None else fragment
 
     def _predicate_clause(self, *, clause: PhraseFragment) -> VerbalizationFragment:
@@ -230,7 +232,9 @@ class CoreferenceProcessor(RealizationPass):
         'for all Robots, their batteries are between 10 and 90'
         """
         subject_number = self._clause_subject_number(subject=clause.parts[0])
-        rebuilt = map_structural_children(clause, lambda fragment: self._walk(fragment=fragment))
+        rebuilt = map_structural_children(
+            clause, lambda fragment: self._walk(fragment=fragment)
+        )
         if subject_number is GrammaticalNumber.PLURAL:
             return self._with_agreed_copula(clause=rebuilt, number=subject_number)
         return rebuilt
@@ -270,7 +274,9 @@ class CoreferenceProcessor(RealizationPass):
             return self._predicate_clause(clause=clause)
         number = self._subject_pronoun_number(subject=subject)
         if number is None:
-            rebuilt = map_structural_children(clause, lambda fragment: self._walk(fragment=fragment))
+            rebuilt = map_structural_children(
+                clause, lambda fragment: self._walk(fragment=fragment)
+            )
             return rebuilt if rebuilt is not None else clause
         pronoun = Pronouns.nominative(number=number).as_fragment()
         agreed_rest = [
@@ -322,9 +328,12 @@ class CoreferenceProcessor(RealizationPass):
             possessive = Pronouns.possessive(
                 number=self._subject_stack[-1].number
             ).as_fragment()
-            return PhraseFragment(parts=[possessive, self._walk(fragment=owned.attributes)])
+            return PhraseFragment(
+                parts=[possessive, self._walk(fragment=owned.attributes)]
+            )
         return coordinated_genitive(
-            [self._walk(fragment=owned.attributes)], self._walk(fragment=owned.owner_fragment)
+            [self._walk(fragment=owned.attributes)],
+            self._walk(fragment=owned.owner_fragment),
         )
 
     def _owner_is_subject(self, *, owned: OwnedAttributes) -> bool:
@@ -363,10 +372,14 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
         'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
         """
-        reduced_quantity = self._reduced_selected_quantity(possessive_chain=possessive_chain)
+        reduced_quantity = self._reduced_selected_quantity(
+            possessive_chain=possessive_chain
+        )
         if reduced_quantity is not None:
             resolved = reduced_quantity
-        elif (built := self._relational_possessive(possessive_chain=possessive_chain)) is not None:
+        elif (
+            built := self._relational_possessive(possessive_chain=possessive_chain)
+        ) is not None:
             # An "its …" continuation keeps the centre it referred to.
             return self._walk(fragment=built)
         elif self._pronominalises(possessive_chain=possessive_chain):
@@ -376,7 +389,9 @@ class CoreferenceProcessor(RealizationPass):
             )
         else:
             resolved = self._walk(
-                fragment=possessive_path(possessive_chain.parts, possessive_chain.root_fragment)
+                fragment=possessive_path(
+                    possessive_chain.parts, possessive_chain.root_fragment
+                )
             )
         self._center = self._chain_topic(parts=possessive_chain.parts)
         return resolved
@@ -585,7 +600,8 @@ class CoreferenceProcessor(RealizationPass):
 
     @staticmethod
     def _comma_framed(
-        *, modifiers: list[VerbalizationFragment],
+        *,
+        modifiers: list[VerbalizationFragment],
     ) -> list[VerbalizationFragment]:
         """:return: *modifiers* set off by a leading and trailing comma, so a non-restrictive relative
         clause reads *"the other Robot, to which its secondary is assigned, is …"*. The comma's
@@ -615,7 +631,8 @@ class CoreferenceProcessor(RealizationPass):
         return NounPhrase(
             head=self._walk(fragment=noun_phrase.head),
             additional_heads=[
-                self._walk(fragment=additional) for additional in noun_phrase.additional_heads
+                self._walk(fragment=additional)
+                for additional in noun_phrase.additional_heads
             ],
             number=noun_phrase.number,
             definiteness=Definiteness.DEFINITE,
@@ -658,16 +675,23 @@ class CoreferenceProcessor(RealizationPass):
         """
         head = self._walk(fragment=noun_phrase.head)
         additional_heads = [
-            self._walk(fragment=additional) for additional in noun_phrase.additional_heads
+            self._walk(fragment=additional)
+            for additional in noun_phrase.additional_heads
         ]
         if noun_phrase.referent_id is None or not noun_phrase.subject_of_modifiers:
-            modifiers = [self._walk(fragment=modifier) for modifier in noun_phrase.modifiers]
+            modifiers = [
+                self._walk(fragment=modifier) for modifier in noun_phrase.modifiers
+            ]
         else:
             self._subject_stack.append(
-                SubjectFrame(subject_id=noun_phrase.referent_id, number=noun_phrase.number)
+                SubjectFrame(
+                    subject_id=noun_phrase.referent_id, number=noun_phrase.number
+                )
             )
             try:
-                modifiers = [self._walk(fragment=modifier) for modifier in noun_phrase.modifiers]
+                modifiers = [
+                    self._walk(fragment=modifier) for modifier in noun_phrase.modifiers
+                ]
             finally:
                 self._subject_stack.pop()
         return replace(

@@ -26,6 +26,7 @@ class StackFrame:
     """
     Full path to the source file.
     """
+
     lineno: int
     """
     Line number within the source file.
@@ -35,6 +36,7 @@ class StackFrame:
     """
     Name of the function or method.
     """
+
     code_snippet: str | None
     """
     One source line, stripped; ``None`` if unavailable.
@@ -44,6 +46,7 @@ class StackFrame:
     """
     The class that owns this method, or ``None`` for free functions.
     """
+
     function_object: Callable | None
     """
     The callable object for this frame, or ``None`` if not resolvable.
@@ -53,6 +56,7 @@ class StackFrame:
     """
     Dotted module name (string, not ``ModuleType``) to avoid reference leaks.
     """
+
     global_namespace: dict[str, Any] | None = None
     """
     Shallow snapshot of the frame's ``f_globals``, or ``None`` when scope was not
@@ -144,7 +148,8 @@ class StackFrame:
     @classmethod
     def _from_frame(
         cls,
-        *, frame: FrameType,
+        *,
+        frame: FrameType,
         filename: str,
         lineno: int,
         function_name: str,

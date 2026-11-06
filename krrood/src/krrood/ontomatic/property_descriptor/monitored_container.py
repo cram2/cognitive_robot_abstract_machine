@@ -86,7 +86,8 @@ class MonitoredContainer(Generic[T], ABC):
 
     def _on_add(
         self,
-        *, value: Symbol,
+        *,
+        value: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = True,
     ) -> Symbol | weakref.ref[Symbol]:
@@ -111,7 +112,8 @@ class MonitoredContainer(Generic[T], ABC):
 
     def _update(
         self,
-        *, value: Symbol,
+        *,
+        value: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = False,
     ) -> bool:
@@ -146,7 +148,8 @@ class MonitoredContainer(Generic[T], ABC):
     @abstractmethod
     def _add_item(
         self,
-        *, item: Symbol,
+        *,
+        item: Symbol,
         inferred: bool = False,
         add_relation_to_the_graph: bool = True,
     ):
@@ -199,7 +202,9 @@ class MonitoredList(MonitoredContainer, list):
         self, *, item, inferred: bool = False, add_relation_to_the_graph: bool = True
     ):
         item = self._on_add(
-            value=item, inferred=inferred, add_relation_to_the_graph=add_relation_to_the_graph
+            value=item,
+            inferred=inferred,
+            add_relation_to_the_graph=add_relation_to_the_graph,
         )
         super().append(item)
 

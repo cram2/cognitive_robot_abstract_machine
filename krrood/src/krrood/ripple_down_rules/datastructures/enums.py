@@ -69,7 +69,6 @@ class Editor(str, Enum):
 
 
 class Category(str, Enum):
-
     @classmethod
     def from_str(cls, *, value: str) -> Category:
         return getattr(cls, value)

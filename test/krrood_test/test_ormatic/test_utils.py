@@ -25,10 +25,25 @@ class WackyEnum(E, Enum): ...
 
 
 def test_distance_between_classes():
-    assert inheritance_path_length(child_class=KRROODPosition5D, parent_class=KRROODPosition) == 2
-    assert inheritance_path_length(child_class=KRROODPosition, parent_class=KRROODPosition5D) is None
+    assert (
+        inheritance_path_length(
+            child_class=KRROODPosition5D, parent_class=KRROODPosition
+        )
+        == 2
+    )
+    assert (
+        inheritance_path_length(
+            child_class=KRROODPosition, parent_class=KRROODPosition5D
+        )
+        is None
+    )
     assert inheritance_path_length(child_class=Atom, parent_class=Symbol) == 1
-    assert inheritance_path_length(child_class=MultipleInheritance, parent_class=PrimaryBase) == 1
+    assert (
+        inheritance_path_length(
+            child_class=MultipleInheritance, parent_class=PrimaryBase
+        )
+        == 1
+    )
     assert inheritance_path_length(child_class=D, parent_class=A) == 2
     assert inheritance_path_length(child_class=E, parent_class=A) == 2
     assert inheritance_path_length(child_class=WackyEnum, parent_class=Enum) == 1

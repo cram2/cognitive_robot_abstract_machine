@@ -81,7 +81,9 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
     one excluded.
     """
 
-    yaw: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.0, upper=2 * math.pi))
+    yaw: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.0, upper=2 * math.pi)
+    )
     """
     The yaws to approach from, in radians, the upper one excluded.
     """
@@ -143,7 +145,9 @@ class GraspBetweenHeights(SurfaceGraspStrategy, ABC):
     A strategy that grasps an object between two fixed heights.
     """
 
-    height: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.05, upper=0.95))
+    height: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.05, upper=0.95)
+    )
     """
     The heights to grasp at, as fractions of the grasp surface's bounding box from its
     bottom to its top, the upper one excluded.
@@ -179,13 +183,17 @@ class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
     grasped.
     """
 
-    position: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.0, upper=1.0))
+    position: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.0, upper=1.0)
+    )
     """
     Where along the axis to close the gripper, as fractions of the axis from its lower
     end to its upper end, both included.
     """
 
-    angle: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.0, upper=2 * math.pi))
+    angle: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.0, upper=2 * math.pi)
+    )
     """
     How far the approach may be turned about the axis, in radians, both included; equal
     bounds fix the side the object is approached from.
@@ -209,7 +217,9 @@ class GraspABar(AxialGraspStrategy):
     away from the ends of the bar.
     """
 
-    position: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.1, upper=0.9))
+    position: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.1, upper=0.9)
+    )
 
 
 @dataclass
@@ -219,7 +229,9 @@ class GraspAcrossTheLength(AxialGraspStrategy):
     closing across its length.
     """
 
-    position: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.2, upper=0.8))
+    position: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.2, upper=0.8)
+    )
 
     angle: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.0, upper=0.0))
 
@@ -292,7 +304,9 @@ class PinchARim(PinchAWall, GraspBetweenHeights):
     rim itself.
     """
 
-    height: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.25, upper=0.75))
+    height: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.25, upper=0.75)
+    )
 
 
 @dataclass
@@ -307,7 +321,9 @@ class PinchTheTopOfAWall(PinchAWall):
     How far below the container's highest point its rim reaches, in meters.
     """
 
-    rim_fraction: Bounds[float] = field(default_factory=lambda: Bounds(lower=0.25, upper=0.75))
+    rim_fraction: Bounds[float] = field(
+        default_factory=lambda: Bounds(lower=0.25, upper=0.75)
+    )
     """
     How far below the highest point to pinch, as fractions of :attr:`rim_depth`.
     """

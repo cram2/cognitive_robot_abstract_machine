@@ -582,7 +582,8 @@ class GraphVisualizer:
 
     def _seg_blocked(
         self,
-        *, p_start: tuple[float, float],
+        *,
+        p_start: tuple[float, float],
         p_end: tuple[float, float],
         ignore: tuple[int, int],
     ):
@@ -689,7 +690,10 @@ class GraphVisualizer:
                 if (min(x0, x1) <= cx <= max(x0, x1)) and (
                     min(y0, y1) <= cy <= max(y0, y1)
                 ):
-                    if self._dist_pt_seg(px=cx, py=cy, ax_=x0, ay_=y0, bx_=x1, by_=y1) < 0.06:
+                    if (
+                        self._dist_pt_seg(px=cx, py=cy, ax_=x0, ay_=y0, bx_=x1, by_=y1)
+                        < 0.06
+                    ):
                         near_count += 1
 
             if edge_style == "straight":

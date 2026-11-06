@@ -39,7 +39,8 @@ def test_probable_variable_with_concrete_kwarg():
     instance = prob_q.construct_instance()
 
     correct_instance = KRROODPose(
-        position=KRROODPosition(x=..., y=..., z=...), orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0)
+        position=KRROODPosition(x=..., y=..., z=...),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
 
     assert instance == correct_instance
@@ -58,7 +59,8 @@ def test_new_underspecified_with_factory():
     prob_q._get_expression_().build()
     r = prob_q.construct_instance()
     assert r == KRROODPose(
-        position=KRROODPosition(x=..., y=..., z=...), orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0)
+        position=KRROODPosition(x=..., y=..., z=...),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
 
 
@@ -75,7 +77,8 @@ def test_match_constructs_an_instance_from_bindings_of_its_nested_pattern():
     x = query._find_assigned_variable_(access_path_name="KRROODPose.position.x")
     instance = query._construct_instance_from_bindings_(bindings={x._id_: bound_x})
     assert instance == KRROODPose(
-        position=KRROODPosition(x=bound_x, y=stated_y, z=stated_z), orientation=orientation
+        position=KRROODPosition(x=bound_x, y=stated_y, z=stated_z),
+        orientation=orientation,
     )
 
 
@@ -87,13 +90,18 @@ def test_match_constructs_list_elements_from_bindings():
         positions=[a(KRROODPosition)(x=stated_x, y=..., z=...), stated_position],
         some_strings=some_strings,
     )
-    y = query._find_assigned_variable_(access_path_name="KRROODPositions.positions[0].y")
-    z = query._find_assigned_variable_(access_path_name="KRROODPositions.positions[0].z")
+    y = query._find_assigned_variable_(
+        access_path_name="KRROODPositions.positions[0].y"
+    )
+    z = query._find_assigned_variable_(
+        access_path_name="KRROODPositions.positions[0].z"
+    )
     instance = query._construct_instance_from_bindings_(
         bindings={y._id_: bound_y, z._id_: bound_z}
     )
     assert instance == KRROODPositions(
-        positions=[KRROODPosition(x=stated_x, y=bound_y, z=bound_z), stated_position], some_strings=some_strings
+        positions=[KRROODPosition(x=stated_x, y=bound_y, z=bound_z), stated_position],
+        some_strings=some_strings,
     )
 
 

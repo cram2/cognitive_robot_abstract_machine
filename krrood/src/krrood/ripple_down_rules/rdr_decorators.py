@@ -1,7 +1,8 @@
 """
-This file contains decorators for the RDR (Ripple Down Rules) framework. Where each type of RDR has a decorator
-that can be used with any python function such that this function can benefit from the incremental knowledge acquisition
-of the RDRs.
+This file contains decorators for the RDR (Ripple Down Rules) framework.
+
+Where each type of RDR has a decorator that can be used with any python function such
+that this function can benefit from the incremental knowledge acquisition of the RDRs.
 """
 
 import inspect
@@ -33,96 +34,125 @@ class RDRDecorator:
     """
     The directory to save the RDR models in.
     """
+
     output_type: tuple[type, ...]
     """
-    The type(s) of the output produced by the RDR model (The type(s) of the queried attribute).
+    The type(s) of the output produced by the RDR model (The type(s) of the queried
+    attribute).
     """
+
     mutual_exclusive: bool
     """
-    Whether the queried attribute is mutually exclusive (i.e. allows for only one possible value) or not.
+    Whether the queried attribute is mutually exclusive (i.e. allows for only one
+    possible value) or not.
     """
+
     fit: bool = field(default=True)
     """
-    Whether to run in fitting mode and prompt the expert or just classify using existing rules.
+    Whether to run in fitting mode and prompt the expert or just classify using existing
+    rules.
     """
+
     expert: Expert | None = field(default=None)
     """
     The expert instance, this is used by the rdr to prompt for answers.
     """
+
     update_existing_rules: bool = field(default=True)
     """
     When in fitting mode, whether to ask for answers for existing rules as well or not.
     """
+
     package_name: str | None = field(default=None)
     """
-    The name of the user python package where the RDR model will be saved, this is useful for generating relative
-    imports in the generated rdr model files.
+    The name of the user python package where the RDR model will be saved, this is
+    useful for generating relative imports in the generated rdr model files.
     """
+
     use_generated_classifier: bool = field(default=False)
     """
-    Whether to use the generated classifier files of the rdr model instead of the RDR instance itself, this is useful
-    when you want to debug inside the rules.
+    Whether to use the generated classifier files of the rdr model instead of the RDR
+    instance itself, this is useful when you want to debug inside the rules.
     """
+
     ask_now: Callable[dict[str, Any], bool] = field(default=lambda _: False)
     """
-    A user provided callable function that outputs a boolean indicating when to ask the expert for an answer. The input
-    to the `ask_now` function is a dictionary with the original function arguments, while arguments like `self` and
-    `cls` are passed as a special key `self_` or `cls_` respectively.
+    A user provided callable function that outputs a boolean indicating when to ask the
+    expert for an answer.
+
+    The input to the `ask_now` function is a dictionary with the original function
+    arguments, while arguments like `self` and `cls` are passed as a special key `self_`
+    or `cls_` respectively.
     """
+
     ask_now_target: Any | None = field(default=None)
     """
     A target for the case that triggers the ask now function.
     """
+
     fitting_decorator: Callable | None = field(default=lambda f: f)
     """
-    A user provided decorator that wraps the `py:meth:ripple_down_rules.rdr.RippleDownRules.fit_case` method which is 
-    used when in fitting mode, this is useful when you want special logic pre and post the fitting operation, you can
-    for example freeze your system during fitting such that you have a stable state that you can query and use while 
-    writing and testing your answer/rule.
+    A user provided decorator that wraps the
+    `py:meth:ripple_down_rules.rdr.RippleDownRules.fit_case` method which is used when
+    in fitting mode, this is useful when you want special logic pre and post the fitting
+    operation, you can for example freeze your system during fitting such that you have
+    a stable state that you can query and use while writing and testing your
+    answer/rule.
     """
     generate_dot_file: bool = field(default=False)
     """
-    Whether to generate a dynamic dot file representing the state of the rule tree each time the rdr is queried, showing
-    which rules fired and which rules didn't get evaluated, ...etc.
+    Whether to generate a dynamic dot file representing the state of the rule tree each
+    time the rdr is queried, showing which rules fired and which rules didn't get
+    evaluated, ...etc.
     """
+
     regenerate_model: bool = field(default=False)
     """
-    Whether to regenerate the rdr model from scratch or not, this is useful when rdr package has been updated.
+    Whether to regenerate the rdr model from scratch or not, this is useful when rdr
+    package has been updated.
     """
     model_name: str | None = field(default=None)
     """
-    The name of the rdr model, this gets auto generated from the function signature and the class/file it is contained
-    in.
+    The name of the rdr model, this gets auto generated from the function signature and
+    the class/file it is contained in.
     """
     rdr: GeneralRDR = field(init=False, default=None)
     """
     The ripple down rules instance of the decorator class.
     """
+
     parsed_output_type: list[type] = field(init=False, default_factory=list)
     """
-    The output of a post processing done on the output types, for example converting typing module types 
-    (i.e. type hints) to python types.
+    The output of a post processing done on the output types, for example converting
+    typing module types (i.e. type hints) to python types.
     """
     origin_type: type | None = field(init=False, default=None)
     """
-    The origin of the type hint of the attribute, useful in the case of not mutually exclusive attributes to map the 
-    result to the specified container type (e.g. a list instead of a set which is the default container type for rdr
-    output).
+    The origin of the type hint of the attribute, useful in the case of not mutually
+    exclusive attributes to map the result to the specified container type (e.g. a list
+    instead of a set which is the default container type for rdr output).
     """
+
     output_name: str = field(init=False, default="output_")
     """
-    This is used to refer to the output value of the decorated function, this is used as part of the case as input to 
-    the rdr model, but is never used in the rule logic to prevent cycles from happening. The correct way to use the 
-    output of an rdr is through refinement rules which happens automatically by the rdr prompting for refinements.
+    This is used to refer to the output value of the decorated function, this is used as
+    part of the case as input to the rdr model, but is never used in the rule logic to
+    prevent cycles from happening.
+
+    The correct way to use the output of an rdr is through refinement rules which
+    happens automatically by the rdr prompting for refinements.
     """
+
     _not_none_output_found: bool = field(init=False, default=False)
     """
-    This is a flag that indicates that a not None output for the rdr has been inferred, this is used to update the 
-    generated dot file if it is set to `True`.
+    This is a flag that indicates that a not None output for the rdr has been inferred,
+    this is used to update the generated dot file if it is set to `True`.
     """
+
     generated_classifier: Callable | None = field(init=False, default=None)
     """
-    The generated classifier file of the rdr model, this is used when `use_generated_classifier` is set to `True`.
+    The generated classifier file of the rdr model, this is used when
+    `use_generated_classifier` is set to `True`.
     """
 
     @called_positionally
@@ -185,7 +215,9 @@ class RDRDecorator:
                     if self.generated_classifier is None:
                         model_path = os.path.join(self.models_dir, self.model_name)
                         self.generated_classifier = (
-                            self.rdr.get_rdr_classifier_from_python_file(package_name=model_path)
+                            self.rdr.get_rdr_classifier_from_python_file(
+                                package_name=model_path
+                            )
                         )
                     output = self.generated_classifier(case)
                 else:
@@ -219,9 +251,7 @@ class RDRDecorator:
         if self.regenerate_model:
             self.rdr.save(save_dir=self.models_dir, model_name=self.model_name)
 
-    def parse_output_type(
-        self, *args, func: Callable, output_type: Any
-    ) -> list[type]:
+    def parse_output_type(self, *args, func: Callable, output_type: Any) -> list[type]:
         parsed_output_type = []
         for ot in make_set(output_type):
             ot = get_arg_type_of_function_output(

@@ -554,7 +554,8 @@ class DerivedConditionVariable(ConditionVariable, ABC):
             # A node may hand back one of these unwrapped, which cannot be substituted into.
             expression = Scalar(expression)
         return expression.substitute(
-            old_variables=variables, new_variables=[variable.expression() for variable in variables]
+            old_variables=variables,
+            new_variables=[variable.expression() for variable in variables],
         )
 
 

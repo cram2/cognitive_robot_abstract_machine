@@ -118,7 +118,9 @@ class MatchAssignedValue(ABC):
     """
 
     @abstractmethod
-    def _as_assigned_variable_(self, *, attribute_type: type | None) -> SymbolicExpression:
+    def _as_assigned_variable_(
+        self, *, attribute_type: type | None
+    ) -> SymbolicExpression:
         """
         :param attribute_type: The type of the attribute this is assigned to.
         :return: The variable this stands for in that attribute's condition.
@@ -205,7 +207,9 @@ class SymbolicExpression(
         """
         return self
 
-    def _as_assigned_variable_(self, *, attribute_type: type | None) -> SymbolicExpression:
+    def _as_assigned_variable_(
+        self, *, attribute_type: type | None
+    ) -> SymbolicExpression:
         """
         :param attribute_type: The type of the attribute this is assigned to.
         :return: This expression, which stands for itself in the attribute's condition.
@@ -278,7 +282,9 @@ class SymbolicExpression(
             if id_ in evaluation_scoped_index:
                 self._expression_id_cache_[id_] = evaluation_scoped_index[id_]
                 return self._expression_id_cache_[id_]
-            raise NoExpressionFoundForGivenID(symbolic_expression=self, expression_id=id_)
+            raise NoExpressionFoundForGivenID(
+                symbolic_expression=self, expression_id=id_
+            )
 
         try:
             self._expression_id_cache_[id_] = next(
@@ -287,12 +293,15 @@ class SymbolicExpression(
                 if expression._id_ == id_
             )
         except StopIteration:
-            raise NoExpressionFoundForGivenID(symbolic_expression=self, expression_id=id_)
+            raise NoExpressionFoundForGivenID(
+                symbolic_expression=self, expression_id=id_
+            )
         return self._expression_id_cache_[id_]
 
     def tolist(
         self,
-        *, backend=None,
+        *,
+        backend=None,
     ) -> list[T | dict[T | SymbolicExpression, T]]:
         """
         Evaluate and return the results as a list.
@@ -313,7 +322,8 @@ class SymbolicExpression(
 
     def evaluate(
         self,
-        *, backend=None,
+        *,
+        backend=None,
     ) -> Iterator[T | dict[T | SymbolicExpression, T]]:
         """
         Evaluate the query and map the results to the correct output data structure.
@@ -419,7 +429,9 @@ class SymbolicExpression(
             ``children`` arguments.
         """
         children = [self._as_operand_(value=child) for child in children]
-        embedded_children = tuple(v._as_embeddable_child_(parent=self) for v in children)
+        embedded_children = tuple(
+            v._as_embeddable_child_(parent=self) for v in children
+        )
         for child in embedded_children:
             child._parent_ = self
         return embedded_children
@@ -444,7 +456,9 @@ class SymbolicExpression(
             return Literal(_value_=value, _name__=name)
         return value._symbolic_expression_
 
-    def _as_embeddable_child_(self, *, parent: SymbolicExpression) -> SymbolicExpression:
+    def _as_embeddable_child_(
+        self, *, parent: SymbolicExpression
+    ) -> SymbolicExpression:
         """
         :param parent: The expression about to take this expression as a child.
         :return: The node that should be stored as ``parent``'s child, defaulting to this
@@ -517,7 +531,8 @@ class SymbolicExpression(
 
     def _build_operation_result_with_truth_(
         self,
-        *, truth: bool,
+        *,
+        truth: bool,
         bindings: Bindings,
         child_result: OperationResult | None = None,
     ) -> OperationResult:
@@ -532,11 +547,14 @@ class SymbolicExpression(
         """
         bindings = copy(bindings)
         bindings[self._id_] = truth
-        return OperationResult(bindings=bindings, operand=self, previous_operation_result=child_result)
+        return OperationResult(
+            bindings=bindings, operand=self, previous_operation_result=child_result
+        )
 
     def _evaluate_(
         self,
-        *, sources: OperationResult | None = None,
+        *,
+        sources: OperationResult | None = None,
     ):
         """
         Wrapper for ``SymbolicExpression._evaluate__`` that manages evaluation context
@@ -548,14 +566,17 @@ class SymbolicExpression(
         """
         evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
-            yield from self._evaluate_within_(evaluation_context=evaluation_context, sources=sources)
+            yield from self._evaluate_within_(
+                evaluation_context=evaluation_context, sources=sources
+            )
             return
 
         yield from self._create_new_context_and_evaluate_(sources=sources)
 
     def _create_new_context_and_evaluate_(
         self,
-        *, sources: OperationResult | None = None,
+        *,
+        sources: OperationResult | None = None,
     ) -> Iterator[OperationResult]:
         """
         Start a new evaluation of this expression, independent of any evaluation already
@@ -577,7 +598,8 @@ class SymbolicExpression(
 
     def _evaluate_in_new_context_(
         self,
-        *, evaluation_context: EvaluationContext,
+        *,
+        evaluation_context: EvaluationContext,
         sources: OperationResult | None = None,
     ) -> Iterator[OperationResult]:
         """
@@ -592,12 +614,15 @@ class SymbolicExpression(
             root=self._conditions_root_, has_condition=self._has_condition_
         )
         yield from evaluation_context.iterate_as_current(
-            results=self._evaluate_within_(evaluation_context=evaluation_context, sources=sources)
+            results=self._evaluate_within_(
+                evaluation_context=evaluation_context, sources=sources
+            )
         )
 
     def _evaluate_within_(
         self,
-        *, evaluation_context: EvaluationContext,
+        *,
+        evaluation_context: EvaluationContext,
         sources: OperationResult | None = None,
     ) -> Iterator[OperationResult]:
         """
@@ -618,14 +643,24 @@ class SymbolicExpression(
                 bindings = copy(sources.bindings)
             else:
                 bindings = {}
-                sources = OperationResult(bindings={})  # empty sentinel for _evaluate__()
+                sources = OperationResult(
+                    bindings={}
+                )  # empty sentinel for _evaluate__()
             if self._id_ in bindings:
-                result = OperationResult(bindings=bindings, operand=self, previous_operation_result=previous_result)
+                result = OperationResult(
+                    bindings=bindings,
+                    operand=self,
+                    previous_operation_result=previous_result,
+                )
                 evaluation_context.on_result_yielded(expression=self, result=result)
                 yield result
             else:
                 for result in map(
-                    lambda current_result: self._evaluate_conclusions_and_update_bindings_(current_result=current_result),
+                    lambda current_result: (
+                        self._evaluate_conclusions_and_update_bindings_(
+                            current_result=current_result
+                        )
+                    ),
                     self._evaluate__(sources=sources),
                 ):
                     evaluation_context.on_result_yielded(expression=self, result=result)
@@ -689,7 +724,8 @@ class SymbolicExpression(
     @abstractmethod
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expression and set the operands bindings in the result
@@ -710,7 +746,9 @@ class SymbolicExpression(
             descendant is expression for descendant in self._descendants_
         )
 
-    def _parent_outside_(self, *, branch: SymbolicExpression) -> SymbolicExpression | None:
+    def _parent_outside_(
+        self, *, branch: SymbolicExpression
+    ) -> SymbolicExpression | None:
         """
         The parent by which the surrounding graph reaches this expression, ignoring any
         that lies inside *branch*.
@@ -725,10 +763,17 @@ class SymbolicExpression(
         :return: That parent, or ``None`` when nothing outside *branch* holds this
             expression.
         """
-        if self._parent_ is not None and not branch._contains_(expression=self._parent_):
+        if self._parent_ is not None and not branch._contains_(
+            expression=self._parent_
+        ):
             return self._parent_
         return next(
-            (parent for parent in self._parents_ if not branch._contains_(expression=parent)), None
+            (
+                parent
+                for parent in self._parents_
+                if not branch._contains_(expression=parent)
+            ),
+            None,
         )
 
     def _has_parent_(self, *, expression: SymbolicExpression) -> bool:
@@ -949,7 +994,9 @@ class SymbolicExpression(
         cache_key = (self._id_, expression_type)
         cache = evaluation_context.subtree_containment_cache
         if cache_key not in cache:
-            cache[cache_key] = self._compute_subtree_contains_(expression_type=expression_type)
+            cache[cache_key] = self._compute_subtree_contains_(
+                expression_type=expression_type
+            )
         return cache[cache_key]
 
     def _compute_subtree_contains_(
@@ -1016,7 +1063,9 @@ class SymbolicExpression(
         enclosing_parent = (
             enclosing_context.owning_parent if enclosing_context is not None else None
         )
-        if enclosing_parent is None or not self._has_parent_(expression=enclosing_parent):
+        if enclosing_parent is None or not self._has_parent_(
+            expression=enclosing_parent
+        ):
             return RuleTreeContext(condition=self, owning_parent=self._parent_)
         return RuleTreeContext(condition=self, owning_parent=enclosing_parent)
 
@@ -1287,7 +1336,9 @@ class TruthValueOperator(SymbolicExpression, ABC):
         """
         evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
-            evaluation_context.truth_value_operator_children.record(expression_id=child._id_)
+            evaluation_context.truth_value_operator_children.record(
+                expression_id=child._id_
+            )
         for result in child._evaluate_(sources=sources):
             if result.has_value:
                 yield result._as_fresh_observation_()
@@ -1425,7 +1476,9 @@ class OperationResult:
         empty — this evaluation is a new one to them.
         """
         fresh_observation = OperationResult(
-            bindings=self.bindings, operand=self.operand, previous_operation_result=self.previous_operation_result
+            bindings=self.bindings,
+            operand=self.operand,
+            previous_operation_result=self.previous_operation_result,
         )
         fresh_observation._is_false_ = self._is_false_
         return fresh_observation
@@ -1554,7 +1607,8 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
 
     def _build_operation_result_(
         self,
-        *, bindings: Bindings,
+        *,
+        bindings: Bindings,
         child_result: OperationResult | None = None,
     ) -> OperationResult:
         """
@@ -1565,7 +1619,9 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
         :param child_result: The result of the child operation, if any.
         :return: The OperationResult instance.
         """
-        return OperationResult(bindings=bindings, operand=self, previous_operation_result=child_result)
+        return OperationResult(
+            bindings=bindings, operand=self, previous_operation_result=child_result
+        )
 
     @cached_property
     def _type__(self):

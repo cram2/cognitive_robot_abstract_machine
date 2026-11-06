@@ -74,7 +74,9 @@ class DiscourseScopeRule(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def focus(cls, *, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
+    def focus(
+        cls, *, node: SymbolicExpression, microplan: Microplan
+    ) -> uuid.UUID | None:
         """:return: The id of *node*'s focus referent — the one a possessive pronoun in its body
         resolves to (``None`` when the scope has no single subject)."""
 
@@ -91,7 +93,9 @@ class QueryScope(DiscourseScopeRule):
     construct = Query
 
     @classmethod
-    def focus(cls, *, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
+    def focus(
+        cls, *, node: SymbolicExpression, microplan: Microplan
+    ) -> uuid.UUID | None:
         """:return: The query's focus referent, read from its plan.
 
         >>> robot = variable(Robot, [])
@@ -101,7 +105,9 @@ class QueryScope(DiscourseScopeRule):
         >>> QueryScope.focus(node=query, microplan=services.microplan) == robot._id_
         True
         """
-        return cls._focus_from_plan(plan=microplan.plan_for(node=node, planner=QueryPlanner))
+        return cls._focus_from_plan(
+            plan=microplan.plan_for(node=node, planner=QueryPlanner)
+        )
 
     @staticmethod
     def _focus_from_plan(*, plan: QueryPlan) -> uuid.UUID | None:
@@ -136,7 +142,9 @@ class QuantifierScope(DiscourseScopeRule):
     construct = QuantifiedConditional
 
     @classmethod
-    def focus(cls, *, node: SymbolicExpression, microplan: Microplan) -> uuid.UUID | None:
+    def focus(
+        cls, *, node: SymbolicExpression, microplan: Microplan
+    ) -> uuid.UUID | None:
         """:return: The bound variable's referent id — the condition's chains rooted there
         pronominalise.
 
@@ -218,7 +226,9 @@ class DiscourseModel:
             )
             if leaf is not None:
                 selected_quantities.add(leaf._id_)
-        return cls(_focus_by_scope=focus, _selected_quantities=frozenset(selected_quantities))
+        return cls(
+            _focus_by_scope=focus, _selected_quantities=frozenset(selected_quantities)
+        )
 
     def is_scope(self, *, source: FoldNode | None) -> bool:
         """:return: ``True`` when *source* is a query node that opens a discourse scope.

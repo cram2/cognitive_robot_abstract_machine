@@ -86,7 +86,9 @@ class ConditionAssembler(Assembler[Comparator, None]):
         transform = PredicateTransform.most_applicable(
             comparator=comparator, negated=negated
         )
-        return transform.render(comparator=comparator, context=self.context, negated=negated)
+        return transform.render(
+            comparator=comparator, context=self.context, negated=negated
+        )
 
     def as_statements(
         self, *, conditions: list[SymbolicExpression]
@@ -113,11 +115,14 @@ class ConditionAssembler(Assembler[Comparator, None]):
         >>> verbalize_expression(and_(robot.battery > 50, robot.name == 'x'))
         "the battery of a Robot is greater than 50, and the name of the Robot is 'x'"
         """
-        return [self.context.child(node=item) for item in reduce_conjuncts(list(conditions))]
+        return [
+            self.context.child(node=item) for item in reduce_conjuncts(list(conditions))
+        ]
 
     def attribute_modifier(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         subject: Variable,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> VerbalizationFragment:
@@ -142,7 +147,9 @@ class ConditionAssembler(Assembler[Comparator, None]):
         return PhraseFragment(
             parts=[
                 RoleFragment.for_attribute(
-                    owner=attribute._owner_class_, attribute_name=attribute._attribute_name_, number=number
+                    owner=attribute._owner_class_,
+                    attribute_name=attribute._attribute_name_,
+                    number=number,
                 ),
                 comparator_operator(
                     comparator, self.context.services, compact=False, number=number
@@ -174,7 +181,8 @@ class ConditionAssembler(Assembler[Comparator, None]):
             parts=[
                 Prepositions.WITH.as_fragment(),
                 RoleFragment.for_attribute(
-                    owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
+                    owner=attribute._owner_class_,
+                    attribute_name=attribute._attribute_name_,
                 ),
                 comparator_operator(comparator, self.context.services, compact=True),
                 self.context.child(node=comparator.right, as_value=True),
@@ -205,14 +213,19 @@ class ConditionAssembler(Assembler[Comparator, None]):
             parts=[
                 Prepositions.WITH.as_fragment(),
                 Articles.THE.as_fragment(),
-                Aggregations.for_aggregator(aggregator_type=type(fold.aggregator)).as_fragment(),
-                RoleFragment.for_attribute(owner=leaf._owner_class_, attribute_name=leaf._attribute_name_),
+                Aggregations.for_aggregator(
+                    aggregator_type=type(fold.aggregator)
+                ).as_fragment(),
+                RoleFragment.for_attribute(
+                    owner=leaf._owner_class_, attribute_name=leaf._attribute_name_
+                ),
             ]
         )
 
     def range_modifier(
         self,
-        *, range_fold: RangeFold,
+        *,
+        range_fold: RangeFold,
         subject: Variable,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> VerbalizationFragment:
@@ -234,7 +247,9 @@ class ConditionAssembler(Assembler[Comparator, None]):
         """
         attribute = single_hop_attribute(range_fold.chain_expression, subject)
         left = RoleFragment.for_attribute(
-            owner=attribute._owner_class_, attribute_name=attribute._attribute_name_, number=number
+            owner=attribute._owner_class_,
+            attribute_name=attribute._attribute_name_,
+            number=number,
         )
         return build_between(
             left,
@@ -246,7 +261,8 @@ class ConditionAssembler(Assembler[Comparator, None]):
 
     def attribute_predicate(
         self,
-        *, attribute_name: str,
+        *,
+        attribute_name: str,
         number: GrammaticalNumber,
         value: VerbalizationFragment,
     ) -> VerbalizationFragment:
@@ -294,4 +310,6 @@ class ConditionAssembler(Assembler[Comparator, None]):
         >>> verbalize_expression(entity(drawer))
         "If true, then there's a Drawer whose container is the parent of a FixedConnection, and whose handle is its child"
         """
-        return RoleFragment.for_attribute(owner=None, attribute_name=name, number=number)
+        return RoleFragment.for_attribute(
+            owner=None, attribute_name=name, number=number
+        )

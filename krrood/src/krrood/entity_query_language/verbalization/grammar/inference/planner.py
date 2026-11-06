@@ -277,7 +277,9 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
                 field_name=field_name,
                 value_expression=child,
                 is_plural_field=morphology.is_plural(field_name),
-                aggregation_status=self._aggregation_status(node_id=child._id_, group_key_ids=group_key_ids),
+                aggregation_status=self._aggregation_status(
+                    node_id=child._id_, group_key_ids=group_key_ids
+                ),
             )
             for field_name, child in self._inferred._child_variables_.items()
         ]
@@ -302,7 +304,9 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
         (1, 0)
         """
         antecedents = self._discover_antecedents(group_key_ids=group_key_ids)
-        unmatched = self._attribute_conditions(antecedents=antecedents, extra_conditions=self._outer_conditions())
+        unmatched = self._attribute_conditions(
+            antecedents=antecedents, extra_conditions=self._outer_conditions()
+        )
         return antecedents, unmatched
 
     def _discover_antecedents(
@@ -329,7 +333,9 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
                 root=root,
                 variable=self._root_variable(root=root),
                 type_name=type_name,
-                aggregation_status=self._aggregation_status(node_id=root._id_, group_key_ids=group_key_ids),
+                aggregation_status=self._aggregation_status(
+                    node_id=root._id_, group_key_ids=group_key_ids
+                ),
                 conditions=own_conditions,
             )
         return list(antecedents_by_root_id.values())
@@ -364,7 +370,8 @@ class InferencePlanner(Planner[Entity, RuleStructure]):
 
     def _attribute_conditions(
         self,
-        *, antecedents: list[AntecedentInformation],
+        *,
+        antecedents: list[AntecedentInformation],
         extra_conditions: list[SymbolicExpression],
     ) -> list[SymbolicExpression]:
         """Distribute outer-WHERE conditions to owning antecedents (in place).

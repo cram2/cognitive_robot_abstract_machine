@@ -544,7 +544,9 @@ class CameraObservationCodec(ViewCodec):
         :raises InvalidCameraObservation: If the recorded camera or model is invalid.
         """
         recorded = DataclassJSONSerializer.from_json(
-            data=payload.payload, clazz=RecordedCameraObservation, **tracker.create_kwargs()
+            data=payload.payload,
+            clazz=RecordedCameraObservation,
+            **tracker.create_kwargs(),
         )
         camera = tracker.get(key=UUID(recorded.camera_id))
         if not isinstance(camera, Camera):

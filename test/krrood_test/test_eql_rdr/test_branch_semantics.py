@@ -100,7 +100,10 @@ class PrioritySelectorBranchSemantics(SelectorBranchSemantics[PrioritySelector])
 
     @classmethod
     def branches(cls, *, selector, decompose) -> list[GuardedBranch]:
-        return [GuardedBranch(child_expression=selector.right, entry_guards=()), GuardedBranch(child_expression=selector.left, entry_guards=())]
+        return [
+            GuardedBranch(child_expression=selector.right, entry_guards=()),
+            GuardedBranch(child_expression=selector.left, entry_guards=()),
+        ]
 
 
 @dataclass(kw_only=True)
@@ -179,7 +182,9 @@ def test_refinement_sibling_guard_is_its_base_condition_only():
     animal = variable(Animal, domain=[])
     selector = Refinement(left=animal.has_fur, right=animal.can_fly)
 
-    guards = RefinementBranchSemantics.sibling_guards(selector=selector, negated=False, decompose=_leaf_guards)
+    guards = RefinementBranchSemantics.sibling_guards(
+        selector=selector, negated=False, decompose=_leaf_guards
+    )
 
     assert len(guards) == 1
     assert guards[0].original_expression is animal.has_fur
@@ -190,7 +195,9 @@ def test_refinement_branches_exclude_each_other():
     animal = variable(Animal, domain=[])
     selector = Refinement(left=animal.has_fur, right=animal.can_fly)
 
-    branches = RefinementBranchSemantics.branches(selector=selector, decompose=_leaf_guards)
+    branches = RefinementBranchSemantics.branches(
+        selector=selector, decompose=_leaf_guards
+    )
 
     assert [branch.child_expression._id_ for branch in branches] == [
         animal.has_fur._id_,
@@ -211,7 +218,9 @@ def test_alternative_negated_sibling_guard_is_de_morgan_over_both_sides():
     animal = variable(Animal, domain=[])
     selector = Alternative(left=animal.has_fur, right=animal.lays_eggs)
 
-    guards = AlternativeBranchSemantics.sibling_guards(selector=selector, negated=True, decompose=_leaf_guards)
+    guards = AlternativeBranchSemantics.sibling_guards(
+        selector=selector, negated=True, decompose=_leaf_guards
+    )
 
     assert _identified_guards(guards) == [
         (animal.has_fur._id_, True),
@@ -223,7 +232,9 @@ def test_alternative_branches_guard_the_second_against_the_first():
     animal = variable(Animal, domain=[])
     selector = Alternative(left=animal.has_fur, right=animal.lays_eggs)
 
-    branches = AlternativeBranchSemantics.branches(selector=selector, decompose=_leaf_guards)
+    branches = AlternativeBranchSemantics.branches(
+        selector=selector, decompose=_leaf_guards
+    )
 
     assert [branch.child_expression._id_ for branch in branches] == [
         animal.has_fur._id_,
@@ -238,7 +249,9 @@ def test_alternative_branches_guard_the_second_against_the_first():
 
 def test_next_branches_are_independent_and_carry_no_cross_guards():
     animal = variable(Animal, domain=[])
-    selector = Next(_operation_children_=(animal.has_fur, animal.can_fly, animal.lays_eggs))
+    selector = Next(
+        _operation_children_=(animal.has_fur, animal.can_fly, animal.lays_eggs)
+    )
 
     branches = NextBranchSemantics.branches(selector=selector, decompose=_leaf_guards)
 
@@ -254,7 +267,9 @@ def test_next_sibling_guard_covers_every_child_at_the_requested_polarity():
     animal = variable(Animal, domain=[])
     selector = Next(_operation_children_=(animal.has_fur, animal.can_fly))
 
-    guards = NextBranchSemantics.sibling_guards(selector=selector, negated=True, decompose=_leaf_guards)
+    guards = NextBranchSemantics.sibling_guards(
+        selector=selector, negated=True, decompose=_leaf_guards
+    )
 
     assert _identified_guards(guards) == [
         (animal.has_fur._id_, True),
@@ -295,7 +310,9 @@ def test_a_new_selector_directs_the_path_walk_without_editing_the_traversal():
         add(animal.species, Species.BIRD)
 
     paths = list(
-        _collect_rule_paths(PrioritySelector(left=first_condition, right=second_condition), [])
+        _collect_rule_paths(
+            PrioritySelector(left=first_condition, right=second_condition), []
+        )
     )
 
     # Right-first, per PrioritySelectorBranchSemantics.branches.

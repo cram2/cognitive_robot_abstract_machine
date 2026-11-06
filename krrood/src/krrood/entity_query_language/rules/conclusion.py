@@ -91,12 +91,15 @@ class Add(Conclusion):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
         v = next(self.value._evaluate_(sources=sources)).value
         new_bindings = sources.bindings | {self.variable._id_: v}
-        yield OperationResult(bindings=new_bindings, operand=self, previous_operation_result=sources)
+        yield OperationResult(
+            bindings=new_bindings, operand=self, previous_operation_result=sources
+        )
 
 
 ConclusionType = TypeVar("ConclusionType", bound=Conclusion)

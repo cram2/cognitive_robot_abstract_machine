@@ -62,9 +62,7 @@ def test_range_fold_selects_the_whose_range_form():
     """
     thing = variable(_Thing, [])
     (folded,) = fold_range_pairs([thing.salary > 100, thing.salary < 200])
-    form = ConditionForm.most_applicable(
-        request=Placement(item=folded, subject=thing)
-    )
+    form = ConditionForm.most_applicable(request=Placement(item=folded, subject=thing))
     assert form is WhoseRangeForm
     assert form.position is SurfacePosition.WHOSE
 

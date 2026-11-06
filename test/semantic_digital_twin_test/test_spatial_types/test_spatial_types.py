@@ -166,7 +166,11 @@ class TestRotationMatrix:
 
         derivative = rotation.axis_angle.angle.jacobian(variables=[variable])
 
-        assert np.isfinite(derivative.substitute(old_variables=[variable], new_variables=[angle]).to_np()).all()
+        assert np.isfinite(
+            derivative.substitute(
+                old_variables=[variable], new_variables=[angle]
+            ).to_np()
+        ).all()
 
     def test_reference_frames(self):
         reference_frame = Body(name=PrefixedName("muh"))
@@ -1168,7 +1172,9 @@ class TestVector3:
         nominator_expr = Vector3.from_iterable(nominator)
         denominator_expr = sm.Scalar(data=denominator)
         if_nan_expr = Vector3.from_iterable(if_nan)
-        result = nominator_expr.safe_division(other=denominator_expr, if_nan=if_nan_expr)
+        result = nominator_expr.safe_division(
+            other=denominator_expr, if_nan=if_nan_expr
+        )
         if denominator == 0:
             assert np.allclose(result[:3], if_nan)
         else:
@@ -2386,7 +2392,9 @@ class TestConstantEntriesAreNormalised:
         np.testing.assert_array_equal(matrix.to_np()[:3, 3], [5.0, 5.0, 5.0])
 
     def test_pose_repairs_its_bottom_row(self):
-        pose = Pose.from_casadi_sx(casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries()))
+        pose = Pose.from_casadi_sx(
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
+        )
         np.testing.assert_array_equal(pose.to_np()[3, :], [0.0, 0.0, 0.0, 1.0])
 
     def test_rotation_matrix_repairs_its_bottom_row(self):

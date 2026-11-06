@@ -83,13 +83,17 @@ def test_arguments_that_fit_no_parameter_are_refused():
 
 
 def test_each_passed_argument_is_named_by_the_parameter_that_receives_it():
-    keyword_arguments = CallSignature.of(callee=scale).keyword_arguments(3.0, offset=1.0)
+    keyword_arguments = CallSignature.of(callee=scale).keyword_arguments(
+        3.0, offset=1.0
+    )
 
     assert keyword_arguments == {"value": 3.0, "offset": 1.0}
 
 
 def test_the_keyword_arguments_make_the_same_call():
-    keyword_arguments = CallSignature.of(callee=scale).keyword_arguments(3.0, 4.0, offset=1.0)
+    keyword_arguments = CallSignature.of(callee=scale).keyword_arguments(
+        3.0, 4.0, offset=1.0
+    )
 
     assert scale(**keyword_arguments) == scale(3.0, 4.0, offset=1.0)
 
@@ -103,7 +107,9 @@ def test_a_class_is_called_without_self():
 def test_a_method_read_from_its_class_is_called_with_self():
     scaler = Scaler()
 
-    keyword_arguments = CallSignature.of(callee=Scaler.scale).keyword_arguments(scaler, 3.0)
+    keyword_arguments = CallSignature.of(callee=Scaler.scale).keyword_arguments(
+        scaler, 3.0
+    )
 
     assert keyword_arguments == {"self": scaler, "value": 3.0}
 
@@ -148,4 +154,6 @@ def test_arbitrary_keywords_accept_any_name():
 
 
 def test_a_parameter_passable_only_by_position_does_not_accept_its_name():
-    assert not CallSignature.of(callee=scale_by_position).accepts_keyword(keyword="value")
+    assert not CallSignature.of(callee=scale_by_position).accepts_keyword(
+        keyword="value"
+    )

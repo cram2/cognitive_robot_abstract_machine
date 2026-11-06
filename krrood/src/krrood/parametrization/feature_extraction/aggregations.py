@@ -277,11 +277,15 @@ def compute_aggregation_statistics(
         return {}
     aggregation_instance = aggregation_class(role_taker=domain_object)
     statistics = {}
-    for feature_function in aggregation_class.symbolic_features_of_field(field_name=field_name):
+    for feature_function in aggregation_class.symbolic_features_of_field(
+        field_name=field_name
+    ):
         feature_name = feature_function._name_
         if feature_name not in latent_variable_by_name:
             continue
-        value = feature_function.apply_mapping_on_external_root(instance=aggregation_instance)
+        value = feature_function.apply_mapping_on_external_root(
+            instance=aggregation_instance
+        )
         latent_variable = latent_variable_by_name[feature_name]
         try:
             latent_variable.make_value(value)

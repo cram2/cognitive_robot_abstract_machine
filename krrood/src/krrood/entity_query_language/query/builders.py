@@ -117,7 +117,9 @@ class FilterBuilder(ExpressionBuilder, ABC):
             exp for exp in self.conditions if not isinstance(exp, SymbolicExpression)
         ]
         if literal_expressions:
-            raise LiteralConditionError(query=self.query, literal_conditions=literal_expressions)
+            raise LiteralConditionError(
+                query=self.query, literal_conditions=literal_expressions
+            )
 
     @cached_property
     def aggregators_and_non_aggregators_in_conditions(
@@ -179,7 +181,9 @@ class WhereBuilder(FilterBuilder):
             self.aggregators_and_non_aggregators_in_conditions
         )
         if aggregators:
-            raise AggregatorInWhereConditionsError(aggregators=aggregators, query=self.query)
+            raise AggregatorInWhereConditionsError(
+                aggregators=aggregators, query=self.query
+            )
 
     def build(self) -> Where:
         return Where(_child_=self.conditions_expression)

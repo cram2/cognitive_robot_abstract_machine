@@ -342,7 +342,10 @@ class InferenceExplanation(Symbol):
             if isinstance(condition_expr, (LogicalOperator,)):
                 continue
             satisfied_conditions.append(
-                ConditionAndBindings(condition=condition_expr, bindings=self.operation_result.all_bindings)
+                ConditionAndBindings(
+                    condition=condition_expr,
+                    bindings=self.operation_result.all_bindings,
+                )
             )
         return satisfied_conditions
 
@@ -485,7 +488,10 @@ class InferenceExplanation(Symbol):
         """
         explanation = self.create_explanation_variable()
         node = self.get_variable_nodes_of_given_type(
-            type_=type_, node_variable=self.create_query_node_variable(explanation_variable=explanation)
+            type_=type_,
+            node_variable=self.create_query_node_variable(
+                explanation_variable=explanation
+            ),
         )
         operation_result = explanation.operation_result
         node_identifier = node_id(node=node)
@@ -523,7 +529,9 @@ class InferenceExplanation(Symbol):
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
         return (
-            entity(condition_node).where(HasType(variable=condition_node, types_=Comparator)).distinct()
+            entity(condition_node)
+            .where(HasType(variable=condition_node, types_=Comparator))
+            .distinct()
         )
 
     def get_satisfied_comparator_conditions_between_attributes(
@@ -568,7 +576,9 @@ class InferenceExplanation(Symbol):
         return (
             entity(condition_node)
             .where(
-                HasType(variable=condition_node, types_=(Comparator, InstantiatedVariable)),
+                HasType(
+                    variable=condition_node, types_=(Comparator, InstantiatedVariable)
+                ),
                 node_id(node=child1) != node_id(node=child2),
                 _build_type_existence_condition(child1_with_descendants, type_),
                 _build_type_existence_condition(child2_with_descendants, type_),
@@ -600,7 +610,9 @@ class InferenceExplanation(Symbol):
         return (
             entity(condition_node)
             .where(
-                HasType(variable=condition_node, types_=(Comparator, InstantiatedVariable)),
+                HasType(
+                    variable=condition_node, types_=(Comparator, InstantiatedVariable)
+                ),
                 node_id(node=desc_a) != node_id(node=desc_b),
                 _build_type_existence_condition(desc_a, type_a),
                 _build_type_existence_condition(desc_b, type_b),
@@ -610,7 +622,8 @@ class InferenceExplanation(Symbol):
 
     @staticmethod
     def create_query_node_variable(
-        *, explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
+        *,
+        explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
     ) -> FlatVariable[SymbolicExpression] | SymbolicExpression:
         """
         Build a flat variable ranging over all descendant nodes of the explanation's

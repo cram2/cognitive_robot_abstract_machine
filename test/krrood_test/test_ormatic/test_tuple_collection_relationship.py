@@ -39,7 +39,9 @@ def module(tmp_path_factory):
     instance = ORMatic(class_dependency_graph=class_diagram)
     instance.make_all_tables()
 
-    interface_file = tmp_path_factory.mktemp("tuple_collection") / "tuple_collection_interface.py"
+    interface_file = (
+        tmp_path_factory.mktemp("tuple_collection") / "tuple_collection_interface.py"
+    )
     with open(interface_file, "w") as f:
         instance.to_sqlalchemy_file(file=f)
 

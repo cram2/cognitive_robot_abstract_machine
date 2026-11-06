@@ -131,7 +131,9 @@ class VariableRule(PhraseRule):
         'the number of Robots'
         """
         return NounPhrase(
-            head=RoleFragment.for_variable(label=context.refer.head_noun_of(variable=node), expression=node),
+            head=RoleFragment.for_variable(
+                label=context.refer.head_noun_of(variable=node), expression=node
+            ),
             number=GrammaticalNumber.PLURAL,
             definiteness=Definiteness.INDEFINITE,
             referent_id=node._id_,
@@ -254,7 +256,12 @@ class LiteralRule(PhraseRule):
         return [
             data_field.name
             for data_field in fields(value)
-            if (grammar := GrammarMetadata.of_field(clazz=value, field_name=data_field.name)) is not None
+            if (
+                grammar := GrammarMetadata.of_field(
+                    clazz=value, field_name=data_field.name
+                )
+            )
+            is not None
             and grammar.is_identifying_field
         ]
 
@@ -287,6 +294,8 @@ class FlatVariableRule(PhraseRule):
 
     construct = FlatVariable
 
-    def build(self, *, node: FlatVariable, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: FlatVariable, context: RuleContext
+    ) -> VerbalizationFragment:
         """:return: The child's rendering, unwrapped from the transparent SetOf wrapper."""
         return context.child(node=node._child_, number=context.number)

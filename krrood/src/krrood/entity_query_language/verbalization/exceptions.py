@@ -36,7 +36,9 @@ class PredicateFragmentRequiredError(DataclassException):
     """
 
     node: InstantiatedVariable
-    """The instantiated predicate whose type supplies no verbalization fragment."""
+    """
+    The instantiated predicate whose type supplies no verbalization fragment.
+    """
 
     def error_message(self) -> str:
         return (
@@ -62,7 +64,9 @@ class NonFragmentPredicateError(DataclassException):
     """
 
     predicate_type: type
-    """The predicate type whose hook returned a non-fragment."""
+    """
+    The predicate type whose hook returned a non-fragment.
+    """
 
     returned: object
     """
@@ -90,7 +94,9 @@ class UnverbalizableExpressionError(DataclassException):
     """
 
     node: SymbolicExpression
-    """The EQL expression no grammar rule matched."""
+    """
+    The EQL expression no grammar rule matched.
+    """
 
     def error_message(self) -> str:
         return (
@@ -112,7 +118,9 @@ class UnloweredFragmentError(DataclassException):
     """
 
     fragment: VerbalizationFragment
-    """The un-lowered fragment that reached the renderer."""
+    """
+    The un-lowered fragment that reached the renderer.
+    """
 
     def error_message(self) -> str:
         return (
@@ -134,7 +142,9 @@ class UndeclaredFormPositionError(DataclassException):
     """
 
     form: type[ConditionForm]
-    """The condition-form subclass missing its ``position``."""
+    """
+    The condition-form subclass missing its ``position``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -156,7 +166,9 @@ class UnknownAggregatorError(DataclassException):
     """
 
     aggregator_type: type[Aggregator]
-    """The aggregator type that maps to no aggregation phrase."""
+    """
+    The aggregator type that maps to no aggregation phrase.
+    """
 
     def error_message(self) -> str:
         return (

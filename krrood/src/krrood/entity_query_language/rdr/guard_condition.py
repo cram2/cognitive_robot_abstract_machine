@@ -44,7 +44,8 @@ class GuardCondition:
 
     def holds_for(
         self,
-        *, shared_variable: Variable,
+        *,
+        shared_variable: Variable,
         case: Any,
     ) -> bool:
         """
@@ -55,7 +56,7 @@ class GuardCondition:
 
         :param shared_variable: The EQL variable the conditions range over.
         :param case: The concrete case object to evaluate against.
-        :return: ``True`` if the guard is satisfied.
+        :return:``True`` if the guard is satisfied.
         """
         shared_variable._update_domain_(domain=[case])
         # A leaf predicate yields its own bound boolean per case; a Not() has no

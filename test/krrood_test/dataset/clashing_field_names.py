@@ -3,9 +3,11 @@ from dataclasses import dataclass, field
 from typing import Optional
 from uuid import UUID
 
+
 @dataclass(kw_only=True)
 class ClashingTarget:
     id: UUID
+
 
 @dataclass(kw_only=True)
 class ClashingEntity:

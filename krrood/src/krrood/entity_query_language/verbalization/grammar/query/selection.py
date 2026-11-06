@@ -84,7 +84,8 @@ class SelectionAssembler:
 
     def prose(
         self,
-        *, variables: list[SymbolicExpression],
+        *,
+        variables: list[SymbolicExpression],
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> VerbalizationFragment:
         """:return: the selections joined as natural prose *"a, b, and c"* (Oxford comma, no
@@ -101,7 +102,9 @@ class SelectionAssembler:
         'Find the department and name of an Employee'
         """
         if number is GrammaticalNumber.PLURAL:
-            selections = [self.one(variable=variable, number=number) for variable in variables]
+            selections = [
+                self.one(variable=variable, number=number) for variable in variables
+            ]
         else:
             selections = self._folded(variables=variables)
         return oxford_comma(selections, Conjunctions.AND.as_fragment())
@@ -119,7 +122,9 @@ class SelectionAssembler:
         if number is GrammaticalNumber.PLURAL and isinstance(variable, Variable):
             return NounPhrase(
                 head=RoleFragment.for_variable(
-                    label=variable._type_.__name__, expression=variable, number=GrammaticalNumber.PLURAL
+                    label=variable._type_.__name__,
+                    expression=variable,
+                    number=GrammaticalNumber.PLURAL,
                 ),
                 number=GrammaticalNumber.PLURAL,
                 definiteness=Definiteness.INDEFINITE,
@@ -166,7 +171,9 @@ class SelectionAssembler:
         'Find the department and salary of an Employee'
         """
         fragments: list[VerbalizationFragment] = []
-        for item in group_consecutive_by_owner(variables, lambda selection: self._foldable_attribute(selection=selection)):
+        for item in group_consecutive_by_owner(
+            variables, lambda selection: self._foldable_attribute(selection=selection)
+        ):
             if isinstance(item, OwnerGroup):
                 fragments.append(
                     coordinated_genitive(
@@ -175,7 +182,9 @@ class SelectionAssembler:
                     )
                 )
             else:
-                fragments.append(self.one(variable=item, number=GrammaticalNumber.SINGULAR))
+                fragments.append(
+                    self.one(variable=item, number=GrammaticalNumber.SINGULAR)
+                )
         return fragments
 
     def _foldable_attribute(

@@ -93,7 +93,8 @@ class SelectorBranchSemantics(Generic[SelectorType], SubClassSafeGeneric, ABC):
     @classmethod
     def most_specific_for(
         cls,
-        *, expression: SymbolicExpression,
+        *,
+        expression: SymbolicExpression,
     ) -> type[SelectorBranchSemantics] | None:
         """
         Find the semantics governing *expression*.
@@ -123,7 +124,8 @@ class SelectorBranchSemantics(Generic[SelectorType], SubClassSafeGeneric, ABC):
     @abstractmethod
     def sibling_guards(
         cls,
-        *, selector: ConclusionSelector,
+        *,
+        selector: ConclusionSelector,
         negated: bool,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardCondition]:
@@ -147,7 +149,8 @@ class SelectorBranchSemantics(Generic[SelectorType], SubClassSafeGeneric, ABC):
     @abstractmethod
     def branches(
         cls,
-        *, selector: ConclusionSelector,
+        *,
+        selector: ConclusionSelector,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardedBranch]:
         """
@@ -165,7 +168,8 @@ class SelectorBranchSemantics(Generic[SelectorType], SubClassSafeGeneric, ABC):
 @dataclass(kw_only=True)
 class RefinementBranchSemantics(SelectorBranchSemantics[Refinement]):
     """
-    ``Refinement(left, right)`` — *right* refines *left*, overriding it when it applies.
+    ``Refinement(left, right)`` — *right* refines *left*, overriding it when it
+    applies.
 
     As a sibling, the refinement branch was taken exactly when *left* passed; *right* is
     a separate rule subtree rather than a condition on *left* having been reached.
@@ -174,7 +178,8 @@ class RefinementBranchSemantics(SelectorBranchSemantics[Refinement]):
     @classmethod
     def sibling_guards(
         cls,
-        *, selector: Refinement,
+        *,
+        selector: Refinement,
         negated: bool,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardCondition]:
@@ -183,12 +188,19 @@ class RefinementBranchSemantics(SelectorBranchSemantics[Refinement]):
     @classmethod
     def branches(
         cls,
-        *, selector: Refinement,
+        *,
+        selector: Refinement,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardedBranch]:
         return [
-            GuardedBranch(child_expression=selector.left, entry_guards=tuple(decompose(selector.right, True))),
-            GuardedBranch(child_expression=selector.right, entry_guards=tuple(decompose(selector.left, False))),
+            GuardedBranch(
+                child_expression=selector.left,
+                entry_guards=tuple(decompose(selector.right, True)),
+            ),
+            GuardedBranch(
+                child_expression=selector.right,
+                entry_guards=tuple(decompose(selector.left, False)),
+            ),
         ]
 
 
@@ -211,7 +223,8 @@ class AlternativeBranchSemantics(SelectorBranchSemantics[Alternative]):
     @classmethod
     def sibling_guards(
         cls,
-        *, selector: Alternative,
+        *,
+        selector: Alternative,
         negated: bool,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardCondition]:
@@ -220,25 +233,31 @@ class AlternativeBranchSemantics(SelectorBranchSemantics[Alternative]):
     @classmethod
     def branches(
         cls,
-        *, selector: Alternative,
+        *,
+        selector: Alternative,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardedBranch]:
         return [
             GuardedBranch(child_expression=selector.left, entry_guards=()),
-            GuardedBranch(child_expression=selector.right, entry_guards=tuple(decompose(selector.left, True))),
+            GuardedBranch(
+                child_expression=selector.right,
+                entry_guards=tuple(decompose(selector.left, True)),
+            ),
         ]
 
 
 @dataclass(kw_only=True)
 class NextBranchSemantics(SelectorBranchSemantics[Next]):
     """
-    ``Next(...)`` — independent rules at the same depth, evaluated without cross-guards.
+    ``Next(...)`` — independent rules at the same depth, evaluated without cross-
+    guards.
     """
 
     @classmethod
     def sibling_guards(
         cls,
-        *, selector: Next,
+        *,
+        selector: Next,
         negated: bool,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardCondition]:
@@ -250,7 +269,11 @@ class NextBranchSemantics(SelectorBranchSemantics[Next]):
     @classmethod
     def branches(
         cls,
-        *, selector: Next,
+        *,
+        selector: Next,
         decompose: LeafGuardDecomposition,
     ) -> list[GuardedBranch]:
-        return [GuardedBranch(child_expression=child, entry_guards=()) for child in selector._operation_children_]
+        return [
+            GuardedBranch(child_expression=child, entry_guards=())
+            for child in selector._operation_children_
+        ]

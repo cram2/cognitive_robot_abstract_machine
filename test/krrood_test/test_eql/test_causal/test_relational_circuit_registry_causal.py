@@ -136,9 +136,13 @@ def test_grounding_mode_field_is_actually_used(relational_probabilistic_circuit)
     )
 
     np.random.seed(0)
-    first = registry.get_model(parameters=UnderspecifiedParameters(statement=_cause_and_effect_query()))
+    first = registry.get_model(
+        parameters=UnderspecifiedParameters(statement=_cause_and_effect_query())
+    )
     np.random.seed(123)
-    second = registry.get_model(parameters=UnderspecifiedParameters(statement=_cause_and_effect_query()))
+    second = registry.get_model(
+        parameters=UnderspecifiedParameters(statement=_cause_and_effect_query())
+    )
 
     assert isinstance(first, CausalCircuit)
     assert {v.name for v in first.probabilistic_circuit.variables} == {

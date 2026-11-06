@@ -202,7 +202,9 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
         :param from_json_kwargs: The kwargs passed to the _from_json method.
         :return: The instance of WorldEntityWithIDKwargsTracker.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=from_json_kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(
+            from_json_kwargs=from_json_kwargs
+        )
         tracker.add(key=self.id, tracked_object=self)
         return tracker
 
@@ -221,7 +223,9 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
         half_initialized_instance.id = from_json(data["id"], **kwargs)
         if tracker.has(key=half_initialized_instance.id):
             return tracker.get(key=half_initialized_instance.id)
-        tracker.add(key=half_initialized_instance.id, tracked_object=half_initialized_instance)
+        tracker.add(
+            key=half_initialized_instance.id, tracked_object=half_initialized_instance
+        )
 
         fields_ = {f.name: f for f in fields(cls)}
 
@@ -1048,7 +1052,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         for field_ in self._serialized_fields():
             value = getattr(self, field_.name)
             if isinstance(value, WorldEntityWithID):
-                WorldEntityReference(subject=field_.name).write(data=result, identified_object=value)
+                WorldEntityReference(subject=field_.name).write(
+                    data=result, identified_object=value
+                )
             else:
                 result[field_.name] = to_json(value, **kwargs)
         return result

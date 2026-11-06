@@ -560,7 +560,9 @@ def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
 
 def test_a_handle_is_grasped_along_its_bar_and_around_it_as_far_as_asked():
     handle = _mug(with_handle=True).handle
-    strategy = GraspABar(position=Bounds(lower=0.3, upper=0.7), angle=Bounds(lower=0.5, upper=1.5))
+    strategy = GraspABar(
+        position=Bounds(lower=0.3, upper=0.7), angle=Bounds(lower=0.5, upper=1.5)
+    )
     allowed = allowed_intervals(strategy.statement(handle))
 
     assert allowed["position"].simple_sets[0].lower == pytest.approx(

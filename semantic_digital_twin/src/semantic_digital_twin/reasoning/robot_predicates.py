@@ -298,7 +298,9 @@ class VisibleTo(Triple[TKinematicStructureEntity, TCamera]):
         return self.camera
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the entity is visible to the camera"*.
 

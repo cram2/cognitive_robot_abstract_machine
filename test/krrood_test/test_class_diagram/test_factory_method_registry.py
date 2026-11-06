@@ -54,11 +54,15 @@ class SubclassInheritingFactory(ClassWithMarkedFactory):
 
 
 def test_descriptor_registers_marked_factory_at_definition():
-    assert FactoryMethodRegistry().is_registered(cls=ClassWithMarkedFactory, name="make")
+    assert FactoryMethodRegistry().is_registered(
+        cls=ClassWithMarkedFactory, name="make"
+    )
 
 
 def test_registration_is_inherited_by_subclasses():
-    assert FactoryMethodRegistry().is_registered(cls=SubclassInheritingFactory, name="make")
+    assert FactoryMethodRegistry().is_registered(
+        cls=SubclassInheritingFactory, name="make"
+    )
 
 
 def test_unmarked_classmethod_is_not_registered():

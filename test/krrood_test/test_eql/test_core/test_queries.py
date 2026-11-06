@@ -655,9 +655,10 @@ def test_generate_with_using_inherited_predicate(handles_and_containers_world):
         len([h for h in world.bodies if isinstance(h, Handle)])
     ) + factorial(len([c for c in world.bodies if isinstance(c, Container)]))
     assert len(body_pairs) == expected, "Should generate at least one handle."
-    assert all(HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)() for b1, b2, b3 in body_pairs), (
-        "All generated items should satisfy the predicate."
-    )
+    assert all(
+        HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)()
+        for b1, b2, b3 in body_pairs
+    ), "All generated items should satisfy the predicate."
     assert all(
         not HaveSameFirstCharacter(body1=b1, body2=b2, body3=b3)()
         for b1 in world.bodies
@@ -752,7 +753,9 @@ def test_predicate_taking_one_variable_attribute_twice():
     An attribute filling two arguments of a predicate gives its value to both of them.
     """
     values = [0.0, 1.0, 2.0]
-    position = variable(KRROODPosition, [KRROODPosition(x=x, y=x, z=0.0) for x in values])
+    position = variable(
+        KRROODPosition, [KRROODPosition(x=x, y=x, z=0.0) for x in values]
+    )
     query = entity(position).where(IsGreaterThan(value=position.x, bound=position.x))
 
     assert query.tolist() == []
@@ -780,7 +783,9 @@ def test_predicate_argument_left_out_takes_its_default():
     values = [0.0, 1.0, 2.0]
     positions = [KRROODPosition(x=x, y=y, z=0.0) for x in values for y in values]
     position = variable(KRROODPosition, positions)
-    query = entity(position).where(IsGreaterThanByMargin(value=position.x, bound=position.y))
+    query = entity(position).where(
+        IsGreaterThanByMargin(value=position.x, bound=position.y)
+    )
 
     assert query.tolist() == [
         candidate
@@ -796,7 +801,9 @@ def test_contains_type():
     fb2 = FruitBox(name="FruitBox2", fruits=fb2_fruits)
 
     fb = variable(FruitBox, domain=None)
-    fruit_box_query = an(entity(fb).where(ContainsType(iterable=fb.fruits, obj_type=Apple)))
+    fruit_box_query = an(
+        entity(fb).where(ContainsType(iterable=fb.fruits, obj_type=Apple))
+    )
 
     query_result = list(fruit_box_query.evaluate())
     assert len(query_result) == 1, "Should generate 1 fruit box."
@@ -811,7 +818,9 @@ def test_equivalent_to_contains_type_using_exists():
     fb = variable(FruitBox, domain=None)
     fruit_box_query = an(
         entity(fb).where(
-            exists(var := flat_variable(fb.fruits), HasType(variable=var, types_=Apple)),
+            exists(
+                var := flat_variable(fb.fruits), HasType(variable=var, types_=Apple)
+            ),
         )
     )
 
@@ -887,7 +896,11 @@ def test_quantified_query(handles_and_containers_world):
 
     results = list(get_quantified_query(AtLeast(value=3)).evaluate())
     assert len(results) == 3
-    results = list(get_quantified_query(Range(at_least=AtLeast(value=2), at_most=AtMost(value=4))).evaluate())
+    results = list(
+        get_quantified_query(
+            Range(at_least=AtLeast(value=2), at_most=AtMost(value=4))
+        ).evaluate()
+    )
     assert len(results) == 3
     with pytest.raises(LessThanExpectedNumberOfSolutions):
         list(get_quantified_query(AtLeast(value=4)).evaluate())
@@ -1609,9 +1622,30 @@ def test_presentation_example():
         tasks: list[Task]
 
     robots = [
-        Robot(name="Robot1", battery=100, tasks=[Task(name="Task1", completed=True), Task(name="Task2", completed=False)]),
-        Robot(name="Robot2", battery=50, tasks=[Task(name="Task3", completed=False), Task(name="Task4", completed=True)]),
-        Robot(name="Robot3", battery=75, tasks=[Task(name="Task5", completed=False), Task(name="Task6", completed=True)]),
+        Robot(
+            name="Robot1",
+            battery=100,
+            tasks=[
+                Task(name="Task1", completed=True),
+                Task(name="Task2", completed=False),
+            ],
+        ),
+        Robot(
+            name="Robot2",
+            battery=50,
+            tasks=[
+                Task(name="Task3", completed=False),
+                Task(name="Task4", completed=True),
+            ],
+        ),
+        Robot(
+            name="Robot3",
+            battery=75,
+            tasks=[
+                Task(name="Task5", completed=False),
+                Task(name="Task6", completed=True),
+            ],
+        ),
     ]
     r = variable(Robot, robots)
     q = an(entity(r).where(r.battery > 50, not_(r.tasks[0].completed)))

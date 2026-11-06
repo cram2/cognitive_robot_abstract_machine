@@ -36,7 +36,12 @@ dependencies = []
 type_mappings = {np.ndarray: NumpyType}
 
 # Create an ORMatic object with the classes to be mapped
-ormatic = ORMatic.from_package(packages=[segmind], ormatic_interface_dependencies=dependencies, ignored_classes=ignored_classes, type_mappings=type_mappings)
+ormatic = ORMatic.from_package(
+    packages=[segmind],
+    ormatic_interface_dependencies=dependencies,
+    ignored_classes=ignored_classes,
+    type_mappings=type_mappings,
+)
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 
 

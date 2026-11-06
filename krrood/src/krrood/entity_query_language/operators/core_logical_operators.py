@@ -54,15 +54,20 @@ class Not(LogicalOperator, UnaryExpression):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
-        for child_result in self._evaluate_child_as_condition_(child=self._child_, sources=sources):
+        for child_result in self._evaluate_child_as_condition_(
+            child=self._child_, sources=sources
+        ):
             # Include child_result as previous so the satisfaction-tracking chain extends
             # through the negated child's evaluation, keeping ancestor conditions
             # reachable in the result chain.
             yield self._build_operation_result_with_truth_(
-                truth=child_result.is_false, bindings=child_result.bindings, child_result=child_result
+                truth=child_result.is_false,
+                bindings=child_result.bindings,
+                child_result=child_result,
             )
 
 
@@ -80,9 +85,13 @@ class LogicalBinaryOperator(LogicalOperator, BinaryExpression, ABC):
         :param sources: The current OperationResult to use during evaluation.
         :return: The new bindings after evaluating the right operand.
         """
-        for right_value in self._evaluate_child_as_condition_(child=self.right, sources=sources):
+        for right_value in self._evaluate_child_as_condition_(
+            child=self.right, sources=sources
+        ):
             yield self._build_operation_result_with_truth_(
-                truth=right_value.is_true, bindings=right_value.bindings, child_result=right_value
+                truth=right_value.is_true,
+                bindings=right_value.bindings,
+                child_result=right_value,
             )
 
 
@@ -94,11 +103,14 @@ class AND(LogicalBinaryOperator):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
 
         yielded: bool = False
-        for left_value in self._evaluate_child_as_condition_(child=self.left, sources=sources):
+        for left_value in self._evaluate_child_as_condition_(
+            child=self.left, sources=sources
+        ):
             yielded = True
             if left_value.is_false:
                 yield self._build_operation_result_with_truth_(
@@ -124,7 +136,8 @@ class OR(LogicalBinaryOperator):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the left operand, if it is False, then evaluate the right operand.
@@ -134,7 +147,9 @@ class OR(LogicalBinaryOperator):
             operand).
         """
         yielded: bool = False
-        for left_value in self._evaluate_child_as_condition_(child=self.left, sources=sources):
+        for left_value in self._evaluate_child_as_condition_(
+            child=self.left, sources=sources
+        ):
             yielded = True
             if left_value.is_false:
                 yield from self.evaluate_right(sources=left_value)
@@ -175,8 +190,9 @@ def flatten_operands(
     """
     Recursively flatten a homogeneous binary chain into a flat operand list.
 
-    ``flatten_operands(AND(left=AND(left=a, right=b), right=c), AND)`` yields ``[a, b, c]``.  A node that is
-    not an instance of *operator_type* is returned as a single-element list.
+    ``flatten_operands(AND(left=AND(left=a, right=b), right=c), AND)`` yields ``[a, b,
+    c]``.  A node that is not an instance of *operator_type* is returned as a single-
+    element list.
 
     :param expr: Root of the expression tree to flatten.
     :param operator_type: The binary operator class whose chains to flatten (e.g.

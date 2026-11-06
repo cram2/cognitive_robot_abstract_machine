@@ -70,13 +70,17 @@ def resolve_class_from_full_name(fully_qualified_class_name: str) -> type:
     try:
         return _resolve_class_from_full_name(fully_qualified_class_name)
     except ValueError as exc:
-        raise InvalidTypeFormatError(invalid_type_value=fully_qualified_class_name) from exc
+        raise InvalidTypeFormatError(
+            invalid_type_value=fully_qualified_class_name
+        ) from exc
     except ModuleNotFoundError as exc:
         module_name = fully_qualified_class_name.rsplit(".", 1)[0]
         raise UnknownModuleError(module_name=module_name) from exc
     except AttributeError as exc:
         module_name, class_name = fully_qualified_class_name.rsplit(".", 1)
-        raise ClassNotFoundError(class_name=class_name, module_name=module_name) from exc
+        raise ClassNotFoundError(
+            class_name=class_name, module_name=module_name
+        ) from exc
 
 
 @dataclass(kw_only=True)
@@ -88,7 +92,9 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
     logic for a type where you cannot control its inheritance.
     """
 
-    def get_external_serializer(self, *, clazz: type) -> type[ExternalClassJSONSerializer]:
+    def get_external_serializer(
+        self, *, clazz: type
+    ) -> type[ExternalClassJSONSerializer]:
         """
         Get the external serializer for the given class.
 
@@ -111,7 +117,9 @@ class JSONSerializableTypeRegistry(metaclass=SingletonMeta):
             if subclass.matches_generic_type(clazz=clazz):
                 return subclass
             else:
-                distance = inheritance_path_length(child_class=clazz, parent_class=subclass.original_class())
+                distance = inheritance_path_length(
+                    child_class=clazz, parent_class=subclass.original_class()
+                )
                 if distance is not None:
                     distances[subclass] = distance
 
@@ -201,9 +209,13 @@ class SubclassJSONSerializer:
             JSONSerializableTypeRegistry().get_external_serializer(clazz=target_cls)
         )
 
-        return external_json_deserializer.from_json(data=data, clazz=target_cls, **kwargs)
+        return external_json_deserializer.from_json(
+            data=data, clazz=target_cls, **kwargs
+        )
 
-    def update_from_json_diff(self, *, diffs: list[JSONAttributeDiff], **kwargs) -> None:
+    def update_from_json_diff(
+        self, *, diffs: list[JSONAttributeDiff], **kwargs
+    ) -> None:
         """
         Update the current object from a list of shallow diffs.
 
@@ -978,7 +990,9 @@ class CompressedSparseRowArrayJSONSerializer(ExternalClassJSONSerializer[csr_arr
     @classmethod
     def to_json(cls, *, instance: csr_array, **kwargs) -> dict[str, Any]:
         return {
-            **CoordinateSparseArrayJSONSerializer.to_json(instance=instance.tocoo(), **kwargs),
+            **CoordinateSparseArrayJSONSerializer.to_json(
+                instance=instance.tocoo(), **kwargs
+            ),
             JSONField.TYPE: get_full_class_name(type(instance)),
         }
 
@@ -987,7 +1001,9 @@ class CompressedSparseRowArrayJSONSerializer(ExternalClassJSONSerializer[csr_arr
         cls, *, data: dict[str, Any], clazz: type[csr_array], **kwargs
     ) -> csr_array:
         return csr_array(
-            CoordinateSparseArrayJSONSerializer.from_json(data=data, clazz=coo_array, **kwargs)
+            CoordinateSparseArrayJSONSerializer.from_json(
+                data=data, clazz=coo_array, **kwargs
+            )
         )
 
 
@@ -1033,7 +1049,8 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
     def from_json(cls, *, data: dict[str, Any], clazz: type, **kwargs) -> Self:
         introspector = DataclassOnlyIntrospector()
         discovered_attributes = {
-            attr.field.name: attr.field for attr in introspector.discover(owner_cls=clazz)
+            attr.field.name: attr.field
+            for attr in introspector.discover(owner_cls=clazz)
         }
 
         init_args = {}

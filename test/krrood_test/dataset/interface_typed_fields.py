@@ -167,4 +167,6 @@ class LabelledPosition3DMapping(
         return cls(origin_name=obj.origin_name, x=obj.x, y=obj.y, z=obj.z)
 
     def to_domain_object(self) -> LabelledPosition3D:
-        return LabelledPosition3D(x=self.x, y=self.y, z=self.z, origin_name=self.origin_name)
+        return LabelledPosition3D(
+            x=self.x, y=self.y, z=self.z, origin_name=self.origin_name
+        )

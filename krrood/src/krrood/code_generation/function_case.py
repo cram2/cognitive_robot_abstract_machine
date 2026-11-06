@@ -169,7 +169,9 @@ class FunctionCaseGenerator:
 
         function_attribute_setter_line = ""
         if callable_import and callable_import.access_expression:
-            function_attribute_setter_line = f"{class_name}.function = {callable_import.access_expression}"
+            function_attribute_setter_line = (
+                f"{class_name}.function = {callable_import.access_expression}"
+            )
 
         return self.code_generator.render(
             template_name=self.template_file_name,
@@ -181,5 +183,5 @@ class FunctionCaseGenerator:
             access_expression=callable_import.access_expression,
             type_imports=type_import_lines,
             function_meta_data=function_meta_data,
-            function_attribute_setter_line=function_attribute_setter_line
+            function_attribute_setter_line=function_attribute_setter_line,
         )

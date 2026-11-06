@@ -28,7 +28,8 @@ class TypeDict:
         return {
             k: v
             for k in self._dict.keys()
-            if (v := inheritance_path_length(child_class=clazz, parent_class=k)) is not None
+            if (v := inheritance_path_length(child_class=clazz, parent_class=k))
+            is not None
         }
 
     def __getitem__(self, key: type) -> Any:

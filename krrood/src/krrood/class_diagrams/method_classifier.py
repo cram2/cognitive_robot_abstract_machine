@@ -46,7 +46,9 @@ class FactoryMethodMarker:
     """
 
     wrapped: classmethod
-    """The ``classmethod`` being marked as a factory."""
+    """
+    The ``classmethod`` being marked as a factory.
+    """
 
     def __set_name__(self, owner: type, name: str) -> None:
         """

@@ -73,7 +73,11 @@ class SameTypePair(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, *, fields):
-        return clause(Noun(content=fields["point_1"]), Verb(lemma="face"), Noun(content=fields["point_2"]))
+        return clause(
+            Noun(content=fields["point_1"]),
+            Verb(lemma="face"),
+            Noun(content=fields["point_2"]),
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -120,7 +124,9 @@ class MetadataNamed(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, *, fields):
-        return clause(Noun(content=fields["burning_thing"]), Copula(), Adjective(word="lit"))
+        return clause(
+            Noun(content=fields["burning_thing"]), Copula(), Adjective(word="lit")
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -176,7 +182,9 @@ class UntypedRole(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, *, fields):
-        return clause(Noun(content=fields["location"]), Copula(), Adjective(word="reachable"))
+        return clause(
+            Noun(content=fields["location"]), Copula(), Adjective(word="reachable")
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -469,7 +477,10 @@ def test_reused_operand_ignores_field_context():
     resort) applies.
     """
     parent = UntypedRole(location=variable(object, []))
-    edges = [ParentEdge(parent=parent, field_name="location"), ParentEdge(parent=parent, field_name="location")]
+    edges = [
+        ParentEdge(parent=parent, field_name="location"),
+        ParentEdge(parent=parent, field_name="location"),
+    ]
     assert operand_head_noun(variable(object, []), edges) == "object"
 
 
@@ -484,7 +495,11 @@ def test_same_type_pair_uses_the_indefinite_alternative_on_first_mention():
 
 def test_same_type_triple_uses_ordinals_with_a_plural_copula():
     assert verbalize_expression(
-        SameTypeTriple(point_1=variable(Marker, []), point_2=variable(Marker, []), point_3=variable(Marker, []))
+        SameTypeTriple(
+            point_1=variable(Marker, []),
+            point_2=variable(Marker, []),
+            point_3=variable(Marker, []),
+        )
     ) == ("a Marker, a second Marker, and a third Marker are collinear")
 
 
@@ -495,14 +510,20 @@ def test_distinct_role_names_are_kept_distinct():
 
 
 def test_metadata_named_pair_shares_one_noun_and_is_disambiguated():
-    assert verbalize_expression(MetadataNamed(burning_thing=variable(object, []))) == "a torch is lit"
+    assert (
+        verbalize_expression(MetadataNamed(burning_thing=variable(object, [])))
+        == "a torch is lit"
+    )
 
 
 # %% reused operand keeps ordinary referring rendering
 
 
 def test_single_operand_is_named_by_its_type_when_informative():
-    assert verbalize_expression(SingleRole(surface=variable(Marker, []))) == "a Marker is warm"
+    assert (
+        verbalize_expression(SingleRole(surface=variable(Marker, [])))
+        == "a Marker is warm"
+    )
 
 
 def test_single_operand_falls_back_to_field_name_when_untyped():
@@ -515,9 +536,9 @@ def test_reused_operand_pronominalises_as_the_query_subject():
     """A variable that is also the query subject keeps its ordinary referring rendering and
     pronominalises -- it is not treated as an anonymous operand."""
     subject = variable(Marker, [])
-    assert verbalize_expression(an(entity(subject).where(SingleRole(surface=subject)))) == (
-        "Find a Marker such that it is warm"
-    )
+    assert verbalize_expression(
+        an(entity(subject).where(SingleRole(surface=subject)))
+    ) == ("Find a Marker such that it is warm")
 
 
 def test_reused_operand_agrees_with_a_plural_population():
@@ -627,9 +648,9 @@ def test_large_concrete_family_falls_back_to_naming_the_abstract_type():
 
 
 def test_concrete_base_with_subclasses_is_named_directly():
-    assert verbalize_expression(ConcreteBaseRole(surface=variable(ConcreteBase, []))) == (
-        "a ConcreteBase is warm"
-    )
+    assert verbalize_expression(
+        ConcreteBaseRole(surface=variable(ConcreteBase, []))
+    ) == ("a ConcreteBase is warm")
 
 
 def test_reused_abstract_operand_pronominalises_as_the_query_subject():
@@ -640,7 +661,9 @@ def test_reused_abstract_operand_pronominalises_as_the_query_subject():
     """
     subject = variable(Shape, [])
     assert (
-        verbalize_expression(an(entity(subject).where(AbstractOperandRole(surface=subject))))
+        verbalize_expression(
+            an(entity(subject).where(AbstractOperandRole(surface=subject)))
+        )
         == "Find a Circle or a Square such that it is warm"
     )
 
@@ -654,7 +677,10 @@ def test_reused_abstract_operand_reads_as_a_definite_disjunction_on_repeat_menti
     """
     shape, sensor = variable(Shape, []), variable(Sensor, [])
     assert verbalize_expression(
-        and_(AbstractOperandRole(surface=shape), VisibleFromSensor(target=shape, sensor=sensor))
+        and_(
+            AbstractOperandRole(surface=shape),
+            VisibleFromSensor(target=shape, sensor=sensor),
+        )
     ) == (
         "a Circle or a Square is warm, and the Circle or the Square is visible from a Sensor"
     )
@@ -671,7 +697,10 @@ def test_reused_abstract_operand_pronominalises_on_every_mention_within_its_scop
     assert verbalize_expression(
         an(
             entity(subject).where(
-                and_(AbstractOperandRole(surface=subject), VisibleFromSensor(target=subject, sensor=sensor))
+                and_(
+                    AbstractOperandRole(surface=subject),
+                    VisibleFromSensor(target=subject, sensor=sensor),
+                )
             )
         )
     ) == (

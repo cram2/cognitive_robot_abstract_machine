@@ -347,7 +347,9 @@ class EvaluationContext:
     exhausted or closed.
     """
 
-    def is_child_of_truth_value_operator(self, *, expression: SymbolicExpression) -> bool:
+    def is_child_of_truth_value_operator(
+        self, *, expression: SymbolicExpression
+    ) -> bool:
         """
         :param expression: The symbolic expression to test.
         :return: ``True`` if *expression* was evaluated as a direct child of a

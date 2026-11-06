@@ -395,40 +395,68 @@ def test_above_and_below(two_block_world) -> None:
     center, top = two_block_world
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=-3)
-    assert Above(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
-    assert Below(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
+    assert Above(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
+    assert Below(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, yaw=np.pi)
-    assert Above(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
-    assert Below(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
+    assert Above(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
+    assert Below(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi)
-    assert Above(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
-    assert Below(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
+    assert Above(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
+    assert Below(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
 
 
 def test_left_and_right(two_block_world) -> None:
     center, top = two_block_world
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi / 2)
-    assert LeftOf(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
-    assert RightOf(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
+    assert LeftOf(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
+    assert RightOf(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=-np.pi / 2)
-    assert RightOf(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
-    assert LeftOf(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
+    assert RightOf(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
+    assert LeftOf(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
 
 
 def test_behind_and_in_front_of(two_block_world) -> None:
     center, top = two_block_world
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=-5, pitch=np.pi / 2)
-    assert Behind(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
-    assert InFrontOf(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
+    assert Behind(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
+    assert InFrontOf(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
 
     pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=5, pitch=-np.pi / 2)
-    assert InFrontOf(point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov)()
-    assert Behind(point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov)()
+    assert InFrontOf(
+        point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
+    )()
+    assert Behind(
+        point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
+    )()
 
 
 def test_body_in_region(two_block_world) -> None:
@@ -625,11 +653,15 @@ def test_region_is_occupied(pr2_world_state_reset) -> None:
     )
     pr2_world_state_reset.notify_state_change()
 
-    assert PlaceIsOccupied(box=target_box, pose=view.root.global_pose, world=pr2_world_state_reset)()
+    assert PlaceIsOccupied(
+        box=target_box, pose=view.root.global_pose, world=pr2_world_state_reset
+    )()
 
     assert not PlaceIsOccupied(
         box=target_box,
-        pose=Pose.from_xyz_rpy(3.5, 2.5, 1, 0, reference_frame=pr2_world_state_reset.root),
+        pose=Pose.from_xyz_rpy(
+            3.5, 2.5, 1, 0, reference_frame=pr2_world_state_reset.root
+        ),
         world=pr2_world_state_reset,
         allowed_bodies=view.bodies_with_collision,
     )()
@@ -970,7 +1002,9 @@ def test_bodies_a_gap_apart_are_in_contact_within_a_threshold_that_spans_it(
     center, top = two_block_world
     _stand_on(center, top, gap=RESTING_CONTACT_TOLERANCE / 2)
 
-    assert InContactWith(body1=center, body2=top, maximum_distance=RESTING_CONTACT_TOLERANCE)()
+    assert InContactWith(
+        body1=center, body2=top, maximum_distance=RESTING_CONTACT_TOLERANCE
+    )()
 
 
 def test_a_body_does_not_support_itself(two_block_world) -> None:
@@ -1282,7 +1316,9 @@ def test_the_threshold_is_what_turns_the_measurement_into_a_verdict(
     measured = InsideOf(body=top, other=center).compute_containment_ratio()
 
     assert InsideOf(body=top, other=center, minimum_containment_ratio=measured)()
-    assert not InsideOf(body=top, other=center, minimum_containment_ratio=measured + 0.01)()
+    assert not InsideOf(
+        body=top, other=center, minimum_containment_ratio=measured + 0.01
+    )()
 
 
 # %% measuring containment

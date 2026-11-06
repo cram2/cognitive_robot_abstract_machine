@@ -435,7 +435,9 @@ def test_a_container_takes_its_kind_from_the_part_that_names_it():
         .apply(handles, drawers_without_a_handle)
     )
 
-    assert NamedContainerKind(body=furniture.bodies["unit"])() is ContainerKind.DISHWASHER
+    assert (
+        NamedContainerKind(body=furniture.bodies["unit"])() is ContainerKind.DISHWASHER
+    )
     assert furniture.root_names(dishwashers) == {furniture.name_of("unit")}
     assert furniture.root_names(cabinets) == set()
 

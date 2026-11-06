@@ -406,7 +406,9 @@ def test_aggregation_statistic_is_a_role_of_its_domain_object(example_scenario):
     aggregation = SceneRoomAggregations(role_taker=room, field_name="objects")
     assert isinstance(aggregation, Role)
     assert aggregation.role_taker is room
-    assert Role.roles_for(role_taker=room, role_type=AggregationStatistic) == [aggregation]
+    assert Role.roles_for(role_taker=room, role_type=AggregationStatistic) == [
+        aggregation
+    ]
 
 
 def test_aggregation_statistic_is_a_distinct_object_from_its_domain_object(
@@ -448,11 +450,15 @@ def test_statistics_are_registered_under_the_field_of_the_given_variable():
 
     assert [
         function.__name__
-        for function in TwoFieldAggregations.aggregation_features_of_field(field_name="items")
+        for function in TwoFieldAggregations.aggregation_features_of_field(
+            field_name="items"
+        )
     ] == [TwoFieldAggregations.item_statistic.__name__]
     assert [
         function.__name__
-        for function in TwoFieldAggregations.aggregation_features_of_field(field_name="rooms")
+        for function in TwoFieldAggregations.aggregation_features_of_field(
+            field_name="rooms"
+        )
     ] == [TwoFieldAggregations.room_statistic.__name__]
 
 

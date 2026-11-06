@@ -37,7 +37,8 @@ class EQLVerbalizer:
 
     def build(
         self,
-        *, expression: SymbolicExpression,
+        *,
+        expression: SymbolicExpression,
         services: MicroplanningServices | None = None,
         performative: Directive | None = None,
     ) -> VerbalizationFragment:
@@ -72,14 +73,16 @@ class EQLVerbalizer:
         # fold, which records this build's own mentions in the same set.
         previously_introduced_referents = set(services.referring.seen)
         if isinstance(expression, Match):
-            fragment = MatchAssembler(context=self._match_context(services=services)).assemble(
-                node=expression
-            )
+            fragment = MatchAssembler(
+                context=self._match_context(services=services)
+            ).assemble(node=expression)
         else:
             fragment = fold(expression, services, RULES)
         # The discourse focus per query scope, projected once from the shared plan read model; the
         # coreference pass consults it instead of rule-emitted subject markers.
-        discourse = DiscourseModel.from_expression(expression=scan_target, microplan=services.microplan)
+        discourse = DiscourseModel.from_expression(
+            expression=scan_target, microplan=services.microplan
+        )
         return realize_tree(
             fragment,
             previously_introduced_referents=previously_introduced_referents,

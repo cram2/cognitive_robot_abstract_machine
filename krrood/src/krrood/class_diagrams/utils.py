@@ -68,7 +68,7 @@ def _underlying_function(method: Callable) -> Callable:
     The plain function a resolved method wraps.
 
     :param method: A method as resolved via attribute access on a class.
-    :return: ``method.__func__`` when *method* is a bound method (a ``classmethod``
+    :return:``method.__func__`` when *method* is a bound method (a ``classmethod``
         accessed via its class), otherwise *method* itself (a plain function or
         ``staticmethod`` access is already bare).
     """
@@ -254,15 +254,21 @@ def resolve_type(
     if isinstance(type_to_resolve, (TypeVar, TypeVarTuple)):
         type_to_resolve_key = ensure_hashable(type_to_resolve)
         if type_to_resolve_key not in substitution:
-            return TypeHintResolutionResult(resolved_type=type_to_resolve, resolved=False, type_hint=type_to_resolve)
+            return TypeHintResolutionResult(
+                resolved_type=type_to_resolve, resolved=False, type_hint=type_to_resolve
+            )
         return TypeHintResolutionResult(
-            resolved_type=substitution[type_to_resolve_key], resolved=True, type_hint=type_to_resolve
+            resolved_type=substitution[type_to_resolve_key],
+            resolved=True,
+            type_hint=type_to_resolve,
         )
 
     # If the type itself can be indexed (like List[T] or Optional[T])
     parameters = getattr(type_to_resolve, "__parameters__", None)
     if not (hasattr(type_to_resolve, "__getitem__") and parameters):
-        return TypeHintResolutionResult(resolved_type=type_to_resolve, resolved=False, type_hint=type_to_resolve)
+        return TypeHintResolutionResult(
+            resolved_type=type_to_resolve, resolved=False, type_hint=type_to_resolve
+        )
 
     new_parameters = []
     resolved: bool = False
@@ -282,7 +288,9 @@ def resolve_type(
         new_parameters[0] if len(new_parameters) == 1 else tuple(new_parameters)
     )
     return TypeHintResolutionResult(
-        resolved_type=type_to_resolve[subscript_parameter], resolved=resolved, type_hint=type_to_resolve
+        resolved_type=type_to_resolve[subscript_parameter],
+        resolved=resolved,
+        type_hint=type_to_resolve,
     )
 
 
@@ -430,7 +438,8 @@ def get_object_by_name_from_another_object_in_same_module(
     source_path = inspect.getsourcefile(object_)
     if source_path is None:
         raise CouldNotResolveType(
-            type_name=name, extra_information=f"Could not find source file for {object_}"
+            type_name=name,
+            extra_information=f"Could not find source file for {object_}",
         )
     scope = _cached_scope_from_imports(source_path)
     if name in scope:

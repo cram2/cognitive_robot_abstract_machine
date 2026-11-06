@@ -21,7 +21,9 @@ CytoscapeElement = Dict[str, Dict[str, Any]]
 
 @dataclass(kw_only=True)
 class CytoscapeGraphVisualizer(GraphVisualizerBase):
-    """Render a live rustworkx graph as an interactive Flask application backed by Cytoscape.js.
+    """
+    Render a live rustworkx graph as an interactive Flask application backed by
+    Cytoscape.js.
 
     The browser lays out and draws the graph; it polls the server for the current nodes and edges
     so that additions made while the graph is being built appear without a restart, and requests a
@@ -36,7 +38,9 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
     """
 
     required_modules: ClassVar[tuple[str, ...]] = ("flask",)
-    """The libraries needed to serve the application."""
+    """
+    The libraries needed to serve the application.
+    """
 
     layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
         layout_options={
@@ -51,7 +55,9 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
             },
         }
     )
-    """The Cytoscape.js layout options for each :class:`GraphLayout`."""
+    """
+    The Cytoscape.js layout options for each :class:`GraphLayout`.
+    """
 
     def _node_element(self, *, node_index: int) -> CytoscapeElement:
         """
@@ -74,7 +80,9 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         """
         :return: The Cytoscape.js node and edge elements for the current graph.
         """
-        elements = [self._node_element(node_index=index) for index in self.graph.node_indices()]
+        elements = [
+            self._node_element(node_index=index) for index in self.graph.node_indices()
+        ]
         elements += [
             {
                 "data": {
@@ -114,12 +122,15 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         @application.route("/")
         def index() -> str:
             """
-            Entry function for the flask app, renders the jinja template and presents it in the browser window.
+            Entry function for the flask app, renders the jinja template and presents it
+            in the browser window.
             """
             return render_template(
                 "cytoscape_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(layout=self.layout)),
+                layout_options_json=json.dumps(
+                    self.layout_options.get_options(layout=self.layout)
+                ),
                 extra_node_styles_json=json.dumps(self.extra_node_styles()),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
                 extra_script=self.extra_script(),
@@ -128,14 +139,14 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
         @application.route("/graph")
         def graph():
             """
-            Graph function that parses the graph to json
+            Graph function that parses the graph to json.
             """
             return jsonify(elements=self.graph_elements())
 
         @application.route("/node/<int:node_index>")
         def node(node_index: int):
             """
-            Is called for each node to parse the node details to json
+            Is called for each node to parse the node details to json.
             """
             return jsonify(details=self.node_details(node_index=node_index))
 
@@ -143,10 +154,11 @@ class CytoscapeGraphVisualizer(GraphVisualizerBase):
 
     def run(self) -> None:
         """
-        Start the Flask application on a daemon thread and optionally open it in a browser.
+        Start the Flask application on a daemon thread and optionally open it in a
+        browser.
 
-        The server runs on a daemon thread, so the calling process must stay alive for the
-        visualization to remain reachable.
+        The server runs on a daemon thread, so the calling process must stay alive for
+        the visualization to remain reachable.
         """
         self.check_dependencies()
         application = self.build_application()

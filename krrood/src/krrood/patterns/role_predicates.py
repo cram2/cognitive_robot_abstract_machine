@@ -44,7 +44,9 @@ class IsSameSemanticEntity(Predicate):
     """
 
     def __call__(self) -> bool:
-        return self._root_of(value=self.first_entity) is self._root_of(value=self.second_entity)
+        return self._root_of(value=self.first_entity) is self._root_of(
+            value=self.second_entity
+        )
 
     @staticmethod
     def _root_of(*, value: Any) -> Any:
@@ -54,7 +56,9 @@ class IsSameSemanticEntity(Predicate):
         return value.root_persistent_entity if isinstance(value, Role) else value
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<first_entity> is the same semantic entity as
         <second_entity>"*."""
         return clause(

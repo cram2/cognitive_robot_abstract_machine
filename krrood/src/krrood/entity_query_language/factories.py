@@ -419,7 +419,9 @@ def _quantify_or_build_match(
         arg = SymbolicExpression._as_operand_(value=arg)
         if not isinstance(arg, Query):
             arg = entity(arg)
-        return arg._quantify_(quantifier_type=quantifier_type, quantification_constraint=quantification)
+        return arg._quantify_(
+            quantifier_type=quantifier_type, quantification_constraint=quantification
+        )
 
     match_ = Match(_factory_=arg, _declared_type_=target_type)
     match_._quantifier_type_ = quantifier_type
@@ -727,7 +729,10 @@ def max(
     :return: A Max object that can be evaluated to find the maximum value.
     """
     return Max(
-        _child_=variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -783,7 +788,10 @@ def min(
     :return: A Min object that can be evaluated to find the minimum value.
     """
     return Min(
-        _child_=variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -803,7 +811,10 @@ def sum(
     :return: A Sum object that can be evaluated to find the sum of values.
     """
     return Sum(
-        _child_=variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -829,7 +840,10 @@ def average(
     :return: An Average object that can be evaluated to find the average of values.
     """
     return Average(
-        _child_=variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -885,7 +899,9 @@ def distinct(
         case Selectable():
             return entity(expression).distinct(*on)
         case _:
-            raise UnsupportedExpressionTypeForDistinct(unsupported_expression_type=type(expression))
+            raise UnsupportedExpressionTypeForDistinct(
+                unsupported_expression_type=type(expression)
+            )
 
 
 def get_false_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
@@ -1119,7 +1135,9 @@ class IsSubclass(Predicate):
         return issubclass(self.subclass, self.parent_or_parents)
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<subclass> is a subclass of <parent>"* — a custom fragment because
         the name-based reading lacks the article and preposition (*"subclass holds for …"*).
         """
@@ -1160,7 +1178,9 @@ class IsClass(Predicate):
         return isclass(self.object)
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<object> is a class"* — a custom fragment because the name-based
         reading drops the complement's article (*"… is class"*)."""
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).

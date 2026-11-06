@@ -209,4 +209,6 @@ class HavingAssembler(Assembler[Query, None]):
         :return: The trailing *"where <condition>"* HAVING clause, or ``None`` when there is no
             HAVING.
         """
-        return self.realize(node=query) if query._having_expression_ is not None else None
+        return (
+            self.realize(node=query) if query._having_expression_ is not None else None
+        )

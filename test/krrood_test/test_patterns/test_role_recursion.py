@@ -25,8 +25,14 @@ def test_role_attribute_resolution():
     assert t.employee_id == "T456"
 
     # Sibling role attrs are accessed via the shared taker's roles dict.
-    assert Role.roles_for(role_taker=p, role_type=TeacherForRoleRecursion)[0].employee_id == "T456"
-    assert Role.roles_for(role_taker=p, role_type=StudentForRoleRecursion)[0].student_id == "S123"
+    assert (
+        Role.roles_for(role_taker=p, role_type=TeacherForRoleRecursion)[0].employee_id
+        == "T456"
+    )
+    assert (
+        Role.roles_for(role_taker=p, role_type=StudentForRoleRecursion)[0].student_id
+        == "S123"
+    )
 
     # Non-existent attribute should raise AttributeError, not RecursionError.
     with pytest.raises(AttributeError):

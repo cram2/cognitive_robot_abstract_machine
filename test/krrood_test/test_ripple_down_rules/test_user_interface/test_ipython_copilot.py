@@ -33,7 +33,9 @@ class ContextAwareCopilotShell:
 
             print("\n🔍 Generating context-aware suggestion...\n")
             # suggestion = self.get_suggestion(current_code, context)
-            suggestion = self.get_suggestion_local(code=current_code, context_vars=context)
+            suggestion = self.get_suggestion_local(
+                code=current_code, context_vars=context
+            )
             print(f"\n💡 Suggestion:\n{suggestion}\n")
 
         shell.pt_app.key_bindings = kb

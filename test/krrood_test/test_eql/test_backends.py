@@ -114,10 +114,12 @@ def test_nested_action():
 def test_selective_query_multiple_backends(session, database):
 
     p1 = KRROODPose(
-        position=KRROODPosition(x=1, y=0, z=0), orientation=KRROODOrientation(x=0, y=0, z=0, w=1)
+        position=KRROODPosition(x=1, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
     )
     p2 = KRROODPose(
-        position=KRROODPosition(x=0, y=1, z=0), orientation=KRROODOrientation(x=0, y=0, z=0, w=1)
+        position=KRROODPosition(x=0, y=1, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
     )
 
     python_domain = [p1, p2]
@@ -378,7 +380,8 @@ def test_probabilistic_backend_rejects_samples_contradicting_a_derived_attribute
     first_width, first_height = RECTANGLE_SIDES[0]
     query = a(Rectangle)(width=..., height=..., area=first_width * first_height)
     backend = ProbabilisticBackend(
-        number_of_samples=20, model_registry=DictRegistry(models={Rectangle: rectangle_model})
+        number_of_samples=20,
+        model_registry=DictRegistry(models={Rectangle: rectangle_model}),
     )
     rectangles = query.evaluate(backend=backend)
     assert {(rectangle.width, rectangle.height) for rectangle in rectangles} == {
@@ -426,7 +429,10 @@ def test_generative_backend_grounds_a_keyword_bound_to_a_flattening_of_a_variabl
     those values in turn, for each value of the variable, in their order.
     """
     holders = [
-        KRROODPositions(positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=2, y=0, z=0)], some_strings=[]),
+        KRROODPositions(
+            positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=2, y=0, z=0)],
+            some_strings=[],
+        ),
         KRROODPositions(positions=[KRROODPosition(x=3, y=0, z=0)], some_strings=[]),
     ]
     holder = variable_from(holders)
@@ -468,7 +474,10 @@ def test_probabilistic_backend_grounds_a_keyword_bound_to_a_flattening_of_a_vari
     values only from those flattened values.
     """
     holders = [
-        KRROODPositions(positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=2, y=0, z=0)], some_strings=[]),
+        KRROODPositions(
+            positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=2, y=0, z=0)],
+            some_strings=[],
+        ),
         KRROODPositions(positions=[KRROODPosition(x=3, y=0, z=0)], some_strings=[]),
     ]
     holder = variable_from(holders)
@@ -544,7 +553,8 @@ def test_probabilistic_backend_leaves_the_pattern_unchanged(rectangle_model):
     area = first_width * first_height
     query = a(Rectangle)(width=..., height=..., area=area)
     backend = ProbabilisticBackend(
-        number_of_samples=20, model_registry=DictRegistry(models={Rectangle: rectangle_model})
+        number_of_samples=20,
+        model_registry=DictRegistry(models={Rectangle: rectangle_model}),
     )
     list(query.evaluate(backend=backend))
     assert query._kwargs_ == {"width": ..., "height": ..., "area": area}
@@ -566,7 +576,8 @@ def rectangle_backend(rectangle_model) -> ProbabilisticBackend:
     :return: A backend that samples rectangles from the rectangle model.
     """
     return ProbabilisticBackend(
-        number_of_samples=20, model_registry=DictRegistry(models={Rectangle: rectangle_model})
+        number_of_samples=20,
+        model_registry=DictRegistry(models={Rectangle: rectangle_model}),
     )
 
 
@@ -617,4 +628,6 @@ def test_a_sampled_row_is_a_role_of_the_operation_result_of_its_bindings(
     query = a(Rectangle)(width=..., height=...)
     row = next(rectangle_backend.sample_bindings(expression=query))
     assert isinstance(row.role_taker, OperationResult)
-    assert Role.roles_for(role_taker=row.role_taker, role_type=ProbabilisticOperationResult) == [row]
+    assert Role.roles_for(
+        role_taker=row.role_taker, role_type=ProbabilisticOperationResult
+    ) == [row]

@@ -282,7 +282,9 @@ class Aggregations(VocabEnum):
         """
         return self.value.child_form or GrammaticalNumber.SINGULAR
 
-    def complement(self, *, child: VerbalizationFragment) -> list[VerbalizationFragment]:
+    def complement(
+        self, *, child: VerbalizationFragment
+    ) -> list[VerbalizationFragment]:
         """
         :param child: The already-rendered complement, built at :attr:`child_number`.
         :return: The complement modifiers — *"of"* then the child — so the bare aggregation noun
@@ -833,7 +835,9 @@ class GroupKeyPhrases(VocabEnum):
 
     COMMON_OF = CommonGroupKeyWord(text="the common")
 
-    def build_phrase(self, *, field_name: str, plural_root: str) -> VerbalizationFragment:
+    def build_phrase(
+        self, *, field_name: str, plural_root: str
+    ) -> VerbalizationFragment:
         """
         Build the group-key phrase.
 

@@ -154,7 +154,9 @@ def test_rule_if_then_carry_keyword_role(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(domain=world.connections)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(
+        domain=world.connections
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     frag = EQLVerbalizer().build(expression=entity(drawer_var))
     keyword_texts = _collect_role_texts(frag, SemanticRole.KEYWORD)
@@ -236,7 +238,9 @@ def test_rule_is_block_fragment(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(domain=world.connections)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(
+        domain=world.connections
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     frag = EQLVerbalizer().build(expression=entity(drawer_var))
     assert isinstance(frag, BlockFragment)
@@ -373,7 +377,10 @@ def test_paragraph_renderer_word():
 
 def test_paragraph_renderer_role_fragment_plain():
     r = ParagraphRenderer(formatter=PlainFormatter())
-    assert r.render(fragment=RoleFragment(text="Robot", role=SemanticRole.VARIABLE)) == "Robot"
+    assert (
+        r.render(fragment=RoleFragment(text="Robot", role=SemanticRole.VARIABLE))
+        == "Robot"
+    )
 
 
 def test_paragraph_renderer_phrase():
@@ -388,7 +395,10 @@ def test_paragraph_renderer_block_flattens_to_prose():
         header=RoleFragment(text="Find", role=SemanticRole.KEYWORD),
         items=[
             PhraseFragment(
-                parts=[RoleFragment(text="such that", role=SemanticRole.KEYWORD), WordFragment(text="x > 5")]
+                parts=[
+                    RoleFragment(text="such that", role=SemanticRole.KEYWORD),
+                    WordFragment(text="x > 5"),
+                ]
             ),
         ],
     )
@@ -400,7 +410,9 @@ def test_paragraph_renderer_block_flattens_to_prose():
 
 def test_paragraph_renderer_block_no_header():
     r = ParagraphRenderer()
-    block = BlockFragment(header=None, items=[WordFragment(text="a"), WordFragment(text="b")])
+    block = BlockFragment(
+        header=None, items=[WordFragment(text="a"), WordFragment(text="b")]
+    )
     result = r.render(fragment=block)
     assert "a" in result and "b" in result
 
@@ -435,7 +447,9 @@ def test_hierarchical_renderer_block_has_header_line():
 
 def test_hierarchical_renderer_items_are_indented():
     r = HierarchicalRenderer(
-        formatter=PlainFormatter(), indent_size=IndentSize.TWO_SPACES, bullet=BulletStyle.DASH
+        formatter=PlainFormatter(),
+        indent_size=IndentSize.TWO_SPACES,
+        bullet=BulletStyle.DASH,
     )
     block = BlockFragment(
         header=RoleFragment(text="Find", role=SemanticRole.KEYWORD),
@@ -450,7 +464,9 @@ def test_hierarchical_renderer_items_are_indented():
 
 def test_hierarchical_renderer_nested_block_deepens_indent():
     r = HierarchicalRenderer(
-        formatter=PlainFormatter(), indent_size=IndentSize.TWO_SPACES, bullet=BulletStyle.DASH
+        formatter=PlainFormatter(),
+        indent_size=IndentSize.TWO_SPACES,
+        bullet=BulletStyle.DASH,
     )
     inner = BlockFragment(
         header=RoleFragment(text="such that", role=SemanticRole.KEYWORD),
@@ -491,7 +507,9 @@ def test_hierarchical_bullet_style_asterisk_produces_asterisk():
 
 
 def test_hierarchical_indent_four_spaces_indents_items_by_four():
-    r = HierarchicalRenderer(formatter=PlainFormatter(), indent_size=IndentSize.FOUR_SPACES)
+    r = HierarchicalRenderer(
+        formatter=PlainFormatter(), indent_size=IndentSize.FOUR_SPACES
+    )
     block = BlockFragment(
         header=WordFragment(text="H"),
         items=[WordFragment(text="item")],
@@ -509,14 +527,18 @@ def test_hierarchical_html_formatter_joins_with_br():
     HTMLFormatter.newline drives line separation — no hardcoded \\n.
     """
     r = HierarchicalRenderer(formatter=HTMLFormatter())
-    block = BlockFragment(header=None, items=[WordFragment(text="a"), WordFragment(text="b")])
+    block = BlockFragment(
+        header=None, items=[WordFragment(text="a"), WordFragment(text="b")]
+    )
     result = r.render(fragment=block)
     assert "<br>" in result
 
 
 def test_hierarchical_ansi_formatter_joins_with_newline_not_br():
     r = HierarchicalRenderer(formatter=ANSIFormatter())
-    block = BlockFragment(header=None, items=[WordFragment(text="a"), WordFragment(text="b")])
+    block = BlockFragment(
+        header=None, items=[WordFragment(text="a"), WordFragment(text="b")]
+    )
     result = r.render(fragment=block)
     assert "\n" in result
     assert "<br>" not in result
@@ -533,7 +555,9 @@ def test_hierarchical_custom_formatter_newline_controls_line_separation():
             return "|"
 
     r = HierarchicalRenderer(formatter=PipeFormatter())
-    block = BlockFragment(header=None, items=[WordFragment(text="a"), WordFragment(text="b")])
+    block = BlockFragment(
+        header=None, items=[WordFragment(text="a"), WordFragment(text="b")]
+    )
     result = r.render(fragment=block)
     assert "|" in result
     assert "\n" not in result
@@ -544,7 +568,9 @@ def test_hierarchical_custom_formatter_newline_controls_line_separation():
 
 def test_paragraph_html_query_contains_find_span():
     r = variable(_Robot, [])
-    text = VerbalizationPipeline.html().verbalize(expression=an(entity(r).where(r.battery > 50)))
+    text = VerbalizationPipeline.html().verbalize(
+        expression=an(entity(r).where(r.battery > 50))
+    )
     assert '<span style="color' in text
     assert "Find" in text
 
@@ -562,9 +588,9 @@ def test_hierarchical_plain_query_structure():
     r = variable(_Robot, [])
     # An OR condition stays a residual "such that" bullet (it is not a groupable
     # single-hop subject predicate), so the hierarchical indentation is exercised.
-    text = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=PlainFormatter())).verbalize(
-        expression=an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
-    )
+    text = VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=PlainFormatter())
+    ).verbalize(expression=an(entity(r).where(or_(r.battery > 50, r.battery < 10))))
     lines = text.splitlines()
     assert any("Find" in l for l in lines)
     assert any("such that" in l for l in lines)
@@ -581,12 +607,14 @@ def test_hierarchical_plain_rule_structure(doors_and_drawers_world):
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(domain=world.connections)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(
+        domain=world.connections
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
 
-    text = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=PlainFormatter())).verbalize(
-        expression=entity(drawer_var)
-    )
+    text = VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=PlainFormatter())
+    ).verbalize(expression=entity(drawer_var))
     lines = text.splitlines()
     assert any("If" in l for l in lines)
     assert any("then" in l for l in lines)
@@ -620,7 +648,9 @@ def _drawer_rule_fragment(doors_and_drawers_world) -> VerbalizationFragment:
     world = doors_and_drawers_world
     handle = variable(Handle, world.bodies)
     pc = variable(PrismaticConnection, world.connections)
-    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(domain=world.connections)
+    fc = a(FixedConnection)(parent=pc.child, child=handle).from_(
+        domain=world.connections
+    )
     drawer_var = inference(Drawer)(container=fc.parent, handle=fc.child)
     return EQLVerbalizer().build(expression=entity(drawer_var))
 
@@ -688,7 +718,9 @@ def test_pipeline_plain_matches_verbalize_expression():
 
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    assert VerbalizationPipeline.plain().verbalize(expression=q) == verbalize_expression(q)
+    assert VerbalizationPipeline.plain().verbalize(
+        expression=q
+    ) == verbalize_expression(q)
 
 
 def test_pipeline_ansi_contains_escape_codes():

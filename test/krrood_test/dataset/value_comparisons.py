@@ -42,7 +42,11 @@ class IsGreaterThan(Predicate):
     def _verbalization_fragment_(
         cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
-        return clause(Noun(content=fields["value"]), Verb(lemma="exceed"), Noun(content=fields["bound"]))
+        return clause(
+            Noun(content=fields["value"]),
+            Verb(lemma="exceed"),
+            Noun(content=fields["bound"]),
+        )
 
 
 @dataclass(kw_only=True)
@@ -73,4 +77,8 @@ class IsGreaterThanByMargin(Predicate):
     def _verbalization_fragment_(
         cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
-        return clause(Noun(content=fields["value"]), Verb(lemma="exceed"), Noun(content=fields["bound"]))
+        return clause(
+            Noun(content=fields["value"]),
+            Verb(lemma="exceed"),
+            Noun(content=fields["bound"]),
+        )

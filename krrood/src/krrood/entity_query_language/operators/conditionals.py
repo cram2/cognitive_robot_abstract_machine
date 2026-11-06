@@ -64,7 +64,9 @@ class CaseWhen(Selectable):
         Replace every operand that holds *old* with *new*.
         """
         operands = (self.condition, self.then_value, self.else_value)
-        if all(operand is None or operand._id_ != old_child._id_ for operand in operands):
+        if all(
+            operand is None or operand._id_ != old_child._id_ for operand in operands
+        ):
             raise ValueError(
                 f"Child {old_child} not found in CaseWhen — "
                 f"expected one of: condition, then_value, else_value"

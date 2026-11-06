@@ -142,11 +142,16 @@ class CausesEffect(LogicalOperator, UnaryExpression):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        for child_result in self._evaluate_child_as_condition_(child=self._child_, sources=sources):
+        for child_result in self._evaluate_child_as_condition_(
+            child=self._child_, sources=sources
+        ):
             yield self._build_operation_result_with_truth_(
-                truth=child_result.is_true, bindings=child_result.bindings, child_result=child_result
+                truth=child_result.is_true,
+                bindings=child_result.bindings,
+                child_result=child_result,
             )
 
 
@@ -251,8 +256,8 @@ class AdjustmentCandidates:
     adjustments: list[CandidateAdjustment]
     """
     Each set the effect may be identified by adjusting for: the one chosen set if the
-    effect is identified, one per candidate if it is partially identified, none if it
-    is not identified.
+    effect is identified, one per candidate if it is partially identified, none if it is
+    not identified.
     """
 
     @property

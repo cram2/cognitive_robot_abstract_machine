@@ -156,7 +156,9 @@ class ConditionForm(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """
         :param request: The condition and its subject.
         :param context: The per-node context (recursion and services).
@@ -190,7 +192,9 @@ class StandaloneForm(ConditionForm):
         return True
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the residual condition as its own clause via the normal recursion.
 
         Deferring to the recursion is what supplies the whole *its salary is greater than its
@@ -227,7 +231,9 @@ class SuperlativeForm(StandaloneForm):
         return superlative_aggregation(request.item, request.subject) is not None
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the post-nominal superlative modifier *"with the maximum/minimum <leaf>"*.
 
         It owns the entire *with the maximum amount* span of the class example, reading the aggregator
@@ -265,7 +271,9 @@ class WhoseRangeForm(StandaloneForm):
         )
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the *"<attribute> is between low and high"* whose-modifier.
 
         It owns the *salary is between 100 and 200* span — naming the attribute and emitting the
@@ -309,7 +317,9 @@ class WhosePredicateForm(StandaloneForm):
         return not references(item.right, subject)
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the bare *"<attribute> <operator> <value>"* the *"whose"* envelope wraps.
 
         It owns the *battery is greater than 50* span of the class example — the attribute noun,
@@ -350,7 +360,9 @@ class AbsenceForm(StandaloneForm):
         )
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the standalone absence predicate *"<owner> has no <attribute>"*.
 
         It owns the *the Mission has no priority* span, flipping owner and attribute into the *has
@@ -391,7 +403,9 @@ class WithAttributeForm(WhosePredicateForm):
         )
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the compact *"with <attribute> <comparison>"* modifier."""
         return ConditionAssembler(context=context).with_attribute_modifier(
             comparator=request.item, subject=request.subject
@@ -419,7 +433,9 @@ class RelationalBindingForm(StandaloneForm):
         return isinstance(request.item, RelationalBindingFold)
 
     @classmethod
-    def render(cls, *, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render *"that is <participle> <preposition> <entity-with-restrictions>"*."""
         fold = request.item
         nested = as_subject_restrictions(
@@ -459,7 +475,9 @@ def place(request: Placement, context: RuleContext) -> Placed:
     'Find a Robot whose battery is greater than 50'
     """
     form = ConditionForm.most_applicable(request=request)
-    return Placed(position=form.position, fragment=form.render(request=request, context=context))
+    return Placed(
+        position=form.position, fragment=form.render(request=request, context=context)
+    )
 
 
 # %% placing a whole subject restriction

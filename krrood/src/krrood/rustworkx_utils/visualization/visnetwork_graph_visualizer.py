@@ -77,7 +77,8 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
                 "label": self.node_label(node_index=index),
                 "color": {
                     "background": self.node_color(node_index=index),
-                    "border": self.node_border_color(node_index=index) or self.default_border_color,
+                    "border": self.node_border_color(node_index=index)
+                    or self.default_border_color,
                 },
             }
             for index in self.graph.node_indices()
@@ -108,7 +109,9 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "visnetwork_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(layout=self.layout)),
+                layout_options_json=json.dumps(
+                    self.layout_options.get_options(layout=self.layout)
+                ),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
             )
 

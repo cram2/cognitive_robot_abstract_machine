@@ -62,7 +62,9 @@ class MicroplanningServices:
     """
 
     @classmethod
-    def from_expression(cls, *, expression: SymbolicExpression) -> MicroplanningServices:
+    def from_expression(
+        cls, *, expression: SymbolicExpression
+    ) -> MicroplanningServices:
         """
         Create a context with the disambiguation map pre-built for *expression*.
 
@@ -70,4 +72,6 @@ class MicroplanningServices:
         :return: A fresh context whose referring service has its disambiguation map
             populated.
         """
-        return cls(referring=ReferringExpressions.from_expression(expression=expression))
+        return cls(
+            referring=ReferringExpressions.from_expression(expression=expression)
+        )

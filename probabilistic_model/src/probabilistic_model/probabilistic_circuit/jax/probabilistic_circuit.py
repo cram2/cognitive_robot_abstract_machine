@@ -128,9 +128,9 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
             classes are assumed to be uniformly distributed.
         :return: The full probabilistic circuit.
         """
-        assert (
-            len(class_variable.domain.simple_sets) == self.root.number_of_nodes
-        ), "The number of classes must match the number of sum units."
+        assert len(class_variable.domain.simple_sets) == self.root.number_of_nodes, (
+            "The number of classes must match the number of sum units."
+        )
 
         number_of_classes = self.root.number_of_nodes
 

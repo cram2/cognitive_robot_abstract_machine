@@ -58,9 +58,9 @@ class Pose:
 
 def _hierarchical(expression) -> str:
     """:return: *expression* rendered as a plain-text indented bullet list (point per condition)."""
-    return VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=PlainFormatter())).verbalize(
-        expression=expression
-    )
+    return VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=PlainFormatter())
+    ).verbalize(expression=expression)
 
 
 # %% Generate vs Find

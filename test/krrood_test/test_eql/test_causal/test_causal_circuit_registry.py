@@ -68,8 +68,13 @@ def test_registry_resolves_the_circuit_registered_for_the_queried_class():
 def test_registry_distinguishes_between_multiple_registered_classes():
     pick_circuit = _build_pick_causal_circuit()
     place_circuit = _build_pick_causal_circuit()
-    registry = CausalCircuitRegistry(circuits={Pick: pick_circuit, Place: place_circuit})
+    registry = CausalCircuitRegistry(
+        circuits={Pick: pick_circuit, Place: place_circuit}
+    )
 
     pick_match = a(Pick)(arm=cause, success=...)
     pick_match.causes_effect(pick_match.success == 0.5)
-    assert registry.get_model(parameters=UnderspecifiedParameters(statement=pick_match)) is pick_circuit
+    assert (
+        registry.get_model(parameters=UnderspecifiedParameters(statement=pick_match))
+        is pick_circuit
+    )

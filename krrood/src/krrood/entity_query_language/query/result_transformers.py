@@ -52,6 +52,7 @@ class Ordering(ResultTransformer):
     """
     The variable whose value the results are ordered by.
     """
+
     descending: bool = False
     """
     Whether to order the results in descending order.
@@ -66,7 +67,11 @@ class Ordering(ResultTransformer):
     def transform(
         self, *, results: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
-        yield from sorted(results, key=lambda result: self._sort_key_(result=result), reverse=self.descending)
+        yield from sorted(
+            results,
+            key=lambda result: self._sort_key_(result=result),
+            reverse=self.descending,
+        )
 
     def _sort_key_(self, *, result: OperationResult) -> Any:
         """
@@ -77,7 +82,9 @@ class Ordering(ResultTransformer):
         variable_id = self.variable._id_
         if variable_id not in result.all_bindings:
             ordering_value = next(
-                self.variable._evaluate_(sources=OperationResult(bindings=result.all_bindings))
+                self.variable._evaluate_(
+                    sources=OperationResult(bindings=result.all_bindings)
+                )
             ).value
         else:
             ordering_value = result.all_bindings[variable_id]
@@ -117,7 +124,13 @@ class Quantification(ResultTransformer):
         for result in results:
             number_of_results += 1
             self.constraint.assert_satisfaction(
-                number_of_solutions=number_of_results, quantified_expression=self.owner, done=False
+                number_of_solutions=number_of_results,
+                quantified_expression=self.owner,
+                done=False,
             )
             yield result
-        self.constraint.assert_satisfaction(number_of_solutions=number_of_results, quantified_expression=self.owner, done=True)
+        self.constraint.assert_satisfaction(
+            number_of_solutions=number_of_results,
+            quantified_expression=self.owner,
+            done=True,
+        )

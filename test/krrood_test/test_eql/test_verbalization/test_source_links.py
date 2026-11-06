@@ -290,9 +290,9 @@ def test_resolver_url_points_to_existing_page_and_anchor(
     page_part, _, anchor = url.partition("#")
     page = Path(page_part)
     assert page.is_file(), f"AutoAPI page does not exist: {page}"
-    assert f'id="{anchor}"' in page.read_text(
-        encoding="utf-8"
-    ), f"anchor #{anchor} not found in {page}"
+    assert f'id="{anchor}"' in page.read_text(encoding="utf-8"), (
+        f"anchor #{anchor} not found in {page}"
+    )
 
 
 def test_in_site_docs_links_resolve_within_built_site(built_example_domain_autoapi):
@@ -535,7 +535,9 @@ def test_hierarchical_renderer_injects_link():
 def test_pipeline_html_with_resolver_links_variable_name():
     r = variable(_Sensor, [])
     resolver = _ConstantResolver("http://example.com/sensor")
-    text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(expression=an(entity(r)))
+    text = VerbalizationPipeline.html(link_resolver=resolver).verbalize(
+        expression=an(entity(r))
+    )
     assert 'href="http://example.com/sensor"' in text
     assert "_Sensor" in text
 

@@ -150,4 +150,8 @@ def restriction_subject(
     chosen = RestrictionSubjectRule.most_applicable(
         expression=expression, selected_variable=selected_variable
     )
-    return chosen.subject(expression=expression, selected_variable=selected_variable) if chosen is not None else None
+    return (
+        chosen.subject(expression=expression, selected_variable=selected_variable)
+        if chosen is not None
+        else None
+    )

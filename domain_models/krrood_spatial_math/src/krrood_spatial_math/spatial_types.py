@@ -1831,7 +1831,8 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def safe_division(
         self,
-        *, other: sm.ScalarData,
+        *,
+        other: sm.ScalarData,
         if_nan: Vector3 | None = None,
     ) -> sm.GenericSymbolicType:
         """
@@ -1852,7 +1853,9 @@ class Vector3(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         )
 
     def __neg__(self) -> Vector3:
-        result = Vector3.from_casadi_sx(casadi_sx=ca.SX.unary(ca.OP_NEG, self.casadi_sx))
+        result = Vector3.from_casadi_sx(
+            casadi_sx=ca.SX.unary(ca.OP_NEG, self.casadi_sx)
+        )
         result.reference_frame = self.reference_frame
         return result
 
@@ -2421,7 +2424,9 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
         # (1 - cos(angle)) times the axis times its transpose, which vanishes at no
         # turn; its column with the largest diagonal entry is the axis up to its sign
-        axis_outer_product = (rotation + rotation.T) / 2 - sm.Matrix.eye(size=3) * cosine
+        axis_outer_product = (rotation + rotation.T) / 2 - sm.Matrix.eye(
+            size=3
+        ) * cosine
         columns = [
             Vector3(*(axis_outer_product[row, column] for row in range(3)))
             for column in range(3)

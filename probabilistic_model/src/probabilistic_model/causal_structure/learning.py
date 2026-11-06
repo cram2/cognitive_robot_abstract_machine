@@ -226,8 +226,10 @@ class PeterClarkStructureLearner(CausalStructureLearner):
 class LearnedCausalStructure:
     """
     The causal structure learned for one class, ready to choose the variables a causal
-    query about the class adjusts for. Its edges are the causal relations of the class
-    in a class diagram, read as they are when asked.
+    query about the class adjusts for.
+
+    Its edges are the causal relations of the class in a class diagram, read as they are
+    when asked.
     """
 
     relations: CausalRelationsOfClass
@@ -346,7 +348,8 @@ class RelationalCausalStructureLearner:
         :return: The causal relations of the class.
         """
         relations = CausalRelationsOfClass(
-            class_diagram=self.class_diagram, owner=self.class_diagram.get_wrapped_class(clazz=circuit.class_)
+            class_diagram=self.class_diagram,
+            owner=self.class_diagram.get_wrapped_class(clazz=circuit.class_),
         )
         endpoints = self.create_endpoints(circuit.feature_extractor, None)
         for part, template in circuit.exchangeable_distribution_templates.items():
@@ -388,7 +391,8 @@ class RelationalCausalStructureLearner:
                 else AttributeEndpoint(
                     fields=prefix
                     + AttributeEndpoint.along(
-                        class_diagram=self.class_diagram, access_path=feature._access_path_
+                        class_diagram=self.class_diagram,
+                        access_path=feature._access_path_,
                     ).fields
                 )
             )
@@ -443,7 +447,9 @@ class RelationalCausalStructureLearner:
         )
         names = [node.name for node in statistic_nodes + part_nodes]
         graph = self.learner.learn(
-            rows=renamed, nodes=statistic_nodes + part_nodes, domain_knowledge=domain_knowledge.restricted_to(names)
+            rows=renamed,
+            nodes=statistic_nodes + part_nodes,
+            domain_knowledge=domain_knowledge.restricted_to(names),
         )
         return [
             edge

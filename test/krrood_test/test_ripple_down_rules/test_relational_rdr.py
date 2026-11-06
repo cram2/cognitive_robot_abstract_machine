@@ -42,13 +42,20 @@ class RelationalRDRTestCase(TestCase):
         cls.part_d = Part(name="D")
         cls.part_e = Part(name="E")
         cls.part_f = Part(name="F")
-        robot = Robot(name="pr2", parts=[cls.part_a, cls.part_b, cls.part_c, cls.part_d])
+        robot = Robot(
+            name="pr2", parts=[cls.part_a, cls.part_b, cls.part_c, cls.part_d]
+        )
         cls.part_a.contained_objects = [cls.part_b, cls.part_c]
         cls.part_c.contained_objects = [cls.part_d]
         cls.part_d.contained_objects = [cls.part_e]
         cls.part_e.contained_objects = [cls.part_f]
         cls.robot: Robot = robot
-        cls.case_query = CaseQuery(original_case=robot, attribute_name="contained_objects", _attribute_types=(PhysicalObject,), mutually_exclusive=False)
+        cls.case_query = CaseQuery(
+            original_case=robot,
+            attribute_name="contained_objects",
+            _attribute_types=(PhysicalObject,),
+            mutually_exclusive=False,
+        )
         cls.target = [cls.part_b, cls.part_c, cls.part_d, cls.part_e]
 
     def test_classify_scrdr(self):
@@ -63,7 +70,12 @@ class RelationalRDRTestCase(TestCase):
 
         scrdr = SingleClassRDR()
         cat = scrdr.fit_case(
-            case_query=CaseQuery(original_case=self.robot, attribute_name="contained_objects", _attribute_types=(PhysicalObject,), mutually_exclusive=False),
+            case_query=CaseQuery(
+                original_case=self.robot,
+                attribute_name="contained_objects",
+                _attribute_types=(PhysicalObject,),
+                mutually_exclusive=False,
+            ),
             expert=expert,
         )
         # render_tree(scrdr.start_rule, use_dot_exporter=True,

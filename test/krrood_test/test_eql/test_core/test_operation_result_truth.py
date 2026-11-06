@@ -163,7 +163,10 @@ def test_union_reports_the_truth_value_of_each_child_result():
     value = variable_from([6])
     other_value = variable_from([3])
 
-    assert truth_values(Union(_operation_children_=(value > 5, other_value > 5))) == [True, False]
+    assert truth_values(Union(_operation_children_=(value > 5, other_value > 5))) == [
+        True,
+        False,
+    ]
 
 
 # %% concatenation

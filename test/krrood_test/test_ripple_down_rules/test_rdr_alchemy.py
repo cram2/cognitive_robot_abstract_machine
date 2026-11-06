@@ -90,11 +90,20 @@ class TestAlchemyRDR(TestCase):
         result = self.session.scalars(query).all()
         scrdr = SingleClassRDR()
         case_queries = [
-            CaseQuery(original_case=c, attribute_name="species", _attribute_types=(Species,), mutually_exclusive=True, _target=t)
+            CaseQuery(
+                original_case=c,
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+                _target=t,
+            )
             for c, t in zip(self.all_cases, self.targets)
         ]
         scrdr.fit(
-            case_queries=case_queries, expert=expert, animate_tree=draw_tree, session=self.session
+            case_queries=case_queries,
+            expert=expert,
+            animate_tree=draw_tree,
+            session=self.session,
         )
 
         cat = scrdr.classify(case=result[50])
@@ -129,7 +138,13 @@ class TestAlchemyRDR(TestCase):
         """
         scrdr = SingleClassRDR()
         case_queries = [
-            CaseQuery(original_case=c, attribute_name="species", _attribute_types=(Species,), mutually_exclusive=True, _target=t)
+            CaseQuery(
+                original_case=c,
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+                _target=t,
+            )
             for c, t in zip(self.all_cases, self.targets)
         ]
         scrdr.fit(case_queries=case_queries, expert=Oracle(), animate_tree=False)
@@ -141,12 +156,19 @@ class TestAlchemyRDR(TestCase):
         use_loaded_answers = True
         draw_tree = False
         expert, filename = self.get_expert_and_file_name(
-            use_loaded_answers=use_loaded_answers, filename="mcrdr_expert_answers_stop_only_fit"
+            use_loaded_answers=use_loaded_answers,
+            filename="mcrdr_expert_answers_stop_only_fit",
         )
 
         mcrdr = MultiClassRDR()
         case_queries = [
-            CaseQuery(original_case=c, attribute_name="species", _attribute_types=(Species,), mutually_exclusive=True, _target=t)
+            CaseQuery(
+                original_case=c,
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+                _target=t,
+            )
             for c, t in zip(self.all_cases, self.targets)
         ]
         mcrdr.fit(case_queries=case_queries, expert=expert, animate_tree=draw_tree)
@@ -201,7 +223,9 @@ class TestAlchemyRDR(TestCase):
                     CaseQuery(
                         original_case=case,
                         attribute_name=attr,
-                        _attribute_types=(Species,) if attr == "species" else (HabitatTable,),
+                        _attribute_types=(Species,)
+                        if attr == "species"
+                        else (HabitatTable,),
                         mutually_exclusive=True if attr == "species" else False,
                         _target=target,
                     )

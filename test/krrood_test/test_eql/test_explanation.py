@@ -202,9 +202,9 @@ def test_query_root_resolves_to_the_evaluating_query_for_a_variable_reused_acros
     first_query = entity(person_var)
     first_results = list(first_query.evaluate())
     assert len(first_results) == 1
-    assert (
-        len(person_var._parents_) >= 2
-    ), "person_var must already be multi-parented after the first query for this to exercise the bug"
+    assert len(person_var._parents_) >= 2, (
+        "person_var must already be multi-parented after the first query for this to exercise the bug"
+    )
 
     second_query = entity(person_var)
     second_results = list(second_query.evaluate())
@@ -545,9 +545,9 @@ def test_satisfied_conditions_for_bare_condition_shared_with_an_unrelated_query(
     target = variable_from([1])
     query = entity(target).where(flag)
     query.build()
-    assert (
-        len(flag._parents_) == 2
-    ), "flag must be a genuinely shared DAG node for this test to exercise the bug"
+    assert len(flag._parents_) == 2, (
+        "flag must be a genuinely shared DAG node for this test to exercise the bug"
+    )
 
     true_results = _get_true_results(query)
     assert len(true_results) == 1
@@ -774,9 +774,9 @@ def test_query_graph_marks_a_shared_bare_condition_satisfied_from_its_own_query(
     target = variable_from([1])
     query = entity(target).where(flag)
     query.build()
-    assert (
-        len(flag._parents_) == 2
-    ), "flag must be a genuinely shared DAG node for this test to exercise the bug"
+    assert len(flag._parents_) == 2, (
+        "flag must be a genuinely shared DAG node for this test to exercise the bug"
+    )
 
     true_results = _get_true_results(query)
     result = true_results[0]
@@ -810,9 +810,9 @@ def test_query_graph_marks_a_node_reused_at_two_positions_satisfied_regardless_o
     sink = variable_from([1])
 
     query = entity(sink).where(and_(flag == True, flag))
-    assert (
-        len(flag._parents_) == 2
-    ), "flag must be a genuinely shared DAG node for this to exercise the behaviour"
+    assert len(flag._parents_) == 2, (
+        "flag must be a genuinely shared DAG node for this to exercise the behaviour"
+    )
 
     true_results = _get_true_results(query)
     result = true_results[0]
@@ -1054,9 +1054,9 @@ def test_explanation_lifecycle_tied_to_instance():
         "likely an InferenceExplanation or a class-level cache holding a strong "
         "reference to a WorldEntity."
     )
-    assert (
-        drawer_ref() is None
-    ), "Drawer should have been garbage-collected together with its World."
+    assert drawer_ref() is None, (
+        "Drawer should have been garbage-collected together with its World."
+    )
 
 
 @pytest.fixture

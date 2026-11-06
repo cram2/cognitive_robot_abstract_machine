@@ -265,8 +265,9 @@ def _format_import_lines(
     import_modules: set[str], from_imports: dict[str, set[str]]
 ) -> list[str]:
     """
-    Render collected import data as sorted ``import``/``from ... import`` line
-    strings.
+    Render collected import data as sorted ``import``/``from ...
+
+    import`` line strings.
 
     :param import_modules: The plain-imported module names.
     :param from_imports: The ``from``-module name to imported-names mapping.

@@ -2037,7 +2037,9 @@ def test_door_with_type_spawns_an_entry_way(empty_world):
 def test_only_aperture_fields_remove_geometry_from_the_whole():
     # The cut is declared by the relationship, not by the part's type: the same EntryWay
     # cuts a wall it is mounted into but not the door it belongs to.
-    apertures = IsPartWholeRelationship.of_field(clazz=HasApertures, field_name="apertures")
+    apertures = IsPartWholeRelationship.of_field(
+        clazz=HasApertures, field_name="apertures"
+    )
     entry_way = IsPartWholeRelationship.of_field(clazz=Door, field_name="entry_way")
     assert apertures.removes_part_geometry_from_whole
     assert not entry_way.removes_part_geometry_from_whole

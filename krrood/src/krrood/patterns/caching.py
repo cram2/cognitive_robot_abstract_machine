@@ -269,8 +269,14 @@ def _wrap_with_memoization(
 
     @wraps(function)
     def wrapper(owner: Any, *arguments: Any, **keyword_arguments: Any) -> Any:
-        key = MemoizationKey(function=function, arguments=arguments, keyword_arguments=frozenset(keyword_arguments.items()))
-        entry = MemoizationCache.of(owner=owner, function_name=function.__name__).entry_for(key=key)
+        key = MemoizationKey(
+            function=function,
+            arguments=arguments,
+            keyword_arguments=frozenset(keyword_arguments.items()),
+        )
+        entry = MemoizationCache.of(
+            owner=owner, function_name=function.__name__
+        ).entry_for(key=key)
         return resolve(
             entry, computation=partial(function, owner, *arguments, **keyword_arguments)
         )

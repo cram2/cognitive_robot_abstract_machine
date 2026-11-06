@@ -101,7 +101,9 @@ class InContactWith(Triple[TBody, TBody]):
         return result.distance
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is in contact with the other body"*.
 
@@ -156,7 +158,9 @@ class Reachable(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the pose is reachable by the tip"*.
 
@@ -265,7 +269,9 @@ class SupportedBy(Triple[TBody, TBody]):
         return self.supporting
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the supported body is supported by the supporting body"*.
 
@@ -324,13 +330,17 @@ class Supports(Predicate):
             if candidate is self.supporting_body:
                 continue
             if SupportedBy(
-                supported=candidate, supporting=self.supporting_body, maximum_intersection_height=self.maximum_intersection_height
+                supported=candidate,
+                supporting=self.supporting_body,
+                maximum_intersection_height=self.maximum_intersection_height,
             )():
                 return True
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is supporting a body"*, naming what is held up, which the
         class name leaves implicit.
@@ -407,7 +417,9 @@ class InsideRegion(Triple[TBody, TRegion]):
         return intersection.volume / body_volume
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is inside the region"*.
 
@@ -468,7 +480,9 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the point is left of the other point, seen from the point of view"*,
         with the direction taken from the relation's own name.
@@ -655,7 +669,9 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
         return float(inside.mean())
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is inside the other"*.
 
@@ -762,7 +778,9 @@ class PlaceIsOccupied(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the place is occupied"*.
 

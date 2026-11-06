@@ -21,7 +21,6 @@ from krrood.ripple_down_rules.utils import (
 
 @magics_class
 class MyMagics(Magics):
-
     def __init__(
         self,
         shell,

@@ -99,7 +99,9 @@ def get_wrapped_field(owner_class: type, field_name: str) -> WrappedField | None
     except ParseError:
         data_class_field = get_dataclass_field(owner_class, field_name)
         return (
-            WrappedField(clazz=wrapped_class, field=data_class_field) if data_class_field else None
+            WrappedField(clazz=wrapped_class, field=data_class_field)
+            if data_class_field
+            else None
         )
 
 

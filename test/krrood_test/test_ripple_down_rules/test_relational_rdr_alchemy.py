@@ -25,14 +25,12 @@ from krrood.ripple_down_rules.utils import render_tree
 
 
 class Base(MappedAsDataclass, DeclarativeBase):
-
     @declared_attr.directive
     def __tablename__(cls) -> str:
         return cls.__name__
 
 
 class PolymorphicIdentityMixin:
-
     @declared_attr.directive
     def __mapper_args__(cls):
         return {
@@ -174,7 +172,12 @@ class RelationalRDRTestCase(TestCase):
         cls.containments.append(ContainsObject(left=cls.part_d, right=cls.part_e))
         cls.containments.append(ContainsObject(left=cls.part_e, right=cls.part_f))
         cls.robot: PhysicalObject = robot
-        cls.case_query = CaseQuery(original_case=robot, attribute_name="contained_objects", _attribute_types=(PhysicalObject,), mutually_exclusive=False)
+        cls.case_query = CaseQuery(
+            original_case=robot,
+            attribute_name="contained_objects",
+            _attribute_types=(PhysicalObject,),
+            mutually_exclusive=False,
+        )
         cls.target = [cls.part_b, cls.part_c, cls.part_d, cls.part_e]
 
     def test_setup(self):
@@ -200,7 +203,12 @@ class RelationalRDRTestCase(TestCase):
 
         scrdr = SingleClassRDR()
         cat = scrdr.fit_case(
-            case_query=CaseQuery(original_case=self.robot, attribute_name="contained_objects", _attribute_types=(PhysicalObject,), mutually_exclusive=False),
+            case_query=CaseQuery(
+                original_case=self.robot,
+                attribute_name="contained_objects",
+                _attribute_types=(PhysicalObject,),
+                mutually_exclusive=False,
+            ),
             expert=expert,
         )
         # render_tree(scrdr.start_rule, use_dot_exporter=True,

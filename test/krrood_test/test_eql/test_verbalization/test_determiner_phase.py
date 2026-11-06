@@ -39,7 +39,9 @@ def _realised(np: NounPhrase) -> str:
     Lower the DP then run morphology — the verbalizer's determiner→morphology order.
     """
     lowered = DeterminerProcessor().process(fragment=np)
-    return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment=lowered))
+    return flatten_fragment_to_plain_text(
+        MorphologyProcessor().process(fragment=lowered)
+    )
 
 
 # ── the concord table, cell by cell ──────────────────────────────────────────────

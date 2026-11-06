@@ -237,7 +237,8 @@ class RippleDownRules(ABC):
 
     def save(
         self,
-        *, save_dir: str | None = None,
+        *,
+        save_dir: str | None = None,
         model_name: str | None = None,
         package_name: str | None = None,
     ) -> str:
@@ -283,7 +284,9 @@ class RippleDownRules(ABC):
         """
         model_dir = os.path.join(load_dir, model_name)
         try:
-            rdr = cls.from_python(model_path=model_dir, parent_package_name=package_name)
+            rdr = cls.from_python(
+                model_path=model_dir, parent_package_name=package_name
+            )
         except (FileNotFoundError, ValueError, SyntaxError, ModuleNotFoundError) as e:
             logger.warning(
                 f"Could not load the python file for the model {model_name} from {model_dir}. "
@@ -297,7 +300,8 @@ class RippleDownRules(ABC):
     @classmethod
     def from_python(
         cls,
-        *, model_path: str,
+        *,
+        model_path: str,
         python_file_path: str | None = None,
         parent_package_name: str | None = None,
     ) -> Self:
@@ -332,7 +336,8 @@ class RippleDownRules(ABC):
 
     def fit(
         self,
-        *, case_queries: list[CaseQuery],
+        *,
+        case_queries: list[CaseQuery],
         expert: Expert | None = None,
         n_iter: int = None,
         animate_tree: bool = False,
@@ -370,7 +375,9 @@ class RippleDownRules(ABC):
                 target = {case_query.attribute_name: case_query.target(case_query.case)}
                 if len(targets) < len(case_queries):
                     targets.append(target)
-                match = is_matching(lambda case: self.classify(case=case), case_query, pred_cat)
+                match = is_matching(
+                    lambda case: self.classify(case=case), case_query, pred_cat
+                )
                 if not match:
                     print(f"Predicted: {pred_cat} but expected: {target}")
                 if animate_tree and len(self.start_rule.descendants) > num_rules:
@@ -378,7 +385,9 @@ class RippleDownRules(ABC):
                     self.update_figures()
             i += 1
             all_predictions = [
-                1 if is_matching(lambda case: self.classify(case=case), case_query) else 0
+                1
+                if is_matching(lambda case: self.classify(case=case), case_query)
+                else 0
                 for case_query in case_queries
                 if case_query.target is not None
             ]
@@ -401,7 +410,8 @@ class RippleDownRules(ABC):
 
     def classify(
         self,
-        *, case: Case | SQLTable,
+        *,
+        case: Case | SQLTable,
         modify_case: bool = False,
         case_query: CaseQuery | None = None,
     ) -> CallableExpression | dict[str, CallableExpression] | None:
@@ -430,7 +440,8 @@ class RippleDownRules(ABC):
     @abstractmethod
     def _classify(
         self,
-        *, case: Case | SQLTable,
+        *,
+        case: Case | SQLTable,
         modify_case: bool = False,
         case_query: CaseQuery | None = None,
     ) -> CallableExpression | dict[str, CallableExpression] | None:
@@ -446,7 +457,8 @@ class RippleDownRules(ABC):
 
     def fit_case(
         self,
-        *, case_query: CaseQuery,
+        *,
+        case_query: CaseQuery,
         expert: Expert | None = None,
         update_existing_rules: bool = True,
         ask_now: Callable = lambda _: False,
@@ -490,7 +502,9 @@ class RippleDownRules(ABC):
                 case=case_query_cp.case, modify_case=True, case_query=case_query_cp
             )
             should_ask = self.should_i_ask_the_expert_for_a_target(
-                conclusions=conclusions, case_query=case_query_cp, update_existing=update_existing_rules
+                conclusions=conclusions,
+                case_query=case_query_cp,
+                update_existing=update_existing_rules,
             )
             ask_now_value = ask_now(case_query_cp.case)
             if ask_now_value and ask_now_target:
@@ -518,7 +532,8 @@ class RippleDownRules(ABC):
 
     @staticmethod
     def should_i_ask_the_expert_for_a_target(
-        *, conclusions: Any | dict[str, Any],
+        *,
+        conclusions: Any | dict[str, Any],
         case_query: CaseQuery,
         update_existing: bool,
     ) -> bool:
@@ -599,7 +614,9 @@ class RippleDownRules(ABC):
         :param model_path : The path to the model directory.
         :return: The path to the generated python file.
         """
-        return cls.get_generated_python_file_path(model_path=model_path).replace(".py", "_defs.py")
+        return cls.get_generated_python_file_path(model_path=model_path).replace(
+            ".py", "_defs.py"
+        )
 
     @classmethod
     def get_generated_python_file_path(cls, *, model_path: str) -> str:
@@ -654,7 +671,8 @@ class RippleDownRules(ABC):
     @abstractmethod
     def update_from_python(
         self,
-        *, model_dir: str,
+        *,
+        model_dir: str,
         parent_package_name: str | None = None,
         python_file_path: str | None = None,
         update_rule_tree: bool = False,
@@ -929,7 +947,6 @@ class MultiClassTreeBuilder(TreeBuilder):
 
 
 class RDRWithCodeWriter(RippleDownRules, ABC):
-
     @classmethod
     def read_rule_tree_from_python(
         cls, *, model_path: str, python_file_path: str | None = None
@@ -979,7 +996,8 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
 
     def update_from_python(
         self,
-        *, model_dir: str,
+        *,
+        model_dir: str,
         parent_package_name: str | None = None,
         python_file_path: str | None = None,
         update_rule_tree: bool = False,
@@ -1081,7 +1099,8 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
     @classmethod
     def get_and_import_model_python_modules(
         cls,
-        *, model_dir: str,
+        *,
+        model_dir: str,
         python_file_path: str | None = None,
         parent_package_name: str | None = None,
     ) -> tuple[ModuleType, ModuleType]:
@@ -1112,7 +1131,8 @@ class RDRWithCodeWriter(RippleDownRules, ABC):
     @abstractmethod
     def write_rules_as_source_code_to_file(
         self,
-        *, rule: Rule,
+        *,
+        rule: Rule,
         filename: str,
         parent_indent: str = "",
         defs_file: str | None = None,
@@ -1323,7 +1343,8 @@ class SingleClassRDR(RDRWithCodeWriter):
 
     def _classify(
         self,
-        *, case: Case,
+        *,
+        case: Case,
         modify_case: bool = False,
         case_query: CaseQuery | None = None,
     ) -> Any | None:
@@ -1361,7 +1382,8 @@ class SingleClassRDR(RDRWithCodeWriter):
 
     def write_rules_as_source_code_to_file(
         self,
-        *, rule: SingleClassRule,
+        *,
+        rule: SingleClassRule,
         filename: str,
         parent_indent: str = "",
         defs_file: str | None = None,
@@ -1371,7 +1393,9 @@ class SingleClassRDR(RDRWithCodeWriter):
         Write the rules as source code to a file.
         """
         if rule.conditions:
-            if_clause = rule.write_condition_as_source_code(parent_indent=parent_indent, defs_file=defs_file)
+            if_clause = rule.write_condition_as_source_code(
+                parent_indent=parent_indent, defs_file=defs_file
+            )
             with open(filename, "a") as file:
                 file.write(if_clause)
             if rule.refinement:
@@ -1477,7 +1501,8 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     def _classify(
         self,
-        *, case: Case | SQLTable,
+        *,
+        case: Case | SQLTable,
         modify_case: bool = False,
         case_query: CaseQuery | None = None,
     ) -> set[Any]:
@@ -1540,7 +1565,9 @@ class MultiClassRDR(RDRWithCodeWriter):
                 if not make_set(rule_conclusion).issubset(target_value):
                     # Rule fired and conclusion is different from target
                     self.stop_wrong_conclusion_else_add_it(
-                        case_query=case_query, expert=expert, evaluated_rule=evaluated_rule
+                        case_query=case_query,
+                        expert=expert,
+                        evaluated_rule=evaluated_rule,
                     )
                 else:
                     # Rule fired and target is correct or there is no target to compare
@@ -1557,7 +1584,8 @@ class MultiClassRDR(RDRWithCodeWriter):
 
     def write_rules_as_source_code_to_file(
         self,
-        *, rule: MultiClassTopRule | MultiClassStopRule,
+        *,
+        rule: MultiClassTopRule | MultiClassStopRule,
         filename: str,
         parent_indent: str = "",
         defs_file: str | None = None,
@@ -1567,7 +1595,9 @@ class MultiClassRDR(RDRWithCodeWriter):
             with open(filename, "a") as file:
                 file.write(f"{parent_indent}conclusions = set()\n")
         if rule.conditions:
-            if_clause = rule.write_condition_as_source_code(parent_indent=parent_indent, defs_file=defs_file)
+            if_clause = rule.write_condition_as_source_code(
+                parent_indent=parent_indent, defs_file=defs_file
+            )
             with open(filename, "a") as file:
                 file.write(if_clause)
             conclusion_indent = parent_indent
@@ -1650,7 +1680,11 @@ class MultiClassRDR(RDRWithCodeWriter):
             return self.start_rule.furthest_alternative[-1]
 
     def stop_wrong_conclusion_else_add_it(
-        self, *, case_query: CaseQuery, expert: Expert, evaluated_rule: MultiClassTopRule
+        self,
+        *,
+        case_query: CaseQuery,
+        expert: Expert,
+        evaluated_rule: MultiClassTopRule,
     ):
         """
         Stop a wrong conclusion by adding a stopping rule.
@@ -1674,12 +1708,16 @@ class MultiClassRDR(RDRWithCodeWriter):
         if stop or add_filter_rule:
             refinement_type = MultiClassStopRule if stop else MultiClassFilterRule
             self.stop_or_filter_conclusion(
-                case_query=case_query, expert=expert, evaluated_rule=evaluated_rule, refinement_type=refinement_type
+                case_query=case_query,
+                expert=expert,
+                evaluated_rule=evaluated_rule,
+                refinement_type=refinement_type,
             )
 
     def stop_or_filter_conclusion(
         self,
-        *, case_query: CaseQuery,
+        *,
+        case_query: CaseQuery,
         expert: Expert,
         evaluated_rule: MultiClassTopRule,
         refinement_type: type[MultiClassRefinementRule] = MultiClassStopRule,
@@ -1692,7 +1730,9 @@ class MultiClassRDR(RDRWithCodeWriter):
         :param evaluated_rule: The evaluated rule to ask the expert about.
         :param refinement_type: The refinement type to use.
         """
-        conditions = expert.ask_for_conditions(case_query=case_query, last_evaluated_rule=evaluated_rule)
+        conditions = expert.ask_for_conditions(
+            case_query=case_query, last_evaluated_rule=evaluated_rule
+        )
         evaluated_rule.fit_rule(case_query=case_query, refinement_type=refinement_type)
         if refinement_type is MultiClassStopRule:
             if self.mode == MCRDRMode.StopPlusRule:
@@ -1750,7 +1790,9 @@ class MultiClassRDR(RDRWithCodeWriter):
 
         :param case_query: The case query to add the top rule for.
         """
-        self.start_rule.alternative = MultiClassTopRule.from_case_query(case_query=case_query)
+        self.start_rule.alternative = MultiClassTopRule.from_case_query(
+            case_query=case_query
+        )
 
     @staticmethod
     def start_rule_type() -> type[Rule]:
@@ -1795,7 +1837,8 @@ class GeneralRDR(RippleDownRules):
     @classmethod
     def from_python(
         cls,
-        *, model_path: str,
+        *,
+        model_path: str,
         python_file_path: str | None = None,
         parent_package_name: str | None = None,
     ) -> Self:
@@ -1837,7 +1880,8 @@ class GeneralRDR(RippleDownRules):
 
     def add_rdr(
         self,
-        *, rdr: SingleClassRDR | MultiClassRDR,
+        *,
+        rdr: SingleClassRDR | MultiClassRDR,
         case_query: CaseQuery | None = None,
     ):
         """
@@ -1864,7 +1908,8 @@ class GeneralRDR(RippleDownRules):
 
     def _classify(
         self,
-        *, case: Any,
+        *,
+        case: Any,
         modify_case: bool = False,
         case_query: CaseQuery | None = None,
     ) -> dict[str, Any] | None:
@@ -1934,7 +1979,8 @@ class GeneralRDR(RippleDownRules):
 
     def update_from_python(
         self,
-        *, model_dir: str,
+        *,
+        model_dir: str,
         parent_package_name: str | None = None,
         python_file_path: str | None = None,
         update_rule_tree: bool = False,
@@ -1950,7 +1996,9 @@ class GeneralRDR(RippleDownRules):
         """
         if update_rule_tree:
             if python_file_path is None:
-                main_python_file_path = self.get_generated_python_file_path(model_path=model_dir)
+                main_python_file_path = self.get_generated_python_file_path(
+                    model_path=model_dir
+                )
             else:
                 main_python_file_path = python_file_path
             main_module = get_and_import_python_module(
@@ -1978,7 +2026,9 @@ class GeneralRDR(RippleDownRules):
                     model_dir=model_dir, parent_package_name=parent_package_name
                 )
 
-    def _write_to_python(self, *, model_dir: str, package_name: str | None = None) -> None:
+    def _write_to_python(
+        self, *, model_dir: str, package_name: str | None = None
+    ) -> None:
         """
         Write the tree of rules as source code to a file.
 

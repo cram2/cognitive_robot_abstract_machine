@@ -17,7 +17,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def body_graph(*bodies: Body) -> rx.PyDiGraph:
-    """Build a chain graph out of the given bodies (or other payloads)."""
+    """
+    Build a chain graph out of the given bodies (or other payloads).
+    """
     graph = rx.PyDiGraph(multigraph=False)
     indices = [graph.add_node(body) for body in bodies]
     for parent, child in zip(indices, indices[1:]):
@@ -26,14 +28,18 @@ def body_graph(*bodies: Body) -> rx.PyDiGraph:
 
 
 def body_visual_mesh(payload):
-    """The combined visual mesh of a ``Body`` payload, or ``None`` otherwise."""
+    """
+    The combined visual mesh of a ``Body`` payload, or ``None`` otherwise.
+    """
     if not isinstance(payload, Body) or not payload.visual:
         return None
     return payload.visual.combined_mesh
 
 
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> MeshThreeGraphVisualizer:
-    """A visualizer that labels bodies by their name."""
+    """
+    A visualizer that labels bodies by their name.
+    """
     overrides.setdefault("mesh_getter", body_visual_mesh)
     return MeshThreeGraphVisualizer(
         graph=graph,
@@ -133,7 +139,8 @@ class TestMeshGlbCaching:
         mesh.export = counting_export
 
         threads = [
-            threading.Thread(target=visualizer._mesh_glb, kwargs={"node_index": 0}) for _ in range(5)
+            threading.Thread(target=visualizer._mesh_glb, kwargs={"node_index": 0})
+            for _ in range(5)
         ]
         for started_thread in threads:
             started_thread.start()

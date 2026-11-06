@@ -111,7 +111,9 @@ class IsEven(Predicate):
 
     @classmethod
     def _verbalization_fragment_(cls, *, fields):
-        return clause(Noun(content=fields["number"]), Verb(lemma="be"), Noun(content="even"))
+        return clause(
+            Noun(content=fields["number"]), Verb(lemma="be"), Noun(content="even")
+        )
 
 
 @dataclass(kw_only=True, eq=False)

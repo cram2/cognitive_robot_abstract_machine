@@ -61,7 +61,9 @@ class Assembler(Generic[TSymbolicExpression, TPlan], SubClassSafeGeneric):
         return self.realize(node=node, plan=self.plan(node=node))
 
     @abstractmethod
-    def realize(self, *, node: TSymbolicExpression, plan: TPlan) -> VerbalizationFragment:
+    def realize(
+        self, *, node: TSymbolicExpression, plan: TPlan
+    ) -> VerbalizationFragment:
         """
         :param node: The node to realise.
         :param plan: The plan computed for *node* (``None`` for realisation-only assemblers).

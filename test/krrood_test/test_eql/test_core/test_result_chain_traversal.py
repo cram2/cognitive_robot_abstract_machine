@@ -193,9 +193,7 @@ def test_stage1_variable_result_reachable_via_previous_on_literal():
     r1 = _first(q1)
     r2 = _first(b, r1)
 
-    literal_result = (
-        r2.previous_operation_result.previous_operation_result.previous_operation_result.previous_operation_result
-    )
+    literal_result = r2.previous_operation_result.previous_operation_result.previous_operation_result.previous_operation_result
     # Literal links the Variable-a result as its previous_operation_result
     a_result = literal_result.previous_operation_result
     assert a_result is not None

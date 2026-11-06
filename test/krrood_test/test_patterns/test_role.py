@@ -97,7 +97,9 @@ def test_role_native_attr_accessible_from_roles_dict():
     person = PersonInRoleAndOntology(name="Bass")
     ceo = CEOAsFirstRole(role_taker=person, head_of=Company(name="BassCo"))
     assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0] is ceo
-    assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0].head_of == Company(name="BassCo")
+    assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[
+        0
+    ].head_of == Company(name="BassCo")
 
 
 def test_getting_and_setting_attribute_between_sibling_roles():
@@ -115,9 +117,14 @@ def test_getting_and_setting_attribute_between_sibling_roles():
     assert ceo.head_of.name == "BassCo"
 
     # sibling role attrs are accessible via the roles dict on the shared taker
-    assert Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0].head_of.name == "BassCo"
     assert (
-        Role.roles_for(role_taker=person, role_type=ProfessorAsFirstRole)[0].teacher_of[0].name
+        Role.roles_for(role_taker=person, role_type=CEOAsFirstRole)[0].head_of.name
+        == "BassCo"
+    )
+    assert (
+        Role.roles_for(role_taker=person, role_type=ProfessorAsFirstRole)[0]
+        .teacher_of[0]
+        .name
         == "BassCourse"
     )
 
@@ -207,7 +214,9 @@ def test_mappings_between_roles_and_role_takers():
     assert all(
         any(role is retrieved for retrieved in roles_of_person) for role in roles
     )
-    assert all(IsSameSemanticEntity(first_entity=role, second_entity=person) for role in roles)
+    assert all(
+        IsSameSemanticEntity(first_entity=role, second_entity=person) for role in roles
+    )
 
     delegate_role_takers = [representative, ceo, person]
     assert len(delegate_role_takers) == len(delegate.all_role_takers)
@@ -245,15 +254,23 @@ def test_get_roles_of_type():
     professor = ProfessorAsFirstRole(role_taker=person)
 
     assert isinstance(
-        Role.get_taker_roles_of_type(role_taker=person, role_type=CEOAsFirstRole)[0], CEOAsFirstRole
+        Role.get_taker_roles_of_type(role_taker=person, role_type=CEOAsFirstRole)[0],
+        CEOAsFirstRole,
     )
     assert isinstance(
-        Role.get_taker_roles_of_type(role_taker=person, role_type=RepresentativeAsSecondRole)[0],
+        Role.get_taker_roles_of_type(
+            role_taker=person, role_type=RepresentativeAsSecondRole
+        )[0],
         RepresentativeAsSecondRole,
     )
-    assert Role.get_taker_roles_of_type(role_taker=person, role_type=DelegateAsThirdRole) == []
+    assert (
+        Role.get_taker_roles_of_type(role_taker=person, role_type=DelegateAsThirdRole)
+        == []
+    )
     assert isinstance(
-        Role.get_taker_roles_of_type(role_taker=person, role_type=ProfessorAsFirstRole)[0],
+        Role.get_taker_roles_of_type(role_taker=person, role_type=ProfessorAsFirstRole)[
+            0
+        ],
         ProfessorAsFirstRole,
     )
     # All three roles (ceo, representative, professor) resolve back to the same taker.

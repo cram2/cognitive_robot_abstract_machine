@@ -1,4 +1,5 @@
-"""Block a rule's conclusions from committing to an out-of-distribution object.
+"""
+Block a rule's conclusions from committing to an out-of-distribution object.
 
 This wires the confidence model into EQL's evaluation pipeline through the
 ``on_conclusions_processed`` hook of
@@ -30,13 +31,17 @@ from experiments.confidence_aware_eql.confidence_model import ConfidenceModel
 
 @dataclass
 class UnfamiliarInstanceError(DataclassException):
-    """Raised when a rule concludes on an instance the confidence model judges unfamiliar."""
+    """
+    Raised when a rule concludes on an instance the confidence model judges unfamiliar.
+    """
 
     instance: Any
     """The instance a rule's conclusion bound that was judged unfamiliar."""
 
     log_likelihood: float
-    """The instance's log-likelihood under the confidence model."""
+    """
+    The instance's log-likelihood under the confidence model.
+    """
 
     threshold: float
     """The familiarity threshold the log-likelihood fell below."""
@@ -53,7 +58,10 @@ class UnfamiliarInstanceError(DataclassException):
 
 @dataclass
 class ConfidenceGuardObserver(EvaluationObserver):
-    """Raises :class:`UnfamiliarInstanceError` for any conclusion bound to an unfamiliar instance."""
+    """
+    Raises :class:`UnfamiliarInstanceError` for any conclusion bound to an unfamiliar
+    instance.
+    """
 
     confidence_model: ConfidenceModel
     """The fitted confidence model every concluded instance is checked against."""
@@ -62,7 +70,8 @@ class ConfidenceGuardObserver(EvaluationObserver):
         self, *, expression: SymbolicExpression, result: OperationResult
     ) -> None:
         """
-        Check every instance this rule just concluded and raise on the first unfamiliar one.
+        Check every instance this rule just concluded and raise on the first unfamiliar
+        one.
 
         :param expression: The rule whose conclusions were processed.
         :param result: The result carrying the bindings the conclusions just updated.
@@ -81,7 +90,8 @@ class ConfidenceGuardObserver(EvaluationObserver):
 def evaluate_with_confidence_guard(
     expression: SymbolicExpression, confidence_model: ConfidenceModel
 ) -> Iterator[Any]:
-    """Evaluate a rule expression with a :class:`ConfidenceGuardObserver` attached.
+    """
+    Evaluate a rule expression with a :class:`ConfidenceGuardObserver` attached.
 
     Builds the default evaluation context up front (rather than letting ``expression``
     create its own while evaluating) so the extra observer can be appended, and so the

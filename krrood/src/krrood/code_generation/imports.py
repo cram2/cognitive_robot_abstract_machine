@@ -1,4 +1,6 @@
-"""Import-line generation and inspection of callables for code generation."""
+"""
+Import-line generation and inspection of callables for code generation.
+"""
 
 from __future__ import annotations
 
@@ -23,17 +25,24 @@ from krrood.utils import (
 
 @dataclass(kw_only=True)
 class ImportData:
-    """Import data required to reference a symbol from generated source."""
+    """
+    Import data required to reference a symbol from generated source.
+    """
 
     import_line: str
-    """The ``from … import …`` statement that makes the symbol available."""
+    """
+    The ``from … import …`` statement that makes the symbol available.
+    """
 
     access_expression: str
-    """The name expression used to reference the symbol after the import."""
+    """
+    The name expression used to reference the symbol after the import.
+    """
 
 
 def generate_import_statement_for_callable(function: Callable) -> ImportData:
-    """Return the :class:`ImportData` for *function*.
+    """
+    Return the :class:`ImportData` for *function*.
 
     :param function: The callable to generate an import for.
     :returns: An :class:`ImportData` bundling the ``from … import …`` line and
@@ -72,7 +81,8 @@ def generate_import_statement_for_callable(function: Callable) -> ImportData:
 
 
 def validate_annotations(function: Callable) -> None:
-    """Raise :exc:`FunctionMissingAnnotationsError` if any required annotation is absent.
+    """
+    Raise :exc:`FunctionMissingAnnotationsError` if any required annotation is absent.
 
     Unannotated ``self`` and ``cls`` parameters are silently excluded.
     """
@@ -101,7 +111,8 @@ def get_type_names_per_module_from_types(
     excluded_names: list[str] | None = None,
     excluded_modules: list[str] | None = None,
 ) -> dict[str, list[str]]:
-    """Get a dictionary of type names grouped by module.
+    """
+    Get a dictionary of type names grouped by module.
 
     :param type_objects: A list of type objects to format.
     :param excluded_names: A list of names to exclude from the imports.
@@ -151,7 +162,8 @@ def get_imports_from_types(
     excluded_names: list[str] | None = None,
     excluded_modules: list[str] | None = None,
 ) -> list[str]:
-    """Format import lines from type objects.
+    """
+    Format import lines from type objects.
 
     :param type_objects: A list of type objects to format.
     :param target_file_path: The file path to which the imports should be relative.

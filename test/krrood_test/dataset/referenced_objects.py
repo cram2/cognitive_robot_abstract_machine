@@ -59,7 +59,9 @@ class ReaderOwnedElementReference(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(cls, *, data: Dict[str, Any], **kwargs) -> ReaderOwnedElement:
-        return ReaderOwnedElementTracker.from_kwargs(from_json_kwargs=kwargs).get(key=data["key"])
+        return ReaderOwnedElementTracker.from_kwargs(from_json_kwargs=kwargs).get(
+            key=data["key"]
+        )
 
 
 @dataclass(kw_only=True)

@@ -137,7 +137,11 @@ def test_query_depth_scope_increments_and_restores():
 
 
 def test_build_between_standard_and_compact_forms():
-    left, lo, hi = WordFragment(text="x"), WordFragment(text="1"), WordFragment(text="10")
+    left, lo, hi = (
+        WordFragment(text="x"),
+        WordFragment(text="1"),
+        WordFragment(text="10"),
+    )
 
     standard = build_between(left, lo, hi, compact=False)
     assert (

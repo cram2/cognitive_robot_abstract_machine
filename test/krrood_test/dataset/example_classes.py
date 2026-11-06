@@ -329,7 +329,9 @@ class BackreferenceMapping(AlternativeMapping[Backreference]):
         return cls(values=list(obj.unmappable.values()), reference=obj.reference)
 
     def to_domain_object(self) -> T:
-        return Backreference(unmappable={v: v for v in self.values}, reference=self.reference)
+        return Backreference(
+            unmappable={v: v for v in self.values}, reference=self.reference
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -549,7 +551,10 @@ class InheritanceLevel1WithoutSymbolButAlternativelyMappedMapping(
 
     @classmethod
     def from_domain_object(cls, *, obj: T):
-        return cls(base_attribute=obj.base_attribute, level_one_attribute=obj.level_one_attribute)
+        return cls(
+            base_attribute=obj.base_attribute,
+            level_one_attribute=obj.level_one_attribute,
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -561,7 +566,11 @@ class InheritanceLevel2WithoutSymbolButAlternativelyMappedMapping(
 
     @classmethod
     def from_domain_object(cls, *, obj: T):
-        return cls(base_attribute=obj.base_attribute, level_one_attribute=obj.level_one_attribute, level_two_attribute=obj.level_two_attribute)
+        return cls(
+            base_attribute=obj.base_attribute,
+            level_one_attribute=obj.level_one_attribute,
+            level_two_attribute=obj.level_two_attribute,
+        )
 
 
 @dataclass(kw_only=True)

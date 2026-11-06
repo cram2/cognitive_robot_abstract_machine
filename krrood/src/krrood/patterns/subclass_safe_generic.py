@@ -156,7 +156,8 @@ class SubClassSafeGeneric(ABC):
 
     @staticmethod
     def _substitutions_bind_a_concrete_type(
-        *, substitutions: dict[Any, ResolvableType],
+        *,
+        substitutions: dict[Any, ResolvableType],
     ) -> bool:
         """
         Report whether the substitution map assigns at least one type parameter to a
@@ -235,14 +236,18 @@ class SubClassSafeGeneric(ABC):
 
         substitutions = {}
         for base in getattr(cls, "__orig_bases__", []):
-            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(base=base)
+            base_origin, resolved_types = cls._resolve_base_origin_and_arguments(
+                base=base
+            )
             if base_origin is None or not issubclass(base_origin, SubClassSafeGeneric):
                 continue
 
             # Map the root TypeVars of the base to the concrete arguments provided here
             if resolved_types:
                 substitutions.update(
-                    cls._get_resolved_type_substitutions(base_origin=base_origin, resolved_types=resolved_types)
+                    cls._get_resolved_type_substitutions(
+                        base_origin=base_origin, resolved_types=resolved_types
+                    )
                 )
 
             # Recursively pull substitutions already defined by the parent
@@ -251,7 +256,9 @@ class SubClassSafeGeneric(ABC):
             substitutions.update(base_origin._get_generic_type_substitutions())
 
         if substitutions:
-            substitutions = cls._resolve_substitutions_transitively(substitutions=substitutions)
+            substitutions = cls._resolve_substitutions_transitively(
+                substitutions=substitutions
+            )
 
         cls._subclass_safe_substitutions = substitutions
         return substitutions
@@ -259,7 +266,8 @@ class SubClassSafeGeneric(ABC):
     @classmethod
     def _get_resolved_type_substitutions(
         cls,
-        *, base_origin: type,
+        *,
+        base_origin: type,
         resolved_types: tuple[type, ...],
     ) -> dict[Any, ResolvableType]:
         """
@@ -302,13 +310,16 @@ class SubClassSafeGeneric(ABC):
         return {
             ensure_hashable(old_type): new_type
             for old_type, new_type in matched_pairs
-            if cls._fulfills_substitution_condition(old_type=old_type, new_type=new_type)
+            if cls._fulfills_substitution_condition(
+                old_type=old_type, new_type=new_type
+            )
         }
 
     @classmethod
     def _fulfills_substitution_condition(
         cls,
-        *, old_type: Any,
+        *,
+        old_type: Any,
         new_type: type | tuple[type, ...] | None,
     ) -> bool:
         """
@@ -338,7 +349,8 @@ class SubClassSafeGeneric(ABC):
     @classmethod
     def _match_type_var_tuple_variable_to_resolved_type(
         cls,
-        *, type_var_tuple_index: int,
+        *,
+        type_var_tuple_index: int,
         root_parameters: list[Any],
         resolved_types: tuple[type, ...],
         base_origin: type,

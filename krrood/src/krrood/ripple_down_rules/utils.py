@@ -1321,7 +1321,6 @@ _RE_ESC = re.compile(r'["\\]')
 
 
 class FilteredDotExporter(object):
-
     def __init__(
         self,
         node,
@@ -1499,7 +1498,11 @@ class FilteredDotExporter(object):
         edgeattrfunc = self.edgeattrfunc or self._default_edgeattrfunc
         edgetypefunc = self.edgetypefunc or self._default_edgetypefunc
         return self.__iter(
-            indent=indent, nodenamefunc=nodenamefunc, nodeattrfunc=nodeattrfunc, edgeattrfunc=edgeattrfunc, edgetypefunc=edgetypefunc
+            indent=indent,
+            nodenamefunc=nodenamefunc,
+            nodeattrfunc=nodeattrfunc,
+            edgeattrfunc=edgeattrfunc,
+            edgetypefunc=edgetypefunc,
         )
 
     @staticmethod
@@ -1526,9 +1529,16 @@ class FilteredDotExporter(object):
         yield "{self.graph} {self.name} {{".format(self=self)
         for option in self.__iter_options(indent=indent):
             yield option
-        for node in self.__iter_nodes(indent=indent, nodenamefunc=nodenamefunc, nodeattrfunc=nodeattrfunc):
+        for node in self.__iter_nodes(
+            indent=indent, nodenamefunc=nodenamefunc, nodeattrfunc=nodeattrfunc
+        ):
             yield node
-        for edge in self.__iter_edges(indent=indent, nodenamefunc=nodenamefunc, edgeattrfunc=edgeattrfunc, edgetypefunc=edgetypefunc):
+        for edge in self.__iter_edges(
+            indent=indent,
+            nodenamefunc=nodenamefunc,
+            edgeattrfunc=edgeattrfunc,
+            edgetypefunc=edgetypefunc,
+        ):
             yield edge
         if self.use_legend:
             legend_dot_graph = """
@@ -1567,7 +1577,11 @@ subgraph cluster_legend {
                 continue
             nodeattr = nodeattrfunc(node)
             nodeattr = " [%s]" % nodeattr if nodeattr is not None else ""
-            yield '%s"%s"%s;' % (indent, FilteredDotExporter.esc(value=nodename), nodeattr)
+            yield '%s"%s"%s;' % (
+                indent,
+                FilteredDotExporter.esc(value=nodename),
+                nodeattr,
+            )
 
     def __iter_edges(self, *, indent, nodenamefunc, edgeattrfunc, edgetypefunc):
         maxlevel = self.maxlevel - 1 if self.maxlevel else None
@@ -1699,8 +1713,10 @@ def render_tree(
             include_nodes=only_nodes,
             nodenamefunc=unique_node_names,
             edgeattrfunc=edge_attr_setter,
-            nodeattrfunc=lambda node: f"style=filled,"
-            f' fillcolor={color_map(node) if color_map else getattr(node, "color", "white")}',
+            nodeattrfunc=lambda node: (
+                f"style=filled,"
+                f" fillcolor={color_map(node) if color_map else getattr(node, 'color', 'white')}"
+            ),
             use_legend=use_legend,
         )
         if view:

@@ -300,7 +300,9 @@ class TestSoftConnectionRebuilding:
         segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)
 
-        restored = Connection.from_json(data=segment.to_json(), **tracker.create_kwargs())
+        restored = Connection.from_json(
+            data=segment.to_json(), **tracker.create_kwargs()
+        )
 
         assert type(restored) is type(segment)
         assert restored.kappa_dof_id == segment.kappa_dof_id
@@ -312,7 +314,9 @@ class TestSoftConnectionRebuilding:
         segment = world.get_connections_by_type(CosseratRodConnection)[0]
         tracker = WorldEntityWithIDKwargsTracker.from_world(world)
 
-        restored = Connection.from_json(data=segment.to_json(), **tracker.create_kwargs())
+        restored = Connection.from_json(
+            data=segment.to_json(), **tracker.create_kwargs()
+        )
 
         assert type(restored) is type(segment)
         assert restored.bending_x_dof_id == segment.bending_x_dof_id

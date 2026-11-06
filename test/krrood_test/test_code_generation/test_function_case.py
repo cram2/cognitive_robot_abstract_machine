@@ -1,4 +1,6 @@
-"""Tests for ``FunctionCase`` source generation in ``krrood.code_generation``."""
+"""
+Tests for ``FunctionCase`` source generation in ``krrood.code_generation``.
+"""
 
 from __future__ import annotations
 
@@ -18,14 +20,20 @@ class GeneratedSourcePoint:
     """
 
     x: float
-    """Position along the first axis."""
+    """
+    Position along the first axis.
+    """
 
 
 def _make_module_level_distance() -> Callable:
-    """Return a fully annotated module-level ``distance`` function."""
+    """
+    Return a fully annotated module-level ``distance`` function.
+    """
 
     def distance(x: float, y: float) -> float:
-        """Compute Euclidean distance between x and y."""
+        """
+        Compute Euclidean distance between x and y.
+        """
         return abs(x - y)
 
     distance.__module__ = "my.module"
@@ -39,12 +47,16 @@ def module_level_distance() -> Callable:
 
 @pytest.fixture(scope="module")
 def distance_source(module_level_distance: Callable) -> str:
-    """The generated source for the ``distance`` function."""
+    """
+    The generated source for the ``distance`` function.
+    """
     return FunctionCaseGenerator().generate(function=module_level_distance)
 
 
 class TestValidateAnnotationsMissingParameter:
-    """A missing parameter annotation aborts generation."""
+    """
+    A missing parameter annotation aborts generation.
+    """
 
     def test_raises_on_unannotated_positional_parameter(self) -> None:
         def bad(x, y: float) -> float:
@@ -62,7 +74,9 @@ class TestValidateAnnotationsMissingParameter:
 
 
 class TestValidateAnnotationsMissingReturn:
-    """A missing return annotation aborts generation."""
+    """
+    A missing return annotation aborts generation.
+    """
 
     def test_raises_on_missing_return_annotation(self) -> None:
         def no_return(x: float, y: float):
@@ -73,7 +87,9 @@ class TestValidateAnnotationsMissingReturn:
 
 
 class TestValidateAnnotationsSelfExcluded:
-    """An unannotated ``self`` parameter is tolerated and never emitted."""
+    """
+    An unannotated ``self`` parameter is tolerated and never emitted.
+    """
 
     def test_self_without_annotation_does_not_raise(self) -> None:
         class MyClass:
@@ -98,7 +114,9 @@ class TestValidateAnnotationsSelfExcluded:
 
 
 class TestValidateAnnotationsClsExcluded:
-    """An unannotated ``cls`` parameter is tolerated and never emitted."""
+    """
+    An unannotated ``cls`` parameter is tolerated and never emitted.
+    """
 
     def test_cls_without_annotation_does_not_raise(self) -> None:
         class MyClass:
@@ -125,7 +143,9 @@ class TestValidateAnnotationsClsExcluded:
 
 
 class TestGeneratedSourceBoilerplate:
-    """The emitted source contains all mandatory boilerplate lines."""
+    """
+    The emitted source contains all mandatory boilerplate lines.
+    """
 
     def test_contains_future_annotations_import(self, *, distance_source: str) -> None:
         assert "from __future__ import annotations" in distance_source
@@ -150,7 +170,9 @@ class TestGeneratedSourceBoilerplate:
 
 
 class TestGeneratedSourceCallableImport:
-    """The emitted source imports the callable being wrapped."""
+    """
+    The emitted source imports the callable being wrapped.
+    """
 
     def test_imports_distance_function(self, *, distance_source: str) -> None:
         assert "import distance" in distance_source
@@ -160,7 +182,9 @@ class TestGeneratedSourceCallableImport:
 
 
 class TestGeneratedSourceClassDeclaration:
-    """The emitted source declares the expected class."""
+    """
+    The emitted source declares the expected class.
+    """
 
     def test_class_name_is_camel_cased_function_name(
         self, *, distance_source: str
@@ -174,18 +198,24 @@ class TestGeneratedSourceClassDeclaration:
 
 
 class TestGeneratedSourceClassVar:
-    """The emitted source contains the ``function`` ClassVar assignment."""
+    """
+    The emitted source contains the ``function`` ClassVar assignment.
+    """
 
     def test_function_classvar_present(self, *, distance_source: str) -> None:
         assert "function" in distance_source
         assert "ClassVar" in distance_source
 
-    def test_function_classvar_assigned_to_distance(self, *, distance_source: str) -> None:
+    def test_function_classvar_assigned_to_distance(
+        self, *, distance_source: str
+    ) -> None:
         assert "= distance" in distance_source or "=distance" in distance_source
 
 
 class TestGeneratedSourceFields:
-    """The emitted source declares one field per non-self/cls parameter."""
+    """
+    The emitted source declares one field per non-self/cls parameter.
+    """
 
     def test_x_field_present(self, *, distance_source: str) -> None:
         assert "x: float" in distance_source
@@ -195,7 +225,9 @@ class TestGeneratedSourceFields:
 
 
 class TestGeneratedSourceOutputField:
-    """The emitted source contains a field for the return value."""
+    """
+    The emitted source contains a field for the return value.
+    """
 
     def test_output_field_present(self, *, distance_source: str) -> None:
         assert "_output" in distance_source

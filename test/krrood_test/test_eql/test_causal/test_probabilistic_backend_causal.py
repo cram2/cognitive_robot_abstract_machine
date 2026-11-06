@@ -179,7 +179,12 @@ def _build_two_cause_candidates_circuit() -> TwoCauseCandidatesCircuit:
         [decisive, uninformative],
         [outcome],
     )
-    return TwoCauseCandidatesCircuit(causal_circuit=causal_circuit, decisive_cause=decisive, uninformative_cause=uninformative, outcome=outcome)
+    return TwoCauseCandidatesCircuit(
+        causal_circuit=causal_circuit,
+        decisive_cause=decisive,
+        uninformative_cause=uninformative,
+        outcome=outcome,
+    )
 
 
 # %% error handling
@@ -436,7 +441,12 @@ def _build_pick_attempt_ranking_circuit() -> TwoCauseCandidatesCircuit:
         [decisive, uninformative],
         [outcome],
     )
-    return TwoCauseCandidatesCircuit(causal_circuit=causal_circuit, decisive_cause=decisive, uninformative_cause=uninformative, outcome=outcome)
+    return TwoCauseCandidatesCircuit(
+        causal_circuit=causal_circuit,
+        decisive_cause=decisive,
+        uninformative_cause=uninformative,
+        outcome=outcome,
+    )
 
 
 def test_rank_causes_returns_every_candidate_ranked_highest_first():
@@ -444,7 +454,9 @@ def test_rank_causes_returns_every_candidate_ranked_highest_first():
     match = a(PickAttempt)(arm=cause, grip=cause, outcome=...)
     match.causes_effect(match.outcome == Outcome.SUCCESS)
     backend = ProbabilisticBackend(
-        model_registry=CausalCircuitRegistry(circuits={PickAttempt: circuit.causal_circuit})
+        model_registry=CausalCircuitRegistry(
+            circuits={PickAttempt: circuit.causal_circuit}
+        )
     )
 
     ranking = backend.rank_causes(expression=match)
@@ -467,7 +479,9 @@ def test_rank_causes_does_not_change_the_result_of_evaluate():
     match = a(PickAttempt)(arm=cause, grip=cause, outcome=...)
     match.causes_effect(match.outcome == Outcome.SUCCESS)
     backend = ProbabilisticBackend(
-        model_registry=CausalCircuitRegistry(circuits={PickAttempt: circuit.causal_circuit}),
+        model_registry=CausalCircuitRegistry(
+            circuits={PickAttempt: circuit.causal_circuit}
+        ),
         number_of_samples=10,
     )
 

@@ -14,14 +14,20 @@ from krrood.rustworkx_utils.graph_visualizer_base import GraphLayout
 
 @dataclass(kw_only=True)
 class NamedPayload:
-    """A payload whose name is shown as the node label and detail line."""
+    """
+    A payload whose name is shown as the node label and detail line.
+    """
 
     name: str
-    """The identifier rendered for this node."""
+    """
+    The identifier rendered for this node.
+    """
 
 
 def chain_graph(names: list[str]) -> rx.PyDiGraph:
-    """Build a directed chain of :class:`NamedPayload` nodes."""
+    """
+    Build a directed chain of :class:`NamedPayload` nodes.
+    """
     graph = rx.PyDiGraph(multigraph=False)
     indices = [graph.add_node(NamedPayload(name=name)) for name in names]
     for parent, child in zip(indices, indices[1:]):
@@ -30,7 +36,9 @@ def chain_graph(names: list[str]) -> rx.PyDiGraph:
 
 
 def named_visualizer(graph: rx.PyDiGraph, **overrides) -> CytoscapeGraphVisualizer:
-    """A visualizer that labels and describes nodes by their payload name."""
+    """
+    A visualizer that labels and describes nodes by their payload name.
+    """
     return CytoscapeGraphVisualizer(
         graph=graph,
         label_getter=lambda payload: payload.name,
@@ -40,12 +48,16 @@ def named_visualizer(graph: rx.PyDiGraph, **overrides) -> CytoscapeGraphVisualiz
 
 
 def node_elements(elements):
-    """The node elements of a Cytoscape element list."""
+    """
+    The node elements of a Cytoscape element list.
+    """
     return [element for element in elements if "source" not in element["data"]]
 
 
 def edge_elements(elements):
-    """The edge elements of a Cytoscape element list."""
+    """
+    The edge elements of a Cytoscape element list.
+    """
     return [element for element in elements if "source" in element["data"]]
 
 
@@ -147,14 +159,18 @@ class TestLayout:
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.LAYERED)
 
         assert (
-            CytoscapeGraphVisualizer.layout_options.get_options(layout=visualizer.layout)["name"]
+            CytoscapeGraphVisualizer.layout_options.get_options(
+                layout=visualizer.layout
+            )["name"]
             == "breadthfirst"
         )
 
     def test_physics_layout_runs_a_continuous_force_simulation(self):
         visualizer = named_visualizer(chain_graph(["a"]), layout=GraphLayout.PHYSICS)
 
-        options = CytoscapeGraphVisualizer.layout_options.get_options(layout=visualizer.layout)
+        options = CytoscapeGraphVisualizer.layout_options.get_options(
+            layout=visualizer.layout
+        )
         assert options["name"] == "cola"
         assert options["infinite"] is True
 

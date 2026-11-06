@@ -64,7 +64,15 @@ def test_stack_frame_scope_is_a_copy_not_live_reference():
 
 def test_stack_frame_positional_construction_still_works():
     # Pre-existing call sites construct StackFrame positionally with 7 args.
-    frame = StackFrame(filename="f.py", lineno=1, function_name="fn", code_snippet=None, class_object=None, function_object=None, module_name="mod")
+    frame = StackFrame(
+        filename="f.py",
+        lineno=1,
+        function_name="fn",
+        code_snippet=None,
+        class_object=None,
+        function_object=None,
+        module_name="mod",
+    )
     assert frame.global_namespace is None and frame.local_namespace is None
 
 

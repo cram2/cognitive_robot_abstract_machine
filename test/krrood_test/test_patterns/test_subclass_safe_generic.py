@@ -260,9 +260,9 @@ def test_subclass_safe_generic_type_resolution_failure_does_not_kill_class_defin
     assert _IntStorage is not None
     # Fields from the parent must still be intact with their original defaults.
     items_field = next(f for f in fields(_IntStorage) if f.name == "items")
-    assert (
-        items_field.default_factory is list
-    ), "items.default_factory was lost after type-resolution failure"
+    assert items_field.default_factory is list, (
+        "items.default_factory was lost after type-resolution failure"
+    )
     instance = _IntStorage(required=1)
     assert instance.items == []
 
@@ -300,7 +300,10 @@ def test_subclass_safe_generic_flags_a_lost_concrete_binding():
     T_local = TypeVar("T_local")
 
     assert (
-        SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={T_local: int}) is True
+        SubClassSafeGeneric._substitutions_bind_a_concrete_type(
+            substitutions={T_local: int}
+        )
+        is True
     )
 
 
@@ -313,10 +316,15 @@ def test_subclass_safe_generic_does_not_flag_a_typevar_only_rename():
     Renamed = TypeVar("Renamed")
 
     assert (
-        SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={T_local: Renamed})
+        SubClassSafeGeneric._substitutions_bind_a_concrete_type(
+            substitutions={T_local: Renamed}
+        )
         is False
     )
-    assert SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={}) is False
+    assert (
+        SubClassSafeGeneric._substitutions_bind_a_concrete_type(substitutions={})
+        is False
+    )
 
 
 def test_subclass_safe_generic_inherited_default_factory_survives_type_update():
@@ -560,13 +568,17 @@ def test_circular_reference_resolution():
 
     # Direct cycle: T -> U, U -> T
     substitutions = {T_local: U_local, U_local: T_local}
-    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions=substitutions)
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(
+        substitutions=substitutions
+    )
     assert resolved[T_local] in {T_local, U_local}
     assert resolved[U_local] in {T_local, U_local}
 
     # Indirect cycle: T -> List[U], U -> T
     substitutions = {T_local: List[U_local], U_local: T_local}
-    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(substitutions=substitutions)
+    resolved = SubClassSafeGeneric._resolve_substitutions_transitively(
+        substitutions=substitutions
+    )
     assert resolved[T_local] is not None
     assert resolved[U_local] is not None
 
@@ -838,7 +850,10 @@ def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
         classmethod(lambda cls: {}),
     )
 
-    assert TextContainer.get_type_of_generic_parameter(parameter=ContentType) is first_lookup
+    assert (
+        TextContainer.get_type_of_generic_parameter(parameter=ContentType)
+        is first_lookup
+    )
 
 
 # %% attributes an interface declares

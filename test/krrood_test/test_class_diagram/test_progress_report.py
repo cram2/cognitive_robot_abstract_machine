@@ -19,7 +19,10 @@ def test_a_report_survives_being_written_and_read_back():
 
 
 def test_a_line_of_logging_carries_no_report():
-    assert ClassDiagramProgress.from_line(line="INFO:krrood:resolving Employee.name") is None
+    assert (
+        ClassDiagramProgress.from_line(line="INFO:krrood:resolving Employee.name")
+        is None
+    )
 
 
 # %% reporting while a diagram is built

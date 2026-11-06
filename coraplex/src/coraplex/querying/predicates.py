@@ -65,9 +65,13 @@ class GripperHolds(GripperOccupancy, Predicate):
         return self.check_manipulator_occupancy(lambda bodies: self.body in bodies)
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<end effector> holds <body>"*.
         """
-        return predicate_clause(cls, Noun(content=fields["end_effector"]), Noun(content=fields["body"]))
+        return predicate_clause(
+            cls, Noun(content=fields["end_effector"]), Noun(content=fields["body"])
+        )

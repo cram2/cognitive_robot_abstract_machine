@@ -184,7 +184,9 @@ def test_first_order_form_and_value_using_form_agree_when_types_match():
 
 def test_first_order_form_ignores_a_class_example_operand_values_override():
     """
-    A truly value-agnostic rendering needs nothing external, so `first_order_form` keeps
+    A truly value-agnostic rendering needs nothing external, so `first_order_form`
+    keeps.
+
     the placeholder variable even for a class that declares `_example_operand_values_`
     -- that hook is for `VerbalizationResultsOfPackage` alone.
     """

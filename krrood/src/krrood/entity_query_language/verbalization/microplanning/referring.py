@@ -253,7 +253,9 @@ def operand_head_noun(node: Variable, edges: list[ParentEdge]) -> str:
     if sole_field is None:
         return "object"
     predicate_class = sole_field.parent._factory_
-    metadata = GrammarMetadata.of_field(clazz=predicate_class, field_name=sole_field.field_name)
+    metadata = GrammarMetadata.of_field(
+        clazz=predicate_class, field_name=sole_field.field_name
+    )
     if metadata is not None and metadata.display_name is not None:
         return metadata.display_name
     return sole_field.field_name.replace("_", " ")
@@ -390,7 +392,8 @@ class _HeadNounGrouping:
 
     def add(
         self,
-        *, referent_id: uuid.UUID,
+        *,
+        referent_id: uuid.UUID,
         representative: uuid.UUID,
         noun: str,
         type_alternatives: tuple[type, ...] = (),
@@ -561,7 +564,10 @@ class ReferringExpressions:
                 else ()
             )
             grouping.add(
-                referent_id=node._id_, representative=aliases.get(node._id_, node._id_), noun=noun, type_alternatives=alternatives
+                referent_id=node._id_,
+                representative=aliases.get(node._id_, node._id_),
+                noun=noun,
+                type_alternatives=alternatives,
             )
         return grouping
 
@@ -618,7 +624,8 @@ class ReferringExpressions:
 
     @staticmethod
     def _resolve_head_noun(
-        *, node: SymbolicExpression,
+        *,
+        node: SymbolicExpression,
         edges_by_id: dict[uuid.UUID, list[ParentEdge]],
     ) -> str | None:
         """:return: The head noun a node is disambiguated (and later referred to) under — the
@@ -677,7 +684,9 @@ class ReferringExpressions:
         >>> referring.head_noun_of(variable=transaction)
         'BankTransaction'
         """
-        return self.head_nouns.get(variable._id_, self._variable_type_label(variable=variable))
+        return self.head_nouns.get(
+            variable._id_, self._variable_type_label(variable=variable)
+        )
 
     def type_alternatives_of(self, *, variable: Variable) -> tuple[type, ...]:
         """:return: *variable*'s concrete-subclass alternatives, pre-computed in the pre-scan

@@ -197,7 +197,9 @@ class CoindexedFoldRule(PhraseRule):
 
     construct = CoindexedFold
 
-    def build(self, *, node: CoindexedFold, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: CoindexedFold, context: RuleContext
+    ) -> VerbalizationFragment:
         """Say the factored clause once — the natural *"have the same"* form over sibling prefixes.
 
         Detecting sibling prefixes selects the natural branch here (the faithful branch would instead
@@ -217,7 +219,10 @@ class CoindexedFoldRule(PhraseRule):
         natural = coindexed_natural_parts(node)
         if natural is not None:
             hops = oxford_comma(
-                [self._attribute(pair=natural.left_hop), self._attribute(pair=natural.right_hop)],
+                [
+                    self._attribute(pair=natural.left_hop),
+                    self._attribute(pair=natural.right_hop),
+                ],
                 Conjunctions.AND.as_fragment(),
             )
             return PhraseFragment(
@@ -290,7 +295,10 @@ class SharedSubjectComparisonsRule(PhraseRule):
         tail (*greater than 50*), so the disjuncts read as one clause rather than
         repeating the subject per disjunct.
         """
-        tails = [self._tail(comparator=comparator, context=context) for comparator in node.comparators]
+        tails = [
+            self._tail(comparator=comparator, context=context)
+            for comparator in node.comparators
+        ]
         return PhraseFragment(
             parts=[
                 context.child(node=node.subject_expression),
@@ -551,7 +559,9 @@ class NotComparatorRule(PhraseRule):
         >>> verbalize_expression(Not(_child_=variable(Robot, []).battery > 50))
         'the battery of a Robot is not greater than 50'
         """
-        return ConditionAssembler(context=context).predicate(comparator=node._child_, negated=True)
+        return ConditionAssembler(context=context).predicate(
+            comparator=node._child_, negated=True
+        )
 
 
 class NotBooleanAttributeRule(PhraseRule):
@@ -589,7 +599,9 @@ class NotBooleanAttributeRule(PhraseRule):
         'a Task is not completed'
         """
         plan = context.microplan.plan_for(node=node._child_, planner=ChainPlanner)
-        return ChainAssembler(context=context).boolean_predicative(plan=plan, negated=True)
+        return ChainAssembler(context=context).boolean_predicative(
+            plan=plan, negated=True
+        )
 
 
 class ForAllRule(PhraseRule):
@@ -764,7 +776,9 @@ class CausesEffectRule(PhraseRule):
 
     construct = CausesEffect
 
-    def build(self, *, node: CausesEffect, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: CausesEffect, context: RuleContext
+    ) -> VerbalizationFragment:
         """
         Prefix the effect condition with *"<cause attribute> causes"*, rendering each
         equality comparator through :func:`_causal_effect_clause` -- *"<attribute> to be
@@ -780,9 +794,12 @@ class CausesEffectRule(PhraseRule):
                 parts=[Keywords.WHAT_CAUSES.as_fragment(), effect_clause]
             )
         cause_nouns = [
-            Noun(content=context.child(node=attribute)) for attribute in node.cause_attributes
+            Noun(content=context.child(node=attribute))
+            for attribute in node.cause_attributes
         ]
         subject = (
-            cause_nouns[0] if len(cause_nouns) == 1 else ConjunctivePhrase(items=cause_nouns)
+            cause_nouns[0]
+            if len(cause_nouns) == 1
+            else ConjunctivePhrase(items=cause_nouns)
         )
         return clause(subject, Verb(lemma="cause"), effect_clause)

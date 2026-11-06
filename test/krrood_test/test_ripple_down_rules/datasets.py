@@ -159,7 +159,9 @@ def load_zoo_dataset(
     ]
     category_id_to_name = {i + 1: name for i, name in enumerate(category_names)}
     # targets = [getattr(SpeciesCol, category_id_to_name[i]) for i in y.values.flatten()]
-    targets = [Species.from_str(value=category_id_to_name[i]) for i in y.values.flatten()]
+    targets = [
+        Species.from_str(value=category_id_to_name[i]) for i in y.values.flatten()
+    ]
     return all_cases, targets
 
 
@@ -218,14 +220,20 @@ class PhysicalObject:
     """
 
     _is_a_robot_rdr: ClassVar[RDRDecorator] = RDRDecorator(
-        models_dir=_rdr_json_dir, output_type=(bool,), mutual_exclusive=True, package_name="test"
+        models_dir=_rdr_json_dir,
+        output_type=(bool,),
+        mutual_exclusive=True,
+        package_name="test",
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.
     """
 
     _select_parts_rdr: ClassVar[RDRDecorator] = RDRDecorator(
-        models_dir=_rdr_json_dir, output_type=(Self,), mutual_exclusive=False, package_name="test"
+        models_dir=_rdr_json_dir,
+        output_type=(Self,),
+        mutual_exclusive=False,
+        package_name="test",
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.

@@ -169,7 +169,9 @@ class Rule(ABC):
             return "white"
 
     @classmethod
-    def from_case_query(cls, *, case_query: CaseQuery, parent: Rule | None = None) -> Rule:
+    def from_case_query(
+        cls, *, case_query: CaseQuery, parent: Rule | None = None
+    ) -> Rule:
         """
         Create a SingleClassRule from a CaseQuery.
 
@@ -650,16 +652,21 @@ class MultiClassTopRule(Rule, HasRefinementRule, HasAlternativeRule):
 
     def fit_rule(
         self,
-        *, case_query: CaseQuery,
+        *,
+        case_query: CaseQuery,
         refinement_type: type[MultiClassRefinementRule] | None = None,
     ):
         if self.fired and case_query.target != self.conclusion:
             if refinement_type in [None, MultiClassStopRule]:
                 new_rule = MultiClassStopRule(
-                    conditions=case_query.conditions, corner_case=case_query.case, _parent=self
+                    conditions=case_query.conditions,
+                    corner_case=case_query.case,
+                    _parent=self,
                 )
             elif refinement_type is MultiClassFilterRule:
-                new_rule = MultiClassFilterRule.from_case_query(case_query=case_query, parent=self)
+                new_rule = MultiClassFilterRule.from_case_query(
+                    case_query=case_query, parent=self
+                )
             else:
                 raise ValueError(f"Unknown refinement type {refinement_type}")
             new_rule.top_rule = self

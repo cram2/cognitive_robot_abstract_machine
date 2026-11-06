@@ -164,7 +164,9 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
         indexing = (
             IndexByExpression if isinstance(key, SymbolicExpression) else IndexByValue
         )
-        return self._symbolic_expression_._get_mapped_variable_(type_=indexing, _key_=key)
+        return self._symbolic_expression_._get_mapped_variable_(
+            type_=indexing, _key_=key
+        )
 
     def __call__(self, *args, **kwargs) -> Call[T]:
         return self._symbolic_expression_._get_mapped_variable_(
@@ -172,22 +174,34 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
         )
 
     def __eq__(self, other) -> Comparator:
-        return Comparator(left=self._symbolic_expression_, right=other, operation=operator.eq)
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.eq
+        )
 
     def __ne__(self, other) -> Comparator:
-        return Comparator(left=self._symbolic_expression_, right=other, operation=operator.ne)
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.ne
+        )
 
     def __lt__(self, other) -> Comparator:
-        return Comparator(left=self._symbolic_expression_, right=other, operation=operator.lt)
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.lt
+        )
 
     def __le__(self, other) -> Comparator:
-        return Comparator(left=self._symbolic_expression_, right=other, operation=operator.le)
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.le
+        )
 
     def __gt__(self, other) -> Comparator:
-        return Comparator(left=self._symbolic_expression_, right=other, operation=operator.gt)
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.gt
+        )
 
     def __ge__(self, other) -> Comparator:
-        return Comparator(left=self._symbolic_expression_, right=other, operation=operator.ge)
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.ge
+        )
 
     def _arithmetic_(
         self, *, other: Any, math_operator: MathOperator
@@ -203,7 +217,9 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
             ArithmeticOperation,
         )
 
-        return ArithmeticOperation(left=self._symbolic_expression_, right=other, math_operator=math_operator)
+        return ArithmeticOperation(
+            left=self._symbolic_expression_, right=other, math_operator=math_operator
+        )
 
     def _reflected_arithmetic_(
         self, *, other: Any, math_operator: MathOperator
@@ -223,7 +239,9 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
             ArithmeticOperation,
         )
 
-        return ArithmeticOperation(left=other, right=self._symbolic_expression_, math_operator=math_operator)
+        return ArithmeticOperation(
+            left=other, right=self._symbolic_expression_, math_operator=math_operator
+        )
 
     def __add__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other=other, math_operator=MathOperator.ADD)
@@ -235,44 +253,58 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
         return self._arithmetic_(other=other, math_operator=MathOperator.SUBTRACT)
 
     def __rsub__(self, other) -> ArithmeticOperation:
-        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.SUBTRACT)
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.SUBTRACT
+        )
 
     def __mul__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other=other, math_operator=MathOperator.MULTIPLY)
 
     def __rmul__(self, other) -> ArithmeticOperation:
-        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.MULTIPLY)
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.MULTIPLY
+        )
 
     def __truediv__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other=other, math_operator=MathOperator.DIVIDE)
 
     def __rtruediv__(self, other) -> ArithmeticOperation:
-        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.DIVIDE)
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.DIVIDE
+        )
 
     def __floordiv__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other=other, math_operator=MathOperator.FLOOR_DIVIDE)
 
     def __rfloordiv__(self, other) -> ArithmeticOperation:
-        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.FLOOR_DIVIDE)
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.FLOOR_DIVIDE
+        )
 
     def __mod__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other=other, math_operator=MathOperator.MODULO)
 
     def __rmod__(self, other) -> ArithmeticOperation:
-        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.MODULO)
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.MODULO
+        )
 
     def __pow__(self, other) -> ArithmeticOperation:
         return self._arithmetic_(other=other, math_operator=MathOperator.POWER)
 
     def __rpow__(self, other) -> ArithmeticOperation:
-        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.POWER)
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.POWER
+        )
 
     def __neg__(self) -> ArithmeticOperation:
         from krrood.entity_query_language.operators.arithmetic import (
             UnaryArithmeticOperation,
         )
 
-        return UnaryArithmeticOperation(_child_=self._symbolic_expression_, math_operator=MathOperator.NEGATE)
+        return UnaryArithmeticOperation(
+            _child_=self._symbolic_expression_, math_operator=MathOperator.NEGATE
+        )
 
     def __hash__(self):
         return hash(self._id_)
@@ -316,7 +348,10 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         :return: The retrieved or created MappedVariable instance.
         """
         cache_item = MappedVariableCacheItem(
-            mapping_type=type_, constructor_arguments=CallSignature.of(callee=type_).bind(_child_=self, **kwargs)
+            mapping_type=type_,
+            constructor_arguments=CallSignature.of(callee=type_).bind(
+                _child_=self, **kwargs
+            ),
         )
         if cache_item in self._known_mapped_variables_:
             return self._known_mapped_variables_[cache_item]
@@ -364,14 +399,16 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Apply the mapping to the child's values.
         """
         yield from (
             self._build_operation_result_(
-                bindings=child_result.bindings | {self._id_: mapped_value}, child_result=child_result
+                bindings=child_result.bindings | {self._id_: mapped_value},
+                child_result=child_result,
             )
             for child_result in self._child_._evaluate_(sources=sources)
             for mapped_value in self._apply_mapping_(

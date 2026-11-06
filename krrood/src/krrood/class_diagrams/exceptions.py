@@ -35,6 +35,7 @@ class MissingContainedTypeOfContainer(DataclassException):
     """
     The class that is missing the contained type.
     """
+
     field_name: str
     """
     The name of the field that is missing the contained type.
@@ -65,6 +66,7 @@ class CouldNotResolveType(DataclassException):
     """
     The name of the type that could not be resolved.
     """
+
     error: Exception | None = None
     """
     The exception that was raised when resolving the type.

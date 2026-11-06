@@ -283,7 +283,10 @@ def test_match_without_domain_selects_from_symbol_graph():
 
 def test_match_with_list():
     domain = [
-        KRROODPositions(positions=[KRROODPosition(x=1, y=2, z=3), KRROODPosition(x=1, y=2, z=3)], some_strings=["a", "b"]),
+        KRROODPositions(
+            positions=[KRROODPosition(x=1, y=2, z=3), KRROODPosition(x=1, y=2, z=3)],
+            some_strings=["a", "b"],
+        ),
         KRROODPositions(positions=[KRROODPosition(x=1, y=2, z=3)], some_strings=["a"]),
     ]
 
@@ -449,20 +452,29 @@ def test_where_through_a_forwarded_attribute_filters():
     The condition the forwarding makes natural must actually filter, which it only does
     once a condition rooted at the query correlates with that query's own bindings.
     """
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
     assert [position.x for position in match.where(match.x >= 5).tolist()] == [5.0]
 
 
 def test_limit_bounds_the_results_and_keeps_the_chain_on_the_match():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
     assert match.limit(n=1) is match
     assert len(match.tolist()) == 1
 
 
 def test_a_match_reports_the_limit_it_was_given():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
     assert match._limit_ is None
 
@@ -490,10 +502,18 @@ def test_every_query_modifier_returns_the_match():
     lowered query itself supports, which is not what this test is about.
     """
     positions = [KRROODPosition(x=1.0, y=0.0, z=0.0)]
-    assert (match := a(KRROODPosition).from_(domain=positions)).where(match.x >= 0) is match
-    assert (match := a(KRROODPosition).from_(domain=positions)).having(match.x >= 0) is match
-    assert (match := a(KRROODPosition).from_(domain=positions)).ordered_by(variable=match.x) is match
-    assert (match := a(KRROODPosition).from_(domain=positions)).grouped_by(match.y) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).where(
+        match.x >= 0
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).having(
+        match.x >= 0
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).ordered_by(
+        variable=match.x
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).grouped_by(
+        match.y
+    ) is match
     assert (match := a(KRROODPosition).from_(domain=positions)).distinct() is match
     assert (match := a(KRROODPosition).from_(domain=positions)).limit(n=1) is match
 
@@ -529,18 +549,33 @@ def test_the_quantifies_a_match_itself():
     Quantifying a match reads the query it stands for, so the match needs no handle of
     its own to be quantified through.
     """
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
-    assert the(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [positions[1]]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    assert the(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [
+        positions[1]
+    ]
 
 
 def test_an_quantifies_a_match_itself():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
-    assert a(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [positions[1]]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    assert a(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [
+        positions[1]
+    ]
 
 
 def test_entity_selects_a_match():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
-    assert entity(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [positions[1]]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    assert entity(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [
+        positions[1]
+    ]
 
 
 def test_set_of_selects_a_match_beside_one_of_its_attributes():
@@ -548,7 +583,10 @@ def test_set_of_selects_a_match_beside_one_of_its_attributes():
     A match selected beside one of its own attributes must bind to the same row, which
     it only does once the selection reads the query the match stands for.
     """
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition)(x=5.0).from_(domain=positions)
     (row,) = set_of(match, match.y).tolist()
     assert row[match] == positions[1]
@@ -560,7 +598,10 @@ def test_selecting_a_match_carries_its_pattern():
     The match's own conditions travel with it, which selecting the bare variable it
     created would drop.
     """
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition)(x=5.0).from_(domain=positions)
     assert entity(match).tolist() == [positions[1]]
 
@@ -638,14 +679,20 @@ class CallableAdder:
 
 
 def test_indexing_a_match_indexes_the_matched_instance():
-    rows = [SubscriptableRow(name="first", cells=(7, 8)), SubscriptableRow(name="second", cells=(9, 10))]
+    rows = [
+        SubscriptableRow(name="first", cells=(7, 8)),
+        SubscriptableRow(name="second", cells=(9, 10)),
+    ]
     match = a(SubscriptableRow).from_(domain=rows)
     assert match[0] is match._symbolic_expression_[0]
     assert [row.name for row in match.where(match[0] == 7).tolist()] == ["first"]
 
 
 def test_comparing_a_match_builds_a_condition_rather_than_answering_identity():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
     assert isinstance(match == positions[1], Comparator)
     assert [position.x for position in match.where(match == positions[1]).tolist()] == [
@@ -659,7 +706,10 @@ def test_a_match_on_the_other_side_of_a_comparison_also_filters():
     contributes the expression it stands for - otherwise it would be read as a literal
     value, and the condition would pass every row.
     """
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     subject = variable(KRROODPosition, positions)
     match = a(KRROODPosition)(x=5.0).from_(domain=positions)
     found = entity(subject).where(subject == match).tolist()
@@ -757,18 +807,29 @@ class XCoordinate(SymbolicFunction):
 
 
 def test_predicate_applied_to_a_match_filters_its_matches():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
-    assert match.where(Is(first_entity=match, second_entity=positions[1])).tolist() == [positions[1]]
+    assert match.where(Is(first_entity=match, second_entity=positions[1])).tolist() == [
+        positions[1]
+    ]
 
 
 def test_symbolic_function_applied_to_a_match_filters_its_matches():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
     assert match.where(rounded_x_coordinate_of(match) == 5).tolist() == [positions[1]]
 
 
 def test_symbolic_function_class_applied_to_a_match_filters_its_matches():
-    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0), KRROODPosition(x=5.0, y=0.0, z=0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     match = a(KRROODPosition).from_(domain=positions)
     assert match.where(XCoordinate(position=match) == 5.0).tolist() == [positions[1]]

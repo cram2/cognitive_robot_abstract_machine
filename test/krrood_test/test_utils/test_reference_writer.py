@@ -73,4 +73,9 @@ def test_a_reference_writer_is_found_only_for_its_referenced_type(element):
     kwargs = writer.create_kwargs()
 
     assert ReferenceWriter.find_for(obj=element, to_json_kwargs=kwargs) is writer
-    assert ReferenceWriter.find_for(obj=ElementHolder(element=element), to_json_kwargs=kwargs) is None
+    assert (
+        ReferenceWriter.find_for(
+            obj=ElementHolder(element=element), to_json_kwargs=kwargs
+        )
+        is None
+    )

@@ -69,7 +69,8 @@ class EveryPairJoinedLearner(CausalStructureLearner):
 
     def learn(
         self,
-        *, rows: pd.DataFrame,
+        *,
+        rows: pd.DataFrame,
         nodes: list[GraphNode],
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
@@ -171,13 +172,14 @@ def test_every_learned_edge_is_a_causal_relation_of_the_class(
         .selector.graph
     )
     relations = CausalRelationsOfClass(
-        class_diagram=class_diagram, owner=class_diagram.get_wrapped_class(clazz=SceneRoom)
+        class_diagram=class_diagram,
+        owner=class_diagram.get_wrapped_class(clazz=SceneRoom),
     )
 
     node_of = {node.name: node for node in graph.nodes()}
-    assert {relation.edge_among(node_of=node_of) for relation in relations.relations} == set(
-        graph.edges()
-    )
+    assert {
+        relation.edge_among(node_of=node_of) for relation in relations.relations
+    } == set(graph.edges())
 
 
 def test_relearning_replaces_the_causal_relations_of_the_class(
@@ -192,7 +194,8 @@ def test_relearning_replaces_the_causal_relations_of_the_class(
 
     assert len(
         CausalRelationsOfClass(
-            class_diagram=class_diagram, owner=class_diagram.get_wrapped_class(clazz=SceneRoom)
+            class_diagram=class_diagram,
+            owner=class_diagram.get_wrapped_class(clazz=SceneRoom),
         ).relations
     ) == len(graph.edges())
 
@@ -207,7 +210,9 @@ def test_a_part_attribute_is_reached_through_its_collection(
 
     assert {
         endpoint.fields
-        for relation in CausalRelationsOfClass(class_diagram=class_diagram, owner=room).relations
+        for relation in CausalRelationsOfClass(
+            class_diagram=class_diagram, owner=room
+        ).relations
         for endpoint in (relation.first, relation.second)
         if isinstance(endpoint, AttributeEndpoint)
         and endpoint.fields[0] == room.get_field(name="objects")
@@ -234,7 +239,9 @@ def test_a_statistic_of_the_parts_is_reached_through_their_collection(
 
     assert {
         endpoint.name
-        for relation in CausalRelationsOfClass(class_diagram=class_diagram, owner=scene).relations
+        for relation in CausalRelationsOfClass(
+            class_diagram=class_diagram, owner=scene
+        ).relations
         for endpoint in (relation.first, relation.second)
         if isinstance(endpoint, StatisticEndpoint)
         and endpoint.collection == scene.get_field(name="rooms")

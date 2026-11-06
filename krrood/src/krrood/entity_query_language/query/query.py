@@ -338,7 +338,9 @@ class Query(
         :return: The conditions, with every chain rooted at this query re-rooted onto its
             selection.
         """
-        return tuple(self._reroot_condition_(condition=condition) for condition in conditions)
+        return tuple(
+            self._reroot_condition_(condition=condition) for condition in conditions
+        )
 
     def _reroot_condition_(self, *, condition: ConditionType) -> ConditionType:
         """
@@ -365,7 +367,8 @@ class Query(
             for child in tuple(expression._children_):
                 if self._is_attribute_of_self_(expression=child):
                     expression._replace_child_(
-                        old_child=child, new_child=self._rerooted_on_selection_(chain=child)
+                        old_child=child,
+                        new_child=self._rerooted_on_selection_(chain=child),
                     )
                 elif self._is_self_(expression=child):
                     expression._replace_child_(
@@ -475,7 +478,8 @@ class Query(
     @modifies_query_structure
     def ordered_by(
         self,
-        *, variable: Selectable[T] | Any,
+        *,
+        variable: Selectable[T] | Any,
         descending: bool = False,
         key: Callable | None = None,
     ) -> Self:
@@ -507,7 +511,9 @@ class Query(
         """
         self._distinct_on = on if on else self._selected_variables_
         self._seen_results = SeenSet(keys=tuple(v._id_ for v in self._distinct_on))
-        self._results_mapping.append(lambda results_gen: self._get_distinct_results_(results_gen=results_gen))
+        self._results_mapping.append(
+            lambda results_gen: self._get_distinct_results_(results_gen=results_gen)
+        )
         return self
 
     @modifies_query_structure
@@ -519,7 +525,9 @@ class Query(
             by.
         :return: This query.
         """
-        self._grouped_by_builder_ = GroupedByBuilder(query=self, variables_to_group_by=variables_to_group_by)
+        self._grouped_by_builder_ = GroupedByBuilder(
+            query=self, variables_to_group_by=variables_to_group_by
+        )
         return self
 
     @modifies_query_structure
@@ -538,7 +546,8 @@ class Query(
     @modifies_query_structure
     def _quantify_(
         self,
-        *, quantifier_type: type[ResultQuantifier] = An,
+        *,
+        quantifier_type: type[ResultQuantifier] = An,
         quantification_constraint: ResultQuantificationConstraint | None = None,
     ) -> Self:
         """
@@ -551,7 +560,9 @@ class Query(
         :return: This query.
         """
         self._quantifier_builder_ = QuantifierBuilder(
-            query=self, type=quantifier_type, quantification_constraint=quantification_constraint
+            query=self,
+            type=quantifier_type,
+            quantification_constraint=quantification_constraint,
         )
         return self
 
@@ -612,14 +623,19 @@ class Query(
         if self._ordered_by_builder_ is not None:
             ordering = self._ordered_by_builder_
             product.ordered_by(
-                variable=ordering.variable, descending=ordering.descending, key=ordering.key
+                variable=ordering.variable,
+                descending=ordering.descending,
+                key=ordering.key,
             )
         if self._distinct_on:
             product.distinct(*self._distinct_on)
         if self._limit_ is not None:
             product.limit(n=self._limit_)
         quantifier = self._quantifier_builder_
-        product._quantify_(quantifier_type=quantifier.type, quantification_constraint=quantifier.quantification_constraint)
+        product._quantify_(
+            quantifier_type=quantifier.type,
+            quantification_constraint=quantifier.quantification_constraint,
+        )
         product._wire_in_place_()
         return product
 
@@ -674,7 +690,8 @@ class Query(
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the query by constraining values, updating conclusions,
@@ -702,7 +719,9 @@ class Query(
 
         cached_stream = evaluation_context.subquery_result_cache.get_or_create(
             query_id=self._id_,
-            factory=lambda: CachedResultStream(_source=self._produce_results_(sources=OperationResult(bindings={}))),
+            factory=lambda: CachedResultStream(
+                _source=self._produce_results_(sources=OperationResult(bindings={}))
+            ),
         )
         yield from cached_stream
 
@@ -715,7 +734,9 @@ class Query(
         """
         return evaluation_context.outermost_query.is_nested(query=self)
 
-    def _produce_results_(self, *, sources: OperationResult) -> Iterator[OperationResult]:
+    def _produce_results_(
+        self, *, sources: OperationResult
+    ) -> Iterator[OperationResult]:
         """
         Produce this product's results: the projected, result-mapped rows of its cartesian product.
 
@@ -784,7 +805,9 @@ class Query(
         """
         return False
 
-    def _get_operation_result_(self, *, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
         """
         :param child_result: The child result to construct the operation result from.
         :return: The operation result.
@@ -852,7 +875,9 @@ class Query(
         for i, id_ in enumerate(self._distinct_on_ids_):
             if id_ in res:
                 continue
-            var_value = self._distinct_on[i]._evaluate_(sources=OperationResult(bindings=copy(res)))
+            var_value = self._distinct_on[i]._evaluate_(
+                sources=OperationResult(bindings=copy(res))
+            )
             res[id_] = next(var_value).value
 
     @cached_property
@@ -948,7 +973,9 @@ class Query(
             results = result_mapping(results)
         return results
 
-    def _as_embeddable_child_(self, *, parent: SymbolicExpression) -> SymbolicExpression:
+    def _as_embeddable_child_(
+        self, *, parent: SymbolicExpression
+    ) -> SymbolicExpression:
         """
         Embed this query's compiled product when it becomes an operand of another expression.
 
@@ -1098,7 +1125,9 @@ class SetOf(Query):
             None,
         )
 
-    def _get_operation_result_(self, *, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
         """
         Update the result bindings with this operation's bindings.
         """
@@ -1117,7 +1146,9 @@ class Entity(Query[T]):
     A query over a single variable.
     """
 
-    def _get_operation_result_(self, *, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
         """
         Update the result bindings with this operation's bindings.
         """

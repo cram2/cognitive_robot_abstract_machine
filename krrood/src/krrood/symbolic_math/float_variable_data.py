@@ -42,7 +42,9 @@ class BoundArgument:
 
         :param data: The array holding the values.
         """
-        self.function.bind_args_to_memory_view(arg_idx=self.argument_index, numpy_array=data)
+        self.function.bind_args_to_memory_view(
+            arg_idx=self.argument_index, numpy_array=data
+        )
 
 
 @dataclass(kw_only=True)

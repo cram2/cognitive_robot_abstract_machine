@@ -27,7 +27,9 @@ def test_chain_of_attributes_reaches_its_value(handles_and_containers_world):
     cabinet = cabinets[0]
     chain = variable(Cabinet, domain=cabinets).container.name
 
-    assert chain.apply_mapping_on_external_root(instance=cabinet) == cabinet.container.name
+    assert (
+        chain.apply_mapping_on_external_root(instance=cabinet) == cabinet.container.name
+    )
 
 
 def test_chain_through_an_index_by_a_value_reaches_its_value(
@@ -44,7 +46,8 @@ def test_chain_through_an_index_by_a_value_reaches_its_value(
     chain = variable(Cabinet, domain=cabinets).drawers[0].handle.name
 
     assert (
-        chain.apply_mapping_on_external_root(instance=cabinet) == cabinet.drawers[0].handle.name
+        chain.apply_mapping_on_external_root(instance=cabinet)
+        == cabinet.drawers[0].handle.name
     )
 
 
@@ -186,7 +189,10 @@ def test_chain_written_on_a_pattern_reaches_the_value_it_states():
     handle_name = "Handle1"
     drawer = a(Drawer)(handle=a(Handle)(name=handle_name))
 
-    assert drawer.handle.name.apply_mapping_on_external_root(instance=drawer) is handle_name
+    assert (
+        drawer.handle.name.apply_mapping_on_external_root(instance=drawer)
+        is handle_name
+    )
 
 
 def test_chain_through_a_pattern_that_does_not_state_the_attribute_reaches_no_value():
@@ -241,7 +247,9 @@ def test_setting_through_an_index_by_an_expression_is_not_supported(
     chain = variable(Cabinet, domain=cabinets).drawers[position]
 
     with pytest.raises(ReadOnlyMapping):
-        chain._set_external_root_instance_value_(instance=cabinet, value=cabinet.drawers[1])
+        chain._set_external_root_instance_value_(
+            instance=cabinet, value=cabinet.drawers[1]
+        )
 
 
 def test_setting_through_a_flattened_attribute_has_no_single_value(
@@ -275,4 +283,6 @@ def test_setting_through_a_step_that_reaches_no_value_is_reported(
     chain = variable(Cabinet, domain=cabinets).drawers[1].handle
 
     with pytest.raises(NoValueAlongAccessPath):
-        chain._set_external_root_instance_value_(instance=cabinet, value=cabinet.drawers[0].handle)
+        chain._set_external_root_instance_value_(
+            instance=cabinet, value=cabinet.drawers[0].handle
+        )

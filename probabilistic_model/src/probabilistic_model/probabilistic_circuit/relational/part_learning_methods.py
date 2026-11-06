@@ -34,8 +34,8 @@ class PartLearningMethods(SubclassJSONSerializer):
 
     default: LearningMethod | None = field(default_factory=JointProbabilityTree)
     """
-    What a part without a learning method is fitted with, copied for every such part,
-    or ``None`` to require a learning method for every part.
+    What a part without a learning method is fitted with, copied for every such part, or
+    ``None`` to require a learning method for every part.
     """
 
     methods_by_path: dict[str, LearningMethod] = field(init=False, default_factory=dict)

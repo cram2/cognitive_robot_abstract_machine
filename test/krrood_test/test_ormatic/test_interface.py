@@ -222,7 +222,9 @@ def test_position_type_wrapper(session, database):
 
 
 def test_a_collection_of_classes_survives_a_round_trip(session, database):
-    wrapper = KRROODPositionTypesWrapper(position_types=[KRROODPosition, KRROODPosition4D])
+    wrapper = KRROODPositionTypesWrapper(
+        position_types=[KRROODPosition, KRROODPosition4D]
+    )
     session.add(to_dao(wrapper))
     session.commit()
     session.expunge_all()
@@ -451,9 +453,24 @@ def test_container_item(session, database):
 
 
 def test_nested_mappings(session, database):
-    shape_1 = Shape(name="rectangle", origin=KRROODTransformation(vector=KRROODVector(x=1), rotation=Rotation(angle=1)))
-    shape_2 = Shape(name="circle", origin=KRROODTransformation(vector=KRROODVector(x=2), rotation=Rotation(angle=2)))
-    shape_3 = Shape(name="rectangle", origin=KRROODTransformation(vector=KRROODVector(x=3), rotation=Rotation(angle=3)))
+    shape_1 = Shape(
+        name="rectangle",
+        origin=KRROODTransformation(
+            vector=KRROODVector(x=1), rotation=Rotation(angle=1)
+        ),
+    )
+    shape_2 = Shape(
+        name="circle",
+        origin=KRROODTransformation(
+            vector=KRROODVector(x=2), rotation=Rotation(angle=2)
+        ),
+    )
+    shape_3 = Shape(
+        name="rectangle",
+        origin=KRROODTransformation(
+            vector=KRROODVector(x=3), rotation=Rotation(angle=3)
+        ),
+    )
     shapes = Shapes(shapes=[shape_1, shape_2, shape_3])
     more_shapes = MoreShapes(shapes=[shapes, shapes])
     dao = to_dao(more_shapes)
@@ -526,7 +543,12 @@ def test_inheritance_mapper_args(session, database):
 
 
 def test_to_dao_alternatively_mapped_parent(session, database):
-    ch2 = ChildLevel2NormallyMapped(base_attribute=1, entities=[Entity(name="a")], level_one_attribute=2, level_two_attribute=3)
+    ch2 = ChildLevel2NormallyMapped(
+        base_attribute=1,
+        entities=[Entity(name="a")],
+        level_one_attribute=2,
+        level_two_attribute=3,
+    )
     ch2_dao: ChildLevel2NormallyMappedDAO = to_dao(ch2)
 
     result_by_hand = ChildLevel2NormallyMappedDAO(
@@ -611,7 +633,9 @@ def test_uuid(session, database):
 
 
 def test_list_of_custom_type(session, database):
-    obj = UUIDWrapper(identification=uuid.uuid4(), other_identifications=[uuid.uuid4(), uuid.uuid4()])
+    obj = UUIDWrapper(
+        identification=uuid.uuid4(), other_identifications=[uuid.uuid4(), uuid.uuid4()]
+    )
     dao = to_dao(obj)
 
     session.add(dao)
@@ -623,7 +647,10 @@ def test_list_of_custom_type(session, database):
 
 
 def test_json_integration(session, database):
-    obj = JSONWrapper(json_serializable_object=JSONSerializableClass(a=1, b=2), more_objects=[JSONSerializableClass(a=3, b=4)])
+    obj = JSONWrapper(
+        json_serializable_object=JSONSerializableClass(a=1, b=2),
+        more_objects=[JSONSerializableClass(a=3, b=4)],
+    )
     dao = to_dao(obj)
     session.add(dao)
     session.commit()
@@ -692,7 +719,9 @@ def test_multiple_inheritance(session, database):
 
 
 def test_list_of_enum(session, database):
-    obj = ListOfEnum(list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C])
+    obj = ListOfEnum(
+        list_of_enum=[TestEnum.OPTION_A, TestEnum.OPTION_B, TestEnum.OPTION_C]
+    )
     dao = to_dao(obj)
 
     session.add(dao)
@@ -814,7 +843,9 @@ def test_generic_class(session, database):
     assert hasattr(GenericClass_KRROODPositionDAO, "container")
 
     assert hasattr(GenericClassAssociationDAO, "associated_value")
-    generic_position = GenericClass[KRROODPosition](value=KRROODPosition(x=1.0, y=2.0, z=3.0))
+    generic_position = GenericClass[KRROODPosition](
+        value=KRROODPosition(x=1.0, y=2.0, z=3.0)
+    )
     obj = GenericClassAssociation(
         associated_value=GenericClass[float](value=1.0),
         associated_value_list=[
@@ -978,7 +1009,9 @@ def test_selectin_loading_reduces_queries_during_from_dao(session, database):
     """
     N = 30
     positions = KRROODPositions(
-        positions=[KRROODPosition(x=float(i), y=float(i), z=float(i)) for i in range(N)],
+        positions=[
+            KRROODPosition(x=float(i), y=float(i), z=float(i)) for i in range(N)
+        ],
         some_strings=["s"],
     )
     session.add(to_dao(positions))

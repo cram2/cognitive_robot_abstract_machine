@@ -139,7 +139,9 @@ class PropertyDescriptor(Symbol):
         """
         field_ = [f for f in fields(self.domain) if f.name == self.field_name][0]
         self.wrapped_field = WrappedField(
-            clazz=WrappedClass(clazz=self.domain), field=field_, property_descriptor=self
+            clazz=WrappedClass(clazz=self.domain),
+            field=field_,
+            property_descriptor=self,
         )
 
     @cached_property
@@ -184,7 +186,10 @@ class PropertyDescriptor(Symbol):
         if domain_value and range_value:
             for v in make_set(range_value):
                 PropertyDescriptorRelation(
-                    source=domain_value, target=v, wrapped_field=self.wrapped_field, inferred=inferred
+                    source=domain_value,
+                    target=v,
+                    wrapped_field=self.wrapped_field,
+                    inferred=inferred,
                 ).add_to_graph_and_apply_implications()
 
     def __get__(self, obj, objtype=None):
@@ -232,7 +237,9 @@ class PropertyDescriptor(Symbol):
                 monitored_type = monitored_type_map[type(value)]
             except KeyError:
                 raise UnMonitoredContainerTypeForDescriptor(
-                    clazz=self.domain, field_name=self.wrapped_field.name, container_type=type(value)
+                    clazz=self.domain,
+                    field_name=self.wrapped_field.name,
+                    container_type=type(value),
                 )
             monitored_value = monitored_type(descriptor=self)
             for v in make_set(value):
@@ -260,11 +267,14 @@ class PropertyDescriptor(Symbol):
                 attr._add_item(item=v, inferred=False)
         else:
             setattr(obj, self.private_attr_name, value)
-            self.add_relation_to_the_graph_and_apply_implications(domain_value=obj, range_value=value)
+            self.add_relation_to_the_graph_and_apply_implications(
+                domain_value=obj, range_value=value
+            )
 
     def update_value(
         self,
-        *, domain_value: Symbol,
+        *,
+        domain_value: Symbol,
         range_value: Symbol,
     ) -> bool:
         """Update the value of the managed attribute
@@ -285,7 +295,8 @@ class PropertyDescriptor(Symbol):
     @memoize
     def get_association_of_source_type(
         cls,
-        *, domain_type: type[Symbol] | WrappedClass,
+        *,
+        domain_type: type[Symbol] | WrappedClass,
     ) -> Association | AssociationThroughRoleTaker | None:
         """
         Get the association that has as a source the given domain type and as a field type this descriptor class.
@@ -293,9 +304,8 @@ class PropertyDescriptor(Symbol):
         :param domain_type: The domain type that has an associated field with this descriptor class.
         """
         class_diagram = SymbolGraph().class_diagram
-        association_condition = (
-            lambda association: type(association.wrapped_field.property_descriptor)
-            is cls
+        association_condition = lambda association: (
+            type(association.wrapped_field.property_descriptor) is cls
         )
         result = next(
             class_diagram.get_outgoing_associations_with_condition(
@@ -309,7 +319,8 @@ class PropertyDescriptor(Symbol):
     @memoize
     def get_superproperties_associations(
         cls,
-        *, domain_type: SymbolType | WrappedClass,
+        *,
+        domain_type: SymbolType | WrappedClass,
     ) -> tuple[Association, ...]:
         """
         :param domain_type: The domain type that has the required association(s).

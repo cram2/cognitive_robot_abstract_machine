@@ -53,7 +53,8 @@ class HasQueryModifiers(Generic[T], ABC):
     @abstractmethod
     def ordered_by(
         self,
-        *, variable: Selectable[T] | Any,
+        *,
+        variable: Selectable[T] | Any,
         descending: bool = False,
         key: Callable | None = None,
     ) -> T | Self:

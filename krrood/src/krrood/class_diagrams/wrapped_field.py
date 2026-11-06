@@ -270,7 +270,9 @@ class WrappedField:
                     return self.resolved_type
                 else:
                     raise MissingContainedTypeOfContainer(
-                        class_=self.clazz.clazz, field_name=self.name, container_type=self.container_type
+                        class_=self.clazz.clazz,
+                        field_name=self.name,
+                        container_type=self.container_type,
                     )
 
     @cached_property

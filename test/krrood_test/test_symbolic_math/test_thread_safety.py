@@ -86,7 +86,9 @@ def test_concurrent_jacobians_over_shared_variables_stay_correct():
         try:
             expression = (x**power) * y + x * y
             jacobian = expression.jacobian(variables=[x, y])
-            compiled = jacobian.compile(parameters=sm.VariableParameters.from_lists([x, y]))
+            compiled = jacobian.compile(
+                parameters=sm.VariableParameters.from_lists([x, y])
+            )
             result = compiled(np.array([x_value, y_value]))
             expected_dx = power * x_value ** (power - 1) * y_value + y_value
             expected_dy = x_value**power + x_value

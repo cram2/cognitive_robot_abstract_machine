@@ -40,13 +40,20 @@ def test_an_alternative_mapping_is_handed_the_domain_object_it_holds():
     would convert the holder first.
     """
     build_first = BuildFirst(value="first")
-    held = EntryPointMapping(build_first=build_first, build_first_association=BuildFirstAssociation(build_first=build_first))
+    held = EntryPointMapping(
+        build_first=build_first,
+        build_first_association=BuildFirstAssociation(build_first=build_first),
+    )
     holder = HoldsAnEntrypointMapping(entrypoint=held)
     owner = OwnsAHolder(holder=holder)
     state = FromDataAccessObjectState()
     # Inserted in this order, the declared dependencies alone sort the holder first.
     state._build_class_dependencies(
-        alternative_mapping_types=[BuildFirstMapping, HoldsAnEntrypointMapping, EntryPointMapping]
+        alternative_mapping_types=[
+            BuildFirstMapping,
+            HoldsAnEntrypointMapping,
+            EntryPointMapping,
+        ]
     )
     state._alternative_mappings_being_referenced[held].append(
         (holder, Attribute(_attribute_name_="entrypoint", _child_=None))
@@ -57,7 +64,9 @@ def test_an_alternative_mapping_is_handed_the_domain_object_it_holds():
 
     state.convert_alternative_mappings_to_domain_objects()
 
-    assert owner.holder.entrypoint is state.resolve_alternative_mapping(alternative_mapping=held)
+    assert owner.holder.entrypoint is state.resolve_alternative_mapping(
+        alternative_mapping=held
+    )
 
 
 def test_each_holder_of_the_same_type_is_handed_its_own_held_domain_object():
@@ -66,15 +75,25 @@ def test_each_holder_of_the_same_type_is_handed_its_own_held_domain_object():
     every holder is still handed the domain object of the mapping it holds itself.
     """
     build_first = BuildFirst(value="first")
-    first_held = EntryPointMapping(build_first=build_first, build_first_association=BuildFirstAssociation(build_first=build_first))
-    second_held = EntryPointMapping(build_first=build_first, build_first_association=BuildFirstAssociation(build_first=build_first))
+    first_held = EntryPointMapping(
+        build_first=build_first,
+        build_first_association=BuildFirstAssociation(build_first=build_first),
+    )
+    second_held = EntryPointMapping(
+        build_first=build_first,
+        build_first_association=BuildFirstAssociation(build_first=build_first),
+    )
     first_holder = HoldsAnEntrypointMapping(entrypoint=first_held)
     second_holder = HoldsAnEntrypointMapping(entrypoint=second_held)
     first_owner = OwnsAHolder(holder=first_holder)
     second_owner = OwnsAHolder(holder=second_holder)
     state = FromDataAccessObjectState()
     state._build_class_dependencies(
-        alternative_mapping_types=[BuildFirstMapping, HoldsAnEntrypointMapping, EntryPointMapping]
+        alternative_mapping_types=[
+            BuildFirstMapping,
+            HoldsAnEntrypointMapping,
+            EntryPointMapping,
+        ]
     )
     for held, holder in ((first_held, first_holder), (second_held, second_holder)):
         state._alternative_mappings_being_referenced[held].append(
@@ -105,7 +124,10 @@ def test_mappings_that_hold_each_other_have_no_conversion_order():
     one_side.other_side = other_side
     state = FromDataAccessObjectState()
     state._build_class_dependencies(
-        alternative_mapping_types=[OneSideOfAHoldingCycleMapping, OtherSideOfAHoldingCycleMapping]
+        alternative_mapping_types=[
+            OneSideOfAHoldingCycleMapping,
+            OtherSideOfAHoldingCycleMapping,
+        ]
     )
     state._alternative_mappings_being_referenced[one_side].append(
         (other_side, Attribute(_attribute_name_="one_side", _child_=None))
@@ -135,11 +157,16 @@ def test_a_declared_dependency_decides_where_holding_disagrees():
     """
     build_first = BuildFirstMapping(value="first")
     entrypoint = EntryPointMapping(
-        build_first=build_first, build_first_association=BuildFirstAssociation(build_first=BuildFirst(value="first"))
+        build_first=build_first,
+        build_first_association=BuildFirstAssociation(
+            build_first=BuildFirst(value="first")
+        ),
     )
     build_first.backreference_to_entrypoint = entrypoint
     state = FromDataAccessObjectState()
-    state._build_class_dependencies(alternative_mapping_types=[BuildFirstMapping, EntryPointMapping])
+    state._build_class_dependencies(
+        alternative_mapping_types=[BuildFirstMapping, EntryPointMapping]
+    )
     state._alternative_mappings_being_referenced[build_first].append(
         (entrypoint, Attribute(_attribute_name_="build_first", _child_=None))
     )
@@ -200,8 +227,12 @@ def test_shared_state_converts_alternative_mappings_once(
     """
     entity = Entity(name="shared")
     to_state = ToDataAccessObjectState()
-    dao_1 = to_dao(AlternativeMappingAggregator(entities1=[entity], entities2=[]), to_state)
-    dao_2 = to_dao(AlternativeMappingAggregator(entities1=[entity], entities2=[]), to_state)
+    dao_1 = to_dao(
+        AlternativeMappingAggregator(entities1=[entity], entities2=[]), to_state
+    )
+    dao_2 = to_dao(
+        AlternativeMappingAggregator(entities1=[entity], entities2=[]), to_state
+    )
     session.add_all([dao_1, dao_2])
     session.commit()
     session.expunge_all()

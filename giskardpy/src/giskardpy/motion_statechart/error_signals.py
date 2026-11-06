@@ -50,4 +50,6 @@ def time_derivative_from_joint_motion(expression: Scalar) -> Scalar:
     )
     if not position_variables:
         return Scalar(0)
-    return expression.total_derivative(variables=position_variables, variables_dot=velocity_variables)[0]
+    return expression.total_derivative(
+        variables=position_variables, variables_dot=velocity_variables
+    )[0]

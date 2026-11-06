@@ -148,7 +148,8 @@ class QueryGraph:
 
     def visualize(
         self,
-        *, figure_size=(35, 30),
+        *,
+        figure_size=(35, 30),
         node_size=7000,
         font_size=25,
         spacing_x: float = 4,
@@ -203,7 +204,8 @@ class QueryGraph:
             case Call():
                 expression: Call
                 args = [
-                    QueryGraph.get_expression_name(expression=arg) for arg in expression._args_
+                    QueryGraph.get_expression_name(expression=arg)
+                    for arg in expression._args_
                 ]
                 kwargs = [f"{k}={v}" for k, v in expression._kwargs_.items()]
                 args_and_kwargs = args + kwargs
@@ -217,7 +219,8 @@ class QueryGraph:
 
     def construct_graph(
         self,
-        *, expression: SymbolicExpression | None = None,
+        *,
+        expression: SymbolicExpression | None = None,
     ) -> QueryNode:
         """
         Construct the graph representation of the query, used for visualization and
@@ -237,7 +240,10 @@ class QueryGraph:
         node = QueryNode(
             name=self.get_expression_name(expression=expression),
             graph=self.graph,
-            color=ColorLegend.from_expression(expression=expression, satisfied_condition_ids=self.satisfied_condition_ids),
+            color=ColorLegend.from_expression(
+                expression=expression,
+                satisfied_condition_ids=self.satisfied_condition_ids,
+            ),
             data=expression,
             is_satisfied=is_satisfied,
         )
@@ -252,7 +258,8 @@ class QueryGraph:
 
     def _add_children_to_graph(
         self,
-        *, parent_node: QueryNode,
+        *,
+        parent_node: QueryNode,
     ):
         """
         Adds child nodes to the graph recursively.
@@ -283,7 +290,8 @@ class ColorLegend(RXUtilsColorLegend):
     @classmethod
     def from_expression(
         cls,
-        *, expression: SymbolicExpression,
+        *,
+        expression: SymbolicExpression,
         satisfied_condition_ids: OrderedSet[UUID] | None = None,
     ) -> ColorLegend:
         name = expression.__class__.__name__

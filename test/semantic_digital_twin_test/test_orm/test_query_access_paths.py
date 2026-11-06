@@ -93,7 +93,9 @@ def test_a_query_on_a_domain_attribute_reads_the_variable_learned_for_it(
 ):
     instances = rotations_about_varied_axes(rotation_from_axis_angle)
     columns = (
-        FeatureExtractor.from_instances(instances=instances).create_dataframe(instances=instances).columns
+        FeatureExtractor.from_instances(instances=instances)
+        .create_dataframe(instances=instances)
+        .columns
     )
 
     rotation = variable(spatial_type, domain=instances)
@@ -110,7 +112,9 @@ def test_probability_of_a_domain_attribute_is_answered_by_the_learned_model(
 ):
     instances = rotations_about_varied_axes(rotation_from_axis_angle)
     model = JointProbabilityTree().fit(
-        FeatureExtractor.from_instances(instances=instances).create_dataframe(instances=instances)
+        FeatureExtractor.from_instances(instances=instances).create_dataframe(
+            instances=instances
+        )
     )
     rotation = variable(spatial_type, domain=instances)
     condition = access_path(rotation) < threshold
@@ -120,7 +124,9 @@ def test_probability_of_a_domain_attribute_is_answered_by_the_learned_model(
     ]
 
     result = probability_of(condition).first(
-        backend=ProbabilisticBackend(model_registry=DictRegistry(models={spatial_type: model}))
+        backend=ProbabilisticBackend(
+            model_registry=DictRegistry(models={spatial_type: model})
+        )
     )
 
     expected = model.probability(

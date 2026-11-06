@@ -31,6 +31,8 @@ def test_is_same_semantic_entity_reads_with_a_single_determiner():
     """
     first, second = variable(Document, []), variable(Document, [])
     assert (
-        verbalize_expression(IsSameSemanticEntity(first_entity=first, second_entity=second))
+        verbalize_expression(
+            IsSameSemanticEntity(first_entity=first, second_entity=second)
+        )
         == "a Document is the same semantic entity as another Document"
     )

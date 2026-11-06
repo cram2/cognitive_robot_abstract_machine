@@ -139,7 +139,9 @@ class Probability(ProbabilisticQuery):
         ).variables.keys()
         roots = {attribute._chain_root_ for attribute in referenced_attributes}
         if len(roots) != 1:
-            raise JointQueryAcrossClassesNotSupported(owner_classes={root._type_ for root in roots})
+            raise JointQueryAcrossClassesNotSupported(
+                owner_classes={root._type_ for root in roots}
+            )
         [root_variable] = roots
 
         matching_count = (

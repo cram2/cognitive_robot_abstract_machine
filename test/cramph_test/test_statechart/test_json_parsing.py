@@ -382,7 +382,8 @@ def assert_children_keep_their_order_after_json_round_trip(
     order `sequence` holds them.
     """
     msc_copy = Statechart.from_json(
-        data=json.loads(json.dumps(msc.to_json())), context=StatechartContext(world=World())
+        data=json.loads(json.dumps(msc.to_json())),
+        context=StatechartContext(world=World()),
     )
     sequence_copy = msc_copy.get_node_by_index(sequence.index)
     assert sequence_copy.nodes == [
@@ -476,7 +477,8 @@ def assert_conditions_survive_json_round_trip(msc: Statechart) -> None:
     that every node of both ends up with the same conditions.
     """
     msc_copy = Statechart.from_json(
-        data=json.loads(json.dumps(msc.to_json())), context=StatechartContext(world=World())
+        data=json.loads(json.dumps(msc.to_json())),
+        context=StatechartContext(world=World()),
     )
 
     msc.compiler.compile()
@@ -597,7 +599,8 @@ def test_condition_using_unsupported_syntax_is_rejected(
 
     with pytest.raises(UnsupportedConditionSyntaxError):
         Statechart.from_json(
-            data=json.loads(json.dumps(document)), context=StatechartContext(world=World())
+            data=json.loads(json.dumps(document)),
+            context=StatechartContext(world=World()),
         )
 
 
@@ -626,7 +629,8 @@ def test_written_conditions_of_a_compiled_statechart_survive_json_round_trip(
     statechart_executor.compile(statechart=msc)
 
     msc_copy = Statechart.from_json(
-        data=json.loads(json.dumps(msc.to_json())), context=StatechartContext(world=World())
+        data=json.loads(json.dumps(msc.to_json())),
+        context=StatechartContext(world=World()),
     )
     StatechartExecutor(msc_copy.context).compile(statechart=msc_copy)
 

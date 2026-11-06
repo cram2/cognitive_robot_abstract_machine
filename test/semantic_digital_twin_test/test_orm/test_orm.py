@@ -178,7 +178,9 @@ def _is_part_whole_relationship(annotation_type, field_name):
     Return whether ``field_name`` on ``annotation_type`` is marked as a part-whole
     relationship.
     """
-    metadata = IsPartWholeRelationship.of_field(clazz=annotation_type, field_name=field_name)
+    metadata = IsPartWholeRelationship.of_field(
+        clazz=annotation_type, field_name=field_name
+    )
     return metadata is not None
 
 

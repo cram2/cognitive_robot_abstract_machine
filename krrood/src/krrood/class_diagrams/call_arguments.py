@@ -70,12 +70,15 @@ class CallArguments:
         if is_hashable(value):
             return value
         if type(value) in (tuple, list):
-            return type(value), tuple(cls.hashable_form(value=element) for element in value)
+            return type(value), tuple(
+                cls.hashable_form(value=element) for element in value
+            )
         if type(value) is set:
             return set, frozenset(value)
         if type(value) is dict:
             return dict, frozenset(
-                (key, cls.hashable_form(value=element)) for key, element in value.items()
+                (key, cls.hashable_form(value=element))
+                for key, element in value.items()
             )
         return ensure_hashable(value)
 

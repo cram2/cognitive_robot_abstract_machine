@@ -397,9 +397,15 @@ class QPProblem:
         )
 
         # Combine constraints
-        self.l = Matrix.vstack(list_of_matrices=[self.lower_box_constraints, self.eq_bound_expr])
-        self.u = Matrix.vstack(list_of_matrices=[self.upper_box_constraints, self.eq_bound_expr])
-        self.A = Matrix.vstack(list_of_matrices=[self.box_constraint_matrix, self.neq_matrix])
+        self.l = Matrix.vstack(
+            list_of_matrices=[self.lower_box_constraints, self.eq_bound_expr]
+        )
+        self.u = Matrix.vstack(
+            list_of_matrices=[self.upper_box_constraints, self.eq_bound_expr]
+        )
+        self.A = Matrix.vstack(
+            list_of_matrices=[self.box_constraint_matrix, self.neq_matrix]
+        )
 
     def _setup_weights(self):
         """
@@ -423,9 +429,15 @@ class QPProblem:
         """
         variable_args = [self.active_variables, self.passive_variables]
 
-        self.l_f = self.l.compile(parameters=VariableParameters.from_lists(*variable_args))
-        self.u_f = self.u.compile(parameters=VariableParameters.from_lists(*variable_args))
-        self.A_f = self.A.compile(parameters=VariableParameters.from_lists(*variable_args))
+        self.l_f = self.l.compile(
+            parameters=VariableParameters.from_lists(*variable_args)
+        )
+        self.u_f = self.u.compile(
+            parameters=VariableParameters.from_lists(*variable_args)
+        )
+        self.A_f = self.A.compile(
+            parameters=VariableParameters.from_lists(*variable_args)
+        )
         self.quadratic_weights_f = self.quadratic_weights.compile(
             parameters=VariableParameters.from_lists(*variable_args)
         )
@@ -542,7 +554,9 @@ class ConstraintBuilder:
         eq_bound_expr = Matrix.vstack(list_of_matrices=[position_error, rotation_error])
 
         J = current_expr.jacobian(variables=active_variables)
-        neq_matrix = Matrix.hstack(list_of_matrices=[J * self.dt, Matrix.eye(size=6) * self.dt])
+        neq_matrix = Matrix.hstack(
+            list_of_matrices=[J * self.dt, Matrix.eye(size=6) * self.dt]
+        )
 
         return eq_bound_expr, neq_matrix
 

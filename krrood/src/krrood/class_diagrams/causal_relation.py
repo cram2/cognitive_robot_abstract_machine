@@ -49,8 +49,10 @@ class CausalEndpoint(ABC):
 @dataclass(kw_only=True, frozen=True)
 class AttributeEndpoint(CausalEndpoint):
     """
-    An attribute reached from the class through a chain of fields. Through a field that
-    holds a collection, it is that attribute of every part in the collection.
+    An attribute reached from the class through a chain of fields.
+
+    Through a field that holds a collection, it is that attribute of every part in the
+    collection.
     """
 
     fields: tuple[WrappedField, ...]
@@ -104,8 +106,8 @@ class StatisticEndpoint(CausalEndpoint):
 
     collection: WrappedField | None = None
     """
-    The field of the class holding the parts the statistic is computed for, or
-    ``None`` if it is computed for the class itself.
+    The field of the class holding the parts the statistic is computed for, or ``None``
+    if it is computed for the class itself.
     """
 
     @property

@@ -37,7 +37,11 @@ def test_wrapping_not_negates_the_predicate_inline():
     """
     assert (
         verbalize_expression(
-            Not(_child_=IsReachable(location=variable(Location, []), body=variable(Robot, [])))
+            Not(
+                _child_=IsReachable(
+                    location=variable(Location, []), body=variable(Robot, [])
+                )
+            )
         )
         == "a Location is not reachable for a Robot"
     )

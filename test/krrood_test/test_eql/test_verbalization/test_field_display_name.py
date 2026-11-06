@@ -39,7 +39,10 @@ def test_display_name_overrides_attribute_name():
     """
     The registered display name replaces the raw field name in the surface word.
     """
-    assert RoleFragment.for_attribute(owner=Period, attribute_name="begin").text == "beginning"
+    assert (
+        RoleFragment.for_attribute(owner=Period, attribute_name="begin").text
+        == "beginning"
+    )
 
 
 def test_absent_display_name_keeps_attribute_name():
@@ -53,7 +56,12 @@ def test_explicit_text_override_wins_over_display_name():
     """
     An explicit *text* argument takes precedence over any registered display name.
     """
-    assert RoleFragment.for_attribute(owner=Period, attribute_name="begin", text="start").text == "start"
+    assert (
+        RoleFragment.for_attribute(
+            owner=Period, attribute_name="begin", text="start"
+        ).text
+        == "start"
+    )
 
 
 def test_display_name_renders_in_a_verbalized_query():

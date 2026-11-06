@@ -56,7 +56,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Compares the left and right symbolic variables using the "operation".

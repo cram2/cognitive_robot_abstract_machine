@@ -922,7 +922,9 @@ class Sage10kRoom(Sage10kWithID):
             dimensions=Sage10kSize._from_json(data=data["dimensions"], **kwargs),
             position=Sage10kPosition._from_json(data=data["position"], **kwargs),
             floor_material=data["floor_material"],
-            objects=[Sage10kObject._from_json(data=d, **kwargs) for d in data["objects"]],
+            objects=[
+                Sage10kObject._from_json(data=d, **kwargs) for d in data["objects"]
+            ],
             walls=[Sage10kWall._from_json(data=w, **kwargs) for w in data["walls"]],
             doors=[Sage10kDoor._from_json(data=d, **kwargs) for d in data["doors"]],
         )

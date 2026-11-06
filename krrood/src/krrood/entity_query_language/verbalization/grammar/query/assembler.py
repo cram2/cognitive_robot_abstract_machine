@@ -97,7 +97,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         is greater than 50"*.
         """
         if plan.report is not None and plan.report.kind is ReportKind.GROUPING:
-            return self._assemble_grouped_report(node=node, plan=plan, report=plan.report)
+            return self._assemble_grouped_report(
+                node=node, plan=plan, report=plan.report
+            )
         handlers = {
             SelectionKind.ENTITY_SELECTOR: self._realize_entity_selector,
             SelectionKind.EMPTY: self._realize_empty,
@@ -118,7 +120,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         selection = self._as_noun(entity=node.selected_variable)
         return self._query_body(
-            node=node, plan=plan, selection=selection, where_items=[self._where_clause(plan=plan)]
+            node=node,
+            plan=plan,
+            selection=selection,
+            where_items=[self._where_clause(plan=plan)],
         )
 
     def _realize_empty(self, *, node: Query, plan: QueryPlan) -> VerbalizationFragment:
@@ -150,7 +155,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         plan = self.plan(node=node)
         if plan.is_aggregation_subquery:
-            return AggregationValueAssembler(context=self.context).realize(node=node, plan=plan)
+            return AggregationValueAssembler(context=self.context).realize(
+                node=node, plan=plan
+            )
         return self._as_noun(entity=node)
 
     def assemble_set_of(self, *, node: SetOf) -> VerbalizationFragment:
@@ -173,7 +180,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         if report is not None and report.kind is ReportKind.GROUPING:
             return self._assemble_grouped_report(node=node, plan=plan, report=report)
         if report is not None and report.kind is ReportKind.AGGREGATION:
-            return self._assemble_aggregation_report(node=node, plan=plan, report=report)
+            return self._assemble_aggregation_report(
+                node=node, plan=plan, report=report
+            )
         if plan.ranking is not None:
             return self._assemble_ranked_set_of(node=node, plan=plan)
         return self._query_body(
@@ -215,7 +224,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                 else None
             ),
             modifiers=[
-                self._highest_aggregate_modifier(aggregate=aggregate, direction=plan.ranking.direction)
+                self._highest_aggregate_modifier(
+                    aggregate=aggregate, direction=plan.ranking.direction
+                )
             ],
             referent_id=subject_referent_id(subject),
         )
@@ -257,7 +268,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         return PhraseFragment(
             parts=[
                 Prepositions.WITH.as_fragment(),
-                self._with_superlative(fragment=self.context.child(node=aggregate), direction=direction),
+                self._with_superlative(
+                    fragment=self.context.child(node=aggregate), direction=direction
+                ),
             ]
         )
 
@@ -271,9 +284,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return False
         if selection._id_ == order_key._id_:
             return True
-        return self._expression_signature(expression=selection) == self._expression_signature(
-            expression=order_key
-        )
+        return self._expression_signature(
+            expression=selection
+        ) == self._expression_signature(expression=order_key)
 
     def _expression_signature(self, *, expression: SymbolicExpression) -> tuple:
         """:return: a structural key for *expression* — its kind, root variable, and attribute path —
@@ -304,7 +317,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return replace(fragment, pre_head=quality.as_fragment())
         return PhraseFragment(parts=[quality.as_fragment(), fragment])
 
-    def _set_of_selection(self, *, node: SetOf, plan: QueryPlan) -> VerbalizationFragment:
+    def _set_of_selection(
+        self, *, node: SetOf, plan: QueryPlan
+    ) -> VerbalizationFragment:
         """:return: the set-of's rendered selection — a plural listing for an ordered report, else
         natural Oxford-comma prose.
 
@@ -340,13 +355,17 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             return self._query_body(
                 node=node,
                 plan=plan,
-                selection=self._selections.parenthesised(variables=node._selected_variables_),
+                selection=self._selections.parenthesised(
+                    variables=node._selected_variables_
+                ),
                 where_items=[self._where_clause(plan=plan)],
                 find_header=self._set_of_header(plan=plan),
             )
         ranking = replace(
             plan.ranking,
-            relation=self._key_relation_to(subject=subject, order_key=plan.ranking.order_key),
+            relation=self._key_relation_to(
+                subject=subject, order_key=plan.ranking.order_key
+            ),
         )
         surface = ranking_surface(RankingRequest(plan=ranking))
         subject_noun = NounPhrase(
@@ -366,7 +385,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                 plan=plan,
                 selection=subject_noun,
                 where_items=[self._where_clause(plan=plan)],
-                find_header=self._sentence_initial(fragment=Keywords.REPORT.as_fragment()),
+                find_header=self._sentence_initial(
+                    fragment=Keywords.REPORT.as_fragment()
+                ),
             )
         header = PhraseFragment(
             parts=[
@@ -507,12 +528,16 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
                 plan=plan,
                 selection=self._distinct_keys(keys=report.group_keys),
                 where_items=[self._where_clause(plan=plan)],
-                find_header=self._sentence_initial(fragment=Keywords.REPORT.as_fragment()),
+                find_header=self._sentence_initial(
+                    fragment=Keywords.REPORT.as_fragment()
+                ),
             )
         selection = PhraseFragment(
             parts=[
                 GroupingPhrases.ALL.as_fragment(),
-                self._selections.prose(variables=report.columns, number=GrammaticalNumber.PLURAL),
+                self._selections.prose(
+                    variables=report.columns, number=GrammaticalNumber.PLURAL
+                ),
             ]
         )
         return self._query_body(
@@ -523,7 +548,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
             find_header=self._for_each_header(keys=report.group_keys, node=node),
         )
 
-    def _distinct_keys(self, *, keys: list[SymbolicExpression]) -> VerbalizationFragment:
+    def _distinct_keys(
+        self, *, keys: list[SymbolicExpression]
+    ) -> VerbalizationFragment:
         """:return: *"the distinct <keys>"* — the group keys as a plural population listing, for a
         grouped query that reports nothing but its keys.
 
@@ -532,7 +559,10 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         'Report the distinct departments'
         """
         labels = oxford_comma(
-            [self._group_label(key=key, number=GrammaticalNumber.PLURAL) for key in keys],
+            [
+                self._group_label(key=key, number=GrammaticalNumber.PLURAL)
+                for key in keys
+            ],
             Conjunctions.AND.as_fragment(),
         )
         return PhraseFragment(
@@ -577,7 +607,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def _group_label(
         self,
-        *, key: SymbolicExpression,
+        *,
+        key: SymbolicExpression,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> VerbalizationFragment:
         """:return: a group key as a bare label in *number* — *"department"* / *"departments"* for an
@@ -591,7 +622,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         if isinstance(key, Attribute):
             return RoleFragment.for_attribute(
-                owner=key._owner_class_, attribute_name=key._attribute_name_, number=number
+                owner=key._owner_class_,
+                attribute_name=key._attribute_name_,
+                number=number,
             )
         return RoleFragment.for_type(type_=key._type_, number=number)
 
@@ -675,7 +708,9 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     # %% subject selection
 
-    def _assemble_subject(self, *, node: Query, plan: QueryPlan) -> VerbalizationFragment:
+    def _assemble_subject(
+        self, *, node: Query, plan: QueryPlan
+    ) -> VerbalizationFragment:
         """:return: *"Find a Robot whose battery is high, such that … [clauses]"* — the
         plain-variable selection with its WHERE woven in.
 
@@ -685,10 +720,14 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         """
         variable = node.selected_variable
         selected = self._build_selection(node=node, variable=variable, plan=plan)
-        selected, where_items = self._apply_subject_restrictions(plan=plan, selected=selected)
+        selected, where_items = self._apply_subject_restrictions(
+            plan=plan, selected=selected
+        )
         # No scope marker: the engine stamps this body with its query node, and the coreference
         # pass reads the focus for that query from the discourse view.
-        return self._query_body(node=node, plan=plan, selection=selected, where_items=where_items)
+        return self._query_body(
+            node=node, plan=plan, selection=selected, where_items=where_items
+        )
 
     def _build_selection(
         self, *, node: Query, variable: SymbolicExpression, plan: QueryPlan
@@ -707,12 +746,16 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
         if plan.report is not None and plan.report.kind is ReportKind.ORDERING:
             # An ordered listing presents all the matching results, so the subject is plural
             # ("Report Employees …"); a plural subject pronominalises to "their".
-            return self._selections.one(variable=variable, number=self._subject_number(plan=plan))
+            return self._selections.one(
+                variable=variable, number=self._subject_number(plan=plan)
+            )
         if plan.is_the:
             # "the unique <type>" first mention; the coreference pass reduces a repeat to
             # "the <type>" (UNIQUE downgrades to DEFINITE) — so it is a referring noun phrase.
             return NounPhrase(
-                head=RoleFragment.for_variable(label=plan.selected_type, expression=variable),
+                head=RoleFragment.for_variable(
+                    label=plan.selected_type, expression=variable
+                ),
                 definiteness=Definiteness.UNIQUE,
                 referent_id=subject_referent_id(variable),
             )
@@ -810,7 +853,8 @@ class QueryAssembler(Assembler[Query, QueryPlan]):
 
     def _query_body(
         self,
-        *, node: Query,
+        *,
+        node: Query,
         plan: QueryPlan,
         selection: VerbalizationFragment,
         where_items: list[VerbalizationFragment | None],

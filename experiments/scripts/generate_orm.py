@@ -21,7 +21,10 @@ ignored_classes |= set(
 
 # Create an ORMatic object with the classes to be mapped
 ormatic = ORMatic.from_package(
-    packages=[experiments], ormatic_interface_dependencies=[coraplex.orm.ormatic_interface], ignored_classes=ignored_classes, type_mappings={}
+    packages=[experiments],
+    ormatic_interface_dependencies=[coraplex.orm.ormatic_interface],
+    ignored_classes=ignored_classes,
+    type_mappings={},
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
 

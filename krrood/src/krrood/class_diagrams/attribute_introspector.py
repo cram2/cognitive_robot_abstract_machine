@@ -19,7 +19,10 @@ class DiscoveredAttribute:
     """
 
     field: Field
-    """The dataclass field object that is wrapped."""
+    """
+    The dataclass field object that is wrapped.
+    """
+
     public_name: str | None = None
     """
     The public name of the field.

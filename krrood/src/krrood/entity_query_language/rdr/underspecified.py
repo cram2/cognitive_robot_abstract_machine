@@ -131,6 +131,10 @@ class RippleDownRulesMatchParser:
         """
         wrapped_field = get_wrapped_field(self.case_type, target.attribute_name)
         if wrapped_field is None:
-            raise UndeclaredInferenceTarget(case_type=self.case_type, attribute_name=target.attribute_name)
+            raise UndeclaredInferenceTarget(
+                case_type=self.case_type, attribute_name=target.attribute_name
+            )
         if wrapped_field.holds_collection:
-            raise UnsupportedInferenceTarget(case_type=self.case_type, attribute_name=target.attribute_name)
+            raise UnsupportedInferenceTarget(
+                case_type=self.case_type, attribute_name=target.attribute_name
+            )

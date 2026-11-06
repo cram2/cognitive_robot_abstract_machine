@@ -117,7 +117,8 @@ class VerbalizationPipeline:
 
     def verbalize(
         self,
-        *, expression: SymbolicExpression,
+        *,
+        expression: SymbolicExpression,
         services: MicroplanningServices | None = None,
         backend: QueryBackend | None = None,
     ) -> str:
@@ -145,7 +146,9 @@ class VerbalizationPipeline:
         if isinstance(target, Query):
             target.build()
         fragment = self._verbalizer.build(
-            expression=expression, services=services, performative=directive_for_backend(backend)
+            expression=expression,
+            services=services,
+            performative=directive_for_backend(backend),
         )
         return self.verbalize_fragment(fragment=fragment)
 
@@ -226,7 +229,8 @@ class VerbalizationPipeline:
     @classmethod
     def ansi(
         cls,
-        *, hierarchical: bool = False,
+        *,
+        hierarchical: bool = False,
         link_resolver: SourceLinkResolver | None = None,
     ) -> VerbalizationPipeline:
         """
@@ -258,7 +262,8 @@ class VerbalizationPipeline:
     @classmethod
     def html(
         cls,
-        *, hierarchical: bool = False,
+        *,
+        hierarchical: bool = False,
         link_resolver: SourceLinkResolver | None = None,
     ) -> VerbalizationPipeline:
         """
@@ -298,4 +303,6 @@ def verbalize_expression(
     >>> verbalize_expression(a(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
     """
-    return VerbalizationPipeline.plain().verbalize(expression=expression, backend=backend)
+    return VerbalizationPipeline.plain().verbalize(
+        expression=expression, backend=backend
+    )

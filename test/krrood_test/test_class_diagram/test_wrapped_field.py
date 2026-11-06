@@ -37,7 +37,9 @@ def get_field_by_name(cls: Type, name: str) -> Field:
 
 def test_builtin_not_optional():
     wrapped_class = WrappedClass(clazz=KRROODPosition)
-    wrapped_field = WrappedField(clazz=wrapped_class, field=get_field_by_name(KRROODPosition, "x"))
+    wrapped_field = WrappedField(
+        clazz=wrapped_class, field=get_field_by_name(KRROODPosition, "x")
+    )
     assert wrapped_field.resolved_type is float
     assert not wrapped_field.is_container
     assert wrapped_field.is_builtin_type
@@ -76,7 +78,8 @@ def test_builtin_optional_written_with_a_pipe():
 def test_optional_relationship_written_with_a_pipe():
     wrapped_class = WrappedClass(clazz=KRROODPipeOptionalOrientation)
     wrapped_field = WrappedField(
-        clazz=wrapped_class, field=get_field_by_name(KRROODPipeOptionalOrientation, "position")
+        clazz=wrapped_class,
+        field=get_field_by_name(KRROODPipeOptionalOrientation, "position"),
     )
 
     assert wrapped_field.is_optional
@@ -112,7 +115,8 @@ def test_one_to_many_relationship():
 def test_is_type_type():
     wrapped_class = WrappedClass(clazz=KRROODPositionTypeWrapper)
     wrapped_field = WrappedField(
-        clazz=wrapped_class, field=get_field_by_name(KRROODPositionTypeWrapper, "position_type")
+        clazz=wrapped_class,
+        field=get_field_by_name(KRROODPositionTypeWrapper, "position_type"),
     )
     assert wrapped_field.is_type_type
 
@@ -134,12 +138,15 @@ def test_is_type_type_for_bare_type_annotation():
 def test_is_specialized_generic():
     wrapped_class = WrappedClass(clazz=GenericClassAssociation)
     associated_value = WrappedField(
-        clazz=wrapped_class, field=get_field_by_name(GenericClassAssociation, "associated_value")
+        clazz=wrapped_class,
+        field=get_field_by_name(GenericClassAssociation, "associated_value"),
     )
     assert associated_value.is_instantiation_of_generic_class
     associated_value_not_parametrized = WrappedField(
         clazz=wrapped_class,
-        field=get_field_by_name(GenericClassAssociation, "associated_value_not_parametrized"),
+        field=get_field_by_name(
+            GenericClassAssociation, "associated_value_not_parametrized"
+        ),
     )
     assert not associated_value_not_parametrized.is_instantiation_of_generic_class
 
@@ -183,7 +190,8 @@ class FieldTypedAsBoundedTypeVariable:
 def test_unbounded_type_variable_field_is_underspecified():
     wrapped_class = WrappedClass(clazz=FieldTypedAsUnboundedTypeVariable)
     wrapped_field = WrappedField(
-        clazz=wrapped_class, field=get_field_by_name(FieldTypedAsUnboundedTypeVariable, "items")
+        clazz=wrapped_class,
+        field=get_field_by_name(FieldTypedAsUnboundedTypeVariable, "items"),
     )
     assert wrapped_field.is_underspecified_generic
 
@@ -191,7 +199,8 @@ def test_unbounded_type_variable_field_is_underspecified():
 def test_bounded_type_variable_field_is_specified_to_its_bound():
     wrapped_class = WrappedClass(clazz=FieldTypedAsBoundedTypeVariable)
     wrapped_field = WrappedField(
-        clazz=wrapped_class, field=get_field_by_name(FieldTypedAsBoundedTypeVariable, "items")
+        clazz=wrapped_class,
+        field=get_field_by_name(FieldTypedAsBoundedTypeVariable, "items"),
     )
     assert not wrapped_field.is_underspecified_generic
     assert wrapped_field.type_endpoint is TypeVariableBound
@@ -279,6 +288,7 @@ class FieldsOfEveryValueShape:
 def test_holds_collection(field_name: str, holds_collection: bool):
     wrapped_class = WrappedClass(clazz=FieldsOfEveryValueShape)
     wrapped_field = WrappedField(
-        clazz=wrapped_class, field=get_field_by_name(FieldsOfEveryValueShape, field_name)
+        clazz=wrapped_class,
+        field=get_field_by_name(FieldsOfEveryValueShape, field_name),
     )
     assert wrapped_field.holds_collection is holds_collection

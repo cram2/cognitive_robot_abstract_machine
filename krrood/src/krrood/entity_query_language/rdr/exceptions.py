@@ -23,7 +23,9 @@ class AmbiguousBranchSemanticsError(DataclassException):
     """
 
     selector: object
-    """The conclusion selector node being dispatched when the collision occurred."""
+    """
+    The conclusion selector node being dispatched when the collision occurred.
+    """
 
     candidates: list[type]
     """

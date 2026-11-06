@@ -120,7 +120,9 @@ class ConversionOrder:
             self.graph[index]: index for index in self.graph.node_indices()
         }
         for held, holder in self._held_and_holder_types():
-            self._order_held_before_holder(held=held, holder=holder, index_of_type=index_of_type)
+            self._order_held_before_holder(
+                held=held, holder=holder, index_of_type=index_of_type
+            )
 
     def _held_and_holder_types(self) -> set[tuple[type, type]]:
         """
@@ -140,7 +142,8 @@ class ConversionOrder:
 
     def _order_held_before_holder(
         self,
-        *, held: type[AlternativeMapping],
+        *,
+        held: type[AlternativeMapping],
         holder: type,
         index_of_type: dict[type, int],
     ):
@@ -166,7 +169,9 @@ class ConversionOrder:
             return
         if self.graph.has_edge(held_index, holder_index):
             return
-        self.graph.add_edge(held_index, holder_index, HoldingOrder(earlier=held, later=holder))
+        self.graph.add_edge(
+            held_index, holder_index, HoldingOrder(earlier=held, later=holder)
+        )
 
     def sort_types(self) -> list[type[AlternativeMapping]]:
         """
@@ -178,6 +183,8 @@ class ConversionOrder:
         cycle = rustworkx.digraph_find_cycle(self.graph)
         if cycle:
             raise ConversionOrderCycle(
-                cycle=[self.graph.get_edge_data(source, target) for source, target in cycle]
+                cycle=[
+                    self.graph.get_edge_data(source, target) for source, target in cycle
+                ]
             )
         return [self.graph[index] for index in rustworkx.topological_sort(self.graph)]

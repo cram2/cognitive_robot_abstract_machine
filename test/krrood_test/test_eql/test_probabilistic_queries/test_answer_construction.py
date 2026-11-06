@@ -145,7 +145,11 @@ def test_a_variable_named_like_several_attributes_is_refused(monkeypatch):
         AttributeMatch, "name_from_variable_access_path", property(lambda _: "Die.face")
     )
     with pytest.raises(AmbiguousVariableName) as error:
-        list(parameters.bindings_from_model_samples(variables=[variable], samples=np.array([[1.0]])))
+        list(
+            parameters.bindings_from_model_samples(
+                variables=[variable], samples=np.array([[1.0]])
+            )
+        )
     assert error.value.variable is variable
     assert len(error.value.attribute_matches) == 2
 
@@ -161,7 +165,9 @@ def test_domain_elements_that_samples_cannot_tell_apart_are_refused():
         ),
         circuit,
     )
-    backend = ProbabilisticBackend(model_registry=DictRegistry(models={Counter: circuit}))
+    backend = ProbabilisticBackend(
+        model_registry=DictRegistry(models={Counter: circuit})
+    )
     with pytest.raises(DomainElementsIndistinguishableInSamples) as error:
         list(query.evaluate(backend=backend))
     assert error.value.variable == number

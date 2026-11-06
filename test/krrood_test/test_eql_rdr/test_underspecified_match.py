@@ -122,7 +122,9 @@ def test_multiple_ellipsis_attributes_raise_multiple_inference_targets():
 
 
 def test_unbounded_iterable_ellipsis_attribute_raises_unsupported_inference_target():
-    match = an(TaggedAnimal)(tags=...).from_(domain=[TaggedAnimal(name="cat", tags=["fluffy"])])
+    match = an(TaggedAnimal)(tags=...).from_(
+        domain=[TaggedAnimal(name="cat", tags=["fluffy"])]
+    )
     parser = RippleDownRulesMatchParser(match=match)
 
     with pytest.raises(UnsupportedInferenceTarget) as error:
@@ -142,7 +144,9 @@ def test_a_target_on_a_case_type_that_is_not_a_dataclass_is_undeclared():
 
 
 def test_a_target_that_is_not_a_field_of_the_case_type_is_undeclared():
-    match = an(AnimalWithDerivedLabel)(label=...).from_(domain=[AnimalWithDerivedLabel(name="cat")])
+    match = an(AnimalWithDerivedLabel)(label=...).from_(
+        domain=[AnimalWithDerivedLabel(name="cat")]
+    )
     parser = RippleDownRulesMatchParser(match=match)
 
     with pytest.raises(UndeclaredInferenceTarget) as error:
@@ -160,7 +164,9 @@ def test_filtered_cases_keeps_only_instances_matching_the_concrete_constraints()
 
     cases = list(parser.filtered_cases())
 
-    assert cases == [Animal(name="cat", has_fur=True, species="mammal", diet="carnivore")]
+    assert cases == [
+        Animal(name="cat", has_fur=True, species="mammal", diet="carnivore")
+    ]
 
 
 def test_filtered_cases_with_no_concrete_constraints_yields_the_whole_domain():

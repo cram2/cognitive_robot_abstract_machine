@@ -61,9 +61,7 @@ class ConclusionSelector(TruthValueOperator, ABC):
         :returns: The conditions root after attaching the new condition to the rule
             tree.
         """
-        return cls.insert_at(
-            *conditions, anchor=cls._get_current_context_condition()
-        )
+        return cls.insert_at(*conditions, anchor=cls._get_current_context_condition())
 
     @classmethod
     def insert_at(
@@ -117,7 +115,9 @@ class ConclusionSelector(TruthValueOperator, ABC):
         # the structural parent only stands in when no enclosing context anchors on it -- and
         # then only one from outside the branch being added, since a parent inside it is part
         # of what is being spliced in rather than an edge the surrounding graph holds.
-        anchor_context = SymbolicExpression._rule_tree_context_anchored_on_(condition=anchor)
+        anchor_context = SymbolicExpression._rule_tree_context_anchored_on_(
+            condition=anchor
+        )
         previous_parent = (
             anchor._parent_outside_(branch=new_condition)
             if anchor_context is None
@@ -131,7 +131,9 @@ class ConclusionSelector(TruthValueOperator, ABC):
         if new_condition is anchor and anchor._parents_:
             raise SelfReferentialInsertionError(anchor=anchor)
 
-        new_context = cls._create_between_two_expressions(current_condition=anchor, new_condition=new_condition)
+        new_context = cls._create_between_two_expressions(
+            current_condition=anchor, new_condition=new_condition
+        )
 
         if new_context is not anchor and previous_parent is not None:
             previous_parent._replace_child_(old_child=anchor, new_child=new_context)
@@ -157,7 +159,8 @@ class ConclusionSelector(TruthValueOperator, ABC):
     @abstractmethod
     def _create_between_two_expressions(
         cls,
-        *, current_condition: SymbolicExpression,
+        *,
+        current_condition: SymbolicExpression,
         new_condition: SymbolicExpression,
     ) -> Self:
         """
@@ -185,19 +188,26 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult | None = None,
+        *,
+        sources: OperationResult | None = None,
     ) -> Iterable[OperationResult]:
         """
         Evaluate the ExceptIf condition and yield the results.
         """
-        for left_value in self._evaluate_child_as_condition_(child=self.left, sources=sources):
+        for left_value in self._evaluate_child_as_condition_(
+            child=self.left, sources=sources
+        ):
             if left_value.is_false:
-                yield from self.get_operation_result_and_clear_conclusion(result=left_value)
+                yield from self.get_operation_result_and_clear_conclusion(
+                    result=left_value
+                )
                 continue
             yield from self.evaluate_right(sources=left_value)
             if not self.right_yielded:
                 # If the right branch didn't yield any True values, propagate the left branch's conclusions.
-                yield from self.get_operation_result_and_clear_conclusion(result=left_value)
+                yield from self.get_operation_result_and_clear_conclusion(
+                    result=left_value
+                )
 
     def evaluate_right(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
@@ -211,10 +221,14 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
         :return: The results of evaluating the right branch.
         """
         self.right_yielded = False
-        for right_value in self._evaluate_child_as_condition_(child=self.right, sources=sources):
+        for right_value in self._evaluate_child_as_condition_(
+            child=self.right, sources=sources
+        ):
             if right_value.is_true:
                 self.right_yielded = True
-            yield from self.get_operation_result_and_clear_conclusion(result=right_value)
+            yield from self.get_operation_result_and_clear_conclusion(
+                result=right_value
+            )
 
     def get_operation_result_and_clear_conclusion(
         self, *, result: OperationResult
@@ -236,7 +250,8 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
     @classmethod
     def _create_between_two_expressions(
         cls,
-        *, current_condition: SymbolicExpression,
+        *,
+        current_condition: SymbolicExpression,
         new_condition: LogicalOperator,
     ) -> Self:
         """
@@ -259,7 +274,8 @@ class Alternative(OR, ConclusionSelector):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         for output in OR._evaluate__(self, sources=sources):
             if output.is_true:
@@ -285,7 +301,8 @@ class Alternative(OR, ConclusionSelector):
     @classmethod
     def _create_between_two_expressions(
         cls,
-        *, current_condition: SymbolicExpression,
+        *,
+        current_condition: SymbolicExpression,
         new_condition: LogicalOperator,
     ) -> Self:
         return cls(left=current_condition, right=new_condition)
@@ -300,12 +317,17 @@ class Next(EQLUnion, ConclusionSelector):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         for child in self._operation_children_:
-            for child_result in self._evaluate_child_as_condition_(child=child, sources=sources):
+            for child_result in self._evaluate_child_as_condition_(
+                child=child, sources=sources
+            ):
                 output = self._build_operation_result_with_truth_(
-                    truth=child_result.is_true, bindings=child_result.bindings, child_result=child_result
+                    truth=child_result.is_true,
+                    bindings=child_result.bindings,
+                    child_result=child_result,
                 )
                 if output.is_true:
                     self._conclusions_.update(child_result.operand._conclusions_)
@@ -322,7 +344,8 @@ class Next(EQLUnion, ConclusionSelector):
     @classmethod
     def _create_between_two_expressions(
         cls,
-        *, current_condition: SymbolicExpression,
+        *,
+        current_condition: SymbolicExpression,
         new_condition: SymbolicExpression,
     ) -> Self:
         match current_condition:
@@ -330,5 +353,7 @@ class Next(EQLUnion, ConclusionSelector):
                 current_condition.add_child(child=new_condition)
                 new_conditions_root = current_condition
             case _:
-                new_conditions_root = cls(_operation_children_=(current_condition, new_condition))
+                new_conditions_root = cls(
+                    _operation_children_=(current_condition, new_condition)
+                )
         return new_conditions_root

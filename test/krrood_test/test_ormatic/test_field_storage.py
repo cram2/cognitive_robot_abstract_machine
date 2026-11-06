@@ -13,7 +13,9 @@ from ..dataset.field_storage_classes import FieldsOfEveryStorage, StorageLeaf
 
 @pytest.fixture
 def ormatic() -> ORMatic:
-    return ORMatic(class_dependency_graph=ClassDiagram(classes=[StorageLeaf, FieldsOfEveryStorage]))
+    return ORMatic(
+        class_dependency_graph=ClassDiagram(classes=[StorageLeaf, FieldsOfEveryStorage])
+    )
 
 
 def field_named(ormatic: ORMatic, name: str) -> WrappedField:
@@ -48,7 +50,10 @@ def field_named(ormatic: ORMatic, name: str) -> WrappedField:
 )
 def test_field_is_stored_the_way_its_type_calls_for(ormatic, field_name, storage):
     assert (
-        ormatic.field_classifier.classify(wrapped_field=field_named(ormatic, field_name)) is storage
+        ormatic.field_classifier.classify(
+            wrapped_field=field_named(ormatic, field_name)
+        )
+        is storage
     )
 
 
@@ -58,4 +63,9 @@ def test_classification_logs_how_the_field_is_stored(ormatic, caplog):
     with caplog.at_level(logging.INFO, logger="krrood.ormatic.field_storage"):
         ormatic.field_classifier.classify(wrapped_field=day)
 
-    assert CustomTypeRule.describe(field_to_store=FieldToStore(wrapped_field=day, ormatic=ormatic)) in caplog.messages
+    assert (
+        CustomTypeRule.describe(
+            field_to_store=FieldToStore(wrapped_field=day, ormatic=ormatic)
+        )
+        in caplog.messages
+    )

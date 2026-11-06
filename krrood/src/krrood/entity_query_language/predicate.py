@@ -181,7 +181,9 @@ class Verbalizable(ABC):
 
     @classmethod
     @abstractmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Structured verbalization for this predicate — a required clause (no string
         fallback).
@@ -569,7 +571,9 @@ class Length(SymbolicFunction):
         return len(self.iterable)
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
@@ -616,7 +620,9 @@ class Is(Predicate):
         return self.first_entity is self.second_entity
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<first_entity> is the same object as <second_entity>"* — the two
         operands hold when they are the same object in memory."""
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).

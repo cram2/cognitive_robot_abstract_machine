@@ -139,15 +139,15 @@ def summer_structures(edges: list[FieldEdge]) -> dict[type, LearnedCausalStructu
     relations = CausalRelationsOfClass(class_diagram=class_diagram, owner=day)
     relations.replace_relations(
         relations=(
-        CausalRelation(
-            source=day,
-            target=day,
-            first=AttributeEndpoint(fields=(day.get_field(name=edge.first),)),
-            second=AttributeEndpoint(fields=(day.get_field(name=edge.second),)),
-            mark_at_first=EdgeMark.TAIL,
-            mark_at_second=EdgeMark.ARROW if edge.directed else EdgeMark.TAIL,
-        )
-        for edge in edges
+            CausalRelation(
+                source=day,
+                target=day,
+                first=AttributeEndpoint(fields=(day.get_field(name=edge.first),)),
+                second=AttributeEndpoint(fields=(day.get_field(name=edge.second),)),
+                mark_at_first=EdgeMark.TAIL,
+                mark_at_second=EdgeMark.ARROW if edge.directed else EdgeMark.TAIL,
+            )
+            for edge in edges
         )
     )
     nodes = [
@@ -241,7 +241,9 @@ def test_learned_graph_supplies_the_confounder(summer_backend_registry):
 
 
 def test_backend_without_a_structure_for_the_class_chooses_nothing():
-    parameters = UnderspecifiedParameters(statement=ice_cream_query(declares_the_season=False))
+    parameters = UnderspecifiedParameters(
+        statement=ice_cream_query(declares_the_season=False)
+    )
 
     ProbabilisticBackend().choose_adjustment_sets(
         parameters=parameters, expression=ice_cream_query(declares_the_season=False)
@@ -265,7 +267,9 @@ def test_each_cause_candidate_gets_its_own_adjustment_set():
     assert {
         cause_variable.name: [
             variable.name
-            for variable in parameters.adjustment_variables_of(cause_variable=cause_variable)
+            for variable in parameters.adjustment_variables_of(
+                cause_variable=cause_variable
+            )
         ]
         for cause_variable in parameters.search_cause_variables
     } == {
@@ -279,7 +283,10 @@ def test_each_cause_candidate_gets_its_own_adjustment_set():
 
 def test_declared_invalid_confounder_is_refused():
     mediated = summer_structures(
-        [FieldEdge(first="ice_cream", second="season"), FieldEdge(first="season", second="drowning")]
+        [
+            FieldEdge(first="ice_cream", second="season"),
+            FieldEdge(first="season", second="drowning"),
+        ]
     )
     query = ice_cream_query(declares_the_season=True)
 
@@ -321,7 +328,8 @@ class FixedEdgesLearner(CausalStructureLearner):
 
     def learn(
         self,
-        *, rows: pd.DataFrame,
+        *,
+        rows: pd.DataFrame,
         nodes: list[GraphNode],
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
@@ -364,7 +372,9 @@ def test_derived_count_survives_the_relational_trim(fitted_circuit, scenario, re
     [x] = parameters.search_cause_variables
     [y] = parameters.effect_variables_from_causes_effect
     learner = RelationalCausalStructureLearner(
-        ClassDiagram(classes=[SceneRoom, SceneObject, KRROODPosition, KRROODOrientation]),
+        ClassDiagram(
+            classes=[SceneRoom, SceneObject, KRROODPosition, KRROODOrientation]
+        ),
         FixedEdgesLearner(parent_names={x.name: [count.name], y.name: [count.name]}),
     )
     backend = ProbabilisticBackend(

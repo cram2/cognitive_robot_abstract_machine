@@ -29,7 +29,11 @@ def generate_interface(tmp_path) -> ModuleType:
     :param tmp_path: The directory to write the interface into.
     :return: The imported interface.
     """
-    instance = ORMatic(class_dependency_graph=ClassDiagram(classes=[LabelledIntervals, HolderOfSpecializedGeneric]))
+    instance = ORMatic(
+        class_dependency_graph=ClassDiagram(
+            classes=[LabelledIntervals, HolderOfSpecializedGeneric]
+        )
+    )
     instance.make_all_tables()
 
     interface_file = tmp_path / "specialized_generic_interface.py"

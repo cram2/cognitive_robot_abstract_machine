@@ -54,7 +54,9 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
 
     assert SupportedBy(supported=milk.annotation_in(world).root, supporting=counter)()
     assert SupportedBy(supported=bowl.annotation_in(world).root, supporting=counter)()
-    assert SupportedBy(supported=spoon.annotation_in(world).root, supporting=spoon_drawer)()
+    assert SupportedBy(
+        supported=spoon.annotation_in(world).root, supporting=spoon_drawer
+    )()
 
     for placed_object in demonstration.place_setting:
         body = placed_object.annotation_in(world).root

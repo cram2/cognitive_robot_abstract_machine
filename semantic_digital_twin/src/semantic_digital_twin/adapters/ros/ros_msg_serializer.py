@@ -105,7 +105,9 @@ class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
         }
 
     @classmethod
-    def from_json(cls, *, data: dict[str, Any], clazz: type[QoSProfile], **kwargs) -> Any:
+    def from_json(
+        cls, *, data: dict[str, Any], clazz: type[QoSProfile], **kwargs
+    ) -> Any:
         """
         Deserialize a JSON-compatible dictionary into a QoSProfile.
         """

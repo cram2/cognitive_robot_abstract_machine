@@ -21,6 +21,7 @@ class RDRLoadError(DataclassException):
     """
     The name of the model that failed to load.
     """
+
     model_path: str
     """
     The path to the model that failed to load.
@@ -108,6 +109,7 @@ class NoDistinguishingAttributeFound(InputError):
     """
     The case being classified.
     """
+
     corner_case: Any
     """
     The corner case that the rule under refinement was created from.

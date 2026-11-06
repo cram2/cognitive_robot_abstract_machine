@@ -154,7 +154,8 @@ class MatchPlanner(Planner[Match, MatchPlan]):
         # Aggregate single-hop equalities by their object via the shared owner-grouping primitive;
         # conditions that are not such an equality (``_as_assignment`` → ``None``) are the remainder.
         owner_groups, other = group_by_owner(
-            list(match._conditions_), lambda condition: self._as_assignment(condition=condition)
+            list(match._conditions_),
+            lambda condition: self._as_assignment(condition=condition),
         )
         groups = [
             AttributeGroup(object=group.owner, assignments=group.items)
@@ -169,7 +170,8 @@ class MatchPlanner(Planner[Match, MatchPlan]):
 
     @staticmethod
     def _as_assignment(
-        *, condition: SymbolicExpression,
+        *,
+        condition: SymbolicExpression,
     ) -> tuple[SymbolicExpression, AttributeAssignment] | None:
         """
         :param condition: A construction-pattern condition.

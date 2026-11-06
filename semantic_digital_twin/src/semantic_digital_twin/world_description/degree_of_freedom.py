@@ -62,9 +62,9 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
 
     def _value_to_json(self, **kwargs) -> dict[str, Any]:
         result = {}
-        WorldEntityReference(subject=DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM).write(
-            data=result, identified_object=self.dof
-        )
+        WorldEntityReference(
+            subject=DegreeOfFreedomVariableJSONKey.DEGREE_OF_FREEDOM
+        ).write(data=result, identified_object=self.dof)
         return result
 
     @classmethod

@@ -60,7 +60,9 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
 
     planner = ChainPlanner
 
-    def realize(self, *, node: MappedVariable, plan: ChainPlan) -> VerbalizationFragment:
+    def realize(
+        self, *, node: MappedVariable, plan: ChainPlan
+    ) -> VerbalizationFragment:
         """
         :param node: The chain to render.
         :param plan: The chain plan computed for *node*.

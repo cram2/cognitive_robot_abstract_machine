@@ -23,7 +23,10 @@ def test_element_referenced_twice_deserializes_to_one_instance():
 def test_from_kwargs_returns_the_tracker_already_in_the_kwargs():
     tracker = KeyedElementTracker()
 
-    assert KeyedElementTracker.from_kwargs(from_json_kwargs=tracker.create_kwargs()) is tracker
+    assert (
+        KeyedElementTracker.from_kwargs(from_json_kwargs=tracker.create_kwargs())
+        is tracker
+    )
 
 
 def test_trackers_of_different_types_keep_separate_kwargs():
@@ -31,7 +34,8 @@ def test_trackers_of_different_types_keep_separate_kwargs():
     kwargs = tracker.create_kwargs()
 
     assert (
-        type(OtherKeyedElementTracker.from_kwargs(from_json_kwargs=kwargs)) is OtherKeyedElementTracker
+        type(OtherKeyedElementTracker.from_kwargs(from_json_kwargs=kwargs))
+        is OtherKeyedElementTracker
     )
     assert KeyedElementTracker.from_kwargs(from_json_kwargs=kwargs) is tracker
 

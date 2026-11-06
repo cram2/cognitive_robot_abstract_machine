@@ -164,12 +164,12 @@ def test_verbalization_produces_natural_language_not_repr():
     query = an(entity(v).where(v.value > 10))
     result = verbalize_expression(query)
 
-    assert isinstance(
-        result, str
-    ), f"Expected str, got {type(result).__name__}: {result!r}"
-    assert result.startswith(
-        "Find "
-    ), f"Expected natural-language output starting with 'Find ', got: {result!r}"
+    assert isinstance(result, str), (
+        f"Expected str, got {type(result).__name__}: {result!r}"
+    )
+    assert result.startswith("Find "), (
+        f"Expected natural-language output starting with 'Find ', got: {result!r}"
+    )
     assert "_Smoke" in result
     assert "10" in result
 
@@ -783,7 +783,12 @@ def test_pronominal_relative_clause_agrees_with_subject_number():
     step = PathStep(
         name="assigned_to",
         source_reference=None,
-        relation=RelationStep(value_type=_Target, owner_class=_NavMission, participle="assigned", preposition="to"),
+        relation=RelationStep(
+            value_type=_Target,
+            owner_class=_NavMission,
+            participle="assigned",
+            preposition="to",
+        ),
     )
     assert (
         realize_subtree(pronominal_path([step], GrammaticalNumber.SINGULAR))
@@ -981,9 +986,9 @@ def test_max_single_attribute_chain():
     """
     t = variable(BankTransaction, domain=None)
     text = verbalize_expression(an(entity(eql.max(t.amount_details))))
-    assert (
-        "the maximum of the amount_details of a BankTransaction" in text
-    ), f"Got: {text!r}"
+    assert "the maximum of the amount_details of a BankTransaction" in text, (
+        f"Got: {text!r}"
+    )
 
 
 def test_min_single_attribute_chain():
@@ -992,9 +997,9 @@ def test_min_single_attribute_chain():
     """
     t = variable(BankTransaction, domain=None)
     text = verbalize_expression(an(entity(eql.min(t.amount_details))))
-    assert (
-        "the minimum of the amount_details of a BankTransaction" in text
-    ), f"Got: {text!r}"
+    assert "the minimum of the amount_details of a BankTransaction" in text, (
+        f"Got: {text!r}"
+    )
 
 
 def test_max_multi_level_attribute_chain():
@@ -1453,9 +1458,9 @@ def test_verbalize_nested_rule(doors_and_drawers_world):
     assert text.startswith("If "), f"Expected 'If' at start, got: {text!r}"
     assert "then" in text, f"Expected 'then' in: {text!r}"
     # IF clause introduces the FixedConnection antecedent
-    assert (
-        "there's a FixedConnection" in text
-    ), f"Expected 'there's a FixedConnection' in: {text!r}"
+    assert "there's a FixedConnection" in text, (
+        f"Expected 'there's a FixedConnection' in: {text!r}"
+    )
     # IF clause describes its conditions, each prefixed by its own "whose …, and whose …"
     assert "whose parent is the child of a PrismaticConnection" in text
     assert "and whose child is a Handle" in text
@@ -1533,7 +1538,10 @@ def test_verbalize_has_type_with_exists():
     fruit_box = variable(FruitBox, domain=[fb1, fb2])
     query = an(
         entity(fruit_box).where(
-            exists(fruit_box, HasType(variable=flat_variable(fruit_box.fruits), types_=Apple))
+            exists(
+                fruit_box,
+                HasType(variable=flat_variable(fruit_box.fruits), types_=Apple),
+            )
         )
     )
     text = verbalize_expression(query)
@@ -1595,7 +1603,9 @@ def test_verbalize_custom_predicate_robotics_domain(handles_and_containers_world
 
         @classmethod
         def _verbalization_fragment_(cls, fields):
-            return clause(Noun(content=fields["body"]), Copula(), Adjective(word="reachable"))
+            return clause(
+                Noun(content=fields["body"]), Copula(), Adjective(word="reachable")
+            )
 
     world = handles_and_containers_world
     handle = variable(Handle, world.bodies)
@@ -1983,7 +1993,9 @@ def test_verbalize_double_nested_with_outer_entity(doors_and_drawers_world):
     # A second entity used directly by the outer Wrapper
     handle2 = variable(Handle, world.bodies)
     pc2 = variable(PrismaticConnection, world.connections)
-    fc2 = a(FixedConnection)(parent=pc2.child, child=handle2).from_(domain=world.connections)
+    fc2 = a(FixedConnection)(parent=pc2.child, child=handle2).from_(
+        domain=world.connections
+    )
 
     wrapper_var = inference(Wrapper)(drawer=drawer_var, connection=fc2.parent)
     text = verbalize_expression(wrapper_var)
@@ -2151,21 +2163,21 @@ def test_cabinet_rule_verbalization(handles_and_containers_world):
     assert text.startswith("If "), f"Expected 'If' at start, got: {text!r}"
     assert "then" in text, f"Expected 'then' in: {text!r}"
     # IF clause introduces PrismaticConnections in plural (aggregated)
-    assert (
-        "there are PrismaticConnections" in text
-    ), f"Expected 'there are PrismaticConnections' in: {text!r}"
+    assert "there are PrismaticConnections" in text, (
+        f"Expected 'there are PrismaticConnections' in: {text!r}"
+    )
     # IF clause contains a "whose children" constraint from the WHERE condition
     assert "whose children" in text, f"Expected 'whose children' in: {text!r}"
     # THEN clause introduces the Cabinet
     assert "there's a Cabinet" in text, f"Expected 'there's a Cabinet' in: {text!r}"
     # group-key binding uses "common"
-    assert (
-        "whose container is the common parent of the PrismaticConnections" in text
-    ), f"Expected 'whose container is the common parent of the PrismaticConnections' in: {text!r}"
+    assert "whose container is the common parent of the PrismaticConnections" in text, (
+        f"Expected 'whose container is the common parent of the PrismaticConnections' in: {text!r}"
+    )
     # aggregated plural binding (second clause, with its own repeated "whose")
-    assert (
-        "and whose drawers are the Drawers" in text
-    ), f"Expected 'and whose drawers are the Drawers' in: {text!r}"
+    assert "and whose drawers are the Drawers" in text, (
+        f"Expected 'and whose drawers are the Drawers' in: {text!r}"
+    )
 
 
 def test_inference_planner_decomposes_rule_without_rendering(
@@ -2317,9 +2329,9 @@ def test_plural_field_binding_uses_are(handles_and_containers_world):
     drawer = variable(Drawer, handles_and_containers_world.views)
     cabinet = inference(Cabinet)(drawers=drawer)
     text = verbalize_expression(cabinet)
-    assert (
-        "drawers of the Cabinet are Drawers" in text
-    ), f"Expected 'drawers of the Cabinet are Drawers' in: {text!r}"
+    assert "drawers of the Cabinet are Drawers" in text, (
+        f"Expected 'drawers of the Cabinet are Drawers' in: {text!r}"
+    )
     assert "drawers is" not in text, f"Did not expect 'drawers is' in: {text!r}"
 
 
@@ -2466,9 +2478,9 @@ def test_pronoun_not_used_for_non_subject_variable():
     assert "the amount of its amount_details" in text, f"Got: {text!r}"
     assert "the starting_salary of an Employee" in text, f"Got: {text!r}"
     # object (non-calculation) equality keeps the bare copula
-    assert (
-        "is the starting_salary" in text and "is equal to" not in text
-    ), f"Got: {text!r}"
+    assert "is the starting_salary" in text and "is equal to" not in text, (
+        f"Got: {text!r}"
+    )
 
 
 def test_whose_grouping_top_level_between():
@@ -2512,9 +2524,9 @@ def test_whose_grouping_mixed_groupable_and_residual():
         )
     )
     text = verbalize_expression(query)
-    assert (
-        "whose booking_date is between May 15, 2026 and May 30, 2026" in text
-    ), f"Got: {text!r}"
+    assert "whose booking_date is between May 15, 2026 and May 30, 2026" in text, (
+        f"Got: {text!r}"
+    )
     assert (
         "such that the amount of its amount_details is equal to the maximum amount"
         in text
@@ -2795,7 +2807,9 @@ def test_verbalize_expression_ansi_paragraph():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    result = VerbalizationPipeline(renderer=ParagraphRenderer(formatter=ANSIFormatter())).verbalize(expression=q)
+    result = VerbalizationPipeline(
+        renderer=ParagraphRenderer(formatter=ANSIFormatter())
+    ).verbalize(expression=q)
     assert "\033[" in result
     assert "Robot" in result
 
@@ -2806,7 +2820,9 @@ def test_verbalize_expression_ansi_hierarchical():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
-    result = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=ANSIFormatter())).verbalize(expression=q)
+    result = VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=ANSIFormatter())
+    ).verbalize(expression=q)
     assert "\033[" in result
     assert "\n" in result
 
@@ -2817,7 +2833,9 @@ def test_verbalize_expression_html_paragraph():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(r.battery > 50))
-    result = VerbalizationPipeline(renderer=ParagraphRenderer(formatter=HTMLFormatter())).verbalize(expression=q)
+    result = VerbalizationPipeline(
+        renderer=ParagraphRenderer(formatter=HTMLFormatter())
+    ).verbalize(expression=q)
     assert "<span" in result
     # HTML pipeline wraps output in a dark <div> for Jupyter rendering.
     assert "<div" in result
@@ -2829,7 +2847,9 @@ def test_verbalize_expression_html_hierarchical():
     """
     r = variable(_Robot, [])
     q = an(entity(r).where(or_(r.battery > 50, r.battery < 10)))
-    result = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(expression=q)
+    result = VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=HTMLFormatter())
+    ).verbalize(expression=q)
     assert "<span" in result
     assert "<br>" in result
 
@@ -2894,9 +2914,9 @@ def test_verbalize_expression_html_hierarchical_handles_constrained_aggregation(
         .grouped_by(employee.department)
         .having(avg_salary > 30000)
     )
-    result = VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(
-        expression=query
-    )
+    result = VerbalizationPipeline(
+        renderer=HierarchicalRenderer(formatter=HTMLFormatter())
+    ).verbalize(expression=query)
     # The grouped report fronts its HAVING onto the group key, so it is a single prose line (no
     # block <br>); the HTML wrapper and coloured content still render end-to-end.
     assert "<span" in result

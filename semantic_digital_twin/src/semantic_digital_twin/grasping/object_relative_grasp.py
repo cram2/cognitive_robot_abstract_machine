@@ -157,6 +157,8 @@ def draw_grasps(
         return []
     return list(
         statement.limit(n=number_of_grasps).evaluate(
-            backend=ProbabilisticBackend(model_registry=model_registry or UniformPriorRegistry())
+            backend=ProbabilisticBackend(
+                model_registry=model_registry or UniformPriorRegistry()
+            )
         )
     )

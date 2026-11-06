@@ -56,4 +56,6 @@ class LandmarkReference(ObjectReference):
     """
 
     def resolve(self, *, data: dict[str, Any], **kwargs) -> Landmark:
-        return LandmarkTracker.from_kwargs(from_json_kwargs=kwargs).get(key=from_json(data[self.id_key]))
+        return LandmarkTracker.from_kwargs(from_json_kwargs=kwargs).get(
+            key=from_json(data[self.id_key])
+        )

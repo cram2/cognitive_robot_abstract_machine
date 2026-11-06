@@ -74,7 +74,9 @@ def drawer_cabinet_human_expert(expert) -> Human:
     """
     Fixture to create an expert for drawer and cabinet views.
     """
-    conf = ExpertConfig(filename="drawer_cabinet_expert_answers_fit", use_loaded_answers=True)
+    conf = ExpertConfig(
+        filename="drawer_cabinet_expert_answers_fit", use_loaded_answers=True
+    )
     return expert(conf)
 
 
@@ -84,7 +86,9 @@ def drawer_cabinet_ai_expert(expert) -> Human:
     Fixture to create an expert for drawer and cabinet views.
     """
     conf = ExpertConfig(
-        filename="drawer_cabinet_ai_expert_answers_fit", use_loaded_answers=False, expert_type=AI
+        filename="drawer_cabinet_ai_expert_answers_fit",
+        use_loaded_answers=False,
+        expert_type=AI,
     )
     return expert(conf)
 
@@ -210,4 +214,6 @@ def saved_drawer_cabinet_rdr(request, drawer_cabinet_rdr) -> SavedRDRModel:
     one nor writes the path a test running beside it is writing.
     """
     directory = Path(__file__).parent.parent / "test_results" / request.node.name
-    return SavedRDRModel(directory=directory, name=drawer_cabinet_rdr.save(save_dir=str(directory)))
+    return SavedRDRModel(
+        directory=directory, name=drawer_cabinet_rdr.save(save_dir=str(directory))
+    )

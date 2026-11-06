@@ -48,7 +48,9 @@ def test_active_conditions_root_resolves_by_what_was_set_not_by_construction_ord
     tracking = ActiveConditionsRoot()
     node = _NodeStub()
 
-    assert not tracking.is_active_root(node=node), "an unset pass must not match any node"
+    assert not tracking.is_active_root(node=node), (
+        "an unset pass must not match any node"
+    )
     tracking.set_active_root_if_not_set(root=node, has_condition=True)
     assert tracking.is_active_root(node=node)
 

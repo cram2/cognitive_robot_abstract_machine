@@ -80,11 +80,16 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     )
 
     with rule:
-        Add(left=views, right=inference(Drawer)(handle=handle, container=body, world=world))
+        Add(
+            left=views,
+            right=inference(Drawer)(handle=handle, container=body, world=world),
+        )
         with alternative(
             revolute_connection.parent == body, revolute_connection.child == handle
         ):
-            Add(left=views, right=inference(Door)(handle=handle, body=body, world=world))
+            Add(
+                left=views, right=inference(Door)(handle=handle, body=body, world=world)
+            )
         with alternative(
             fixed_connection_condition,
             body == revolute_connection.child,

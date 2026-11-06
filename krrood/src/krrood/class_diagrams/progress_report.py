@@ -76,7 +76,8 @@ class ClassDiagramProgress:
             return None
         payload = json.loads(line[len(LINE_PREFIX) :])
         return cls(
-            class_name=payload[ProgressField.CLASS_NAME], total_classes=payload[ProgressField.TOTAL_CLASSES]
+            class_name=payload[ProgressField.CLASS_NAME],
+            total_classes=payload[ProgressField.TOTAL_CLASSES],
         )
 
     def to_line(self) -> str:
@@ -108,4 +109,9 @@ def report_progress(class_name: str, total_classes: int) -> None:
     :param class_name: Name of the class that is done.
     :param total_classes: How many classes the diagram holds.
     """
-    print(ClassDiagramProgress(class_name=class_name, total_classes=total_classes).to_line(), flush=True)
+    print(
+        ClassDiagramProgress(
+            class_name=class_name, total_classes=total_classes
+        ).to_line(),
+        flush=True,
+    )

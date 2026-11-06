@@ -409,7 +409,9 @@ class WrappedTable(TableLike):
         if not self.is_alternatively_mapped:
             return None
 
-        original = self._original_wrapped_for_mapping(mapping_wrapped=self.wrapped_clazz)
+        original = self._original_wrapped_for_mapping(
+            mapping_wrapped=self.wrapped_clazz
+        )
         if original is None:
             return None
 
@@ -512,7 +514,9 @@ class WrappedTable(TableLike):
         :param original_parent_wrapped: The original parent wrapped node.
         :return: The wrapped node to use as parent in DAO generation.
         """
-        alt_parent = self.ormatic.get_alternative_mapping(wrapped_class=original_parent_wrapped)
+        alt_parent = self.ormatic.get_alternative_mapping(
+            wrapped_class=original_parent_wrapped
+        )
         return alt_parent if alt_parent is not None else original_parent_wrapped
 
     def _to_wrapped_tables_key(self, *, wrapped: WrappedClass) -> WrappedClass:
@@ -592,7 +596,9 @@ class WrappedTable(TableLike):
         ):
             og_parent_class = self.parent_table.wrapped_clazz.clazz.original_class()
             wrapped_og_parent_class = (
-                self.ormatic.class_dependency_graph.get_wrapped_class(clazz=og_parent_class)
+                self.ormatic.class_dependency_graph.get_wrapped_class(
+                    clazz=og_parent_class
+                )
             )
 
             og_parent_field_names = {
@@ -610,7 +616,6 @@ class WrappedTable(TableLike):
     def parse_fields(self):
 
         for f in self.fields:
-
             logger.info("=" * 80)
             logger.info(
                 f"Processing Field {self.wrapped_clazz.clazz.__name__}.{f.field.name}: {f.field.type}."
@@ -692,7 +697,9 @@ class WrappedTable(TableLike):
         )
         column_constructor = f"mapped_column(TypeType, nullable={wrapped_field.is_optional}, use_existing_column=True)"
         self.custom_columns.append(
-            ColumnConstructor(name=column_name, type=column_type, constructor=column_constructor)
+            ColumnConstructor(
+                name=column_name, type=column_type, constructor=column_constructor
+            )
         )
 
     def get_table_of_wrapped_field(self, *, wrapped_field: WrappedField) -> TableLike:
@@ -703,7 +710,9 @@ class WrappedTable(TableLike):
         type_endpoint = wrapped_field.type_endpoint
         try:
             return self.ormatic.table_for(
-                wrapped_class=self.ormatic.class_dependency_graph.get_wrapped_class(clazz=type_endpoint)
+                wrapped_class=self.ormatic.class_dependency_graph.get_wrapped_class(
+                    clazz=type_endpoint
+                )
             )
         except KeyError:
             raise WrappedTableNotFound(type_=type_endpoint, wrapped_field=wrapped_field)
@@ -725,13 +734,17 @@ class WrappedTable(TableLike):
         )
 
         # get the target table
-        target_wrapped_table = self.get_table_of_wrapped_field(wrapped_field=wrapped_field)
+        target_wrapped_table = self.get_table_of_wrapped_field(
+            wrapped_field=wrapped_field
+        )
 
         # columns have to be nullable and use_alter=True since the insertion order might be incorrect otherwise
         fk_column_constructor = f"mapped_column(ForeignKey('{target_wrapped_table.full_primary_key_name}', use_alter=True), nullable=True, use_existing_column=True)"
 
         self.foreign_keys.append(
-            ColumnConstructor(name=fk_name, type=fk_type, constructor=fk_column_constructor)
+            ColumnConstructor(
+                name=fk_name, type=fk_type, constructor=fk_column_constructor
+            )
         )
 
         # create relationship to remote side
@@ -754,7 +767,9 @@ class WrappedTable(TableLike):
         :param wrapped_field: The field for the many-to-many relationship.
         """
         # get the target table
-        target_wrapped_table = self.get_table_of_wrapped_field(wrapped_field=wrapped_field)
+        target_wrapped_table = self.get_table_of_wrapped_field(
+            wrapped_field=wrapped_field
+        )
 
         # create association table name
         association_table_name = (
@@ -841,7 +856,9 @@ class WrappedTable(TableLike):
             column_type = f"Mapped[{module_and_class_name(container)}[{value_type}]]"
         column_constructor = f"mapped_column(JSON, nullable={wrapped_field.is_optional}, use_existing_column=True)"
         self.custom_columns.append(
-            ColumnConstructor(name=column_name, type=column_type, constructor=column_constructor)
+            ColumnConstructor(
+                name=column_name, type=column_type, constructor=column_constructor
+            )
         )
 
     def create_custom_type(self, *, wrapped_field: WrappedField):
@@ -859,7 +876,9 @@ class WrappedTable(TableLike):
         constructor = f"mapped_column({module_and_class_name(custom_type)}, nullable={wrapped_field.is_optional}, use_existing_column=True)"
 
         self.custom_columns.append(
-            ColumnConstructor(name=column_name, type=column_type, constructor=constructor)
+            ColumnConstructor(
+                name=column_name, type=column_type, constructor=constructor
+            )
         )
 
     @property

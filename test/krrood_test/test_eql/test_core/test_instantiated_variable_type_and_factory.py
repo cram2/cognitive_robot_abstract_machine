@@ -124,4 +124,7 @@ def test_symbolic_function_class_with_unannotated_call_is_rejected():
 
 
 def test_symbolic_function_class_still_binds_its_computed_value():
-    assert Halved(number=variable_from([4, 7])).tolist() == [Halved(number=4)(), Halved(number=7)()]
+    assert Halved(number=variable_from([4, 7])).tolist() == [
+        Halved(number=4)(),
+        Halved(number=7)(),
+    ]

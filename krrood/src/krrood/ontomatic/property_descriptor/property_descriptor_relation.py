@@ -136,7 +136,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             original_source_instance = association.get_original_source_instance_given_this_relation_source_instance(
                 source_instance=self.source.instance
             )
-            source = SymbolGraph().get_wrapped_instance(instance=original_source_instance)
+            source = SymbolGraph().get_wrapped_instance(
+                instance=original_source_instance
+            )
             yield source, association.wrapped_field
 
     @property
@@ -163,7 +165,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         Return the inverse field (if it exists) stored in the target of this relation.
         """
-        return self.inverse_of.get_association_of_source_type(domain_type=self.target.instance_type)
+        return self.inverse_of.get_association_of_source_type(
+            domain_type=self.target.instance_type
+        )
 
     def infer_transitive_relations(self):
         """

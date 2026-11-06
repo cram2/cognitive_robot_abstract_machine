@@ -61,7 +61,9 @@ class Robot:
     """
 
     name: str
-    """The robot's identifier string."""
+    """
+    The robot's identifier string.
+    """
 
     battery: int
     """
@@ -69,7 +71,9 @@ class Robot:
     """
 
     operational: bool
-    """Whether the robot is operational (a boolean terminal for predicative chains)."""
+    """
+    Whether the robot is operational (a boolean terminal for predicative chains).
+    """
 
 
 @dataclass(kw_only=True)
@@ -79,7 +83,9 @@ class Mission:
     """
 
     assigned_to: Robot
-    """The robot the mission is assigned to."""
+    """
+    The robot the mission is assigned to.
+    """
 
     priority: int
     """
@@ -97,7 +103,9 @@ class Task:
     """
 
     name: str
-    """The task's name."""
+    """
+    The task's name.
+    """
 
     completed: bool
     """
@@ -112,7 +120,9 @@ class Worker:
     """
 
     name: str
-    """The worker's name."""
+    """
+    The worker's name.
+    """
 
     tasks: list[Task]
     """
@@ -130,7 +140,9 @@ class AmountDetails:
     """
 
     amount: float
-    """The amount of money."""
+    """
+    The amount of money.
+    """
 
 
 @dataclass(kw_only=True)
@@ -140,7 +152,9 @@ class BankTransaction:
     """
 
     amount_details: AmountDetails
-    """The transaction's amount (a nested attribute chain)."""
+    """
+    The transaction's amount (a nested attribute chain).
+    """
 
     booking_date: datetime.datetime
     """
@@ -158,7 +172,9 @@ class Employee:
     """
 
     name: str
-    """The employee's name."""
+    """
+    The employee's name.
+    """
 
     department: str
     """
@@ -166,7 +182,9 @@ class Employee:
     """
 
     salary: int
-    """Current salary."""
+    """
+    Current salary.
+    """
 
     starting_salary: int
     """

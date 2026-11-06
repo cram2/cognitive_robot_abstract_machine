@@ -58,19 +58,24 @@ class ForAll(QuantifiedConditional):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         solution_set = None
 
         for variable_result in self.variable._evaluate_(sources=sources):
             if solution_set is None:
-                solution_set = self.get_all_candidate_solutions(variable_result=variable_result)
+                solution_set = self.get_all_candidate_solutions(
+                    variable_result=variable_result
+                )
             else:
                 solution_set = [
                     solution
                     for solution in solution_set
                     if self.evaluate_condition(
-                        sources=OperationResult(bindings={**solution, **variable_result.bindings})
+                        sources=OperationResult(
+                            bindings={**solution, **variable_result.bindings}
+                        )
                     )
                 ]
             if not solution_set:
@@ -79,7 +84,9 @@ class ForAll(QuantifiedConditional):
 
         # Yield the remaining bindings (non-universal) merged with the incoming sources
         yield from [
-            self._build_operation_result_with_truth_(truth=True, bindings=sources.bindings | solution)
+            self._build_operation_result_with_truth_(
+                truth=True, bindings=sources.bindings | solution
+            )
             for solution in solution_set
         ]
 
@@ -121,7 +128,8 @@ class Exists(QuantifiedConditional):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         for variable_result in self._evaluate_child_as_condition_(
             child=self.variable, sources=sources
@@ -147,7 +155,9 @@ class Exists(QuantifiedConditional):
             return
 
         # Negation as failure: no variable value satisfied the condition.
-        yield self._build_operation_result_with_truth_(truth=False, bindings=sources.bindings)
+        yield self._build_operation_result_with_truth_(
+            truth=False, bindings=sources.bindings
+        )
 
     def _condition_holds_for_(self, *, variable_result: OperationResult) -> bool:
         """

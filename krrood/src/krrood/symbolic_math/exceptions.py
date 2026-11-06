@@ -24,14 +24,19 @@ class UnsupportedOperationError(SymbolicMathError, TypeError):
     """
 
     operation: str
-    """The name of the operation that was attempted (e.g., '+', '-', etc.)."""
+    """
+    The name of the operation that was attempted (e.g., '+', '-', etc.).
+    """
+
     left: Any
     """
     The first argument involved in the operation.
     """
 
     right: Any
-    """The second argument involved in the operation."""
+    """
+    The second argument involved in the operation.
+    """
 
     def error_message(self) -> str:
         return f"unsupported operand type(s) for {self.operation}: '{self.left.__class__.__name__}' and '{self.right.__class__.__name__}'"

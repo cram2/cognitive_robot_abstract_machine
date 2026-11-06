@@ -102,7 +102,10 @@ def _get_allocation_plan(original_clazz: type) -> _AllocationPlan:
             default_factories.append(
                 _DefaultFactory(field_.name, field_.default_factory)
             )
-    return _AllocationPlan(static_defaults=tuple(static_defaults), default_factories=tuple(default_factories))
+    return _AllocationPlan(
+        static_defaults=tuple(static_defaults),
+        default_factories=tuple(default_factories),
+    )
 
 
 @dataclass(kw_only=True)
@@ -291,14 +294,16 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
         # add all dependencies between the classes defined from the alternative mappings
         for alternative_mapping_type in alternative_mapping_types:
-
             self._build_dependencies_of_alternative_mapping(
-                alternative_mapping=alternative_mapping_type, concrete_alternative_mappings=alternative_mapping_types, types_to_index=types_to_index
+                alternative_mapping=alternative_mapping_type,
+                concrete_alternative_mappings=alternative_mapping_types,
+                types_to_index=types_to_index,
             )
 
     def _build_dependencies_of_alternative_mapping(
         self,
-        *, alternative_mapping: type[AlternativeMapping],
+        *,
+        alternative_mapping: type[AlternativeMapping],
         concrete_alternative_mappings: list[type[AlternativeMapping]],
         types_to_index: dict[type, int],
     ):
@@ -315,10 +320,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         """
         # get all concrete types that are affected by the dependencies
         for required_domain_type in alternative_mapping.required_pre_build_classes():
-
             # for every concrete dao type discovered in the discovery phase
             for concrete_alternative_mapping in concrete_alternative_mappings:
-
                 # get the concrete domain type of the dao current dao type
                 concrete_domain_type = concrete_alternative_mapping.original_class()
 
@@ -335,7 +338,9 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
                 self._class_dependencies.add_edge(
                     types_to_index[concrete_alternative_mapping],
                     types_to_index[alternative_mapping],
-                    DeclaredOrder(earlier=concrete_alternative_mapping, later=alternative_mapping),
+                    DeclaredOrder(
+                        earlier=concrete_alternative_mapping, later=alternative_mapping
+                    ),
                 )
 
     def convert_alternative_mappings_to_domain_objects(self):
@@ -354,7 +359,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         # types in conversion order first, then any referenced types not in the graph
         # (e.g. instances that were already converted in a previous conversion)
         ordered_types = ConversionOrder(
-            declared_dependencies=self._class_dependencies, references=self._alternative_mappings_being_referenced
+            declared_dependencies=self._class_dependencies,
+            references=self._alternative_mappings_being_referenced,
         ).sort_types()
         ordered_types += [
             type_ for type_ in instances_by_type if type_ not in set(ordered_types)
@@ -362,7 +368,9 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
         for alternative_mapping_type in ordered_types:
             for instance in instances_by_type[alternative_mapping_type]:
-                domain_object = self.resolve_alternative_mapping(alternative_mapping=instance)
+                domain_object = self.resolve_alternative_mapping(
+                    alternative_mapping=instance
+                )
                 for (
                     referencing_instance,
                     reference,

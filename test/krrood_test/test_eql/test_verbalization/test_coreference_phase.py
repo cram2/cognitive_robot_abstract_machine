@@ -52,7 +52,9 @@ def _scope(child: VerbalizationFragment, focus_id):
     model keys on).
     """
     node = MinimalSymbolicExpression()
-    return replace(child, source=node), DiscourseModel(_focus_by_scope={node._id_: focus_id})
+    return replace(child, source=node), DiscourseModel(
+        _focus_by_scope={node._id_: focus_id}
+    )
 
 
 def _noun(text: str) -> RoleFragment:
@@ -60,7 +62,9 @@ def _noun(text: str) -> RoleFragment:
 
 
 def _text(fragment) -> str:
-    return flatten_fragment_to_plain_text(CoreferenceProcessor().process(fragment=fragment))
+    return flatten_fragment_to_plain_text(
+        CoreferenceProcessor().process(fragment=fragment)
+    )
 
 
 def test_noop_on_plain_tree():
@@ -101,7 +105,9 @@ def _realise(fragment, discourse=EMPTY_DISCOURSE) -> str:
     Coreference then determiner phase → plain text (the pipeline's first two stages).
     """
     resolved = CoreferenceProcessor(discourse=discourse).process(fragment=fragment)
-    return flatten_fragment_to_plain_text(DeterminerProcessor().process(fragment=resolved))
+    return flatten_fragment_to_plain_text(
+        DeterminerProcessor().process(fragment=resolved)
+    )
 
 
 def test_repeat_mention_is_downgraded_to_definite():

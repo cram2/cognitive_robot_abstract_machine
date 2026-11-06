@@ -880,7 +880,11 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
         cup = (
             an(entity(v_cup)).where(
                 contains(v_cup.type_description, "cup"),
-                SupportedBy(supported=v_cup.root, supporting=table.root, maximum_intersection_height=0.05),
+                SupportedBy(
+                    supported=v_cup.root,
+                    supporting=table.root,
+                    maximum_intersection_height=0.05,
+                ),
             )
         ).first()
         return cup

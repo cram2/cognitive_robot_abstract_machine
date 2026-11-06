@@ -42,7 +42,10 @@ class PointsCreatedOnEveryAccess:
         """
         :return: A new point at each of :attr:`coordinates`.
         """
-        return [IdentityHashedPoint(coordinate=coordinate) for coordinate in self.coordinates]
+        return [
+            IdentityHashedPoint(coordinate=coordinate)
+            for coordinate in self.coordinates
+        ]
 
 
 # %% an object generated around one of the points

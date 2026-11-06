@@ -102,7 +102,9 @@ class TemplateFileCreator:
         self.case_query = case_query
         self.output_type = self.get_output_type()
         self.user_edit_line = 0
-        self.func_name: str = self.get_func_name(prompt_for=self.prompt_for, case_query=self.case_query)
+        self.func_name: str = self.get_func_name(
+            prompt_for=self.prompt_for, case_query=self.case_query
+        )
         self.func_doc: str = self.get_func_doc()
         self.function_signature: str = self.get_function_signature()
         self.editor: Editor | None = detect_available_editor()
@@ -187,7 +189,9 @@ class TemplateFileCreator:
 
     def get_function_signature(self) -> str:
         if self.func_name is None:
-            self.func_name = self.get_func_name(prompt_for=self.prompt_for, case_query=self.case_query)
+            self.func_name = self.get_func_name(
+                prompt_for=self.prompt_for, case_query=self.case_query
+            )
         output_type_hint = self.get_output_type_hint()
         func_args = self.get_func_args()
         return f"def {self.func_name}({func_args}){output_type_hint}:"
@@ -321,7 +325,9 @@ class TemplateFileCreator:
             func_name += case_name.replace(f"_{case_query.attribute_name}", "")
         else:
             func_name += case_name
-            attribute_types = TemplateFileCreator.get_core_attribute_types(case_query=case_query)
+            attribute_types = TemplateFileCreator.get_core_attribute_types(
+                case_query=case_query
+            )
             attribute_type_names = [t.__name__ for t in attribute_types]
             func_name += f"_of_type_{'_or_'.join(attribute_type_names)}"
         return str_to_snake_case(func_name)
@@ -359,7 +365,9 @@ class TemplateFileCreator:
         with open(file_path, "r") as f:
             source = f.read()
 
-        return TemplateFileCreator.load_from_source(source=source, func_name=func_name, print_func=print_func)
+        return TemplateFileCreator.load_from_source(
+            source=source, func_name=func_name, print_func=print_func
+        )
 
     @staticmethod
     def load_from_source(*, source: str, func_name: str, print_func: Callable = print):

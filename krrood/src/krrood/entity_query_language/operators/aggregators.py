@@ -94,7 +94,8 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterator[OperationResult]:
         yield from (
             OperationResult(
@@ -294,7 +295,9 @@ class EntityAggregator(Aggregator[T], ABC):
 
     def __post_init__(self):
         if not isinstance(self._child_, Selectable):
-            raise InvalidChildType(invalid_child_type=type(self._child_), correct_child_types=[Selectable])
+            raise InvalidChildType(
+                invalid_child_type=type(self._child_), correct_child_types=[Selectable]
+            )
         self._var_ = self
         super().__post_init__()
 
@@ -367,7 +370,9 @@ class Extreme(EntityAggregator[T], ABC):
     def _apply_aggregation_function_and_get_bindings_(
         self, *, child_result: OperationResult
     ) -> Iterator[Bindings]:
-        for extreme_val in self.get_aggregation_result_from_child_result(result=child_result):
+        for extreme_val in self.get_aggregation_result_from_child_result(
+            result=child_result
+        ):
             bindings = child_result.bindings.copy()
             bindings[self._id_] = extreme_val
             yield bindings

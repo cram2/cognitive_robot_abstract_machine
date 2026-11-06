@@ -545,7 +545,9 @@ class MutagenesisDoQuery:
         model.fit(training_molecules)
         registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
         np.random.seed(self.random_seed)
-        return registry.get_model(parameters=UnderspecifiedParameters(statement=self.question.build()))
+        return registry.get_model(
+            parameters=UnderspecifiedParameters(statement=self.question.build())
+        )
 
     def _adjustment_variables(
         self, causal_circuit: RelationalCausalCircuit

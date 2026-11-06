@@ -54,7 +54,11 @@ class DeterminerProcessor(RewritePass):
         >>> verbalize_expression(a(entity(variable(Robot, []))))
         'Find a Robot'
         """
-        return self._lower_noun_phrase(noun_phrase=leaf) if isinstance(leaf, NounPhrase) else leaf
+        return (
+            self._lower_noun_phrase(noun_phrase=leaf)
+            if isinstance(leaf, NounPhrase)
+            else leaf
+        )
 
     def _lower_noun_phrase(self, *, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """Lower *noun_phrase* to a determiner-bearing phrase: the chosen determiner, an optional
@@ -95,11 +99,19 @@ class DeterminerProcessor(RewritePass):
             if fragment is not None
         ]
         head_group = self._head_group(
-            noun_phrase=noun_phrase, head=noun_phrase.head, pre_head=pre_head, leading_fragment=leading_fragment
+            noun_phrase=noun_phrase,
+            head=noun_phrase.head,
+            pre_head=pre_head,
+            leading_fragment=leading_fragment,
         )
         if noun_phrase.additional_heads:
             additional_groups = [
-                self._head_group(noun_phrase=noun_phrase, head=additional, pre_head=[], leading_fragment=None)
+                self._head_group(
+                    noun_phrase=noun_phrase,
+                    head=additional,
+                    pre_head=[],
+                    leading_fragment=None,
+                )
                 for additional in noun_phrase.additional_heads
             ]
             head_group = oxford_comma(
@@ -107,14 +119,17 @@ class DeterminerProcessor(RewritePass):
             )
         if not noun_phrase.modifiers:
             return head_group
-        modifiers = [self.process(fragment=modifier) for modifier in noun_phrase.modifiers]
+        modifiers = [
+            self.process(fragment=modifier) for modifier in noun_phrase.modifiers
+        ]
         return PhraseFragment(
             parts=[head_group, *modifiers], separator=noun_phrase.modifier_separator
         )
 
     def _head_group(
         self,
-        *, noun_phrase: NounPhrase,
+        *,
+        noun_phrase: NounPhrase,
         head: VerbalizationFragment,
         pre_head: list[VerbalizationFragment],
         leading_fragment: VerbalizationFragment | None,
@@ -135,11 +150,15 @@ class DeterminerProcessor(RewritePass):
             (the ordinal or pre-head qualifier); ``None`` to anchor on *head* itself.
         :return: The determiner-and-head group fragment.
         """
-        processed_head = self._tag_number(head=self.process(fragment=head), number=noun_phrase.number)
+        processed_head = self._tag_number(
+            head=self.process(fragment=head), number=noun_phrase.number
+        )
         determiner = self._determiner(
             definiteness=noun_phrase.definiteness,
             number=noun_phrase.number,
-            article_anchor=leading_fragment if leading_fragment is not None else processed_head,
+            article_anchor=leading_fragment
+            if leading_fragment is not None
+            else processed_head,
             alternative=noun_phrase.alternative,
         )
         parts = [
@@ -165,7 +184,8 @@ class DeterminerProcessor(RewritePass):
 
     @staticmethod
     def _determiner(
-        *, definiteness: Definiteness,
+        *,
+        definiteness: Definiteness,
         number: GrammaticalNumber,
         article_anchor: VerbalizationFragment,
         alternative: bool = False,
@@ -210,5 +230,7 @@ class DeterminerProcessor(RewritePass):
         ):
             if alternative:
                 return Articles.ANOTHER.as_fragment()
-            return Articles.indefinite(following_word=flatten_fragment_to_plain_text(article_anchor))
+            return Articles.indefinite(
+                following_word=flatten_fragment_to_plain_text(article_anchor)
+            )
         return None  # BARE, or INDEFINITE + PLURAL → the determiner-drop

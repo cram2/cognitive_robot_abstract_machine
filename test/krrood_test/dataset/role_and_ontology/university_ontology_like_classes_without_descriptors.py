@@ -95,7 +95,6 @@ class CEOAsFirstRole(Role[TPersonInRoleAndOntology], Symbol):
 
 @dataclass(kw_only=True, eq=False)
 class CEOThatOverridesFactory(Role[TPersonInRoleAndOntology], Symbol):
-
     @classmethod
     def from_name(cls, *, name: str) -> Self:
         """

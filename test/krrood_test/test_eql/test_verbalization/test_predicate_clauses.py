@@ -90,9 +90,9 @@ def test_morphology_realizes_verb_present_tense():
 
 
 def test_morphology_realizes_verb_do_support_negation():
-    assert MorphologyProcessor().rewrite(leaf=_verb_leaf("work", negated=True)).text == (
-        "does not work"
-    )
+    assert MorphologyProcessor().rewrite(
+        leaf=_verb_leaf("work", negated=True)
+    ).text == ("does not work")
     assert (
         MorphologyProcessor()
         .rewrite(leaf=_verb_leaf("work", number=GrammaticalNumber.PLURAL, negated=True))
@@ -123,7 +123,12 @@ def test_verb_element_is_a_verb_role_leaf_carrying_the_lemma():
 
 
 def test_clause_joins_constituents_in_order():
-    built = clause(Noun(content="Employee"), Verb(lemma="work"), Prepositions.IN, Noun(content="Department"))
+    built = clause(
+        Noun(content="Employee"),
+        Verb(lemma="work"),
+        Prepositions.IN,
+        Noun(content="Department"),
+    )
     # Realization lowers the noun phrases (articles) and inflects the verb for agreement.
     assert (
         flatten_fragment_to_plain_text(realize_tree(built))
@@ -140,7 +145,9 @@ def _render(fragment):
 
 def test_coordinated_subject_takes_a_plural_copula():
     built = clause(
-        ConjunctivePhrase(items=[Noun(content="point"), Noun(content="point"), Noun(content="point")]),
+        ConjunctivePhrase(
+            items=[Noun(content="point"), Noun(content="point"), Noun(content="point")]
+        ),
         Copula(),
         Adjective(word="collinear"),
     )
@@ -148,7 +155,10 @@ def test_coordinated_subject_takes_a_plural_copula():
 
 
 def test_coordinated_subject_takes_a_plural_verb():
-    built = clause(ConjunctivePhrase(items=[Noun(content="robot"), Noun(content="robot")]), Verb(lemma="work"))
+    built = clause(
+        ConjunctivePhrase(items=[Noun(content="robot"), Noun(content="robot")]),
+        Verb(lemma="work"),
+    )
     assert _render(built) == "a robot and a robot work"
 
 
@@ -174,7 +184,12 @@ def test_holds_given_branch_keeps_its_singular_subject():
 
 
 def test_negate_clause_marks_the_verb_head():
-    built = clause(Noun(content="Employee"), Verb(lemma="work"), Prepositions.IN, Noun(content="Department"))
+    built = clause(
+        Noun(content="Employee"),
+        Verb(lemma="work"),
+        Prepositions.IN,
+        Noun(content="Department"),
+    )
     negated = negate_clause(built)
     assert negated.parts[1].negated is True
 
@@ -192,9 +207,9 @@ def test_copula_predicate_affirmative_and_negated():
     assert verbalize_expression(IsReachable(location=location, body=robot)) == (
         "a Location is reachable for a Robot"
     )
-    assert verbalize_expression(Not(_child_=IsReachable(location=location, body=robot))) == (
-        "a Location is not reachable for a Robot"
-    )
+    assert verbalize_expression(
+        Not(_child_=IsReachable(location=location, body=robot))
+    ) == ("a Location is not reachable for a Robot")
 
 
 def test_verb_predicate_affirmative_and_negated_with_do_support():
@@ -202,9 +217,9 @@ def test_verb_predicate_affirmative_and_negated_with_do_support():
     assert verbalize_expression(WorksIn(employee=employee, department=department)) == (
         "a StaffMember works in a Department"
     )
-    assert verbalize_expression(Not(_child_=WorksIn(employee=employee, department=department))) == (
-        "a StaffMember does not work in a Department"
-    )
+    assert verbalize_expression(
+        Not(_child_=WorksIn(employee=employee, department=department))
+    ) == ("a StaffMember does not work in a Department")
 
 
 # %% subject-aware clause: pronominalisation and agreement
@@ -217,7 +232,11 @@ def test_clause_subject_pronominalises_in_singular_scope():
     """
     location = variable(Location, [])
     assert verbalize_expression(
-        an(entity(location).where(IsReachable(location=location, body=variable(Robot, []))))
+        an(
+            entity(location).where(
+                IsReachable(location=location, body=variable(Robot, []))
+            )
+        )
     ) == ("Find a Location such that it is reachable for a Robot")
 
 
@@ -236,9 +255,9 @@ def test_clause_verb_agrees_with_plural_population():
     A lexical verb (not a copula) likewise agrees with the plural population — *"work"*.
     """
     employee, department = variable(StaffMember, []), variable(Department, [])
-    assert verbalize_expression(for_all(employee, WorksIn(employee=employee, department=department))) == (
-        "for all StaffMembers, they work in a Department"
-    )
+    assert verbalize_expression(
+        for_all(employee, WorksIn(employee=employee, department=department))
+    ) == ("for all StaffMembers, they work in a Department")
 
 
 def test_clause_subject_keeps_noun_phrase_outside_a_subject_scope():

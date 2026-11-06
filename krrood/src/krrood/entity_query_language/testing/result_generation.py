@@ -74,7 +74,9 @@ class VerbalizationResultGenerator:
             from the snapshot's own rendering.
         """
         return tuple(
-            VerbalizationResult(callable_class=cls, sentence=self.snapshot.rendered_result(cls=cls))
+            VerbalizationResult(
+                callable_class=cls, sentence=self.snapshot.rendered_result(cls=cls)
+            )
             for cls in self.covered_callables()
         )
 
@@ -97,7 +99,9 @@ class VerbalizationResultGenerator:
         )
         entries = [self._entry(result=result) for result in results]
         return self.code_generator.render(
-            template_name="verbalization_results.py.jinja", imports=imports, entries=entries
+            template_name="verbalization_results.py.jinja",
+            imports=imports,
+            entries=entries,
         )
 
     def write(self, *, path: str | Path) -> None:

@@ -183,7 +183,9 @@ class LeadingRankForm(RankingForm):
         quality = _quality(request.plan.direction, n).as_fragment()
         pre_head = quality if n == 1 else PhraseFragment(parts=[quality, _cardinal(n)])
         return RankingSurface(
-            pre_head=pre_head, number=GrammaticalNumber.of(is_plural=n > 1), modifiers=[]
+            pre_head=pre_head,
+            number=GrammaticalNumber.of(is_plural=n > 1),
+            modifiers=[],
         )
 
 

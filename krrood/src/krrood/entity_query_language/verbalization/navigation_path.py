@@ -161,7 +161,9 @@ def build_path_parts(
             parts.append(
                 PathStep(
                     name=name,
-                    source_reference=SourceReference.for_attribute(owner=owner, attribute_name=name),
+                    source_reference=SourceReference.for_attribute(
+                        owner=owner, attribute_name=name
+                    ),
                     relation=relation,
                     is_scalar_value=_is_scalar_value(node._type_),
                 )

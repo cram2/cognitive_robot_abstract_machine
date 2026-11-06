@@ -266,7 +266,9 @@ class IsNamedAfter(Predicate):
         return kind is not None and kind.value is self.annotation_type
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after <annotation type>"*.
@@ -293,7 +295,9 @@ class NamesARecognisedKind(Predicate):
         return asserted_kind(_name_words(self.body), NamedKind) is not None
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> names a recognised kind"*.
@@ -321,7 +325,9 @@ class IsNamedAfterFurniture(Predicate):
         return kind is not None and kind.is_furniture
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after furniture"*.
@@ -351,7 +357,9 @@ class NamedContainerKind(SymbolicFunction):
         return None
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the named container kind of <body>"*.
@@ -395,7 +403,9 @@ class IsPartOfARobot(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is part of a robot"*.
@@ -424,7 +434,9 @@ class HasCollisionGeometry(Predicate):
         return self.body.has_collision()
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has collision geometry"*.
@@ -469,7 +481,9 @@ class HasAnotherAnnotation(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has an annotation besides <annotation type>"*, which
@@ -571,13 +585,19 @@ class HoldsOpenableParts(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, *, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> holds openable parts"*, which names the annotations
             it looked them up in no more than the rule does.
         """
-        return clause(Noun(content=fields["body"]), Verb(lemma="hold"), Noun.bare(head="openable parts"))
+        return clause(
+            Noun(content=fields["body"]),
+            Verb(lemma="hold"),
+            Noun.bare(head="openable parts"),
+        )
 
 
 # %% graspable parts
@@ -604,7 +624,13 @@ def handles(world: World) -> list[Handle]:
             HasCollisionGeometry(body=grip),
             not_(IsPartOfARobot(body=grip)),
             not_(IsNamedAfterFurniture(body=grip)),
-            not_(HasAnotherAnnotation(body=grip, annotation_type=Handle, annotations=world.semantic_annotations)),
+            not_(
+                HasAnotherAnnotation(
+                    body=grip,
+                    annotation_type=Handle,
+                    annotations=world.semantic_annotations,
+                )
+            ),
         )
         .tolist()
     )

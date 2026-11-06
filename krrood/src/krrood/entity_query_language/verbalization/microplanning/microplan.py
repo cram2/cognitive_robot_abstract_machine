@@ -33,7 +33,8 @@ class Microplan:
 
     def plan_for(
         self,
-        *, node: TSymbolicExpression,
+        *,
+        node: TSymbolicExpression,
         planner: type[Planner[TSymbolicExpression, TPlan]],
     ) -> TPlan:
         """

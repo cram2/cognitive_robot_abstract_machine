@@ -94,7 +94,9 @@ def test_value_survives_a_database_round_trip(original, session, database):
 
 
 def test_timezone_keeps_its_name(session, database):
-    original = StoredTimezone(value=datetime.timezone(datetime.timedelta(hours=-3), "BRT"))
+    original = StoredTimezone(
+        value=datetime.timezone(datetime.timedelta(hours=-3), "BRT")
+    )
 
     reconstructed = store_and_load(original, session)
 
@@ -121,7 +123,9 @@ def test_timezone_aware_datetime_is_stored_as_the_same_instant_in_utc(
     SQLite keeps no timezone, so the instant comes back as naive UTC.
     """
     offset = datetime.timezone(datetime.timedelta(hours=2))
-    original = StoredDateTime(value=datetime.datetime(2026, 9, 29, 12, 0, tzinfo=offset))
+    original = StoredDateTime(
+        value=datetime.datetime(2026, 9, 29, 12, 0, tzinfo=offset)
+    )
 
     reconstructed = store_and_load(original, session)
 

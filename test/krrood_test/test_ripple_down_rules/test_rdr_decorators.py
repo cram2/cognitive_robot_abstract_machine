@@ -3,11 +3,12 @@ from .datasets import PhysicalObject, Part, Robot
 
 
 class RDRDecoratorsTestCase(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         cls.robot = Robot(name="Robot1", parts=[Part(name="Part1"), Part(name="Part2")])
-        cls.physical_object = PhysicalObject(name="Object1", _contained_objects=[cls.robot])
+        cls.physical_object = PhysicalObject(
+            name="Object1", _contained_objects=[cls.robot]
+        )
         cls.part_3 = Part(name="Part3")
 
     def test_is_a_robot(self):

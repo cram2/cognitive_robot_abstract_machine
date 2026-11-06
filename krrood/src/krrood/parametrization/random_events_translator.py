@@ -120,7 +120,9 @@ class WhereExpressionToRandomEventTranslator:
             ) | self._translate_expression(expression=expression.right)
 
         if isinstance(expression, Not):
-            return self._translate_expression(expression=expression._child_).complement()
+            return self._translate_expression(
+                expression=expression._child_
+            ).complement()
 
         if isinstance(expression, CausesEffect):
             return self._translate_expression(expression=expression._child_)
@@ -136,7 +138,9 @@ class WhereExpressionToRandomEventTranslator:
             not isinstance(expression, BinaryExpression)
             or not expression._is_literal_comparator_()
         ):
-            raise WhereExpressionHasNoRandomEventRepresentation(where_expression=expression)
+            raise WhereExpressionHasNoRandomEventRepresentation(
+                where_expression=expression
+            )
 
         return self._translate_comparator(comparator=expression)
 
@@ -160,17 +164,41 @@ class WhereExpressionToRandomEventTranslator:
 
         match comparator.operation:
             case operator.eq:
-                self._translate_equal(comparator=comparator, parametrization_variable=variable, result=result)
+                self._translate_equal(
+                    comparator=comparator,
+                    parametrization_variable=variable,
+                    result=result,
+                )
             case operator.ne:
-                self._translate_not_equal(comparator=comparator, parametrization_variable=variable, result=result)
+                self._translate_not_equal(
+                    comparator=comparator,
+                    parametrization_variable=variable,
+                    result=result,
+                )
             case operator.gt:
-                self._translate_greater_than(comparator=comparator, parametrization_variable=variable, result=result)
+                self._translate_greater_than(
+                    comparator=comparator,
+                    parametrization_variable=variable,
+                    result=result,
+                )
             case operator.lt:
-                self._translate_less_than(comparator=comparator, parametrization_variable=variable, result=result)
+                self._translate_less_than(
+                    comparator=comparator,
+                    parametrization_variable=variable,
+                    result=result,
+                )
             case operator.ge:
-                self._translate_greater_than_or_equal(comparator=comparator, parametrization_variable=variable, result=result)
+                self._translate_greater_than_or_equal(
+                    comparator=comparator,
+                    parametrization_variable=variable,
+                    result=result,
+                )
             case operator.le:
-                self._translate_less_than_or_equal(comparator=comparator, parametrization_variable=variable, result=result)
+                self._translate_less_than_or_equal(
+                    comparator=comparator,
+                    parametrization_variable=variable,
+                    result=result,
+                )
             case _:
                 assert_never(comparator.operation)
 
@@ -199,7 +227,8 @@ class WhereExpressionToRandomEventTranslator:
 
     def _translate_equal(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         parametrization_variable: random_events.variable.Variable,
         result: SimpleEvent,
     ) -> None:
@@ -209,7 +238,8 @@ class WhereExpressionToRandomEventTranslator:
 
     def _translate_not_equal(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         parametrization_variable: random_events.variable.Variable,
         result: SimpleEvent,
     ) -> None:
@@ -219,7 +249,8 @@ class WhereExpressionToRandomEventTranslator:
 
     def _translate_greater_than(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         parametrization_variable: random_events.variable.Variable,
         result: SimpleEvent,
     ) -> None:
@@ -227,7 +258,8 @@ class WhereExpressionToRandomEventTranslator:
 
     def _translate_less_than(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         parametrization_variable: random_events.variable.Variable,
         result: SimpleEvent,
     ) -> None:
@@ -238,7 +270,8 @@ class WhereExpressionToRandomEventTranslator:
 
     def _translate_less_than_or_equal(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         parametrization_variable: random_events.variable.Variable,
         result: SimpleEvent,
     ) -> None:
@@ -249,7 +282,8 @@ class WhereExpressionToRandomEventTranslator:
 
     def _translate_greater_than_or_equal(
         self,
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
         parametrization_variable: random_events.variable.Variable,
         result: SimpleEvent,
     ) -> None:

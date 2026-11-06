@@ -73,7 +73,9 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
         self.context.scope.push_constraint_frame()
-        binding_fragments, overrides = self._bindings(plan=plan, instantiated_type=node._factory_)
+        binding_fragments, overrides = self._bindings(
+            plan=plan, instantiated_type=node._factory_
+        )
         self.context.scope.binding_overrides.update(overrides)
         deferred = self.context.scope.pop_constraint_frame()
         constraint_fragments = [
@@ -81,7 +83,10 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         ]
 
         return self._phrase(
-            node=node, type_name=plan.type_name, binding_fragments=binding_fragments, constraint_fragments=constraint_fragments
+            node=node,
+            type_name=plan.type_name,
+            binding_fragments=binding_fragments,
+            constraint_fragments=constraint_fragments,
         )
 
     # %% bindings
@@ -104,11 +109,17 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         overrides: dict[uuid.UUID, VerbalizationFragment] = {}
         for binding in plan.bindings:
             field_reference = self._field_reference(
-                field_name=binding.field_name, type_name=plan.type_name, instantiated_type=instantiated_type
+                field_name=binding.field_name,
+                type_name=plan.type_name,
+                instantiated_type=instantiated_type,
             )
             binding_fragments.append(
                 PhraseFragment(
-                    parts=[field_reference, self._copula(binding=binding), self._value(binding=binding)]
+                    parts=[
+                        field_reference,
+                        self._copula(binding=binding),
+                        self._value(binding=binding),
+                    ]
                 )
             )
             overrides[binding.value._id_] = field_reference
@@ -134,7 +145,9 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
                 RoleFragment.for_type(type_=instantiated_type, text=type_name),
             ]
         )
-        return possessive_path([PathStep(name=field_name, source_reference=None)], type_root)
+        return possessive_path(
+            [PathStep(name=field_name, source_reference=None)], type_root
+        )
 
     def _copula(self, *, binding: BindingPlan) -> VerbalizationFragment:
         """:return: *"is"* / *"are"* agreeing with the binding's plurality (the plural ``drawers``
@@ -143,7 +156,9 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         >>> verbalize_expression(inference(Cabinet)(container=variable(Container, []), drawers=variable(Drawer, [])))
         'a Cabinet, where the container of the Cabinet is a Container, and the drawers of the Cabinet are Drawers'
         """
-        return Copulas.for_number(number=GrammaticalNumber.of(is_plural=binding.is_plural))
+        return Copulas.for_number(
+            number=GrammaticalNumber.of(is_plural=binding.is_plural)
+        )
 
     def _value(self, *, binding: BindingPlan) -> VerbalizationFragment:
         """:return: The binding's value expression, rendered in the binding's number (*"the parent of
@@ -165,7 +180,8 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
 
     def _phrase(
         self,
-        *, node: InstantiatedVariable,
+        *,
+        node: InstantiatedVariable,
         type_name: str,
         binding_fragments: list[VerbalizationFragment],
         constraint_fragments: list[VerbalizationFragment],

@@ -63,9 +63,9 @@ def test_generate_drawers_from_direct_condition(handles_and_containers_world):
     solutions_gen = condition.evaluate()
     all_solutions = list(solutions_gen)
 
-    assert (
-        len(all_solutions) == 2
-    ), "Should generate components for two possible drawer."
+    assert len(all_solutions) == 2, (
+        "Should generate components for two possible drawer."
+    )
     assert all(isinstance(d[drawers], Drawer) for d in all_solutions)
     assert all_solutions[0][drawers].handle.name == "Handle3"
     assert all_solutions[0][drawers].container.name == "Container3"
@@ -288,9 +288,9 @@ def test_generate_drawers_from_query(handles_and_containers_world):
     solutions = query.evaluate()
     all_solutions = list(solutions)
 
-    assert (
-        len(all_solutions) == 2
-    ), "Should generate components for two possible drawer."
+    assert len(all_solutions) == 2, (
+        "Should generate components for two possible drawer."
+    )
     assert all(isinstance(d, Drawer) for d in all_solutions)
     assert all_solutions[0].handle.name == "Handle3"
     assert all_solutions[0].container.name == "Container3"
@@ -312,7 +312,10 @@ def test_rule_tree_with_a_refinement(doors_and_drawers_world):
     )
 
     with query:
-        Add(left=drawers_and_doors, right=inference(Drawer)(handle=handle, container=body))
+        Add(
+            left=drawers_and_doors,
+            right=inference(Drawer)(handle=handle, container=body),
+        )
         with refinement(body.size > 1):
             Add(left=drawers_and_doors, right=inference(Door)(handle=handle, body=body))
 
@@ -354,7 +357,9 @@ def test_rule_tree_with_multiple_refinements(doors_and_drawers_world):
             ):
                 Add(
                     left=views,
-                    right=inference(Wardrobe)(handle=handle, body=body, container=container),
+                    right=inference(Wardrobe)(
+                        handle=handle, body=body, container=container
+                    ),
                 )
 
     all_solutions = list(query.evaluate())
@@ -443,7 +448,9 @@ def test_rule_tree_with_multiple_alternatives(doors_and_drawers_world):
         ):
             Add(
                 left=views,
-                right=inference(Wardrobe)(handle=handle, body=body, container=container),
+                right=inference(Wardrobe)(
+                    handle=handle, body=body, container=container
+                ),
             )
 
     all_solutions = list(query.evaluate())
@@ -552,7 +559,9 @@ def test_rule_tree_with_multiple_alternatives_better_rule_tree(doors_and_drawers
             ):
                 Add(
                     left=views,
-                    right=inference(Wardrobe)(handle=handle, body=body, container=container),
+                    right=inference(Wardrobe)(
+                        handle=handle, body=body, container=container
+                    ),
                 )
         with alternative(
             revolute_connection.parent == body, revolute_connection.child == handle
@@ -684,7 +693,15 @@ def rule_tree_doc_example_connections():
                 ExampleView(connection=ExampleConnection(type_code=3, name="c3")),
             },
         ),
-        (4, og_set | {ExampleRevoluteView(connection=ExampleConnection(type_code=4, name="m4"))}),
+        (
+            4,
+            og_set
+            | {
+                ExampleRevoluteView(
+                    connection=ExampleConnection(type_code=4, name="m4")
+                )
+            },
+        ),
     ],
 )
 def test_doc_example(rule_tree_doc_example_connections, alternative_code, result_set):
@@ -730,7 +747,9 @@ def test_conclusions_of_type_returns_matching_conclusions(handles_and_containers
     )
 
     with condition:
-        added = Add(left=drawers, right=inference(Drawer)(handle=handle, container=container))
+        added = Add(
+            left=drawers, right=inference(Drawer)(handle=handle, container=container)
+        )
 
     assert condition.conclusions_of_type(conclusion_type=Add) == [added]
 
@@ -797,10 +816,14 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
     failed.
     """
     correct_drawer = Drawer(
-        handle=Handle(name="Handle1"), container=Container(name="Container1"), correct=True
+        handle=Handle(name="Handle1"),
+        container=Container(name="Container1"),
+        correct=True,
     )
     incorrect_drawer = Drawer(
-        handle=Handle(name="Handle2"), container=Container(name="Container2"), correct=False
+        handle=Handle(name="Handle2"),
+        container=Container(name="Container2"),
+        correct=False,
     )
     drawer = variable(Drawer, domain=[correct_drawer, incorrect_drawer])
     views = deduced_variable(View)
@@ -812,9 +835,9 @@ def test_rule_tree_anchors_when_where_condition_is_reused_in_a_sibling():
             add(views, inference(Door)(handle=drawer.handle, body=drawer.container))
 
     all_solutions = list(query.evaluate())
-    assert (
-        len(all_solutions) == 2
-    ), "The base branch and its reused-condition alternative must both fire."
+    assert len(all_solutions) == 2, (
+        "The base branch and its reused-condition alternative must both fire."
+    )
     assert {(door.handle.name, door.body.name) for door in all_solutions} == {
         ("Handle1", "Container1"),
         ("Handle2", "Container2"),
@@ -858,10 +881,14 @@ def test_nested_refinement_fires_when_its_anchor_was_attached_in_an_earlier_bran
     detaches it from the rule tree, so its conclusion never replaces the one it refines.
     """
     correct_drawer = Drawer(
-        handle=Handle(name="Handle1"), container=Container(name="Container1"), correct=True
+        handle=Handle(name="Handle1"),
+        container=Container(name="Container1"),
+        correct=True,
     )
     incorrect_drawer = Drawer(
-        handle=Handle(name="Handle2"), container=Container(name="Container2"), correct=False
+        handle=Handle(name="Handle2"),
+        container=Container(name="Container2"),
+        correct=False,
     )
     drawer = variable(Drawer, domain=[correct_drawer, incorrect_drawer])
     views = deduced_variable(View)
@@ -921,7 +948,9 @@ def test_conclusions_fire_without_an_active_evaluation_context(
         if not result.is_false
     )
 
-    processed_result = condition._evaluate_conclusions_and_update_bindings_(current_result=raw_result)
+    processed_result = condition._evaluate_conclusions_and_update_bindings_(
+        current_result=raw_result
+    )
 
     assert drawers._id_ in processed_result.bindings
     assert isinstance(processed_result.bindings[drawers._id_], Drawer)

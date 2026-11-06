@@ -114,7 +114,8 @@ class RWXNode:
 
     def visualize(
         self,
-        *, figsize=(35, 30),
+        *,
+        figsize=(35, 30),
         node_size=7000,
         font_size=25,
         spacing_x: float = 4,

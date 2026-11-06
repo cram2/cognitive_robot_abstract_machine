@@ -35,12 +35,28 @@ class Person(Symbol):
 
 
 def test_stack_frame_is_method_true():
-    frame = StackFrame(filename="f.py", lineno=1, function_name="m", code_snippet=None, class_object=Person, function_object=None, module_name=None)
+    frame = StackFrame(
+        filename="f.py",
+        lineno=1,
+        function_name="m",
+        code_snippet=None,
+        class_object=Person,
+        function_object=None,
+        module_name=None,
+    )
     assert frame.is_method is True
 
 
 def test_stack_frame_is_method_false():
-    frame = StackFrame(filename="f.py", lineno=1, function_name="f", code_snippet=None, class_object=None, function_object=None, module_name=None)
+    frame = StackFrame(
+        filename="f.py",
+        lineno=1,
+        function_name="f",
+        code_snippet=None,
+        class_object=None,
+        function_object=None,
+        module_name=None,
+    )
     assert frame.is_method is False
 
 

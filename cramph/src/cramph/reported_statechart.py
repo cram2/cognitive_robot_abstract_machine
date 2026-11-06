@@ -52,10 +52,12 @@ class ReportedStatechart:
             )
         self.statechart.compiler.add_transitions()
         self.statechart.life_cycle_state.data = LifeCycleState.from_json(
-            data=payload[StatechartPayloadKey.LIFE_CYCLE_STATE], statechart=self.statechart
+            data=payload[StatechartPayloadKey.LIFE_CYCLE_STATE],
+            statechart=self.statechart,
         ).data
         self.statechart.observation_state.data = ObservationState.from_json(
-            data=payload[StatechartPayloadKey.OBSERVATION_STATE], statechart=self.statechart
+            data=payload[StatechartPayloadKey.OBSERVATION_STATE],
+            statechart=self.statechart,
         ).data
         self.statechart.last_observation_state.data = LastObservationState.from_json(
             data=payload[StatechartPayloadKey.LAST_OBSERVATION_STATE],

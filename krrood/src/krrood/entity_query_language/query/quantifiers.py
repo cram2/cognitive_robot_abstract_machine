@@ -31,7 +31,8 @@ class ResultQuantificationConstraint(ABC):
     @abstractmethod
     def assert_satisfaction(
         self,
-        *, number_of_solutions: int,
+        *,
+        number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
@@ -40,7 +41,8 @@ class ResultQuantificationConstraint(ABC):
         QuantificationNotSatisfiedError exception.
 
         :param number_of_solutions: The current number of solutions.
-        :param quantified_expression: The query expression being quantified. This will be mentioned in errors.
+        :param quantified_expression: The query expression being quantified. This will
+            be mentioned in errors.
         :param done: Whether all results have been found.
         :raises: QuantificationNotSatisfiedError: If the constraint is not satisfied.
         """
@@ -77,7 +79,8 @@ class Exactly(SingleValueQuantificationConstraint):
 
     def assert_satisfaction(
         self,
-        *, number_of_solutions: int,
+        *,
+        number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
@@ -87,16 +90,21 @@ class Exactly(SingleValueQuantificationConstraint):
             )
         elif done and number_of_solutions < self.value:
             raise LessThanExpectedNumberOfSolutions(
-                expression=quantified_expression, expected_number=self.value, found_number=number_of_solutions
+                expression=quantified_expression,
+                expected_number=self.value,
+                found_number=number_of_solutions,
             )
 
 
 @dataclass(kw_only=True)
 class ExactlyOne(Exactly):
     """
-    A definite single-result constraint. Unlike :class:`Exactly`, it raises the definite-result
-    errors (:class:`NoSolutionFound` / :class:`MultipleSolutionFound`) directly, so a definite query
-    (``the``) enforces exactly one result without translating generic quantification errors.
+    A definite single-result constraint.
+
+    Unlike :class:`Exactly`, it raises the definite-result errors
+    (:class:`NoSolutionFound` / :class:`MultipleSolutionFound`) directly, so a definite
+    query (``the``) enforces exactly one result without translating generic
+    quantification errors.
     """
 
     value: int = 1
@@ -106,7 +114,8 @@ class ExactlyOne(Exactly):
 
     def assert_satisfaction(
         self,
-        *, number_of_solutions: int,
+        *,
+        number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
@@ -127,13 +136,16 @@ class AtLeast(SingleValueQuantificationConstraint):
 
     def assert_satisfaction(
         self,
-        *, number_of_solutions: int,
+        *,
+        number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         if done and number_of_solutions < self.value:
             raise LessThanExpectedNumberOfSolutions(
-                expression=quantified_expression, expected_number=self.value, found_number=number_of_solutions
+                expression=quantified_expression,
+                expected_number=self.value,
+                found_number=number_of_solutions,
             )
 
 
@@ -148,7 +160,8 @@ class AtMost(SingleValueQuantificationConstraint):
 
     def assert_satisfaction(
         self,
-        *, number_of_solutions: int,
+        *,
+        number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
@@ -168,6 +181,7 @@ class Range(ResultQuantificationConstraint):
     """
     The minimum value of the range.
     """
+
     at_most: AtMost
     """
     The maximum value of the range.
@@ -178,19 +192,26 @@ class Range(ResultQuantificationConstraint):
         Validate quantification constraints are consistent.
         """
         if self.at_most.value < self.at_least.value:
-            raise InvalidQuantificationRangeError(at_least=self.at_least, at_most=self.at_most)
+            raise InvalidQuantificationRangeError(
+                at_least=self.at_least, at_most=self.at_most
+            )
 
     def assert_satisfaction(
         self,
-        *, number_of_solutions: int,
+        *,
+        number_of_solutions: int,
         quantified_expression: SymbolicExpression,
         done: bool,
     ) -> None:
         self.at_least.assert_satisfaction(
-            number_of_solutions=number_of_solutions, quantified_expression=quantified_expression, done=done
+            number_of_solutions=number_of_solutions,
+            quantified_expression=quantified_expression,
+            done=done,
         )
         self.at_most.assert_satisfaction(
-            number_of_solutions=number_of_solutions, quantified_expression=quantified_expression, done=done
+            number_of_solutions=number_of_solutions,
+            quantified_expression=quantified_expression,
+            done=done,
         )
 
     def __repr__(self):
@@ -200,10 +221,11 @@ class Range(ResultQuantificationConstraint):
 @dataclass(kw_only=True)
 class ResultQuantifier(ABC):
     """
-    Marker for the kind of result quantification a query requests (e.g. :class:`An`, :class:`The`).
+    Marker for the kind of result quantification a query requests (e.g. :class:`An`,
+    :class:`The`).
 
-    A query stores the requested kind, and its quantification pipeline stage enforces that kind's
-    default result-count constraint.
+    A query stores the requested kind, and its quantification pipeline stage enforces
+    that kind's default result-count constraint.
     """
 
     @classmethod
@@ -217,12 +239,16 @@ class ResultQuantifier(ABC):
 
 @dataclass(kw_only=True)
 class An(ResultQuantifier):
-    """Quantifier that accepts all matching results."""
+    """
+    Quantifier that accepts all matching results.
+    """
 
 
 @dataclass(kw_only=True)
 class The(ResultQuantifier):
-    """Quantifier that requires exactly one result."""
+    """
+    Quantifier that requires exactly one result.
+    """
 
     @classmethod
     def _default_constraint_(cls) -> ResultQuantificationConstraint:

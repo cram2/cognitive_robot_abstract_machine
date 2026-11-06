@@ -117,7 +117,9 @@ def test_unlimited_ordered_set_of_reports_pronominalised():
     An unranked ordered set-of reports the plural population, pronominalised to "their".
     """
     e = variable(Employee, [])
-    text = verbalize_expression(a(set_of(e).ordered_by(variable=e.salary, descending=True)))
+    text = verbalize_expression(
+        a(set_of(e).ordered_by(variable=e.salary, descending=True))
+    )
     assert text == "Report Employees ordered by their salaries from highest to lowest"
 
 
@@ -157,7 +159,10 @@ def test_set_of_limit_ascending_is_bottom():
     pnl = variable(ProfitAndLossStatement, domain=None)
     revenue = eql.sum(pnl.revenue.money.amount)
     q = a(
-        set_of(pnl.period, revenue).grouped_by(pnl.period).ordered_by(variable=revenue).limit(n=2)
+        set_of(pnl.period, revenue)
+        .grouped_by(pnl.period)
+        .ordered_by(variable=revenue)
+        .limit(n=2)
     )
     text = verbalize_expression(q)
     assert text.startswith("For the two ProfitAndLossStatements with the lowest sum")

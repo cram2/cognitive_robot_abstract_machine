@@ -675,7 +675,9 @@ class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
             raise AmbiguousPart(self, part, [match.field for match in matches])
 
         [match] = matches
-        part._mount_strategy(self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=match))
+        part._mount_strategy(
+            self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=match)
+        )
         if match.is_many_to_many_relationship:
             getattr(self, match.field.name).append(part)
         else:

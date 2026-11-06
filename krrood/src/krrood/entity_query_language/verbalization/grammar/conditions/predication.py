@@ -367,7 +367,8 @@ class RelationalIdentityTransform(GenericComparator):
 
     @staticmethod
     def _relational_identity(
-        *, comparator: Comparator,
+        *,
+        comparator: Comparator,
     ) -> tuple | None:
         """:return: ``(relational_hop, subject_variable)`` when one operand is a relational attribute
         chain and the other a (non-literal) variable, in either order; else ``None``."""
@@ -576,7 +577,10 @@ def render_absence(
     left = comparator.left
     if not isinstance(left, Attribute):
         return PhraseFragment(
-            parts=[context.child(node=left), NonExistence.for_number(number=number).as_fragment()]
+            parts=[
+                context.child(node=left),
+                NonExistence.for_number(number=number).as_fragment(),
+            ]
         )
     verb_phrase = relational_verb_phrase(left._attribute_name_)
     if verb_phrase is not None:
@@ -585,7 +589,9 @@ def render_absence(
                 context.child(node=left._child_),
                 PassiveAbsence.for_number(number=number).as_fragment(),
                 RoleFragment.for_attribute(
-                    owner=left._owner_class_, attribute_name=left._attribute_name_, text=verb_phrase
+                    owner=left._owner_class_,
+                    attribute_name=left._attribute_name_,
+                    text=verb_phrase,
                 ),
                 *_relation_target(left),
             ]
@@ -594,7 +600,9 @@ def render_absence(
         parts=[
             context.child(node=left._child_),
             Absence.for_number(number=number).as_fragment(),
-            RoleFragment.for_attribute(owner=left._owner_class_, attribute_name=left._attribute_name_),
+            RoleFragment.for_attribute(
+                owner=left._owner_class_, attribute_name=left._attribute_name_
+            ),
         ]
     )
 
@@ -613,7 +621,10 @@ def _relation_target(attribute: Attribute) -> list[VerbalizationFragment]:
     """
     related_type = attribute._type_
     if isinstance(related_type, type) and related_type.__module__ != "builtins":
-        return [Quantifiers.ANY.as_fragment(), RoleFragment.for_type(type_=related_type)]
+        return [
+            Quantifiers.ANY.as_fragment(),
+            RoleFragment.for_type(type_=related_type),
+        ]
     return [Quantifiers.ANYTHING.as_fragment()]
 
 

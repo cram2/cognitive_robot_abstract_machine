@@ -33,7 +33,9 @@ class SourceReference:
         return cls(owner_type=type_) if isinstance(type_, type) else None
 
     @classmethod
-    def for_attribute(cls, *, owner: Any, attribute_name: str) -> SourceReference | None:
+    def for_attribute(
+        cls, *, owner: Any, attribute_name: str
+    ) -> SourceReference | None:
         """
         :param owner: Candidate owner class (any value; non-types return ``None``).
         :param attribute_name: Canonical attribute name on *owner*.

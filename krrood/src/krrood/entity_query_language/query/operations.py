@@ -60,7 +60,9 @@ class Where(Filter, UnaryExpression):
     def _evaluate__(self, *, sources: OperationResult) -> Iterator[OperationResult]:
         yield from (
             result
-            for result in self._evaluate_child_as_condition_(child=self._child_, sources=sources)
+            for result in self._evaluate_child_as_condition_(
+                child=self._child_, sources=sources
+            )
             if result.is_true
         )
 
@@ -92,7 +94,8 @@ class Having(Filter, BinaryExpression):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
             self._build_operation_result_with_truth_(
@@ -173,7 +176,6 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
         group_key_count = defaultdict(lambda: 0)
 
         for res in self._evaluate_product_(sources=sources):
-
             group_key = tuple(
                 ensure_hashable(res[var._id_]) for var in self.variables_to_group_by
             )
@@ -181,7 +183,9 @@ class GroupedBy(MultiArityExpressionThatPerformsACartesianProduct):
             res[self._id_] = res.bindings
             group_key_count[group_key] += 1
 
-            self.update_group_from_bindings(group=groups[group_key], results=res.bindings)
+            self.update_group_from_bindings(
+                group=groups[group_key], results=res.bindings
+            )
 
         if len(groups) == 0:
             # if there are no groups, add one empty group with an empty list for each aggregated

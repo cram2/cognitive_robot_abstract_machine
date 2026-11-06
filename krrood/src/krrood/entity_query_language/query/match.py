@@ -131,7 +131,9 @@ class AbstractMatchExpression(MatchAssignedValue, Generic[T], ABC):
         """
         ...
 
-    def _as_assigned_variable_(self, *, attribute_type: type | None) -> Variable[T] | None:
+    def _as_assigned_variable_(
+        self, *, attribute_type: type | None
+    ) -> Variable[T] | None:
         """
         :param attribute_type: The type of the attribute this match is assigned to.
         :return: The variable this match creates, which the attribute's value is bound to.
@@ -386,7 +388,8 @@ class Match(
 
     def _resolve(
         self,
-        *, variable: Selectable | None = None,
+        *,
+        variable: Selectable | None = None,
         parent: Match | None = None,
     ):
         """
@@ -403,7 +406,9 @@ class Match(
                 isinstance(element, AbstractMatchExpression)
                 for element in attr_assigned_value
             ):
-                self._resolve_list_like_value(key=attr_name, value=attr_assigned_value, parent=parent)
+                self._resolve_list_like_value(
+                    key=attr_name, value=attr_assigned_value, parent=parent
+                )
                 continue
             self._create_attribute_match_and_resolve(
                 parent=parent,
@@ -413,7 +418,8 @@ class Match(
 
     def _create_attribute_match_and_resolve(
         self,
-        *, parent: Match,
+        *,
+        parent: Match,
         attribute_name: str,
         assigned_value: Any,
         index_access: Any | None = None,
@@ -458,7 +464,8 @@ class Match(
 
     def _update_fields_(
         self,
-        *, variable: Selectable | None = None,
+        *,
+        variable: Selectable | None = None,
         parent: AbstractMatchExpression | None = None,
     ):
         """
@@ -491,7 +498,9 @@ class Match(
             self._variable_ = variable(self._type_, domain=self._domain_)
             return
 
-        self._variable_._update_domain_(domain=_resolve_domain(self._type_, self._domain_))
+        self._variable_._update_domain_(
+            domain=_resolve_domain(self._type_, self._domain_)
+        )
 
     def _evaluate_natively_(self) -> Iterator:
         """
@@ -566,7 +575,9 @@ class Match(
         self.resolve()
         return self._factory_(
             **{
-                keyword: self._construct_argument_from_bindings_(keyword=keyword, bindings=bindings)
+                keyword: self._construct_argument_from_bindings_(
+                    keyword=keyword, bindings=bindings
+                )
                 for keyword in self._factory_keyword_arguments_
             }
         )
@@ -664,13 +675,20 @@ class Match(
         matched class, which grounding computes.
         """
         return self._is_pattern_keyword_kept_out_of_construction_(
-            factory=self._factory_, matched_type=self._type_, keyword=keyword, value_type=value_type
+            factory=self._factory_,
+            matched_type=self._type_,
+            keyword=keyword,
+            value_type=value_type,
         )
 
     @staticmethod
     @lru_cache(maxsize=None)
     def _is_pattern_keyword_kept_out_of_construction_(
-        *, factory: Callable[..., Any], matched_type: type, keyword: str, value_type: type
+        *,
+        factory: Callable[..., Any],
+        matched_type: type,
+        keyword: str,
+        value_type: type,
     ) -> bool:
         """
         :param factory: The factory constructing the matched instance.
@@ -721,7 +739,8 @@ class Match(
 
     def ordered_by(
         self,
-        *, variable: Selectable[T] | Any,
+        *,
+        variable: Selectable[T] | Any,
         descending: bool = False,
         key: Callable | None = None,
     ) -> Self:
@@ -733,7 +752,9 @@ class Match(
         :param key: A function to extract the key from the expression's value.
         :return: This match.
         """
-        self._symbolic_expression_.ordered_by(variable=variable, descending=descending, key=key)
+        self._symbolic_expression_.ordered_by(
+            variable=variable, descending=descending, key=key
+        )
         return self
 
     def distinct(self, *on: Selectable | Any) -> Self:
@@ -968,13 +989,19 @@ class AttributeMatch(AbstractMatchExpression[T]):
             variable and it states no value of its own.
         """
         if isinstance(self.assigned_value, Match):
-            return self.assigned_value._construct_instance_from_bindings_(bindings=bindings)
+            return self.assigned_value._construct_instance_from_bindings_(
+                bindings=bindings
+            )
         if (
             not isinstance(self.assigned_variable, Literal)
             and self.assigned_variable._id_ not in bindings
         ):
             raise UnboundPatternVariable(attribute_match=self)
-        return next(self.assigned_variable._evaluate_(sources=OperationResult(bindings=bindings))).value
+        return next(
+            self.assigned_variable._evaluate_(
+                sources=OperationResult(bindings=bindings)
+            )
+        ).value
 
     @property
     def _stating_match_(self) -> Match:

@@ -38,11 +38,14 @@ class EvaluatesChildrenInSequence(MultiArityExpression, ABC):
 
     def _evaluate__(
         self,
-        *, sources: OperationResult,
+        *,
+        sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
             self._build_operation_result_with_truth_(
-                truth=child_result.is_true, bindings=child_result.bindings, child_result=child_result
+                truth=child_result.is_true,
+                bindings=child_result.bindings,
+                child_result=child_result,
             )
             for child_result in itertools.chain(
                 *(var._evaluate_(sources=sources) for var in self._operation_children_)

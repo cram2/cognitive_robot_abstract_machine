@@ -210,7 +210,9 @@ class BranchingAtomCountCausalQuery:
         registry = RelationalCircuitRegistry(relational_probabilistic_circuit=model)
 
         np.random.seed(random_seed)
-        causal_circuit = registry.get_model(parameters=UnderspecifiedParameters(statement=query))
+        causal_circuit = registry.get_model(
+            parameters=UnderspecifiedParameters(statement=query)
+        )
 
         [branching_atom_count_variable] = causal_circuit.causal_variables
         [mutagenic_variable] = causal_circuit.effect_variables

@@ -48,7 +48,7 @@ class NoDAOFoundError(DataclassException, TypeError):
 
     obj: Any
     """
-    The class that no dao was found for
+    The class that no dao was found for.
     """
 
     def error_message(self) -> str:
@@ -112,7 +112,6 @@ class NoDAOFoundForSelectionError(NoDAOFoundError):
 
 @dataclass(kw_only=True)
 class NoDAOFoundDuringParsingError(NoDAOFoundError):
-
     dao: type
     """
     The DAO class that tried to convert the cls to a DAO if any.

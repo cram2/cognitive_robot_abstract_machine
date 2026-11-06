@@ -72,7 +72,9 @@ class CallSignature:
         """
         bound_arguments = self.parameters.bind(*positional, **keyword)
         bound_arguments.apply_defaults()
-        return CallArguments(positional=bound_arguments.args, keyword=bound_arguments.kwargs)
+        return CallArguments(
+            positional=bound_arguments.args, keyword=bound_arguments.kwargs
+        )
 
     def keyword_arguments(self, /, *positional: Any, **keyword: Any) -> dict[str, Any]:
         """

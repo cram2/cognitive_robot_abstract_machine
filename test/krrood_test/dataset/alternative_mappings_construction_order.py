@@ -13,20 +13,17 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 
 @dataclass(kw_only=True)
 class BuildFirst:
-
     value: str
     backreference_to_entrypoint: Optional[Entrypoint] = None
 
 
 @dataclass(kw_only=True)
 class BuildFirstAssociation:
-
     build_first: BuildFirst
 
 
 @dataclass(kw_only=True)
 class Entrypoint:
-
     build_first: BuildFirst
 
     build_first_association: BuildFirstAssociation
@@ -34,16 +31,20 @@ class Entrypoint:
 
 @dataclass(kw_only=True, eq=False)
 class BuildFirstMapping(AlternativeMapping[BuildFirst]):
-
     value: str
     backreference_to_entrypoint: Optional[Entrypoint] = None
 
     @classmethod
     def from_domain_object(cls, *, obj: T) -> Self:
-        return cls(value=obj.value, backreference_to_entrypoint=obj.backreference_to_entrypoint)
+        return cls(
+            value=obj.value, backreference_to_entrypoint=obj.backreference_to_entrypoint
+        )
 
     def to_domain_object(self) -> T:
-        return BuildFirst(value=self.value, backreference_to_entrypoint=self.backreference_to_entrypoint)
+        return BuildFirst(
+            value=self.value,
+            backreference_to_entrypoint=self.backreference_to_entrypoint,
+        )
 
 
 @dataclass(kw_only=True, eq=False)
@@ -53,10 +54,16 @@ class EntryPointMapping(AlternativeMapping[Entrypoint]):
 
     @classmethod
     def from_domain_object(cls, *, obj: T) -> Self:
-        return cls(build_first=obj.build_first, build_first_association=obj.build_first_association)
+        return cls(
+            build_first=obj.build_first,
+            build_first_association=obj.build_first_association,
+        )
 
     def to_domain_object(self) -> T:
-        return Entrypoint(build_first=self.build_first, build_first_association=self.build_first_association)
+        return Entrypoint(
+            build_first=self.build_first,
+            build_first_association=self.build_first_association,
+        )
 
     @classmethod
     def required_pre_build_classes(cls) -> List[Type]:
@@ -65,7 +72,6 @@ class EntryPointMapping(AlternativeMapping[Entrypoint]):
 
 @dataclass(kw_only=True)
 class HoldsAnEntrypoint:
-
     entrypoint: Entrypoint
 
 

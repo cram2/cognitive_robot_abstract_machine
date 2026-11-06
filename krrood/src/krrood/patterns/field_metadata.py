@@ -48,7 +48,9 @@ class FieldMetadata:
         ..note:: The lookup goes through the dataclass field name, which may differ from
             the public name under which the field is addressed.
         """
-        return cls.of_field(clazz=wrapped_field.clazz.clazz, field_name=wrapped_field.field.name)
+        return cls.of_field(
+            clazz=wrapped_field.clazz.clazz, field_name=wrapped_field.field.name
+        )
 
 
 @dataclass(kw_only=True)

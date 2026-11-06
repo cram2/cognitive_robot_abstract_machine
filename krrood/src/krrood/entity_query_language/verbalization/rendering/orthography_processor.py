@@ -42,7 +42,9 @@ class OrthographyProcessor(RealizationPass):
         >>> flatten_fragment_to_plain_text(OrthographyProcessor().process(fragment=parens))
         '(x)'
         """
-        rebuilt = map_structural_children(fragment, lambda fragment: self.process(fragment=fragment))
+        rebuilt = map_structural_children(
+            fragment, lambda fragment: self.process(fragment=fragment)
+        )
         node = rebuilt if rebuilt is not None else fragment
         if isinstance(node, PhraseFragment):
             return PhraseFragment(

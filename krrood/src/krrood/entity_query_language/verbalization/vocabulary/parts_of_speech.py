@@ -279,7 +279,9 @@ class DisjunctivePhrase(ClauseElement):
         )
         if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
             return Noun(content=self.members).as_fragment()
-        return disjunctive_phrase([RoleFragment.for_value(value=member) for member in value])
+        return disjunctive_phrase(
+            [RoleFragment.for_value(value=member) for member in value]
+        )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -569,4 +571,6 @@ def predicate_clause(
         if is_copular
         else [Verb(lemma=morphology.verb_lemma(head)), *complement]
     )
-    return clause(Noun(content=subject), *predicate, *(Noun(content=obj) for obj in objects))
+    return clause(
+        Noun(content=subject), *predicate, *(Noun(content=obj) for obj in objects)
+    )

@@ -7,7 +7,6 @@ from ..datasets import World, Handle, Container, FixedConnection, PrismaticConne
 
 
 class TestPrompt(TestCase):
-
     @skip
     def test_prompt(self):
         user_prompt = UserPrompt()
@@ -18,9 +17,18 @@ class TestPrompt(TestCase):
         container_1 = Container(name="c1", world=world)
         container_2 = Container(name="c2", world=world)
         connection_1 = FixedConnection(parent=container_1, child=handle, world=world)
-        connection_2 = PrismaticConnection(parent=container_2, child=container_1, world=world)
+        connection_2 = PrismaticConnection(
+            parent=container_2, child=container_1, world=world
+        )
 
         world.bodies = [handle, container_1, container_2, handle_2]
         world.connections = [connection_1, connection_2]
-        case_query = CaseQuery(original_case=world, attribute_name="views", _attribute_types=(Handle,), mutually_exclusive=False)
-        user_prompt.prompt_user_about_case(case_query=case_query, prompt_for=PromptFor.Conclusion)
+        case_query = CaseQuery(
+            original_case=world,
+            attribute_name="views",
+            _attribute_types=(Handle,),
+            mutually_exclusive=False,
+        )
+        user_prompt.prompt_user_about_case(
+            case_query=case_query, prompt_for=PromptFor.Conclusion
+        )

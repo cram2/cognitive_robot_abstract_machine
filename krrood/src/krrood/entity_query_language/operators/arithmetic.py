@@ -89,7 +89,8 @@ class ArithmeticOperation(
         )
         value = self.math_operator.function(*operands)
         return self._build_operation_result_(
-            bindings=child_result.bindings | {self._id_: value}, child_result=child_result
+            bindings=child_result.bindings | {self._id_: value},
+            child_result=child_result,
         )
 
 

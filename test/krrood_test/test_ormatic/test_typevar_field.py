@@ -11,12 +11,12 @@ def test_typevar_field_dao_generation():
     TypeVar-typed fields should generate FK columns and relationships.
     """
     mapper = inspect(TypeVarFieldHolderDAO)
-    assert hasattr(
-        TypeVarFieldHolderDAO, "_typed_field_id"
-    ), "TypeVarFieldHolderDAO should have a typed_field_id column"
-    assert (
-        "typed_field" in mapper.relationships
-    ), "TypeVarFieldHolderDAO should have a typed_field relationship"
+    assert hasattr(TypeVarFieldHolderDAO, "_typed_field_id"), (
+        "TypeVarFieldHolderDAO should have a typed_field_id column"
+    )
+    assert "typed_field" in mapper.relationships, (
+        "TypeVarFieldHolderDAO should have a typed_field relationship"
+    )
 
 
 def test_typevar_field_to_dao(session, database):

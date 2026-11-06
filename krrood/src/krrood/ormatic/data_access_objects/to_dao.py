@@ -60,7 +60,8 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
 
     def push_work_item(
         self,
-        *, source_object: Any,
+        *,
+        source_object: Any,
         dao_instance: DataAccessObject,
         alternative_base: type[DataAccessObject] | None = None,
     ):
@@ -91,7 +92,9 @@ class ToDataAccessObjectState(DataAccessObjectState[ToDataAccessObjectWorkItem])
         """
         alternative_mapping_class = _get_alternative_mapping_class(dao_clazz)
         if alternative_mapping_class is not None:
-            return alternative_mapping_class.to_dao(source_object=source_object, state=self)
+            return alternative_mapping_class.to_dao(
+                source_object=source_object, state=self
+            )
         return source_object
 
     def register(self, *, source: Any, target: DataAccessObject) -> None:

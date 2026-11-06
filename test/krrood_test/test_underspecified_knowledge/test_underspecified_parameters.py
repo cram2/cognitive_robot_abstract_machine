@@ -194,9 +194,13 @@ def test_model_sample_from_bindings_inverts_bindings_from_model_samples():
         model=FullyFactorizedRegistry().get_model(parameters=parameters)
     )
     samples = model.sample(1)
-    [bindings] = parameters.bindings_from_model_samples(variables=model.variables, samples=samples)
+    [bindings] = parameters.bindings_from_model_samples(
+        variables=model.variables, samples=samples
+    )
     assert (
-        parameters.model_sample_from_bindings(variables=model.variables, bindings=bindings).tolist()
+        parameters.model_sample_from_bindings(
+            variables=model.variables, bindings=bindings
+        ).tolist()
         == samples.tolist()
     )
 
@@ -236,7 +240,10 @@ def pose_over_two_positions() -> PoseOverPositions:
     """
     :return: A pose pattern whose position ranges over two positions.
     """
-    positions = [KRROODPosition(x=1.0, y=2.0, z=3.0), KRROODPosition(x=4.0, y=5.0, z=6.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=2.0, z=3.0),
+        KRROODPosition(x=4.0, y=5.0, z=6.0),
+    ]
     position = variable(KRROODPosition, positions)
     return PoseOverPositions(
         positions=positions,
@@ -257,7 +264,9 @@ def test_model_sample_from_bindings_derives_the_features_of_a_bound_domain_objec
         model=FullyFactorizedRegistry().get_model(parameters=parameters)
     )
     bindings = {position._id_: positions[1]}
-    samples = parameters.model_sample_from_bindings(variables=model.variables, bindings=bindings)
+    samples = parameters.model_sample_from_bindings(
+        variables=model.variables, bindings=bindings
+    )
     [sample] = samples
     sample_values = {
         model_variable.name: value
@@ -268,9 +277,11 @@ def test_model_sample_from_bindings_derives_the_features_of_a_bound_domain_objec
         sample_values["KRROODPose.position.y"],
         sample_values["KRROODPose.position.z"],
     ] == [positions[1].x, positions[1].y, positions[1].z]
-    assert list(parameters.bindings_from_model_samples(variables=model.variables, samples=samples)) == [
-        bindings
-    ]
+    assert list(
+        parameters.bindings_from_model_samples(
+            variables=model.variables, samples=samples
+        )
+    ) == [bindings]
 
 
 # %% bindings outside the domain of a model variable

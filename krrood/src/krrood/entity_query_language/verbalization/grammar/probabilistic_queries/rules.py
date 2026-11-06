@@ -75,7 +75,9 @@ class DistributionRule(PhraseRule):
 
     construct = Distribution
 
-    def build(self, *, node: Distribution, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: Distribution, context: RuleContext
+    ) -> VerbalizationFragment:
         context.services.performative_override = Directive.DISTRIBUTION_OVER
         assembler = MatchAssembler(context=context)
         plan = assembler.plan(node=node.match)
@@ -85,7 +87,8 @@ class DistributionRule(PhraseRule):
             variable_list = oxford_comma(
                 [
                     RoleFragment.for_attribute(
-                        owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
+                        owner=attribute._owner_class_,
+                        attribute_name=attribute._attribute_name_,
                     )
                     for attribute in node.marginalize_for
                 ],
@@ -133,11 +136,16 @@ class ProbabilityRule(PhraseRule):
 
     construct = Probability
 
-    def build(self, *, node: Probability, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: Probability, context: RuleContext
+    ) -> VerbalizationFragment:
         parts = [
             Keywords.THE_PROBABILITY_THAT.as_fragment(),
             context.child(node=node.condition),
         ]
         if node.evidence is not None:
-            parts += [Keywords.GIVEN_THAT.as_fragment(), context.child(node=node.evidence)]
+            parts += [
+                Keywords.GIVEN_THAT.as_fragment(),
+                context.child(node=node.evidence),
+            ]
         return PhraseFragment(parts=parts)

@@ -140,7 +140,8 @@ class Expert(ABC):
 
     def save_answers(
         self,
-        *, path: str | None = None,
+        *,
+        path: str | None = None,
         expert_answers: list[tuple[dict, str]] | None = None,
     ):
         """
@@ -205,7 +206,11 @@ class Expert(ABC):
                 if func_source is None:
                     func_source = "pass  # No user input provided for this case.\n"
                 f.write(
-                    imports + func_source + "\n\n\n\n" + self.answer_delimiter + "\n\n\n"
+                    imports
+                    + func_source
+                    + "\n\n\n\n"
+                    + self.answer_delimiter
+                    + "\n\n\n"
                 )
 
     def load_answers(self, *, path: str | None = None):
@@ -286,12 +291,16 @@ class AI(Expert):
     def ask_for_conditions(
         self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
     ) -> CallableExpression:
-        prompt_str = self.get_prompt_for_ai(case_query=case_query, prompt_for=PromptFor.Conditions)
+        prompt_str = self.get_prompt_for_ai(
+            case_query=case_query, prompt_for=PromptFor.Conditions
+        )
         print(prompt_str)
         sys.exit()
 
     def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
-        prompt_str = self.get_prompt_for_ai(case_query=case_query, prompt_for=PromptFor.Conclusion)
+        prompt_str = self.get_prompt_for_ai(
+            case_query=case_query, prompt_for=PromptFor.Conclusion
+        )
         output_type_source = self.get_output_type_class_source(case_query=case_query)
         prompt_str = (
             f"\n\n\nOutput type(s) class source:\n{output_type_source}\n\n" + prompt_str
@@ -356,7 +365,9 @@ class AI(Expert):
         boilerplate_code = template_file_creator.build_boilerplate_code()
         initial_prompt_str = data_to_show + "\n\n" + boilerplate_code + "\n\n"
         return self.user_prompt.build_prompt_str_for_ai(
-            case_query=case_query, prompt_for=prompt_for, initial_prompt_str=initial_prompt_str
+            case_query=case_query,
+            prompt_for=prompt_for,
+            initial_prompt_str=initial_prompt_str,
         )
 
 
@@ -412,11 +423,16 @@ class Human(Expert):
             condition = CallableExpression(user_input, bool, scope=case_query.scope)
             if self.answers_save_path is not None and not any(loaded_scope):
                 self.convert_json_answer_to_python_answer(
-                    case_query=case_query, user_input=user_input, callable_expression=condition, prompt_for=PromptFor.Conditions
+                    case_query=case_query,
+                    user_input=user_input,
+                    callable_expression=condition,
+                    prompt_for=PromptFor.Conditions,
                 )
         else:
             user_input, condition = self.user_prompt.prompt_user_for_expression(
-                case_query=case_query, prompt_for=PromptFor.Conditions, prompt_str=data_to_show
+                case_query=case_query,
+                prompt_for=PromptFor.Conditions,
+                prompt_str=data_to_show,
             )
         if user_input in ["exit", "quit"]:
             sys.exit()
@@ -429,7 +445,8 @@ class Human(Expert):
 
     def convert_json_answer_to_python_answer(
         self,
-        *, case_query: CaseQuery,
+        *,
+        case_query: CaseQuery,
         user_input: str,
         callable_expression: CallableExpression,
         prompt_for: PromptFor,
@@ -483,14 +500,19 @@ class Human(Expert):
                     )
                     if self.answers_save_path is not None and not any(loaded_scope):
                         self.convert_json_answer_to_python_answer(
-                            case_query=case_query, user_input=expert_input, callable_expression=expression, prompt_for=PromptFor.Conclusion
+                            case_query=case_query,
+                            user_input=expert_input,
+                            callable_expression=expression,
+                            prompt_for=PromptFor.Conclusion,
                         )
             except IndexError:
                 self.use_loaded_answers = False
         if not self.use_loaded_answers:
             data_to_show = show_current_and_corner_cases(case_query.case)
             expert_input, expression = self.user_prompt.prompt_user_for_expression(
-                case_query=case_query, prompt_for=PromptFor.Conclusion, prompt_str=data_to_show
+                case_query=case_query,
+                prompt_for=PromptFor.Conclusion,
+                prompt_str=data_to_show,
             )
             if expert_input is None:
                 self.all_expert_answers.append(({}, None))
@@ -561,7 +583,9 @@ class Oracle(Expert):
         if corner_case is None:
             return "return True"
         attribute_name, attribute_value = self._first_distinguishing_attribute(
-            case=case_query.case, corner_case=corner_case, exclude={case_query.attribute_name.lower()}
+            case=case_query.case,
+            corner_case=corner_case,
+            exclude={case_query.attribute_name.lower()},
         )
         return f"return case.{attribute_name} == {attribute_value!r}"
 

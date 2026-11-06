@@ -720,7 +720,9 @@ class DegreeOfFreedomDecisionVariables:
                 growth_factor=qp_controller_config.horizon_weight_gain_scalar,
             )
             quadratic_weights.append(normalized_weight)
-        return sm.Vector(quadratic_weights), sm.Vector.zeros(size=len(quadratic_weights))
+        return sm.Vector(quadratic_weights), sm.Vector.zeros(
+            size=len(quadratic_weights)
+        )
 
     def _decision_variable_limits(
         self, upper_limits: DerivativeMap[float], time_step: timedelta

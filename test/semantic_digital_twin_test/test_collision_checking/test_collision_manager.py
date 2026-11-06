@@ -123,7 +123,9 @@ class TestExternalCollisionExpressionManager:
             first
         )
         expr = root_b_V_contact_normal @ group_a_P_point_on_a.vector3
-        compiled_expression = expr.compile(parameters=VariableParameters.from_lists(variables))
+        compiled_expression = expr.compile(
+            parameters=VariableParameters.from_lists(variables)
+        )
         result = compiled_expression(external_collisions.float_variable_data.data)
         expected = (
             external_collisions.get_root_V_contact_normal_symbol(first).evaluate()
@@ -217,7 +219,9 @@ class TestSelfCollisionExpressionManager:
             first
         )
         expr = group_b_V_contact_normal @ group_b_P_point_on_b.vector3
-        compiled_expression = expr.compile(parameters=VariableParameters.from_lists(variables))
+        compiled_expression = expr.compile(
+            parameters=VariableParameters.from_lists(variables)
+        )
         result = compiled_expression(self_collisions.float_variable_data.data)
         expected = expr.evaluate()
         assert np.allclose(result, expected)

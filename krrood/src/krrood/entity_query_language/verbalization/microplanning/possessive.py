@@ -50,9 +50,13 @@ def attribute_fragment(
     'salary'
     """
     if step.source_reference is None:
-        return RoleFragment.for_attribute(owner=None, attribute_name=step.name, number=number)
+        return RoleFragment.for_attribute(
+            owner=None, attribute_name=step.name, number=number
+        )
     return RoleFragment.for_attribute(
-        owner=step.source_reference.owner_type, attribute_name=step.source_reference.attribute, number=number
+        owner=step.source_reference.owner_type,
+        attribute_name=step.source_reference.attribute,
+        number=number,
     )
 
 
@@ -156,7 +160,9 @@ def _relative_clause(
         modifiers = [
             Keywords.WHO.as_fragment(),
             RoleFragment.for_attribute(
-                owner=relation.owner_class, attribute_name=step.name, text=relation.active_verb
+                owner=relation.owner_class,
+                attribute_name=step.name,
+                text=relation.active_verb,
             ),
             owner_fragment,
         ]
@@ -167,7 +173,9 @@ def _relative_clause(
             owner_fragment,
             Copulas.for_number(number=owner_number),
             RoleFragment.for_attribute(
-                owner=relation.owner_class, attribute_name=step.name, text=relation.participle
+                owner=relation.owner_class,
+                attribute_name=step.name,
+                text=relation.participle,
             ),
         ]
     return NounPhrase(
@@ -206,7 +214,9 @@ def subject_relative_relation(
             Keywords.THAT.as_fragment(),
             Copulas.for_number(number=number),
             RoleFragment.for_attribute(
-                owner=owner_class, attribute_name=attribute_name, text=relation.participle
+                owner=owner_class,
+                attribute_name=attribute_name,
+                text=relation.participle,
             ),
             WordFragment(text=relation.preposition),
             object_fragment,

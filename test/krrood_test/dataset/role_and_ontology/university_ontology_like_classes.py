@@ -61,7 +61,6 @@ class DelegateAsThirdRole(Role[RepresentativeAsSecondRole], Symbol):
 
 @dataclass(kw_only=True)
 class Member(PropertyDescriptor, HasInverseProperty):
-
     @classmethod
     def get_inverse(cls) -> Type[MemberOf]:
         return MemberOf
@@ -111,7 +110,9 @@ RepresentativeAsSecondRole.representative_of = RepresentativeOf(
 )
 
 # Delegate fields' descriptors
-DelegateAsThirdRole.delegate_of = DelegateOf(domain=DelegateAsThirdRole, field_name="delegate_of")
+DelegateAsThirdRole.delegate_of = DelegateOf(
+    domain=DelegateAsThirdRole, field_name="delegate_of"
+)
 
 # RecognizedGroup fields' descriptors
 RecognizedGroup.members = Member(domain=RecognizedGroup, field_name="members")

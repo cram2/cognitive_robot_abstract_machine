@@ -184,7 +184,9 @@ def test_a_reference_resolves_to_the_entity_it_names():
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
     tracker.add(key=parent.id, tracked_object=parent)
     tracker.add(key=child.id, tracked_object=child)
-    parsed_connection = FixedConnection.from_json(data=json_data, **tracker.create_kwargs())
+    parsed_connection = FixedConnection.from_json(
+        data=json_data, **tracker.create_kwargs()
+    )
 
     assert parsed_connection.parent is parent
     assert parsed_connection.child is child

@@ -33,7 +33,9 @@ def _realised(fragment) -> str:
     """
     Apply the morphology pass (as ``build`` does), then flatten to plain text.
     """
-    return flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment=fragment))
+    return flatten_fragment_to_plain_text(
+        MorphologyProcessor().process(fragment=fragment)
+    )
 
 
 def test_number_of_bridges_boolean_plan_features():
@@ -76,15 +78,17 @@ def test_predicative_operator_factors_copula_for_agreement():
 def test_existential_noun_pluralised_by_the_pass():
     assert (
         _realised(
-            ExistentialPhrase.for_number(number=GrammaticalNumber.SINGULAR).build_phrase(
-                type_name="Robot"
-            )
+            ExistentialPhrase.for_number(
+                number=GrammaticalNumber.SINGULAR
+            ).build_phrase(type_name="Robot")
         )
         == "there's a Robot"
     )
     assert (
         _realised(
-            ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).build_phrase(type_name="Robot")
+            ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).build_phrase(
+                type_name="Robot"
+            )
         )
         == "there are Robots"
     )
@@ -95,7 +99,9 @@ def test_existential_noun_pluralised_by_the_pass():
 
 def test_ordered_report_agrees_attribute_operator_and_possessive():
     e = variable(Employee, [])
-    text = verbalize_expression(an(entity(e).where(e.salary > 5).ordered_by(variable=e.salary)))
+    text = verbalize_expression(
+        an(entity(e).where(e.salary > 5).ordered_by(variable=e.salary))
+    )
     assert text == (
         "Report Employees whose salaries are greater than 5, "
         "ordered by their salaries from lowest to highest"
@@ -120,7 +126,9 @@ def test_ranking_subject_agrees_the_whose_restriction():
 def test_plural_subject_agrees_a_range_restriction():
     e = variable(Employee, [])
     query = an(
-        entity(e).where(and_(e.salary > 100, e.salary < 200)).ordered_by(variable=e.salary)
+        entity(e)
+        .where(and_(e.salary > 100, e.salary < 200))
+        .ordered_by(variable=e.salary)
     )
     text = verbalize_expression(query)
     assert text == (

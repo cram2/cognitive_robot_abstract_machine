@@ -120,7 +120,9 @@ class ParagraphRenderer(FragmentRenderer):
         return fold_fragment(
             fragment,
             word=lambda text: text,
-            role=lambda text, role, reference: self._render_role(text=text, role=role, source_reference=reference),
+            role=lambda text, role, reference: self._render_role(
+                text=text, role=role, source_reference=reference
+            ),
             phrase=lambda parts, separator: separator.join(parts),
             block=_block,
         )
@@ -179,7 +181,9 @@ class HierarchicalRenderer(FragmentRenderer):
                         else ""
                     )
                     lines.append(
-                        self.formatted_indent * depth + bullet + self._inline(fragment=header)
+                        self.formatted_indent * depth
+                        + bullet
+                        + self._inline(fragment=header)
                     )
                     depth = depth + 1
                 for item in items:
@@ -255,7 +259,9 @@ class HierarchicalRenderer(FragmentRenderer):
         return fold_fragment(
             fragment,
             word=lambda text: text,
-            role=lambda text, role, reference: self._render_role(text=text, role=role, source_reference=reference),
+            role=lambda text, role, reference: self._render_role(
+                text=text, role=role, source_reference=reference
+            ),
             phrase=lambda parts, separator: separator.join(parts),
             block=_flatten,
         )
