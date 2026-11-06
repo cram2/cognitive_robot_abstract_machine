@@ -2223,6 +2223,16 @@ def test_move_branch_preserves_active_connection(world_setup):
     assert np.allclose(r2.global_transform, old_pose)
 
 
+def test_move_branch_keeps_connection_findable_by_name(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection_name = r2.parent_connection.name
+
+    with world.modify_world():
+        world.move_branch(r2, bf)
+
+    assert world.get_connection_by_name(connection_name) is r2.parent_connection
+
+
 # %% re-parenting a free-floating branch
 
 
