@@ -2072,7 +2072,6 @@ class World(HasSimulatorProperties):
                 new_world.add_degree_of_freedom(dof)
                 new_world.state[dof.id] = branch_state[dof.id]
 
-            # connections first: one removed after its entities cannot be replayed
             self.remove_connection(root_connection)
             for connection in child_body_parent_connections:
                 self.remove_connection(connection)
