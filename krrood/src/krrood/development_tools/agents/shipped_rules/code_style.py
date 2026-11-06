@@ -89,6 +89,13 @@ class NamingRules(Section):
         LeadingPrepositionChecker(),
     )
 
+    NO_TRAILING_PREPOSITIONS = (
+        "Never end a function or method name with a preposition that only its first "
+        "argument finishes, such as `bottom_of(body)`: name what it returns or does, "
+        "such as `bottom_height(body)`. A preposition that belongs to the verb, as "
+        "in `look_for` or `is_contained_in`, is part of the name"
+    )
+
     RESERVE_FROM_AND_TO_FOR_CONVERSIONS = (
         "Begin a function or method name with `from_` or `to_` only for an "
         "alternative constructor or a conversion, such as `from_json` or `to_json`"
