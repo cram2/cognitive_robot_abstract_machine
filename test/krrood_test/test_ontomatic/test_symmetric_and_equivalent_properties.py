@@ -1,5 +1,5 @@
 """
-Statements implied by symmetric and by equivalent properties.
+Statements implied by symmetric, by equivalent and by transitive properties.
 """
 
 from __future__ import annotations
@@ -8,6 +8,7 @@ import pytest
 
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 from ..dataset.role_and_ontology.symmetric_and_equivalent_properties import (
+    Area,
     PersonWithFriends,
 )
 
@@ -61,3 +62,21 @@ def test_equivalence_holds_in_both_directions():
     alice.is_acquainted_with.add(bob)
 
     assert alice.knows == {bob}
+
+
+# %% transitive properties with an equivalent property
+
+
+def test_a_statement_through_an_equivalent_property_is_composed_with_the_statements_after_it():
+    """
+    A statement of a transitive property implied by its equivalent property is composed
+    with the statements of the transitive property already made about its object.
+    """
+    kitchen = Area("kitchen")
+    flat = Area("flat")
+    city = Area("city")
+    flat.is_part_of.add(city)
+
+    kitchen.lies_within.add(flat)
+
+    assert kitchen.is_part_of == {flat, city}

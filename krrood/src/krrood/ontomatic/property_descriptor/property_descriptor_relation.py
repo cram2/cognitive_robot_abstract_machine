@@ -353,7 +353,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         property is transitive. Symmetric and transitive properties are closed after loading instead, unless
         :attr:`eager_symmetric_transitive_closure` is set.
         """
-        if self.rule is InferredThrough.EQUIVALENT or not self.transitive:
+        if not self.transitive:
             return
         if (
             issubclass(self.property_descriptor_cls, SymmetricProperty)
