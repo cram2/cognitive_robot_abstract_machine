@@ -42,9 +42,10 @@ class ExampleToPartDependence:
     The exchangeable part the attribute belongs to.
     """
 
-    p_value: float
+    probability_value: float
     """
-    The permutation p-value of the dependence.
+    The probability, were the attributes independent given the statistics, of a
+    dependence at least as strong as the one observed, estimated by permutation.
     """
 
 
@@ -61,7 +62,8 @@ class ExampleToPartCheck:
 
     significance_level: float = 0.05
     """
-    The level below which a p-value rejects independence.
+    The level below which a :attr:`ExampleToPartDependence.probability_value` rejects
+    independence.
     """
 
     permutation_count: int = 199
@@ -134,18 +136,18 @@ class ExampleToPartCheck:
                 part_values = part_codes[part_attribute].to_numpy()
                 if len(np.unique(part_values)) < 2:
                     continue
-                p_value = self.permutation_p_value(
+                probability_value = self.permutation_probability_value(
                     values[positions], permutations, part_values, strata[positions]
                 )
-                if p_value < self.significance_level:
+                if probability_value < self.significance_level:
                     dependences.append(
                         ExampleToPartDependence(
-                            example_attribute, part_attribute, part, p_value
+                            example_attribute, part_attribute, part, probability_value
                         )
                     )
         return dependences
 
-    def permutation_p_value(
+    def permutation_probability_value(
         self,
         example_values: np.ndarray,
         permutations: list[np.ndarray],
