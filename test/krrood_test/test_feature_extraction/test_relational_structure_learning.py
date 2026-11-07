@@ -97,10 +97,20 @@ def test_training_tables_match_the_fitted_tables(
         variable.name
         for variable in relational_probabilistic_circuit.class_probabilistic_circuit.variables
     ]
-    assert set(tables.part_rows["objects"].columns) == {
+    assert set(tables.part_tables["objects"].rows.columns) == {
         variable.name
         for variable in template.template_distribution.class_probabilistic_circuit.variables
     }
+
+
+def test_training_tables_place_each_part_with_its_instance(
+    relational_probabilistic_circuit, scenario
+):
+    tables = relational_probabilistic_circuit.training_tables(list(scenario))
+
+    assert tables.part_tables["objects"].example_positions == [
+        position for position, room in enumerate(scenario) for _ in room.objects
+    ]
 
 
 # %% the graph learned from them

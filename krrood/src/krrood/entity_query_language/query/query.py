@@ -83,6 +83,7 @@ from krrood.entity_query_language.utils import (
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.backends import QueryBackend
+    from krrood.entity_query_language.ground_term import TermReader
 
 ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 """
@@ -264,7 +265,9 @@ class Query(
         self.__dict__.pop("_group_", None)
         self.__dict__.pop("_distinct_on_ids_", None)
 
-    def evaluate(self, backend: QueryBackend | None = None) -> Iterator:
+    def evaluate(
+        self, backend: QueryBackend | None = None, state: TermReader | None = None
+    ) -> Iterator:
         """
         Evaluate the query using the given backend, returning an iterator over
         the results.
@@ -275,9 +278,10 @@ class Query(
         :param backend: The query backend to evaluate with. Defaults to
             the ``EntityQueryLanguageBackend`` (native python
             evaluation).
+        :param state: Forwarded to :meth:`Evaluable.evaluate`.
         """
         self.build()
-        return super().evaluate(backend)
+        return super().evaluate(backend, state)
 
     def _evaluate_natively_(self) -> Iterator:
         """

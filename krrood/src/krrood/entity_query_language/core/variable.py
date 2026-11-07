@@ -8,7 +8,6 @@ variables that are instantiated from other expressions.
 
 from __future__ import annotations
 
-from inspect import isclass
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -22,6 +21,7 @@ from typing_extensions import (
     get_origin,
 )
 
+from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
@@ -29,7 +29,8 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
 )
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-from krrood.entity_query_language.core.bound_value import HasBoundValue
+from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.ground_term import CallTerm, GroundTermExpression
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
 from krrood.class_diagrams.utils import get_type_hints_of_object
@@ -196,6 +197,7 @@ class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct,
     CanHaveDomainSource[T],
     HasFactoryAndKwargs[T],
+    GroundTermExpression[CallTerm],
 ):
     """
     A variable which does not have an explicit domain, but builds its values by
@@ -267,6 +269,16 @@ class InstantiatedVariable(
         for name, value in self._kwargs_.items():
             self._child_variables_[name] = SymbolicExpression._as_operand_(value, name)
 
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return tuple(self._child_variables_.values())
+
+    def _ground_term_(self, *operand_values: Any) -> CallTerm:
+        return CallTerm.from_call(
+            self._factory_,
+            CallArguments(keyword=dict(zip(self._child_variables_, operand_values))),
+        )
+
     def _evaluate__(
         self,
         sources: OperationResult,
@@ -287,16 +299,9 @@ class InstantiatedVariable(
                 for name, child in self._child_variables_.items()
                 if child._id_ in child_result.bindings
             }
-            # A callable class (Predicate / SymbolicFunction) implements HasBoundValue -- it binds the
-            # constructed instance, or, for a value operation, its constructed-and-called value -- the
-            # class-form counterpart of a @symbolic_function being called. A plain function/type does
-            # not, so it binds the direct call result.
-            bind = (
-                self._factory_._bound_value_
-                if isclass(self._factory_) and issubclass(self._factory_, HasBoundValue)
-                else self._factory_
-            )
-            instance = bind(**arguments)
+            instance = EvaluationContext.current_value_of_term(
+                CallTerm.from_call(self._factory_, CallArguments(keyword=arguments))
+            ).value
 
             bindings = {self._id_: instance} | child_result.bindings
             result = self._build_operation_result_(bindings, child_result)
