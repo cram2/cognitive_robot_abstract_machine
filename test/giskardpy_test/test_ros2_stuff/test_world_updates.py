@@ -28,7 +28,7 @@ from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import to_json
-from semantic_digital_twin.messages import MetaData, StreamPosition
+from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3

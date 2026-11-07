@@ -10,7 +10,7 @@ For all synchronizations, ROS2 topics are used to communicate changes in a peer-
 In the semantic digital twin package, the following classes and modules are needed to understand this document:
 
 Modules:
-- :mod:`semantic_digital_twin.messages`
+- :mod:`semantic_digital_twin.adapters.ros.messages`
 - :mod:`semantic_digital_twin.adapters.ros.world_synchronizer`
 - :mod:`semantic_digital_twin.world_modification`
 

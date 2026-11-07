@@ -21,7 +21,7 @@ from giskardpy.middleware.ros2.client_presence import (
 )
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import to_json
-from semantic_digital_twin.messages import MetaData
+from semantic_digital_twin.adapters.ros.messages import MetaData
 
 # %% helpers
 

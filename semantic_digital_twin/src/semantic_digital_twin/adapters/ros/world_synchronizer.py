@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.ormatic.data_access_objects.helper import to_dao
-from semantic_digital_twin.messages import (
+from semantic_digital_twin.adapters.ros.messages import (
     MessageField,
     MetaData,
     WorldStateUpdate,
@@ -39,10 +39,12 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
+from semantic_digital_twin.adapters.ros.exceptions import (
+    WorldUpdateReferencesUnknownEntityError,
+)
 from semantic_digital_twin.exceptions import (
     SynchronizerNotConnectedError,
     WorldEntityWithIDNotInKwargs,
-    WorldUpdateReferencesUnknownEntityError,
     MissingPublishChangesKWARG,
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
     StateUpdateContainsUnknownDegreesOfFreedomError,

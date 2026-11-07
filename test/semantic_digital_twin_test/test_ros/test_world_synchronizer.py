@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import JSONAttributeDiff, to_json, from_json
-from semantic_digital_twin.messages import (
+from semantic_digital_twin.adapters.ros.messages import (
     MetaData,
     WorldStateUpdate,
     LoadModel,
@@ -38,6 +38,9 @@ from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.adapters.ros.exceptions import (
+    WorldUpdateReferencesUnknownEntityError,
+)
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingPublishChangesAttribute,
@@ -47,7 +50,6 @@ from semantic_digital_twin.exceptions import (
     SynchronizerNotConnectedError,
     WorldHasMultipleSynchronizersError,
     WorldHasNoSynchronizerError,
-    WorldUpdateReferencesUnknownEntityError,
 )
 from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.robots.pr2 import PR2
@@ -88,7 +90,7 @@ from semantic_digital_twin.callbacks.callback import (
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.messages import (
+from semantic_digital_twin.adapters.ros.messages import (
     MetaData,
     WorldStateUpdate,
     ModificationBlock,

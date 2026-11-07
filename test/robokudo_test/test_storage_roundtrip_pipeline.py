@@ -28,7 +28,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
-from semantic_digital_twin.messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",

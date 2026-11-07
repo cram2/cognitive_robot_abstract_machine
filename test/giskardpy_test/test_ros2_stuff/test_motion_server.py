@@ -39,7 +39,7 @@ from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import from_json
 from krrood.utils import get_full_class_name
-from semantic_digital_twin.messages import MetaData, StreamPosition
+from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl

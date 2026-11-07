@@ -7,7 +7,7 @@ from time import sleep
 from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json
-from semantic_digital_twin.messages import StreamPosition
+from semantic_digital_twin.adapters.ros.messages import StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
     PublicationProgress,

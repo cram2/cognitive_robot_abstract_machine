@@ -24,7 +24,7 @@ from robokudo.io.exceptions import RecordedViewMissing
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.camera import CameraObservation
 from krrood_spatial_math.spatial_types import Point2
-from semantic_digital_twin.messages import WorldModelSnapshot
+from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )

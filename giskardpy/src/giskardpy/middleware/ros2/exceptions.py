@@ -11,7 +11,7 @@ from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
-from semantic_digital_twin.messages import MetaData
+from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.world_description.connections import WheeledDrive
 
 
