@@ -2,14 +2,16 @@ from __future__ import annotations, division
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from functools import partial
 from itertools import combinations, takewhile
 
-from typing_extensions import Any, Generator, Generic, TypeVar
+from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 
 from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import QueryBackend
 from krrood.entity_query_language.query.match import Match
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -34,6 +36,7 @@ from cramph.node import (
     CompositeNode,
     StatechartNode,
     NodeArtifacts,
+    NodeRebuild,
     TerminalNode,
 )
 from krrood.exceptions import DataclassException
@@ -139,6 +142,16 @@ class ControlStructureNode(CompositeNode, ABC):
             return StatementNode(statement=node)
         return node
 
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        :return: This goal constructed anew, holding its children built anew, or None if
+            none of them is.
+        """
+        children = rebuild.rebuilt_children(self, self.nodes)
+        if not children:
+            return None
+        return self._rebuilt_holding(rebuild, nodes=children)
+
     def add_node(self, node: StatechartNode) -> None:
         """
         Hands this goal one more child, after all the others.
@@ -184,10 +197,17 @@ class ControlStructureNode(CompositeNode, ABC):
             which can hold a neighbour of whatever holds `node` below it.
         :raises NoControlStructureNodeAboveError: If no control structure node is above `node`.
         """
-        for ancestor in node.path:
-            if isinstance(ancestor, ControlStructureNode):
-                return ancestor
-        raise NoControlStructureNodeAboveError(node=node)
+        parent = node.parent_node
+        holder = (
+            None
+            if parent is None
+            else parent.find_upwards(
+                lambda ancestor: isinstance(ancestor, ControlStructureNode)
+            )
+        )
+        if holder is None:
+            raise NoControlStructureNodeAboveError(node=node)
+        return holder
 
     @staticmethod
     def step_holding(node: StatechartNode) -> StatechartNode:
@@ -197,15 +217,12 @@ class ControlStructureNode(CompositeNode, ABC):
             above `node` holds as a step, or the top-level node above `node` when no
             control structure node is above it.
         """
-        holders = [node, *node.path]
-        return next(
-            (
-                holder
-                for holder in holders
-                if isinstance(holder.parent_node, ControlStructureNode)
-            ),
-            holders[-1],
+        step = node.find_upwards(
+            lambda holder: isinstance(holder.parent_node, ControlStructureNode)
         )
+        if step is not None:
+            return step
+        return node.path[-1] if node.path else node
 
     def adopt_handed_children(self) -> None:
         """
@@ -255,10 +272,10 @@ class ControlStructureNode(CompositeNode, ABC):
         :return: The position of the child that is `reference` or holds it.
         :raises NodeIsNotAChildError: If no child is or holds `reference`.
         """
-        for holder in [reference, *reference.path]:
-            if holder in self.nodes:
-                return self.nodes.index(holder)
-        raise NodeIsNotAChildError(node=self, child=reference)
+        holder = reference.find_upwards(lambda candidate: candidate in self.nodes)
+        if holder is None:
+            raise NodeIsNotAChildError(node=self, child=reference)
+        return self.nodes.index(holder)
 
     def _check_is_not_a_child(self, node: StatechartNode) -> None:
         """
@@ -512,6 +529,19 @@ class RepeatUntil(CompositeNodeEndingItsChildren):
     retrying off, or None to only observe False then.
     """
 
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        :return: This goal constructed anew, holding its task and stop monitor built
+            anew, or None if one of them is left out.
+        """
+        task = rebuild.rebuilt(self.task)
+        stop_retry_monitor = rebuild.rebuilt(self.stop_retry_monitor)
+        if task is None or stop_retry_monitor is None:
+            return None
+        return self._rebuilt_holding(
+            rebuild, task=task, stop_retry_monitor=stop_retry_monitor
+        )
+
     def expand(self) -> None:
         """
         Wire the retry loop.
@@ -722,6 +752,19 @@ class MonitoredCompositeNode(EndedByOwner, CompositeNode, ABC):
     The node placed under the monitor's control.
     """
 
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        :return: This goal constructed anew, holding its monitor and monitored node
+            built anew, or None if one of them is left out.
+        """
+        monitor = rebuild.rebuilt(self.monitor)
+        monitored_node = rebuild.rebuilt(self.monitored_node)
+        if monitor is None or monitored_node is None:
+            return None
+        return self._rebuilt_holding(
+            rebuild, monitor=monitor, monitored_node=monitored_node
+        )
+
     def expand(self) -> None:
         """
         Add the monitor and the monitored node, and wire the monitor.
@@ -784,6 +827,24 @@ class PausedUntilTrue(MonitoredCompositeNode):
         self.monitored_node.pause_condition = logic_or(
             self.monitored_node.pause_condition,
             logic_not(self.monitor.observes_true),
+        )
+
+
+@dataclass(repr=False, eq=False, kw_only=True)
+class StartedWhenTrue(MonitoredCompositeNode):
+    """
+    Starts the monitored node only once the monitor observes True, and lets it run from
+    then on, whatever the monitor observes afterwards.
+
+    Unlike :class:`PausedUntilTrue`, which starts the monitored node paused, nothing the
+    monitored node does when it starts happens before, such as putting collision rules
+    in force.
+    """
+
+    def wire_monitor(self) -> None:
+        self.monitored_node.start_condition = logic_and(
+            self.monitored_node.start_condition,
+            self.monitor.observes_true,
         )
 
 
@@ -1184,6 +1245,15 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         self.success_condition = logic_or(self.success_condition, child.is_succeeded)
         self.statechart.request_rebuild(self)
 
+    def restore_chosen_children(self, children: list[StatechartNode]) -> None:
+        """
+        Take `children` as the children this node chose, as written by the statechart it
+        was sent from, whose conditions already wire them.
+
+        :param children: Children of this node, in the order they were chosen.
+        """
+        self._chosen_children = list(children)
+
     def give_up_on_child_when(
         self, child: StatechartNode, failure_monitors: list[StatechartNode]
     ) -> None:
@@ -1292,8 +1362,11 @@ class StatementNode(CompositeNodeChoosingItsChild):
     def reached_candidate_limit(self) -> bool:
         """
         :return: Whether the last run through the statement stopped because it yielded
-            :attr:`candidate_limit` candidates.
+            :attr:`candidate_limit` candidates, which a statement that never ran through
+            its statement did not.
         """
+        if self.candidate_limit is None:
+            return False
         return self._candidates_pulled >= self.candidate_limit
 
     def next_candidate(
@@ -1324,6 +1397,33 @@ class StatementNode(CompositeNodeChoosingItsChild):
             return None
         self._candidates_pulled += 1
         return candidate
+
+    def go_on_after(self, read: list[Any], taken: Any) -> None:
+        """
+        Lets the next candidates be the others of `read`, in their order, then those
+        beyond them, as if only `taken` had been yielded so far.
+
+        :param read: Candidates the statement yielded last, in their order, `taken`
+            among them.
+        :param taken: The candidate of `read` this node runs.
+        """
+        others = [candidate for candidate in read if candidate is not taken]
+        self._candidates_pulled -= len(others)
+        self._candidates = self._chained(others, self._candidates)
+
+    @staticmethod
+    def _chained(
+        first: list[Any], rest: Generator[Any, None, None] | None
+    ) -> Generator[Any, None, None]:
+        """
+        :param first: The candidates yielded first.
+        :param rest: The candidates yielded after `first`, none if None.
+        :return: `first`, then `rest`, as a generator, which :meth:`stop_grounding`
+            closes, `rest` with it.
+        """
+        yield from first
+        if rest is not None:
+            yield from rest
 
     def stop_grounding(self) -> None:
         """
@@ -1369,3 +1469,70 @@ class StatementNode(CompositeNodeChoosingItsChild):
 
     def __repr__(self) -> str:
         return f"{self.statement._type_.__name__}"
+
+
+# %% grounding statements together
+
+
+@dataclass
+class StatementsGroundedTogether:
+    """
+    Grounds several statements into combinations of their candidates, one candidate of
+    each, the combinations of the candidates every statement ranks first coming first,
+    see :class:`~krrood.patterns.cartesian_product.CartesianProductByRankSum`.
+    """
+
+    statements: list[StatementNode]
+    """
+    The statements grounded together.
+    """
+
+    query_backend: QueryBackend
+    """
+    The backend answering the statements.
+    """
+
+    default_candidate_limit: int
+    """
+    How many candidates a statement without a limit of its own yields.
+    """
+
+    _product: CartesianProductByRankSum = field(init=False, repr=False)
+    """
+    The cartesian product of the candidates of :attr:`statements`.
+    """
+
+    def __post_init__(self) -> None:
+        self._product = CartesianProductByRankSum(
+            factors=[
+                iter(
+                    partial(
+                        statement.next_candidate,
+                        self.query_backend,
+                        self.default_candidate_limit,
+                    ),
+                    None,
+                )
+                for statement in self.statements
+            ]
+        )
+
+    def __iter__(self) -> Iterator[dict[StatementNode, Any]]:
+        """
+        :return: The combinations, each holding one candidate of every statement, each
+            statement grounded against the world as it is when a combination first
+            reaches a candidate of it.
+        """
+        for combination in self._product:
+            yield dict(zip(self.statements, combination))
+
+    def take(self, combination: dict[StatementNode, Any]) -> None:
+        """
+        Lets every statement go on from the candidates read for the combinations so far
+        that `combination` does not hold, once its candidate of `combination` failed,
+        see :meth:`StatementNode.go_on_after`.
+
+        :param combination: The combination the statements run.
+        """
+        for statement, read in zip(self.statements, self._product.read):
+            statement.go_on_after(read, combination[statement])

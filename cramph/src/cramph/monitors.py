@@ -1,11 +1,11 @@
 import time
 from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
-from typing_extensions import Callable
+from typing_extensions import Callable, Self
 
 from cramph.node import EndedByOwner
 from cramph.data_types import LifeCycleValues, ObservationStateValues
-from cramph.node import StatechartNode, NodeArtifacts
+from cramph.node import NodeArtifacts, NodeRebuild, StatechartNode
 
 # %% tick count check
 
@@ -218,6 +218,16 @@ class CountNodeResets(EndedByOwner, StatechartNode):
     """
     Life cycle state of :attr:`node` on the previous tick.
     """
+
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        :return: This monitor constructed anew, counting the resets of :attr:`node`
+            built anew, or None if it is left out.
+        """
+        node = rebuild.rebuilt(self.node)
+        if node is None:
+            return None
+        return self._rebuilt_holding(rebuild, node=node)
 
     def on_tick(self) -> ObservationStateValues | None:
         current_life_cycle = self.node.life_cycle_state
