@@ -290,3 +290,28 @@ class InvalidRobotAnnotation(UsageError):
 
     def suggest_correction(self) -> str:
         return "Restore consistent world entities, a default camera and robot part ownership."
+
+
+# %% griplink grippers without their ROS action package
+
+
+@dataclass
+class GriplinkInterfacesNotInstalledError(DataclassException):
+    """
+    Raised when the ROS action type of a griplink endpoint is asked for, but
+    ``griplink_interfaces`` cannot be imported.
+    """
+
+    action_topic: str
+    """
+    The action topic of the endpoint whose ROS action type was asked for.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The griplink endpoint on {self.action_topic} has no ROS action type: "
+            f"griplink_interfaces is not installed."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Install griplink_interfaces to command the real griplink grippers."

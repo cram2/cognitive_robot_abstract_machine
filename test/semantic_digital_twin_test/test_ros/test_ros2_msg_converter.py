@@ -417,7 +417,7 @@ def test_an_object_no_converter_handles_is_reported_as_unconvertible_to_ros2():
         SemDTToRos2Converter.get_to_converter(object())
 
 
-# %% discovery in a fresh process
+# %% discovery in a process that imported nothing else
 
 
 def run_cold_import_script(script_name: str) -> str:
@@ -435,7 +435,7 @@ def run_cold_import_script(script_name: str) -> str:
     return result.stdout.strip()
 
 
-def test_converters_are_found_once_their_modules_are_imported():
+def test_converters_are_found_without_anything_having_imported_them():
     found = run_cold_import_script("converter_lookup_from_cold_import.py")
 
     assert found.splitlines() == [

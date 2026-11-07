@@ -1,21 +1,60 @@
 from __future__ import annotations
 
+import logging
 from abc import ABC
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Self
 
 from krrood.ormatic.utils import classproperty
+
+try:
+    from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
+except ModuleNotFoundError:
+    logging.getLogger(__name__).warning(
+        "griplink_interfaces could not be imported: the griplink grippers' ROS action "
+        "types are unavailable, so the real grippers cannot be commanded."
+    )
+    Flexgrip = Flexrelease = Grip = Release = None
+
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
+from semantic_digital_twin.robots.exceptions import GriplinkInterfacesNotInstalledError
 from semantic_digital_twin.robots.robot_parts import EndEffector
 
 # %% griplink action server endpoints
+
+
+class GriplinkAction(StrEnum):
+    """
+    The actions a griplink action server executes, each named as its ROS action type in
+    ``griplink_interfaces.action``.
+    """
+
+    GRIP = "Grip"
+    """
+    Closes the gripper with a stored grip preset.
+    """
+
+    RELEASE = "Release"
+    """
+    Opens the gripper with a stored grip preset.
+    """
+
+    FLEXGRIP = "Flexgrip"
+    """
+    Closes the gripper to a commanded opening width.
+    """
+
+    FLEXRELEASE = "Flexrelease"
+    """
+    Opens the gripper to a commanded opening width.
+    """
 
 
 @dataclass(frozen=True)
@@ -29,12 +68,28 @@ class GriplinkEndpoint:
     ROS action topic the griplink server for one gripper listens on.
     """
 
-    message_type: type | None
+    action: GriplinkAction
     """
-    The griplink ROS action this endpoint's server executes (``Grip``/``Release``/
-    ``Flexgrip``/``Flexrelease``), or ``None`` where ``griplink_interfaces`` is not
-    installed.
+    The action this endpoint's server executes.
     """
+
+    @property
+    def message_type(self) -> type:
+        """
+        The ROS action type of :attr:`action`.
+
+        :raises GriplinkInterfacesNotInstalledError: If ``griplink_interfaces`` is not
+            installed.
+        """
+        message_type = {
+            GriplinkAction.GRIP: Grip,
+            GriplinkAction.RELEASE: Release,
+            GriplinkAction.FLEXGRIP: Flexgrip,
+            GriplinkAction.FLEXRELEASE: Flexrelease,
+        }[self.action]
+        if message_type is None:
+            raise GriplinkInterfacesNotInstalledError(self.action_topic)
+        return message_type
 
 
 # %% grip presets

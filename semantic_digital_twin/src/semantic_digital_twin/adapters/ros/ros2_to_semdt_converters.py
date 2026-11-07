@@ -11,7 +11,7 @@ from visualization_msgs.msg import Marker
 
 from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.ros.exceptions import LaserScanBeamCountMismatch
-from semantic_digital_twin.adapters.ros.msg_converter import (
+from semantic_digital_twin.adapters.ros.message_converter_bases import (
     Ros2ToSemDTConverter,
     InputType,
     OutputType,
