@@ -10,7 +10,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from semantic_digital_twin.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 
 

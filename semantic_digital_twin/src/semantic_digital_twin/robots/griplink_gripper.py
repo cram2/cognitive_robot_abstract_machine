@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from abc import ABC
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -9,30 +8,20 @@ from typing import Self
 
 from krrood.ormatic.utils import classproperty
 
-try:
-    from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
-except ModuleNotFoundError:
-    logging.getLogger(__name__).warning(
-        "griplink_interfaces could not be imported: the griplink grippers' ROS action "
-        "types are unavailable, so the real grippers cannot be commanded."
-    )
-    Flexgrip = Flexrelease = Grip = Release = None
-
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
-from semantic_digital_twin.robots.exceptions import GriplinkInterfacesNotInstalledError
 from semantic_digital_twin.robots.robot_parts import EndEffector
 
 # %% griplink action server endpoints
 
 
-class GriplinkAction(StrEnum):
+class GriplinkCommand(StrEnum):
     """
-    The actions a griplink action server executes, each named as its ROS action type in
+    The commands a griplink action server executes, each named as its ROS action in
     ``griplink_interfaces.action``.
     """
 
@@ -68,28 +57,10 @@ class GriplinkEndpoint:
     ROS action topic the griplink server for one gripper listens on.
     """
 
-    action: GriplinkAction
+    command: GriplinkCommand
     """
-    The action this endpoint's server executes.
+    The command this endpoint's server executes.
     """
-
-    @property
-    def message_type(self) -> type:
-        """
-        The ROS action type of :attr:`action`.
-
-        :raises GriplinkInterfacesNotInstalledError: If ``griplink_interfaces`` is not
-            installed.
-        """
-        message_type = {
-            GriplinkAction.GRIP: Grip,
-            GriplinkAction.RELEASE: Release,
-            GriplinkAction.FLEXGRIP: Flexgrip,
-            GriplinkAction.FLEXRELEASE: Flexrelease,
-        }[self.action]
-        if message_type is None:
-            raise GriplinkInterfacesNotInstalledError(self.action_topic)
-        return message_type
 
 
 # %% grip presets

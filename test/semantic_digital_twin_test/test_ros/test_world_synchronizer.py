@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import JSONAttributeDiff, to_json, from_json
-from semantic_digital_twin.adapters.ros.messages import (
+from semantic_digital_twin.messages import (
     MetaData,
     WorldStateUpdate,
     LoadModel,
@@ -88,7 +88,7 @@ from semantic_digital_twin.callbacks.callback import (
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.adapters.ros.messages import (
+from semantic_digital_twin.messages import (
     MetaData,
     WorldStateUpdate,
     ModificationBlock,

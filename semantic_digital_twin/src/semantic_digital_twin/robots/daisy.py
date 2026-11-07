@@ -32,7 +32,7 @@ from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.griplink_gripper import (
-    GriplinkAction,
+    GriplinkCommand,
     GriplinkEndpoint,
     GriplinkGripper,
 )
@@ -199,17 +199,17 @@ class DAiSyLeftGripper(
         """
         return {
             GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/release", action=GriplinkAction.RELEASE
+                action_topic="/left_gripper/release", command=GriplinkCommand.RELEASE
             ),
             GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/grip", action=GriplinkAction.GRIP
+                action_topic="/left_gripper/grip", command=GriplinkCommand.GRIP
             ),
             GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/flexgrip", action=GriplinkAction.FLEXGRIP
+                action_topic="/left_gripper/flexgrip", command=GriplinkCommand.FLEXGRIP
             ),
             GripperState.FLEXOPEN: GriplinkEndpoint(
                 action_topic="/left_gripper/flexrelease",
-                action=GriplinkAction.FLEXRELEASE,
+                command=GriplinkCommand.FLEXRELEASE,
             ),
         }
 
@@ -274,17 +274,17 @@ class DAiSyRightGripper(
         """
         return {
             GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/release", action=GriplinkAction.RELEASE
+                action_topic="/right_gripper/release", command=GriplinkCommand.RELEASE
             ),
             GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/grip", action=GriplinkAction.GRIP
+                action_topic="/right_gripper/grip", command=GriplinkCommand.GRIP
             ),
             GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/flexgrip", action=GriplinkAction.FLEXGRIP
+                action_topic="/right_gripper/flexgrip", command=GriplinkCommand.FLEXGRIP
             ),
             GripperState.FLEXOPEN: GriplinkEndpoint(
                 action_topic="/right_gripper/flexrelease",
-                action=GriplinkAction.FLEXRELEASE,
+                command=GriplinkCommand.FLEXRELEASE,
             ),
         }
 

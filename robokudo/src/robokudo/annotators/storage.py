@@ -26,7 +26,7 @@ import json
 from timeit import default_timer
 
 from py_trees.common import Status
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from semantic_digital_twin.messages import WorldModelSnapshot
 from typing_extensions import Any
 
 import robokudo.world

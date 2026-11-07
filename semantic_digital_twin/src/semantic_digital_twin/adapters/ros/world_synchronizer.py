@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.ormatic.data_access_objects.helper import to_dao
-from semantic_digital_twin.adapters.ros.messages import (
+from semantic_digital_twin.messages import (
     MessageField,
     MetaData,
     WorldStateUpdate,

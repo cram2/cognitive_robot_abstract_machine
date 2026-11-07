@@ -36,7 +36,7 @@ from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from krrood.utils import get_full_class_name
-from semantic_digital_twin.adapters.ros.messages import StreamPosition
+from semantic_digital_twin.messages import StreamPosition
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )

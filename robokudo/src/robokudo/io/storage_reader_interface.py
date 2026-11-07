@@ -30,7 +30,7 @@ from time import perf_counter
 from typing_extensions import Any, TYPE_CHECKING
 from uuid import UUID
 
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from semantic_digital_twin.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )

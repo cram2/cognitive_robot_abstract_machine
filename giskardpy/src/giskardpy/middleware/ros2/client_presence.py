@@ -17,7 +17,7 @@ from rclpy.timer import Timer
 
 from giskardpy.middleware.ros2.exceptions import NoWatchedClientError
 from krrood.adapters.json_serializer import from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from semantic_digital_twin.messages import MetaData
 
 # %% where heartbeats are sent and received
 

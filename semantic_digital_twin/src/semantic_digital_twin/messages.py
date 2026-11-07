@@ -1,3 +1,8 @@
+"""
+The messages processes exchange to keep their worlds synchronized, and the snapshot of a
+world's modifications and state.
+"""
+
 import uuid
 from abc import ABC
 from dataclasses import dataclass, field

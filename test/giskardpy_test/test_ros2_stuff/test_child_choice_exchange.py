@@ -42,7 +42,7 @@ from giskardpy.middleware.ros2.world_updates import (
     ClientWorldUpdates,
     OutgoingWorldUpdates,
 )
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from semantic_digital_twin.messages import MetaData, StreamPosition
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock

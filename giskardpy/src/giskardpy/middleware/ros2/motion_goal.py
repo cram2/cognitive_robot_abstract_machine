@@ -5,7 +5,7 @@ from typing_extensions import Self, Any
 
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from semantic_digital_twin.messages import MetaData, StreamPosition
 
 from cramph.statechart import Statechart
 

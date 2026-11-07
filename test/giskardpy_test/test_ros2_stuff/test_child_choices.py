@@ -33,7 +33,7 @@ from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_statechart.graph_node import EndMotion
 from krrood.adapters.json_serializer import from_json
-from semantic_digital_twin.adapters.ros.messages import MetaData
+from semantic_digital_twin.messages import MetaData
 from semantic_digital_twin.world import World
 
 from .test_world_updates import PublishingSynchronizerMimic
