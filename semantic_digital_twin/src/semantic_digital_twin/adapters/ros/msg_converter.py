@@ -1,17 +1,121 @@
-"""
-The converters between ROS2 messages and their semDT representation: the base classes
-and every converter this package defines, so that a lookup through a base class finds
-each of them.
-"""
+from __future__ import annotations
 
-# %% the base classes, with every converter of this package loaded
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing_extensions import Generic, TypeVar, Any, get_args
 
-import semantic_digital_twin.adapters.ros.ros2_to_semdt_converters  # noqa: F401
-import semantic_digital_twin.adapters.ros.semdt_to_ros2_converters  # noqa: F401
-from semantic_digital_twin.adapters.ros.message_converter_bases import (  # noqa: F401
-    InputType,
-    MessageConverter,
-    OutputType,
-    Ros2ToSemDTConverter,
-    SemDTToRos2Converter,
+
+from krrood.utils import recursive_subclasses
+from semantic_digital_twin.adapters.ros.exceptions import (
+    CannotConvertRos2ToSemDTError,
+    CannotConvertSemDTToRos2Error,
+    ROS2ConversionError,
 )
+from semantic_digital_twin.world import World
+
+InputType = TypeVar("InputType")
+OutputType = TypeVar("OutputType")
+
+
+# %% finding the converter for a message
+
+
+@dataclass
+class MessageConverter(ABC, Generic[InputType, OutputType]):
+    """
+    Base class for converters between ROS2 messages and their semDT representation.
+
+    If you want to add a new converter, subclass one of the two directions below and
+    override the convert method. No registration is necessary.
+    """
+
+    @classmethod
+    @property
+    def input_type(cls) -> type[InputType]:
+        """
+        The type this converter reads.
+        """
+        return get_args(cls.__orig_bases__[0])[0]
+
+    @classmethod
+    @property
+    def output_type(cls) -> type[OutputType]:
+        """
+        The type this converter writes.
+        """
+        return get_args(cls.__orig_bases__[0])[1]
+
+    @classmethod
+    @abstractmethod
+    def conversion_error(cls) -> type[ROS2ConversionError]:
+        """
+        :return: The error raised when no converter of this direction fits.
+        """
+
+    @classmethod
+    def can_convert(cls, data: Any) -> bool:
+        """
+        Checks whether this converter can convert the given object.
+
+        Override this if you want to customize the conversion check.
+
+        :param data: The object to check conversion for.
+        :return: True if this converter can handle the conversion, False otherwise.
+        """
+        return cls.input_type == type(data)
+
+    @classmethod
+    def get_to_converter(cls, input_obj: Any) -> type[MessageConverter]:
+        """
+        :param input_obj: The object to find a converter for.
+        :return: The subclass of this direction that converts the given object.
+        :raises ROS2ConversionError: If no converter of this direction fits.
+        """
+        for sub_class in recursive_subclasses(cls):
+            if sub_class.can_convert(input_obj):
+                return sub_class
+        raise cls.conversion_error()(data_type=type(input_obj))
+
+
+@dataclass
+class Ros2ToSemDTConverter(MessageConverter[InputType, OutputType], ABC):
+    """
+    Base class for converters that convert ROS2 messages to their semDT representation.
+    """
+
+    @classmethod
+    def conversion_error(cls) -> type[ROS2ConversionError]:
+        return CannotConvertRos2ToSemDTError
+
+    @classmethod
+    def convert(cls, data: InputType, world: World) -> OutputType:
+        """
+        Converts the given ROS2 message to its semDT representation.
+
+        :param data: The ROS2 message to convert.
+        :param world: The world in which the semDT object exists.
+        :return: The semDT representation of the given ROS2 message.
+        """
+        return cls.get_to_converter(data).convert(data, world)
+
+
+@dataclass
+class SemDTToRos2Converter(MessageConverter[InputType, OutputType], ABC):
+    """
+    Base class for converters that convert semDT objects to their ROS2 message
+    representation.
+    """
+
+    @classmethod
+    def conversion_error(cls) -> type[ROS2ConversionError]:
+        return CannotConvertSemDTToRos2Error
+
+    @classmethod
+    def convert(cls, data: InputType) -> OutputType:
+        """
+        Converts the given semDT object to its ROS2 message representation.
+
+        :param data: The semDT object to convert.
+        :return: The ROS2 message representation of the given semDT object.
+        """
+        return cls.get_to_converter(data).convert(data)

@@ -8,7 +8,7 @@ import visualization_msgs.msg as visualization_msgs
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import Marker
 
-from semantic_digital_twin.adapters.ros.message_converter_bases import (
+from semantic_digital_twin.adapters.ros.msg_converter import (
     SemDTToRos2Converter,
     InputType,
 )
