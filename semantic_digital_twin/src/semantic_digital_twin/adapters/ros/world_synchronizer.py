@@ -39,12 +39,10 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
-from semantic_digital_twin.adapters.ros.exceptions import (
-    WorldUpdateReferencesUnknownEntityError,
-)
 from semantic_digital_twin.exceptions import (
     SynchronizerNotConnectedError,
     WorldEntityWithIDNotInKwargs,
+    WorldUpdateReferencesUnknownEntityError,
     MissingPublishChangesKWARG,
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
     StateUpdateContainsUnknownDegreesOfFreedomError,
