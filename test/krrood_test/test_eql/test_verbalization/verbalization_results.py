@@ -27,7 +27,7 @@ from krrood.entity_query_language.verbalization._example_domain import (
     WorksIn,
 )
 from krrood.inheritance_path_length import InheritancePathLength
-from krrood.patterns.role_predicates import IsSameSemanticEntity
+from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
 
 results: tuple[VerbalizationResult, ...] = (
     VerbalizationResult(

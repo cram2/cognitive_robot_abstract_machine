@@ -154,7 +154,9 @@ core = [
     "krrood.class_diagrams",
     "krrood.exceptions",
     "krrood.patterns",
+    "krrood.singleton",
     "krrood.symbol_graph",
+    "krrood.utils",
 ]
 # The distributions core may load, with everything they require.
 dependencies = [

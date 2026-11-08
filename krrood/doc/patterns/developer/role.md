@@ -97,7 +97,7 @@ argument because the inherited field's own annotation is the unbound generic par
 Each role is equal only to itself and distinct from its taker and from
 sibling roles. This keeps two concerns separate: *object identity* (am I this exact object?) and
 *semantic equivalence* (do we refer to the same underlying entity?). The latter is expressed explicitly by the `IsSameEntity` predicate in
-`krrood/src/krrood/patterns/role_predicates.py`, which unwraps each operand to its
+`krrood/src/krrood/entity_query_language/role_predicates.py`, which unwraps each operand to its
 `root_persistent_entity` (walking the taker chain to the non-`Role` object) and compares the
 roots by identity. Two roles at different levels of a chain, and a role versus its root taker,
 are therefore *not* `==` but *are* `IsSameEntity`. A direct consequence is that multiple roles,
