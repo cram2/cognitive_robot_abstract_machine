@@ -2044,7 +2044,7 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         unvisited = [self.connection.child]
         while unvisited:
             entity = unvisited.pop()
-            if isinstance(entity, Body) and entity.has_collision():
+            if isinstance(entity, Body) and entity.collision:
                 carried.append(entity)
             unvisited += [
                 child
