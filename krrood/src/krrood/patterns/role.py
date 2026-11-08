@@ -32,7 +32,6 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     :class:`~krrood.patterns.exceptions.RoleAttributeNotDeclaredError`.
 
     >>> from dataclasses import dataclass
-    >>> from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
     >>> @dataclass(unsafe_hash=True)
     ... class Person:
     ...     name: str
@@ -49,7 +48,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     False
     >>> len({person, student})
     2
-    >>> bool(IsSameSemanticEntity(person, student))
+    >>> Role.is_same_semantic_entity(person, student)
     True
     """
 
@@ -265,6 +264,20 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
             if isinstance(role, role_types)
         )
 
+    @staticmethod
+    def is_same_semantic_entity(first_entity: Any, second_entity: Any) -> bool:
+        """
+        :param first_entity: A role or any other object.
+        :param second_entity: A role or any other object.
+        :return: Whether both resolve to the same object, a role resolving to its
+            :attr:`root_persistent_entity` and any other object to itself.
+        """
+        first_root, second_root = (
+            entity.root_persistent_entity if isinstance(entity, Role) else entity
+            for entity in (first_entity, second_entity)
+        )
+        return first_root is second_root
+
     @property
     def all_role_takers(self) -> list[Any]:
         """
@@ -281,7 +294,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     def __eq__(self, other: Any) -> bool:
         """
         A role is equal only to itself (identity), never to its taker; "same underlying
-        entity?" is answered by the ``IsSameSemanticEntity`` predicate instead.
+        entity?" is answered by :meth:`is_same_semantic_entity` instead.
         """
         return self is other
 

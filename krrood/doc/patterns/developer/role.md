@@ -92,15 +92,17 @@ The role taker is the inherited `role_taker` field, so it is identified by its f
 resolves to its bound). The class diagram derives the role-taker association from that generic
 argument because the inherited field's own annotation is the unbound generic parameter.
 
-### Distinct Identity and the `IsSameEntity` Predicate
+### Distinct Identity and `Role.is_same_semantic_entity`
 
 Each role is equal only to itself and distinct from its taker and from
 sibling roles. This keeps two concerns separate: *object identity* (am I this exact object?) and
-*semantic equivalence* (do we refer to the same underlying entity?). The latter is expressed explicitly by the `IsSameEntity` predicate in
-`krrood/src/krrood/entity_query_language/role_predicates.py`, which unwraps each operand to its
+*semantic equivalence* (do we refer to the same underlying entity?). The latter is expressed explicitly by
+`Role.is_same_semantic_entity`, which unwraps each operand to its
 `root_persistent_entity` (walking the taker chain to the non-`Role` object) and compares the
-roots by identity. Two roles at different levels of a chain, and a role versus its root taker,
-are therefore *not* `==` but *are* `IsSameEntity`. A direct consequence is that multiple roles,
+roots by identity. The `IsSameSemanticEntity` predicate in
+`krrood/src/krrood/entity_query_language/role_predicates.py` asks the same question inside entity
+queries, so the pattern itself does not depend on the query language. Two roles at different levels of a chain, and a role versus its root taker,
+are therefore *not* `==` but *are* the same semantic entity. A direct consequence is that multiple roles,
 even of the same type, on one taker stay distinct in sets and dicts.
 
 ### The Role Registry
