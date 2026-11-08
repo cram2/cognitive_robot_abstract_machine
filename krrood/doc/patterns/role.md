@@ -45,8 +45,8 @@ at the end of this guide.
 A **role** adds a semantic context to an existing object — the **role taker** — without altering
 the taker's type or identity. A role is an **ordinary object with its own identity**: it is equal
 only to itself, never to its taker. When you need to ask whether two objects refer to the same
-underlying entity, the `IsSameSemanticEntity` predicate answers that — it sees through role chains
-to the root entity.
+underlying entity, `Role.is_same_semantic_entity` answers that — it sees through role chains
+to the root entity. Inside entity queries, the `IsSameSemanticEntity` predicate asks the same question.
 
 This guide uses a university domain as its running example. A `Person` is a persistent entity with
 a name. Over time that person may become a `CEO` or a `Professor`. These are roles: they add
@@ -355,7 +355,7 @@ print("root type:", Representative.get_root_role_taker_type())
 | Retrieve all roles | `Role.roles_for(taker)` |
 | Access the immediate role taker | `role.role_taker` |
 | Access the root non-role entity | `role.root_persistent_entity` |
-| Check two objects are the same entity | `IsSameSemanticEntity(a, b)` (sees through role chains) |
+| Check two objects are the same entity | `Role.is_same_semantic_entity(a, b)`, or `IsSameSemanticEntity(a, b)` in a query (both see through role chains) |
 | Find the root role-taker type | `MyRole.get_root_role_taker_type()` |
 | Read taker attributes via role | Use the role instance directly — read delegation is automatic |
 | Change a taker attribute | Assign through `role.role_taker` |

@@ -18,7 +18,6 @@ from krrood.class_diagrams.method_classifier import (
 from krrood.class_diagrams.utils import classes_of_module, T
 from krrood.patterns.exceptions import DelegatedFactoryMethodError
 from krrood.patterns.role import Role
-from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes,
@@ -149,11 +148,11 @@ def test_roles_are_distinct_objects_but_share_same_entity():
     assert ceo != professor
     assert len({person, ceo, representative, professor}) == 4
 
-    # ...yet the IsSameEntity predicate sees through the role chain to the one root entity.
-    assert IsSameSemanticEntity(ceo, person)
-    assert IsSameSemanticEntity(ceo, representative)
-    assert IsSameSemanticEntity(ceo, professor)
-    assert IsSameSemanticEntity(representative, professor)
+    # ...yet Role.is_same_semantic_entity sees through the role chain to the one root entity.
+    assert Role.is_same_semantic_entity(ceo, person)
+    assert Role.is_same_semantic_entity(ceo, representative)
+    assert Role.is_same_semantic_entity(ceo, professor)
+    assert Role.is_same_semantic_entity(representative, professor)
 
 
 def test_multiple_roles_of_same_type_on_same_taker():
@@ -170,10 +169,10 @@ def test_multiple_roles_of_same_type_on_same_taker():
     assert first is not second
     assert first != second
     assert len({first, second}) == 2
-    assert IsSameSemanticEntity(first, second)
+    assert Role.is_same_semantic_entity(first, second)
 
 
-def test_is_same_entity_predicate():
+def test_is_same_semantic_entity():
     person = PersonInRoleAndOntology(name="Bass")
     ceo = CEOAsFirstRole(role_taker=person)
     professor = ProfessorAsFirstRole(role_taker=person)
@@ -182,15 +181,15 @@ def test_is_same_entity_predicate():
     other_person = PersonInRoleAndOntology(name="Other")
 
     # Two roles on one taker, and a role versus its taker, are the same entity.
-    assert IsSameSemanticEntity(ceo, professor)
-    assert IsSameSemanticEntity(ceo, person)
+    assert Role.is_same_semantic_entity(ceo, professor)
+    assert Role.is_same_semantic_entity(ceo, person)
     # A role chain resolves to its root entity, in either operand order.
-    assert IsSameSemanticEntity(delegate, person)
-    assert IsSameSemanticEntity(person, delegate)
+    assert Role.is_same_semantic_entity(delegate, person)
+    assert Role.is_same_semantic_entity(person, delegate)
     # Unrelated entities are not the same; a plain object is the same as itself.
-    assert not IsSameSemanticEntity(ceo, other_person)
-    assert not IsSameSemanticEntity(person, other_person)
-    assert IsSameSemanticEntity(person, person)
+    assert not Role.is_same_semantic_entity(ceo, other_person)
+    assert not Role.is_same_semantic_entity(person, other_person)
+    assert Role.is_same_semantic_entity(person, person)
 
 
 def test_mappings_between_roles_and_role_takers():
@@ -207,7 +206,7 @@ def test_mappings_between_roles_and_role_takers():
     assert all(
         any(role is retrieved for retrieved in roles_of_person) for role in roles
     )
-    assert all(IsSameSemanticEntity(role, person) for role in roles)
+    assert all(Role.is_same_semantic_entity(role, person) for role in roles)
 
     delegate_role_takers = [representative, ceo, person]
     assert len(delegate_role_takers) == len(delegate.all_role_takers)
