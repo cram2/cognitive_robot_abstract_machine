@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, ConvergingTask
 from giskardpy.motion_statechart.mixins import (
-    HasPoseReferenceVelocityParameters,
+    HasPoseCruiseVelocityParameters,
     HasRootLinkParameter,
     HasTipLinkParameter,
 )
@@ -17,7 +17,7 @@ class GraspBar(
     ConvergingTask,
     HasRootLinkParameter,
     HasTipLinkParameter,
-    HasPoseReferenceVelocityParameters,
+    HasPoseCruiseVelocityParameters,
 ):
     """
     Like a CartesianPose but with more freedom: the tip link is allowed to be at any
@@ -45,16 +45,6 @@ class GraspBar(
     bar_length: float
     """
     Length of the bar to be grasped.
-    """
-
-    reference_linear_velocity: float = 0.1
-    """
-    The velocity the position constraints are normalized with, in m/s.
-    """
-
-    reference_angular_velocity: float = 0.5
-    """
-    The velocity the orientation constraints are normalized with, in rad/s.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
@@ -92,7 +82,7 @@ class GraspBar(
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_bar_axis,
-            reference_velocity=self.reference_angular_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
 
@@ -108,7 +98,7 @@ class GraspBar(
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_tip,
             frame_P_goal=nearest,
-            reference_velocity=self.reference_linear_velocity,
+            cruise_velocity=self.cruise_linear_velocity,
             quadratic_weight=self.weight,
         )
 

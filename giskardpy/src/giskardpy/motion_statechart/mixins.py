@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing_extensions import Generic, TypeVar
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
@@ -130,35 +131,34 @@ class HasPoseThresholdParameters:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasReferenceVelocityParameter:
+class HasCruiseVelocityParameter:
     """
-    A node whose constraints are normalized with a velocity.
+    A node that approaches its goal at a set speed.
     """
 
-    reference_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    The velocity the constraints of this node are normalized with, in the units of its
-    error per second; a velocity limit sets real limits.
+    How fast the goal is approached, in the units of the node's error per second; not
+    strictly enforced, a velocity limit sets a strict one.
     """
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasPoseReferenceVelocityParameters:
+class HasPoseCruiseVelocityParameters:
     """
-    A node whose position and orientation constraints are normalized with a velocity
-    each.
-    """
-
-    reference_linear_velocity: float = 0.2
-    """
-    The velocity the position constraints are normalized with, in m/s; a velocity limit
-    sets real limits.
+    A node that approaches a goal position and a goal orientation at a set speed each.
     """
 
-    reference_angular_velocity: float = 0.2
+    cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    The velocity the orientation constraints are normalized with, in rad/s; a velocity
-    limit sets real limits.
+    How fast the goal position is approached, in m/s; not strictly enforced, a velocity
+    limit sets a strict one.
+    """
+
+    cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION
+    """
+    How fast the goal orientation is approached, in rad/s; not strictly enforced, a
+    velocity limit sets a strict one.
     """
 
 

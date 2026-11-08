@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
@@ -14,7 +16,7 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.mixins import (
     FeatureType,
     HasFeaturePairParameters,
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
     HasRootLinkParameter,
     HasTipLinkParameter,
 )
@@ -26,7 +28,7 @@ class FeatureFunctionGoal(
     HasRootLinkParameter,
     HasTipLinkParameter,
     HasFeaturePairParameters[FeatureType],
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
     ABC,
 ):
     """
@@ -107,6 +109,11 @@ class AlignPerpendicular(FeatureFunctionGoal[Vector3]):
     :attr:`reference_feature` to zero, and its error is the absolute dot product.
     """
 
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
+    """
+    How fast the normals are turned perpendicular, in rad/s; not strictly enforced.
+    """
+
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
         Build a constraint that drives the two normals perpendicular.
@@ -117,7 +124,8 @@ class AlignPerpendicular(FeatureFunctionGoal[Vector3]):
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.ROTATION,
             equality_bound=0 - expr,
             quadratic_weight=self.weight,
             task_expression=expr,
@@ -160,7 +168,8 @@ class HeightGoal(FeatureFunctionGoal[Point3]):
         ) @ Vector3.Z()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -205,7 +214,8 @@ class DistanceGoal(FeatureFunctionGoal[Point3]):
         expr = root_V_diff.norm()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -216,7 +226,8 @@ class DistanceGoal(FeatureFunctionGoal[Point3]):
         # An extra constraint that makes the execution more stable
         for i, axis_name in enumerate(["x", "y", "z"]):
             artifacts.constraints.add_inequality_constraint(
-                reference_velocity=self.reference_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=0,
                 upper_error=0,
                 quadratic_weight=self.weight,
@@ -245,7 +256,7 @@ class ReachPoint(FeatureFunctionGoal[Point3]):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=self.root_P_controlled_feature,
             frame_P_goal=self.root_P_reference_feature,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = self.root_P_controlled_feature.euclidean_distance(
@@ -269,6 +280,11 @@ class AngleGoal(FeatureFunctionGoal[Vector3]):
     """
     Upper limit to control the angle between the two features.
     """
+
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
+    """
+    How fast the angle goal is approached, in rad/s; not strictly enforced.
+    """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
@@ -286,7 +302,8 @@ class AngleGoal(FeatureFunctionGoal[Vector3]):
         )
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.ROTATION,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
             quadratic_weight=self.weight,

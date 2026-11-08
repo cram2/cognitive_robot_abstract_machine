@@ -17,7 +17,7 @@ from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
 )
 from giskardpy.motion_statechart.mixins import (
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
     HasRootLinkParameter,
     HasTipLinkParameter,
 )
@@ -34,7 +34,7 @@ class WiggleInsert(
     ConvergingTask,
     HasRootLinkParameter,
     HasTipLinkParameter,
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
 ):
     """
     Presses the tip link down towards a hole while wiggling it with random translational
@@ -211,7 +211,7 @@ class WiggleInsert(
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_current,
             frame_P_goal=root_P_hole_wiggled,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
             name=f"{self.name}_point_goal",
         )
@@ -230,7 +230,7 @@ class WiggleInsert(
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight + 1,
         )
 

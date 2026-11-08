@@ -13,7 +13,7 @@ from cramph.node import (
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.mixins import (
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
     HasRootLinkParameter,
     HasTipLinkParameter,
     HasWeightParameter,
@@ -31,7 +31,7 @@ class StayOnLineTask(
     ConvergingTask,
     HasRootLinkParameter,
     HasTipLinkParameter,
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
 ):
     """
     Keeps a point on the tip on the line segment between two points, with an error in
@@ -51,11 +51,6 @@ class StayOnLineTask(
     root_P_end: Point3
     """
     End of the line segment.
-    """
-
-    reference_velocity: float = 0.1
-    """
-    The velocity the constraints of this task are normalized with, in m/s.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -84,7 +79,7 @@ class StayOnLineTask(
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_tool,
             frame_P_goal=root_P_on_line,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = distance_to_line
@@ -144,19 +139,19 @@ class InsertCylinder(
     How far from :attr:`tilt` the cylinder still counts as tilted, in rad.
     """
 
-    approach_velocity: float = 0.1
+    approach_cruise_velocity: float = 0.2
     """
-    Reference velocity while reaching the point above the hole, in m/s.
-    """
-
-    insertion_velocity: float = 0.05
-    """
-    Reference velocity while moving down into the hole, in m/s.
+    Sets how fast the point above the hole is approached, in m/s; not strictly enforced.
     """
 
-    straightening_velocity: float = 0.025
+    insertion_cruise_velocity: float = 0.1
     """
-    Reference angular velocity while straightening the cylinder, in rad/s.
+    Sets how fast the hole is approached, in m/s; not strictly enforced.
+    """
+
+    straightening_cruise_velocity: float = 0.05
+    """
+    Sets how fast the cylinder is straightened, in rad/s; not strictly enforced.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
@@ -205,7 +200,7 @@ class InsertCylinder(
             tip_link=self.tip_link,
             controlled_feature=self.tip_P_tool,
             reference_feature=root_P_top,
-            reference_velocity=self.approach_velocity,
+            cruise_velocity=self.approach_cruise_velocity,
             weight=self.weight,
         )
         self.tilt_task = AngleGoal(
@@ -234,7 +229,7 @@ class InsertCylinder(
             tip_link=self.tip_link,
             controlled_feature=self.tip_P_tool,
             reference_feature=root_P_hole,
-            reference_velocity=self.insertion_velocity,
+            cruise_velocity=self.insertion_cruise_velocity,
             weight=self.weight,
         )
         self.tilt_straight_task = AlignPlanes(
@@ -243,7 +238,7 @@ class InsertCylinder(
             tip_link=self.tip_link,
             controlled_feature=self.tip_V_axis,
             reference_feature=root_V_up,
-            reference_velocity=self.straightening_velocity,
+            cruise_velocity=self.straightening_cruise_velocity,
             weight=self.weight,
         )
         self._add_children_to_statechart(

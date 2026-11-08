@@ -183,15 +183,15 @@ def test_a_holonomic_base_goal_reaches_the_pose_on_the_floor_below_its_target(
 
 
 def _peak_yaw_per_tick_towards(
-    world: World, yaw: float, reference_velocity: float = 0.05
+    world: World, yaw: float, cruise_velocity: float = 0.05
 ) -> float:
     """
     Turns the base of the robot in `world` on the spot and measures how fast it turns.
 
     :param yaw: How far the goal is turned away from the current orientation of the
         base.
-    :param reference_velocity: The reference velocity of the turn in rad/s, far enough
-        below the velocity limit of the drive that the limit does not set the speed.
+    :param cruise_velocity: The cruise velocity of the turn in rad/s, far enough below
+        the velocity limit of the drive that the limit does not set the speed.
     :return: The largest angle the base turned within one control cycle.
     """
     base = world.get_semantic_annotations_by_type(MinimalRobot)[0].root
@@ -199,7 +199,7 @@ def _peak_yaw_per_tick_towards(
         driven_body=base,
         goal=Pose.from_xyz_rpy(yaw=yaw, reference_frame=world.root),
         parent_T_goal_reference_frame=HomogeneousTransformationMatrix(),
-        reference_velocity=reference_velocity,
+        cruise_velocity=cruise_velocity,
     )
     executor = _compiled(world, turn)
 
@@ -214,8 +214,8 @@ def test_a_base_turns_as_fast_towards_a_far_away_yaw_as_towards_a_close_one(
     cylinder_bot_world: World, orientation_speed_ratio_tolerance: float
 ) -> None:
     """
-    The angular speed towards a yaw goal is set by its reference velocity, not by how
-    far away the goal is.
+    The angular speed towards a yaw goal is set by its cruise velocity, not by how far
+    away the goal is.
     """
     derivatives = Derivatives.range(Derivatives.position, Derivatives.jerk)
     initial_state = {

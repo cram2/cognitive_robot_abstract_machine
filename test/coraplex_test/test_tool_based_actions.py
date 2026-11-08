@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
@@ -8,6 +10,7 @@ from coraplex.datastructures.enums import (
     WipingTechnique,
 )
 from coraplex.exceptions import WipingTargetMissing
+from coraplex.plans.failures import MotionMadeNoProgress
 from coraplex.robot_plans.actions.base import ParallelAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.composite.tool_based import (
@@ -16,6 +19,7 @@ from coraplex.robot_plans.actions.composite.tool_based import (
     PouringAction,
     WipingAction,
 )
+from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PositionReached
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -23,6 +27,8 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from cramph.composites import PausedUntilTrue, Sequence
 from cramph.data_types import LifeCycleValues
+from cramph.node import StatechartNode
+import krrood.symbolic_math.symbolic_math as sm
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -46,6 +52,8 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
 )
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.justin import Justin
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.world import World
 
 from .conftest import expand
 from ..plan_running import (
@@ -424,41 +432,89 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     assert tool_path.life_cycle_state == LifeCycleValues.SUCCEEDED
 
 
-def test_a_wipe_stalled_close_to_its_final_waypoint_is_done(
-    tool_action_world,
-) -> None:
+# %% accepting a stalled wipe
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ToolPathStuckInPlace(ConvergingTask):
     """
-    A wipe whose tool gets stuck within the success tolerance of its final waypoint is
-    accepted once the motion stalled.
+    A tool path that never moves the tool and never gets closer to its goal.
     """
-    world, robot, extensions, container, tool_body = tool_action_world
+
+    def build_artifacts(self) -> MotionNodeArtifacts:
+        artifacts = MotionNodeArtifacts()
+        artifacts.error = sm.Scalar(data=1.0)
+        return artifacts
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class WipeWhoseToolGetsStuck(WipingAction):
+    """
+    A wipe whose tool stays where it starts instead of following its path.
+    """
+
+    def _tool_path_steps(self) -> list[StatechartNode]:
+        """
+        :return: A tool path that never moves the tool, in place of the one of
+            :meth:`WipingAction._tool_path_steps`.
+        """
+        return [ToolPathStuckInPlace()]
+
+
+def wipe_stuck_away_from_its_final_waypoint(
+    world: World, robot: PR2, distance: float
+) -> WipeWhoseToolGetsStuck:
+    """
+    :param world: The world of `robot`.
+    :param robot: The robot holding the sponge.
+    :param distance: How far the held sponge is from the final waypoint of the wipe.
+    :return: A spread wipe with a sponge held by `robot`, whose sponge gets stuck where
+        it starts.
+    """
     held_sponge = _attach_box_to_gripper(
         world, robot, "held_sponge", (0.05, 0.05, 0.05), 0.0
     )
-    # the sponge reaches up to about 1.58 m here, so it gets stuck 5 cm below the patch
-    wiping = WipingAction(
+    sponge_position = held_sponge.global_pose.position.to_np()
+    # a spread sweep ends at the center of its patch
+    return WipeWhoseToolGetsStuck(
         arm=robot.right_arm,
         tool=Sponge(root=held_sponge),
         technique=WipingTechnique.SPREAD,
-        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.63, reference_frame=world.root),
-    )
-    plan = Sequence(
-        nodes=[
-            NavigateAction(
-                target_location=Pose2D.from_xy_yaw(
-                    x=1.85, y=2.2, reference_frame=world.root
-                )
-            ),
-            wiping,
-        ]
+        target_pose=Pose.from_xyz_rpy(
+            x=sponge_position[0],
+            y=sponge_position[1] + distance,
+            z=sponge_position[2],
+            reference_frame=world.root,
+        ),
     )
 
-    run_plan(plan, extensions)
+
+def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
+    tool_action_world,
+) -> None:
+    world, robot, extensions, container, tool_body = tool_action_world
+    wiping = wipe_stuck_away_from_its_final_waypoint(
+        world, robot, WipingAction.final_waypoint_threshold / 2
+    )
+
+    run_plan(wiping, extensions)
 
     [final_waypoint_check] = [
         node for node in wiping.nodes if isinstance(node, PausedUntilTrue)
     ]
     assert final_waypoint_check.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+
+def test_a_wipe_stalled_beyond_its_tolerance_of_the_final_waypoint_is_not_done(
+    tool_action_world,
+) -> None:
+    world, robot, extensions, container, tool_body = tool_action_world
+    wiping = wipe_stuck_away_from_its_final_waypoint(
+        world, robot, 2 * WipingAction.final_waypoint_threshold
+    )
+
+    with pytest.raises(MotionMadeNoProgress):
+        run_plan(wiping, extensions)
 
 
 # %% keeping the torso upright

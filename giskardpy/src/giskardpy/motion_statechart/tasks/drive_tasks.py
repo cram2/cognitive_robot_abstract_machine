@@ -11,10 +11,12 @@ from dataclasses import dataclass, field
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.mixins import (
     HasGoalParameter,
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
 )
+from giskardpy.motion_statechart.weights import VelocityScale
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
@@ -32,7 +34,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class DrivenBaseTask(
-    ConvergingTask, HasGoalParameter[Pose], HasReferenceVelocityParameter, ABC
+    ConvergingTask, HasGoalParameter[Pose], HasCruiseVelocityParameter, ABC
 ):
     """
     Moves the base a drive carries towards :attr:`goal`, relative to the parent of the
@@ -101,7 +103,8 @@ class BasePosition(DrivenBaseTask):
             artifacts.geometry.add_position_constraint(
                 expression_current=base_coordinate,
                 expression_goal=goal_coordinate,
-                reference_velocity=self.reference_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 quadratic_weight=self.weight,
             )
         parent_V_base_to_goal = parent_P_goal - parent_P_base
@@ -115,6 +118,11 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
     """
     Turns the base about the vertical until it faces the way the orientation
     :meth:`parent_R_goal` describes does, with an error in radians.
+    """
+
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
+    """
+    How fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     @abstractmethod
@@ -138,7 +146,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
         artifacts.geometry.add_yaw_goal_constraint(
             frame_R_current=parent_R_base,
             frame_R_goal=parent_R_goal,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         yaw_error = sm.shortest_angular_distance(

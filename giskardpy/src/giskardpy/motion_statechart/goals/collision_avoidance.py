@@ -12,7 +12,7 @@ from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
     UnexpectedWorldEntityCountError,
     CollisionViolatedError,
@@ -23,7 +23,7 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from cramph.node import CompositeNode, NodeArtifacts, CancelStatechart
 from giskardpy.motion_statechart.graph_node import Task
-from giskardpy.motion_statechart.mixins import HasReferenceVelocityParameter
+from giskardpy.motion_statechart.mixins import HasCruiseVelocityParameter
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.collision_checking.collision_groups import (
@@ -53,7 +53,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class _CollisionAvoidanceTask(Task, HasReferenceVelocityParameter, ABC):
+class _CollisionAvoidanceTask(Task, HasCruiseVelocityParameter, ABC):
     """
     Avoids collisions of :attr:`robot` with one inequality constraint per collision it
     avoids.
@@ -182,9 +182,7 @@ def _single_robot_of_world(node: CompositeNode) -> AbstractRobot:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CollisionAvoidance(
-    EndedByOwner, CompositeNode, HasReferenceVelocityParameter, ABC
-):
+class CollisionAvoidance(EndedByOwner, CompositeNode, HasCruiseVelocityParameter, ABC):
     """
     Avoids collisions of the robot with one task, and cancels the motion once one of
     them is violated.
@@ -311,7 +309,8 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             root_V_contact_normal = manager.get_root_V_contact_normal_symbol(contact)
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
-                reference_velocity=self.reference_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -345,7 +344,7 @@ class ExternalCollisionAvoidance(CollisionAvoidance):
         return _ExternalCollisionAvoidanceTask(
             name=f"{self.name}/task",
             robot=self.robot,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
         )
 
     def _create_cancel_node(
@@ -594,7 +593,8 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
             )
             artifacts.constraints.add_inequality_constraint(
                 name=f"{group_a.root.name}/{group_b.root.name}/{contact.rank}",
-                reference_velocity=self.reference_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -629,7 +629,7 @@ class SelfCollisionAvoidance(CollisionAvoidance):
         return _SelfCollisionAvoidanceTask(
             name=f"{self.name}/task",
             robot=self.robot,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
         )
 
     def _create_cancel_node(

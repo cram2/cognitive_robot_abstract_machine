@@ -11,7 +11,8 @@ from cramph.composites import Parallel
 from cramph.data_types import ObservationStateValues
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.error_signals import (
     joint_position_and_velocity_variables,
     time_derivative_from_joint_motion,
@@ -29,9 +30,9 @@ from giskardpy.motion_statechart.mixins import (
     HasFeaturePairParameters,
     HasGoalBindingPolicyParameter,
     HasGoalParameter,
-    HasPoseReferenceVelocityParameters,
+    HasPoseCruiseVelocityParameters,
     HasPoseThresholdParameters,
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
     HasRootLinkParameter,
     HasThresholdParameter,
     HasTipLinkParameter,
@@ -67,7 +68,7 @@ class CartesianTask(
     BindsGoalReferenceFrame[GoalType],
     HasRootLinkParameter,
     HasTipLinkParameter,
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
     ABC,
 ):
     """
@@ -148,7 +149,7 @@ class CartesianPosition(CartesianTask[Point3]):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_goal=root_P_goal,
             frame_P_current=root_P_current,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
 
@@ -165,7 +166,7 @@ class DistanceAlongAxis(
     ConvergingTask,
     HasRootLinkParameter,
     HasFeaturePairParameters[Point3],
-    HasReferenceVelocityParameter,
+    HasCruiseVelocityParameter,
 ):
     """
     Move two points, each fixed on a link of its own, until they stand a given distance
@@ -201,7 +202,8 @@ class DistanceAlongAxis(
         )
         current_distance = (root_P_tip - root_P_reference) @ self.axis
         artifacts.constraints.add_equality_constraint(
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             equality_bound=self.distance - current_distance,
             quadratic_weight=self.weight,
             task_expression=current_distance,
@@ -311,7 +313,7 @@ class CartesianPositionTrajectory(CartesianTask[list[Point3]]):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_goal=root_P_goal,
             frame_P_current=root_P_current,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
 
@@ -407,8 +409,7 @@ class CartesianPositionTrajectory(CartesianTask[list[Point3]]):
         distances = np.linalg.norm(
             remaining_points - goal_reference_frame_P_tip_np, axis=1
         )
-        local_closest_index = np.argmin(distances)
-        self.current_index += local_closest_index
+        self.current_index += int(np.argmin(distances))
 
     def _compute_target_point(
         self, goal_reference_frame_P_tip_np: np.ndarray
@@ -571,21 +572,24 @@ class CartesianPositionStraight(CartesianTask[Point3]):
         artifacts.geometry.add_position_constraint(
             expression_current=line_V_travelled[0],
             expression_goal=line_length,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             quadratic_weight=self.weight,
             name="line/progress",
         )
         artifacts.geometry.add_position_constraint(
             expression_current=line_V_travelled[1],
             expression_goal=0,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             quadratic_weight=lateral_weight,
             name="line/y",
         )
         artifacts.geometry.add_position_constraint(
             expression_current=line_V_travelled[2],
             expression_goal=0,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             quadratic_weight=lateral_weight,
             name="line/z",
         )
@@ -609,6 +613,11 @@ class CartesianOrientation(CartesianTask[RotationMatrix]):
     .. warning:: This task does not constrain position.
     """
 
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
+    """
+    How fast the goal orientation is approached, in rad/s; not strictly enforced.
+    """
+
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
         Build motion constraints for reaching the goal orientation.
@@ -629,7 +638,7 @@ class CartesianOrientation(CartesianTask[RotationMatrix]):
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
 
@@ -648,7 +657,7 @@ class CartesianPose(
     HasGoalParameter[Pose],
     HasGoalBindingPolicyParameter,
     HasPoseThresholdParameters,
-    HasPoseReferenceVelocityParameters,
+    HasPoseCruiseVelocityParameters,
     HasWeightParameter,
 ):
     """
@@ -693,7 +702,7 @@ class CartesianPose(
                 root_link=self.root_link,
                 tip_link=self.tip_link,
                 goal=self.goal.position,
-                reference_velocity=self.reference_linear_velocity,
+                cruise_velocity=self.cruise_linear_velocity,
                 threshold=self.position_threshold,
                 weight=self.weight,
                 binding_policy=self.binding_policy,
@@ -703,7 +712,7 @@ class CartesianPose(
                 root_link=self.root_link,
                 tip_link=self.tip_link,
                 goal=self.goal.rotation_matrix,
-                reference_velocity=self.reference_angular_velocity,
+                cruise_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,
                 binding_policy=self.binding_policy,
@@ -755,15 +764,14 @@ class HoldLink(Task, HasRootLinkParameter, HasTipLinkParameter, ABC):
     def _hold_orientation(
         self,
         artifacts: MotionNodeArtifacts,
-        reference_velocity: float,
+        cruise_velocity: float,
         threshold: float,
     ) -> Scalar:
         """
         Constrain the chain to the orientation bound when this task started.
 
         :param artifacts: The artifacts the constraints are added to.
-        :param reference_velocity: The velocity the constraints are normalized with, in
-            rad/s.
+        :param cruise_velocity: How fast the orientation is restored, in rad/s.
         :param threshold: The angle in radians up to which the link counts as held.
         :return: Whether the link is within `threshold` of that orientation.
         """
@@ -774,7 +782,7 @@ class HoldLink(Task, HasRootLinkParameter, HasTipLinkParameter, ABC):
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_goal=root_R_tip_when_started,
             frame_R_current=root_R_tip,
-            reference_velocity=reference_velocity,
+            cruise_velocity=cruise_velocity,
             quadratic_weight=self.weight,
             name="orientation",
         )
@@ -785,15 +793,14 @@ class HoldLink(Task, HasRootLinkParameter, HasTipLinkParameter, ABC):
     def _hold_position(
         self,
         artifacts: MotionNodeArtifacts,
-        reference_velocity: float,
+        cruise_velocity: float,
         threshold: float,
     ) -> Scalar:
         """
         Constrain the chain to the position bound when this task started.
 
         :param artifacts: The artifacts the constraints are added to.
-        :param reference_velocity: The velocity the constraints are normalized with, in
-            m/s.
+        :param cruise_velocity: How fast the position is restored, in m/s.
         :param threshold: The distance in meters up to which the link counts as held.
         :return: Whether the link is within `threshold` of that position.
         """
@@ -804,7 +811,7 @@ class HoldLink(Task, HasRootLinkParameter, HasTipLinkParameter, ABC):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_goal=root_P_tip_when_started,
             frame_P_current=root_P_tip,
-            reference_velocity=reference_velocity,
+            cruise_velocity=cruise_velocity,
             quadratic_weight=self.weight,
             name="position",
         )
@@ -812,12 +819,17 @@ class HoldLink(Task, HasRootLinkParameter, HasTipLinkParameter, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HoldOrientation(HoldLink, HasThresholdParameter, HasReferenceVelocityParameter):
+class HoldOrientation(HoldLink, HasThresholdParameter, HasCruiseVelocityParameter):
     """
     Keeps a link in the orientation it had when this task started, leaving it free to
     move.
 
     Its threshold is an angle in radians.
+    """
+
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
+    """
+    How fast the orientation is restored, in rad/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -827,15 +839,13 @@ class HoldOrientation(HoldLink, HasThresholdParameter, HasReferenceVelocityParam
         """
         artifacts = MotionNodeArtifacts()
         artifacts.observation = self._hold_orientation(
-            artifacts, self.reference_velocity, self.threshold
+            artifacts, self.cruise_velocity, self.threshold
         )
         return artifacts
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HoldPose(
-    HoldLink, HasPoseThresholdParameters, HasPoseReferenceVelocityParameters
-):
+class HoldPose(HoldLink, HasPoseThresholdParameters, HasPoseCruiseVelocityParameters):
     """
     Keeps a link at the pose it had when this task started.
     """
@@ -849,10 +859,10 @@ class HoldPose(
         artifacts = MotionNodeArtifacts()
         artifacts.observation = sm.logic_and(
             self._hold_orientation(
-                artifacts, self.reference_angular_velocity, self.orientation_threshold
+                artifacts, self.cruise_angular_velocity, self.orientation_threshold
             ),
             self._hold_position(
-                artifacts, self.reference_linear_velocity, self.position_threshold
+                artifacts, self.cruise_linear_velocity, self.position_threshold
             ),
         )
         return artifacts
@@ -863,7 +873,6 @@ class RigidCoupling(
     Task,
     HasRootLinkParameter,
     HasTipLinkParameter,
-    HasPoseReferenceVelocityParameters,
 ):
     """
     Keeps :attr:`tip_link` at rest relative to :attr:`root_link` at every step of the
@@ -891,13 +900,16 @@ class RigidCoupling(
         )
         root_R_tip = root_T_tip.rotation_matrix
         self._keep_at_rest(
-            artifacts, root_T_tip.position, self.reference_linear_velocity, "position"
+            artifacts,
+            root_T_tip.position,
+            VelocityScale.TRANSLATION,
+            "position",
         )
         self._keep_at_rest(
-            artifacts, root_R_tip.x_vector(), self.reference_angular_velocity, "x_axis"
+            artifacts, root_R_tip.x_vector(), VelocityScale.ROTATION, "x_axis"
         )
         self._keep_at_rest(
-            artifacts, root_R_tip.y_vector(), self.reference_angular_velocity, "y_axis"
+            artifacts, root_R_tip.y_vector(), VelocityScale.ROTATION, "y_axis"
         )
         artifacts.observation = sm.Scalar.const_true()
         return artifacts
@@ -906,7 +918,7 @@ class RigidCoupling(
         self,
         artifacts: MotionNodeArtifacts,
         vector: Point3 | Vector3,
-        reference_velocity: float,
+        velocity_scale: float,
         name: str,
     ) -> None:
         """
@@ -918,7 +930,7 @@ class RigidCoupling(
                 velocity_goal=0,
                 quadratic_weight=self.weight,
                 task_expression=vector[index],
-                velocity_limit=reference_velocity,
+                velocity_scale=velocity_scale,
                 name=f"{name}/{index}",
             )
 

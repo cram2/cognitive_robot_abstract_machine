@@ -28,13 +28,13 @@ from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from krrood_spatial_math.spatial_types import Point3
-from semantic_digital_twin.utils import tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
 pytestmark = [
     pytest.mark.skipif(
-        not tracy_installed(), reason="iai_tracy_description is not installed"
+        not Tracy.is_description_installed(),
+        reason="iai_tracy_description is not installed",
     ),
     pytest.mark.skipif(
         not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"

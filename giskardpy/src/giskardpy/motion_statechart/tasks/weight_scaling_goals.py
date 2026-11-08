@@ -47,7 +47,8 @@ class MaxManipulability(
         manipulability = sm.sqrt(jacobian_gram.det())
 
         artifacts.geometry.add_position_constraint(
-            reference_velocity=1,
+            cruise_velocity=1,
+            velocity_scale=1,
             expression_goal=self.goal,
             quadratic_weight=1,
             expression_current=manipulability,
