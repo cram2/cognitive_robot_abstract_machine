@@ -462,22 +462,22 @@ class ChildChoiceClient:
         :return: One message for each node of `given_a_child`, then one for each of
             `left_without_a_child`.
         """
-        first_node_indices = [
-            *[answered.latest_child.index for answered in given_a_child],
-            len(self.statechart.nodes),
+        chosen_child_indices = [
+            answered.latest_child.index for answered in given_a_child
         ]
+        stop_node_indices = [*chosen_child_indices[1:], len(self.statechart.nodes)]
         return [
             ChildChoiceMessage(
                 goal_id=goal_id,
                 node_index=answered.index,
-                first_node_index=first_node_index,
+                first_node_index=chosen_child_index,
                 nodes=self.statechart.nodes_from_to_json(
-                    first_node_index, stop_node_index
+                    chosen_child_index, stop_node_index
                 ),
                 required_position=self.required_position,
             )
-            for answered, first_node_index, stop_node_index in zip(
-                given_a_child, first_node_indices, first_node_indices[1:]
+            for answered, chosen_child_index, stop_node_index in zip(
+                given_a_child, chosen_child_indices, stop_node_indices
             )
         ] + [
             ChildChoiceMessage(
