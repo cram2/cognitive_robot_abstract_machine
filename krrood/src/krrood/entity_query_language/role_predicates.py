@@ -1,3 +1,7 @@
+"""
+Entity query language predicates about :class:`~krrood.patterns.role.Role` objects.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

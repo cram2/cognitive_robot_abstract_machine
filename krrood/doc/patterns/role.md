@@ -82,7 +82,7 @@ from dataclasses import dataclass, field
 from typing_extensions import List, Optional
 
 from krrood.entity_query_language.predicate import Symbol
-from krrood.patterns.role_predicates import IsSameSemanticEntity
+from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
 
 
 @dataclass(eq=False)
@@ -392,7 +392,7 @@ flowchart TD
 
 - **Developer guide**: {doc}`developer/role` — design decisions, architecture, and extension points.
 - **API reference**: `krrood.patterns.role` — `Role`; `krrood.patterns.role_registry` —
-  `RoleRegistry`; `krrood.patterns.role_predicates` — `IsSameSemanticEntity`.
+  `RoleRegistry`; `krrood.entity_query_language.role_predicates` — `IsSameSemanticEntity`.
 - **Source**: `krrood/src/krrood/patterns/role.py`
 - **Tests**: `test/krrood_test/test_patterns/test_role.py` and the dataset under
   `test/krrood_test/dataset/role_and_ontology/`.

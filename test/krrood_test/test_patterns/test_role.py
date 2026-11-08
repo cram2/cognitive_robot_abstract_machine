@@ -18,7 +18,7 @@ from krrood.class_diagrams.method_classifier import (
 from krrood.class_diagrams.utils import classes_of_module, T
 from krrood.patterns.exceptions import DelegatedFactoryMethodError
 from krrood.patterns.role import Role
-from krrood.patterns.role_predicates import IsSameSemanticEntity
+from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from ..dataset.role_and_ontology import (
     university_ontology_like_classes,
