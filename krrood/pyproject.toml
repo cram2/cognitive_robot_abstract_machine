@@ -145,8 +145,6 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
-# Core is everything a plain `pip install krrood` needs. Its modules are the source modules of
-# the contract below, and the packages they may load are core's dependencies further down.
 [tool.krrood.core-boundary]
 # The packages and modules a plain `pip install krrood` must be able to load; every other
 # module of krrood is not core. `krrood check` reports a core module that loads a module
