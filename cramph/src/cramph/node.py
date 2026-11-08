@@ -2048,31 +2048,42 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
 
     def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
         """
-        .. note:: A node holding other nodes among its constructor arguments overrides
-            this to hold them built anew.
-
         :param rebuild: Builds the nodes this node holds anew and rebinds what it refers
             to.
-        :return: A node of no statechart constructed like this one, or None if it
-            cannot be without a node `rebuild` leaves out.
-        """
-        return self._rebuilt_holding(rebuild)
-
-    def _rebuilt_holding(self, rebuild: NodeRebuild, **held_nodes: Any) -> Self:
-        """
-        :param rebuild: Rebinds what this node refers to.
-        :param held_nodes: Every constructor argument of this node that holds nodes,
-            built anew.
-        :return: A node of no statechart constructed like this one, holding
-            `held_nodes`, with every other constructor argument rebound by `rebuild`.
+        :return: A node of no statechart constructed like this one, holding every node
+            and every list of nodes among its constructor arguments built anew, or None
+            if `rebuild` leaves out such a node or every node of such a list.
         """
         arguments = {
             # a field known only by its name can only be read with getattr
             constructor_field.name: getattr(self, constructor_field.name)
             for constructor_field in fields(self)
-            if constructor_field.init and constructor_field.name not in held_nodes
+            if constructor_field.init
         }
-        return type(self)(**rebuild.rebound(arguments), **held_nodes)
+        held_nodes = {
+            name: rebuild.rebuilt(value)
+            for name, value in arguments.items()
+            if isinstance(value, StatechartNode)
+        }
+        held_node_lists = {
+            name: rebuild.rebuilt_children(self, value)
+            for name, value in arguments.items()
+            if isinstance(value, list)
+            and value
+            and all(isinstance(element, StatechartNode) for element in value)
+        }
+        if any(node is None for node in held_nodes.values()) or not all(
+            held_node_lists.values()
+        ):
+            return None
+        other_arguments = {
+            name: value
+            for name, value in arguments.items()
+            if name not in held_nodes and name not in held_node_lists
+        }
+        return type(self)(
+            **rebuild.rebound(other_arguments), **held_nodes, **held_node_lists
+        )
 
     def __repr__(self) -> str:
         return self.unique_name

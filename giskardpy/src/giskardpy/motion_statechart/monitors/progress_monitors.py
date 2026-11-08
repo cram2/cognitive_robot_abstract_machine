@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from typing_extensions import Self
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,7 +21,7 @@ from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from giskardpy.motion_statechart.exceptions import NoProgressError
-from cramph.node import CancelStatechart, CompositeNode, NodeArtifacts, NodeRebuild
+from cramph.node import CancelStatechart, CompositeNode, NodeArtifacts
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionStatechartNode
 from cramph.monitors import CountSimulationTimeSeconds
 
@@ -119,16 +118,6 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
     Each monitored task's error on the previous control cycle, which the observation of
     that cycle judged, or NaN where there was none.
     """
-
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
-        """
-        :return: This node constructed anew, watching :attr:`monitored_tasks` built
-            anew, without those left out.
-        """
-        return self._rebuilt_holding(
-            rebuild,
-            monitored_tasks=rebuild.rebuilt_children(self, self.monitored_tasks),
-        )
 
     @classproperty
     def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
@@ -379,16 +368,6 @@ class AnyMonitoredTaskShortOfItsGoal(EndedByOwner, MotionStatechartNode):
     The tasks whose life cycle states and goals are watched.
     """
 
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
-        """
-        :return: This node constructed anew, watching :attr:`monitored_tasks` built
-            anew, without those left out.
-        """
-        return self._rebuilt_holding(
-            rebuild,
-            monitored_tasks=rebuild.rebuilt_children(self, self.monitored_tasks),
-        )
-
     def build_artifacts(self) -> NodeArtifacts:
         """
         Each task contributes ``0`` or ``1``, so their maximum is ``1`` exactly when at
@@ -447,16 +426,6 @@ class StillProgressing(EndedByOwner, CompositeNode):
     @property
     def prerequisite_nodes(self) -> list[MotionStatechartNode]:
         return [self.monitored_node]
-
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
-        """
-        :return: This node constructed anew, watching :attr:`monitored_node` built anew,
-            or None if it is left out.
-        """
-        monitored_node = rebuild.rebuilt(self.monitored_node)
-        if monitored_node is None:
-            return None
-        return self._rebuilt_holding(rebuild, monitored_node=monitored_node)
 
     @property
     def monitored_tasks(self) -> list[ConvergingTask]:

@@ -1,62 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-import cramph
-import cramph.nodes_for_testing
-from cramph.composites import Parallel, Sequence, StartedWhenTrue
+from cramph.composites import Parallel, RepeatUntil, Sequence, StartedWhenTrue
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountNodeResets
-from cramph.node import (
-    DerivedConditionVariable,
-    EndStatechart,
-    NodeRebuild,
-    StatechartNode,
+from cramph.node import DerivedConditionVariable, EndStatechart
+from cramph.nodes_for_testing import (
+    NodeFailingOnObservingFalse,
+    NodeObservingLastObservation,
+    NodeSucceedingOnObservingTrue,
 )
-from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
-from typing_extensions import Any
 
-from .node_rebuild_audit import NodeRebuildAudit
-
-# %% mimics
-
-
-@dataclass
-class RebuildLeavingNodesOut(NodeRebuild):
-    """
-    Builds every node anew except those it leaves out, and keeps every other value as it
-    is.
-    """
-
-    left_out: list[StatechartNode] = field(default_factory=list)
-    """
-    The nodes it leaves out.
-    """
-
-    built: dict[StatechartNode, StatechartNode | None] = field(default_factory=dict)
-    """
-    The node each node was built anew as, None for one left out.
-    """
-
-    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
-        if node not in self.built:
-            self.built[node] = None if node in self.left_out else node.rebuilt_by(self)
-        return self.built[node]
-
-    def rebuilt_children(
-        self, owner: StatechartNode, children: list[StatechartNode]
-    ) -> list[StatechartNode]:
-        return [
-            rebuilt
-            for child in children
-            if (rebuilt := self.rebuilt(child)) is not None
-        ]
-
-    def rebound(self, value: Any) -> Any:
-        return value
-
+from .node_rebuild import RebuildLeavingNodesOut
 
 # %% helpers
 
@@ -134,11 +90,51 @@ def test_a_monitor_counting_resets_counts_those_of_the_node_built_anew() -> None
     assert rebuilt.target == 2
 
 
-def test_every_cramph_node_holding_nodes_builds_them_anew() -> None:
-    audit = NodeRebuildAudit(
-        modules=[cramph], ignored_modules=[cramph.nodes_for_testing]
+def test_a_repeated_task_is_built_anew_with_its_stop_monitor_built_anew() -> None:
+    task = NodeFailingOnObservingFalse(
+        name="task", observation=ObservationStateValues.FALSE
     )
-    assert audit.nodes_holding_nodes_they_do_not_rebuild() == []
+    stop_retry_monitor = _succeeding("stop")
+    rebuild = RebuildLeavingNodesOut()
+
+    rebuilt = rebuild.rebuilt(
+        RepeatUntil(task=task, stop_retry_monitor=stop_retry_monitor)
+    )
+
+    assert rebuilt.task is rebuild.built[task]
+    assert rebuilt.stop_retry_monitor is rebuild.built[stop_retry_monitor]
+
+
+def test_a_repeated_task_without_its_stop_monitor_is_left_out() -> None:
+    stop_retry_monitor = _succeeding("stop")
+    rebuild = RebuildLeavingNodesOut(left_out=[stop_retry_monitor])
+
+    rebuilt = rebuild.rebuilt(
+        RepeatUntil(
+            task=NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE),
+            stop_retry_monitor=stop_retry_monitor,
+        )
+    )
+
+    assert rebuilt is None
+
+
+def test_a_node_reading_another_node_reads_it_built_anew() -> None:
+    watched_node = _succeeding("watched")
+    rebuild = RebuildLeavingNodesOut()
+
+    rebuilt = rebuild.rebuilt(NodeObservingLastObservation(watched_node=watched_node))
+
+    assert rebuilt.watched_node is rebuild.built[watched_node]
+
+
+def test_a_sequence_keeps_its_children_that_are_not_left_out() -> None:
+    first, second = _succeeding("first"), _succeeding("second")
+    rebuild = RebuildLeavingNodesOut(left_out=[first])
+
+    rebuilt = rebuild.rebuilt(Sequence(nodes=[first, second]))
+
+    assert rebuilt.nodes == [rebuild.built[second]]
 
 
 # %% a condition reading the counterparts of the nodes it reads

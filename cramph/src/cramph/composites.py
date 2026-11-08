@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from itertools import combinations, takewhile
 
-from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
+from typing_extensions import Any, Generator, Generic, Iterator, TypeVar
 
 from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import QueryBackend
@@ -36,7 +36,6 @@ from cramph.node import (
     CompositeNode,
     StatechartNode,
     NodeArtifacts,
-    NodeRebuild,
     TerminalNode,
 )
 from krrood.exceptions import DataclassException
@@ -141,16 +140,6 @@ class ControlStructureNode(CompositeNode, ABC):
         if isinstance(node, Match):
             return StatementNode(statement=node)
         return node
-
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
-        """
-        :return: This goal constructed anew, holding its children built anew, or None if
-            none of them is.
-        """
-        children = rebuild.rebuilt_children(self, self.nodes)
-        if not children:
-            return None
-        return self._rebuilt_holding(rebuild, nodes=children)
 
     def add_node(self, node: StatechartNode) -> None:
         """
@@ -529,19 +518,6 @@ class RepeatUntil(CompositeNodeEndingItsChildren):
     retrying off, or None to only observe False then.
     """
 
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
-        """
-        :return: This goal constructed anew, holding its task and stop monitor built
-            anew, or None if one of them is left out.
-        """
-        task = rebuild.rebuilt(self.task)
-        stop_retry_monitor = rebuild.rebuilt(self.stop_retry_monitor)
-        if task is None or stop_retry_monitor is None:
-            return None
-        return self._rebuilt_holding(
-            rebuild, task=task, stop_retry_monitor=stop_retry_monitor
-        )
-
     def expand(self) -> None:
         """
         Wire the retry loop.
@@ -751,19 +727,6 @@ class MonitoredCompositeNode(EndedByOwner, CompositeNode, ABC):
     """
     The node placed under the monitor's control.
     """
-
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
-        """
-        :return: This goal constructed anew, holding its monitor and monitored node
-            built anew, or None if one of them is left out.
-        """
-        monitor = rebuild.rebuilt(self.monitor)
-        monitored_node = rebuild.rebuilt(self.monitored_node)
-        if monitor is None or monitored_node is None:
-            return None
-        return self._rebuilt_holding(
-            rebuild, monitor=monitor, monitored_node=monitored_node
-        )
 
     def expand(self) -> None:
         """
