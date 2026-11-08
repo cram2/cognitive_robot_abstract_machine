@@ -107,11 +107,7 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
     Point3,
 )
-from semantic_digital_twin.utils import (
-    rclpy_installed,
-    tracy_installed,
-    daisy_installed,
-)
+from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -588,7 +584,7 @@ def _garmi_world_setup():
 
 @pytest.fixture(scope="session")
 def tracy_world():
-    if not tracy_installed():
+    if not Tracy.is_description_installed():
         pytest.skip("Tracy not installed")
     tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
     world_with_tracy = tracy_parser.create_world()
@@ -598,11 +594,10 @@ def tracy_world():
 
 @pytest.fixture(scope="session")
 def daisy_world():
-    if not daisy_installed():
+    if not DAiSy.is_description_installed():
         pytest.skip("DAiSy not installed")
-    daisy = "package://iai_daisy_description/robots/daisy.urdf.xacro"
     try:
-        daisy_parser = URDFParser.from_file(file_path=daisy)
+        daisy_parser = URDFParser.from_file(file_path=DAiSy.get_ros_file_path())
         world_with_daisy = daisy_parser.create_world()
         DAiSy.from_world(world_with_daisy)
     except Exception:
