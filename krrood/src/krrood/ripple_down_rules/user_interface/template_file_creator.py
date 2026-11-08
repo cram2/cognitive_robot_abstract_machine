@@ -1,3 +1,7 @@
+"""
+Writing a rule template file for an expert to edit, and opening it in an editor.
+"""
+
 import ast
 import os
 import shutil
@@ -20,7 +24,7 @@ from krrood.ripple_down_rules.utils import (
     get_types_to_import_from_type_hints,
 )
 from krrood.code_generation.imports import get_imports_from_types
-from krrood.code_generation.source_extraction_utils import extract_function_source
+from krrood.source_analysis.source_extraction import extract_function_source
 from krrood.code_generation.type_hints import stringify_type_hint
 from krrood.utils import get_scope_from_imports
 

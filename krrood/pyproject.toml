@@ -151,20 +151,10 @@ exclude_lines = [
 # outside core, or a distribution outside `dependencies`, at module level.
 core = [
     "krrood._version",
-    "krrood.adapters",
-    "krrood.bounds",
     "krrood.class_diagrams",
-    "krrood.entity_query_language",
     "krrood.exceptions",
-    "krrood.inheritance_path_length",
     "krrood.patterns",
-    "krrood.rustworkx_utils.graph_visualizer",
-    "krrood.rustworkx_utils.graph_visualizer_base",
-    "krrood.rustworkx_utils.rxnode",
-    "krrood.rustworkx_utils.utils",
-    "krrood.singleton",
     "krrood.symbol_graph",
-    "krrood.utils",
 ]
 # The distributions core may load, with everything they require.
 dependencies = [
