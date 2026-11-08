@@ -62,6 +62,8 @@ def spinner_thread_target(node: Node) -> None:
     try:
         while rclpy.ok():
             executor.spin_once(timeout_sec=0.1)
+            # Needed: without this pause the threads start choking and everything becomes
+            # slower. Do not remove it, not even to raise the callback throughput.
             sleep(0.001)
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass

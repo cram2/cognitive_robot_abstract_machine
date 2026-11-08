@@ -9,6 +9,8 @@ from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
+from .dataset.field_accessors import hand_written_accessors
+from .dataset.leading_prepositions import prepositional_names, verb_phrase_names
 from .dataset.missing_docstrings import (
     documented_module,
     no_module_docstring,
@@ -202,4 +204,34 @@ class MimicDistribution(StrEnum):
     MATPLOTLIB = "matplotlib"
     """
     The distribution only the mimic distribution's drawing extra requires.
+    """
+
+
+class FieldAccessorSnippet(PathEnumeration):
+    """
+    The Python sources the hand written field accessor check reads.
+    """
+
+    HAND_WRITTEN_ACCESSORS = Path(hand_written_accessors.__file__)
+    """
+    A module with a hand written data descriptor and a dataclass property setter, next
+    to a plain class property setter and a descriptor built on the base, which pass.
+    """
+
+
+class MethodNameSnippet(PathEnumeration):
+    """
+    The Python sources the leading preposition check reads.
+    """
+
+    PREPOSITIONAL_NAMES = Path(prepositional_names.__file__)
+    """
+    A module whose classmethod, method, private method and function each begin their
+    name with a preposition.
+    """
+
+    VERB_PHRASE_NAMES = Path(verb_phrase_names.__file__)
+    """
+    A module whose method names are verb phrases, an alternative constructor and a
+    conversion.
     """

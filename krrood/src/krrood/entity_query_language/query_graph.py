@@ -202,12 +202,15 @@ class QueryGraph:
                 return "Flatten"
             case Call():
                 expression: Call
-                args = [
-                    QueryGraph.get_expression_name(arg) for arg in expression._args_
+                positional_labels = [
+                    QueryGraph.get_expression_name(argument)
+                    for argument in expression._arguments_.positional
                 ]
-                kwargs = [f"{k}={v}" for k, v in expression._kwargs_.items()]
-                args_and_kwargs = args + kwargs
-                return f"({','.join(args_and_kwargs)})"
+                keyword_labels = [
+                    f"{name}={value}"
+                    for name, value in expression._arguments_.keyword.items()
+                ]
+                return f"({','.join(positional_labels + keyword_labels)})"
             case Query():
                 return f"({','.join(QueryGraph.get_expression_name(v) for v in expression._selected_variables_)})"
             case SymbolicExpression():
