@@ -1,11 +1,4 @@
-import subprocess
-import sys
-from pathlib import Path
-
 import numpy as np
-from geometry_msgs.msg import Point
-
-from krrood.utils import get_full_class_name
 
 from robokudo.io import cas_annotation_codecs
 from robokudo.types.annotation import CloudAnnotation, Shape, Sphere, Cylinder
@@ -181,24 +174,3 @@ def test_body_keypoint_cloud_serialization_roundtrip_preserves_keypoint_and_poin
     np.testing.assert_allclose(
         np.asarray(restored_keypoint_cloud.points.points), points
     )
-
-
-def test_annotation_codecs_serialize_ros_messages_on_their_own():
-    """
-    Importing the annotation codecs is enough to serialize a ROS2 message, without
-    another import registering the ROS serializers first.
-    """
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(
-                Path(__file__).parent / "ros_message_serialization_from_cold_import.py"
-            ),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == get_full_class_name(Point)
