@@ -464,9 +464,9 @@ class StatedProposition(ABC):
     ) -> bool:
         """
         EQL represents a predicate or a symbolic function applied to variables as an
-        :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable` naming the
-        class rather than as an instance of it, so what a node applies is read off that
-        name.
+        :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable` whose
+        factory is the class rather than as an instance of it, so what a node applies is
+        read off that factory.
 
         :param expression: A node of an EQL condition.
         :param applied: The predicate or symbolic function the node may apply.
@@ -474,8 +474,8 @@ class StatedProposition(ABC):
         """
         return (
             isinstance(expression, InstantiatedVariable)
-            and isinstance(expression._type_, type)
-            and issubclass(expression._type_, applied)
+            and isinstance(expression._factory_, type)
+            and issubclass(expression._factory_, applied)
         )
 
     @property
@@ -516,7 +516,7 @@ class AssertedRelation(StatedProposition):
 
     @property
     def kind(self) -> PredicateKind:
-        return self.expression._type_.kind
+        return self.expression._factory_.kind
 
     @property
     def stated_under(self) -> str:
@@ -573,7 +573,7 @@ class MeasuredComparison(StatedProposition):
 
     @property
     def kind(self) -> PredicateKind:
-        return self.measure._type_.kind
+        return self.measure._factory_.kind
 
     @property
     def stated_under(self) -> str:

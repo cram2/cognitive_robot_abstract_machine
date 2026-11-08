@@ -17,6 +17,7 @@ from probabilistic_model.causal_structure.exceptions import (
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
+    ColliderPatternInCausalGraph,
     GraphEdge,
     GraphNode,
     NodeLevel,
@@ -27,6 +28,7 @@ from .graphs import (
     confounded,
     mediated,
     undirected_chain,
+    undirected_parent,
     without_member_graphs,
 )
 
@@ -55,7 +57,18 @@ class Shape(Enum):
 def test_member_graphs_keep_v_structures():
     [member] = collider_with_an_undirected_child().member_graphs()
 
-    assert set(member.edges()) == {("A", "C"), ("B", "C"), ("C", "D")}
+    assert {(parent.name, child.name) for parent, child in member.edges()} == {
+        ("A", "C"),
+        ("B", "C"),
+        ("C", "D"),
+    }
+
+
+def test_unshielded_colliders_name_both_parents_in_name_order():
+    graph = collider_with_an_undirected_child()
+    assert graph.unshielded_colliders() == {
+        ColliderPatternInCausalGraph(graph.node("A"), graph.node("C"), graph.node("B"))
+    }
 
 
 def test_too_many_undirected_edges_raises():
@@ -76,18 +89,20 @@ def test_graph_without_member_graphs_raises():
 def test_an_edge_to_a_node_the_graph_lacks_raises():
     graph = confounded()
 
+    outside = GraphNode(variable=Continuous("W"), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+
     with pytest.raises(UnknownGraphNode):
-        graph.add_edge(GraphEdge.directed("X", "W"))
+        graph.add_edge(GraphEdge.directed_edge(graph.node("X"), outside))
 
 
 def test_the_edge_between_two_nodes_is_found_from_either_end():
     graph = confounded()
-    x, z = graph.node("X"), graph.node("Z")
+    cause, confounder = graph.node("X"), graph.node("Z")
 
     assert (
-        graph.edge_between(x, z)
-        == graph.edge_between(z, x)
-        == GraphEdge.directed("Z", "X")
+        graph.edge_between(cause, confounder)
+        == graph.edge_between(confounder, cause)
+        == GraphEdge.directed_edge(confounder, cause)
     )
 
 
@@ -95,6 +110,12 @@ def test_nodes_without_an_edge_are_not_adjacent():
     graph = mediated()
 
     assert not graph.adjacent(graph.node("X"), graph.node("Y"))
+
+
+def test_a_node_an_undirected_edge_may_point_into_is_a_possible_ancestor():
+    graph = undirected_parent()
+
+    assert graph.possible_ancestors(graph.node("X")) == {graph.node("A")}
 
 
 # %% storing a graph
@@ -109,14 +130,59 @@ def test_graph_round_trips_through_json():
 # %% the nodes of a relational graph
 
 
-def test_variable_of_part_names_the_indexed_copy():
-    node = GraphNode(
+def disturbed_neighbour() -> GraphNode:
+    """
+    :return: The node of an attribute every neighbour of a scene has.
+    """
+    return GraphNode(
         variable=Continuous("Scene.neighbours.disturbed"),
         level=NodeLevel.PART_ATTRIBUTE,
         collection="neighbours",
     )
 
-    assert node.variable_of_part(3).name == "Scene.neighbours[3].disturbed"
+
+def test_variable_of_part_names_the_indexed_copy():
+    assert (
+        disturbed_neighbour().variable_of_part(3).name
+        == "Scene.neighbours[3].disturbed"
+    )
+
+
+def test_part_index_of_reads_the_position_back_from_the_copy():
+    node = disturbed_neighbour()
+
+    assert node.part_index_of(node.variable_of_part(3).name) == 3
+
+
+@pytest.mark.parametrize(
+    "variable_name",
+    [
+        "Scene.neighbours.disturbed",
+        "Scene.obstacles[3].disturbed",
+        "Scene.neighbours[3].displacement",
+        "Scene.neighbours[first].disturbed",
+    ],
+)
+def test_part_index_of_is_none_for_a_variable_that_is_no_copy(variable_name):
+    assert disturbed_neighbour().part_index_of(variable_name) is None
+
+
+def test_part_index_of_is_none_for_a_node_of_no_part():
+    node = GraphNode(
+        variable=Continuous("Scene.friction"), level=NodeLevel.EXAMPLE_ATTRIBUTE
+    )
+
+    assert node.part_index_of("Scene.neighbours[3].disturbed") is None
+
+
+def test_reference_of_a_copy_names_the_node_and_the_part():
+    node = disturbed_neighbour()
+    graph = CausalGraph.from_edges([node], [])
+
+    reference = graph.reference_of(node.variable_of_part(3).name)
+
+    assert (reference.node, reference.part_index) == (node, 3)
+    assert reference.variable == node.variable_of_part(3)
 
 
 # %% cells for the support of an adjustment

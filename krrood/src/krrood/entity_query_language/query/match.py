@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
-from inspect import ismethod, isfunction, isclass
+from inspect import isclass
 from typing_extensions import (
     Callable,
     Generic,
@@ -26,7 +26,6 @@ from typing_extensions import (
     Self,
     Iterator,
     Iterable,
-    assert_never,
     Any,
 )
 
@@ -288,24 +287,17 @@ class Match(
     """
 
     def __post_init__(self):
-        if self._declared_type_ is None:
-            self._initialize_type_()
+        """
+        Take the matched type from :attr:`_factory_` when none was declared.
 
-    def _initialize_type_(self):
+        :raises MatchTypeCannotBeDetermined: If :attr:`_factory_` names no type it
+            builds.
         """
-        Initialize the type of the match based on the provided information in- place.
-        """
-        if isclass(self._factory_):
-            self._declared_type_ = self._factory_
-        elif ismethod(self._factory_):
-            self._declared_type_ = self._factory_.__class__
-        elif isfunction(self._factory_):
-            type_ = get_type_hints_of_object(self._factory_).get("return")
-            if type_ is None or not isclass(type_):
-                raise MatchTypeCannotBeDetermined(self)
-            self._declared_type_ = type_
-        else:
-            assert_never(self._factory_)
+        if self._declared_type_ is not None:
+            return
+        self._declared_type_ = self._type_built_by_(self._factory_)
+        if self._declared_type_ is None:
+            raise MatchTypeCannotBeDetermined(self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> T | Self:
         """
@@ -691,7 +683,7 @@ class Match(
         :return: Whether that keyword is left out of construction, decided once per
             factory, matched class, keyword and value type.
         """
-        if CallSignature.of(factory).accepts_keyword(keyword):
+        if CallSignature.from_callable(factory).accepts_keyword(keyword):
             return False
         return keyword in dir(matched_type) or issubclass(value_type, CausalRoleMarker)
 
