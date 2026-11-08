@@ -376,10 +376,10 @@ class CoreBoundary:
         The normalized names of the distribution itself, of :attr:`dependencies` and of
         every installed distribution they require.
         """
-        return {self.distribution} | self.with_requirements(set(self.dependencies))
+        return {self.distribution} | self.requirement_closure(set(self.dependencies))
 
     @staticmethod
-    def with_requirements(distributions: set[str]) -> set[str]:
+    def requirement_closure(distributions: set[str]) -> set[str]:
         """
         :param distributions: Names of distributions.
         :return: Their normalized names and those of every installed distribution they

@@ -105,7 +105,7 @@ def test_loading_core_loads_only_the_distributions_its_import_graph_predicts() -
         for package in loaded_by_core
         for distribution in distributions_by_package.get(package, [])
     }
-    predicted = boundary.with_requirements(
+    predicted = boundary.requirement_closure(
         set().union(
             *map(boundary.distributions_loaded_beyond_core, boundary.core_modules)
         )
