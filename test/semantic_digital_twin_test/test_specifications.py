@@ -29,7 +29,6 @@ from semantic_digital_twin.specifications.semantic_annotations import (
     SemanticAnnotationWithRootSpecification,
 )
 from semantic_digital_twin.specifications.exceptions import (
-    RobotNamesTakenError,
     VisualCollisionBackupDisabledError,
 )
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -739,18 +738,12 @@ def test_world_specification_with_several_robots():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    description_parser=URDFParser.from_file(
-                        PR2.get_ros_file_path(), prefix="first"
-                    ),
                     localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=1.0
                     ),
                 ),
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    description_parser=URDFParser.from_file(
-                        PR2.get_ros_file_path(), prefix="second"
-                    ),
                     localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-1.0
                     ),
@@ -764,7 +757,6 @@ def test_world_specification_with_several_robots():
 
     odometry_bodies = _odometry_bodies(world, PR2MobileBase)
     assert len(odometry_bodies) == 2
-    assert odometry_bodies[0].name != odometry_bodies[1].name
     for odometry_body in odometry_bodies:
         assert isinstance(odometry_body.parent_connection, FixedConnection)
         assert odometry_body.parent_connection.parent is world.root
@@ -774,52 +766,6 @@ def test_world_specification_with_several_robots():
         for odometry_body in odometry_bodies
     )
     np.testing.assert_allclose(odometry_positions, [-1.0, 1.0])
-
-
-def test_a_robot_whose_names_the_world_already_holds_is_rejected(empty_world):
-    """
-    Every name the second robot shares with the first is reported, so the caller sees
-    which prefix to change.
-    """
-    RobotSpecification(
-        semantic_annotation_type=MinimalRobot,
-        description_parser=_parser_of_robot_rooted_at_map(),
-    ).spawn(empty_world)
-    described_names = {
-        entity.name
-        for entity in _parser_of_robot_rooted_at_map()
-        .create_world()
-        .kinematic_structure_entities
-    }
-
-    with pytest.raises(RobotNamesTakenError) as raised:
-        RobotSpecification(
-            semantic_annotation_type=MinimalRobot,
-            description_parser=_parser_of_robot_rooted_at_map(),
-        ).spawn(empty_world)
-
-    assert raised.value.robot_class is MinimalRobot
-    assert set(raised.value.taken_names) == described_names
-
-
-def test_two_robots_read_from_their_default_description_clash_at_their_odometry_body(
-    empty_world,
-):
-    """
-    Robots read with the same prefix name their odometry bodies alike, so the clash
-    covers the localization frame as well.
-    """
-    try:
-        first_robot = RobotSpecification(semantic_annotation_type=PR2).spawn(
-            empty_world
-        )
-    except ParsingError as error:
-        pytest.skip(f"PR2 URDF not available: {error}")
-
-    with pytest.raises(RobotNamesTakenError) as raised:
-        RobotSpecification(semantic_annotation_type=PR2).spawn(empty_world)
-
-    assert first_robot.mobile_base.drive.parent.name in raised.value.taken_names
 
 
 # %% robot specifications: a movable localization

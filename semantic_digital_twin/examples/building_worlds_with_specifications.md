@@ -700,26 +700,21 @@ world = WorldSpecification.from_urdf(
 ```
 
 Because `robots` is a list, a world can hold several of them, each with its own localization —
-including several instances of the same robot. Names are not unique in a world, so each robot is
-annotated while it still owns the world it was parsed into. Its odometry body takes the prefix of
-the robot's own names, so robots read with different prefixes keep their localization frames
-apart. A robot whose names the world already holds is rejected with a `RobotNamesTakenError`, so
-each further instance of the same robot is read by a parser with a prefix of its own.
+including several instances of the same robot. Names are not unique in a world, so two PR2s
+contribute two joints called `pr2/torso_lift_joint` and two odometry bodies called
+`pr2/odom_combined`, told apart by their identifiers. Each robot is therefore annotated while it
+still owns the world it was parsed into.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.adapters.urdf import URDFParser
-
 two_robot_world = WorldSpecification.from_urdf(
     file_path=table_urdf,
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            description_parser=URDFParser.from_file(PR2.get_ros_file_path(), prefix="left_pr2"),
             localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
         ),
         RobotSpecification(
             semantic_annotation_type=PR2,
-            description_parser=URDFParser.from_file(PR2.get_ros_file_path(), prefix="right_pr2"),
             localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
         ),
     ],

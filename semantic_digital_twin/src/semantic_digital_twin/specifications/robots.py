@@ -22,7 +22,6 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
 from semantic_digital_twin.specifications.exceptions import (
-    RobotNamesTakenError,
     VisualCollisionBackupDisabledError,
 )
 from semantic_digital_twin.world_description.world_entity import Body
@@ -155,11 +154,8 @@ class RobotSpecification:
         :return: The semantic annotation of the merged robot.
         :raises RobotDescriptionMissingError: If no :attr:`description_parser` is given
             and the robot class declares no description file.
-        :raises RobotNamesTakenError: If ``world`` already holds an entity with a name
-            of the robot or of its odometry body.
         """
         described_robot = self._create_described_robot()
-        self._reject_taken_names(world, described_robot)
         robot_id = described_robot.id
         if isinstance(described_robot, HasMobileBase):
             self._merge_behind_its_odometry(world, described_robot)
@@ -177,29 +173,6 @@ class RobotSpecification:
         return self.semantic_annotation_type.from_world(
             self.description_parser.create_world()
         )
-
-    def _reject_taken_names(self, world: World, described_robot: AbstractRobot) -> None:
-        """
-        :param world: The world the robot is about to be merged into.
-        :param described_robot: The robot, in the world it was read into.
-        :raises RobotNamesTakenError: If ``world`` already holds an entity with a name
-            of the robot or of its odometry body.
-        """
-        robot_names = {
-            entity.name
-            for entity in described_robot._world.kinematic_structure_entities
-        }
-        if isinstance(described_robot, HasMobileBase):
-            robot_names.add(self._odometry_body_name(described_robot))
-        taken_names = [
-            entity.name
-            for entity in world.kinematic_structure_entities
-            if entity.name in robot_names
-        ]
-        if taken_names:
-            raise RobotNamesTakenError(
-                robot_class=self.semantic_annotation_type, taken_names=taken_names
-            )
 
     def _merge_at_its_localization(
         self, world: World, described_robot: AbstractRobot
