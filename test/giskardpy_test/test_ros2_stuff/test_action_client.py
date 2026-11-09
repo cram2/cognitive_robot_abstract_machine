@@ -11,7 +11,7 @@ from typing_extensions import Any
 
 from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOutcome
-from giskardpy.middleware.ros2.action_client import MyActionClient
+from giskardpy.middleware.ros2.action_client import GiskardActionClient
 
 # %% mimics
 
@@ -129,7 +129,7 @@ def server_sending_feedback(giskard_command_server) -> ServerAnsweringOneGoal:
 def test_an_error_of_the_feedback_callback_is_raised_to_the_sender_of_the_goal(
     server_sending_feedback: ServerAnsweringOneGoal,
 ) -> None:
-    client = MyActionClient(rospy.get_node(), JsonAction, "giskard/command")
+    client = GiskardActionClient(rospy.get_node(), JsonAction, "giskard/command")
 
     with pytest.raises(FeedbackDeliberatelyRejected):
         client.send_goal(JsonAction.Goal(), feedback_callback=reject_feedback)
@@ -138,7 +138,7 @@ def test_an_error_of_the_feedback_callback_is_raised_to_the_sender_of_the_goal(
 def test_a_goal_whose_feedback_callback_failed_is_canceled(
     server_sending_feedback: ServerAnsweringOneGoal,
 ) -> None:
-    client = MyActionClient(rospy.get_node(), JsonAction, "giskard/command")
+    client = GiskardActionClient(rospy.get_node(), JsonAction, "giskard/command")
 
     with pytest.raises(FeedbackDeliberatelyRejected):
         client.send_goal(JsonAction.Goal(), feedback_callback=reject_feedback)

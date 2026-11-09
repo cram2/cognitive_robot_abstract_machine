@@ -7,7 +7,7 @@ from rclpy.node import Node
 
 from giskardpy.middleware.ros2 import action_client
 from semantic_digital_twin.adapters.ros import rospy
-from giskardpy.middleware.ros2.action_client import MyActionClient
+from giskardpy.middleware.ros2.action_client import GiskardActionClient
 
 # %% test doubles
 
@@ -62,7 +62,7 @@ def test_waiting_for_a_late_server_uses_the_given_node(rclpy_node, monkeypatch):
     monkeypatch.setattr(rospy, "get_node", None)
     monkeypatch.setattr(action_client, "ActionClient", LateServerActionClient)
 
-    client = MyActionClient(rclpy_node, JsonAction, "late_server_action")
+    client = GiskardActionClient(rclpy_node, JsonAction, "late_server_action")
 
     assert client.node_handle is rclpy_node
     assert (

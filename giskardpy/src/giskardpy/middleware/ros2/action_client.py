@@ -29,7 +29,15 @@ from semantic_digital_twin.adapters.ros import rospy
 # %% action client
 
 
-class MyActionClient:
+class GiskardActionClient:
+    """
+    Sends goals to a Giskard action server one at a time and waits for their results.
+
+    Only the goal sent last is followed; results and acceptances of earlier goals are
+    ignored. An aborted goal carries its error as JSON in the result, which
+    :meth:`create_abort_exception` turns back into the exception.
+    """
+
     _goal_handle: ClientGoalHandle | None
     _result_future: Future | None
     _goal_counter: int

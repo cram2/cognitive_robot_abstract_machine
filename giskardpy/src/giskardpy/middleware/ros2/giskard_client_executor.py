@@ -27,7 +27,7 @@ from giskardpy.middleware.ros2.exceptions import (
     StatechartNotEndedByResultError,
 )
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
-from giskardpy.middleware.ros2.action_client import MyActionClient
+from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_control import MotionControl
@@ -78,7 +78,7 @@ class GiskardClientExecutor(Executor):
     _goal_result: JsonAction_Result | None = None
     _result_future: Future | None = None
     world: World = None
-    _client: MyActionClient = None
+    _client: GiskardActionClient = None
 
     world_updates: ClientWorldUpdates = field(init=False, default=None)
     """
@@ -119,7 +119,7 @@ class GiskardClientExecutor(Executor):
         if self.announces_presence:
             self.announce_presence()
         giskard_topic = f"{self.giskard_node_name}/command"
-        self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
+        self._client = GiskardActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
 
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -258,7 +258,7 @@ class GiskardClientExecutor(Executor):
 
         :param result: result of a goal that succeeded or was aborted
         :raises Exception: The exception that made Giskard abort the goal, see
-            :meth:`MyActionClient.create_abort_exception`.
+            :meth:`GiskardActionClient.create_abort_exception`.
         :raises StatechartNotEndedByResultError: If a goal that succeeded leaves the
             statechart not ended.
         """
