@@ -365,6 +365,24 @@ class GoalRequestNotAnsweredError(ExecutionException):
 
 
 @dataclass
+class ActionClientClosedError(ExecutionException):
+    """
+    Raised when a goal is sent through an action client that was closed.
+    """
+
+    action_name: str
+    """
+    The action the closed client was built for.
+    """
+
+    def error_message(self) -> str:
+        return f"The client of '{self.action_name}' was closed and sends no more goals."
+
+    def suggest_correction(self) -> str:
+        return "Build a new client for the action and send the goal through it."
+
+
+@dataclass
 class UnexpectedGoalStatusError(ExecutionException):
     """
     Raised when a goal ends in a status that a finished goal cannot have.

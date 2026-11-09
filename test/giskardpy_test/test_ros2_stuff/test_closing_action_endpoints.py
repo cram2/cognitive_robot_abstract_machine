@@ -21,6 +21,7 @@ from rclpy.node import Node
 from typing_extensions import Callable, Iterator
 
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
+from giskardpy.middleware.ros2.exceptions import ActionClientClosedError
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 from giskardpy.middleware.ros2.utils.utils_for_tests import StretchTester
 from semantic_digital_twin.adapters.ros import rospy
@@ -44,7 +45,7 @@ class ObservedRosGraph:
     How long a change may take to show up in the view of :attr:`observer`.
     """
 
-    def action_servers_of(self, node_name: str) -> list[str]:
+    def served_actions(self, node_name: str) -> list[str]:
         """
         :return: The actions the node called ``node_name`` serves.
         """
@@ -55,7 +56,7 @@ class ObservedRosGraph:
             )
         ]
 
-    def action_clients_of(self, node_name: str) -> list[str]:
+    def client_actions(self, node_name: str) -> list[str]:
         """
         :return: The actions the node called ``node_name`` has a client for.
         """
@@ -85,17 +86,15 @@ def test_a_closed_action_server_no_longer_serves_its_action(init_rospy) -> None:
         action_name="closed_server/command", action_type=JsonAction
     )
     graph.wait_until(
-        lambda: "/closed_server/command" in graph.action_servers_of(server_node_name)
+        lambda: "/closed_server/command" in graph.served_actions(server_node_name)
     )
 
     action_server.close()
     graph.wait_until(
-        lambda: (
-            "/closed_server/command" not in graph.action_servers_of(server_node_name)
-        )
+        lambda: "/closed_server/command" not in graph.served_actions(server_node_name)
     )
 
-    assert "/closed_server/command" not in graph.action_servers_of(server_node_name)
+    assert "/closed_server/command" not in graph.served_actions(server_node_name)
 
 
 # %% closing an action client
@@ -122,17 +121,27 @@ def test_a_closed_action_client_no_longer_uses_its_action(
         rospy.get_node(), JsonAction, "closed_client/command"
     )
     graph.wait_until(
-        lambda: "/closed_client/command" in graph.action_clients_of(client_node_name)
+        lambda: "/closed_client/command" in graph.client_actions(client_node_name)
     )
 
     action_client.close()
     graph.wait_until(
-        lambda: (
-            "/closed_client/command" not in graph.action_clients_of(client_node_name)
-        )
+        lambda: "/closed_client/command" not in graph.client_actions(client_node_name)
     )
 
-    assert "/closed_client/command" not in graph.action_clients_of(client_node_name)
+    assert "/closed_client/command" not in graph.client_actions(client_node_name)
+
+
+def test_a_closed_action_client_refuses_to_send_a_goal(
+    closed_client_action_server: ActionServerHandler,
+) -> None:
+    action_client = MyActionClient(
+        rospy.get_node(), JsonAction, closed_client_action_server.action_name
+    )
+    action_client.close()
+
+    with pytest.raises(ActionClientClosedError):
+        action_client.send_goal(JsonAction.Goal())
 
 
 # %% closing a Giskard and its client
@@ -153,9 +162,9 @@ def test_a_closed_giskard_and_its_client_leave_the_graph(init_rospy) -> None:
     graph.wait_until(
         lambda: (
             client_node_name not in graph.observer.get_node_names()
-            and not graph.action_servers_of(giskard_node_name)
+            and not graph.served_actions(giskard_node_name)
         )
     )
 
     assert client_node_name not in graph.observer.get_node_names()
-    assert f"/{command_action_name}" not in graph.action_servers_of(giskard_node_name)
+    assert f"/{command_action_name}" not in graph.served_actions(giskard_node_name)

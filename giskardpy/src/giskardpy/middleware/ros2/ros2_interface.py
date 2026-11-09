@@ -23,6 +23,7 @@ from std_msgs.msg import String
 from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.event_loop_manager import get_event_loop
 from giskardpy.middleware.ros2.exceptions import (
+    ActionClientClosedError,
     ExecutionAbortedException,
     ExecutionCanceledException,
     GoalRequestNotAnsweredError,
@@ -269,6 +270,13 @@ class MyActionClient:
     The rclpy action client, ``None`` once :meth:`close` withdrew it.
     """
 
+    _current_goal_lock: threading.Lock = field(
+        init=False, default_factory=threading.Lock
+    )
+    """
+    Keeps a goal from being given up while its acceptance makes it the current one.
+    """
+
     def __post_init__(self) -> None:
         self._client = ActionClient(
             node=self.node_handle,
@@ -302,14 +310,19 @@ class MyActionClient:
         :param feedback_callback: Receives every feedback of the goal, see
             :meth:`_receive_feedback`.
         :return: The future that resolves once the server accepted or rejected the goal.
+        :raises ActionClientClosedError: If the client was closed.
         """
+        if self._client is None:
+            raise ActionClientClosedError(action_name=self.action_name)
         self._goal_counter += 1
         self._current_goal_id = self._goal_counter
         self._feedback_error = None
         if feedback_callback is not None:
             feedback_callback = partial(self._receive_feedback, feedback_callback)
         future = self._client.send_goal_async(goal, feedback_callback=feedback_callback)
-        future.add_done_callback(self._receive_goal_response)
+        future.add_done_callback(
+            partial(self._receive_goal_response, goal_id=self._goal_counter)
+        )
         return future
 
     def _receive_feedback(
@@ -343,13 +356,20 @@ class MyActionClient:
         :param feedback_callback: Receives every feedback of the goal, see
             :meth:`_receive_feedback`.
         :return: The result of the goal, see :meth:`get_result`.
+        :raises ActionClientClosedError: If the client was closed.
         :raises GoalRequestNotAnsweredError: If no server accepts or rejects the goal
-            within :attr:`goal_response_timeout`.
+            within :attr:`goal_response_timeout`. The goal is given up, so a server that
+            accepts it later has it canceled.
         """
         goal_response = self.send_goal_async(goal, feedback_callback=feedback_callback)
         answered = threading.Event()
         goal_response.add_done_callback(lambda _: answered.set())
-        if not answered.wait(self.goal_response_timeout.total_seconds()):
+        answered.wait(self.goal_response_timeout.total_seconds())
+        with self._current_goal_lock:
+            is_given_up = not goal_response.done()
+            if is_given_up:
+                self._current_goal_id = None
+        if is_given_up:
             raise GoalRequestNotAnsweredError(
                 action_name=self.action_name, timeout=self.goal_response_timeout
             )
@@ -410,29 +430,35 @@ class MyActionClient:
         except (JSONSerializationError, TypeError):
             return ExecutionAbortedException()
 
-    def _receive_goal_response(self, future: Future) -> None:
+    def _receive_goal_response(self, future: Future, goal_id: int) -> None:
         """
-        Start waiting for the result of the goal sent last, if its server accepted it.
+        Start waiting for the result of the goal ``goal_id`` if its server accepted it.
+
+        A goal that is accepted after it was given up or superseded by a newer goal is
+        canceled, so that it does not run although nobody waits for it.
 
         :param future: Resolved with the handle of the goal the server answered.
+        :param goal_id: Identifier of the goal the answer belongs to.
         """
         goal_handle = future.result()
-        goal_id = self._goal_counter  # Capture the current goal ID
-
         if not goal_handle.accepted:
             self.node_handle.get_logger().info(
                 f"{self.action_name} Goal {goal_id} rejected"
             )
             return
 
-        # Only process if this is still the current goal
-        if goal_id != self._current_goal_id:
-            self.node_handle.get_logger().debug(
-                f"Ignoring accepted callback for old goal {goal_id}"
+        with self._current_goal_lock:
+            is_current = goal_id == self._current_goal_id
+            if is_current:
+                self._goal_handle = goal_handle
+        if not is_current:
+            self.node_handle.get_logger().info(
+                f"{self.action_name} Goal #{goal_id} accepted after it was given up, "
+                f"canceling it"
             )
+            goal_handle.cancel_goal_async()
             return
 
-        self._goal_handle = goal_handle
         self.node_handle.get_logger().info(
             f"{self.action_name} Goal #{goal_id} accepted"
         )
