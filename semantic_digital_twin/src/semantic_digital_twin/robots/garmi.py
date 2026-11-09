@@ -417,7 +417,7 @@ class GarmiLeftGripper(
 
     @property
     def closing_axis(self) -> Vector3:
-        return Vector3.NEGATIVE_Y(reference_frame=self.tool_frame)
+        return Vector3.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
