@@ -114,3 +114,43 @@ class Loves(Likes):
 PeopleWithHobby.likes = Likes(PeopleWithHobby, "likes")
 SportsLover.loves = Loves(SportsLover, "loves")
 BasketBallLover.loves = Loves(BasketBallLover, "loves")
+
+
+@dataclass
+class PersonWithTwoRoles:
+    """
+    A person with a basketball lover role and a sports lover role, created in that order.
+    """
+
+    person: PersonWithHobbies
+    """
+    The root role taker.
+    """
+    basketball_lover: BasketBallLover
+    """
+    The role created first.
+    """
+    sports_lover: SportsLover
+    """
+    The role created second.
+    """
+
+    @classmethod
+    def named(cls, name: str) -> PersonWithTwoRoles:
+        """
+        :param name: The name of the person.
+        :return: A new person with both roles.
+        """
+        person = PersonWithHobbies(name=name)
+        return cls(
+            person,
+            BasketBallLover(role_taker=person),
+            SportsLover(role_taker=person),
+        )
+
+    @property
+    def objects(self) -> list[Symbol]:
+        """
+        The person followed by its roles, in the order they were created.
+        """
+        return [self.person, self.basketball_lover, self.sports_lover]

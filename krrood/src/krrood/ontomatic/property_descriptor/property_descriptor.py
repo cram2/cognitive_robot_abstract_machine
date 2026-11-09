@@ -179,7 +179,7 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
     """
 
     @classmethod
-    def declared_by(cls, domain_type: type) -> PropertyDescriptor | None:
+    def declared_by(cls, domain_type: SymbolType) -> PropertyDescriptor | None:
         """
         :param domain_type: A class.
         :return: The descriptor of exactly this descriptor class managing a field of the class, declared on the class
@@ -192,7 +192,7 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
         return None
 
     @classmethod
-    def super_classes(cls) -> tuple[type[PropertyDescriptor], ...]:
+    def super_properties(cls) -> tuple[type[PropertyDescriptor], ...]:
         """
         :return: The descriptor classes this descriptor class directly inherits from, its superproperties.
         """

@@ -5,6 +5,8 @@ taker or one of its roles, whose declaration of the property admits the value.
 
 from __future__ import annotations
 
+import pytest
+
 from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
     PropertyDescriptorRelation,
 )
@@ -15,22 +17,19 @@ from ..dataset.role_and_ontology.hobbies import (
     Loves,
     PeopleWithHobby,
     PersonWithHobbies,
+    PersonWithTwoRoles,
     Sports,
     SportsLover,
     VideoGames,
 )
 
-# %% helpers
 
-
-def make_individual() -> tuple[PersonWithHobbies, BasketBallLover, SportsLover]:
+@pytest.fixture
+def individual() -> PersonWithTwoRoles:
     """
-    :return: A person with a basketball lover role and a sports lover role, created in that order.
+    :return: A person with a basketball lover role and a sports lover role.
     """
-    person = PersonWithHobbies(name="Bass")
-    basketball_lover = BasketBallLover(role_taker=person)
-    sports_lover = SportsLover(role_taker=person)
-    return person, basketball_lover, sports_lover
+    return PersonWithTwoRoles.named("Bass")
 
 
 # %% declarations of a property
@@ -49,53 +48,56 @@ def test_a_class_declares_a_property_through_the_nearest_class_declaring_it():
 # %% the objects of an individual
 
 
-def test_objects_of_individual_lists_the_root_first_and_tells_roles_apart():
+def test_objects_of_individual_lists_the_root_first_and_tells_roles_apart(
+    individual: PersonWithTwoRoles,
+):
     """
     The objects of an individual are its root followed by its roles in the order they
     were created.
+
+    Roles compare equal to their taker, so the objects are compared by identity.
     """
-    person, basketball_lover, sports_lover = make_individual()
-    for individual_object in (person, basketball_lover, sports_lover):
+    for individual_object in individual.objects:
         objects = PropertyDescriptorRelation.objects_of_individual(individual_object)
-        assert [id(o) for o in objects] == [
-            id(person),
-            id(basketball_lover),
-            id(sports_lover),
-        ]
+        assert list(map(id, objects)) == list(map(id, individual.objects))
 
 
 # %% declaring objects
 
 
-def test_declaring_object_chooses_the_first_declaration_whose_range_admits_the_value():
+def test_declaring_object_chooses_the_first_declaration_whose_range_admits_the_value(
+    individual: PersonWithTwoRoles,
+):
     """
     The declaring object is the first object whose declaration admits the value.
     """
-    person, basketball_lover, sports_lover = make_individual()
     football = Sports(name="Football")
     basketball = BasketBall(name="BasketBall")
-    for individual_object in (person, basketball_lover, sports_lover):
+    for individual_object in individual.objects:
         declaration = PropertyDescriptorRelation.declaring_object(
             individual_object, Loves, football
         )
-        assert declaration.holder is sports_lover
+        assert declaration.holder is individual.sports_lover
         assert declaration.descriptor.domain is SportsLover
         declaration = PropertyDescriptorRelation.declaring_object(
             individual_object, Loves, basketball
         )
-        assert declaration.holder is basketball_lover
+        assert declaration.holder is individual.basketball_lover
         assert declaration.descriptor.domain is BasketBallLover
 
 
-def test_declaring_object_falls_back_to_the_first_declaration():
+def test_declaring_object_falls_back_to_the_first_declaration(
+    individual: PersonWithTwoRoles,
+):
     """
     Without a declaration admitting the value, the declaring object is the first
     declaring the property.
     """
-    person, basketball_lover, _ = make_individual()
     game = VideoGames(name="Tetris")
-    declaration = PropertyDescriptorRelation.declaring_object(person, Loves, game)
-    assert declaration.holder is basketball_lover
+    declaration = PropertyDescriptorRelation.declaring_object(
+        individual.person, Loves, game
+    )
+    assert declaration.holder is individual.basketball_lover
     assert declaration.descriptor.domain is BasketBallLover
 
 

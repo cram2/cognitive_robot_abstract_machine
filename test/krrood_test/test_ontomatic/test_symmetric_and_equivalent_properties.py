@@ -12,6 +12,8 @@ from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
 from ..dataset.role_and_ontology.symmetric_and_equivalent_properties import (
     Area,
     Building,
+    FriendOf,
+    IsPartOf,
     PersonWithFriends,
 )
 
@@ -41,10 +43,10 @@ def test_the_statement_back_is_explained_by_the_statement_it_reverses():
 
     alice.friend_of.add(bob)
 
-    asserted = PropertyDescriptorRelation.find(alice, "friend_of", bob)
+    asserted = PropertyDescriptorRelation.find(alice, FriendOf, bob)
     assert asserted.explanation is None
     assert PropertyDescriptorRelation.find(
-        bob, "friend_of", alice
+        bob, FriendOf, alice
     ).explanation == RelationExplanation(InferredThrough.SYMMETRY, (asserted,))
 
 
@@ -109,11 +111,11 @@ def test_a_composed_statement_is_held_by_the_field_of_its_subject():
 
     city.is_part_of.add(country)
 
-    composed = PropertyDescriptorRelation.find(house, "stands_in", country)
+    composed = PropertyDescriptorRelation.find(house, IsPartOf, country)
     assert composed.explanation == RelationExplanation(
         InferredThrough.TRANSITIVE,
         (
-            PropertyDescriptorRelation.find(house, "stands_in", city),
-            PropertyDescriptorRelation.find(city, "is_part_of", country),
+            PropertyDescriptorRelation.find(house, IsPartOf, city),
+            PropertyDescriptorRelation.find(city, IsPartOf, country),
         ),
     )

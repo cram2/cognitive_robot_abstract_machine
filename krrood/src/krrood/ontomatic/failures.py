@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from typing_extensions import TYPE_CHECKING
+
 from krrood.exceptions import DataclassException
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.predicate import Symbol
+    from krrood.ontomatic.property_descriptor.property_descriptor import (
+        PropertyDescriptor,
+    )
 
 
 @dataclass
@@ -33,12 +41,12 @@ class NoObjectOfIndividualDeclaresProperty(DataclassException):
     taker and its roles, has the field of the property.
     """
 
-    individual_object: object
+    individual_object: Symbol
     """
     An object of the individual.
     """
 
-    property_descriptor_class: type
+    property_descriptor_class: type[PropertyDescriptor]
     """
     The property of the fact.
     """

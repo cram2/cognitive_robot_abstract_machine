@@ -10,6 +10,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
     PropertyChainPosition,
     PropertyChain,
 )
+from krrood.symbol_graph.symbol_graph import SymbolGraph
 from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
     InferredThrough,
     PropertyDescriptorRelation,
@@ -116,14 +117,57 @@ def test_an_implied_statement_is_explained_by_the_statements_of_its_chain():
     parent.parent_of.add(child)
 
     assert PropertyDescriptorRelation.find(
-        grandparent, "ancestor_of", child
+        grandparent, AncestorOf, child
     ).explanation == RelationExplanation(
         InferredThrough.CHAIN,
         (
-            PropertyDescriptorRelation.find(grandparent, "parent_of", parent),
-            PropertyDescriptorRelation.find(parent, "parent_of", child),
+            PropertyDescriptorRelation.find(grandparent, ParentOf, parent),
+            PropertyDescriptorRelation.find(parent, ParentOf, child),
         ),
     )
+
+
+def test_an_explanation_shows_a_fact_above_the_facts_it_was_inferred_from():
+    """
+    An explanation names each fact by the symbol graph's names of its subject and value,
+    and the rule it was inferred through, with its premises indented below it.
+    """
+    grandparent = PersonWithAncestors("grandparent")
+    parent = PersonWithAncestors("parent")
+    child = PersonWithAncestors("child")
+
+    grandparent.parent_of.add(parent)
+    parent.parent_of.add(child)
+
+    names = {
+        person.name: SymbolGraph().get_wrapped_instance(person).name
+        for person in (grandparent, parent, child)
+    }
+    assert PropertyDescriptorRelation.find(
+        grandparent, AncestorOf, child
+    ).explain() == (
+        f"{names['grandparent']} ancestor_of {names['child']} (chain)\n"
+        f"  {names['grandparent']} parent_of {names['parent']} (asserted)\n"
+        f"  {names['parent']} parent_of {names['child']} (asserted)"
+    )
+
+
+def test_an_explanation_shows_premises_only_down_to_its_depth():
+    """
+    An explanation of depth zero shows only the fact and its rule.
+    """
+    grandparent = PersonWithAncestors("grandparent")
+    parent = PersonWithAncestors("parent")
+    child = PersonWithAncestors("child")
+
+    grandparent.parent_of.add(parent)
+    parent.parent_of.add(child)
+
+    explanation = PropertyDescriptorRelation.find(
+        grandparent, AncestorOf, child
+    ).explain(depth=0)
+    assert explanation.endswith("(chain)")
+    assert "\n" not in explanation
 
 
 # %% descriptors from attributes
