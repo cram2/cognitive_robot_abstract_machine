@@ -1,11 +1,16 @@
+"""
+Descriptors that manage the fields relating symbols and keep the relations in the symbol graph.
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field, fields
 from functools import cached_property, lru_cache
 
-from typing_extensions import ClassVar, Any, Iterable, Dict, List
+from typing_extensions import TYPE_CHECKING, ClassVar, Any, Iterable, Dict, List, Self
 
+from krrood.ontomatic.property_descriptor.mixins import HasChainAxioms
 from krrood.ontomatic.property_descriptor.monitored_container import (
     MonitoredContainer,
     monitored_type_map,
@@ -27,6 +32,10 @@ from krrood.symbol_graph.symbol_graph import (
 from krrood.entity_query_language.utils import make_set
 from krrood.patterns.caching import memoize
 from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
+from krrood.utils import recursive_subclasses
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.core.mapped_variable import Attribute
 
 SymbolType = type[Symbol]
 """
@@ -36,6 +45,62 @@ DomainRangeMap = Dict[SymbolType, SymbolType]
 """
 Type alias for the domain-range map.
 """
+
+
+@dataclass(frozen=True)
+class PropertyChain:
+    """
+    Properties whose statements follow each other, each starting where the previous one ends.
+    """
+
+    properties: tuple[type[PropertyDescriptor], ...]
+    """
+    The descriptor classes of the chain, in order.
+    """
+
+    def positions_of(self, descriptor_class: type[PropertyDescriptor]) -> list[int]:
+        """
+        :return: The indices at which the descriptor class appears in the chain.
+        """
+        return [
+            index
+            for index, chain_descriptor_class in enumerate(self.properties)
+            if chain_descriptor_class is descriptor_class
+        ]
+
+
+@dataclass(frozen=True)
+class PropertyChainPosition:
+    """
+    The place of a descriptor class in a property chain that implies another descriptor class.
+    """
+
+    implied_descriptor: type[PropertyDescriptor]
+    """
+    The descriptor class the chain implies.
+    """
+    chain: PropertyChain
+    """
+    The chain.
+    """
+    index: int
+    """
+    The index of the descriptor class in the chain.
+    """
+
+    @property
+    def descriptors_before(self) -> tuple[type[PropertyDescriptor], ...]:
+        """
+        The descriptor classes of the chain that come before this position.
+        """
+        return self.chain.properties[: self.index]
+
+    @property
+    def descriptors_after(self) -> tuple[type[PropertyDescriptor], ...]:
+        """
+        The descriptor classes of the chain that come after this position.
+        """
+        return self.chain.properties[self.index + 1 :]
 
 
 @dataclass
@@ -117,6 +182,30 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
         self._validate_non_redundant_domain()
         self._update_wrapped_field()
         self._update_domain_and_range()
+
+    @classmethod
+    def from_eql_attribute(cls, attribute: Attribute) -> Self:
+        """
+        :param attribute: The field as an attribute of a symbolic variable of its class,
+            e.g. ``a(Person).parent_of``.
+        :return: A descriptor of this class managing that field of that class.
+        """
+        return cls(attribute._owner_class_, attribute._attribute_name_)
+
+    @classmethod
+    def chain_positions(cls) -> list[PropertyChainPosition]:
+        """
+        :return: The positions this descriptor class takes in the property chains that imply descriptor classes.
+        """
+        return [
+            PropertyChainPosition(implied_descriptor, chain, index)
+            for implied_descriptor in dict.fromkeys(
+                recursive_subclasses(PropertyDescriptor)
+            )
+            if issubclass(implied_descriptor, HasChainAxioms)
+            for chain in implied_descriptor.get_chain_axioms()
+            for index in chain.positions_of(cls)
+        ]
 
     @cached_property
     def private_attr_name(self) -> str:
