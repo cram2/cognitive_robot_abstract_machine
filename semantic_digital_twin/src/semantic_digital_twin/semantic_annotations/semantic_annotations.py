@@ -1805,7 +1805,7 @@ class Whisk(ToolWithHandle):
         return [
             AlignmentPair(
                 tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             )
         ]
 
@@ -1820,11 +1820,11 @@ class CuttingKnife(ToolWithHandle):
         return [
             AlignmentPair(
                 tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
-                goal_normal=Vector3(0, 1, 0, reference_frame=target),
+                reference_normal=Vector3(0, 1, 0, reference_frame=target),
             ),
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             ),
         ]
 
@@ -1839,7 +1839,7 @@ class PouringCup(Tool, Container):
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             )
         ]
 
@@ -1858,13 +1858,13 @@ class Sponge(Tool):
             return [
                 AlignmentPair(
                     tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                    goal_normal=Vector3(0, 0, -1, reference_frame=target),
+                    reference_normal=Vector3(0, 0, -1, reference_frame=target),
                 )
             ]
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, -1, reference_frame=self.root),
-                goal_normal=self._pose_surface_normal(target),
+                reference_normal=self._pose_surface_normal(target),
             )
         ]
 

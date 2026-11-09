@@ -811,13 +811,13 @@ def test_align_planes(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_normal = Vector3.X(reference_frame=root)
+    reference_normal = Vector3.X(reference_frame=root)
     tip_normal = Vector3.Y(reference_frame=tip)
 
     align_planes = AlignPlanes(
         root_link=root,
         tip_link=tip,
-        reference_normal=goal_normal,
+        reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
     statechart.add_node(align_planes)
@@ -830,16 +830,16 @@ def test_align_planes(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     # Check if the angle between normal vectors is below the threshold
-    root_V_goal_normal = pr2_world_state_reset.transform(
-        target_frame=root, spatial_object=goal_normal
+    root_V_reference_normal = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=reference_normal
     )
-    root_V_goal_normal.scale(1)
+    root_V_reference_normal.scale(1)
     root_V_tip_normal = pr2_world_state_reset.transform(
         target_frame=root, spatial_object=tip_normal
     )
     root_V_tip_normal.scale(1)
     v_tip = root_V_tip_normal.to_np()[:3]
-    v_goal = root_V_goal_normal.to_np()[:3]
+    v_goal = root_V_reference_normal.to_np()[:3]
 
     eps = 1e-9
     assert np.linalg.norm(v_goal) > eps, "goal normal became zero-length"
@@ -864,13 +864,13 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_normal = Vector3.X(reference_frame=root)
+    reference_normal = Vector3.X(reference_frame=root)
     tip_normal = Vector3.X(reference_frame=tip)
 
     align_perp = AlignPerpendicular(
         root_link=root,
         tip_link=tip,
-        reference_normal=goal_normal,
+        reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
     statechart.add_node(align_perp)
@@ -883,17 +883,17 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     # Check if the angle between normals is (approximately) 90 degrees
-    root_V_goal_normal = pr2_world_state_reset.transform(
-        target_frame=root, spatial_object=goal_normal
+    root_V_reference_normal = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=reference_normal
     )
-    root_V_goal_normal.scale(1)
+    root_V_reference_normal.scale(1)
     root_V_tip_normal = pr2_world_state_reset.transform(
         target_frame=root, spatial_object=tip_normal
     )
     root_V_tip_normal.scale(1)
 
     v_tip = root_V_tip_normal.to_np()[:3]
-    v_goal = root_V_goal_normal.to_np()[:3]
+    v_goal = root_V_reference_normal.to_np()[:3]
 
     eps = 1e-9
     assert np.linalg.norm(v_goal) > eps, "goal normal became zero-length"

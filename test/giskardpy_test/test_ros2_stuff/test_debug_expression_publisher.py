@@ -118,7 +118,7 @@ def test_attach_visualizes_spatial_debug_expressions_only(
     publisher.attach(motion_statechart)
 
     namespaces = {request.namespace for request in publisher._publisher._requests}
-    assert namespaces == {"align/current_normal", "align/goal_normal"}
+    assert namespaces == {"align/current_normal", "align/reference_normal"}
 
 
 def test_vector_with_reference_frame_is_transformed_to_visualisation_frame(

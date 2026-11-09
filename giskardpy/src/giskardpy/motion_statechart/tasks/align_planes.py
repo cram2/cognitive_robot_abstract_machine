@@ -78,7 +78,7 @@ class AlignPlanes(
             color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
         goal_dbg = DebugExpression(
-            name=f"{self.name}/goal_normal",
+            name=f"{self.name}/reference_normal",
             expression=root_V_root_normal,
             color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
         )

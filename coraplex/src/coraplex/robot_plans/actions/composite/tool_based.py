@@ -183,7 +183,7 @@ class ToolMotionAction(
                 tip_link=tip,
                 root_link=root,
                 tip_normal=pair.tip_normal,
-                reference_normal=pair.goal_normal,
+                reference_normal=pair.reference_normal,
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE.value,
             )
             for pair in self._alignment_pairs

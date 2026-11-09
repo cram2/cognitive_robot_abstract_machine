@@ -194,7 +194,7 @@ def test_vectors_aligned(pr2_world_state_reset: World):
         "r_gripper_tool_frame"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
-    goal_normal = Vector3.X(reference_frame=root)
+    reference_normal = Vector3.X(reference_frame=root)
     tip_normal = Vector3.X(reference_frame=tip)
 
     executor = _create_executor(pr2_world_state_reset)
@@ -202,13 +202,13 @@ def test_vectors_aligned(pr2_world_state_reset: World):
     drive = AlignPlanes(
         root_link=root,
         tip_link=tip,
-        reference_normal=goal_normal,
+        reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
     monitor = VectorsAligned(
         root_link=root,
         tip_link=tip,
-        reference_normal=goal_normal,
+        reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
     statechart.add_nodes([drive, monitor])

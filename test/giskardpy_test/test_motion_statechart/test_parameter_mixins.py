@@ -84,6 +84,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
 from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.motion_statechart.tasks.wiggle_insert import WiggleInsert
+from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix, Vector3
@@ -154,7 +155,7 @@ def _declared_type(cls: type, field_name: str) -> object:
 
 def _feature_parameters(cls: type) -> dict[str, object]:
     """
-    :param cls: A node class.
+    :param cls: A dataclass.
     :return: The type of every point and vector `cls` takes, by the name it takes it as.
     """
     return {
@@ -367,3 +368,7 @@ def test_a_feature_task_takes_its_features_as_its_monitor_does(
     task: type, monitor: type
 ):
     assert _feature_parameters(task) == _feature_parameters(monitor)
+
+
+def test_an_alignment_pair_names_its_normals_as_align_planes_takes_them():
+    assert _feature_parameters(AlignmentPair) == _feature_parameters(AlignPlanes)
