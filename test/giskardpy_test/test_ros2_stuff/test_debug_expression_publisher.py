@@ -1,3 +1,7 @@
+"""
+Tests visualizing the debug expressions of motion statechart nodes.
+"""
+
 import builtins
 import importlib
 import sys
@@ -135,6 +139,9 @@ def test_vector_with_reference_frame_is_transformed_to_visualisation_frame(
 
 
 def test_stop_clears_previously_published_markers(rclpy_node, cylinder_bot_world):
+    """
+    Stopping deletes every marker the publisher has published.
+    """
     task = build_align_planes_task(cylinder_bot_world)
     motion_statechart = Statechart(
         context=create_context_with_motion_control(cylinder_bot_world)
@@ -143,11 +150,11 @@ def test_stop_clears_previously_published_markers(rclpy_node, cylinder_bot_world
 
     publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
     publisher.attach(motion_statechart)
-    assert publisher._publisher._published_marker_identities
+    assert publisher._publisher.marker_publisher._published_marker_identities
 
     publisher.stop()
 
-    assert publisher._publisher._published_marker_identities == set()
+    assert publisher._publisher.marker_publisher._published_marker_identities == set()
 
 
 def test_attach_publisher_tracks_state_changes(rclpy_node, cylinder_bot_world):

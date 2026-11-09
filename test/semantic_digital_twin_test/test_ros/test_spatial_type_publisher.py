@@ -1,11 +1,21 @@
+"""
+Tests publishing spatial types as RViz markers.
+"""
+
 from dataclasses import dataclass, field
 
+import numpy as np
+import pytest
+from rclpy.node import Node
 from visualization_msgs.msg import Marker, MarkerArray
 
+from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
+    EvaluatedSpatialTypeVisualization,
+    SpatialTypeMarkerPublisher,
     SpatialTypePublisher,
 )
 from krrood_spatial_math.spatial_types import Point3
@@ -26,13 +36,81 @@ class FakeMarkerPublisher:
 
 
 def capture(publisher: SpatialTypePublisher) -> FakeMarkerPublisher:
+    """
+    Replace the ROS publisher with one that records the published marker arrays.
+    """
     fake = FakeMarkerPublisher()
-    publisher.publisher = fake
+    publisher.marker_publisher.publisher = fake
     return fake
 
 
 def first_moving_dof(world: World) -> DegreeOfFreedom:
     return world.active_degrees_of_freedom[0]
+
+
+def create_publisher(node: Node, world: World) -> SpatialTypePublisher:
+    """
+    A spatial type publisher on the given world, publishing through the given node.
+    """
+    return SpatialTypePublisher(
+        marker_publisher=SpatialTypeMarkerPublisher(node=node), _world=world
+    )
+
+
+# %% marker publishing from evaluated values
+
+
+def test_marker_publisher_draws_markers_from_the_given_values(rclpy_node):
+    """
+    The marker publisher draws the given values and evaluates nothing.
+    """
+    marker_publisher = SpatialTypeMarkerPublisher(node=rclpy_node)
+    fake = FakeMarkerPublisher()
+    marker_publisher.publisher = fake
+    unresolvable = FloatVariable(name="unresolvable")
+
+    marker_publisher.publish(
+        [
+            EvaluatedSpatialTypeVisualization(
+                visualization=SpatialTypeVisualization(
+                    spatial_type=Point3(x=unresolvable)
+                ),
+                rendered_value=np.array([4.0, 5.0, 6.0]),
+            )
+        ],
+        "map",
+    )
+
+    position = fake.published[-1].markers[0].pose.position
+    assert (position.x, position.y, position.z) == (4, 5, 6)
+
+
+def test_marker_publisher_deletes_markers_no_longer_published(rclpy_node):
+    """
+    Markers of the previous call that are not published again are deleted.
+    """
+    marker_publisher = SpatialTypeMarkerPublisher(node=rclpy_node)
+    fake = FakeMarkerPublisher()
+    marker_publisher.publisher = fake
+    visualization = SpatialTypeVisualization(spatial_type=Point3(), namespace="removed")
+    marker_publisher.publish(
+        [
+            EvaluatedSpatialTypeVisualization(
+                visualization=visualization, rendered_value=np.zeros(3)
+            )
+        ],
+        "map",
+    )
+
+    marker_publisher.publish([], "map")
+
+    markers = fake.published[-1].markers
+    assert [(marker.action, marker.ns) for marker in markers] == [
+        (Marker.DELETE, "removed")
+    ]
+
+
+# %% live world-state visualization
 
 
 def test_publish_once_publishes_expected_markers(rclpy_node, cylinder_bot_world):
@@ -51,10 +129,13 @@ def test_publish_once_publishes_expected_markers(rclpy_node, cylinder_bot_world)
 
 
 def test_markers_update_on_state_change(rclpy_node, cylinder_bot_world):
+    """
+    A world state change republishes the markers at the new value.
+    """
     dof = first_moving_dof(cylinder_bot_world)
     point = Point3(x=dof.variables.position, reference_frame=cylinder_bot_world.root)
 
-    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
     fake = capture(publisher)
     publisher.add(SpatialTypeVisualization(spatial_type=point))
     initial_x = fake.published[-1].markers[0].pose.position.x
@@ -67,7 +148,10 @@ def test_markers_update_on_state_change(rclpy_node, cylinder_bot_world):
 
 
 def test_set_requests_replaces_previous(rclpy_node, cylinder_bot_world):
-    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    """
+    Replacing the requests deletes the markers of the replaced ones.
+    """
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
     publisher.add(
         SpatialTypeVisualization(
             spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
@@ -93,7 +177,10 @@ def test_set_requests_replaces_previous(rclpy_node, cylinder_bot_world):
 
 
 def test_add_all_publishes_all_requests(rclpy_node, cylinder_bot_world):
-    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    """
+    Every added request is published.
+    """
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
     fake = capture(publisher)
 
     publisher.add_all(
@@ -114,7 +201,10 @@ def test_add_all_publishes_all_requests(rclpy_node, cylinder_bot_world):
 
 
 def test_clear_deletes_previously_published_markers(rclpy_node, cylinder_bot_world):
-    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    """
+    Clearing deletes every published marker and forgets the requests.
+    """
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
     fake = capture(publisher)
     publisher.add(
         SpatialTypeVisualization(
@@ -134,7 +224,10 @@ def test_clear_deletes_previously_published_markers(rclpy_node, cylinder_bot_wor
 
 
 def test_publish_deletes_only_removed_request_markers(rclpy_node, cylinder_bot_world):
-    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    """
+    Only the markers of removed requests are deleted.
+    """
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
     fake = capture(publisher)
     publisher.add_all(
         [
@@ -165,8 +258,35 @@ def test_publish_deletes_only_removed_request_markers(rclpy_node, cylinder_bot_w
 
 
 def test_stop_deregisters_from_state_callbacks(rclpy_node, cylinder_bot_world):
-    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    """
+    Stopping removes the publisher from the world's state change callbacks.
+    """
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
 
     assert publisher in cylinder_bot_world.state.state_change_callbacks
     publisher.stop()
     assert publisher not in cylinder_bot_world.state.state_change_callbacks
+
+
+def test_state_change_reuses_the_compiled_function(
+    rclpy_node, cylinder_bot_world, monkeypatch
+):
+    """
+    A state change evaluates the function compiled on registration instead of
+    recompiling.
+    """
+    dof = first_moving_dof(cylinder_bot_world)
+    point = Point3(x=dof.variables.position, reference_frame=cylinder_bot_world.root)
+    publisher = create_publisher(rclpy_node, cylinder_bot_world)
+    fake = capture(publisher)
+    publisher.add(SpatialTypeVisualization(spatial_type=point))
+    compiled_function = publisher._compiled_rendered_values
+    monkeypatch.setattr(
+        SymbolicMathType, "evaluate", lambda self: pytest.fail("evaluate recompiles")
+    )
+
+    cylinder_bot_world.state[dof.id].position = 1.5
+    cylinder_bot_world.notify_state_change()
+
+    assert publisher._compiled_rendered_values is compiled_function
+    assert fake.published[-1].markers[0].pose.position.x == 1.5
