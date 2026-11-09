@@ -154,8 +154,9 @@ has a say in it only where one of these conditions reads the observation:
 
 - **SUCCEEDED**: the node's success condition held.
 - **FAILED**: the node's fail condition held: it cannot continue.
-- **INTERRUPTED**: the node's interrupt condition held, or one of its ancestors ended. Neither
-  is a judgement of the node itself.
+- **INTERRUPTED**: the node's interrupt condition held, one of its ancestors ended, however
+  that ancestor ended, or a `CancelStatechart` ended the statechart while the node ran. None
+  of these is a judgement of the node itself.
 
 ### When several conditions hold at once
 
@@ -586,6 +587,11 @@ Both are usually created with factory methods that set their start condition:
 
 The `CancelStatechart` factories also take the `exception` to raise. `when_true` and
 `when_failed` default to one naming `node`; `when_all_true` and `when_any_true` require it.
+
+`Statechart.is_ended()` tells whether an `EndStatechart` observes True.
+`StatechartExecutor.tick_until_end()` ticks until it does; to drive a statechart by hand,
+compile it with `executor.compile(statechart)` and call `executor.tick()` until
+`statechart.is_ended()` is True.
 
 Once `execute()` or `tick_until_end()` returns or raises, because the statechart ended, was
 cancelled or ran out of ticks, the executor calls every node's `cleanup`. Calling `tick()`
