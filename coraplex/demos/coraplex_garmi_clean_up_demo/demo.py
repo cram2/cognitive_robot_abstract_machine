@@ -262,31 +262,6 @@ class ScenePose(Enum):
 # %% how the run is set up
 
 
-@dataclass(frozen=True)
-class DriveVelocityLimits:
-    """
-    How fast a base may move.
-    """
-
-    translation: float
-    """
-    In meter per second.
-    """
-
-    rotation: float
-    """
-    In radian per second.
-    """
-
-
-class GarmiDrive(Enum):
-    """
-    How fast GARMI's base moves in this demonstration.
-    """
-
-    DEMONSTRATION = DriveVelocityLimits(translation=0.1, rotation=0.1)
-
-
 class GraspSelection(Enum):
     """
     How the grasps on the milk and on the drawer's handle come about.
@@ -334,13 +309,11 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
 
     def robot_specification(self) -> RobotSpecification:
         """
-        GARMI at its start, driving at the demonstration's speed.
+        GARMI at its start.
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odom_T_robot_start=ScenePose.GARMI_START.value.transform,
-            drive_translation_velocity_limits=GarmiDrive.DEMONSTRATION.value.translation,
-            drive_rotation_velocity_limits=GarmiDrive.DEMONSTRATION.value.rotation,
+            odometry_T_robot_start=ScenePose.GARMI_START.value.transform,
         )
 
     def is_scene_populated(self, world: World) -> bool:
@@ -430,7 +403,6 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     *self._take_hold_of_the_milk_and_the_handle(
                         milk_grasp, handle_grasp, left_arm, right_arm
                     ),
-
                     # Left hand opens the drawer while the right hands drops the milk in the open
                     # drawer. the gripper is kept at the handle of the drawer the whole time
                     Parallel(

@@ -7,8 +7,10 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.model.world_config import WorldWithFixedRobot
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
 @dataclass
@@ -31,7 +33,13 @@ def create_giskard() -> Giskard:
         read from its topic.
     """
     return Giskard(
-        world_config=WorldWithFixedRobot(urdf=get_robot_description()),
+        world_source=WorldSpecification(
+            robots=[
+                RobotSpecification.specify_real_robot(
+                    MinimalRobot, urdf=get_robot_description()
+                )
+            ]
+        ),
         robot_interface_config=ControllerManagerInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=50),
