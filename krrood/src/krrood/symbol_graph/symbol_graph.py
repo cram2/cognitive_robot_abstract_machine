@@ -34,6 +34,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptorOwner
 from typing_extensions import Generic
 from krrood.singleton import SingletonMeta
 from krrood.utils import recursive_subclasses
@@ -55,7 +56,7 @@ class GraphType(StrEnum):
 
 
 @dataclass(eq=False)
-class Symbol:
+class Symbol(DataclassFieldDescriptorOwner):
     """Base class for things that can be cached in the symbol graph."""
 
     _cache_instances_: ClassVar[bool] = True

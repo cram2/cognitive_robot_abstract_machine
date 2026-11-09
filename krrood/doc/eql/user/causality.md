@@ -290,8 +290,18 @@ What the backend does with the learned structure:
 
 | The query marks | For a class without a structure | For a class with one |
 |---|---|---|
-| `cause`, `confounder`, `causes_effect` | backdoor adjustment with the marked set, unchecked | the marked set is checked; a set that fails the adjustment criterion raises {py:class}`~probabilistic_model.causal_structure.exceptions.InvalidAdjustmentSet` |
+| `cause`, `confounder`, `causes_effect` | backdoor adjustment with the marked set, unchecked | the marked set is checked; what happens to a set that fails the adjustment criterion is up to the backend's `declared_adjustment_policy` (see below) |
 | `cause`, `causes_effect` | an empty adjustment set, which is plain conditioning | the set is chosen from the graph, among the variables the query names and the aggregation statistics; {py:class}`~krrood.entity_query_language.exceptions.EffectNotIdentified` if the graph identifies the effect by no such set |
+
+A marked set that fails the adjustment criterion raises
+{py:class}`~probabilistic_model.causal_structure.exceptions.InvalidAdjustmentSet` by
+default, under
+{py:class}`~probabilistic_model.causal_structure.identification.InvalidDeclaredAdjustmentRefusal`.
+A backend made with
+`declared_adjustment_policy=InvalidDeclaredAdjustmentRepair()` adjusts for a repaired
+set instead: it keeps every marked variable the graph allows and adds what the graph
+says is missing. So a correct declaration survives a graph that misses an edge, and a
+marked proxy of the confounder gets the confounder added.
 
 When the graph leaves the direction of an edge at the cause open, the effect is only
 partially identified: `backend.interventional_range(query)` then returns, per region of

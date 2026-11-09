@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Entity
     from krrood.entity_query_language.query.operations import GroupedBy
     from krrood.entity_query_language.backends import QueryBackend
+    from krrood.entity_query_language.ground_term import TermReader
 
 
 IntOrFloat = int | float
@@ -71,18 +72,23 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         super().__post_init__()
         self._var_ = self
 
-    def evaluate(self, backend: QueryBackend | None = None) -> Iterator[T]:
+    def evaluate(
+        self, backend: QueryBackend | None = None, state: TermReader | None = None
+    ) -> Iterator[T]:
         """
         Wrap the aggregator in an entity and evaluate it (i.e., make a query
         with this aggregator as the selected expression and evaluate it.).
 
         :param backend: The query backend to evaluate with; forwarded to
             the wrapping entity.
+        :param state: Forwarded to the wrapping entity.
         :return: An iterator over the aggregator results.
         """
         from krrood.entity_query_language.query.query import Entity
 
-        return Entity(_selected_variables_=(self,)).evaluate(backend=backend)
+        return Entity(_selected_variables_=(self,)).evaluate(
+            backend=backend, state=state
+        )
 
     def grouped_by(self, *variables: Selectable) -> Entity:
         """

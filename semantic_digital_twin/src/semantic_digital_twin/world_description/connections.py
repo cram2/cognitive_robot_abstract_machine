@@ -309,6 +309,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     ) -> Self:
         # Reuse the same degree of freedom so the joint state is kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -481,6 +482,7 @@ class ScrewConnection(ActiveConnection1DOF):
     ) -> Self:
         # Reuse the same degree of freedom so the joint state is kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -702,6 +704,7 @@ class Connection6DoF(Connection):
     ) -> Self:
         # Reuse the same degrees of freedom so the world state layout is kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -935,6 +938,7 @@ class OmniDrive(WheeledDrive):
     ) -> Self:
         # Reuse the same degrees of freedom so the odometry and the world state layout are kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -1124,6 +1128,7 @@ class DifferentialDrive(WheeledDrive):
     ) -> Self:
         # Reuse the same degrees of freedom so the odometry and the world state layout are kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,

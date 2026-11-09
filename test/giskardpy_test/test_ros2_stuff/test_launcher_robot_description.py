@@ -38,7 +38,6 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.utils import daisy_installed, tracy_installed
 
 # %% commanding a real robot
 
@@ -88,14 +87,14 @@ def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
             tracy_standalone,
             Tracy,
             marks=pytest.mark.skipif(
-                not tracy_installed(), reason="Tracy not installed"
+                not Tracy.is_description_installed(), reason="Tracy not installed"
             ),
         ),
         pytest.param(
             daisy_standalone,
             DAiSy,
             marks=pytest.mark.skipif(
-                not daisy_installed(), reason="DAiSy not installed"
+                not DAiSy.is_description_installed(), reason="DAiSy not installed"
             ),
         ),
         (hsr_standalone, HSRB),

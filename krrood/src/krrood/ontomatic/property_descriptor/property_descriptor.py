@@ -31,6 +31,7 @@ from krrood.symbol_graph.symbol_graph import (
 )
 from krrood.entity_query_language.utils import make_set
 from krrood.patterns.caching import memoize
+from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptor
 from krrood.utils import recursive_subclasses
 
 if TYPE_CHECKING:
@@ -103,12 +104,13 @@ class PropertyChainPosition:
 
 
 @dataclass
-class PropertyDescriptor(Symbol):
+class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
     """Descriptor managing a data class field while giving it metadata like superproperties,
     sub-properties, inverse, transitivity, ...etc.
 
     The descriptor injects a hidden dataclass-managed attribute (backing storage) into the owner class
-    and collects domain and range types for introspection.
+    and collects domain and range types for introspection. Writing a value adds its relations to the symbol graph,
+    and a container value is kept as a monitored container bound to its owner.
 
     The way this should be used is after defining your dataclasses you declare either in the same file or in a separate
     file the descriptors for each field that is considered a relation between two symbol types.
@@ -276,18 +278,9 @@ class PropertyDescriptor(Symbol):
                     domain_value, v, self.wrapped_field, inferred=inferred
                 ).add_to_graph_and_apply_implications()
 
-    def __get__(self, obj, objtype=None):
-        """
-        Get the value of the managed attribute. In addition, ensure that the value is a monitored container type if
-        it is an iterable and that the owner instance is bound to the monitored container.
-
-        :param obj: The owner instance (i.e., the instance that this descriptor is attached to).
-        :param objtype: The owner type.
-        """
-        if obj is None:
-            return self
-        value = getattr(obj, self.private_attr_name)
-        self._bind_owner_if_container_type(value, owner=obj)
+    def read(self, instance: Symbol) -> Any:
+        value = getattr(instance, self.private_attr_name)
+        self._bind_owner_if_container_type(value, owner=instance)
         return value
 
     @staticmethod
@@ -329,27 +322,19 @@ class PropertyDescriptor(Symbol):
             value = monitored_value
         return value
 
-    def __set__(self, obj, value):
-        """
-        Set the value of the managed attribute and add it to the symbol graph.
-
-        :param obj: The owner instance.
-        :param value: The value to set.
-        """
-        if isinstance(value, PropertyDescriptor):
-            return
-        attr = getattr(obj, self.private_attr_name, None)
+    def write(self, instance: Symbol, value: Any) -> None:
+        attr = getattr(instance, self.private_attr_name, None)
         if self.is_iterable and not isinstance(attr, MonitoredContainer):
-            attr = self._ensure_monitored_type(value, obj)
-            self._bind_owner_if_container_type(attr, owner=obj)
-            setattr(obj, self.private_attr_name, attr)
+            attr = self._ensure_monitored_type(value, instance)
+            self._bind_owner_if_container_type(attr, owner=instance)
+            setattr(instance, self.private_attr_name, attr)
         if isinstance(attr, MonitoredContainer):
             attr._clear()
             for v in make_set(value):
                 attr._add_item(v, inferred=False)
         else:
-            setattr(obj, self.private_attr_name, value)
-            self.add_relation_to_the_graph_and_apply_implications(obj, value)
+            setattr(instance, self.private_attr_name, value)
+            self.add_relation_to_the_graph_and_apply_implications(instance, value)
 
     def update_value(
         self,
