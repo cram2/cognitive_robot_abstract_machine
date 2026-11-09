@@ -165,7 +165,7 @@ class KeepHeldBodyUpright(AlignPlanes):
             float_variable_data=self.context.float_variable_data,
         )
         self._tool_T_held_body.bind(self.context.world)
-        self.tip_normal = self._tool_T_held_body.root_T_tip.rotation_matrix @ Vector3.Z(
+        self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3.Z(
             reference_frame=self.tip_link
         )
 
