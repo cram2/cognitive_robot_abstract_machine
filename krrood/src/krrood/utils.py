@@ -9,6 +9,8 @@ import types
 from dataclasses import Field
 from dataclasses import fields, MISSING
 from functools import lru_cache
+from itertools import accumulate
+from importlib.machinery import PathFinder
 from importlib.util import find_spec, resolve_name
 from inspect import isclass
 from os import PathLike
@@ -456,7 +458,7 @@ def get_scope_from_imports(
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
 
-    An absolute import in an ``if TYPE_CHECKING:`` block whose top-level package is not
+    An absolute import in an ``if TYPE_CHECKING:`` block of a module that is not
     installed contributes no names.
 
     :param file_path: The path to the Python file to extract imports from.
@@ -489,7 +491,7 @@ def get_scope_from_imports(
                 node=node,
                 scope=scope,
                 package_name=package_name,
-                skips_uninstalled_package=node in imports_that_never_run,
+                skips_uninstalled_module=node in imports_that_never_run,
             )
         elif isinstance(node, ast.ImportFrom):
             package_name = _handle_import_from_node(
@@ -497,7 +499,7 @@ def get_scope_from_imports(
                 scope=scope,
                 file_path=file_path,
                 package_name=package_name,
-                skips_uninstalled_package=node in imports_that_never_run,
+                skips_uninstalled_module=node in imports_that_never_run,
             )
 
     return scope
@@ -644,7 +646,7 @@ def _handle_import_node(
     node: ast.Import,
     scope: dict[str, Any],
     package_name: str | None,
-    skips_uninstalled_package: bool,
+    skips_uninstalled_module: bool,
 ) -> None:
     """
     Process a standard import node and update the provided scope mapping.
@@ -652,24 +654,39 @@ def _handle_import_node(
     :param node: The import node to process.
     :param scope: The scope mapping to update.
     :param package_name: The package name to use for relative imports.
-    :param skips_uninstalled_package: Whether a module whose top-level package is not
-        installed contributes no name instead of raising.
+    :param skips_uninstalled_module: Whether a module that is not installed contributes
+        no name instead of raising.
     """
     for alias in node.names:
-        if skips_uninstalled_package and not is_top_level_package_installed(alias.name):
+        if skips_uninstalled_module and not is_module_installed(alias.name):
             continue
         asname = alias.asname or alias.name
         scope[asname] = get_and_import_module(alias.name, package_name)
 
 
-def is_top_level_package_installed(module_name: str) -> bool:
+def is_module_installed(module_name: str) -> bool:
     """
     :param module_name: The absolute name of a module.
-    :return: Whether the top-level package of *module_name* is installed or already
-        imported.
+    :return: Whether *module_name* is already imported or can be found on the import
+        path, without running any of its packages.
     """
-    top_level_package = module_name.partition(".")[0]
-    return top_level_package in sys.modules or find_spec(top_level_package) is not None
+    package_search_locations = None
+    for prefix in accumulate(
+        module_name.split("."), lambda package, child: f"{package}.{child}"
+    ):
+        if prefix in sys.modules:
+            continue
+        parent_package = prefix.rpartition(".")[0]
+        if not parent_package or parent_package in sys.modules:
+            specification = find_spec(prefix)
+        elif package_search_locations is None:
+            return False
+        else:
+            specification = PathFinder.find_spec(prefix, package_search_locations)
+        if specification is None:
+            return False
+        package_search_locations = specification.submodule_search_locations
+    return True
 
 
 @lru_cache(maxsize=None)
@@ -706,7 +723,7 @@ def _handle_import_from_node(
     scope: dict[str, Any],
     file_path: str | None,
     package_name: str | None,
-    skips_uninstalled_package: bool,
+    skips_uninstalled_module: bool,
 ) -> str | None:
     """
     Process a from-import node and update the provided scope mapping.
@@ -727,16 +744,16 @@ def _handle_import_from_node(
     :param scope: The scope mapping to update.
     :param file_path: The path to the file containing the import statement.
     :param package_name: The package name to use for relative imports.
-    :param skips_uninstalled_package: Whether an absolute import whose top-level package
-        is not installed is skipped before any import is attempted.
+    :param skips_uninstalled_module: Whether an absolute import of a module that is not
+        installed is skipped before any import is attempted.
     :return: the (possibly) updated package_name to mimic original behavior.
     """
     module_name = node.module
     if (
-        skips_uninstalled_package
+        skips_uninstalled_module
         and node.level == 0
         and module_name is not None
-        and not is_top_level_package_installed(module_name)
+        and not is_module_installed(module_name)
     ):
         return package_name
 
