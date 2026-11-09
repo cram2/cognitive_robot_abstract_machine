@@ -35,6 +35,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
     AvoidSelfCollisions,
 )
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
@@ -45,7 +46,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
     ExternalCollisionVariableManager,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -401,6 +402,19 @@ class UpdateTemporaryCollisionRules(EndedByOwner, MotionStatechartNode):
     """
     The rules in force while this node runs.
     """
+
+    @classmethod
+    def for_end_effector(
+        cls, end_effector: EndEffector
+    ) -> UpdateTemporaryCollisionRules:
+        """
+        :param end_effector: The end effector that may touch its surroundings.
+        :return: A node that lets this end effector, together with whatever it holds,
+            collide with the environment.
+        """
+        return cls(
+            temporary_rules=[AllowCollisionForEndEffector(end_effector=end_effector)]
+        )
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         artifacts = MotionNodeArtifacts()
