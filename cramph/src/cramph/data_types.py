@@ -65,6 +65,12 @@ class StatechartJSONKey(StrEnum):
     holds, in the order the parent holds them, by the index of the parent.
     """
 
+    CHOSEN_CHILDREN = "chosen_children"
+    """
+    The indices of the children every node choosing its child that the document holds
+    has chosen, in the order it chose them, by the index of the node.
+    """
+
 
 class StatechartPayloadKey(StrEnum):
     """

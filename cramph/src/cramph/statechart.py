@@ -381,29 +381,12 @@ class Statechart(SubclassJSONSerializer):
             for transition_kind in TransitionKind:
                 node_copy.set_condition(
                     transition_kind,
-                    statechart_copy._copy_condition(
-                        node.get_condition(transition_kind)
+                    DerivedConditionVariable.reading_counterparts(
+                        node.get_condition(transition_kind),
+                        lambda read: statechart_copy.get_node_by_index(read.index),
                     ),
                 )
         return statechart_copy
-
-    def _copy_condition(self, condition: sm.Scalar) -> sm.Scalar:
-        """
-        :param condition: A condition of the chart this chart is a structural copy of.
-        :return: The same condition, reading the nodes of this chart with the same index.
-        """
-        variables: list[DerivedConditionVariable] = condition.free_variables()
-        if not variables:
-            return condition
-        return sm.Scalar(condition).substitute(
-            variables,
-            [
-                variable.for_node(
-                    self.get_node_by_index(variable.statechart_node.index)
-                )
-                for variable in variables
-            ],
-        )
 
     @property
     def nodes(self) -> list[StatechartNode]:
@@ -800,10 +783,22 @@ class Statechart(SubclassJSONSerializer):
     ) -> None:
         """
         Let every node of `waiting_nodes` choose its child, compiling once for all.
+
+        A choice may hand another node its child, or let the chooser of another node
+        answer, so the nodes still waiting are asked again until a round chooses
+        nothing.
         """
         with self.modify():
-            for node in waiting_nodes:
-                node.choose_child()
+            while waiting_nodes:
+                for node in waiting_nodes:
+                    if node.is_waiting_for_a_child:
+                        node.choose_child()
+                still_waiting = [
+                    node for node in waiting_nodes if node.is_waiting_for_a_child
+                ]
+                if len(still_waiting) == len(waiting_nodes):
+                    return
+                waiting_nodes = still_waiting
 
     def get_nodes_by_type(
         self, node_type: type[GenericStatechartNode]
@@ -939,18 +934,21 @@ class Statechart(SubclassJSONSerializer):
         }
 
     def nodes_from_to_json(
-        self, first_node_index: int, **kwargs: Any
+        self, first_node_index: int, stop_node_index: int | None = None, **kwargs: Any
     ) -> dict[str, Any]:
         """
         World entities are written as references, see :meth:`to_json`.
 
         :param first_node_index: The index of the first node to write.
-        :return: The JSON representation of the nodes from `first_node_index` on and of
-            their transition conditions, which :meth:`add_nodes_from_json` adds to a
-            statechart holding the nodes before them.
+        :param stop_node_index: The index of the first node not to write, None to write
+            every node from `first_node_index` on.
+        :return: The JSON representation of the nodes from `first_node_index` up to
+            `stop_node_index` and of their transition conditions, which
+            :meth:`add_nodes_from_json` adds to a statechart holding the nodes before
+            them.
         """
         kwargs = {**kwargs, **WorldEntityReferenceWriter().create_kwargs()}
-        written_nodes = self.nodes[first_node_index:]
+        written_nodes = self.nodes[first_node_index:stop_node_index]
         return {
             StatechartJSONKey.NODES: [
                 to_json(node, **kwargs) for node in written_nodes
@@ -966,6 +964,12 @@ class Statechart(SubclassJSONSerializer):
                 ]
                 for node in written_nodes
                 if node.parent_node is not None
+            },
+            StatechartJSONKey.CHOSEN_CHILDREN: {
+                node.index: [child.index for child in node.chosen_children]
+                for node in written_nodes
+                if isinstance(node, CompositeNodeChoosingItsChild)
+                and node.chosen_children
             },
         }
 
@@ -1028,6 +1032,12 @@ class Statechart(SubclassJSONSerializer):
             self.get_node_by_index(int(parent_index)).nodes = [
                 self.get_node_by_index(child_index) for child_index in child_indices
             ]
+        for node_index, child_indices in data[
+            StatechartJSONKey.CHOSEN_CHILDREN
+        ].items():
+            self.get_node_by_index(int(node_index)).restore_chosen_children(
+                [self.get_node_by_index(child_index) for child_index in child_indices]
+            )
 
     def sanity_check(self) -> None:
         """
