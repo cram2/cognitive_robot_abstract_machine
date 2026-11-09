@@ -518,7 +518,7 @@ def world_with_urdf_factory(
     map -> odom_combined -> "urdf tree"
     """
     drive_connection_type = robot_semantic_annotation.get_type_of_generic_parameter(
-        TGenericMobileBase
+        parameter=TGenericMobileBase
     ).get_drive_connection_type()
     urdf_parser = URDFParser.from_file(
         file_path=robot_semantic_annotation.get_ros_file_path(),
