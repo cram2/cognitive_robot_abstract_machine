@@ -1,3 +1,7 @@
+"""
+The statechart: a graph of nodes that is compiled and ticked to run them.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -21,7 +25,9 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphVisualizerBase,
 )
 from cramph.context import ContextExtension, StatechartContext
+from cramph.compiled_tick import LifeCycleChange
 from cramph.data_types import (
+    LifeCycleValues,
     StatechartJSONKey,
     TransitionKind,
     ObservationStateValues,
@@ -182,67 +188,13 @@ class StatechartModification:
 @dataclass
 class Statechart(SubclassJSONSerializer):
     """
-    Represents a statechart.
-    A statechart is a directed graph of nodes and edges.
-    Nodes have two states: observation state and life cycle state.
-    Life cycle states indicate the current state in the life cycle of the node:
-        - NOT_STARTED: the node has not started yet.
-        - RUNNING: the node is running.
-        - PAUSED: the node is paused.
-        - SUCCEEDED: the node's success condition ended it.
-        - FAILED: the node's fail condition ended it.
-        - INTERRUPTED: the node's interrupt condition ended it, or one of its ancestors
-                       ended.
-    Out of these 6 states, nodes are only "active" if they are in the RUNNING state, and
-    the last 3 are terminal: they are the node's outcome and only left by a reset.
-    Observation states indicate the current observation of the node:
-        - TrinaryFalse: the thing the node is observing is not True.
-        - TrinaryUnknown: the node cannot determine the truth value yet, or is not
-                          observing at all.
-        - TrinaryTrue: the thing the node is observing is True.
-    Only a running node observes. A node that has not started or has reached a terminal
-    state reports TrinaryUnknown from the next tick on, while a paused node
-    keeps its last observation because it resumes and observes again.
-    An observation is re-evaluated every tick and may change in both directions, whereas a
-    outcome is latched. A condition is two-valued and may read either through a
-    predicate: the observation state of a node through :attr:`~cramph.node.StatechartNode.observes_true` or
-    :attr:`~cramph.node.StatechartNode.observes_false`, or its life cycle state through e.g. :attr:`~cramph.node.StatechartNode.is_failed`. What a
-    node observes is gone once the tick it ended in is over, so a condition that outlives the node it
-    reads has to read something that outlasts it: :attr:`~cramph.node.StatechartNode.last_observed_true` keeps whether
-    the observation the node took most recently was True, whatever its outcome, and a
-    life cycle predicate keeps the outcome. Every tick settles the whole statechart before
-    it returns, see :class:`~cramph.compiled_tick.CompiledTick`, so a node waiting on another node's
-    outcome starts on the tick that outcome is reached, however deeply either is nested.
-    Nodes are connected with edges, or transitions.
-    There are 6 types of transitions:
-        - start condition: If True, the node transitions from NOT_STARTED to RUNNING,
-                           or to PAUSED while its pause condition is True.
-        - pause condition: If True, the node transitions from RUNNING to PAUSED.
-                           If False, the node transitions from PAUSED to RUNNING.
-        - success condition: If True, the node ends from RUNNING or PAUSED as SUCCEEDED.
-        - fail condition: If True, the node ends from RUNNING or PAUSED as FAILED.
-        - interrupt condition: If True, the node ends from RUNNING or PAUSED as
-                               INTERRUPTED.
-        - reset condition: If True, the node transitions from any state to NOT_STARTED.
-    The condition that ends a node decides its outcome; what the node observes at that
-    moment has no say in it. A node ending takes its descendants down with it, and each
-    of them is INTERRUPTED, however the node ended.
-    If multiple conditions are met, the following order is used:
-        1. its own reset condition, or its parent has not started
-        2. its own success condition
-        3. its own fail condition
-        4. its own interrupt condition, or its parent has ended
-        5. its own pause condition, or its parent is paused
-        6. its own start condition, while its parent is running
-    How to use this class:
-        1. initialized with the context of the executor that runs it
-        2. add nodes.
-        3. set the transition conditions of nodes
-        4. compile the statechart.
-        5. call tick() to update the observation state and life cycle state.
-            tick() raises the exception of a CancelStatechart that started, once the
-            tick is complete.
-        6. call is_ended() to check if the statechart is done.
+    A directed graph of nodes whose life cycle and observation states :meth:`tick`
+    brings up to date, until an :class:`EndStatechart` observes True or a
+    :class:`CancelStatechart` starts.
+
+    .. seealso:: ``cramph/doc/statecharts.md`` for the states, the transitions between
+        them and their precedence, what one tick does and how a statechart is built,
+        run and ended.
     """
 
     context: StatechartContext = field(kw_only=True, repr=False)
@@ -332,7 +284,7 @@ class Statechart(SubclassJSONSerializer):
     )
     """
     Cache of all :class:`CancelStatechart` nodes, checked every tick in
-    :meth:`_raise_if_cancelled`.
+    :meth:`_end_if_cancelled`.
     """
 
     _end_nodes: list[EndStatechart] = field(
@@ -733,7 +685,8 @@ class Statechart(SubclassJSONSerializer):
         chooses one, then the life cycle callbacks of every change run and the tick is
         recorded. A :class:`CancelStatechart` that started in this
         tick ends the statechart only after that, even if a
-        :class:`~cramph.state_history.StateHistoryObserver` of the record failed.
+        :class:`~cramph.state_history.StateHistoryObserver` of the record failed, see
+        :meth:`_end_if_cancelled`.
 
         If the statechart changed since it compiled last, or the kinematic structure of
         the world did, it compiles again before this tick settles once every
@@ -760,7 +713,7 @@ class Statechart(SubclassJSONSerializer):
                 )
             )
         finally:
-            self._raise_if_cancelled()
+            self._end_if_cancelled()
 
     def _let_waiting_nodes_choose_their_child(self) -> None:
         """
@@ -847,13 +800,55 @@ class Statechart(SubclassJSONSerializer):
             for node in self._end_nodes
         )
 
-    def _raise_if_cancelled(self) -> None:
+    def _end_if_cancelled(self) -> None:
         """
-        Raises the exception of the first :class:`CancelStatechart` node that started in
-        the current tick.
+        Ends the statechart if a :class:`CancelStatechart` node started in the current
+        tick: every other node still running or paused is interrupted, which is recorded
+        as the last snapshot of :attr:`state_history`, naming the first such cancel
+        node, and then that node's exception is raised.
         """
-        for node in self._cancel_nodes:
-            node.raise_pending_exception()
+        cancelling_node = next(
+            (node for node in self._cancel_nodes if node.has_pending_exception), None
+        )
+        if cancelling_node is None:
+            return
+        for change in self._interrupt_unfinished_nodes(cancelling_node):
+            change.run_callback()
+        try:
+            self.state_history.append(
+                next_item=StateHistoryItem(
+                    tick_count=self.context.tick_count,
+                    life_cycle_state=self.life_cycle_state,
+                    observation_state=self.observation_state,
+                    cancelled_by=cancelling_node,
+                )
+            )
+        finally:
+            cancelling_node.raise_pending_exception()
+
+    def _interrupt_unfinished_nodes(
+        self, cancelling_node: CancelStatechart
+    ) -> list[LifeCycleChange]:
+        """
+        :param cancelling_node: The node cancelling the statechart, which is left as it
+            is.
+        :return: The change of every node but `cancelling_node` that was running or
+            paused and is interrupted now.
+        """
+        changes = [
+            LifeCycleChange(
+                node=node,
+                previous_state=node.life_cycle_state,
+                new_state=LifeCycleValues.INTERRUPTED,
+            )
+            for node in self.nodes
+            if node is not cancelling_node
+            and node.life_cycle_state
+            in (LifeCycleValues.RUNNING, LifeCycleValues.PAUSED)
+        ]
+        for change in changes:
+            self.life_cycle_state[change.node] = change.new_state
+        return changes
 
     def cleanup_nodes(self) -> None:
         """

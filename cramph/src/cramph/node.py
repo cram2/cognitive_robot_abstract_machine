@@ -1,3 +1,8 @@
+"""
+The nodes of a statechart, the conditions of their transitions and the variables those
+conditions read.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -2722,6 +2727,14 @@ class CancelStatechart(TerminalNode):
 
     def on_start(self) -> None:
         self._pending_exception = self.create_exception()
+
+    @property
+    def has_pending_exception(self) -> bool:
+        """
+        :return: Whether this node started in the current tick, so its exception is
+            still to be raised.
+        """
+        return self._pending_exception is not None
 
     def raise_pending_exception(self) -> None:
         """
