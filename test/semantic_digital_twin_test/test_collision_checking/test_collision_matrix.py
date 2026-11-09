@@ -5,9 +5,6 @@ from itertools import combinations
 import pytest
 
 from krrood.adapters.json_serializer import from_json, to_json
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -447,8 +444,7 @@ class TestCollisionRules:
             == 4
         )
 
-    def test_compute_self_collision_matrix(self, pr2_world_state_reset, rclpy_node):
-        VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
+    def test_compute_self_collision_matrix(self, pr2_world_state_reset):
         pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
         base_link = pr2_world_state_reset.get_body_by_name("base_link")
         head_pan_link = pr2_world_state_reset.get_body_by_name("head_pan_link")
@@ -589,7 +585,6 @@ class TestCollisionRules:
 
 
 class TestCollisionGroups:
-
     @dataclass
     class MockCollisionGroupConsumer(CollisionGroupConsumer):
         def on_compute_collisions(self, collision_results: CollisionCheckingResult): ...
@@ -642,9 +637,9 @@ class TestCollisionGroups:
             parent = group.root.parent_connection.parent
             assert group.root.parent_connection.is_controlled or body_to_robot.get(
                 parent
-            ) != body_to_robot.get(
-                group.root
-            ), f"group root {group.root.name} does not have a controlled parent connection and is not an ownership boundary"
+            ) != body_to_robot.get(group.root), (
+                f"group root {group.root.name} does not have a controlled parent connection and is not an ownership boundary"
+            )
 
         # no group body should be in another group body
         for group1, group2 in combinations(
@@ -1252,8 +1247,8 @@ class TestRolledBackCollisionRules:
                 id="external",
             ),
             pytest.param(
-                lambda collision_manager, robot: collision_manager.add_ignore_collision_rule(
-                    AllowAllCollisions()
+                lambda collision_manager, robot: (
+                    collision_manager.add_ignore_collision_rule(AllowAllCollisions())
                 ),
                 id="ignore_all",
             ),

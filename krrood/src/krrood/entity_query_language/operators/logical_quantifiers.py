@@ -14,6 +14,7 @@ from functools import cached_property
 from typing_extensions import Iterable
 
 from krrood.entity_query_language.core.base_expressions import OperationResult
+from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.operators.core_logical_operators import (
     LogicalBinaryOperator,
 )
@@ -123,6 +124,30 @@ class Exists(QuantifiedConditional):
         self,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
+        for outer_result in self._bind_variables_the_values_are_taken_from_(sources):
+            yield self._quantify_over_values_in_(outer_result)
+
+    def _bind_variables_the_values_are_taken_from_(
+        self, sources: OperationResult
+    ) -> Iterable[OperationResult]:
+        """
+        :param sources: The bindings this quantifier is evaluated under.
+        :return: One result per binding of the expression the quantified variable maps
+            from, such as each lease of ``flat_variable(lease.units)``, each extending
+            *sources*.
+        """
+        if not isinstance(self.variable, MappedVariable):
+            yield sources
+            return
+        for outer_result in self.variable._child_._evaluate_(sources):
+            yield outer_result.update(sources.bindings)
+
+    def _quantify_over_values_in_(self, sources: OperationResult) -> OperationResult:
+        """
+        :param sources: Bindings that fix the outer variables of this quantifier.
+        :return: A true result for the first value of the quantified variable that
+            satisfies the condition, or a false result with *sources* if none does.
+        """
         for variable_result in self._evaluate_child_as_condition_(
             self.variable, sources
         ):
@@ -134,7 +159,7 @@ class Exists(QuantifiedConditional):
             variable_result = variable_result.update(sources.bindings)
             if not self._condition_holds_for_(variable_result):
                 continue
-            yield self._build_operation_result_with_truth_(
+            return self._build_operation_result_with_truth_(
                 True,
                 sources.bindings
                 | {
@@ -144,10 +169,9 @@ class Exists(QuantifiedConditional):
                 },
                 variable_result,
             )
-            return
 
         # Negation as failure: no variable value satisfied the condition.
-        yield self._build_operation_result_with_truth_(False, sources.bindings)
+        return self._build_operation_result_with_truth_(False, sources.bindings)
 
     def _condition_holds_for_(self, variable_result: OperationResult) -> bool:
         """

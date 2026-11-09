@@ -7,14 +7,12 @@ from __future__ import annotations
 import inspect
 from importlib.resources import files
 from types import ModuleType
-from typing_extensions import Iterator
 
 import pytest
 from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
+from typing_extensions import Iterator
 
-from semantic_digital_twin.adapters.ros import rospy
-from semantic_digital_twin.adapters.urdf import URDFParser
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy import (
     daisy_standalone,
@@ -33,6 +31,8 @@ from giskardpy.middleware.ros2.scripts.iai_robots.tracy import (
     tracy_standalone,
     tracy_velocity,
 )
+from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
@@ -40,7 +40,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.specifications.worlds import WorldSpecification
-from semantic_digital_twin.utils import daisy_installed, tracy_installed
+
 
 # %% reading the robot of a world specification
 
@@ -113,14 +113,14 @@ def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
             tracy_standalone,
             Tracy,
             marks=pytest.mark.skipif(
-                not tracy_installed(), reason="Tracy not installed"
+                not Tracy.is_description_installed(), reason="Tracy not installed"
             ),
         ),
         pytest.param(
             daisy_standalone,
             DAiSy,
             marks=pytest.mark.skipif(
-                not daisy_installed(), reason="DAiSy not installed"
+                not DAiSy.is_description_installed(), reason="DAiSy not installed"
             ),
         ),
         (hsr_standalone, HSRB),
