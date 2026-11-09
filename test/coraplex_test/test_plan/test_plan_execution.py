@@ -37,6 +37,7 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.executor import Pacer, StatechartExecutor
 from cramph.node import CancelStatechart
 from cramph.nodes_for_testing import NodeFailingOnObservingFalse
+from cramph.orm.model import NodeStatesAtTick
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -198,12 +199,13 @@ def test_compiling_watches_the_plan_for_progress(pr2_apartment_context) -> None:
     assert len(plan.statechart.get_nodes_by_type(CancelStatechart)) == 1
 
 
-def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
+@pytest.fixture
+def executor_reaching_out_of_range(
     pr2_apartment_context,
-) -> None:
+) -> KinematicallySimulatedPlanExecutor:
     """
-    Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
-    to end the run rather than tick forever.
+    :return: An executor with a reach for a milk carton far above the robot, which the
+        arm cannot close on.
     """
     world, robot_view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
@@ -214,10 +216,36 @@ def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
         grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
     )
     executor = simulated_executor(extensions)
+    executor.compile(statechart_of(executor, plan))
+    return executor
 
+
+def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
+    executor_reaching_out_of_range: KinematicallySimulatedPlanExecutor,
+) -> None:
+    """
+    Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
+    to end the run rather than tick forever.
+    """
     with pytest.raises(MotionMadeNoProgress):
-        executor.compile(statechart_of(executor, plan))
-        executor.execute()
+        executor_reaching_out_of_range.execute()
+
+
+def test_a_plan_given_up_on_keeps_the_stalled_tasks_in_its_stored_history(
+    executor_reaching_out_of_range: KinematicallySimulatedPlanExecutor,
+) -> None:
+    """
+    Once the statechart of the plan is stored and read back, it still names the tasks
+    that stopped approaching their goal.
+    """
+    with pytest.raises(MotionMadeNoProgress) as failure:
+        executor_reaching_out_of_range.execute()
+    statechart = executor_reaching_out_of_range.statechart
+
+    stored = NodeStatesAtTick.from_item(statechart.state_history.latest_item)
+    read_back = stored.item_of(statechart).cancellation_error
+
+    assert read_back.stalled_tasks == failure.value.no_progress.stalled_tasks
 
 
 def test_a_plan_that_outlasts_the_simulation_time_limit_is_given_up_on(

@@ -1,3 +1,8 @@
+"""
+Collision avoidance keeps bodies apart, and reports the contacts it could not keep
+apart.
+"""
+
 import time
 from collections.abc import Iterable
 from copy import deepcopy
@@ -29,6 +34,7 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
+from cramph.orm.model import NodeStatesAtTick
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -1184,9 +1190,14 @@ def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
     assert observer.collision_check_count > 0
 
 
-def test_hard_constraints_violated(
+@pytest.fixture
+def executor_driving_into_obstacles(
     cylinder_bot_world: World, statechart_origin: StatechartOrigin
-) -> None:
+) -> StatechartExecutor:
+    """
+    :return: An executor compiled with a motion that drives the bot between obstacles
+        closer than collision avoidance allows.
+    """
     root = cylinder_bot_world.root
     with cylinder_bot_world.modify_world():
         env2 = Body(
@@ -1284,10 +1295,41 @@ def test_hard_constraints_violated(
     statechart.add_node(EndMotion.when_true(local_min))
 
     executor.compile(statechart=statechart_origin.hand_over(statechart, executor))
+    return executor
 
+
+def test_hard_constraints_violated(
+    executor_driving_into_obstacles: StatechartExecutor,
+) -> None:
+    """
+    A motion that brings bodies closer than allowed is cancelled, naming each of them.
+    """
     with pytest.raises(CollisionViolatedError) as exc_info:
-        executor.tick_until_end()
+        executor_driving_into_obstacles.tick_until_end()
     assert len(exc_info.value.violated_collisions) == 2
+
+
+def test_violated_body_pairs_survive_storing_the_history(
+    executor_driving_into_obstacles: StatechartExecutor,
+) -> None:
+    """
+    The body pairs that came too close are still known once the state history is stored
+    and read back.
+    """
+    with pytest.raises(CollisionViolatedError) as exc_info:
+        executor_driving_into_obstacles.tick_until_end()
+    statechart = executor_driving_into_obstacles.statechart
+
+    stored = NodeStatesAtTick.from_item(statechart.state_history.latest_item)
+    read_back = stored.item_of(statechart).cancellation_error
+
+    assert [
+        (violation.closest_points.body_a, violation.closest_points.body_b)
+        for violation in read_back.violated_collisions
+    ] == [
+        (violation.closest_points.body_a, violation.closest_points.body_b)
+        for violation in exc_info.value.violated_collisions
+    ]
 
 
 @pytest.mark.parametrize(

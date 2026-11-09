@@ -49,6 +49,12 @@ class StateHistoryItem:
     with this snapshot, None for a snapshot that did not end it.
     """
 
+    cancellation_error: Exception | None = field(default=None, kw_only=True)
+    """
+    The exception :attr:`cancelled_by` ended the statechart with, which says why it was
+    cancelled; None for a snapshot that did not end it.
+    """
+
     def __post_init__(self) -> None:
         """
         Snapshots the given states, so later mutation of the live states does not affect
@@ -75,6 +81,7 @@ class StateHistoryItem:
             other.life_cycle_state == self.life_cycle_state
             and other.observation_state == self.observation_state
             and other.cancelled_by is self.cancelled_by
+            and other.cancellation_error is self.cancellation_error
         )
 
     def __repr__(self) -> str:
