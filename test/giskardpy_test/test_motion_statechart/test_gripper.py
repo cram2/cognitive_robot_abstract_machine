@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import numpy as np
 import pytest
 
@@ -13,6 +15,7 @@ from giskardpy.motion_statechart.goals.gripper import (
 )
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 from giskardpy.motion_statechart.tasks.cartesian_tasks import DistanceAlongAxis
 from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
@@ -119,14 +122,14 @@ def test_gripper_without_stall_tolerance_only_ends_on_the_finger_task(
     pr2_world_copy,
 ) -> None:
     """
-    Stall tolerance is off unless asked for, so nothing watches the fingers for standing
-    still.
+    Stall tolerance is off unless asked for, so nothing watches the fingers for having
+    stopped.
     """
     goal = _half_open(_left_gripper(pr2_world_copy))
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
-    assert not any(isinstance(node, LocalMinimumReached) for node in nodes)
+    assert not any(isinstance(node, Stalled) for node in nodes)
 
 
 def test_gripper_tolerating_stall_settles_for_either_outcome(pr2_world_copy) -> None:
@@ -141,27 +144,21 @@ def test_gripper_tolerating_stall_settles_for_either_outcome(pr2_world_copy) -> 
 
     alternative = next(node for node in nodes if isinstance(node, Parallel))
     assert alternative.minimum_success == 1
-    assert {type(node) for node in alternative.nodes} == {
-        DistanceAlongAxis,
-        LocalMinimumReached,
-    }
+    assert {type(node) for node in alternative.nodes} == {DistanceAlongAxis, Stalled}
 
 
 def test_gripper_watches_only_the_fingers_for_stalling(pr2_world_copy) -> None:
     """
-    The stall monitor judges the fingers, not the whole robot, so the rest of the body
-    moving cannot keep it from reporting settled fingers.
+    The stall monitor judges the finger task, not the whole robot, so the rest of the
+    body moving cannot keep it from reporting settled fingers.
     """
-    gripper = _left_gripper(pr2_world_copy)
-    goal = _half_open(gripper, tolerate_stall=True)
+    goal = _half_open(_left_gripper(pr2_world_copy), tolerate_stall=True)
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
-    monitor = next(node for node in nodes if isinstance(node, LocalMinimumReached))
-    assert monitor.degrees_of_freedom == [
-        connection.raw_dof for connection in gripper.finger_connections
-    ]
-    assert monitor.measure_from_own_start
+    monitor = next(node for node in nodes if isinstance(node, Stalled))
+    finger_task = next(node for node in nodes if isinstance(node, DistanceAlongAxis))
+    assert monitor.monitored_node is finger_task
 
 
 def test_gripper_keeps_the_monitors_dwell_time_when_none_is_given(
@@ -175,16 +172,16 @@ def test_gripper_keeps_the_monitors_dwell_time_when_none_is_given(
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
-    monitor = next(node for node in nodes if isinstance(node, LocalMinimumReached))
-    assert monitor.minimum_time == LocalMinimumReached.minimum_time
+    monitor = next(node for node in nodes if isinstance(node, Stalled))
+    assert monitor.timeout == timedelta(seconds=LocalMinimumReached.minimum_time)
 
 
 def test_gripper_dwells_as_long_as_asked_before_accepting_a_stall(
     pr2_world_copy,
 ) -> None:
     """
-    A caller that wants the fingers to stand still longer before the stall counts gets
-    that time on the monitor.
+    A caller that wants the fingers to have stopped for longer before the stall counts
+    gets that time on the monitor.
     """
     goal = _half_open(
         _left_gripper(pr2_world_copy), tolerate_stall=True, stall_minimum_time=2.5
@@ -192,8 +189,8 @@ def test_gripper_dwells_as_long_as_asked_before_accepting_a_stall(
 
     nodes = _descendants(_expanded_nodes(goal, pr2_world_copy))
 
-    monitor = next(node for node in nodes if isinstance(node, LocalMinimumReached))
-    assert monitor.minimum_time == goal.stall_minimum_time
+    monitor = next(node for node in nodes if isinstance(node, Stalled))
+    assert monitor.timeout == timedelta(seconds=goal.stall_minimum_time)
 
 
 # %% capping the finger speed

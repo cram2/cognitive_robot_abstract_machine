@@ -14,6 +14,13 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
+from semantic_digital_twin.robots.pr2 import PR2
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
@@ -29,6 +36,7 @@ from giskardpy.motion_statechart.tasks.align_planes import (
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
+    RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.feature_functions import (
@@ -1434,6 +1442,57 @@ class TestArticulateGraspedMechanism:
         grasp_node = next(node for node in nodes if isinstance(node, CartesianPose))
         assert mechanism_node.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
         assert grasp_node.weight == DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
+
+    def test_the_end_effector_holding_the_grasped_part_may_touch_its_surroundings(
+        self, pr2_world_copy
+    ):
+        """
+        Holding on to the grasped part means touching it and what it is mounted on, so
+        the end effector holding it is let off collision avoidance while the goal runs.
+        """
+        end_effector = pr2_world_copy.get_semantic_annotations_by_type(PR2)[
+            0
+        ].right_arm.end_effector
+        goal = ArticulateGraspedMechanism(
+            tip_link=end_effector.tool_frame,
+            environment_link=pr2_world_copy.get_body_by_name("torso_lift_link"),
+            goal_joint_state=0.0,
+            holding_end_effector=end_effector,
+        )
+
+        Statechart(context=create_context_with_motion_control(pr2_world_copy)).add_node(
+            goal
+        )
+
+        nodes = goal.nodes
+
+        [allowance] = [
+            node for node in nodes if isinstance(node, UpdateTemporaryCollisionRules)
+        ]
+        assert [
+            (type(rule), rule.end_effector) for rule in allowance.temporary_rules
+        ] == [(AllowCollisionForEndEffector, end_effector)]
+
+    def test_without_an_end_effector_holding_the_grasped_part_nothing_is_let_off_collision_avoidance(
+        self, prismatic_bot
+    ):
+        goal = ArticulateGraspedMechanism(
+            tip_link=prismatic_bot.root,
+            environment_link=prismatic_bot.get_body_by_name("robot"),
+            goal_joint_state=0.0,
+        )
+
+        Statechart(context=create_context_with_motion_control(prismatic_bot)).add_node(
+            goal
+        )
+
+        nodes = goal.nodes
+
+        assert [type(node) for node in nodes] == [
+            JointPositionList,
+            CartesianPose,
+            RigidCoupling,
+        ]
 
     def test_a_goal_within_the_limits_is_kept(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")

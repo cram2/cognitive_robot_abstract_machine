@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1044 346" role="img" aria-label="Combinations are tried in order of lowest rank sum; the third, open rank 1 with milk pick-up rank 0, passes its trial. The statement that asked first runs its candidate and hands the other statement of the parallel its own, in place; the later statements still wait to ground.">
+<style>
+.background { fill: #ffffff; }
+.box { fill: #ffffff; stroke: #98a5ac; stroke-width: 1.2; }
+.choose { fill: #ffffff; stroke: #17212a; stroke-width: 1.6; }
+.start { fill: #d7eeef; stroke: #0e7882; stroke-width: 1.6; }
+.later { fill: #ffffff; stroke: #0e7882; stroke-width: 1.3; stroke-dasharray: 5 3; }
+.ok { fill: #dcf0e2; stroke: #2c8448; stroke-width: 1.4; }
+.fail { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; }
+.run { fill: #dde8f7; stroke: #2d69b8; stroke-width: 1.4; }
+.wait { fill: #f6ead3; stroke: #a86d12; stroke-width: 1.6; }
+.ghost { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.gap { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; stroke-dasharray: 5 3; }
+.trialbox { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1.4; }
+.zone { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1; stroke-dasharray: 6 4; opacity: 0.9; }
+.template { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 6 4; }
+.rootmark { fill: none; stroke: #0e7882; stroke-width: 1.4; stroke-dasharray: 6 4; }
+.root { fill: #d7eeef; stroke: #0e7882; stroke-width: 2.2; }
+.edge { stroke: #98a5ac; stroke-width: 1.2; fill: none; }
+.flow { stroke: #17212a; stroke-width: 1.4; fill: none; }
+.flow-bad { stroke: #bf3f2b; stroke-width: 1.4; fill: none; }
+.flow-accent { stroke: #0e7882; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+.marker-line { stroke: #5b6971; stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.head { fill: #17212a; }
+.head-bad { fill: #bf3f2b; }
+text { fill: #17212a; }
+.h { font: 600 14px "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif; }
+.t { font: 500 12px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.tn { font: 500 11px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.s { font: 11px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #5b6971; }
+.lab { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #17212a; }
+.lab-bad { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #bf3f2b; }
+.lab-accent { font: 500 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #0e7882; }
+.lab-trial { font: 600 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #6b4fc0; }
+.num { font: 600 13px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.gridcell { fill: #ffffff; stroke: #98a5ac; stroke-width: 1; }
+</style>
+<rect class="background" x="0" y="0" width="1044" height="346"/>
+        <defs>
+          <marker id="f3-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0 0 L10 5 L0 10 z"/></marker>
+          <marker id="f3-arrow-bad" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head-bad" d="M0 0 L10 5 L0 10 z"/></marker>
+        </defs>
+        <text class="h" x="20" y="22">Order the combinations are tried in</text>
+        <text class="s" x="174" y="44" text-anchor="middle">a(PickUpAction) milk: candidate rank</text>
+        <text class="s" x="0" y="0" text-anchor="middle" transform="translate(44 158) rotate(-90)">a(OpenAction): candidate rank</text>
+        <text class="tn" x="108" y="62" text-anchor="middle">0</text>
+        <text class="tn" x="152" y="62" text-anchor="middle">1</text>
+        <text class="tn" x="196" y="62" text-anchor="middle">2</text>
+        <text class="tn" x="240" y="62" text-anchor="middle">3</text>
+        <text class="tn" x="76" y="96" text-anchor="end">0</text>
+        <text class="tn" x="76" y="140" text-anchor="end">1</text>
+        <text class="tn" x="76" y="184" text-anchor="end">2</text>
+        <text class="tn" x="76" y="228" text-anchor="end">3</text>
+        <rect class="fail" x="86" y="70" width="44" height="44"/><text class="num" x="108" y="97" text-anchor="middle">1</text>
+        <rect class="fail" x="130" y="70" width="44" height="44"/><text class="num" x="152" y="97" text-anchor="middle">2</text>
+        <rect class="gridcell" x="174" y="70" width="44" height="44"/><text class="num" x="196" y="97" text-anchor="middle">4</text>
+        <rect class="gridcell" x="218" y="70" width="44" height="44"/><text class="num" x="240" y="97" text-anchor="middle">7</text>
+        <rect class="ok" x="86" y="114" width="44" height="44"/><text class="num" x="108" y="141" text-anchor="middle">3</text>
+        <rect class="gridcell" x="130" y="114" width="44" height="44"/><text class="num" x="152" y="141" text-anchor="middle">5</text>
+        <rect class="gridcell" x="174" y="114" width="44" height="44"/><text class="num" x="196" y="141" text-anchor="middle">8</text>
+        <rect class="gridcell" x="218" y="114" width="44" height="44"/><text class="num" x="240" y="141" text-anchor="middle">11</text>
+        <rect class="gridcell" x="86" y="158" width="44" height="44"/><text class="num" x="108" y="185" text-anchor="middle">6</text>
+        <rect class="gridcell" x="130" y="158" width="44" height="44"/><text class="num" x="152" y="185" text-anchor="middle">9</text>
+        <rect class="gridcell" x="174" y="158" width="44" height="44"/><text class="num" x="196" y="185" text-anchor="middle">12</text>
+        <rect class="gridcell" x="218" y="158" width="44" height="44"/><text class="num" x="240" y="185" text-anchor="middle">14</text>
+        <rect class="gridcell" x="86" y="202" width="44" height="44"/><text class="num" x="108" y="229" text-anchor="middle">10</text>
+        <rect class="gridcell" x="130" y="202" width="44" height="44"/><text class="num" x="152" y="229" text-anchor="middle">13</text>
+        <rect class="gridcell" x="174" y="202" width="44" height="44"/><text class="num" x="196" y="229" text-anchor="middle">15</text>
+        <rect class="gridcell" x="218" y="202" width="44" height="44"/><text class="num" x="240" y="229" text-anchor="middle">16</text>
+        <text class="s" x="20" y="270">number: position in the order tried</text>
+        <text class="s" x="20" y="286">lowest rank sum first, then by the first ranking</text>
+        <text class="s" x="20" y="302">red failed its trial, green passed</text>
+
+        <path class="flow-bad" d="M 740 60 C 740 30, 610 30, 610 58" marker-end="url(#f3-arrow-bad)"/>
+        <text class="lab-bad" x="675" y="24" text-anchor="middle">fails: next combination</text>
+        <rect class="wait" x="330" y="60" width="152" height="52" rx="6"/>
+        <text class="tn" x="406" y="82" text-anchor="middle">first statement asks</text>
+        <text class="s" x="406" y="100" text-anchor="middle">grounds all of them</text>
+        <rect class="box" x="510" y="60" width="152" height="52" rx="6"/>
+        <text class="tn" x="586" y="82" text-anchor="middle">next combination</text>
+        <text class="s" x="586" y="100" text-anchor="middle">one candidate per statement</text>
+        <rect class="trialbox" x="690" y="60" width="152" height="52" rx="6"/>
+        <text class="tn" x="766" y="82" text-anchor="middle">trial, world copy</text>
+        <text class="s" x="766" y="100" text-anchor="middle">remainder around it</text>
+        <rect class="box" x="870" y="60" width="152" height="52" rx="6"/>
+        <text class="tn" x="946" y="82" text-anchor="middle">hand over</text>
+        <text class="s" x="946" y="100" text-anchor="middle">each its own candidate</text>
+        <line class="flow" x1="482" y1="86" x2="508" y2="86" marker-end="url(#f3-arrow)"/>
+        <line class="flow" x1="662" y1="86" x2="688" y2="86" marker-end="url(#f3-arrow)"/>
+        <line class="flow" x1="842" y1="86" x2="868" y2="86" marker-end="url(#f3-arrow)"/>
+        <text class="lab-bad" x="586" y="134" text-anchor="middle">none left: EmptyUnderspecified</text>
+
+        <path class="flow" d="M 946 112 V 132 H 817 V 198" marker-end="url(#f3-arrow)"/>
+        <text class="lab" x="826" y="166">in place, one message each</text>
+        <line class="edge" x1="817" y1="230" x2="711" y2="250"/>
+        <line class="edge" x1="817" y1="230" x2="923" y2="250"/>
+        <line class="edge" x1="711" y1="276" x2="658" y2="296"/>
+        <line class="edge" x1="711" y1="276" x2="764" y2="296"/>
+        <line class="edge" x1="923" y1="276" x2="870" y2="296"/>
+        <line class="edge" x1="923" y1="276" x2="976" y2="296"/>
+                <rect class="box" x="762" y="200" width="110" height="30" rx="6"/>
+        <text class="t" x="817" y="219" text-anchor="middle">Parallel</text>
+        <text class="s" x="752" y="219" text-anchor="end">branches start on one tick</text>
+        <rect class="box" x="666" y="250" width="90" height="26" rx="6"/>
+        <text class="t" x="711" y="267" text-anchor="middle">Sequence</text>
+        <rect class="box" x="878" y="250" width="90" height="26" rx="6"/>
+        <text class="t" x="923" y="267" text-anchor="middle">Sequence</text>
+        <rect class="start" x="608" y="296" width="100" height="42" rx="6"/>
+        <text class="tn" x="658" y="313" text-anchor="middle">OpenAction</text>
+        <text class="s" x="658" y="329" text-anchor="middle">rank 1, asked first</text>
+        <rect class="later" x="714" y="296" width="100" height="42" rx="6"/>
+        <text class="tn" x="764" y="313" text-anchor="middle">a(PickUp…)</text>
+        <text class="s" x="764" y="329" text-anchor="middle">grounds later</text>
+        <rect class="start" x="820" y="296" width="100" height="42" rx="6"/>
+        <text class="tn" x="870" y="313" text-anchor="middle">PickUpAction</text>
+        <text class="s" x="870" y="329" text-anchor="middle">rank 0, handed over</text>
+        <rect class="later" x="926" y="296" width="100" height="42" rx="6"/>
+        <text class="tn" x="976" y="313" text-anchor="middle">a(PlaceAction)</text>
+        <text class="s" x="976" y="329" text-anchor="middle">grounds later</text>
+      </svg>

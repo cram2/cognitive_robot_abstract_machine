@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from krrood.patterns.exceptions import InterfaceInstantiationError
 
 from probabilistic_model.causal_structure.exceptions import (
     InvalidAdjustmentSet,
@@ -12,8 +13,11 @@ from probabilistic_model.causal_structure.identification import (
     AdjustmentCheck,
     AdjustmentSet,
     AdjustmentSelector,
+    DeclaredAdjustmentPolicy,
     IdentifiedEffect,
     InvalidAdjustmentReason,
+    InvalidDeclaredAdjustmentRefusal,
+    InvalidDeclaredAdjustmentRepair,
     PartiallyIdentifiedEffect,
     UnidentifiedEffect,
     UnidentifiedReason,
@@ -175,14 +179,14 @@ def test_undirected_edge_gives_partial_identification():
     graph = undirected_parent()
 
     assert identify(graph, {"A"}) == PartiallyIdentifiedEffect(
-        candidate_adjustments=[AdjustmentSet(), adjustment_of(graph, {"A"})],
+        parent_sets=[AdjustmentSet(), adjustment_of(graph, {"A"})],
         includes_member_without_causal_path=False,
     )
 
 
 def test_effect_may_be_parent_of_cause():
     assert identify(undirected_cause_and_effect(), set()) == PartiallyIdentifiedEffect(
-        candidate_adjustments=[AdjustmentSet()],
+        parent_sets=[AdjustmentSet()],
         includes_member_without_causal_path=True,
     )
 
@@ -193,6 +197,45 @@ def test_graph_without_member_graphs_leaves_the_effect_unidentified():
     )
 
     assert identification == UnidentifiedEffect(UnidentifiedReason.NO_MEMBER_GRAPH)
+
+
+# %% what an identification offers to adjust for
+
+
+def test_identified_effect_offers_its_one_set():
+    graph = confounded()
+    adjustment = adjustment_of(graph, {"Z"})
+    identification = IdentifiedEffect(adjustment)
+
+    assert (
+        identification.candidate_adjustments,
+        identification.is_identified,
+        identification.includes_no_effect,
+    ) == ([adjustment], True, False)
+
+
+def test_partially_identified_effect_offers_every_parent_set():
+    identification = identify(undirected_cause_and_effect(), set())
+
+    assert (
+        identification.candidate_adjustments,
+        identification.is_identified,
+        identification.includes_no_effect,
+    ) == (
+        identification.parent_sets,
+        False,
+        identification.includes_member_without_causal_path,
+    )
+
+
+def test_unidentified_effect_offers_nothing():
+    identification = UnidentifiedEffect(UnidentifiedReason.NO_MEMBER_GRAPH)
+
+    assert (
+        identification.candidate_adjustments,
+        identification.is_identified,
+        identification.includes_no_effect,
+    ) == ([], False, False)
 
 
 # %% checking a declared adjustment set
@@ -217,6 +260,56 @@ def test_declared_confounder_is_accepted():
     )
 
     assert identification == IdentifiedEffect(adjustment_of(graph, {"Z"}))
+
+
+# %% what to do with a declared adjustment set
+
+
+@pytest.mark.parametrize(
+    "graph, declared, eligible, kept",
+    [
+        (confounded(), {"Z"}, {"Z"}, {"Z"}),
+        (m_bias(), {"M", "A"}, {"M", "A", "B"}, {"M", "A"}),
+        (proxied_confounder(), {"E"}, {"N", "E"}, {"N", "E"}),
+        (mediated(), {"M"}, {"M"}, set()),
+    ],
+    ids=[
+        "valid_declared_set_is_kept",
+        "valid_declared_set_is_kept_over_a_smaller_one",
+        "proxy_is_kept_and_its_confounder_added",
+        "forbidden_declared_node_is_dropped",
+    ],
+)
+def test_a_repair_keeps_a_declared_set_as_far_as_the_graph_allows(
+    graph: CausalGraph, declared: set[str], eligible: set[str], kept: set[str]
+):
+    identification = InvalidDeclaredAdjustmentRepair().identify(
+        AdjustmentSelector(graph),
+        graph.node("X"),
+        graph.node("Y"),
+        adjustment_of(graph, declared),
+        set(nodes_of(graph, eligible)),
+    )
+
+    assert identification == IdentifiedEffect(adjustment_of(graph, kept))
+
+
+def test_the_declared_adjustment_policy_is_an_interface():
+    with pytest.raises(InterfaceInstantiationError):
+        DeclaredAdjustmentPolicy()
+
+
+def test_a_refusal_raises_for_an_invalid_declared_set():
+    graph = mediated()
+
+    with pytest.raises(InvalidAdjustmentSet):
+        InvalidDeclaredAdjustmentRefusal().identify(
+            AdjustmentSelector(graph),
+            graph.node("X"),
+            graph.node("Y"),
+            adjustment_of(graph, {"M"}),
+            set(nodes_of(graph, {"M"})),
+        )
 
 
 # %% ordering adjustment sets

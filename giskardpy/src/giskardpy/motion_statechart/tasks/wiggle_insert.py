@@ -9,6 +9,7 @@ import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.ormatic.utils import classproperty
 from cramph.context import ContextExtension
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
@@ -59,9 +60,10 @@ class WiggleInsert(ConvergingTask):
     Default is an untuned preset, not a calibrated value.
     """
 
-    down_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Reference velocity for pressing down in m/s.
+    Sets how fast the tip is pressed into the hole, in m/s, and wiggled, in rad/s; not
+    strictly enforced.
 
     Default is an untuned preset, not a calibrated value.
     """
@@ -219,7 +221,7 @@ class WiggleInsert(ConvergingTask):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_current,
             frame_P_goal=root_P_hole_wiggled,
-            reference_velocity=self.down_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
             name=f"{self.name}_point_goal",
         )
@@ -238,7 +240,7 @@ class WiggleInsert(ConvergingTask):
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
-            reference_velocity=self.down_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight + 1,
         )
 

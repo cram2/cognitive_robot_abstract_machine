@@ -14,6 +14,9 @@ from typing_extensions import TYPE_CHECKING, Any, Callable
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
+    import random_events.variable
+    from probabilistic_model.causal_structure.identification import Identification
+
     from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.query.query import (
         Query,
@@ -1005,6 +1008,32 @@ class BackendCannotEvaluateCause(DataclassException):
 
 
 @dataclass
+class BackendCannotReadState(DataclassException):
+    """
+    Raised when an evaluation is given a state to read ground terms from, but its
+    backend computes values where no state can reach them, such as in a database.
+    """
+
+    backend_type: type[QueryBackend]
+    """
+    The type of the backend that cannot read the state.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.backend_type.__name__} cannot read a state: it computes the values "
+            f"of attributes, indexes and calls without reading them through the "
+            f"evaluation context."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Evaluate with a backend whose reads_state holds, such as "
+            "EntityQueryLanguageBackend, or evaluate without a state."
+        )
+
+
+@dataclass
 class BackendCannotEvaluateProbabilisticQuery(DataclassException):
     """
     Raised when a
@@ -1447,3 +1476,94 @@ class NoReturnStatementInProperty(ModelingError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class EffectNotIdentified(DataclassException):
+    """
+    Raised when the causal structure learned for a query's class does not identify the
+    effect of a cause on the query's effect by adjusting for the variables the query
+    names.
+    """
+
+    cause: random_events.variable.Variable
+    """
+    The cause variable.
+    """
+
+    effect: random_events.variable.Variable
+    """
+    The effect variable.
+    """
+
+    identification: Identification
+    """
+    What the learned structure says about the effect: a
+    :class:`~probabilistic_model.causal_structure.identification.PartiallyIdentifiedEffect`
+    or an
+    :class:`~probabilistic_model.causal_structure.identification.UnidentifiedEffect`.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure does not identify the effect of "
+            f"'{self.cause.name}' on '{self.effect.name}': {self.identification}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Name more of the variables in the query, add domain causal knowledge that "
+            "orients the undirected edges, or mark the confounders yourself."
+        )
+
+
+@dataclass
+class VariableNotInCausalGraph(DataclassException):
+    """
+    Raised when a causal query's cause or effect has no node in the causal structure
+    learned for its class.
+    """
+
+    variable: random_events.variable.Variable
+    """
+    The variable.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The learned causal structure has no node for the variable "
+            f"'{self.variable.name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Learn the structure over the variables the query's model is fitted on."
+
+
+@dataclass
+class NoLearnedCausalStructure(DataclassException):
+    """
+    Raised when a causal query needs the learned causal structure of its class and the
+    backend has none for that class.
+    """
+
+    expression: Query
+    """
+    The query.
+    """
+
+    queried_class: type
+    """
+    The class the query asks about.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.expression} needs a learned causal structure, and the backend has "
+            f"none for {self.queried_class.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Learn the structure of the class and give it to the ProbabilisticBackend "
+            "in causal_structures."
+        )
