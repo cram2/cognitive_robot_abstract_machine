@@ -6,17 +6,22 @@ aggregation statistics.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field, replace
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+from typing_extensions import TYPE_CHECKING, Self
 
 from probabilistic_model.causal_structure.discretization import Discretizer
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     PartTrainingTable,
     RelationalTrainingTables,
 )
+
+if TYPE_CHECKING:
+    from probabilistic_model.causal_structure.graph import GraphEdge, GraphNode
 
 # %% one dependence the assumption does not allow
 
@@ -154,6 +159,46 @@ class ConditioningAttributes:
     """
 
 
+@dataclass
+class PartAttributeAdjacency:
+    """
+    Which attributes of a part the part's own causal graph joins to each other.
+    """
+
+    adjacent_attributes: dict[str, set[str]] = field(default_factory=dict)
+    """
+    Per part attribute, the part attributes an edge joins it to, by the names the
+    part's training table gives them.
+    """
+
+    @classmethod
+    def from_part_edges(
+        cls,
+        part_edges: list[GraphEdge],
+        part_node_of_column: dict[str, GraphNode],
+    ) -> Self:
+        """
+        :param part_edges: The edges learned from a part's table.
+        :param part_node_of_column: The template nodes of the part's attributes, by
+            column.
+        :return: The adjacency of the part attributes those edges join.
+        """
+        column_of = {node: column for column, node in part_node_of_column.items()}
+        adjacent_attributes = defaultdict(set)
+        for edge in part_edges:
+            if edge.first in column_of and edge.second in column_of:
+                adjacent_attributes[column_of[edge.first]].add(column_of[edge.second])
+                adjacent_attributes[column_of[edge.second]].add(column_of[edge.first])
+        return cls(dict(adjacent_attributes))
+
+    def adjacent_to(self, part_attribute: str) -> set[str]:
+        """
+        :param part_attribute: The name of a part attribute.
+        :return: The part attributes an edge joins it to.
+        """
+        return self.adjacent_attributes.get(part_attribute, set())
+
+
 # %% the check
 
 
@@ -238,14 +283,13 @@ class ExampleToPartCheck:
         example_rows: pd.DataFrame,
         part_collection: str,
         table: PartTrainingTable,
-        adjacent_part_attributes: dict[str, set[str]],
+        adjacency: PartAttributeAdjacency,
     ) -> list[ExampleToPartDependence]:
         """
         :param example_rows: One row per instance.
         :param part_collection: The name of the instance's attribute that holds the parts.
         :param table: The part's training table.
-        :param adjacent_part_attributes: Per part attribute, the part attributes the
-            part's own graph joins it to.
+        :param adjacency: Which part attributes the part's own graph joins.
         :return: The dependences of :meth:`dependences_of_part` that remain given any one
             other attribute the instance attribute could reach the part attribute
             through, each with the largest probability it was tested with.
@@ -268,7 +312,7 @@ class ExampleToPartCheck:
                     for conditioning in self.other_paths(
                         dependence,
                         dependences,
-                        adjacent_part_attributes.get(dependence.part_attribute, set()),
+                        adjacency.adjacent_to(dependence.part_attribute),
                     )
                 ]
             )

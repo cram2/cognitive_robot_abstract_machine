@@ -7,7 +7,6 @@ relational circuit is fitted on.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from enum import IntEnum, StrEnum
 
@@ -45,7 +44,10 @@ from probabilistic_model.causal_structure.graph import (
     NodeLevel,
 )
 from probabilistic_model.causal_structure.identification import AdjustmentSelector
-from probabilistic_model.causal_structure.relational_checks import ExampleToPartCheck
+from probabilistic_model.causal_structure.relational_checks import (
+    ExampleToPartCheck,
+    PartAttributeAdjacency,
+)
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
     RelationalTrainingTables,
@@ -516,25 +518,6 @@ class RelationalCausalStructureLearner:
                 tables.example_rows,
                 part,
                 tables.part_tables[part],
-                self.adjacent_part_attributes(part_edges, part_node_of_column),
+                PartAttributeAdjacency.from_part_edges(part_edges, part_node_of_column),
             )
         ]
-
-    @staticmethod
-    def adjacent_part_attributes(
-        part_edges: list[GraphEdge], part_node_of_column: dict[str, GraphNode]
-    ) -> dict[str, set[str]]:
-        """
-        :param part_edges: The edges learned from a part's table.
-        :param part_node_of_column: The template nodes of the part's attributes, by
-            column.
-        :return: Per part attribute, the part attributes an edge joins it to, by the
-            names the part's training table gives them.
-        """
-        column_of = {node: column for column, node in part_node_of_column.items()}
-        adjacent = defaultdict(set)
-        for edge in part_edges:
-            if edge.first in column_of and edge.second in column_of:
-                adjacent[column_of[edge.first]].add(column_of[edge.second])
-                adjacent[column_of[edge.second]].add(column_of[edge.first])
-        return dict(adjacent)

@@ -5,6 +5,7 @@ import pandas as pd
 
 from probabilistic_model.causal_structure.relational_checks import (
     ExampleToPartCheck,
+    PartAttributeAdjacency,
 )
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     PartTrainingTable,
@@ -131,7 +132,10 @@ def test_copy_of_the_driving_attribute_is_dropped_given_it():
     tables = room_tables_with_noisy_copies()
 
     dependences = ExampleToPartCheck().dependences_given_another_attribute(
-        tables.example_rows, "parts", tables.part_tables["parts"], {}
+        tables.example_rows,
+        "parts",
+        tables.part_tables["parts"],
+        PartAttributeAdjacency(),
     )
 
     assert {dependence.example_attribute for dependence in dependences} == {"Room.warm"}
@@ -144,7 +148,7 @@ def test_part_attribute_reached_through_an_adjacent_one_is_dropped_given_it():
         tables.example_rows,
         "parts",
         tables.part_tables["parts"],
-        {"wet": {"dripping"}, "dripping": {"wet"}},
+        PartAttributeAdjacency({"wet": {"dripping"}, "dripping": {"wet"}}),
     )
 
     assert [

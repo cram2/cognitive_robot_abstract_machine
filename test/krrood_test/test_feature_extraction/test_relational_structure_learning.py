@@ -1,6 +1,7 @@
 import itertools
 from dataclasses import dataclass, field
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -26,6 +27,7 @@ from probabilistic_model.causal_structure.learning import (
 from probabilistic_model.causal_structure.relational_checks import (
     ExampleToPartCheck,
     ExampleToPartDependence,
+    PartAttributeAdjacency,
 )
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     PartTrainingTable,
@@ -47,6 +49,8 @@ from .test_nested_exchangeable_parts import (  # noqa: F401  # fixtures
 from ..dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,
+    GraspAttempt,
+    PickingRobot,
     SceneObject,
     SceneRoom,
     SceneWithExchangeableParts,
@@ -293,7 +297,7 @@ class FixedDependenceCheck(ExampleToPartCheck):
         example_rows: pd.DataFrame,
         part_collection: str,
         table: PartTrainingTable,
-        adjacent_part_attributes: dict[str, set[str]],
+        adjacency: PartAttributeAdjacency,
     ) -> list[ExampleToPartDependence]:
         return [self.dependence]
 
@@ -380,5 +384,57 @@ def test_a_kept_dependence_is_reversed_where_the_tiers_say_so(
         GraphEdge.directed_edge(
             graph.node(part_attribute),
             graph.node(room_type_dependence.example_attribute),
+        )
+    }
+
+
+# %% the check on robots whose skill sets each attempt's arm
+
+
+def robots_whose_skill_sets_the_arm(
+    robot_count: int = 150, seed: int = 0
+) -> list[PickingRobot]:
+    """
+    :param robot_count: How many robots to draw.
+    :param seed: Seed of the draw.
+    :return: Robots of skill 0 or 1 with two to four attempts each; each attempt's arm
+        follows the robot's skill, and whether it grasps is a coin flip.
+    """
+    random_state = np.random.default_rng(seed)
+    robots = []
+    for _ in range(robot_count):
+        skill = float(random_state.integers(0, 2))
+        robots.append(
+            PickingRobot(
+                skill=skill,
+                attempts=[
+                    GraspAttempt(
+                        arm=skill + random_state.normal(0.0, 0.3),
+                        grasped=bool(random_state.random() < 0.5),
+                    )
+                    for _ in range(random_state.integers(2, 5))
+                ],
+            )
+        )
+    return robots
+
+
+def test_the_check_joins_the_skill_to_the_arm_it_sets():
+    robots = robots_whose_skill_sets_the_arm()
+    circuit = RelationalProbabilisticCircuit().fit(robots)
+
+    graph = (
+        RelationalCausalStructureLearner(
+            ClassDiagram([PickingRobot, GraspAttempt]),
+            example_to_part_check=ExampleToPartCheck(),
+        )
+        .learn(circuit, robots)
+        .selector.graph
+    )
+
+    assert edges_between_an_instance_and_a_part_attribute(graph) == {
+        GraphEdge.directed_edge(
+            graph.node(f"{PickingRobot.__name__}.skill"),
+            graph.node(f"{PickingRobot.__name__}.attempts.arm"),
         )
     }
