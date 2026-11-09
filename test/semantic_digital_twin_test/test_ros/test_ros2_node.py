@@ -23,7 +23,8 @@ from semantic_digital_twin.adapters.ros.visualization.collision_viz_marker impor
     CollisionVisualizationMarkerPublisher,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
-    SpatialTypeMarkerPublisher,
+    EvaluatedSpatialTypePublisher,
+    SpatialTypePublisher,
 )
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
@@ -39,7 +40,8 @@ node_users = [
     TFPublisher,
     VizMarkerPublisher,
     CollisionVisualizationMarkerPublisher,
-    SpatialTypeMarkerPublisher,
+    SpatialTypePublisher,
+    EvaluatedSpatialTypePublisher,
     FetchWorldServer,
     TFWrapper,
 ]

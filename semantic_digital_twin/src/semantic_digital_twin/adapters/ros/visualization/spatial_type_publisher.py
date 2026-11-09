@@ -75,11 +75,11 @@ class EvaluatedSpatialTypeVisualization:
     """
 
 
-# %% marker publishing
+# %% publishing evaluated spatial types
 
 
 @dataclass(eq=False)
-class SpatialTypeMarkerPublisher(HasROS2Node):
+class EvaluatedSpatialTypePublisher(HasROS2Node):
     """
     Publishes already evaluated spatial type visualizations as one RViz marker array.
 
@@ -173,7 +173,7 @@ class SpatialTypeMarkerPublisher(HasROS2Node):
 
 
 @dataclass(eq=False)
-class SpatialTypePublisher(StateChangeCallback):
+class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     """
     Publishes spatial types as RViz markers and keeps them updated as the robot moves.
 
@@ -182,9 +182,9 @@ class SpatialTypePublisher(StateChangeCallback):
     track motion.
     """
 
-    marker_publisher: SpatialTypeMarkerPublisher = field(kw_only=True)
+    marker_publisher: EvaluatedSpatialTypePublisher = field(init=False)
     """
-    Publishes the evaluated spatial types.
+    Publishes the evaluated spatial types on :attr:`node`.
     """
 
     _requests: list[SpatialTypeVisualization] = field(init=False, default_factory=list)
@@ -205,6 +205,7 @@ class SpatialTypePublisher(StateChangeCallback):
 
     def __post_init__(self):
         super().__post_init__()
+        self.marker_publisher = EvaluatedSpatialTypePublisher(node=self.node)
         self._compile()
 
     def add(self, request: SpatialTypeVisualization) -> None:
@@ -299,9 +300,7 @@ class SpatialTypePublisher(StateChangeCallback):
             if reference_frame is None:
                 raise WorldNotResolvableError(spatial_type=spatial_type)
             world = reference_frame._world
-        publisher = cls(
-            marker_publisher=SpatialTypeMarkerPublisher(node=node), _world=world
-        )
+        publisher = cls(node=node, _world=world)
         publisher.add(
             SpatialTypeVisualization(
                 spatial_type=spatial_type, color=color or Color(), label=label

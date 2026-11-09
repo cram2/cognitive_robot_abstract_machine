@@ -13,7 +13,6 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
-    SpatialTypeMarkerPublisher,
     SpatialTypePublisher,
 )
 from krrood_spatial_math.spatial_types import SpatialType, Vector3
@@ -57,10 +56,7 @@ class DebugExpressionPublisher:
             if isinstance(debug_expression.expression, SpatialType)
         ]
         if self._publisher is None:
-            self._publisher = SpatialTypePublisher(
-                marker_publisher=SpatialTypeMarkerPublisher(node=self.node),
-                _world=self.world,
-            )
+            self._publisher = SpatialTypePublisher(node=self.node, _world=self.world)
         self._publisher.set_requests(requests)
 
     def _to_request(
