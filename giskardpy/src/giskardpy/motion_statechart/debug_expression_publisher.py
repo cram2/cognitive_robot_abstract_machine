@@ -231,7 +231,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         world = executor.context.world
         for node in executor.statechart.get_nodes_by_type(MotionStatechartNode):
             visualizations = [
-                self._create_visualization(debug_expression, world)
+                self._create_visualization(debug_expression, node, world)
                 for debug_expression in node.debug_expressions
                 if isinstance(debug_expression.expression, SpatialType)
             ]
@@ -302,12 +302,14 @@ class DebugExpressionPublishing(TickingExecutorExtension):
 
     @staticmethod
     def _create_visualization(
-        debug_expression: DebugExpression, world: World
+        debug_expression: DebugExpression, node: MotionStatechartNode, world: World
     ) -> SpatialTypeVisualization:
         """
         :param debug_expression: A debug expression whose expression is a spatial type.
+        :param node: The node that registered `debug_expression`.
         :param world: The world the expression is expressed in.
-        :return: The visualization of `debug_expression`, with a vector expressed in its
+        :return: The visualization of `debug_expression`, labelled with its name, in a
+            marker namespace no other node shares, and with a vector expressed in its
             visualisation frame so the arrow starts there.
         """
         expression = debug_expression.expression
@@ -321,6 +323,6 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         return SpatialTypeVisualization(
             spatial_type=expression,
             color=debug_expression.color,
-            namespace=debug_expression.name,
+            namespace=f"{debug_expression.name}#{node.index}",
             label=debug_expression.name,
         )

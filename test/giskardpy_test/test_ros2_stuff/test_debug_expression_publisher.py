@@ -206,6 +206,19 @@ def published_namespaces(publishing: DebugExpressionPublishing) -> set[str]:
     }
 
 
+def collected_namespaces(
+    publishing: DebugExpressionPublishing, *nodes: MotionStatechartNode
+) -> set[str]:
+    """
+    The marker namespaces of the debug expressions `publishing` collected of `nodes`.
+    """
+    return {
+        visualization.namespace
+        for node in nodes
+        for visualization in publishing._visualizations_per_node[node]
+    }
+
+
 # %% importing without ROS
 
 
@@ -279,7 +292,7 @@ def test_compile_collects_the_spatial_debug_expressions_of_each_node(
     executor.compile(statechart)
 
     assert {
-        collected_node: [visualization.namespace for visualization in visualizations]
+        collected_node: [visualization.label for visualization in visualizations]
         for collected_node, visualizations in publishing._visualizations_per_node.items()
     } == {node: ["node/point"]}
 
@@ -294,7 +307,9 @@ def test_vector_is_expressed_in_its_visualisation_frame(cylinder_bot_world):
     vector = Vector3(x=1, y=0, z=0, reference_frame=root, visualisation_frame=bot)
 
     visualization = DebugExpressionPublishing._create_visualization(
-        DebugExpression(name="vector", expression=vector), cylinder_bot_world
+        DebugExpression(name="vector", expression=vector),
+        NodeRegisteringDebugExpressions(name="node"),
+        cylinder_bot_world,
     )
 
     assert visualization.spatial_type.reference_frame is bot
@@ -314,10 +329,41 @@ def test_only_the_debug_expressions_of_running_nodes_are_published(
     executor.compile(nodes.statechart)
 
     executor.tick()
-    assert published_namespaces(publishing) == {"first/point"}
+    assert published_namespaces(publishing) == collected_namespaces(
+        publishing, nodes.first
+    )
 
     tick_until_running(executor, nodes.second)
-    assert published_namespaces(publishing) == {"first/point", "second/point"}
+    assert published_namespaces(publishing) == collected_namespaces(
+        publishing, nodes.first, nodes.second
+    )
+
+
+def test_running_nodes_whose_debug_expressions_share_a_name_publish_apart(
+    publishing, cylinder_bot_world
+):
+    """
+    Two nodes with the same name, such as two arms reaching for a pose at once, do not
+    overwrite each other's markers.
+    """
+    executor = create_executor(cylinder_bot_world, publishing)
+    statechart = Statechart(context=executor.context)
+    statechart.add_nodes(
+        [
+            NodeRegisteringDebugExpressions(
+                name="reach",
+                registered_debug_expressions=[
+                    point_debug_expression("reach/point", cylinder_bot_world)
+                ],
+            )
+            for _ in range(2)
+        ]
+    )
+    executor.compile(statechart)
+
+    executor.tick()
+
+    assert len(published_namespaces(publishing)) == 2
 
 
 def test_the_shown_debug_expressions_are_compiled_again_only_when_they_change(
@@ -369,7 +415,8 @@ def test_markers_show_the_current_values_without_recompiling(
     The published markers follow the world state through the compiled function.
     """
     executor = create_executor(cylinder_bot_world, publishing)
-    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    nodes = NodesStartingInTurn.build(executor.context)
+    executor.compile(nodes.statechart)
     executor.tick()
     fake = FakeMarkerPublisher()
     publishing._marker_publisher.marker_publisher.publisher = fake
@@ -385,7 +432,8 @@ def test_markers_show_the_current_values_without_recompiling(
     [sphere] = [
         marker
         for marker in fake.published[-1].markers
-        if marker.ns == "first/point" and marker.type == Marker.SPHERE
+        if marker.ns in collected_namespaces(publishing, nodes.first)
+        and marker.type == Marker.SPHERE
     ]
     assert sphere.pose.position.x == 1.5
 
@@ -479,15 +527,17 @@ def test_executor_with_motion_control_publishes_the_running_tasks(
         extensions=[RosNodeAccess(rclpy_node), MotionControl(), publishing],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(align_planes_task(cylinder_bot_world))
+    task = align_planes_task(cylinder_bot_world)
+    statechart.add_node(task)
     executor.compile(statechart)
 
     executor.tick()
 
-    assert published_namespaces(publishing) == {
-        "align/current_normal",
-        "align/goal_normal",
-    }
+    assert [
+        visualization.label
+        for visualization in publishing._visualizations_per_node[task]
+    ] == ["align/current_normal", "align/goal_normal"]
+    assert published_namespaces(publishing) == collected_namespaces(publishing, task)
 
 
 def test_executor_skips_debug_expressions_by_default(rclpy_node, cylinder_bot_world):
