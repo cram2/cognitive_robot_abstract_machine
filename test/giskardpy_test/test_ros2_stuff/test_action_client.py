@@ -7,10 +7,13 @@ from time import sleep
 
 import pytest
 from json_msgs.action import JsonAction
-from typing_extensions import Any
+from rclpy.action import ActionServer
+from rclpy.node import Node
+from typing_extensions import Any, Iterator
 
 from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOutcome
+from giskardpy.middleware.ros2.exceptions import GoalRequestNotAnsweredError
 from giskardpy.middleware.ros2.ros2_interface import MyActionClient
 
 # %% mimics
@@ -104,11 +107,33 @@ def reject_feedback(feedback_message: Any) -> None:
 
 
 @pytest.fixture()
-def giskard_command_server(init_rospy) -> ActionServerHandler:
+def giskard_command_server(init_rospy) -> Iterator[ActionServerHandler]:
     """
     A real "giskard/command" action server that a client can send goals to.
     """
-    return ActionServerHandler(action_name="giskard/command", action_type=JsonAction)
+    action_server = ActionServerHandler(
+        action_name="giskard/command", action_type=JsonAction
+    )
+    yield action_server
+    action_server.close()
+
+
+@pytest.fixture()
+def server_never_answering(init_rospy) -> Iterator[ActionServer]:
+    """
+    An action server on a node that nothing spins, so it is found by a client but never
+    answers a goal request, like the server of a node whose executor stopped.
+    """
+    node = Node("server_never_answering")
+    action_server = ActionServer(
+        node=node,
+        action_type=JsonAction,
+        action_name="never_answered/command",
+        execute_callback=lambda goal_handle: JsonAction.Result(),
+    )
+    yield action_server
+    action_server.destroy()
+    node.destroy_node()
 
 
 @pytest.fixture()
@@ -145,3 +170,20 @@ def test_a_goal_whose_feedback_callback_failed_is_canceled(
 
     server_sending_feedback.thread.join()
     assert server_sending_feedback.cancel_was_requested
+
+
+# %% a goal request nobody answers
+
+
+def test_a_goal_request_nobody_answers_raises_once_the_response_timeout_passed(
+    server_never_answering: ActionServer,
+) -> None:
+    client = MyActionClient(
+        rospy.get_node(),
+        JsonAction,
+        "never_answered/command",
+        goal_response_timeout=timedelta(seconds=0.5),
+    )
+
+    with pytest.raises(GoalRequestNotAnsweredError):
+        client.send_goal(JsonAction.Goal())
