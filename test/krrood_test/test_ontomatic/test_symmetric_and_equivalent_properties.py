@@ -4,22 +4,16 @@ Statements implied by symmetric, by equivalent and by transitive properties.
 
 from __future__ import annotations
 
-import pytest
-
-from krrood.symbol_graph.symbol_graph import SymbolGraph
+from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
+    InferredThrough,
+    PropertyDescriptorRelation,
+    RelationExplanation,
+)
 from ..dataset.role_and_ontology.symmetric_and_equivalent_properties import (
     Area,
+    Building,
     PersonWithFriends,
 )
-
-
-@pytest.fixture(autouse=True)
-def fresh_symbol_graph():
-    """
-    Start every test from an empty symbol graph.
-    """
-    SymbolGraph().clear()
-    SymbolGraph()
 
 
 # %% symmetric properties
@@ -35,6 +29,23 @@ def test_a_symmetric_property_relates_the_object_back_to_the_subject():
     alice.friend_of.add(bob)
 
     assert bob.friend_of == {alice}
+
+
+def test_the_statement_back_is_explained_by_the_statement_it_reverses():
+    """
+    The statement back from the object is inferred through symmetry from the statement
+    made, which is asserted and has no explanation.
+    """
+    alice = PersonWithFriends("alice")
+    bob = PersonWithFriends("bob")
+
+    alice.friend_of.add(bob)
+
+    asserted = PropertyDescriptorRelation.find(alice, "friend_of", bob)
+    assert asserted.explanation is None
+    assert PropertyDescriptorRelation.find(
+        bob, "friend_of", alice
+    ).explanation == RelationExplanation(InferredThrough.SYMMETRY, (asserted,))
 
 
 # %% equivalent properties
@@ -80,3 +91,29 @@ def test_a_statement_through_an_equivalent_property_is_composed_with_the_stateme
     kitchen.lies_within.add(flat)
 
     assert kitchen.is_part_of == {flat, city}
+
+
+# %% transitive properties held by different fields
+
+
+def test_a_composed_statement_is_held_by_the_field_of_its_subject():
+    """
+    A statement composed with a statement made before it is held by the field of the
+    subject of the earlier statement, also when the two subjects hold the property in
+    fields of different classes.
+    """
+    house = Building("house")
+    city = Area("city")
+    country = Area("country")
+    house.stands_in.add(city)
+
+    city.is_part_of.add(country)
+
+    composed = PropertyDescriptorRelation.find(house, "stands_in", country)
+    assert composed.explanation == RelationExplanation(
+        InferredThrough.TRANSITIVE,
+        (
+            PropertyDescriptorRelation.find(house, "stands_in", city),
+            PropertyDescriptorRelation.find(city, "is_part_of", country),
+        ),
+    )

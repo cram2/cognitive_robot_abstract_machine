@@ -8,11 +8,12 @@ from __future__ import annotations
 from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
     PropertyDescriptorRelation,
 )
-from krrood.symbol_graph.symbol_graph import SymbolGraph
 from ..dataset.role_and_ontology.hobbies import (
     BasketBall,
     BasketBallLover,
+    Likes,
     Loves,
+    PeopleWithHobby,
     PersonWithHobbies,
     Sports,
     SportsLover,
@@ -26,12 +27,23 @@ def make_individual() -> tuple[PersonWithHobbies, BasketBallLover, SportsLover]:
     """
     :return: A person with a basketball lover role and a sports lover role, created in that order.
     """
-    SymbolGraph().clear()
-    SymbolGraph()
     person = PersonWithHobbies(name="Bass")
     basketball_lover = BasketBallLover(role_taker=person)
     sports_lover = SportsLover(role_taker=person)
     return person, basketball_lover, sports_lover
+
+
+# %% declarations of a property
+
+
+def test_a_class_declares_a_property_through_the_nearest_class_declaring_it():
+    """
+    A class declares a property through its own field managed by exactly that property,
+    or else through the nearest class it inherits such a field from.
+    """
+    assert Loves.declared_by(BasketBallLover) is BasketBallLover.__dict__["loves"]
+    assert Likes.declared_by(BasketBallLover) is PeopleWithHobby.__dict__["likes"]
+    assert Loves.declared_by(PersonWithHobbies) is None
 
 
 # %% the objects of an individual
@@ -63,14 +75,16 @@ def test_declaring_object_chooses_the_first_declaration_whose_range_admits_the_v
     football = Sports(name="Football")
     basketball = BasketBall(name="BasketBall")
     for individual_object in (person, basketball_lover, sports_lover):
-        holder, descriptor = PropertyDescriptorRelation.declaring_object(
+        declaration = PropertyDescriptorRelation.declaring_object(
             individual_object, Loves, football
         )
-        assert holder is sports_lover and descriptor.domain is SportsLover
-        holder, descriptor = PropertyDescriptorRelation.declaring_object(
+        assert declaration.holder is sports_lover
+        assert declaration.descriptor.domain is SportsLover
+        declaration = PropertyDescriptorRelation.declaring_object(
             individual_object, Loves, basketball
         )
-        assert holder is basketball_lover and descriptor.domain is BasketBallLover
+        assert declaration.holder is basketball_lover
+        assert declaration.descriptor.domain is BasketBallLover
 
 
 def test_declaring_object_falls_back_to_the_first_declaration():
@@ -80,18 +94,15 @@ def test_declaring_object_falls_back_to_the_first_declaration():
     """
     person, basketball_lover, _ = make_individual()
     game = VideoGames(name="Tetris")
-    holder, descriptor = PropertyDescriptorRelation.declaring_object(
-        person, Loves, game
-    )
-    assert holder is basketball_lover and descriptor.domain is BasketBallLover
+    declaration = PropertyDescriptorRelation.declaring_object(person, Loves, game)
+    assert declaration.holder is basketball_lover
+    assert declaration.descriptor.domain is BasketBallLover
 
 
 def test_declaring_object_is_none_without_a_declaration():
     """
     No object declares the property of an individual without a role declaring it.
     """
-    SymbolGraph().clear()
-    SymbolGraph()
     person = PersonWithHobbies(name="Bass")
     assert (
         PropertyDescriptorRelation.declaring_object(

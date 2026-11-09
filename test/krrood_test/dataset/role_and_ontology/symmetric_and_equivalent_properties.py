@@ -1,6 +1,6 @@
 """
 A symmetric property, ``friendOf``, two equivalent properties, ``knows`` and ``isAcquaintedWith``, and a transitive
-property, ``isPartOf``, equivalent to ``liesWithin``.
+property, ``isPartOf``, equivalent to ``liesWithin``, held by areas and by the buildings standing in them.
 """
 
 from __future__ import annotations
@@ -124,3 +124,22 @@ class LiesWithin(PropertyDescriptor, HasEquivalentProperties):
 
 Area.is_part_of = IsPartOf(Area, "is_part_of")
 Area.lies_within = LiesWithin(Area, "lies_within")
+
+
+@dataclass(eq=False)
+class Building(Symbol):
+    """
+    A building standing in an area.
+    """
+
+    name: str = ""
+    """
+    The name of the building.
+    """
+    stands_in: Set[Area] = field(default_factory=set)
+    """
+    The areas the building is part of.
+    """
+
+
+Building.stands_in = IsPartOf(Building, "stands_in")

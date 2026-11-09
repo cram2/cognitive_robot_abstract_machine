@@ -177,12 +177,19 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
     """
     A set of all range types for this descriptor class.
     """
-    descriptor_instances_by_domain_type: ClassVar[
-        defaultdict[type[PropertyDescriptor], dict[SymbolType, PropertyDescriptor]]
-    ] = defaultdict(dict)
-    """
-    For each descriptor class, the descriptor instance managing the field of each of its domain types.
-    """
+
+    @classmethod
+    def declared_by(cls, domain_type: type) -> PropertyDescriptor | None:
+        """
+        :param domain_type: A class.
+        :return: The descriptor of exactly this descriptor class managing a field of the class, declared on the class
+            or else on the nearest class it inherits the field from; None if no such class declares one.
+        """
+        for declaring_type in domain_type.__mro__:
+            for attribute in vars(declaring_type).values():
+                if type(attribute) is cls:
+                    return attribute
+        return None
 
     @classmethod
     def super_classes(cls) -> tuple[type[PropertyDescriptor], ...]:
@@ -257,13 +264,11 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
 
     def _update_domain_and_range(self):
         """
-        Update the domain and range sets and the domain-range map for this descriptor type, and register this
-        descriptor instance as the one managing the field for instances of its domain.
+        Update the domain and range sets and the domain-range map for this descriptor type.
         """
         range_type = self.wrapped_field.type_endpoint
         assert issubclass(range_type, Symbol)
         self.domain_range_map[self.__class__][self.domain] = range_type
-        self.descriptor_instances_by_domain_type[self.__class__][self.domain] = self
         for super_class in self.__class__.__mro__:
             if (super_class is PropertyDescriptor) or not issubclass(
                 super_class, PropertyDescriptor

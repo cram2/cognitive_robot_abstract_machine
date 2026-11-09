@@ -1,6 +1,7 @@
 """
-The positions a property takes in the property chains that imply other properties, and
-descriptors made from an attribute of a symbolic variable.
+The positions a property takes in the property chains that imply other properties, the
+statements the chains imply, and descriptors made from an attribute of a symbolic
+variable.
 """
 
 from __future__ import annotations
@@ -8,6 +9,11 @@ from __future__ import annotations
 from krrood.ontomatic.property_descriptor.property_descriptor import (
     PropertyChainPosition,
     PropertyChain,
+)
+from krrood.ontomatic.property_descriptor.property_descriptor_relation import (
+    InferredThrough,
+    PropertyDescriptorRelation,
+    RelationExplanation,
 )
 from ..dataset.role_and_ontology.property_chains import (
     AncestorOf,
@@ -62,6 +68,62 @@ def test_a_chain_finds_every_place_of_a_property_in_it():
 
     assert chain.positions_of(ParentOf) == [0, 2]
     assert chain.positions_of(AncestorOf) == [1]
+
+
+# %% statements implied by chains
+
+
+def test_a_chain_of_two_properties_implies_the_chained_property():
+    """
+    A chain of two properties implies the chained property.
+    """
+    grandparent = PersonWithAncestors("grandparent")
+    parent = PersonWithAncestors("parent")
+    child = PersonWithAncestors("child")
+
+    grandparent.parent_of.add(parent)
+    parent.parent_of.add(child)
+
+    assert child in grandparent.ancestor_of
+
+
+def test_a_chain_through_the_implied_property_implies_it_again():
+    """
+    A chain through the implied property implies it again.
+    """
+    great_grandparent = PersonWithAncestors("great grandparent")
+    grandparent = PersonWithAncestors("grandparent")
+    parent = PersonWithAncestors("parent")
+    child = PersonWithAncestors("child")
+
+    great_grandparent.parent_of.add(grandparent)
+    grandparent.parent_of.add(parent)
+    parent.parent_of.add(child)
+
+    assert great_grandparent.ancestor_of == {parent, child}
+
+
+def test_an_implied_statement_is_explained_by_the_statements_of_its_chain():
+    """
+    The statement a chain implies is explained by the statements of the chain, in the
+    order of the chain.
+    """
+    grandparent = PersonWithAncestors("grandparent")
+    parent = PersonWithAncestors("parent")
+    child = PersonWithAncestors("child")
+
+    grandparent.parent_of.add(parent)
+    parent.parent_of.add(child)
+
+    assert PropertyDescriptorRelation.find(
+        grandparent, "ancestor_of", child
+    ).explanation == RelationExplanation(
+        InferredThrough.CHAIN,
+        (
+            PropertyDescriptorRelation.find(grandparent, "parent_of", parent),
+            PropertyDescriptorRelation.find(parent, "parent_of", child),
+        ),
+    )
 
 
 # %% descriptors from attributes
