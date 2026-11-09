@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
+from typing_extensions import Iterable
 
 from krrood.entity_query_language.factories import (
     alternative,
@@ -422,6 +423,14 @@ def box_sizes(results) -> list[int]:
     return sorted(box.size for box in results)
 
 
+def distinct_box_sizes(results: Iterable[Box]) -> list[int]:
+    """
+    The sizes of the boxes in the results, each once, so a check does not depend on how
+    many unselected bindings produced the same box.
+    """
+    return sorted({box.size for box in results})
+
+
 def test_exists_over_a_variable_used_elsewhere_equals_the_plain_conjunction_last():
     """
     ``worker`` also occurs outside the quantifier, so it is outer-visible and
@@ -488,9 +497,9 @@ def test_extending_an_evaluated_query_updates_the_outer_visible_variables():
     boxes, workers = boxes_and_workers()
     box, worker = variable(Box, domain=boxes), variable(SalariedWorker, domain=workers)
     query = an(entity(box).where(exists(worker, worker.salary < box.size)))
-    assert box_sizes(query.evaluate()) == [2, 5, 10]
+    assert distinct_box_sizes(query.evaluate()) == [2, 5, 10]
     query.where(worker.salary > 3)
-    assert box_sizes(query.evaluate()) == [5, 10, 10]
+    assert distinct_box_sizes(query.evaluate()) == [5, 10]
 
 
 def test_a_quantifier_reused_in_two_queries_is_scoped_by_the_evaluated_one():
@@ -503,9 +512,9 @@ def test_a_quantifier_reused_in_two_queries_is_scoped_by_the_evaluated_one():
     quantifier = exists(worker, worker.salary < box.size)
     uncorrelated = an(entity(box).where(quantifier))
     correlated_query = an(entity(box).where(quantifier, worker.salary > 3))
-    assert box_sizes(uncorrelated.evaluate()) == [2, 5, 10]
-    assert box_sizes(correlated_query.evaluate()) == [5, 10, 10]
-    assert box_sizes(uncorrelated.evaluate()) == [2, 5, 10]
+    assert distinct_box_sizes(uncorrelated.evaluate()) == [2, 5, 10]
+    assert distinct_box_sizes(correlated_query.evaluate()) == [5, 10]
+    assert distinct_box_sizes(uncorrelated.evaluate()) == [2, 5, 10]
 
 
 # %% local variables never escape
