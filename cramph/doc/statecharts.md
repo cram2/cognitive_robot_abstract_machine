@@ -51,7 +51,7 @@ A node's life cycle has six states:
 | PAUSED           | the node was running and is suspended until it resumes   |
 | SUCCEEDED        | the node ended successfully                              |
 | FAILED           | the node ended because it could not continue             |
-| INTERRUPTED      | the node was ended from outside                          |
+| INTERRUPTED      | the node was ended from outside, or the statechart was cancelled while it ran |
 
 Only RUNNING is active: its observation is recomputed and its `on_tick` callback is
 called. SUCCEEDED, FAILED and INTERRUPTED are **final states**,
@@ -567,7 +567,9 @@ monitor's `last_observed_true` is True.
 
 The statechart ends once an `EndStatechart` node is running and observes True, which it does
 as soon as it runs. A `CancelStatechart` node ends the statechart by raising its exception at
-the end of the tick it starts in.
+the end of the tick it starts in. Before it raises, every other node still running or paused
+is INTERRUPTED and its `on_end` callback runs, and this is recorded as the last item of the
+state history, whose `cancelled_by` names the `CancelStatechart` node.
 
 An `EndStatechart` must be added at the top level of the statechart; adding it to a composite
 node raises `EndInCompositeNodeError`. A `CancelStatechart` may be placed anywhere.
