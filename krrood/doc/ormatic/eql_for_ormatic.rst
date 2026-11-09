@@ -56,4 +56,10 @@ Notes on the EQL translator:
 - Variable resolution uses :py:func:`krrood.ormatic.data_access_objects.helper.get_data_access_object_class` to map EQL variables to DAO classes.
 - Attribute comparisons on a single table are supported, including ``==``, ``!=``, ``>``, ``>=``, ``<``, ``<=``, ``in``, logical ``and``/``or``, and ``not``.
 - If a variable’s DAO class cannot be found, a specific EQL translation error is raised to help diagnose missing mappings.
+- ``exists(x, condition)`` becomes ``EXISTS (SELECT 1 FROM <DAO of x's type> WHERE <condition>)``. The subquery is
+  correlated with the outer query only through the condition's own comparisons with outer columns (foreign key to
+  primary key). Membership of ``x`` in an outer variable's collection is not translated, so an ``exists`` over
+  ``flat_variable(outer.collection)`` is not correlated with ``outer`` in SQL and does not match the in-memory
+  evaluation, which evaluates it per binding of ``outer``.
+- ``for_all`` is not translated; it raises :py:class:`~krrood.ormatic.eql_interface.UnsupportedQueryTypeError`.
 - EQL translation is not complete; feel free to extend it.
