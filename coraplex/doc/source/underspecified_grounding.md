@@ -115,6 +115,8 @@ now:
 - The grounding statement gets the proposal.
 - A branch is cut at its first statement that has no candidate, together with everything after it, because what
   follows depends on how that statement grounds.
+- A parallel that needs a number of successes (`minimum_success`) needs one fewer for every child left out or cut,
+  except a child that ended without succeeding, since that child can never count again.
 
 ```{figure} _static/images/underspecified_grounding/failed_branch_grounds_alone.svg
 :alt: Left, the live plan when the open's child failed - a parallel holding the two sequences and the running allowance; right, the trial built from it in the world copy - the new open candidate beside the running place and a rebuilt allowance, the succeeded milk pick-up left out and the later cup pick-up cut.
@@ -163,10 +165,4 @@ preconditions.
 **Running nodes run again in a trial.** A node without a statement that is still running when something grounds is
 rebuilt from its parameters and runs again in the world copy. A motion or a collision allowance is fine to run again; a
 node with an immediate effect, such as a function call, can run twice in the copy.
-```
-
-```{warning}
-**A parallel needing a number of successes.** A trial leaves out the children of a parallel that already ended, but
-the parallel still needs as many successes (`minimum_success`) as before, so a trial of such a parallel can wait for a
-success it will never see.
 ```

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from itertools import combinations, takewhile
 
-from typing_extensions import Any, Generator, Generic, Iterator, TypeVar
+from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 
 from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import QueryBackend
@@ -36,6 +36,7 @@ from cramph.node import (
     CompositeNode,
     StatechartNode,
     NodeArtifacts,
+    NodeRebuild,
     TerminalNode,
 )
 from krrood.exceptions import DataclassException
@@ -414,6 +415,27 @@ class Parallel(EndedByOwner, ControlStructureNode):
         if self.minimum_success is None:
             return len(self.nodes)
         return self.minimum_success
+
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        Differs from :meth:`~cramph.node.StatechartNode.rebuilt_by` in needing one
+        success fewer for every child left out that did not end without succeeding,
+        which counts as having reached its goal.
+        """
+        rebuilt = super().rebuilt_by(rebuild)
+        if rebuilt is None or self.minimum_success is None:
+            return rebuilt
+        counted_as_succeeded = [
+            child
+            for child in self.nodes
+            if rebuild.rebuilt(child) is None
+            and child.life_cycle_state
+            not in (LifeCycleValues.FAILED, LifeCycleValues.INTERRUPTED)
+        ]
+        rebuilt.minimum_success = max(
+            0, self.minimum_success - len(counted_as_succeeded)
+        )
+        return rebuilt
 
     @property
     def inherent_fail_condition(self) -> Scalar:

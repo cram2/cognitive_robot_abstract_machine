@@ -6,6 +6,7 @@ from cramph.executor import StatechartExecutor
 from cramph.monitors import CountNodeResets
 from cramph.node import DerivedConditionVariable, EndStatechart
 from cramph.nodes_for_testing import (
+    ConstFalseNode,
     NodeFailingOnObservingFalse,
     NodeObservingLastObservation,
     NodeSucceedingOnObservingTrue,
@@ -24,6 +25,45 @@ def _succeeding(name: str) -> NodeSucceedingOnObservingTrue:
     return NodeSucceedingOnObservingTrue(
         name=name, observation=ObservationStateValues.TRUE
     )
+
+
+def _parallel_with_a_child_of_each_outcome(
+    statechart_executor: StatechartExecutor,
+    minimum_success: int,
+    maximum_ticks: int = 10,
+) -> Parallel:
+    """
+    :param maximum_ticks: How many ticks the children get to end in.
+    :return: A parallel needing `minimum_success` successes, run until its first child
+        succeeded and its second failed, while its third still runs.
+    """
+    parallel = Parallel(
+        nodes=[
+            _succeeding("succeeded"),
+            NodeFailingOnObservingFalse(
+                name="failed", observation=ObservationStateValues.FALSE
+            ),
+            ConstFalseNode(name="running"),
+        ],
+        minimum_success=minimum_success,
+    )
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_node(parallel)
+    statechart_executor.compile(statechart)
+    succeeded, failed, running = parallel.nodes
+    for _ in range(maximum_ticks):
+        if (
+            succeeded.life_cycle_state == LifeCycleValues.SUCCEEDED
+            and failed.life_cycle_state == LifeCycleValues.FAILED
+        ):
+            break
+        statechart_executor.tick()
+    assert [child.life_cycle_state for child in parallel.nodes] == [
+        LifeCycleValues.SUCCEEDED,
+        LifeCycleValues.FAILED,
+        LifeCycleValues.RUNNING,
+    ]
+    return parallel
 
 
 # %% building a node anew
@@ -55,6 +95,50 @@ def test_a_parallel_built_anew_needs_as_many_successes() -> None:
     rebuilt = RebuildLeavingNodesOut().rebuilt(parallel)
 
     assert rebuilt.minimum_success == parallel.minimum_success
+
+
+def test_a_parallel_needs_one_success_fewer_without_a_child_that_succeeded(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 2)
+    succeeded, _, _ = parallel.nodes
+
+    rebuilt = RebuildLeavingNodesOut(left_out=[succeeded]).rebuilt(parallel)
+
+    assert rebuilt.minimum_success == parallel.minimum_success - 1
+
+
+def test_a_parallel_needs_as_many_successes_without_a_child_that_failed(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 2)
+    _, failed, _ = parallel.nodes
+
+    rebuilt = RebuildLeavingNodesOut(left_out=[failed]).rebuilt(parallel)
+
+    assert rebuilt.minimum_success == parallel.minimum_success
+
+
+def test_a_parallel_needs_one_success_fewer_without_a_child_still_running(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 2)
+    _, _, running = parallel.nodes
+
+    rebuilt = RebuildLeavingNodesOut(left_out=[running]).rebuilt(parallel)
+
+    assert rebuilt.minimum_success == parallel.minimum_success - 1
+
+
+def test_a_parallel_needs_no_success_once_more_children_are_left_out_than_it_needs(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    parallel = _parallel_with_a_child_of_each_outcome(statechart_executor, 1)
+    succeeded, _, running = parallel.nodes
+
+    rebuilt = RebuildLeavingNodesOut(left_out=[succeeded, running]).rebuilt(parallel)
+
+    assert rebuilt.minimum_success == 0
 
 
 def test_a_monitored_node_is_built_anew_with_its_monitor_built_anew() -> None:

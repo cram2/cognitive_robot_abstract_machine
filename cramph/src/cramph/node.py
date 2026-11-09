@@ -2106,7 +2106,8 @@ class NodeRebuild(ABC):
     def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
         """
         :param node: A node a node being built anew holds or refers to.
-        :return: `node` built anew, or None if it is left out.
+        :return: `node` built anew, the same node each time `node` is asked for, or
+            None if it is left out.
         """
 
     @abstractmethod

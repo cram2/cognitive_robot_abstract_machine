@@ -1454,6 +1454,39 @@ def test_a_statement_grounded_again_is_tried_without_what_already_ended(
     assert [node.slot for node in grounded.grounded_nodes] == [2, 3]
 
 
+def test_a_statement_grounded_again_is_tried_needing_only_the_successes_still_missing(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the failed statement succeeded and ended, so the statement's
+    next slot is tried needing one success, not the two its parallel needed at first.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [2, 3],
+                        slot_dof_ids,
+                        ticks_before_claiming=5,
+                        probe_key=register_probe(),
+                        fail_on_attempt_number=2,
+                    ),
+                    ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+                ],
+                minimum_success=2,
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [grounded] = _statements_of(plan)
+    assert [node.slot for node in grounded.grounded_nodes] == [2, 3]
+
+
 def test_a_statement_grounded_again_is_tried_beside_what_still_runs(
     apartment_world_pr2_copy_with_context,
 ):
