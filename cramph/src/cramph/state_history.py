@@ -1,3 +1,7 @@
+"""
+The recorded sequence of snapshots of a statechart's life cycle and observation state.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -39,6 +43,12 @@ class StateHistoryItem:
     The observation state of every node at that tick.
     """
 
+    cancelled_by: StatechartNode | None = field(default=None, kw_only=True)
+    """
+    The :class:`~cramph.node.CancelStatechart` whose cancellation ended the statechart
+    with this snapshot, None for a snapshot that did not end it.
+    """
+
     def __post_init__(self) -> None:
         """
         Snapshots the given states, so later mutation of the live states does not affect
@@ -57,12 +67,14 @@ class StateHistoryItem:
     def __eq__(self, other: StateHistoryItem) -> bool:
         """
         :param other: The item to compare against.
-        :return: True if `other` has the same life cycle and observation state.
+        :return: True if `other` has the same life cycle and observation state and was
+            ended by the same cancellation, if any.
         .. note:: :attr:`tick_count` is not compared.
         """
         return (
             other.life_cycle_state == self.life_cycle_state
             and other.observation_state == self.observation_state
+            and other.cancelled_by is self.cancelled_by
         )
 
     def __repr__(self) -> str:
