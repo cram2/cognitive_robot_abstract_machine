@@ -390,7 +390,9 @@ class PoseVisualization:
         corners_in_front = corners[corners[:, 2] > 0]
         if len(corners_in_front) == 0:
             return
-        left, top = self.color_pixels(corners_in_front).min(axis=0)
+        left, top = self.color_to_depth_ratio.project_to_color_pixels(
+            corners_in_front, self.camera_model
+        ).min(axis=0)
         cv2.putText(
             self.color_image,
             label,
@@ -444,7 +446,9 @@ class PoseVisualization:
         """
         if start[2] <= 0 or end[2] <= 0:
             return
-        start_pixel, end_pixel = self.color_pixels(numpy.array([start, end]))
+        start_pixel, end_pixel = self.color_to_depth_ratio.project_to_color_pixels(
+            numpy.array([start, end]), self.camera_model
+        )
         cv2.line(
             self.color_image,
             (int(start_pixel[0]), int(start_pixel[1])),
@@ -453,19 +457,6 @@ class PoseVisualization:
             self.line_thickness,
             cv2.LINE_AA,
         )
-
-    def color_pixels(
-        self, points: numpy_typing.NDArray[numpy.float64]
-    ) -> numpy_typing.NDArray[numpy.int_]:
-        """
-        Project points in front of the camera into the color image.
-
-        :param points: Points in the camera frame, one per row.
-        :return: The (x, y) color image pixel of each point, one per row.
-        """
-        projected = points @ self.camera_model.intrinsic_matrix.T
-        depth_pixels = projected[:, :2] / projected[:, 2:]
-        return self.color_to_depth_ratio.color_pixels(depth_pixels)
 
     def posed_mesh(self, shape: Mesh, pose: Pose) -> open3d.geometry.TriangleMesh:
         """
