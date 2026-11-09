@@ -7,6 +7,7 @@ relational circuit is fitted on.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from enum import IntEnum, StrEnum
 
@@ -44,8 +45,10 @@ from probabilistic_model.causal_structure.graph import (
     NodeLevel,
 )
 from probabilistic_model.causal_structure.identification import AdjustmentSelector
+from probabilistic_model.causal_structure.relational_checks import ExampleToPartCheck
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
+    RelationalTrainingTables,
 )
 
 # %% learning from one table
@@ -266,8 +269,9 @@ class RelationalCausalStructureLearner:
 
     A part attribute is one template node for every part of its collection, named
     ``Class.collection.attribute``. The circuit lets an instance's attributes reach a
-    part's attributes only through the aggregation statistics, so no edge joins an
-    instance attribute and a part attribute.
+    part's attributes only through the aggregation statistics, so without an
+    :attr:`example_to_part_check` no edge joins an instance attribute and a part
+    attribute.
 
     The learned graph is kept in a class diagram, as causal relations of the circuit's
     class.
@@ -282,6 +286,15 @@ class RelationalCausalStructureLearner:
     learner: CausalStructureLearner = field(default_factory=PeterClarkStructureLearner)
     """
     What learns the graph of each table.
+    """
+
+    example_to_part_check: ExampleToPartCheck | None = None
+    """
+    What finds the instance attributes that depend on a part attribute even given the
+    aggregation statistics and any one other attribute the dependence could run
+    through. Each such pair is joined by an edge from the instance attribute to the part
+    attribute, as the circuit draws an instance before its parts, unless the domain
+    causal knowledge's tiers place the part attribute first.
     """
 
     def learn(
@@ -323,10 +336,20 @@ class RelationalCausalStructureLearner:
         )
         nodes, edges = list(example_nodes), example_graph.edges()
         for part, table in tables.part_tables.items():
-            part_nodes = self.create_part_nodes(circuit, part)
-            nodes += part_nodes
-            edges += self.learn_part_edges(
-                part, table.rows, part_nodes, example_nodes, domain_knowledge
+            part_node_of_column = self.part_node_of_column(
+                part, self.create_part_nodes(circuit, part)
+            )
+            part_edges = self.learn_part_edges(
+                table.rows, part_node_of_column, example_nodes, domain_knowledge
+            )
+            nodes += part_node_of_column.values()
+            edges += part_edges + self.learn_example_to_part_edges(
+                part,
+                tables,
+                part_node_of_column,
+                part_edges,
+                example_nodes,
+                domain_knowledge,
             )
         return LearnedCausalStructure(
             relations=self.record_in_class_diagram(circuit, edges),
@@ -419,27 +442,36 @@ class RelationalCausalStructureLearner:
             if variable.name not in statistic_names
         ]
 
+    @staticmethod
+    def part_node_of_column(
+        part: str, part_nodes: list[GraphNode]
+    ) -> dict[str, GraphNode]:
+        """
+        :param part: An exchangeable part.
+        :param part_nodes: The template nodes of its attributes.
+        :return: Each template node by the name the part's training table gives its
+            column.
+        """
+        return {node.name.split(f".{part}.", 1)[1]: node for node in part_nodes}
+
     def learn_part_edges(
         self,
-        part: str,
         rows: pd.DataFrame,
-        part_nodes: list[GraphNode],
+        part_node_of_column: dict[str, GraphNode],
         example_nodes: list[GraphNode],
         domain_knowledge: DomainCausalKnowledge,
     ) -> list[GraphEdge]:
         """
-        :param part: An exchangeable part.
-        :param rows: Its training table.
-        :param part_nodes: The template nodes of its attributes.
+        :param rows: The training table of an exchangeable part.
+        :param part_node_of_column: The template nodes of its attributes, by column.
         :param example_nodes: The nodes of the class table.
         :param domain_knowledge: What is known about the structure in advance.
         :return: The edges learned from the part's table that touch a part attribute.
         """
+        part_nodes = list(part_node_of_column.values())
         statistic_nodes = [node for node in example_nodes if node.name in rows.columns]
         renamed = rows.rename(
-            columns={
-                node.name.split(f".{part}.", 1)[1]: node.name for node in part_nodes
-            }
+            columns={column: node.name for column, node in part_node_of_column.items()}
         )
         names = [node.name for node in statistic_nodes + part_nodes]
         graph = self.learner.learn(
@@ -450,3 +482,59 @@ class RelationalCausalStructureLearner:
             for edge in graph.edges()
             if edge.first in part_nodes or edge.second in part_nodes
         ]
+
+    def learn_example_to_part_edges(
+        self,
+        part: str,
+        tables: RelationalTrainingTables,
+        part_node_of_column: dict[str, GraphNode],
+        part_edges: list[GraphEdge],
+        example_nodes: list[GraphNode],
+        domain_knowledge: DomainCausalKnowledge,
+    ) -> list[GraphEdge]:
+        """
+        :param part: An exchangeable part.
+        :param tables: The circuit's training tables.
+        :param part_node_of_column: The template nodes of the part's attributes, by
+            column.
+        :param part_edges: The edges learned from the part's table.
+        :param example_nodes: The nodes of the class table.
+        :param domain_knowledge: What is known about the structure in advance.
+        :return: An edge for every dependence :attr:`example_to_part_check` keeps
+            between an instance attribute and an attribute of the part; none without a
+            check.
+        """
+        if self.example_to_part_check is None:
+            return []
+        example_node_of = {node.name: node for node in example_nodes}
+        return [
+            domain_knowledge.orient_edge(
+                example_node_of[dependence.example_attribute],
+                part_node_of_column[dependence.part_attribute],
+            )
+            for dependence in self.example_to_part_check.dependences_given_another_attribute(
+                tables.example_rows,
+                part,
+                tables.part_tables[part],
+                self.adjacent_part_attributes(part_edges, part_node_of_column),
+            )
+        ]
+
+    @staticmethod
+    def adjacent_part_attributes(
+        part_edges: list[GraphEdge], part_node_of_column: dict[str, GraphNode]
+    ) -> dict[str, set[str]]:
+        """
+        :param part_edges: The edges learned from a part's table.
+        :param part_node_of_column: The template nodes of the part's attributes, by
+            column.
+        :return: Per part attribute, the part attributes an edge joins it to, by the
+            names the part's training table gives them.
+        """
+        column_of = {node: column for column, node in part_node_of_column.items()}
+        adjacent = defaultdict(set)
+        for edge in part_edges:
+            if edge.first in column_of and edge.second in column_of:
+                adjacent[column_of[edge.first]].add(column_of[edge.second])
+                adjacent[column_of[edge.second]].add(column_of[edge.first])
+        return dict(adjacent)

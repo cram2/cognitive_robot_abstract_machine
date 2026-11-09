@@ -1,5 +1,5 @@
 import itertools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 import pytest
@@ -22,6 +22,13 @@ from probabilistic_model.causal_structure.graph import (
 from probabilistic_model.causal_structure.learning import (
     CausalStructureLearner,
     RelationalCausalStructureLearner,
+)
+from probabilistic_model.causal_structure.relational_checks import (
+    ExampleToPartCheck,
+    ExampleToPartDependence,
+)
+from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
+    PartTrainingTable,
 )
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
@@ -264,3 +271,114 @@ def test_the_learned_structure_reads_the_relations_the_diagram_holds_now(
     structure.relations.replace_relations([])
 
     assert structure.selector.graph.edges() == []
+
+
+# %% edges between an instance and its parts
+
+
+@dataclass
+class FixedDependenceCheck(ExampleToPartCheck):
+    """
+    Keeps one fixed dependence between an instance and a part attribute, whatever the
+    rows say.
+    """
+
+    dependence: ExampleToPartDependence = field(kw_only=True)
+    """
+    The dependence it keeps.
+    """
+
+    def dependences_given_another_attribute(
+        self,
+        example_rows: pd.DataFrame,
+        part_collection: str,
+        table: PartTrainingTable,
+        adjacent_part_attributes: dict[str, set[str]],
+    ) -> list[ExampleToPartDependence]:
+        return [self.dependence]
+
+
+@pytest.fixture
+def room_type_dependence(relational_probabilistic_circuit) -> ExampleToPartDependence:
+    """
+    :return: A dependence of the rooms' first attribute on their objects' type.
+    """
+    return ExampleToPartDependence(
+        example_attribute=relational_probabilistic_circuit.class_probabilistic_circuit.variables[
+            0
+        ].name,
+        part_attribute="type",
+        part_collection="objects",
+        probability=0.0,
+    )
+
+
+def edges_between_an_instance_and_a_part_attribute(
+    graph: CausalGraph,
+) -> set[GraphEdge]:
+    """
+    :param graph: A learned graph.
+    :return: Its edges that join an instance attribute to a part attribute.
+    """
+    return {
+        edge
+        for edge in graph.edges()
+        if {edge.first.level, edge.second.level}
+        == {NodeLevel.EXAMPLE_ATTRIBUTE, NodeLevel.PART_ATTRIBUTE}
+    }
+
+
+def test_without_a_check_no_edge_joins_an_instance_and_a_part_attribute(
+    relational_probabilistic_circuit, scenario, class_diagram
+):
+    graph = (
+        RelationalCausalStructureLearner(class_diagram, EveryPairJoinedLearner())
+        .learn(relational_probabilistic_circuit, list(scenario))
+        .selector.graph
+    )
+
+    assert edges_between_an_instance_and_a_part_attribute(graph) == set()
+
+
+def test_a_kept_dependence_runs_from_the_instance_to_the_part_attribute(
+    relational_probabilistic_circuit, scenario, class_diagram, room_type_dependence
+):
+    graph = (
+        RelationalCausalStructureLearner(
+            class_diagram,
+            example_to_part_check=FixedDependenceCheck(dependence=room_type_dependence),
+        )
+        .learn(relational_probabilistic_circuit, list(scenario))
+        .selector.graph
+    )
+
+    assert edges_between_an_instance_and_a_part_attribute(graph) == {
+        GraphEdge.directed_edge(
+            graph.node(room_type_dependence.example_attribute),
+            graph.node(f"{SceneRoom.__name__}.objects.type"),
+        )
+    }
+
+
+def test_a_kept_dependence_is_reversed_where_the_tiers_say_so(
+    relational_probabilistic_circuit, scenario, class_diagram, room_type_dependence
+):
+    part_attribute = f"{SceneRoom.__name__}.objects.type"
+    domain_knowledge = DomainCausalKnowledge(
+        tiers=[[part_attribute], [room_type_dependence.example_attribute]]
+    )
+    graph = (
+        RelationalCausalStructureLearner(
+            class_diagram,
+            example_to_part_check=FixedDependenceCheck(dependence=room_type_dependence),
+        )
+        .learn(relational_probabilistic_circuit, list(scenario), domain_knowledge)
+        .selector.graph
+    )
+
+    assert edges_between_an_instance_and_a_part_attribute(graph) == {
+        GraphEdge.directed_edge(
+            graph.node(part_attribute),
+            graph.node(room_type_dependence.example_attribute),
+        )
+    }

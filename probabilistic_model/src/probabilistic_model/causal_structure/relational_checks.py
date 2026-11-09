@@ -6,7 +6,7 @@ aggregation statistics.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import pandas as pd
@@ -48,6 +48,106 @@ class ExampleToPartDependence:
     """
     The probability, were the attributes independent given the statistics, of a
     dependence at least as strong as the one observed, estimated by permutation.
+    """
+
+
+# %% the tables the check reads
+
+
+@dataclass
+class DiscretizedPartTables:
+    """
+    The instance table and one part's table of a relational circuit, cut into levels.
+    """
+
+    example_levels: pd.DataFrame
+    """
+    One row of levels per instance, over its attributes and the part's aggregation
+    statistics.
+    """
+
+    part_levels: pd.DataFrame
+    """
+    One row of levels per part, over the part's own attributes.
+    """
+
+    example_positions: np.ndarray
+    """
+    Per part row, the position of its instance among the instances.
+    """
+
+    aggregation_names: list[str]
+    """
+    The names of the part's aggregation statistics.
+    """
+
+    @property
+    def varying_example_attributes(self) -> list[str]:
+        """
+        :return: The instance attributes, other than the aggregation statistics, that
+            take more than one level.
+        """
+        return [
+            column
+            for column in self.example_levels.columns
+            if column not in self.aggregation_names
+            and self.example_levels[column].nunique() > 1
+        ]
+
+    @property
+    def varying_part_attributes(self) -> list[str]:
+        """
+        :return: The part attributes that take more than one level.
+        """
+        return [
+            column
+            for column in self.part_levels.columns
+            if self.part_levels[column].nunique() > 1
+        ]
+
+    def group_of_each_instance(self, example_attributes: list[str]) -> np.ndarray:
+        """
+        :param example_attributes: Names of instance columns.
+        :return: One integer per instance, the same for instances whose levels agree on
+            those columns.
+        """
+        if not example_attributes:
+            return np.zeros(len(self.example_levels), dtype=int)
+        return pd.factorize(
+            pd.MultiIndex.from_frame(self.example_levels[example_attributes])
+        )[0]
+
+    def group_of_each_part(
+        self, instance_groups: np.ndarray, part_attributes: list[str]
+    ) -> np.ndarray:
+        """
+        :param instance_groups: One group per instance.
+        :param part_attributes: Names of part columns.
+        :return: One integer per part, the same for parts whose instances share a group
+            and whose levels agree on those columns.
+        """
+        return pd.factorize(
+            pd.MultiIndex.from_arrays(
+                [instance_groups[self.example_positions]]
+                + [self.part_levels[column].to_numpy() for column in part_attributes]
+            )
+        )[0]
+
+
+@dataclass
+class ConditioningAttributes:
+    """
+    The attributes a test conditions on besides the aggregation statistics.
+    """
+
+    example_attributes: list[str] = field(default_factory=list)
+    """
+    The names of the instance attributes.
+    """
+
+    part_attributes: list[str] = field(default_factory=list)
+    """
+    The names of the part attributes.
     """
 
 
@@ -110,6 +210,104 @@ class ExampleToPartCheck:
         :return: The dependences between an instance attribute and one of the part's
             attributes, given the part's aggregation statistics.
         """
+        tables = self.discretized(example_rows, table)
+        random_state = np.random.default_rng(self.random_seed)
+        return [
+            ExampleToPartDependence(
+                example_attribute, part_attribute, part_collection, probability
+            )
+            for example_attribute in tables.varying_example_attributes
+            for part_attribute in tables.varying_part_attributes
+            if (
+                probability := self.permutation_probability(
+                    tables,
+                    example_attribute,
+                    part_attribute,
+                    ConditioningAttributes(),
+                    random_state,
+                )
+            )
+            < self.significance_level
+        ]
+
+    def dependences_given_another_attribute(
+        self,
+        example_rows: pd.DataFrame,
+        part_collection: str,
+        table: PartTrainingTable,
+        adjacent_part_attributes: dict[str, set[str]],
+    ) -> list[ExampleToPartDependence]:
+        """
+        :param example_rows: One row per instance.
+        :param part_collection: The name of the instance's attribute that holds the parts.
+        :param table: The part's training table.
+        :param adjacent_part_attributes: Per part attribute, the part attributes the
+            part's own graph joins it to.
+        :return: The dependences of :meth:`dependences_of_part` that remain given any one
+            other attribute the instance attribute could reach the part attribute
+            through, each with the largest probability it was tested with.
+        """
+        dependences = self.dependences_of_part(example_rows, part_collection, table)
+        tables = self.discretized(example_rows, table)
+        random_state = np.random.default_rng(self.random_seed)
+        remaining = []
+        for dependence in dependences:
+            probability = max(
+                [dependence.probability]
+                + [
+                    self.permutation_probability(
+                        tables,
+                        dependence.example_attribute,
+                        dependence.part_attribute,
+                        conditioning,
+                        random_state,
+                    )
+                    for conditioning in self.other_paths(
+                        dependence,
+                        dependences,
+                        adjacent_part_attributes.get(dependence.part_attribute, set()),
+                    )
+                ]
+            )
+            if probability < self.significance_level:
+                remaining.append(replace(dependence, probability=probability))
+        return remaining
+
+    @staticmethod
+    def other_paths(
+        dependence: ExampleToPartDependence,
+        dependences: list[ExampleToPartDependence],
+        adjacent_part_attributes: set[str],
+    ) -> list[ConditioningAttributes]:
+        """
+        :param dependence: A dependence between an instance and a part attribute.
+        :param dependences: Every dependence found in the part's table.
+        :param adjacent_part_attributes: The part attributes the part's own graph joins
+            the dependence's part attribute to.
+        :return: One conditioning per attribute the dependence could run through: another
+            instance attribute that also depends on the part attribute, or an adjacent
+            part attribute the instance attribute also depends on.
+        """
+        return [
+            ConditioningAttributes(example_attributes=[other.example_attribute])
+            for other in dependences
+            if other.part_attribute == dependence.part_attribute
+            and other.example_attribute != dependence.example_attribute
+        ] + [
+            ConditioningAttributes(part_attributes=[other.part_attribute])
+            for other in dependences
+            if other.example_attribute == dependence.example_attribute
+            and other.part_attribute in adjacent_part_attributes
+        ]
+
+    def discretized(
+        self, example_rows: pd.DataFrame, table: PartTrainingTable
+    ) -> DiscretizedPartTables:
+        """
+        :param example_rows: One row per instance.
+        :param table: One part's training table.
+        :return: Both tables cut into levels by :attr:`discretizer`.
+        """
         statistics = table.aggregation_names
         example_attributes = [
             column for column in example_rows.columns if column not in statistics
@@ -117,75 +315,57 @@ class ExampleToPartCheck:
         part_attributes = [
             column for column in table.rows.columns if column not in statistics
         ]
-        example_codes = self.discretizer.fit_transform(
-            example_rows[example_attributes + statistics]
+        return DiscretizedPartTables(
+            example_levels=self.discretizer.fit_transform(
+                example_rows[example_attributes + statistics]
+            ),
+            part_levels=self.discretizer.fit_transform(table.rows[part_attributes]),
+            example_positions=np.asarray(table.example_positions),
+            aggregation_names=statistics,
         )
-        part_codes = self.discretizer.fit_transform(table.rows[part_attributes])
-        positions = np.asarray(table.example_positions)
-        groups = (
-            self.group_of_each_row(example_codes[statistics])
-            if statistics
-            else np.zeros(len(example_rows), dtype=int)
-        )
-        random_state = np.random.default_rng(self.random_seed)
-        dependences = []
-        for example_attribute in example_attributes:
-            values = example_codes[example_attribute].to_numpy()
-            if len(np.unique(values)) < 2:
-                continue
-            permutations = [
-                self.permuted_within_groups(values, groups, random_state)[positions]
-                for _ in range(self.permutation_count)
-            ]
-            for part_attribute in part_attributes:
-                part_values = part_codes[part_attribute].to_numpy()
-                if len(np.unique(part_values)) < 2:
-                    continue
-                probability = self.permutation_probability(
-                    values[positions], permutations, part_values, groups[positions]
-                )
-                if probability < self.significance_level:
-                    dependences.append(
-                        ExampleToPartDependence(
-                            example_attribute,
-                            part_attribute,
-                            part_collection,
-                            probability,
-                        )
-                    )
-        return dependences
 
     def permutation_probability(
         self,
-        example_values: np.ndarray,
-        permutations: list[np.ndarray],
-        part_values: np.ndarray,
-        groups: np.ndarray,
+        tables: DiscretizedPartTables,
+        example_attribute: str,
+        part_attribute: str,
+        conditioning: ConditioningAttributes,
+        random_state: np.random.Generator,
     ) -> float:
         """
-        :param example_values: Per part row, its instance's level of the instance
-            attribute.
-        :param permutations: The same levels after each permutation of the instances.
-        :param part_values: Per part row, its level of the part attribute.
-        :param groups: Per part row, the group of instances with the same aggregation
-            statistics its instance belongs to.
-        :return: The share of permutations, counting the observed levels as one, whose
-            G² statistic is at least the observed one.
+        :param tables: The discretized tables.
+        :param example_attribute: The name of the instance attribute.
+        :param part_attribute: The name of the part attribute.
+        :param conditioning: The attributes conditioned on besides the aggregation
+            statistics.
+        :param random_state: Source of the permutations.
+        :return: The share of permutations of the instance attribute, counting the
+            observed levels as one, whose G² statistic is at least the observed one.
         """
-        observed = self.likelihood_ratio_statistic(example_values, part_values, groups)
-        exceeding = sum(
-            self.likelihood_ratio_statistic(permuted, part_values, groups) >= observed
-            for permuted in permutations
+        instance_groups = tables.group_of_each_instance(
+            tables.aggregation_names + conditioning.example_attributes
         )
-        return (1 + exceeding) / (1 + len(permutations))
-
-    @staticmethod
-    def group_of_each_row(codes: pd.DataFrame) -> np.ndarray:
-        """
-        :param codes: Integer columns.
-        :return: One integer per row, the same for rows with the same values.
-        """
-        return pd.factorize(pd.MultiIndex.from_frame(codes))[0]
+        part_groups = tables.group_of_each_part(
+            instance_groups, conditioning.part_attributes
+        )
+        values = tables.example_levels[example_attribute].to_numpy()
+        part_values = tables.part_levels[part_attribute].to_numpy()
+        positions = tables.example_positions
+        observed = self.likelihood_ratio_statistic(
+            values[positions], part_values, part_groups
+        )
+        exceeding = sum(
+            self.likelihood_ratio_statistic(
+                self.permuted_within_groups(values, instance_groups, random_state)[
+                    positions
+                ],
+                part_values,
+                part_groups,
+            )
+            >= observed
+            for _ in range(self.permutation_count)
+        )
+        return (1 + exceeding) / (1 + self.permutation_count)
 
     @staticmethod
     def permuted_within_groups(
@@ -193,8 +373,7 @@ class ExampleToPartCheck:
     ) -> np.ndarray:
         """
         :param values: One value per instance.
-        :param groups: Per instance, the group of instances with the same aggregation
-            statistics it belongs to.
+        :param groups: Per instance, the group of instances it is permuted among.
         :param random_state: Source of randomness.
         :return: The values shuffled among the instances of each group.
         """
@@ -215,19 +394,17 @@ class ExampleToPartCheck:
         :return: The likelihood-ratio statistic (G²) of the two within each group, summed
             over the groups.
         """
-        statistic = 0.0
-        for group in np.unique(groups):
-            members = groups == group
-            observed = pd.crosstab(first[members], second[members]).to_numpy(float)
-            expected = (
-                observed.sum(axis=1, keepdims=True)
-                * observed.sum(axis=0, keepdims=True)
-                / observed.sum()
-            )
-            nonzero = observed > 0
-            statistic += 2 * float(
-                (
-                    observed[nonzero] * np.log(observed[nonzero] / expected[nonzero])
-                ).sum()
-            )
-        return statistic
+        shape = (groups.max() + 1, first.max() + 1, second.max() + 1)
+        observed = np.bincount(
+            np.ravel_multi_index((groups, first, second), shape),
+            minlength=int(np.prod(shape)),
+        ).reshape(shape)
+        expected = (
+            observed.sum(axis=2, keepdims=True)
+            * observed.sum(axis=1, keepdims=True)
+            / np.maximum(observed.sum(axis=(1, 2), keepdims=True), 1)
+        )
+        nonzero = observed > 0
+        return 2 * float(
+            (observed[nonzero] * np.log(observed[nonzero] / expected[nonzero])).sum()
+        )
