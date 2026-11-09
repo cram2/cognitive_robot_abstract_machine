@@ -6,6 +6,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing_extensions import Any, Protocol
 
+from krrood.patterns.dataclass_field_descriptor import (
+    DataclassFieldDescriptor,
+    DataclassFieldDescriptorOwner,
+)
+
 
 @dataclass
 class CanBehaveLikeDataclassException(Protocol):
@@ -26,8 +31,48 @@ class CanBehaveLikeDataclassException(Protocol):
         """
 
 
+# %% exception chaining
+
+
+@dataclass(eq=False)
+class CauseLink(DataclassFieldDescriptor):
+    """
+    The link to the exception that an exception was raised from with ``raise ... from``.
+
+    .. note:: Writing the cause also suppresses the context in tracebacks, so writing the
+        cause the exception already has does nothing.
+    """
+
+    def read(self, instance: BaseException) -> BaseException | None:
+        return instance.__cause__
+
+    def write(self, instance: BaseException, value: BaseException | None) -> None:
+        if value is instance.__cause__:
+            return
+        instance.__cause__ = value
+
+
+@dataclass(eq=False)
+class ContextLink(DataclassFieldDescriptor):
+    """
+    The link to the exception that was being handled when an exception was raised,
+    recorded whether or not ``raise ... from`` was used.
+    """
+
+    def read(self, instance: BaseException) -> BaseException | None:
+        return instance.__context__
+
+    def write(self, instance: BaseException, value: BaseException | None) -> None:
+        instance.__context__ = value
+
+
+# %% dataclass exceptions
+
+
 @dataclass
-class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
+class DataclassException(
+    Exception, CanBehaveLikeDataclassException, DataclassFieldDescriptorOwner, ABC
+):
     """
     A base exception class for dataclass-based exceptions.
     Subclasses implement error_message() and suggest_correction(); both are evaluated at
@@ -39,6 +84,16 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
     print_stack_trace: bool = field(default=True, kw_only=True)
     """
     Whether the stack trace of this exception should be printed when it is handled.
+    """
+
+    raised_from: Exception | None = field(default=None, kw_only=True)
+    """
+    The exception this one was raised from with ``raise ... from``, if any.
+    """
+
+    raised_while_handling: Exception | None = field(default=None, kw_only=True)
+    """
+    The exception that was being handled when this one was raised, if any.
     """
 
     def __post_init__(self):
@@ -58,6 +113,10 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
         # Stdlib mixins like KeyError override __str__ to repr their args; always render the
         # plain message that __post_init__ baked into the args.
         return Exception.__str__(self)
+
+
+DataclassException.raised_from = CauseLink()
+DataclassException.raised_while_handling = ContextLink()
 
 
 @dataclass

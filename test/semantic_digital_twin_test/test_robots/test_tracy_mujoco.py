@@ -26,7 +26,6 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.utils import tracy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -35,7 +34,8 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 pytestmark = pytest.mark.skipif(
-    not tracy_installed(), reason="iai_tracy_description is not installed"
+    not Tracy.is_description_installed(),
+    reason="iai_tracy_description is not installed",
 )
 
 
