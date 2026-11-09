@@ -33,7 +33,7 @@ def rendered_value(spatial_type: SpatialType) -> np.ndarray:
     """
     The evaluated rendered expression of a spatial type.
     """
-    renderer = SpatialTypeMarkerRenderer.renderer_for(spatial_type)
+    renderer = SpatialTypeMarkerRenderer.find_spatial_type_renderer(spatial_type)
     return renderer.rendered_expression(spatial_type).evaluate()
 
 

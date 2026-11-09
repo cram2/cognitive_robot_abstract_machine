@@ -108,7 +108,9 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         return isinstance(spatial_type, cls.input_type())
 
     @classmethod
-    def renderer_for(cls, spatial_type: SpatialType) -> type[SpatialTypeMarkerRenderer]:
+    def find_spatial_type_renderer(
+        cls, spatial_type: SpatialType
+    ) -> type[SpatialTypeMarkerRenderer]:
         """
         Find the renderer responsible for the given spatial type.
 
@@ -135,7 +137,7 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         :param root_frame_name: The frame used when the spatial type has no reference frame.
         :return: The markers representing the spatial type.
         """
-        renderer = cls.renderer_for(request.spatial_type)
+        renderer = cls.find_spatial_type_renderer(request.spatial_type)
         return renderer.render_markers(request, rendered_value, root_frame_name)
 
     @classmethod

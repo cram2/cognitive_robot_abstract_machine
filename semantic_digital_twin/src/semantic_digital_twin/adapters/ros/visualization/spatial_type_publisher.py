@@ -4,7 +4,6 @@ Publishes spatial types as RViz markers.
 
 from __future__ import annotations
 
-import threading
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing_extensions import TYPE_CHECKING
@@ -84,7 +83,9 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
     Publishes already evaluated spatial type visualizations as one RViz marker array.
 
     Markers of the previous call that are no longer rendered are deleted. It evaluates
-    no expression, so it may be called from any thread.
+    no expression, so it may run on a thread other than the one evaluating them.
+
+    .. warning:: Publish through one instance from one thread at a time.
     """
 
     topic_name: str = "/semworld/viz_marker"
@@ -113,11 +114,6 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
     )
     """
     Identities of the markers published on the previous call, used to delete stale ones.
-    """
-
-    _publish_lock: threading.Lock = field(init=False, default_factory=threading.Lock)
-    """
-    Serialises publishing, so concurrent calls agree on which markers are stale.
     """
 
     def __post_init__(self):
@@ -151,11 +147,10 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
         current_identities = {
             MarkerIdentity(marker.ns, marker.id) for marker in marker_array.markers
         }
-        with self._publish_lock:
-            for identity in self._published_marker_identities - current_identities:
-                marker_array.markers.append(self._delete_marker(identity))
-            self.publisher.publish(marker_array)
-            self._published_marker_identities = current_identities
+        for identity in self._published_marker_identities - current_identities:
+            marker_array.markers.append(self._delete_marker(identity))
+        self.publisher.publish(marker_array)
+        self._published_marker_identities = current_identities
 
     @staticmethod
     def _delete_marker(identity: MarkerIdentity) -> Marker:
@@ -265,7 +260,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         function of their free variables.
         """
         rendered_expressions = [
-            SpatialTypeMarkerRenderer.renderer_for(
+            SpatialTypeMarkerRenderer.find_spatial_type_renderer(
                 request.spatial_type
             ).rendered_expression(request.spatial_type)
             for request in self._requests
