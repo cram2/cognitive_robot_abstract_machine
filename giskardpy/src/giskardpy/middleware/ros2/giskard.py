@@ -10,6 +10,7 @@ from typing_extensions import Callable, Self
 
 import rclpy
 from json_msgs.action import JsonAction
+from rclpy.node import Node
 from std_msgs.msg import String
 from sqlalchemy.orm import sessionmaker
 
@@ -171,17 +172,17 @@ class Giskard:
 
     @classmethod
     def launch(
-        cls, create_giskard: Callable[[], Giskard], node_name: str = "giskard"
+        cls, create_giskard: Callable[[Node], Giskard], node_name: str = "giskard"
     ) -> None:
         """
         Run a Giskard as a ros node until ROS shuts down.
 
-        :param create_giskard: Builds the Giskard to run. It is called once the ros node
-            exists, so it can read from topics.
+        :param create_giskard: Builds the Giskard to run from the ros node it runs on.
+            The node already spins, so the builder can read from its topics.
         :param node_name: The name of the ros node.
         """
         rospy.init_node(node_name)
-        create_giskard().live()
+        create_giskard(rospy.get_node()).live()
 
     def setup(self):
         """

@@ -13,7 +13,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 from typing_extensions import Iterator
 
-from giskardpy.middleware.ros2.ros2_interface import get_robot_description
+from semantic_digital_twin.adapters.ros.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy import (
     daisy_standalone,
     daisy_velocity,
@@ -96,7 +96,7 @@ def published_robot_description(init_rospy) -> Iterator[str]:
 def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
     launcher: ModuleType, published_robot_description: str
 ) -> None:
-    giskard = launcher.create_giskard()
+    giskard = launcher.create_giskard(rospy.get_node())
 
     assert urdfs_read_by(giskard.world_source) == [
         URDFParser(urdf=published_robot_description).urdf
@@ -129,9 +129,9 @@ def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
     ],
 )
 def test_a_standalone_launcher_uses_the_description_its_robot_class_declares(
-    launcher: ModuleType, robot_class: type[AbstractRobot]
+    launcher: ModuleType, robot_class: type[AbstractRobot], init_rospy
 ) -> None:
-    giskard = launcher.create_giskard()
+    giskard = launcher.create_giskard(rospy.get_node())
 
     assert urdfs_read_by(giskard.world_source) == [
         URDFParser.from_file(robot_class.get_ros_file_path()).urdf

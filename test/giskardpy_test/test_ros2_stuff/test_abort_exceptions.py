@@ -10,7 +10,7 @@ from giskardpy.middleware.ros2.exceptions import (
     UnserializableGoalError,
     WorldModelModifiedDuringMotionError,
 )
-from giskardpy.middleware.ros2.ros2_interface import MyActionClient
+from giskardpy.middleware.ros2.action_client import MyActionClient
 from krrood.adapters.json_serializer import to_json
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (

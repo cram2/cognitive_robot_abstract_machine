@@ -9,7 +9,6 @@ from giskardpy.middleware.ros2.scripts.other_robots.garmi.configs import (
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     InteractiveMarkerNode,
 )
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.garmi import Garmi
@@ -27,13 +26,10 @@ def main() -> None:
     args, _ = parser.parse_known_args()
 
     rospy.init_node("giskard")
-    robot_description = load_xacro("package://garmi_description/urdf/garmi.urdf")
 
     giskard = Giskard.standalone(
         world_source=WorldSpecification(
-            robots=[
-                RobotSpecification.specify_real_robot(Garmi, urdf=robot_description)
-            ]
+            robots=[RobotSpecification.specify_real_robot(Garmi)]
         ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )

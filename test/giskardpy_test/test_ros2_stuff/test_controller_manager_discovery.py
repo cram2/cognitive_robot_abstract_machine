@@ -118,7 +118,7 @@ class ControllerManagerMimic:
     """
 
     def __post_init__(self) -> None:
-        manager = ControllerManager(self.name)
+        manager = ControllerManager(self.name, node=rospy.get_node())
         manager_node = Node(manager.node_name, namespace=manager.namespace)
         manager_node.create_service(
             controller_manager_services.ListControllers,
@@ -133,7 +133,10 @@ class ControllerManagerMimic:
         """
         :return: A node offering the parameters and topics of ``controller``.
         """
-        node = Node(controller.name, namespace=ControllerManager(self.name).namespace)
+        node = Node(
+            controller.name,
+            namespace=ControllerManager(self.name, node=rospy.get_node()).namespace,
+        )
         match controller.controller_type:
             case ControllerType.JOINT_GROUP_VELOCITY:
                 node.declare_parameter(ControllerParameter.JOINTS, controller.joints)

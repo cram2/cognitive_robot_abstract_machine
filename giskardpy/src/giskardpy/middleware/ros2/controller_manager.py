@@ -4,10 +4,11 @@ Reading what a ros2_control controller manager knows about the robot it drives.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 from controller_manager_msgs.srv import ListControllers
+from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from typing_extensions import TYPE_CHECKING
 
@@ -15,7 +16,7 @@ from giskardpy.middleware.ros2.exceptions import (
     ControllersNotActiveError,
     ControllersNotLoadedError,
 )
-from giskardpy.middleware.ros2.ros2_interface import (
+from semantic_digital_twin.adapters.ros.ros2_interface import (
     call_service,
     get_parameters,
     search_for_publisher_of_node_with_type,
@@ -74,6 +75,11 @@ class ControllerManager:
     The name of the controller manager node, including the namespace it runs in.
     """
 
+    node: Node = field(kw_only=True)
+    """
+    The node that talks to the controller manager and its controllers.
+    """
+
     @property
     def node_name(self) -> str:
         """
@@ -100,7 +106,10 @@ class ControllerManager:
             loaded but does not run.
         """
         controllers = call_service(
-            ListControllers, f"{self.name}/list_controllers", ListControllers.Request()
+            self.node,
+            ListControllers,
+            f"{self.name}/list_controllers",
+            ListControllers.Request(),
         ).controller
         if whitelist is not None:
             loaded_controllers = {controller.name for controller in controllers}
@@ -137,8 +146,9 @@ class ControllerManager:
         """
         return (
             get_parameters(
-                parameters=[ControllerParameter.JOINTS],
+                self.node,
                 node_name=f"{self.namespace.rstrip('/')}/{controller_name}",
+                parameter_names=[ControllerParameter.JOINTS],
             )
             .values[0]
             .string_array_value
@@ -150,6 +160,7 @@ class ControllerManager:
         :return: The topic the controller receives its commands on.
         """
         return search_for_subscriber_of_node_with_type(
+            self.node,
             node_name=controller_name,
             topic_type=message_type,
             namespace=self.namespace,
@@ -160,5 +171,8 @@ class ControllerManager:
         :return: The topic a joint state broadcaster publishes on.
         """
         return search_for_publisher_of_node_with_type(
-            node_name=controller_name, topic_type=JointState, namespace=self.namespace
+            self.node,
+            node_name=controller_name,
+            topic_type=JointState,
+            namespace=self.namespace,
         )

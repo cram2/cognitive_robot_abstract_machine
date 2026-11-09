@@ -29,7 +29,7 @@ from giskardpy.middleware.ros2.scripts.tutorial.joint_goal_client import (
 from giskardpy.middleware.ros2.scripts.tutorial.universal_robot_velocity import (
     create_giskard,
 )
-from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
@@ -141,7 +141,7 @@ def connected_giskard(mock_robot) -> Iterator[Giskard]:
     """
     A Giskard that discovered the controllers of the mock robot.
     """
-    giskard = create_giskard()
+    giskard = create_giskard(rospy.get_node())
     giskard.setup()
     yield giskard
     giskard.close_world_model_ros_interface()
@@ -178,7 +178,7 @@ class ControllerManagerRobotTester(GiskardTester):
     """
 
     def setup_giskard(self) -> Giskard:
-        return create_giskard()
+        return create_giskard(rospy.get_node())
 
 
 @pytest.fixture()

@@ -42,24 +42,6 @@ class UnknownMinimumVelocityJointError(SetupException):
 
 
 @dataclass
-class ServiceUnavailableError(SetupException):
-    """
-    Raised when a service Giskard needs for its setup does not become available.
-    """
-
-    service_name: str
-    """
-    The service that was waited for.
-    """
-
-    def error_message(self) -> str:
-        return f'The service "{self.service_name}" is not available.'
-
-    def suggest_correction(self) -> str:
-        return "Make sure the node offering the service is running."
-
-
-@dataclass
 class ControllersNotLoadedError(SetupException):
     """
     Raised when controllers Giskard was told to use are not loaded by their controller

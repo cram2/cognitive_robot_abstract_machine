@@ -19,12 +19,11 @@ from experiments.control_loop_experiments.control_loop_profiler import (
     ControlLoopProfiler,
 )
 from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
 from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     ExternalCollisionAvoidance,
@@ -62,6 +61,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
 
 # %% how much the measurement records
 
@@ -284,7 +284,7 @@ class BenchmarkRobot(GiskardTester):
             environment.
         :param pose: Where the environment is placed in the world.
         """
-        self.add_urdf_to_world(name=name, urdf=load_xacro(package_path), pose=pose)
+        self.add_urdf_to_world(name=name, file_path=package_path, pose=pose)
 
 
 # %% scenarios

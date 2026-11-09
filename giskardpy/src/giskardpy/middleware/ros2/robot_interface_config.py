@@ -31,7 +31,7 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
     TfFrameSynchronizer,
 )
 from giskardpy.middleware.ros2.motion_server import MotionServer
-from giskardpy.middleware.ros2.ros2_interface import (
+from semantic_digital_twin.adapters.ros.ros2_interface import (
     search_for_unique_publisher_of_type,
     search_for_unique_subscriber_of_type,
 )
@@ -177,7 +177,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         Tell Giskard to sync an odometry joint added during by the world config.
         """
         if odometry_topic is None:
-            odometry_topic = search_for_unique_publisher_of_type(Odometry)
+            odometry_topic = search_for_unique_publisher_of_type(
+                rospy.get_node(), Odometry
+            )
         assert isinstance(joint, (OmniDrive, DifferentialDrive))
         synchronizer = OdometrySynchronizer(
             world=self.world,
@@ -279,7 +281,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         command_format = command_format or TwistFormat()
         if command_topic is None:
             command_topic = search_for_unique_subscriber_of_type(
-                command_format.message_type()
+                rospy.get_node(), command_format.message_type()
             )
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
@@ -345,7 +347,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             namespace it runs in.
         :param whitelist: The names of the controllers to consider, all if ``None``.
         """
-        controller_manager = ControllerManager(controller_manager_name)
+        controller_manager = ControllerManager(
+            controller_manager_name, node=rospy.get_node()
+        )
         for controller in controller_manager.active_controllers(whitelist):
             match controller.type:
                 case ControllerType.JOINT_STATE_BROADCASTER:

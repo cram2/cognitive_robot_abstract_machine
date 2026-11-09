@@ -5,7 +5,8 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2.ros2_interface import get_robot_description
+from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -24,19 +25,18 @@ class ControllerManagerInterface(ClosedLoopRobotInterfaceConfig):
         self.discover_interfaces_from_controller_manager()
 
 
-def create_giskard() -> Giskard:
+def create_giskard(node: Node) -> Giskard:
     """
     Build a Giskard that commands the robot described on ``/robot_description`` through
     its controller manager.
 
-    .. note:: The ros node has to be initialized first, because the robot description is
-        read from its topic.
+    :param node: The node Giskard runs on, which reads the robot description.
     """
     return Giskard(
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    MinimalRobot, urdf=get_robot_description()
+                    MinimalRobot, urdf=get_robot_description(node)
                 )
             ]
         ),

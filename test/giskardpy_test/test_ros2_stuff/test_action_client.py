@@ -11,7 +11,7 @@ from typing_extensions import Any
 
 from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOutcome
-from giskardpy.middleware.ros2.ros2_interface import MyActionClient
+from giskardpy.middleware.ros2.action_client import MyActionClient
 
 # %% mimics
 

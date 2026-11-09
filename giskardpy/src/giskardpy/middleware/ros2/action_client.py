@@ -1,204 +1,32 @@
+"""
+An action client that waits for the result of a Giskard goal and rebuilds the error an
+aborted goal carries.
+"""
+
 from __future__ import annotations
 
 import json
-import threading
-from datetime import timedelta
 from functools import partial
-from typing_extensions import Callable, Any
 
 from action_msgs.msg import GoalStatus
-from rcl_interfaces.srv._get_parameters import (
-    GetParameters_Request,
-    GetParameters_Response,
-    GetParameters,
-)
 from rclpy import Future
 from rclpy.action import ActionClient
 from rclpy.action.client import ClientGoalHandle
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, QoSDurabilityPolicy
-from std_msgs.msg import String
+from typing_extensions import Callable, Any
 
-from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.event_loop_manager import get_event_loop
 from giskardpy.middleware.ros2.exceptions import (
     ExecutionAbortedException,
     ExecutionCanceledException,
-    ServiceUnavailableError,
 )
 from giskardpy.middleware.ros2.utils.asynio_utils import wait_until_not_none
 from krrood.adapters.exceptions import JSONSerializationError
 from krrood.adapters.json_serializer import from_json
+from semantic_digital_twin.adapters.ros import rospy
 
 
-def msg_type_as_str(msg_type) -> str:
-    type_str_parts = str(type(msg_type())).split(".")
-    part1 = type_str_parts[0].split("'")[1]
-    part2 = type_str_parts[1]
-    part3 = type_str_parts[-1].split("'")[0]
-    return f"{part1}/{part2}/{part3}"
-
-
-def wait_for_message(
-    msg_type,
-    node: Node,
-    topic: str,
-    *,
-    qos_profile: QoSProfile | int = QoSProfile(depth=10),
-    time_to_wait=-1,
-) -> tuple[bool, Any]:
-    event = threading.Event()
-    msg_holder = [None]
-
-    def cb(msg):
-        msg_holder[0] = msg
-        event.set()
-
-    sub = node.create_subscription(msg_type, topic, cb, qos_profile)
-    try:
-        timeout = None if time_to_wait < 0 else time_to_wait
-        received = event.wait(timeout=timeout)
-    finally:
-        node.destroy_subscription(sub)
-
-    if received:
-        return True, msg_holder[0]
-    return False, None
-
-
-def get_robot_description(topic: str = "/robot_description") -> str:
-    qos_profile = QoSProfile(depth=10)
-    qos_profile.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
-    rospy.get_node().get_logger().info(f"Waiting for the robot description on {topic}.")
-    return wait_for_message(String, rospy.get_node(), topic, qos_profile=qos_profile)[
-        1
-    ].data
-
-
-def search_for_publisher_of_node_with_type(
-    node_name: str, topic_type: type, namespace: str = "/"
-) -> str:
-    """
-    :param node_name: The name of the node that publishes the topic.
-    :param topic_type: The message type of the topic.
-    :param namespace: The namespace of the node.
-    :return: The first topic of `topic_type` the node publishes.
-    """
-    topics = rospy.get_node().get_publisher_names_and_types_by_node(
-        node_name, namespace
-    )
-    return _search_in_topic_list(
-        node_name=node_name, topic_list=topics, topic_type=topic_type
-    )[0]
-
-
-def search_for_subscriber_of_node_with_type(
-    node_name: str, topic_type: type, namespace: str = "/"
-) -> str:
-    """
-    :param node_name: The name of the node that subscribes to the topic.
-    :param topic_type: The message type of the topic.
-    :param namespace: The namespace of the node.
-    :return: The first topic of `topic_type` the node subscribes to.
-    """
-    topics = rospy.get_node().get_subscriber_names_and_types_by_node(
-        node_name, namespace
-    )
-    return _search_in_topic_list(
-        node_name=node_name, topic_list=topics, topic_type=topic_type
-    )[0]
-
-
-def search_for_publishers_of_type(topic_type) -> list[str]:
-    topics = _search_in_topic_list(
-        topic_list=rospy.get_node().get_topic_names_and_types(), topic_type=topic_type
-    )
-    matches = []
-    for topic_name in topics:
-        if len(rospy.get_node().get_publishers_info_by_topic(topic_name)) > 0:
-            matches.append(topic_name)
-    return matches
-
-
-def search_for_unique_publisher_of_type(topic_type) -> str:
-    topic_names = search_for_publishers_of_type(topic_type)
-    assert len(topic_names) == 1, (
-        f"Found too many {msg_type_as_str(topic_type)} topics: {topic_names}."
-    )
-    return topic_names[0]
-
-
-def search_for_unique_subscriber_of_type(topic_type) -> str:
-    topic_names = search_for_subscribers_of_type(topic_type)
-    assert len(topic_names) == 1, (
-        f"Found too many {msg_type_as_str(topic_type)} topics: {topic_names}."
-    )
-    return topic_names[0]
-
-
-def search_for_subscribers_of_type(topic_type) -> list[str]:
-    topics = _search_in_topic_list(
-        topic_list=rospy.get_node().get_topic_names_and_types(), topic_type=topic_type
-    )
-    matches = []
-    for topic_name in topics:
-        if len(rospy.get_node().get_subscriptions_info_by_topic(topic_name)) > 0:
-            matches.append(topic_name)
-    return matches
-
-
-def call_service(
-    service_type: type,
-    service_name: str,
-    request: Any,
-    wait_timeout: timedelta = timedelta(seconds=10),
-) -> Any:
-    """
-    Call a service through Giskard's node and wait for its response.
-
-    .. warning:: The response is delivered by the executor that spins Giskard's node, so
-        this must not be called from one of that node's callbacks.
-
-    :param service_type: The type of the service.
-    :param service_name: The name of the service.
-    :param request: The request to send.
-    :param wait_timeout: How long to wait for the service to become available.
-    :return: The response of the service.
-    :raises ServiceUnavailableError: If the service does not become available in time.
-    """
-    node = rospy.get_node()
-    client = node.create_client(service_type, service_name)
-    node.get_logger().info(f"Waiting for the service {service_name}.")
-    if not client.wait_for_service(timeout_sec=wait_timeout.total_seconds()):
-        node.destroy_client(client)
-        raise ServiceUnavailableError(service_name=service_name)
-    future = client.call_async(request)
-    rospy.wait_for_future_to_complete(future)
-    node.destroy_client(client)
-    return future.result()
-
-
-def get_parameters(
-    parameters: list[str], node_name: str = "controller_manager"
-) -> GetParameters_Response:
-    request = GetParameters_Request()
-    request.names = parameters
-    return call_service(GetParameters, f"{node_name}/get_parameters", request)
-
-
-def _search_in_topic_list(
-    topic_list: list[tuple[str, list]], topic_type: str, node_name: str | None = None
-) -> list[str]:
-    matches = []
-    for topic_name, topic_types in topic_list:
-        if topic_types[0] == msg_type_as_str(topic_type):
-            matches.append(topic_name)
-    if matches:
-        return matches
-    if node_name is not None:
-        raise AttributeError(f"Node {node_name} has no topic of type {topic_type}.")
-    else:
-        raise AttributeError(f"Didn't find topic of type {topic_type}.")
+# %% action client
 
 
 class MyActionClient:
