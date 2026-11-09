@@ -698,7 +698,7 @@ class Match(
         :return: Whether that keyword is left out of construction, decided once per
             factory, matched class, keyword and value type.
         """
-        if CallSignature.of(callee=factory).accepts_keyword(keyword=keyword):
+        if CallSignature.from_callable(callee=factory).accepts_keyword(keyword=keyword):
             return False
         return keyword in dir(matched_type) or issubclass(value_type, CausalRoleMarker)
 

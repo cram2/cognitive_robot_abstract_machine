@@ -1,7 +1,11 @@
+"""
+The errors a motion statechart raises while it is built or run.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from typing_extensions import TYPE_CHECKING
 
@@ -11,6 +15,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 )
 
 if TYPE_CHECKING:
+    from giskardpy.motion_statechart.graph_node import ConvergingTask
     from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
     from semantic_digital_twin.datastructures.definitions import GripperState
     from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
@@ -190,12 +195,16 @@ class NoProgressError(MotionStatechartError):
 
     progress_monitor: StillProgressing
     """
-    The monitor that detected the stall and knows which tasks are affected.
+    The monitor that detected the stall.
+    """
+
+    stalled_tasks: list[ConvergingTask] = field(default_factory=list)
+    """
+    The tasks that had stopped approaching their goal when the stall was detected.
     """
 
     def error_message(self) -> str:
-        stalled_tasks = self.progress_monitor.stalled_tasks
-        names = ", ".join(task.unique_name for task in stalled_tasks)
+        names = ", ".join(task.unique_name for task in self.stalled_tasks)
         return (
             f"{names or self.progress_monitor.monitored_node.unique_name} stopped "
             f"approaching a goal for {self.progress_monitor.timeout}."

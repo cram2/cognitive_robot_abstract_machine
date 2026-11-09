@@ -201,12 +201,6 @@ def _search_in_topic_list(
         raise AttributeError(f"Didn't find topic of type {topic_type}.")
 
 
-def wait_for_publisher(publisher):
-    return
-    # while publisher.get_num_connections() == 0:
-    #     rospy.sleep(0.1)
-
-
 class MyActionClient:
     _goal_handle: ClientGoalHandle | None
     _result_future: Future | None

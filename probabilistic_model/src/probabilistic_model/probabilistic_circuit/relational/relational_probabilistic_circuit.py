@@ -83,6 +83,12 @@ class PartTrainingTable:
     The names of the aggregation statistic columns.
     """
 
+    example_positions: list[int]
+    """
+    Per row, the position among the training instances of the instance the part belongs
+    to.
+    """
+
 
 @dataclass
 class RelationalTrainingTables:
@@ -95,10 +101,9 @@ class RelationalTrainingTables:
     One row per training instance: its attributes and aggregation statistics.
     """
 
-    part_rows: dict[str, pd.DataFrame]
+    part_tables: dict[str, PartTrainingTable]
     """
-    Per exchangeable part, one row per part, carrying its instance's aggregation
-    statistics.
+    The table of each exchangeable part.
     """
 
 
@@ -316,11 +321,10 @@ class RelationalProbabilisticCircuit:
             for aggregation_function in aggregation_functions
         ]
         aggregation_names = [function._name_ for function in aggregation_functions]
-        part_instances = list(
-            itertools.chain.from_iterable(
-                getattr(instance, exchangeable_part) for instance in instances
-            )
-        )
+        parts_of_instances = [
+            getattr(instance, exchangeable_part) for instance in instances
+        ]
+        part_instances = list(itertools.chain.from_iterable(parts_of_instances))
         rows = self._build_child_joint_dataframe(
             exchangeable_part,
             instances,
@@ -332,6 +336,11 @@ class RelationalProbabilisticCircuit:
             part_instances=part_instances,
             rows=rows,
             aggregation_names=aggregation_names,
+            example_positions=[
+                position
+                for position, parts in enumerate(parts_of_instances)
+                for _ in parts
+            ],
         )
 
     def training_tables(self, instances: list[Any]) -> RelationalTrainingTables:
@@ -347,10 +356,10 @@ class RelationalProbabilisticCircuit:
             example_rows=self._build_class_dataframe(
                 self.feature_extractor, instances, None
             ),
-            part_rows={
+            part_tables={
                 exchangeable_part: self._part_training_table(
                     exchangeable_part, instances
-                ).rows
+                )
                 for exchangeable_part in self.exchangeable_distribution_templates
             },
         )

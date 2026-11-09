@@ -705,7 +705,6 @@ class DegreeOfFreedomDecisionVariables:
             )
             for degree_of_freedom in self.degrees_of_freedom
         }
-        last_velocity_step = self.number_of_steps(Derivatives.velocity) - 1
         quadratic_weights = []
         for slot in self.slots:
             normalized_weight = self.normalize_degree_of_freedom_weight(
@@ -715,9 +714,9 @@ class DegreeOfFreedomDecisionVariables:
                 base_weight=qp_controller_config.get_degree_of_freedom_weight(
                     slot.degree_of_freedom.name, slot.derivative
                 ),
-                horizon_index=slot.step,
-                total_horizon_length=last_velocity_step,
-                growth_factor=qp_controller_config.horizon_weight_gain_scalar,
+                horizon_weight_scale=qp_controller_config.horizon_weight_scale(
+                    slot.step
+                ),
             )
             quadratic_weights.append(normalized_weight)
         return sm.Vector(quadratic_weights), sm.Vector.zeros(
@@ -746,46 +745,20 @@ class DegreeOfFreedomDecisionVariables:
         self,
         variable_limit: float | None,
         base_weight: float | None,
-        horizon_index: int,
-        total_horizon_length: int,
-        growth_factor: float,
+        horizon_weight_scale: float,
     ) -> sm.Scalar:
         """
         Scales a free variable weight by its limit so derivatives become comparable, and
-        ramps it over the horizon so later time steps are penalized more.
+        by its step's place in the horizon so later time steps are penalized more.
 
         :param variable_limit: Limit of the free variable used to normalize the weight.
         :param base_weight: Base objective weight before normalization and ramping,
             ``None`` if the free variable is not weighted.
-        :param horizon_index: Index of the horizon step the weight applies to.
-        :param total_horizon_length: Horizon length over which the weight is ramped.
-        :param growth_factor: Factor scaling the weight at the start of the horizon.
+        :param horizon_weight_scale: The fraction of the weight applied at the free
+            variable's step, see :meth:`QPControllerConfig.horizon_weight_scale`.
         :return: Normalized and ramped weight, ``0`` if the free variable is not limited
             or not weighted.
         """
-
-        def linear(
-            horizon_index: float,
-            weight: float,
-            total_horizon_length: int,
-            growth_factor: float,
-        ) -> float:
-            """
-            Ramps a weight linearly from ``weight * growth_factor`` at the start of the
-            horizon to ``weight`` at its end.
-
-            :param horizon_index: Index of the horizon step the weight applies to.
-            :param weight: Weight at the end of the horizon.
-            :param total_horizon_length: Horizon length over which the weight is ramped.
-            :param growth_factor: Factor scaling the weight at the start of the horizon.
-            :return: Weight at ``horizon_index``.
-            """
-            start = weight * growth_factor
-            slope = (weight - start) / total_horizon_length
-            return slope * horizon_index + start
-
         if variable_limit is None or base_weight is None:
             return 0.0
-        weight = linear(horizon_index, base_weight, total_horizon_length, growth_factor)
-
-        return weight * (1 / variable_limit) ** 2
+        return base_weight * horizon_weight_scale * (1 / variable_limit) ** 2

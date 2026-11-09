@@ -257,6 +257,26 @@ class TestSoftConnectionRebuilding:
         world.notify_state_change()
         return world
 
+    def test_a_re_parented_piecewise_constant_curvature_segment_keeps_its_name(self):
+        world = self.build_piecewise_constant_curvature_world()
+        segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
+
+        copied_segment = segment.copy_with_new_parent(
+            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        )
+
+        assert copied_segment.name == segment.name
+
+    def test_a_re_parented_cosserat_rod_segment_keeps_its_name(self):
+        world = self.build_cosserat_world()
+        segment = world.get_connections_by_type(CosseratRodConnection)[0]
+
+        copied_segment = segment.copy_with_new_parent(
+            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        )
+
+        assert copied_segment.name == segment.name
+
     def test_a_copied_piecewise_constant_curvature_world_bends_the_same_way(self):
         world = self.build_piecewise_constant_curvature_world()
         trunk = world.get_semantic_annotations_by_type(SoftTrunk)[0]

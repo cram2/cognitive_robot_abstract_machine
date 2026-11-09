@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 from giskardpy.middleware.ros2.robot_interface_config import (
@@ -7,10 +7,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 from giskardpy.middleware.ros2.scripts.tools.interactive_marker import (
     RootTipPair,
 )
-from giskardpy.model.world_config import WorldWithFixedRobot
-from semantic_digital_twin.robots.daisy import DAiSy, DAiSyController
-
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.daisy import DAiSyController
 
 
 class DAiSyInteractiveMarkerChain(Enum):
@@ -36,20 +33,3 @@ class DAiSyVelocityInterface(ClosedLoopRobotInterfaceConfig):
                 DAiSyController.RIGHT_FORWARD_VELOCITY,
             ]
         )
-
-
-@dataclass
-class WorldWithDAiSyConfig(WorldWithFixedRobot):
-    """
-    A world containing only DAiSy, whose base is fixed to the world root.
-    """
-
-    root_name: PrefixedName = field(default=PrefixedName(name="map2"))
-    """
-    Name of the body DAiSy is attached to.
-    """
-
-    robot_class: type[DAiSy] = field(kw_only=True, default=DAiSy, init=False)
-    """
-    The robot class that is applied to the parsed description.
-    """

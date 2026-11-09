@@ -166,7 +166,6 @@ class ConnectionSpecification(
                     ).evaluate()
                 ),
             )
-            placed_connection.name = connection.name
             world.remove_connection(connection)
             world.add_connection(placed_connection)
         return placed_connection

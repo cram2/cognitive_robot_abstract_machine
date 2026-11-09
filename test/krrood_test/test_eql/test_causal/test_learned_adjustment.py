@@ -22,6 +22,9 @@ from probabilistic_model.causal_structure.graph import (
     GraphNode,
     NodeLevel,
 )
+from probabilistic_model.causal_structure.identification import (
+    InvalidDeclaredAdjustmentRepair,
+)
 from probabilistic_model.causal_structure.learning import (
     CausalStructureLearner,
     LearnedCausalStructure,
@@ -294,6 +297,52 @@ def test_declared_invalid_confounder_is_refused():
         ProbabilisticBackend(causal_structures=mediated).choose_adjustment_sets(
             parameters=UnderspecifiedParameters(statement=query), expression=query
         )
+
+
+# %% repairing a declared adjustment set
+
+
+def repaired_adjustment_names(
+    structures: dict[type, LearnedCausalStructure], query: Match[SummerDay]
+) -> list[str]:
+    """
+    :param structures: The structure of ``SummerDay``.
+    :param query: A query about the ice cream sales as the cause.
+    :return: The names of the variables the ice cream sales adjust for once the backend
+        has repaired the declared ones against the graph.
+    """
+    parameters = UnderspecifiedParameters(statement=query)
+    ProbabilisticBackend(
+        causal_structures=structures,
+        declared_adjustment_policy=InvalidDeclaredAdjustmentRepair(),
+    ).choose_adjustment_sets(parameters=parameters, expression=query)
+    [ice_cream] = parameters.search_cause_variables
+    return sorted(
+        variable.name for variable in parameters.adjustment_variables_of(cause_variable=ice_cream)
+    )
+
+
+def test_repair_drops_a_declared_mediator():
+    mediated = summer_structures(
+        [FieldEdge(first="ice_cream", second="season"), FieldEdge(first="season", second="drowning")]
+    )
+
+    assert (
+        repaired_adjustment_names(mediated, ice_cream_query(declares_the_season=True))
+        == []
+    )
+
+
+def test_repair_keeps_a_declared_bystander_and_adds_the_confounder():
+    query = a(SummerDay)(
+        season=..., ice_cream=cause, sunscreen=confounder, heat=..., drowning=...
+    )
+    query.causes_effect(query.drowning == 1)
+
+    assert repaired_adjustment_names(summer_structures(true_summer_edges()), query) == [
+        "SummerDay.season",
+        "SummerDay.sunscreen",
+    ]
 
 
 def test_partially_identified_effect_raises_effect_not_identified():

@@ -8,10 +8,6 @@ from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from semantic_digital_twin.adapters.ros.world_fetcher import (
-    FetchWorldServer,
-    fetch_world_from_service,
-)
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.orm.utils import semantic_digital_twin_sessionmaker
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -161,9 +157,14 @@ def test_pr2_world(pr2_world_state_reset, session):
 def test_pr2_semantic_annotation_and_safe_to_db(
     rclpy_node, pr2_world_state_reset, session
 ):
-    fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
+    world_fetcher = pytest.importorskip(
+        "semantic_digital_twin.adapters.ros.world_fetcher"
+    )
+    fetcher = world_fetcher.FetchWorldServer(
+        node=rclpy_node, world=pr2_world_state_reset
+    )
 
-    pr2_world_copy = fetch_world_from_service(
+    pr2_world_copy = world_fetcher.fetch_world_from_service(
         rclpy_node,
     )
 

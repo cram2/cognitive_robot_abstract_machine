@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
 
@@ -30,6 +31,7 @@ from krrood.ormatic.data_access_objects.base import (
 from krrood.ormatic.data_access_objects.from_dao import (
     FromDataAccessObjectWorkItem,
     FromDataAccessObjectState,
+    ObjectInheritingFromAlternativeMapping,
 )
 from krrood.ormatic.data_access_objects.helper import (
     get_data_access_object_class,
@@ -923,6 +925,7 @@ class DataAccessObject(HasGeneric[T]):
         self._discover_dependencies(state=state, discovery_order=discovery_order)
         self._fill_domain_objects(state=state, discovery_order=discovery_order)
         state.convert_alternative_mappings_to_domain_objects()
+        state.copy_attributes_inherited_from_alternative_mappings()
         self._finalize_containers(state=state, discovery_order=discovery_order)
         self._call_post_inits(state=state, discovery_order=discovery_order)
 
@@ -979,38 +982,6 @@ class DataAccessObject(HasGeneric[T]):
             if not state.is_initialized(dao_instance=work_item.dao_instance):
                 work_item.dao_instance._populate_relationships_and_scalars_from_dao(
                     domain_object=work_item.domain_object, state=state
-                )
-
-    def _handle_subclass_of_alternative_mapping_in_from_dao(
-        self,
-        *,
-        data_access_object: DataAccessObject,
-        domain_object: Any,
-        alternatively_mapped_base: type[AlternativeMapping],
-    ):
-        """
-        Handle the case where the parent class is an alternative mapping in the `from_dqo` algorithm.
-
-        :param data_access_object: The data access object that has an alternative mapping as its parent class.
-        :param domain_object: The domain object that is being constructed.
-        :param alternatively_mapped_base: The base class that is the alternative mapping.
-        :return:
-        """
-        logger.warning(
-            "Subclasses of AlternativeMapping are only partially supported. "
-            "If the parent classes alternative mapping has dependencies these are ignored and may yield "
-            "inconsistent build orders."
-        )
-        # create the domain object of the alternatively mapped base
-        base_domain_object = alternatively_mapped_base.to_domain_object(
-            data_access_object
-        )
-        for domain_object_field in fields(domain_object):
-            if hasattr(base_domain_object, domain_object_field.name):
-                object.__setattr__(
-                    domain_object,
-                    domain_object_field.name,
-                    getattr(base_domain_object, domain_object_field.name),
                 )
 
     def _finalize_containers(
@@ -1095,29 +1066,64 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         """
         plan = get_dao_schema(type(self))
-
-        # check if self is a subclass of an alternative mapping and is not alternatively mapped on its own
-        if plan.alternative_base is not None and not plan.uses_alternative_mapping:
-            self._handle_subclass_of_alternative_mapping_in_from_dao(
-                data_access_object=self,
+        alternative_parent = self._alternative_parent(state=state)
+        if alternative_parent is None:
+            self._populate_from_columns_and_relationships(
                 domain_object=domain_object,
-                alternatively_mapped_base=plan.alternative_base.original_class(),
+                data_column_names=plan.data_column_names,
+                single_relationships=plan.single_relationships,
+                collection_relationships=plan.collection_relationships,
+                state=state,
             )
             return
 
-        # Populate scalar columns
-        for name in plan.data_column_names:
+        partition = _get_alternative_partition_plan(type(self), plan.alternative_base)
+        self._populate_from_columns_and_relationships(
+            domain_object=domain_object,
+            data_column_names=partition.intermediate_attribute_keys,
+            single_relationships=partition.own_single_relationships,
+            collection_relationships=partition.own_collection_relationships,
+            state=state,
+        )
+        own_attribute_keys = (
+            *partition.intermediate_attribute_keys,
+            *(entry.key for entry in partition.own_single_relationships),
+            *(entry.key for entry in partition.own_collection_relationships),
+        )
+        state.objects_inheriting_from_alternative_mappings.append(
+            ObjectInheritingFromAlternativeMapping(
+                domain_object=domain_object, parent=alternative_parent, own_attribute_keys=own_attribute_keys
+            )
+        )
+
+    def _populate_from_columns_and_relationships(
+        self,
+        *, domain_object: T,
+        data_column_names: Iterable[str],
+        single_relationships: Iterable[SingleRelationship],
+        collection_relationships: Iterable[CollectionRelationship],
+        state: FromDataAccessObjectState,
+    ) -> None:
+        """
+        Set the given columns and relationships of this DAO on the domain object.
+
+        :param domain_object: The domain object.
+        :param data_column_names: The names of the scalar columns to set.
+        :param single_relationships: The single valued relationships to set.
+        :param collection_relationships: The collection valued relationships to set.
+        :param state: The conversion state.
+        """
+        for name in data_column_names:
             object.__setattr__(domain_object, name, getattr(self, name))
 
-        # Populate all relationships
-        for relationship in plan.single_relationships:
+        for relationship in single_relationships:
             self._populate_single_relationship(
                 domain_object=domain_object,
                 key=relationship.key,
                 value=_read_single_relationship(self, relationship),
                 state=state,
             )
-        for relationship in plan.collection_relationships:
+        for relationship in collection_relationships:
             self._populate_collection_relationship(
                 domain_object=domain_object,
                 key=relationship.key,
@@ -1179,9 +1185,7 @@ class DataAccessObject(HasGeneric[T]):
                 for item in value:
                     item.from_dao(state=state)
 
-        self._build_base_keyword_arguments_for_alternative_parent(
-            domain_object=domain_object, state=state
-        )
+        self._alternative_parent(state=state)
         return domain_object
 
     def _populate_single_relationship(
@@ -1274,48 +1278,29 @@ class DataAccessObject(HasGeneric[T]):
         """
         return dao_instance.from_dao(state=state)
 
-    def _build_base_keyword_arguments_for_alternative_parent(
-        self,
-        *,
-        domain_object: T,
-        state: FromDataAccessObjectState,
-    ) -> None:
+    def _alternative_parent(
+        self, *, state: FromDataAccessObjectState
+    ) -> AlternativeMapping | None:
         """
-        Build keyword arguments from an alternative parent DAO.
+        The alternative mapping of the alternatively mapped base class that the domain
+        object of this DAO inherits from, built from the base's columns of this DAO.
 
-        :param domain_object: The domain object to populate.
         :param state: The conversion state.
+        :return: The alternative mapping, or ``None`` if the DAO has no alternatively
+            mapped base class or is an alternative mapping itself.
         """
-        base_clazz = self.__class__.__bases__[0]
-        if not _uses_alternative_mapping(base_clazz):
-            return
+        plan = get_dao_schema(type(self))
+        if plan.alternative_base is None or plan.uses_alternative_mapping:
+            return None
 
-        # a mapping that extends the parent's mapping already holds the parent's fields
-        if issubclass(
-            self.constructable_original_class(),
-            base_clazz.constructable_original_class(),
-        ):
-            return
-
-        # The cache key uses id(self) because synthetic parent DAOs are only valid
-        # for the lifetime of this specific DAO instance and are scoped to the
-        # current conversion state to ensure identity consistency between discovery
-        # and filling phases.
-        cache_key = (id(self), base_clazz)
+        # Keyed by id(self) since a synthetic parent DAO belongs to this DAO only, and
+        # cached so discovery and filling see the same parent.
+        cache_key = (id(self), plan.alternative_base)
         if cache_key not in state.synthetic_parent_daos:
             state.synthetic_parent_daos[cache_key] = self._create_filled_parent_dao(
-                base_clazz=base_clazz
+                base_clazz=plan.alternative_base
             )
-        parent_dao = state.synthetic_parent_daos[cache_key]
-
-        base_result = parent_dao.from_dao(state=state)
-
-        if state.discovery_mode:
-            return
-
-        for key in _get_type_hints_cached(type(domain_object)):
-            if not hasattr(self, key) and hasattr(base_result, key):
-                object.__setattr__(domain_object, key, getattr(base_result, key))
+        return state.synthetic_parent_daos[cache_key].from_dao(state=state)
 
     def _create_filled_parent_dao(
         self, *, base_clazz: type[DataAccessObject]

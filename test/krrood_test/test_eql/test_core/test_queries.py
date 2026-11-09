@@ -1,3 +1,7 @@
+"""
+Tests of evaluating entity queries: conditions, quantifiers and result shapes.
+"""
+
 import itertools
 from dataclasses import dataclass
 from math import factorial
@@ -826,6 +830,52 @@ def test_equivalent_to_contains_type_using_exists():
 
     query_result = list(fruit_box_query.evaluate())
     assert len(query_result) == 1, "Should generate 1 fruit box."
+
+
+@pytest.fixture
+def fruit_boxes_with_and_without_apples() -> list[FruitBox]:
+    """
+    An apple box, a box without apples, a mixed box with an apple, and an empty box.
+    """
+    return [
+        FruitBox(name="apples", fruits=[Apple(name="apple1")]),
+        FruitBox(name="bodies", fruits=[Body(name="body1")]),
+        FruitBox(name="mixed", fruits=[Body(name="body2"), Apple(name="apple2")]),
+        FruitBox(name="empty", fruits=[]),
+    ]
+
+
+def test_exists_over_flat_variable_is_checked_for_each_outer_binding(
+    fruit_boxes_with_and_without_apples,
+):
+    """
+    Every box that holds an apple is selected, not only the first one in the domain.
+    """
+    fruit_box = variable(FruitBox, domain=fruit_boxes_with_and_without_apples)
+    fruit = flat_variable(fruit_box.fruits)
+    query = an(entity(fruit_box).where(exists(fruit, HasType(variable=fruit, types_=Apple))))
+
+    assert query.tolist() == [
+        fruit_boxes_with_and_without_apples[0],
+        fruit_boxes_with_and_without_apples[2],
+    ]
+
+
+def test_negated_exists_over_flat_variable_is_checked_for_each_outer_binding(
+    fruit_boxes_with_and_without_apples,
+):
+    """
+    Every box without an apple is selected, the empty box included, although other boxes
+    hold one.
+    """
+    fruit_box = variable(FruitBox, domain=fruit_boxes_with_and_without_apples)
+    fruit = flat_variable(fruit_box.fruits)
+    query = an(entity(fruit_box).where(not_(exists(fruit, HasType(variable=fruit, types_=Apple)))))
+
+    assert query.tolist() == [
+        fruit_boxes_with_and_without_apples[1],
+        fruit_boxes_with_and_without_apples[3],
+    ]
 
 
 def test_double_not(handles_and_containers_world):

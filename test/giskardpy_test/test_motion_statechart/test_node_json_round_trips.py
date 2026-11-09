@@ -495,12 +495,17 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             ArticulateGraspedMechanism,
             lambda world: [
                 ArticulateGraspedMechanism(
-                    environment_link=world.get_body_by_name("robot"),
-                    tip_link=world.get_body_by_name("robot2"),
+                    environment_link=world.get_body_by_name("torso_lift_link"),
+                    tip_link=world.get_semantic_annotations_by_type(EndEffector)[
+                        0
+                    ].tool_frame,
                     goal_joint_state=0.0,
+                    holding_end_effector=world.get_semantic_annotations_by_type(
+                        EndEffector
+                    )[0],
                 )
             ],
-            WorldFixture.PRISMATIC_BOT2,
+            WorldFixture.PR2_WORLD,
         ),
     ]
 

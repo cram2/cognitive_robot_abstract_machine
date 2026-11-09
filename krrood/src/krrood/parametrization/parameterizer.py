@@ -318,7 +318,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
     ] = field(init=False, default_factory=dict)
     """
     Per cause variable, the variables a learned causal structure chose to adjust for,
-    among those the query names.
+    among those the query names, in place of those marked ``confounder``.
     """
 
     def __post_init__(self):
@@ -338,14 +338,12 @@ class UnderspecifiedParameters(ModelQueryParameters):
     ) -> list[random_events.variable.Variable]:
         """
         :param cause_variable: A cause variable of the query.
-        :return: The variables intervening on it adjusts for: those marked
-            ``confounder``, and those a learned causal structure chose for it.
+        :return: The variables intervening on it adjusts for: those a learned causal
+            structure chose for it, else those marked ``confounder``.
         """
-        return self.search_confounder_variables + [
-            variable
-            for variable in self.derived_adjustment_variables.get(cause_variable, [])
-            if variable not in self.search_confounder_variables
-        ]
+        return self.derived_adjustment_variables.get(
+            cause_variable, self.search_confounder_variables
+        )
 
     @property
     def adjustment_variables(self) -> list[random_events.variable.Variable]:

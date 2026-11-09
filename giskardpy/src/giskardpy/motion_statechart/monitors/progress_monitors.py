@@ -1,7 +1,13 @@
+"""
+Monitors that detect when the tasks of a motion stop approaching their goals, and cancel
+the motion then.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
+
 
 import numpy as np
 from numpy.typing import NDArray
@@ -595,4 +601,11 @@ class _CancelBecauseNoProgress(CancelStatechart):
     """
 
     def create_exception(self) -> NoProgressError:
-        return NoProgressError(progress_monitor=self.progress_monitor)
+        """
+        :return: An error naming the tasks that are stalled when this node starts, see
+            :meth:`~cramph.node.CancelStatechart.create_exception`.
+        """
+        return NoProgressError(
+            progress_monitor=self.progress_monitor,
+            stalled_tasks=self.progress_monitor.stalled_tasks,
+        )

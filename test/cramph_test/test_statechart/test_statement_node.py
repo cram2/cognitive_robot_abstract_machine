@@ -202,6 +202,15 @@ def test_a_statement_that_ran_out_of_candidates_did_not_reach_its_limit() -> Non
     assert not node.reached_candidate_limit
 
 
+def test_a_statement_that_never_grounded_did_not_reach_its_limit() -> None:
+    """
+    A statement handed its candidate rather than grounding one has pulled none.
+    """
+    node = StatementNode(statement=_statement_of_names(["only"]))
+
+    assert not node.reached_candidate_limit
+
+
 def test_grounding_again_after_stopping_starts_from_the_first_candidate() -> None:
     node = StatementNode(statement=_statement_of_names(["first", "second"]))
     backend = EntityQueryLanguageGenerativeBackend()

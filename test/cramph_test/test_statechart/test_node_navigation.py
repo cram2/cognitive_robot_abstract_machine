@@ -151,6 +151,35 @@ def test_the_depth_of_a_node_is_the_length_of_its_path(
         assert node.depth == len(node.path)
 
 
+# %% finding a node upwards
+
+
+def test_a_node_that_fits_is_found_upwards_from_itself(
+    nested_statechart: Statechart,
+) -> None:
+    middle = node_named(nested_statechart, "middle")
+
+    assert middle.find_upwards(lambda node: isinstance(node, Parallel)) is middle
+
+
+def test_the_closest_fitting_node_above_is_found_upwards(
+    nested_statechart: Statechart,
+) -> None:
+    inner_first = node_named(nested_statechart, "inner_first")
+
+    assert inner_first.find_upwards(
+        lambda node: isinstance(node, Parallel)
+    ) is node_named(nested_statechart, "middle")
+
+
+def test_no_node_is_found_upwards_if_none_up_to_the_root_fits(
+    nested_statechart: Statechart,
+) -> None:
+    inner_first = node_named(nested_statechart, "inner_first")
+
+    assert inner_first.find_upwards(lambda node: isinstance(node, Sequence)) is None
+
+
 # %% is_leaf
 
 

@@ -1008,6 +1008,32 @@ class BackendCannotEvaluateCause(DataclassException):
 
 
 @dataclass(kw_only=True)
+class BackendCannotReadState(DataclassException):
+    """
+    Raised when an evaluation is given a state to read ground terms from, but its
+    backend computes values where no state can reach them, such as in a database.
+    """
+
+    backend_type: type[QueryBackend]
+    """
+    The type of the backend that cannot read the state.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.backend_type.__name__} cannot read a state: it computes the values "
+            f"of attributes, indexes and calls without reading them through the "
+            f"evaluation context."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Evaluate with a backend whose reads_state holds, such as "
+            "EntityQueryLanguageBackend, or evaluate without a state."
+        )
+
+
+@dataclass(kw_only=True)
 class BackendCannotEvaluateProbabilisticQuery(DataclassException):
     """
     Raised when a

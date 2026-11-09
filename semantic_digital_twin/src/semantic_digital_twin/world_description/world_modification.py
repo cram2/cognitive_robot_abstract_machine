@@ -727,6 +727,8 @@ def synchronized_attribute_modification(func):
 
     @wraps(func)
     def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
+        if not self._world._model_manager._active_world_model_update_context_manager_ids:
+            raise MissingWorldModificationContextError(func)
 
         object_before_change = to_json(self)
         result = func(self, *args, **kwargs)
@@ -742,9 +744,6 @@ def synchronized_attribute_modification(func):
         current_model_modification_block = (
             self._world.get_world_model_manager().current_model_modification_block
         )
-        if not self._world._model_manager._active_world_model_update_context_manager_ids:
-            raise MissingWorldModificationContextError(func)
-
         current_model_modification_block.append(
             AttributeUpdateModification.from_kwargs(
                 {

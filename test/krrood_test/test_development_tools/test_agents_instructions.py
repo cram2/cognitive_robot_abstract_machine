@@ -17,7 +17,10 @@ from krrood.development_tools.agents.repository_files import (
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.development_tools.agents.rule_module import RuleModule
-from krrood.development_tools.agents.shipped_rules.code_style import CodeStyleRules
+from krrood.development_tools.agents.shipped_rules.code_style import (
+    CodeStyleRules,
+    NamingRules,
+)
 from krrood.development_tools.agents.shipped_rules.documentation import (
     DocumentationRules,
 )
@@ -139,11 +142,13 @@ def test_the_checkers_of_a_section_include_those_of_its_subsections() -> None:
 
 def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
     """
-    The checkers krrood runs are exactly those of its shipped rules, in section order.
+    The checkers come in the order of the sections and rules declaring them.
     """
     assert RuleModule(module=shipped_rules).checkers == (
         CodeStyleRules.KEYWORD_ONLY_DATACLASS_FIELDS.checker,
         CodeStyleRules.KEYWORD_ONLY_METHOD_PARAMETERS.checker,
+        CodeStyleRules.NO_HAND_WRITTEN_FIELD_ACCESSORS.checker,
+        NamingRules.NO_LEADING_PREPOSITIONS.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_PROSE.checker,
     )

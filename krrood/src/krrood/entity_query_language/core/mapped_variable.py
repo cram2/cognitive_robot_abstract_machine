@@ -13,7 +13,15 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from inspect import isclass
-from typing_extensions import TYPE_CHECKING, Generic, Iterable, Any, get_args, Self
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Self,
+    get_args,
+)
 
 
 from random_events.variable import (
@@ -34,6 +42,14 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
     UnificationDict,
+)
+from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.ground_term import (
+    AttributeTerm,
+    CallTerm,
+    GroundTermExpression,
+    GroundTermType,
+    IndexTerm,
 )
 from krrood.entity_query_language.exceptions import (
     MultipleValuesAlongAccessPath,
@@ -170,7 +186,7 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
 
     def __call__(self, *args, **kwargs) -> Call[T]:
         return self._symbolic_expression_._get_mapped_variable_(
-            type_=Call, _args_=args, _kwargs_=kwargs
+            type_=Call, _arguments_=CallArguments(positional=args, keyword=kwargs)
         )
 
     def __eq__(self, other) -> Comparator:
@@ -349,8 +365,8 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         """
         cache_item = MappedVariableCacheItem(
             mapping_type=type_,
-            constructor_arguments=CallSignature.of(callee=type_).bind(
-                _child_=self, **kwargs
+            constructor_arguments=CallSignature.from_callable(callee=type_).bind(
+                arguments=CallArguments(keyword={"_child_": self, **kwargs})
             ),
         )
         if cache_item in self._known_mapped_variables_:
@@ -604,7 +620,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class SingleValueMapping(MappedVariable[T], ABC):
+class SingleValueMapping(MappedVariable[T], GroundTermExpression[GroundTermType], ABC):
     """
     A mapping that reaches a single value, fully determined by the expression it is
     applied to and its own arguments.
@@ -618,6 +634,19 @@ class SingleValueMapping(MappedVariable[T], ABC):
         when nothing is stored under that key.
     """
 
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return (self._child_,)
+
+    def _apply_mapping_(
+        self, *, value: Any, sources: OperationResult | None = None
+    ) -> Iterable[T]:
+        term_value = EvaluationContext.current_value_of_term(
+            term=self._ground_term_(operand_values=(value,))
+        )
+        if term_value is not None:
+            yield term_value.value
+
     def _apply_mapping_on_external_value_(self, *, value: Any) -> Iterable[T]:
         """
         :param value: A value outside query evaluation.
@@ -627,7 +656,7 @@ class SingleValueMapping(MappedVariable[T], ABC):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class Attribute(SingleValueMapping[T]):
+class Attribute(SingleValueMapping[T, AttributeTerm]):
     """
     A symbolic attribute that can be used to access attributes of symbolic variables.
 
@@ -653,11 +682,9 @@ class Attribute(SingleValueMapping[T]):
         """
         self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
 
-    def _apply_mapping_(
-        self, *, value: Any, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        if hasattr(value, self._attribute_name_):
-            yield getattr(value, self._attribute_name_)
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> AttributeTerm:
+        (instance,) = operand_values
+        return AttributeTerm(instance=instance, attribute_name=self._attribute_name_)
 
     def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(
@@ -740,19 +767,15 @@ class Index(MappedVariable[T], ABC):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class IndexByValue(Index[T], SingleValueMapping[T]):
+class IndexByValue(Index[T], SingleValueMapping[T, IndexTerm]):
     """
     Indexing by a key that is a plain value, which reaches the one element stored under
     it.
     """
 
-    def _apply_mapping_(
-        self, *, value: Any, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        try:
-            yield value[self._key_]
-        except IndexError:  # break iterator if the key does not exist
-            return
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> IndexTerm:
+        (container,) = operand_values
+        return IndexTerm(container=container, key=self._key_)
 
     def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(type_=IndexByValue, _key_=self._key_)
@@ -762,7 +785,7 @@ class IndexByValue(Index[T], SingleValueMapping[T]):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class IndexByExpression(Index[T]):
+class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
     """
     Indexing by a key that is itself an expression, which reaches one element per value
     that expression takes.
@@ -771,50 +794,48 @@ class IndexByExpression(Index[T]):
     indexing it by one of them reaches the single value bound to it.
     """
 
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return self._child_, self._key_
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> IndexTerm:
+        container, key = operand_values
+        return IndexTerm(container=container, key=key)
+
     def _apply_mapping_(
         self, *, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
-        try:
-            if isinstance(value, UnificationDict) and self._key_ in value:
-                yield value[self._key_]
-                return
-            for key in self._key_._evaluate_(sources=sources):
-                yield value[key.value]
-        except IndexError:  # break iterator if the key does not exist
+        if isinstance(value, UnificationDict) and self._key_ in value:
+            yield value[self._key_]
             return
+        for key in self._key_._evaluate_(sources=sources):
+            term_value = EvaluationContext.current_value_of_term(
+                term=self._ground_term_(operand_values=(value, key.value))
+            )
+            if term_value is not None:
+                yield term_value.value
 
     def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(type_=IndexByExpression, _key_=self._key_)
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class Call(SingleValueMapping[T]):
+class Call(SingleValueMapping[T, CallTerm]):
     """
     A variable created through a function call operation on its child variable.
     """
 
-    _args_: tuple[Any, ...] = field(default_factory=tuple)
+    _arguments_: CallArguments = field(default_factory=CallArguments)
     """
-    The arguments to call the method with.
-    """
-
-    _kwargs_: dict[str, Any] = field(default_factory=dict)
-    """
-    The keyword arguments to call the method with.
+    The arguments the called value is called with.
     """
 
-    def _apply_mapping_(
-        self, *, value: Any, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        if len(self._args_) > 0 or len(self._kwargs_) > 0:
-            yield value(*self._args_, **self._kwargs_)
-        else:
-            yield value()
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
+        (callee,) = operand_values
+        return CallTerm.from_call(callee=callee, arguments=self._arguments_)
 
     def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
-        return child._get_mapped_variable_(
-            type_=Call, _args_=self._args_, _kwargs_=self._kwargs_
-        )
+        return child._get_mapped_variable_(type_=Call, _arguments_=self._arguments_)
 
     @property
     def _name_(self):

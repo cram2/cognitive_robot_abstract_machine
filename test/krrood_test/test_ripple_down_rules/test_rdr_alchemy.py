@@ -194,19 +194,19 @@ class TestAlchemyRDR(TestCase):
         def get_habitat(x: MappedAnimal, t: Column) -> list[Column]:
             habitats = set()
             if t == Species.mammal and x.aquatic == 0:
-                habitats = {HabitatTable(Habitat.land)}
+                habitats = {HabitatTable(habitat=Habitat.land)}
             elif t == Species.bird:
-                habitats = {HabitatTable(Habitat.land)}
+                habitats = {HabitatTable(habitat=Habitat.land)}
                 if x.airborne == 1:
-                    habitats.update({HabitatTable(Habitat.air)})
+                    habitats.update({HabitatTable(habitat=Habitat.air)})
                 if x.aquatic == 1:
-                    habitats.update({HabitatTable(Habitat.water)})
+                    habitats.update({HabitatTable(habitat=Habitat.water)})
             elif t == Species.fish:
-                habitats = {HabitatTable(Habitat.water)}
+                habitats = {HabitatTable(habitat=Habitat.water)}
             elif t == Species.molusc:
-                habitats = {HabitatTable(Habitat.land)}
+                habitats = {HabitatTable(habitat=Habitat.land)}
                 if x.aquatic == 1:
-                    habitats.update({HabitatTable(Habitat.water)})
+                    habitats.update({HabitatTable(habitat=Habitat.water)})
             if len(habitats) == 0:
                 return {"species": t}
             else:

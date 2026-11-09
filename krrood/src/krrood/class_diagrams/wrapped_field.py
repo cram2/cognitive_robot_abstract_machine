@@ -13,6 +13,7 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
 from typing_extensions import (
+    Annotated,
     get_origin,
     get_args,
     ClassVar,
@@ -109,25 +110,27 @@ class WrappedField:
         return f"{module_and_class_name(self.clazz.clazz)}.{self.field.name}"
 
     @cached_property
-    def resolved_type(self):
+    def resolved_type(self) -> Any:
         """
         Resolve the type hint for this field.
+
+        A field typed ``Annotated[T, ...]`` resolves to ``T``.
 
         :return: The resolved type hint.
         :raises CouldNotResolveType: If the type cannot be resolved.
         """
-        # Fast path: already-resolved type (e.g., provided by specialized generic introspector)
-        if not isinstance(self.field.type, str):
-            return self.field.type
+        type_hint = self.field.type
+        # A string is a postponed annotation; anything else is already resolved, e.g. by
+        # the specialized generic introspector.
+        if isinstance(type_hint, str):
+            type_hint = get_type_hints_of_object(
+                self.clazz.class_to_introspect,
+                namespace=tuple(self._build_initial_namespace().items()),
+            )[self.field.name]
 
-        local_namespace = self._build_initial_namespace()
-
-        # If it's a specialized generic, use its origin for get_type_hints
-        clazz = self.clazz.class_to_introspect
-
-        return get_type_hints_of_object(
-            clazz, namespace=tuple(local_namespace.items())
-        )[self.field.name]
+        if get_origin(type_hint) is not Annotated:
+            return type_hint
+        return type_hint.__origin__
 
     def _build_initial_namespace(self) -> dict:
         """

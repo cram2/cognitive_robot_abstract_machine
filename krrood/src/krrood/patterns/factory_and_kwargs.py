@@ -124,7 +124,9 @@ class HasFactoryAndKwargs(Generic[T]):
         :return: Whether :attr:`_factory_` takes that keyword, as a parameter of that
             name or through arbitrary keywords (a ``**kwargs`` parameter).
         """
-        return CallSignature.of(callee=self._factory_).accepts_keyword(keyword=keyword)
+        return CallSignature.from_callable(callee=self._factory_).accepts_keyword(
+            keyword=keyword
+        )
 
     def _is_kept_out_of_construction_(self, *, keyword: str, value_type: type) -> bool:
         """
