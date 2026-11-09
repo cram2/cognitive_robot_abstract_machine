@@ -1,6 +1,12 @@
+"""
+Tests for :func:`krrood.utils.get_scope_from_imports`, which builds the names a source
+file's imports bind.
+"""
+
 import ast
 import inspect
 import os
+import sys
 import math
 from dataclasses import dataclass, fields
 from pathlib import Path
@@ -23,6 +29,14 @@ from ..dataset.type_checking_plain_import_of_missing_module import (
 from ..dataset.type_checking_import_of_uninstalled_krrood_part import (
     OwnerOfAnnotationNextToUninstalledKrroodPart,
 )
+from ..dataset.type_checking_import_of_module_with_uninstalled_dependency import (
+    OwnerOfAnnotationNextToUnimportableModule,
+)
+from ..dataset.type_checking_import_through_an_extended_package_path import (
+    OwnerOfAnnotationFromAnExtendedPackagePath,
+)
+from ..dataset import package_extending_its_path
+from ..dataset.package_extending_its_path import type_found_through_an_extended_path
 from ..dataset.latebound_annotation_type import LateBoundAnnotationType
 
 
@@ -145,6 +159,45 @@ def test_scope_holds_the_other_imports_when_a_type_checking_import_targets_an_un
     assert scope["Optional"] == Optional
     assert scope["LateBoundAnnotationType"] is LateBoundAnnotationType
     assert "UninstalledPartType" not in scope
+
+
+def test_scope_holds_the_other_imports_when_a_type_checking_import_targets_a_module_whose_dependencies_are_missing():
+    """
+    A file whose ``TYPE_CHECKING`` block plainly imports an installed module that fails
+    to import, because its own dependencies are missing, must still yield the scope its
+    remaining imports define.
+    """
+    source_path = inspect.getsourcefile(OwnerOfAnnotationNextToUnimportableModule)
+
+    scope = get_scope_from_imports(file_path=source_path)
+
+    assert scope["Optional"] == Optional
+    assert scope["LateBoundAnnotationType"] is LateBoundAnnotationType
+    assert (
+        "test.krrood_test.dataset.installed_module_with_uninstalled_dependency"
+        not in scope
+    )
+
+
+def test_scope_holds_a_type_checking_import_found_through_an_extended_package_path(
+    monkeypatch,
+):
+    """
+    A ``TYPE_CHECKING`` import of a submodule that its package, not yet imported, finds
+    only through the path it adds to itself must bind the name from that submodule.
+    """
+    source_path = inspect.getsourcefile(OwnerOfAnnotationFromAnExtendedPackagePath)
+    monkeypatch.delitem(sys.modules, package_extending_its_path.__name__)
+    monkeypatch.delitem(sys.modules, type_found_through_an_extended_path.__name__)
+
+    scope = get_scope_from_imports(file_path=source_path)
+
+    assert (
+        scope["TypeFoundThroughAnExtendedPath"]
+        is sys.modules[
+            type_found_through_an_extended_path.__name__
+        ].TypeFoundThroughAnExtendedPath
+    )
 
 
 # %% function-local imports

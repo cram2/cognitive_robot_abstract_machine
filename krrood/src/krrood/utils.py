@@ -1,3 +1,8 @@
+"""
+Standard-library helpers for naming and resolving classes, modules and import paths,
+reading dataclass fields, and building the names a source file's imports bind.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -9,9 +14,7 @@ import types
 from dataclasses import Field
 from dataclasses import fields, MISSING
 from functools import lru_cache
-from itertools import accumulate
-from importlib.machinery import PathFinder
-from importlib.util import find_spec, resolve_name
+from importlib.util import resolve_name
 from inspect import isclass
 from os import PathLike
 from os.path import dirname
@@ -458,8 +461,8 @@ def get_scope_from_imports(
     """
     Create a scope dictionary from imports in a Python file or an AST tree.
 
-    An absolute import in an ``if TYPE_CHECKING:`` block of a module that is not
-    installed contributes no names.
+    An import in an ``if TYPE_CHECKING:`` block whose module cannot be imported
+    contributes no names; elsewhere, a plain ``import`` of such a module raises.
 
     :param file_path: The path to the Python file to extract imports from.
     :param tree: An AST tree to extract imports from. If provided, file_path is ignored.
@@ -490,8 +493,9 @@ def get_scope_from_imports(
             _handle_import_node(
                 node=node,
                 scope=scope,
+                file_path=file_path,
                 package_name=package_name,
-                skips_uninstalled_module=node in imports_that_never_run,
+                skips_unimportable_module=node in imports_that_never_run,
             )
         elif isinstance(node, ast.ImportFrom):
             package_name = _handle_import_from_node(
@@ -499,7 +503,6 @@ def get_scope_from_imports(
                 scope=scope,
                 file_path=file_path,
                 package_name=package_name,
-                skips_uninstalled_module=node in imports_that_never_run,
             )
 
     return scope
@@ -645,48 +648,28 @@ def _resolve_relative_import(
 def _handle_import_node(
     node: ast.Import,
     scope: dict[str, Any],
+    file_path: str | None,
     package_name: str | None,
-    skips_uninstalled_module: bool,
+    skips_unimportable_module: bool,
 ) -> None:
     """
     Process a standard import node and update the provided scope mapping.
 
     :param node: The import node to process.
     :param scope: The scope mapping to update.
+    :param file_path: The path to the file containing the import statement.
     :param package_name: The package name to use for relative imports.
-    :param skips_uninstalled_module: Whether a module that is not installed contributes
-        no name instead of raising.
+    :param skips_unimportable_module: Whether a module that cannot be imported
+        contributes no name instead of raising.
     """
     for alias in node.names:
-        if skips_uninstalled_module and not is_module_installed(alias.name):
-            continue
         asname = alias.asname or alias.name
-        scope[asname] = get_and_import_module(alias.name, package_name)
-
-
-def is_module_installed(module_name: str) -> bool:
-    """
-    :param module_name: The absolute name of a module.
-    :return: Whether *module_name* is already imported or can be found on the import
-        path, without running any of its packages.
-    """
-    package_search_locations = None
-    for prefix in accumulate(
-        module_name.split("."), lambda package, child: f"{package}.{child}"
-    ):
-        if prefix in sys.modules:
-            continue
-        parent_package = prefix.rpartition(".")[0]
-        if not parent_package or parent_package in sys.modules:
-            specification = find_spec(prefix)
-        elif package_search_locations is None:
-            return False
-        else:
-            specification = PathFinder.find_spec(prefix, package_search_locations)
-        if specification is None:
-            return False
-        package_search_locations = specification.submodule_search_locations
-    return True
+        try:
+            scope[asname] = get_and_import_module(alias.name, package_name)
+        except ImportError as error:
+            if not skips_unimportable_module:
+                raise
+            _log_unresolvable_import_once(alias.name, asname, file_path, str(error))
 
 
 @lru_cache(maxsize=None)
@@ -723,7 +706,6 @@ def _handle_import_from_node(
     scope: dict[str, Any],
     file_path: str | None,
     package_name: str | None,
-    skips_uninstalled_module: bool,
 ) -> str | None:
     """
     Process a from-import node and update the provided scope mapping.
@@ -744,18 +726,9 @@ def _handle_import_from_node(
     :param scope: The scope mapping to update.
     :param file_path: The path to the file containing the import statement.
     :param package_name: The package name to use for relative imports.
-    :param skips_uninstalled_module: Whether an absolute import of a module that is not
-        installed is skipped before any import is attempted.
     :return: the (possibly) updated package_name to mimic original behavior.
     """
     module_name = node.module
-    if (
-        skips_uninstalled_module
-        and node.level == 0
-        and module_name is not None
-        and not is_module_installed(module_name)
-    ):
-        return package_name
 
     # Resolve relative imports (may update package_name and module_name)
     resolved_module_name, resolved_package_name = _resolve_relative_import(
