@@ -496,8 +496,9 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         kw_only=True,
     )
     """
-    The plan transformations adapting every plan to being performed in physics. Unless
-    one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
+    The plan transformations adapting every plan to being performed in physics.
+
+    Unless one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
     is put first that squeezes by the
     :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.squeeze` of the
     robot's two-finger grippers.

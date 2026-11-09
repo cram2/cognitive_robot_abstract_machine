@@ -14,12 +14,16 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.executor import StatechartExecutor
 from cramph.node import CancelStatechart, StatechartNode
 from cramph.nodes_for_testing import (
+    ConstFalseNode,
     ConstTrueNode,
+    LifeCycleCallback,
     NodeAssertionError,
+    NodeRecordingItsCallbacks,
     NodeSucceedingOnObservingTrue,
 )
 from cramph.state_history import StateHistory, StateHistoryItem, StateHistoryObserver
 from cramph.statechart import Statechart
+from krrood.symbolic_math.symbolic_math import Scalar
 
 # %% observers
 
@@ -240,6 +244,141 @@ def test_cancelled_tick_preserves_error_when_observer_fails(
 
     assert caught.value is cancel.exception
     assert recorder.snapshots[-1].life_cycle_state[cancel] is LifeCycleValues.RUNNING
+
+
+@dataclass
+class ChartCancelledWithNodesInEveryState:
+    """
+    A chart cancelled in its first tick, with one node in each state a node can be in
+    when that happens.
+    """
+
+    chart: Statechart
+    """
+    The cancelled chart.
+    """
+
+    cancel: CancelStatechart
+    """
+    The node that cancelled the chart.
+    """
+
+    running: NodeRecordingItsCallbacks
+    """
+    A node that was still running.
+    """
+
+    paused: StatechartNode
+    """
+    A node that was paused.
+    """
+
+    succeeded: StatechartNode
+    """
+    A node that had succeeded, which started the cancellation.
+    """
+
+    not_started: StatechartNode
+    """
+    A node that had not started.
+    """
+
+
+@pytest.fixture
+def chart_cancelled_with_nodes_in_every_state(
+    statechart_context: StatechartContext,
+) -> ChartCancelledWithNodesInEveryState:
+    """
+    :return: The chart, ticked until its cancellation raised.
+    """
+    running = NodeRecordingItsCallbacks()
+    paused = ConstFalseNode()
+    paused.pause_condition = Scalar.const_true()
+    succeeded = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+    not_started = ConstFalseNode()
+    not_started.start_condition = Scalar.const_false()
+    cancel = CancelStatechart.when_true(
+        succeeded, NodeAssertionError(reason="cancelled")
+    )
+    chart = Statechart(context=statechart_context)
+    chart.add_nodes([running, paused, succeeded, not_started, cancel])
+    executor = StatechartExecutor(statechart_context)
+    executor.compile(statechart=chart)
+    with pytest.raises(NodeAssertionError):
+        executor.tick()
+    return ChartCancelledWithNodesInEveryState(
+        chart=chart,
+        cancel=cancel,
+        running=running,
+        paused=paused,
+        succeeded=succeeded,
+        not_started=not_started,
+    )
+
+
+def test_cancellation_interrupts_unfinished_nodes(
+    chart_cancelled_with_nodes_in_every_state: ChartCancelledWithNodesInEveryState,
+) -> None:
+    """
+    Running and paused nodes end as interrupted; nodes that had not started or had
+    ended, and the cancelling node itself, keep their state.
+    """
+    cancelled = chart_cancelled_with_nodes_in_every_state
+
+    assert {
+        node: node.life_cycle_state
+        for node in [
+            cancelled.running,
+            cancelled.paused,
+            cancelled.succeeded,
+            cancelled.not_started,
+            cancelled.cancel,
+        ]
+    } == {
+        cancelled.running: LifeCycleValues.INTERRUPTED,
+        cancelled.paused: LifeCycleValues.INTERRUPTED,
+        cancelled.succeeded: LifeCycleValues.SUCCEEDED,
+        cancelled.not_started: LifeCycleValues.NOT_STARTED,
+        cancelled.cancel: LifeCycleValues.RUNNING,
+    }
+
+
+def test_cancellation_is_the_last_record_of_the_history(
+    chart_cancelled_with_nodes_in_every_state: ChartCancelledWithNodesInEveryState,
+) -> None:
+    """
+    The history ends with the states the cancellation left the nodes in.
+    """
+    cancelled = chart_cancelled_with_nodes_in_every_state
+
+    final = cancelled.chart.state_history.latest_item
+    assert final.life_cycle_state == cancelled.chart.life_cycle_state
+    assert final.life_cycle_state[cancelled.running] is LifeCycleValues.INTERRUPTED
+
+
+def test_cancellation_record_names_the_cancelling_node(
+    chart_cancelled_with_nodes_in_every_state: ChartCancelledWithNodesInEveryState,
+) -> None:
+    """
+    Only the record of the cancellation names the node that cancelled the chart.
+    """
+    cancelled = chart_cancelled_with_nodes_in_every_state
+
+    *earlier, final = cancelled.chart.state_history.items
+    assert [item.cancelled_by for item in earlier] == [None] * len(earlier)
+    assert final.cancelled_by is cancelled.cancel
+
+
+def test_cancellation_runs_the_end_callback_of_interrupted_nodes(
+    chart_cancelled_with_nodes_in_every_state: ChartCancelledWithNodesInEveryState,
+) -> None:
+    """
+    An interrupted node is told that it ended, as for every other terminal state.
+    """
+    assert chart_cancelled_with_nodes_in_every_state.running.take_callbacks() == [
+        LifeCycleCallback.START,
+        LifeCycleCallback.END,
+    ]
 
 
 # %% incomplete ticks

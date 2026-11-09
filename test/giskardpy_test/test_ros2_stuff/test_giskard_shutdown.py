@@ -10,12 +10,12 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.model.world_config import WorldConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.input_synchronization import InputSynchronizer
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_source import WorldSource
 
 # %% being interrupted while waiting for goals
 
@@ -42,20 +42,26 @@ class InterruptedWhileIdleInterface(StandAloneRobotInterfaceConfig):
 
 
 @dataclass
-class WorldWithMinimalRobot(WorldConfig):
+class WorldWithMinimalRobot(WorldSource):
     """
-    Treats everything in an existing world as the robot.
+    Hands out an existing world, treating everything in it as the robot.
     """
 
-    def setup_world(self) -> None:
+    world: World
+    """
+    The world handed out.
+    """
+
+    def create_world(self) -> World:
         MinimalRobot.from_world(self.world)
+        return self.world
 
 
 def test_an_interrupt_while_waiting_for_goals_shuts_ros_down(
     init_rospy, mini_world: World
 ) -> None:
     giskard = Giskard(
-        world_config=WorldWithMinimalRobot(world=mini_world),
+        world_source=WorldWithMinimalRobot(world=mini_world),
         robot_interface_config=InterruptedWhileIdleInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=50),
@@ -85,14 +91,14 @@ class RobotUnreachableError(DataclassException):
 @dataclass
 class WorldUnbuildableError(DataclassException):
     """
-    Raised by a world config that cannot build its world.
+    Raised by a world source that cannot create its world.
     """
 
     def error_message(self) -> str:
         return "The world cannot be built."
 
     def suggest_correction(self) -> str:
-        return "Check the robot description the world config loads."
+        return "Check the robot description the world source loads."
 
 
 @dataclass
@@ -106,12 +112,12 @@ class UnreachableRobotInterface(StandAloneRobotInterfaceConfig):
 
 
 @dataclass
-class UnbuildableWorld(WorldConfig):
+class UnbuildableWorld(WorldSource):
     """
-    Fails as soon as Giskard builds the world.
+    Fails as soon as Giskard creates the world.
     """
 
-    def setup_world(self) -> Never:
+    def create_world(self) -> Never:
         raise WorldUnbuildableError()
 
 
@@ -119,7 +125,7 @@ def test_an_interface_that_fails_to_connect_makes_giskard_fail(
     init_rospy, mini_world: World
 ) -> None:
     giskard = Giskard(
-        world_config=WorldWithMinimalRobot(world=mini_world),
+        world_source=WorldWithMinimalRobot(world=mini_world),
         robot_interface_config=UnreachableRobotInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=50),
@@ -135,7 +141,7 @@ def test_a_world_that_fails_to_build_makes_giskard_fail_with_that_error(
     init_rospy,
 ) -> None:
     giskard = Giskard(
-        world_config=UnbuildableWorld(),
+        world_source=UnbuildableWorld(),
         robot_interface_config=StandAloneRobotInterfaceConfig(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(target_frequency=50),

@@ -52,6 +52,15 @@ def test_only_the_nodes_from_the_index_on_are_sent() -> None:
     assert sent_names == [statechart.nodes[1].name]
 
 
+def test_only_the_nodes_before_the_stop_index_are_sent() -> None:
+    statechart = _two_node_statechart()
+
+    data = statechart.nodes_from_to_json(first_node_index=0, stop_node_index=1)
+
+    sent_names = [node_data["name"] for node_data in data[StatechartJSONKey.NODES]]
+    assert sent_names == [statechart.nodes[0].name]
+
+
 def test_only_the_conditions_of_the_sent_nodes_are_sent() -> None:
     statechart = _two_node_statechart()
     second = statechart.nodes[1]

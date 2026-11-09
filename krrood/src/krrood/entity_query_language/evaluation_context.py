@@ -16,7 +16,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ordered_set import OrderedSet
-from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING
+from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING, TypeVar
+
+from krrood.entity_query_language.ground_term import (
+    GroundTerm,
+    LiveTermReader,
+    TermReader,
+    TermValue,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import (
@@ -27,6 +34,8 @@ if TYPE_CHECKING:
 _evaluation_context_var: ContextVar[EvaluationContext | None] = ContextVar(
     "_evaluation_context", default=None
 )
+
+ResultType = TypeVar("ResultType")
 
 
 def get_evaluation_context() -> EvaluationContext | None:
@@ -341,6 +350,12 @@ class EvaluationContext:
     Caches each nested subquery's result stream for the current evaluation pass.
     """
 
+    term_reader: TermReader = field(default_factory=LiveTermReader)
+    """
+    Reads the value of every attribute, index, call and symbolic function application
+    the evaluation reaches.
+    """
+
     has_running_evaluation: bool = field(default=False, init=False)
     """
     Whether an evaluation is running in this context, from its first result until it is
@@ -380,9 +395,34 @@ class EvaluationContext:
         finally:
             _evaluation_context_var.reset(context_token)
 
-    def iterate_as_current(
-        self, results: Iterator[OperationResult]
-    ) -> Iterator[OperationResult]:
+    @classmethod
+    def current_value_of_term(cls, term: GroundTerm) -> TermValue | None:
+        """
+        :param term: The ground term to read.
+        :return: The value of *term* as the current evaluation context's
+            :attr:`term_reader` reads it, or its live value outside an evaluation.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return term.live_term_value()
+        return evaluation_context.term_reader.value_of_term(term)
+
+    @classmethod
+    def iterate_reading_from(
+        cls, term_reader: TermReader | None, results: Iterator[ResultType]
+    ) -> Iterator[ResultType]:
+        """
+        :param term_reader: What the evaluation producing *results* reads ground terms
+            with, or ``None`` to read them as the current evaluation context does.
+        :param results: The results of an evaluation that has not started yet.
+        :return: The same results. The evaluation, and every evaluation it starts, reads
+            ground terms with *term_reader*.
+        """
+        if term_reader is None:
+            return results
+        return cls(term_reader=term_reader).iterate_as_current(results)
+
+    def iterate_as_current(self, results: Iterator[ResultType]) -> Iterator[ResultType]:
         """
         Iterate the given results with this context as the current evaluation context
         while each of them is produced, and while they are closed.

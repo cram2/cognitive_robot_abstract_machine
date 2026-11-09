@@ -7,7 +7,8 @@ import pytest
 
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from cramph.data_types import ObservationStateValues, LifeCycleValues
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from cramph.composites import Sequence, Parallel
@@ -585,6 +586,30 @@ class TestCartesianPositionTrajectory:
             root_P_tip_start + tip_start_P_last_point,
             atol=move_away.threshold + cartesian_trajectory.threshold,
         )
+
+    def test_current_index_stays_a_python_int(self, cylinder_bot_world: World):
+        """
+        The index advanced while following the trajectory keeps its declared type, so
+        database drivers and JSON encoders that reject numpy scalars can store it.
+        """
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        points = [Point3(0, y, 0, reference_frame=tip) for y in np.linspace(0, 0.2, 21)]
+
+        executor = StatechartExecutor(
+            context=StatechartContext(world=cylinder_bot_world),
+            extensions=[MotionControl()],
+        )
+        motion_statechart = Statechart(context=executor.context)
+        cartesian_trajectory = CartesianPositionTrajectory(
+            root_link=cylinder_bot_world.root, tip_link=tip, goal_points=points
+        )
+        motion_statechart.add_node(cartesian_trajectory)
+        motion_statechart.add_node(EndMotion.when_true(cartesian_trajectory))
+
+        executor.compile(statechart=motion_statechart)
+        executor.tick_until_end()
+
+        assert type(cartesian_trajectory.current_index) is int
 
     def test_cartesian_position_trajectory_spiral_pr2(
         self, pr2_world_state_reset: World, better_pr2_pose
@@ -1758,8 +1783,8 @@ class TestCartesianTasks:
         self, pr2_world_state_reset: World, orientation_speed_ratio_tolerance: float
     ):
         """
-        The angular speed towards an orientation goal is set by its reference velocity,
-        not by how far away the goal is.
+        The angular speed towards an orientation goal is set by its cruise velocity, not
+        by how far away the goal is.
 
         Capping the half-angle rows directly makes the angular speed grow with
         1/cos(angle/2), so a goal at 150 degrees would turn more than twice as fast as
@@ -1775,6 +1800,19 @@ class TestCartesianTasks:
             )
 
         assert peak_speeds[1] <= orientation_speed_ratio_tolerance * peak_speeds[0]
+
+    def test_orientation_goal_never_turns_faster_than_its_cruise_velocity(
+        self, pr2_world_state_reset: World
+    ):
+        peak_angle_per_tick = peak_angle_per_tick_towards_roll_goal(
+            pr2_world_state_reset, np.radians(150)
+        )
+        time_step = MotionControl().qp_controller_config.control_time_step
+
+        assert (
+            peak_angle_per_tick / time_step.total_seconds()
+            <= DefaultCruiseVelocity.ROTATION
+        )
 
     def test_cartesian_position_straight_weighs_its_rows_by_its_weight(
         self, cylinder_bot_world: World
@@ -2482,6 +2520,37 @@ class TestVelocityTasks:
         assert tight_cycles >= 2 * loose_cycles, (
             f"tight ({tight_cycles}) should take >= loose ({2 * loose_cycles}) control cycles"
         )
+
+    @pytest.mark.parametrize(
+        "limit_type", ["position", "rotation"], ids=["position", "rotation"]
+    )
+    def test_a_velocity_limit_measures_its_violation_in_a_velocity_scale(
+        self, pr2_world_state_reset: World, limit_type: str
+    ):
+        world = pr2_world_state_reset
+        tip = world.get_kinematic_structure_entity_by_name("base_footprint")
+        root = world.get_kinematic_structure_entity_by_name("odom_combined")
+        if limit_type == "position":
+            limit = CartesianPositionVelocityLimit(
+                root_link=root, tip_link=tip, max_linear_velocity=0.05
+            )
+            velocity_scale = VelocityScale.TRANSLATION
+        else:
+            limit = CartesianRotationVelocityLimit(
+                root_link=root, tip_link=tip, max_angular_velocity=0.1
+            )
+            velocity_scale = VelocityScale.ROTATION
+        executor = StatechartExecutor(
+            context=StatechartContext(world=world), extensions=[MotionControl()]
+        )
+        motion_statechart = Statechart(context=executor.context)
+        motion_statechart.add_node(limit)
+        executor.compile(statechart=motion_statechart)
+
+        assert [
+            constraint.velocity_scale
+            for constraint in limit.constraint_collection.inequality_constraints
+        ] == [velocity_scale]
 
 
 class TestDebugExpressions:

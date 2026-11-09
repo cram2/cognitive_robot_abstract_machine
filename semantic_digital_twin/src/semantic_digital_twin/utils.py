@@ -12,12 +12,7 @@ from typing_extensions import Any, ClassVar
 from krrood.class_diagrams.mocking import MockedModule, MockedClass
 from platformdirs import user_cache_dir
 
-try:
-    from ament_index_python import PackageNotFoundError
-except ModuleNotFoundError:
-    PackageNotFoundError = None
 from xml.etree import ElementTree as ET
-
 
 
 def create_cache_dir(folder_name: str) -> Path:
@@ -33,6 +28,7 @@ def create_cache_dir(folder_name: str) -> Path:
     cache_dir = Path(user_cache_dir(package_name)) / folder_name
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
+
 
 class suppress_stdout_stderr(object):
     """
@@ -110,45 +106,6 @@ def rclpy_installed() -> bool:
 
         return True
     except ImportError:
-        return False
-
-
-def tracy_installed() -> bool:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "iai_tracy_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, PackageNotFoundError, ValueError):
-        return False
-
-
-def daisy_installed() -> bool:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "iai_daisy_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, PackageNotFoundError, ValueError):
-        return False
-
-
-def hsrb_installed() -> bool:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "hsr_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, PackageNotFoundError, ValueError):
         return False
 
 

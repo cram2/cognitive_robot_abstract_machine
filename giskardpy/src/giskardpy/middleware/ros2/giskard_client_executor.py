@@ -3,11 +3,9 @@ from __future__ import annotations
 from cramph.data_types import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
-from threading import Thread
 from time import sleep
 from typing_extensions import Any
 
-import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import (
     JsonAction_FeedbackMessage,
@@ -36,7 +34,6 @@ from giskardpy.motion_control import MotionControl
 from rclpy import Context, Parameter, Future
 from action_msgs.msg import GoalStatus
 from rclpy.action.client import ClientGoalHandle
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
@@ -341,11 +338,6 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
     A :class:`GiskardClientExecutor` that creates and owns its own ros node.
     """
 
-    is_spinning: bool = False
-    """
-    Whether the background spinner currently spins the node.
-    """
-
     node_name: str = "giskard_client"
     """
     The name of the ros node this executor creates.
@@ -428,22 +420,7 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
             enable_logger_service=self.enable_logger_service,
         )
         rospy.executor.add_node(self.node_handle)
-        self.is_spinning = False
         super().__post_init__()
-
-    def __spin(self):
-        self.my_executor = MultiThreadedExecutor()
-        self.my_executor.add_node(self.node_handle)
-        self.is_spinning = True
-        while rclpy.ok():
-            self.my_executor.spin_once(timeout_sec=1)
-        self.is_spinning = False
-
-    def spin_in_background(self):
-        self.spinner = Thread(
-            target=self.__spin, daemon=False, name="background giskard wrapper spinner"
-        )
-        self.spinner.start()
 
     def close(self) -> None:
         """

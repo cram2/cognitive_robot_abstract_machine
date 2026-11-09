@@ -217,6 +217,16 @@ def variable(
     )
 
 
+def literal(value: T) -> Union[T, Literal[T]]:
+    """
+    Declare an expression whose only value is *value*.
+
+    :param value: The value the expression stands for.
+    :return: A literal of *value* that can be used inside queries.
+    """
+    return Literal(_value_=value, _type_=type(value))
+
+
 def deduced_variable(
     type_: type[T] | None = None,
 ) -> Union[type[T], ExternallySetVariable[T]]:
@@ -626,17 +636,18 @@ def add(variable: Any, value: Any) -> None:
 
 
 def inference(
-    type_: type[T],
-) -> Union[Callable[[], Union[T, InstantiatedVariable[T]]]]:
+    factory: Callable[..., T],
+) -> Callable[..., InstantiatedVariable[T]]:
     """
-    This returns a factory function that creates a new variable of the given type and
-    takes keyword arguments for the type constructor.
+    This returns a factory function that creates a new variable whose values *factory*
+    builds, and takes keyword arguments for *factory*.
 
-    :param type_: The type of the variable (i.e., The class you want to instantiate).
+    :param factory: The callable that builds the values, such as a class or a factory
+        method; the variable's type is the type it builds.
     :return: The factory function for creating a new variable.
     """
     return lambda **kwargs: InstantiatedVariable(
-        _type_=type_,
+        _factory_=factory,
         _kwargs_=kwargs,
     )
 
@@ -1190,7 +1201,7 @@ type_ = symbolic_callable_to_function(RuntimeType)
 
 
 @symbolic_function
-def type_(obj: Any):
+def type_(obj: Any) -> type:
     """
     Determines the type of the given object.
 

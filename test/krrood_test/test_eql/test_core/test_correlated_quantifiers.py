@@ -511,6 +511,19 @@ def test_a_quantifier_reused_in_two_queries_is_scoped_by_the_evaluated_one():
 # %% local variables never escape
 
 
+def test_exists_over_a_collection_of_a_local_variable_keeps_one_row_per_outer_binding(
+    university,
+):
+    """
+    The student occurs only inside the quantifier, so it is local to it: the selected
+    course appears once, not once per student taking Logic.
+    """
+    student, course = correlated(university)
+    other = variable(QuantifiedCourse, domain=[university.logic])
+    query = an(entity(other).where(exists(course, course.name == "Logic")))
+    assert list(query.evaluate()) == [university.logic]
+
+
 def test_set_of_with_an_exists_does_not_expose_the_local_variable(university):
     """
     Only the selected variables appear in each result row of a set query.
