@@ -711,9 +711,9 @@ class ProbabilisticBackend(GenerativeBackend):
         Ask the learned structure what intervening on one cause adjusts for, among the
         variables the query names and the aggregation statistics a relational grounding
         keeps; the variables marked ``confounder`` are settled by
-        :attr:`declared_adjustment_policy`. A chosen statistic the query does not name is
-        added to its parameters' variables. A part attribute's node stands for the copy
-        on the part the cause, or else the effect, sits on.
+        :attr:`declared_adjustment_policy`. A chosen statistic the query does not name
+        is added to its parameters' variables. A part attribute's node stands for the
+        copy on the part the cause, or else the effect, sits on.
 
         :param parameters: The query's parameters.
         :param structure: The structure learned for the queried class.

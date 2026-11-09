@@ -99,6 +99,7 @@ class RDRDecorator:
     a stable state that you can query and use while writing and testing your
     answer/rule.
     """
+
     generate_dot_file: bool = field(default=False)
     """
     Whether to generate a dynamic dot file representing the state of the rule tree each
@@ -111,11 +112,13 @@ class RDRDecorator:
     Whether to regenerate the rdr model from scratch or not, this is useful when rdr
     package has been updated.
     """
+
     model_name: str | None = field(default=None)
     """
     The name of the rdr model, this gets auto generated from the function signature and
     the class/file it is contained in.
     """
+
     rdr: GeneralRDR = field(init=False, default=None)
     """
     The ripple down rules instance of the decorator class.
@@ -126,6 +129,7 @@ class RDRDecorator:
     The output of a post processing done on the output types, for example converting
     typing module types (i.e. type hints) to python types.
     """
+
     origin_type: type | None = field(init=False, default=None)
     """
     The origin of the type hint of the attribute, useful in the case of not mutually

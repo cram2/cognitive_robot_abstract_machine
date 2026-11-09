@@ -59,7 +59,9 @@ class Fact:
         """
         if cls._is_predicate(condition=condition):
             return cls(expression=condition, value=True)
-        if isinstance(condition, Not) and cls._is_predicate(condition=condition._child_):
+        if isinstance(condition, Not) and cls._is_predicate(
+            condition=condition._child_
+        ):
             return cls(expression=condition._child_, value=False)
         if not (
             isinstance(condition, Comparator)

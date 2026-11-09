@@ -346,7 +346,9 @@ class SymbolicExpression(
         :param state: What the evaluation reads the values of attributes, indexes,
             calls and predicates from; their live values when omitted.
         """
-        return EvaluationContext.iterate_reading_from(term_reader=state, results=self._processed_results_())
+        return EvaluationContext.iterate_reading_from(
+            term_reader=state, results=self._processed_results_()
+        )
 
     def _processed_results_(self) -> Iterator[T | dict[T | SymbolicExpression, T]]:
         """

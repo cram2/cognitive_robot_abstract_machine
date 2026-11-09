@@ -55,8 +55,13 @@ class CartesianProductByRankSum:
             :attr:`factors`.
         """
         for rank_sum in count():
-            for ranks in self._ranks_summing_to(total=rank_sum, parts=len(self.factors)):
-                if all(self._reaches(index=index, rank=rank) for index, rank in enumerate(ranks)):
+            for ranks in self._ranks_summing_to(
+                total=rank_sum, parts=len(self.factors)
+            ):
+                if all(
+                    self._reaches(index=index, rank=rank)
+                    for index, rank in enumerate(ranks)
+                ):
                     yield tuple(
                         self.read[index][rank] for index, rank in enumerate(ranks)
                     )

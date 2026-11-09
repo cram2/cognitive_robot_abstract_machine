@@ -190,7 +190,9 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
             e.g. ``a(Person).parent_of``.
         :return: A descriptor of this class managing that field of that class.
         """
-        return cls(domain=attribute._owner_class_, field_name=attribute._attribute_name_)
+        return cls(
+            domain=attribute._owner_class_, field_name=attribute._attribute_name_
+        )
 
     @classmethod
     def chain_positions(cls) -> list[PropertyChainPosition]:
@@ -198,7 +200,9 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
         :return: The positions this descriptor class takes in the property chains that imply descriptor classes.
         """
         return [
-            PropertyChainPosition(implied_descriptor=implied_descriptor, chain=chain, index=index)
+            PropertyChainPosition(
+                implied_descriptor=implied_descriptor, chain=chain, index=index
+            )
             for implied_descriptor in dict.fromkeys(
                 recursive_subclasses(PropertyDescriptor)
             )

@@ -350,8 +350,8 @@ def test_started_when_true_never_starts_its_node_before_the_monitor_observed_tru
 
 def test_started_when_true_runs_its_node_from_when_the_monitor_observed_true() -> None:
     """
-    The monitored node starts on the monitor observing True, and runs unpaused from
-    then on.
+    The monitored node starts on the monitor observing True, and runs unpaused from then
+    on.
     """
     monitored_node = ConstTrueNode(name="monitored")
     goal = StartedWhenTrue(

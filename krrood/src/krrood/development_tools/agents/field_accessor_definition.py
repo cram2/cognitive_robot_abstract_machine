@@ -64,13 +64,18 @@ class HandWrittenFieldAccessorChecker(CodeRuleChecker):
             if not isinstance(node, ast.ClassDef):
                 continue
             for statement in node.body:
-                accessor = self.hand_written_accessor(path=path, definition=node, statement=statement)
+                accessor = self.hand_written_accessor(
+                    path=path, definition=node, statement=statement
+                )
                 if accessor is None:
                     continue
                 decorators = statement.decorator_list
                 first_line = decorators[0].lineno if decorators else statement.lineno
                 yield CodeRuleViolation(
-                    path=path, first_line=first_line, last_line=statement.end_lineno, description=accessor
+                    path=path,
+                    first_line=first_line,
+                    last_line=statement.end_lineno,
+                    description=accessor,
                 )
 
     def hand_written_accessor(
@@ -84,7 +89,9 @@ class HandWrittenFieldAccessorChecker(CodeRuleChecker):
         """
         if not isinstance(statement, ast.FunctionDef | ast.AsyncFunctionDef):
             return None
-        if statement.name == "__set__" and not self.is_base_class(path=path, definition=definition):
+        if statement.name == "__set__" and not self.is_base_class(
+            path=path, definition=definition
+        ):
             return HandWrittenAccessor.DATA_DESCRIPTOR
         if not self.is_dataclass(definition=definition):
             return None

@@ -295,8 +295,9 @@ class RelationalCausalStructureLearner:
     example_to_part_check: ExampleToPartCheck | None = None
     """
     What finds the instance attributes that depend on a part attribute even given the
-    aggregation statistics and any one other attribute the dependence could run
-    through. Each such pair is joined by an edge from the instance attribute to the part
+    aggregation statistics and any one other attribute the dependence could run through.
+
+    Each such pair is joined by an edge from the instance attribute to the part
     attribute, as the circuit draws an instance before its parts, unless the domain
     causal knowledge's tiers place the part attribute first.
     """

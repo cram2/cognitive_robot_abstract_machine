@@ -119,7 +119,11 @@ def two_towers() -> TwoTowers:
     a = Block(name="a", support=table)
     b = Block(name="b", support=table)
     return TwoTowers(
-        table=table, a=a, b=b, c=Block(name="c", support=a), shelf=Shelf(name="shelf", slots=[a, b])
+        table=table,
+        a=a,
+        b=b,
+        c=Block(name="c", support=a),
+        shelf=Shelf(name="shelf", slots=[a, b]),
     )
 
 
@@ -301,7 +305,9 @@ def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term
         lambda: literal(SlottedAttributes(coordinate=1.0)).coordinate,
         lambda: literal(FrozenAttributes(coordinate=1.0)).coordinate,
         lambda: literal(AttributeReadThroughProperty(radius=1.0)).diameter,
-        lambda: literal(ElementsInAnImmutableContainer(end_points=(0.0, 1.0))).end_points[0],
+        lambda: literal(
+            ElementsInAnImmutableContainer(end_points=(0.0, 1.0))
+        ).end_points[0],
     ],
     ids=["slot", "frozen dataclass", "read-only property", "immutable container"],
 )
@@ -347,7 +353,9 @@ def test_different_arguments_name_different_ground_terms(two_towers):
 
     assert State().with_facts(
         block.rests_on(support=two_towers.table) == False
-    ) != State().with_facts(block.rests_on(support=two_towers.table, directly=False) == False)
+    ) != State().with_facts(
+        block.rests_on(support=two_towers.table, directly=False) == False
+    )
 
 
 def test_assignment_by_keyword_is_read_by_a_positional_call(two_towers):
@@ -371,7 +379,8 @@ def test_ground_term_reached_through_another_object_is_the_same_ground_term(two_
         literal(two_towers).a.rests_on(support=two_towers.table) == False
     )
     through_match = State().with_facts(
-        the(TwoTowers).from_(domain=[two_towers]).a.rests_on(support=two_towers.table) == False
+        the(TwoTowers).from_(domain=[two_towers]).a.rests_on(support=two_towers.table)
+        == False
     )
 
     assert direct == through_literal == through_match
@@ -455,7 +464,9 @@ def test_equal_containers_never_share_their_elements():
 
 def test_attribute_of_an_assigned_attribute_reads_the_new_value(two_towers):
     result = (
-        a(Block).from_(domain=[two_towers.b]).support.support.tolist(state=two_towers.b_on_c)
+        a(Block)
+        .from_(domain=[two_towers.b])
+        .support.support.tolist(state=two_towers.b_on_c)
     )
 
     assert result == [two_towers.a]
@@ -488,7 +499,9 @@ def test_python_body_reads_live_values_it_does_not_receive_as_arguments(two_towe
 def test_flattening_an_assigned_collection_ranges_over_its_new_elements(two_towers):
     state = State().with_facts(literal(two_towers.shelf).slots == [two_towers.c])
 
-    result = flat_variable(a(Shelf).from_(domain=[two_towers.shelf]).slots).tolist(state=state)
+    result = flat_variable(a(Shelf).from_(domain=[two_towers.shelf]).slots).tolist(
+        state=state
+    )
 
     assert result == [two_towers.c]
 
@@ -510,7 +523,9 @@ def test_assigned_predicate_overrides_what_it_derives(two_towers):
 
     ``c`` rests on ``a``, yet the state says it rests on the table.
     """
-    state = State().with_facts(IsOn(block=literal(two_towers.c), support=literal(two_towers.table)))
+    state = State().with_facts(
+        IsOn(block=literal(two_towers.c), support=literal(two_towers.table))
+    )
     result = (
         (block := a(Block).from_(domain=two_towers.blocks))
         .where(IsOn(block=block, support=two_towers.table))

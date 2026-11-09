@@ -853,7 +853,9 @@ def test_exists_over_flat_variable_is_checked_for_each_outer_binding(
     """
     fruit_box = variable(FruitBox, domain=fruit_boxes_with_and_without_apples)
     fruit = flat_variable(fruit_box.fruits)
-    query = an(entity(fruit_box).where(exists(fruit, HasType(variable=fruit, types_=Apple))))
+    query = an(
+        entity(fruit_box).where(exists(fruit, HasType(variable=fruit, types_=Apple)))
+    )
 
     assert query.tolist() == [
         fruit_boxes_with_and_without_apples[0],
@@ -870,7 +872,11 @@ def test_negated_exists_over_flat_variable_is_checked_for_each_outer_binding(
     """
     fruit_box = variable(FruitBox, domain=fruit_boxes_with_and_without_apples)
     fruit = flat_variable(fruit_box.fruits)
-    query = an(entity(fruit_box).where(not_(exists(fruit, HasType(variable=fruit, types_=Apple)))))
+    query = an(
+        entity(fruit_box).where(
+            not_(exists(fruit, HasType(variable=fruit, types_=Apple)))
+        )
+    )
 
     assert query.tolist() == [
         fruit_boxes_with_and_without_apples[1],

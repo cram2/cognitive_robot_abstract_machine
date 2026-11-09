@@ -1233,6 +1233,7 @@ class ConditionParameters(ModelQueryParameters):
     A class that extracts all necessary information from a condition expression given to
     {py:class}`~krrood.entity_query_language.operators.probabilistic_queries.Probability
     ` (``probability_of(...)``) and binds it together, reusing the same :class:`~krrood.
+
     parametrization.random_events_translator.WhereExpressionToRandomEventTranslator` a
     ``Match``'s ``where`` conditions are already translated with.
     """

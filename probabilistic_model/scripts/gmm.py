@@ -81,7 +81,6 @@ def generate_gaussian_component(mean, variance):
 
 # create models
 if not load_from_disc:
-
     result = SumUnit()
     for index in tqdm.trange(number_of_mixtures, desc="Generating model"):
         result.add_subcircuit(

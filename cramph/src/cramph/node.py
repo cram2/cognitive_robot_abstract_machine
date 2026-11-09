@@ -587,7 +587,9 @@ class DerivedConditionVariable(ConditionVariable, ABC):
                 if counterpart is None
                 else variable.for_node(counterpart)
             )
-        return Scalar(condition).substitute(old_variables=variables, new_variables=replacements)
+        return Scalar(condition).substitute(
+            old_variables=variables, new_variables=replacements
+        )
 
 
 @dataclass(repr=False, eq=False, init=False)

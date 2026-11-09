@@ -318,13 +318,17 @@ def repaired_adjustment_names(
     ).choose_adjustment_sets(parameters=parameters, expression=query)
     [ice_cream] = parameters.search_cause_variables
     return sorted(
-        variable.name for variable in parameters.adjustment_variables_of(cause_variable=ice_cream)
+        variable.name
+        for variable in parameters.adjustment_variables_of(cause_variable=ice_cream)
     )
 
 
 def test_repair_drops_a_declared_mediator():
     mediated = summer_structures(
-        [FieldEdge(first="ice_cream", second="season"), FieldEdge(first="season", second="drowning")]
+        [
+            FieldEdge(first="ice_cream", second="season"),
+            FieldEdge(first="season", second="drowning"),
+        ]
     )
 
     assert (

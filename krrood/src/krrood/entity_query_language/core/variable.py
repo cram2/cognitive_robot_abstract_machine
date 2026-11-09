@@ -310,7 +310,9 @@ class InstantiatedVariable(
                 if child._id_ in child_result.bindings
             }
             instance = EvaluationContext.current_value_of_term(
-                term=CallTerm.from_call(callee=self._factory_, arguments=CallArguments(keyword=arguments))
+                term=CallTerm.from_call(
+                    callee=self._factory_, arguments=CallArguments(keyword=arguments)
+                )
             ).value
 
             bindings = {self._id_: instance} | child_result.bindings

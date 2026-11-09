@@ -50,13 +50,17 @@ class Scaler:
 
 
 def test_a_callee_has_one_signature():
-    assert CallSignature.from_callable(callee=scale) is CallSignature.from_callable(callee=scale)
+    assert CallSignature.from_callable(callee=scale) is CallSignature.from_callable(
+        callee=scale
+    )
 
 
 def test_a_callee_that_cannot_be_hashed_has_a_signature():
     signature = CallSignature.from_callable(callee=Scaler().scale)
 
-    assert signature.bind_by_name(arguments=CallArguments(positional=(3.0,))) == {"value": 3.0}
+    assert signature.bind_by_name(arguments=CallArguments(positional=(3.0,))) == {
+        "value": 3.0
+    }
 
 
 # %% binding arguments
@@ -65,9 +69,9 @@ def test_a_callee_that_cannot_be_hashed_has_a_signature():
 def test_a_call_binds_the_same_however_its_arguments_are_passed():
     signature = CallSignature.from_callable(callee=scale)
 
-    assert signature.bind(arguments=CallArguments(positional=(3.0, 4.0))) == signature.bind(
-        arguments=CallArguments(keyword={"factor": 4.0, "value": 3.0})
-    )
+    assert signature.bind(
+        arguments=CallArguments(positional=(3.0, 4.0))
+    ) == signature.bind(arguments=CallArguments(keyword={"factor": 4.0, "value": 3.0}))
 
 
 def test_a_default_that_was_left_out_binds_as_if_it_was_passed():
@@ -80,7 +84,9 @@ def test_a_default_that_was_left_out_binds_as_if_it_was_passed():
 
 def test_arguments_that_fit_no_parameter_are_refused():
     with pytest.raises(TypeError):
-        CallSignature.from_callable(callee=scale).bind(arguments=CallArguments(positional=(1.0, 2.0, 3.0)))
+        CallSignature.from_callable(callee=scale).bind(
+            arguments=CallArguments(positional=(1.0, 2.0, 3.0))
+        )
 
 
 # %% passing every argument by name
@@ -143,7 +149,9 @@ def test_an_argument_passable_only_by_position_cannot_be_named(
     callee: Callable[..., Any],
 ):
     with pytest.raises(ArgumentsPassableOnlyByPosition):
-        CallSignature.from_callable(callee=callee).bind_by_name(arguments=CallArguments(positional=(3.0,)))
+        CallSignature.from_callable(callee=callee).bind_by_name(
+            arguments=CallArguments(positional=(3.0,))
+        )
 
 
 # %% accepting a keyword
@@ -154,12 +162,18 @@ def test_a_parameter_accepts_its_name_as_a_keyword():
 
 
 def test_a_name_no_parameter_has_is_not_accepted():
-    assert not CallSignature.from_callable(callee=scale).accepts_keyword(keyword="shift")
+    assert not CallSignature.from_callable(callee=scale).accepts_keyword(
+        keyword="shift"
+    )
 
 
 def test_arbitrary_keywords_accept_any_name():
-    assert CallSignature.from_callable(callee=scale_by_options).accepts_keyword(keyword="shift")
+    assert CallSignature.from_callable(callee=scale_by_options).accepts_keyword(
+        keyword="shift"
+    )
 
 
 def test_a_parameter_passable_only_by_position_does_not_accept_its_name():
-    assert not CallSignature.from_callable(callee=scale_by_position).accepts_keyword(keyword="value")
+    assert not CallSignature.from_callable(callee=scale_by_position).accepts_keyword(
+        keyword="value"
+    )

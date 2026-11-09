@@ -1092,13 +1092,16 @@ class DataAccessObject(HasGeneric[T]):
         )
         state.objects_inheriting_from_alternative_mappings.append(
             ObjectInheritingFromAlternativeMapping(
-                domain_object=domain_object, parent=alternative_parent, own_attribute_keys=own_attribute_keys
+                domain_object=domain_object,
+                parent=alternative_parent,
+                own_attribute_keys=own_attribute_keys,
             )
         )
 
     def _populate_from_columns_and_relationships(
         self,
-        *, domain_object: T,
+        *,
+        domain_object: T,
         data_column_names: Iterable[str],
         single_relationships: Iterable[SingleRelationship],
         collection_relationships: Iterable[CollectionRelationship],

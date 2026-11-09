@@ -47,13 +47,16 @@ class ValueKeptInStorage(DataclassFieldDescriptor):
     """
 
     def read(
-        self, *, instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage
+        self,
+        *,
+        instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage,
     ) -> int | None:
         return instance.storage.value
 
     def write(
         self,
-        *, instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage,
+        *,
+        instance: HolderOfValueKeptInStorage | GenericHolderOfValueKeptInStorage,
         value: int | None,
     ) -> None:
         instance.storage.value = value

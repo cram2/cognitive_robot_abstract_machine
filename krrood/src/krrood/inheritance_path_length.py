@@ -99,10 +99,11 @@ def _inheritance_path_length(
 @symbolic_function
 def inheritance_distance(child_class: type, parent_class: type) -> int:
     """
-    Calculate the inheritance path length between two classes. Every inheritance level
-    that lies between `child_class` and `parent_class` increases the length by one. In
-    case of multiple inheritance, the path length is calculated for each branch and the
-    minimum is returned.
+    Calculate the inheritance path length between two classes.
+
+    Every inheritance level that lies between `child_class` and `parent_class` increases
+    the length by one. In case of multiple inheritance, the path length is calculated
+    for each branch and the minimum is returned.
 
     :param child_class: The child class.
     :param parent_class: The parent class.

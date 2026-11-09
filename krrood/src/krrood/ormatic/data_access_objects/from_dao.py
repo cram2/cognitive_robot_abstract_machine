@@ -95,7 +95,9 @@ def _get_field_defaults(original_clazz: type) -> tuple[_FieldDefault, ...]:
         if field_.default is not MISSING:
             defaults.append(_StaticDefault(name=field_.name, value=field_.default))
         elif field_.default_factory is not MISSING:
-            defaults.append(_DefaultFactory(name=field_.name, factory=field_.default_factory))
+            defaults.append(
+                _DefaultFactory(name=field_.name, factory=field_.default_factory)
+            )
     return tuple(defaults)
 
 
@@ -448,6 +450,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         """
         for inheriting_object in self.objects_inheriting_from_alternative_mappings:
             inheriting_object.copy_inherited_attributes(
-                parent_domain_object=self.resolve_alternative_mapping(alternative_mapping=inheriting_object.parent)
+                parent_domain_object=self.resolve_alternative_mapping(
+                    alternative_mapping=inheriting_object.parent
+                )
             )
         self.objects_inheriting_from_alternative_mappings.clear()

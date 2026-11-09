@@ -244,7 +244,9 @@ class IndexTerm(GroundTerm):
 
     @property
     def normalized_arguments(self) -> tuple[Hashable, ...]:
-        return ObjectIdentity(identified_object=self.container), ensure_hashable(self.key)
+        return ObjectIdentity(identified_object=self.container), ensure_hashable(
+            self.key
+        )
 
     def setting_runs_code(self) -> bool:
         """
@@ -305,7 +307,8 @@ class CallTerm(GroundTerm):
         """
         if inspect.ismethod(callee):
             arguments = CallArguments(
-                positional=(callee.__self__, *arguments.positional), keyword=arguments.keyword
+                positional=(callee.__self__, *arguments.positional),
+                keyword=arguments.keyword,
             )
             callee = callee.__func__
         if inspect.isclass(callee) and issubclass(callee, HasBoundValue):
@@ -328,7 +331,9 @@ class CallTerm(GroundTerm):
         normalized = arguments.key_by(value_form=ensure_hashable)
         if not self._first_argument_is_receiver(arguments=arguments):
             return normalized
-        return ObjectIdentity(identified_object=arguments.positional[0]), *normalized[1:]
+        return ObjectIdentity(identified_object=arguments.positional[0]), *normalized[
+            1:
+        ]
 
     def _first_argument_is_receiver(self, *, arguments: CallArguments) -> bool:
         """

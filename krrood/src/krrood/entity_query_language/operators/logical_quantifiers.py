@@ -132,7 +132,9 @@ class Exists(QuantifiedConditional):
         *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        for outer_result in self._bind_variables_the_values_are_taken_from_(sources=sources):
+        for outer_result in self._bind_variables_the_values_are_taken_from_(
+            sources=sources
+        ):
             yield self._quantify_over_values_in_(sources=outer_result)
 
     def _bind_variables_the_values_are_taken_from_(

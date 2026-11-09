@@ -411,7 +411,9 @@ class EvaluationContext:
             return results
         return cls(term_reader=term_reader).iterate_as_current(results=results)
 
-    def iterate_as_current(self, *, results: Iterator[ResultType]) -> Iterator[ResultType]:
+    def iterate_as_current(
+        self, *, results: Iterator[ResultType]
+    ) -> Iterator[ResultType]:
         """
         Iterate the given results with this context as the current evaluation context
         while each of them is produced, and while they are closed.

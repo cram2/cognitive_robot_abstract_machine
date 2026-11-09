@@ -27,9 +27,15 @@ def test_a_property_takes_a_position_in_every_chain_it_is_part_of():
     child_of_descendant = PropertyChain(properties=(ParentOf, AncestorOf))
 
     assert set(ParentOf.chain_positions()) == {
-        PropertyChainPosition(implied_descriptor=AncestorOf, chain=child_of_child, index=0),
-        PropertyChainPosition(implied_descriptor=AncestorOf, chain=child_of_child, index=1),
-        PropertyChainPosition(implied_descriptor=AncestorOf, chain=child_of_descendant, index=0),
+        PropertyChainPosition(
+            implied_descriptor=AncestorOf, chain=child_of_child, index=0
+        ),
+        PropertyChainPosition(
+            implied_descriptor=AncestorOf, chain=child_of_child, index=1
+        ),
+        PropertyChainPosition(
+            implied_descriptor=AncestorOf, chain=child_of_descendant, index=0
+        ),
     }
 
 
@@ -38,7 +44,11 @@ def test_the_implied_property_takes_a_position_in_a_chain_it_is_part_of():
     The property a chain implies can itself be part of the chain.
     """
     assert AncestorOf.chain_positions() == [
-        PropertyChainPosition(implied_descriptor=AncestorOf, chain=PropertyChain(properties=(ParentOf, AncestorOf)), index=1)
+        PropertyChainPosition(
+            implied_descriptor=AncestorOf,
+            chain=PropertyChain(properties=(ParentOf, AncestorOf)),
+            index=1,
+        )
     ]
 
 
@@ -47,7 +57,9 @@ def test_a_position_knows_the_properties_before_and_after_it():
     A position splits its chain into the properties before it and those after it.
     """
     position = PropertyChainPosition(
-        implied_descriptor=AncestorOf, chain=PropertyChain(properties=(ParentOf, ParentOf, AncestorOf)), index=1
+        implied_descriptor=AncestorOf,
+        chain=PropertyChain(properties=(ParentOf, ParentOf, AncestorOf)),
+        index=1,
     )
 
     assert position.descriptors_before == (ParentOf,)
