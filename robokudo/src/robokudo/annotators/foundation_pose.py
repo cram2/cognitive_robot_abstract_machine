@@ -28,7 +28,10 @@ from robokudo.types.annotation import Classification, PoseAnnotation
 from robokudo.types.cv import ColorToDepthRatio, Rect
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.comparators import RoiComparator
-from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
+from robokudo.utils.cv_helper import (
+    get_scaled_color_image_for_depth_image,
+    project_to_color_pixels,
+)
 from robokudo.utils.decorators import record_time
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.o3d_helper import create_oriented_bounding_box, trimesh_to_o3d_mesh
@@ -390,8 +393,8 @@ class PoseVisualization:
         corners_in_front = corners[corners[:, 2] > 0]
         if len(corners_in_front) == 0:
             return
-        left, top = self.color_to_depth_ratio.project_to_color_pixels(
-            corners_in_front, self.camera_model
+        left, top = project_to_color_pixels(
+            corners_in_front, self.camera_model, self.color_to_depth_ratio
         ).min(axis=0)
         cv2.putText(
             self.color_image,
@@ -446,8 +449,8 @@ class PoseVisualization:
         """
         if start[2] <= 0 or end[2] <= 0:
             return
-        start_pixel, end_pixel = self.color_to_depth_ratio.project_to_color_pixels(
-            numpy.array([start, end]), self.camera_model
+        start_pixel, end_pixel = project_to_color_pixels(
+            numpy.array([start, end]), self.camera_model, self.color_to_depth_ratio
         )
         cv2.line(
             self.color_image,

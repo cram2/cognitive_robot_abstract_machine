@@ -6,9 +6,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from krrood_spatial_math.spatial_types import Point2
-from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
-from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 from robokudo.types.cv import ColorToDepthRatio, Point2D, Rect
 
@@ -19,19 +16,6 @@ def half_resolution() -> ColorToDepthRatio:
     A depth image with half the width and a quarter of the height of the color image.
     """
     return ColorToDepthRatio(horizontal=0.5, vertical=0.25)
-
-
-@pytest.fixture
-def depth_camera_model() -> PinholeCameraModel:
-    """
-    Calibration of a camera at depth image resolution.
-    """
-    return PinholeCameraModel(
-        image_resolution=CameraResolution(width=320, height=240),
-        focal_length_x=200.0,
-        focal_length_y=100.0,
-        principal_point=Point2(x=160.0, y=120.0),
-    )
 
 
 # %% identity
@@ -68,15 +52,4 @@ def test_color_pixels_scale_each_axis(half_resolution: ColorToDepthRatio):
 
     np.testing.assert_array_equal(
         half_resolution.color_pixels(depth_pixels), [[4, 12], [10, 4]]
-    )
-
-
-def test_points_are_projected_to_color_pixels(
-    half_resolution: ColorToDepthRatio, depth_camera_model: PinholeCameraModel
-):
-    points = np.array([[0.5, -0.4, 2.0], [0.0, 0.0, 1.0]])
-
-    np.testing.assert_array_equal(
-        half_resolution.project_to_color_pixels(points, depth_camera_model),
-        [[420, 400], [320, 480]],
     )

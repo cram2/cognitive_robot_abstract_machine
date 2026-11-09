@@ -26,7 +26,6 @@ from robokudo.types.tf import Pose
 if TYPE_CHECKING:
     import numpy as np
     import numpy.typing as npt
-    from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
 
 @dataclass(kw_only=True)
@@ -154,17 +153,6 @@ class ColorToDepthRatio:
             per row.
         """
         return (depth_pixels * (1 / self.horizontal, 1 / self.vertical)).astype(int)
-
-    def project_to_color_pixels(
-        self, points: npt.NDArray[np.float64], camera_model: PinholeCameraModel
-    ) -> npt.NDArray[np.int_]:
-        """
-        :param points: Points in front of the camera in the camera frame, one per row.
-        :param camera_model: Calibration of the camera at depth image resolution.
-        :return: The (x, y) color image pixel of each point, one per row.
-        """
-        projected = points @ camera_model.intrinsic_matrix.T
-        return self.color_pixels(projected[:, :2] / projected[:, 2:])
 
 
 @dataclass(kw_only=True)
