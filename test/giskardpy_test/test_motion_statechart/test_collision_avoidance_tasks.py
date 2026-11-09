@@ -34,7 +34,12 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
-from cramph.orm.model import NodeStatesAtTick
+from cramph.orm.ormatic_interface import StatechartMappingDAO
+from giskardpy.orm.ormatic_interface import Base
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.utils import create_engine
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -1320,8 +1325,15 @@ def test_violated_body_pairs_survive_storing_the_history(
         executor_driving_into_obstacles.tick_until_end()
     statechart = executor_driving_into_obstacles.statechart
 
-    stored = NodeStatesAtTick.from_item(statechart.state_history.latest_item)
-    read_back = stored.item_of(statechart).cancellation_error
+    session = Session(create_engine("sqlite:///:memory:"))
+    Base.metadata.create_all(bind=session.bind)
+    session.add(to_dao(statechart))
+    session.commit()
+    session.expunge_all()
+    statechart_read_back = (
+        session.scalars(select(StatechartMappingDAO)).one().from_dao()
+    )
+    read_back = statechart_read_back.state_history.latest_item.cancellation_error
 
     assert [
         (violation.closest_points.body_a, violation.closest_points.body_b)

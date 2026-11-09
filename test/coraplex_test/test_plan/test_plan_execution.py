@@ -37,7 +37,9 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.executor import Pacer, StatechartExecutor
 from cramph.node import CancelStatechart
 from cramph.nodes_for_testing import NodeFailingOnObservingFalse
-from cramph.orm.model import NodeStatesAtTick
+from cramph.orm.ormatic_interface import StatechartMappingDAO
+from krrood.ormatic.data_access_objects.helper import to_dao
+from sqlalchemy import select
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
@@ -233,19 +235,27 @@ def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
 
 def test_a_plan_given_up_on_keeps_the_stalled_tasks_in_its_stored_history(
     executor_reaching_out_of_range: KinematicallySimulatedPlanExecutor,
+    coraplex_testing_session,
 ) -> None:
     """
     Once the statechart of the plan is stored and read back, it still names the tasks
-    that stopped approaching their goal.
+    that stopped approaching their goal, as copies of them.
     """
     with pytest.raises(MotionMadeNoProgress) as failure:
         executor_reaching_out_of_range.execute()
     statechart = executor_reaching_out_of_range.statechart
 
-    stored = NodeStatesAtTick.from_item(statechart.state_history.latest_item)
-    read_back = stored.item_of(statechart).cancellation_error
+    coraplex_testing_session.add(to_dao(statechart))
+    coraplex_testing_session.commit()
+    coraplex_testing_session.expunge_all()
+    statechart_read_back = (
+        coraplex_testing_session.scalars(select(StatechartMappingDAO)).one().from_dao()
+    )
+    read_back = statechart_read_back.state_history.latest_item.cancellation_error
 
-    assert read_back.stalled_tasks == failure.value.no_progress.stalled_tasks
+    assert [(type(task), task.name) for task in read_back.stalled_tasks] == [
+        (type(task), task.name) for task in failure.value.no_progress.stalled_tasks
+    ]
 
 
 def test_a_plan_that_outlasts_the_simulation_time_limit_is_given_up_on(

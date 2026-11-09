@@ -199,15 +199,16 @@ class TestStatechartSurvivesRoundTrip:
             for item in cancelled_statechart.state_history.items
         ]
 
-    def test_cancellation_error_is_read_back_naming_the_same_node(
+    def test_cancellation_error_is_read_back_with_a_copy_of_the_node_it_names(
         self, session, cancelled_statechart: Statechart
     ) -> None:
         read_back = store_and_read_back(session, cancelled_statechart)
 
         original = cancelled_statechart.state_history.latest_item.cancellation_error
         error = read_back.state_history.latest_item.cancellation_error
-        assert (type(error), error.reason, error.node) == (
+        assert (type(error), error.reason, type(error.node), error.node.name) == (
             type(original),
             original.reason,
-            read_back.get_node_by_index(original.node.index),
+            type(original.node),
+            original.node.name,
         )

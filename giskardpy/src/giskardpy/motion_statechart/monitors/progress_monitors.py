@@ -26,7 +26,12 @@ from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from giskardpy.motion_statechart.exceptions import NoProgressError
-from cramph.node import CancelStatechart, CompositeNode, NodeArtifacts
+from cramph.node import (
+    CancelStatechart,
+    CompositeNode,
+    NodeArtifacts,
+    StatechartNode,
+)
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionStatechartNode
 from cramph.monitors import CountSimulationTimeSeconds
 
@@ -412,7 +417,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
     the negation of its observation to a node's fail condition to give up on that node.
     """
 
-    monitored_node: MotionStatechartNode
+    monitored_node: StatechartNode
     """
     The task or goal whose progress is watched.
     """
@@ -429,7 +434,13 @@ class StillProgressing(EndedByOwner, CompositeNode):
     """
 
     @property
-    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[StatechartNode]:
+        """
+        See :meth:`~cramph.node.StatechartNode.prerequisite_nodes`.
+
+        :return: :attr:`monitored_node`, whose converging tasks this node only finds
+            once it expanded.
+        """
         return [self.monitored_node]
 
     @property
@@ -541,9 +552,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         """
         return NodeArtifacts(observation=sm.logic_not(self._timer.observes_true))
 
-    def _find_converging_tasks(
-        self, node: MotionStatechartNode
-    ) -> list[ConvergingTask]:
+    def _find_converging_tasks(self, node: StatechartNode) -> list[ConvergingTask]:
         """
         Collect every converging task at or below ``node``.
 

@@ -14,19 +14,14 @@ import numpy as np
 from typing_extensions import Self
 
 from cramph.context import StatechartContext
-from cramph.node import DeserializedNodeTracker
 from cramph.state import LifeCycleState, ObservationState
 from cramph.state_history import StateHistoryItem
 from cramph.statechart import Statechart
-from krrood.adapters.json_serializer import from_json, to_json
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import (
-    WorldEntityReferenceWriter,
-)
 
 # %% the history of a statechart's state
 
@@ -61,11 +56,9 @@ class NodeStatesAtTick:
     None if they did not end it.
     """
 
-    cancellation_error: str | None = None
+    cancellation_error: Exception | None = None
     """
-    The exception the cancellation ended the statechart with, as the JSON text
-    :func:`~krrood.adapters.json_serializer.to_json` writes, naming the nodes and the
-    entities of the context's world it refers to by their id; None if the values did not
+    The exception the cancellation ended the statechart with, None if the values did not
     end it.
     """
 
@@ -82,16 +75,7 @@ class NodeStatesAtTick:
             cancelling_node_index=(
                 None if item.cancelled_by is None else item.cancelled_by.index
             ),
-            cancellation_error=(
-                None
-                if item.cancellation_error is None
-                else json.dumps(
-                    to_json(
-                        item.cancellation_error,
-                        **WorldEntityReferenceWriter().create_kwargs(),
-                    )
-                )
-            ),
+            cancellation_error=item.cancellation_error,
         )
 
     def item_of(self, statechart: Statechart) -> StateHistoryItem:
@@ -114,19 +98,7 @@ class NodeStatesAtTick:
                 if self.cancelling_node_index is None
                 else statechart.get_node_by_index(self.cancelling_node_index)
             ),
-            cancellation_error=(
-                None
-                if self.cancellation_error is None
-                else from_json(
-                    json.loads(self.cancellation_error),
-                    **WorldEntityWithIDKwargsTracker.from_world(
-                        statechart.context.world
-                    ).create_kwargs(),
-                    **DeserializedNodeTracker.from_statechart(
-                        statechart
-                    ).create_kwargs(),
-                )
-            ),
+            cancellation_error=self.cancellation_error,
         )
 
 
