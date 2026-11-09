@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from probabilistic_model.causal_structure.discretization import Discretizer
@@ -71,7 +72,7 @@ class DiscretizedPartTables:
     One row of levels per part, over the part's own attributes.
     """
 
-    example_positions: np.ndarray
+    example_positions: npt.NDArray[np.integer]
     """
     Per part row, the position of its instance among the instances.
     """
@@ -105,7 +106,9 @@ class DiscretizedPartTables:
             if self.part_levels[column].nunique() > 1
         ]
 
-    def group_of_each_instance(self, example_attributes: list[str]) -> np.ndarray:
+    def group_of_each_instance(
+        self, example_attributes: list[str]
+    ) -> npt.NDArray[np.integer]:
         """
         :param example_attributes: Names of instance columns.
         :return: One integer per instance, the same for instances whose levels agree on
@@ -118,8 +121,8 @@ class DiscretizedPartTables:
         )[0]
 
     def group_of_each_part(
-        self, instance_groups: np.ndarray, part_attributes: list[str]
-    ) -> np.ndarray:
+        self, instance_groups: npt.NDArray[np.integer], part_attributes: list[str]
+    ) -> npt.NDArray[np.integer]:
         """
         :param instance_groups: One group per instance.
         :param part_attributes: Names of part columns.
@@ -369,8 +372,10 @@ class ExampleToPartCheck:
 
     @staticmethod
     def permuted_within_groups(
-        values: np.ndarray, groups: np.ndarray, random_state: np.random.Generator
-    ) -> np.ndarray:
+        values: npt.NDArray[np.integer],
+        groups: npt.NDArray[np.integer],
+        random_state: np.random.Generator,
+    ) -> npt.NDArray[np.integer]:
         """
         :param values: One value per instance.
         :param groups: Per instance, the group of instances it is permuted among.
@@ -385,7 +390,9 @@ class ExampleToPartCheck:
 
     @staticmethod
     def likelihood_ratio_statistic(
-        first: np.ndarray, second: np.ndarray, groups: np.ndarray
+        first: npt.NDArray[np.integer],
+        second: npt.NDArray[np.integer],
+        groups: npt.NDArray[np.integer],
     ) -> float:
         """
         :param first: Integer levels.
