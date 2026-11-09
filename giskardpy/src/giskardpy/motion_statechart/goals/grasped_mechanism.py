@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -13,7 +14,13 @@ from semantic_digital_twin.world_description.world_entity import (
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.node import CompositeNode, NodeArtifacts
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPose,
+    RigidCoupling,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 
 
@@ -21,11 +28,14 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
     """
     Drive the degree of freedom of a 1-dof mechanism in an environment to a position
-    while keeping the end effector fixed relative to the grasped part.
+    while keeping the end effector fixed relative to the grasped part. The mechanism
+    moves only as fast as the end effector can move with it.
 
     Assumes that the grasped part (e.g. a handle or a bottle cap) has already been
     grasped. Works with any mechanism whose grasped part hangs below an
     :class:`ActiveConnection1DOF`, e.g. drawers, doors, or screw caps.
+
+    While it runs, :attr:`holding_end_effector`, if given, may touch its surroundings.
     """
 
     tip_link: KinematicStructureEntity
@@ -44,6 +54,12 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
     limits once this goal expands.
     """
 
+    holding_end_effector: EndEffector | None = None
+    """
+    The end effector holding the grasped part, which is let off collision avoidance
+    while this goal runs, or None to keep every collision check.
+    """
+
     mechanism_weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
     """
     Weight of the goal driving the degree of freedom of the mechanism.
@@ -55,7 +71,7 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
 
     grasp_weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Weight of the goal keeping the end effector fixed relative to the grasped part.
+    Weight of the tasks keeping the end effector fixed relative to the grasped part.
 
     .. warning:: Unlike most goals, this one is weighted above collision avoidance on
         purpose. Holding on to the grasped part has to matter more than both moving the
@@ -73,8 +89,16 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
             np.clip(self.goal_joint_state, limits.lower.position, limits.upper.position)
         )
 
+        allowances = []
+        if self.holding_end_effector is not None:
+            allowances.append(
+                UpdateTemporaryCollisionRules.for_end_effector(
+                    self.holding_end_effector
+                )
+            )
         self._add_children_to_statechart(
             [
+                *allowances,
                 JointPositionList(
                     name="hinge goal",
                     goal_state=JointState.from_mapping(
@@ -87,6 +111,12 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
                     goal_pose=Pose(reference_frame=self.tip_link),
+                    weight=self.grasp_weight,
+                ),
+                RigidCoupling(
+                    name="move with handle",
+                    root_link=self.environment_link,
+                    tip_link=self.tip_link,
                     weight=self.grasp_weight,
                 ),
             ]

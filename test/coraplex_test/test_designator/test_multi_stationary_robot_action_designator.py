@@ -1,9 +1,14 @@
+from dataclasses import dataclass, field
+
 import mujoco
 import numpy as np
 import pytest
 from rustworkx import NoEdgeBetweenNodes
 
 from coraplex.datastructures.trajectory import PoseTrajectory
+from coraplex.datastructures.enums import InsertionPosition
+from coraplex.plans.failures import PlanFailure
+from coraplex.plans.plan_transformation import SequentialInsertion
 from coraplex.robot_plans.actions.core.pick_up import (
     ReachAction,
     GraspingAction,
@@ -16,9 +21,12 @@ from coraplex.robot_plans.actions.core.robot_body import (
     FollowToolCenterPointPathAction,
 )
 from coraplex.testing import _make_sine_scan_poses
-from cramph.composites import Sequence
+from cramph.composites import Sequence, StatementNode
+from cramph.data_types import LifeCycleValues
+from cramph.node import StatechartNode
+from cramph.threaded_nodes import FunctionCall
 from giskardpy.utils.utils_for_tests import compare_axis_angle, compare_orientations
-from krrood.entity_query_language.factories import an, entity, variable
+from krrood.entity_query_language.factories import a, an, entity, variable
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
@@ -29,8 +37,8 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -38,7 +46,13 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 from ..conftest import grasp_point_of, left_or_only_arm, right_or_only_arm
 from ..world_snapshot import WorldSnapshot
-from ...plan_running import perform_in_physics, run_plan, robot_extensions
+from ...plan_running import (
+    perform_in_physics,
+    run_plan,
+    robot_extensions,
+    simulated_executor,
+    statechart_of,
+)
 from ...pytest_environment import runs_in_continuous_integration
 
 
@@ -363,6 +377,8 @@ def physically_simulated_block_context(stationary_block_context):
     The block world with a box narrow enough for the gripper standing on the table, and
     its physics running, so a plan performed in it is carried out by the robot's own
     servos.
+
+    The robot starts with its arms parked, as a real one is switched on.
     """
     world, view, extensions = stationary_block_context
     if not isinstance(view, Tracy):
@@ -387,6 +403,9 @@ def physically_simulated_block_context(stationary_block_context):
             )
         )
         world.add_semantic_annotations([HasGraspCandidates(root=narrow_box)])
+    for arm in view.all_arms:
+        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+    world.notify_state_change()
     # Under the default pyramidal friction cone, a held box creeps down in the grip.
     simulation = MujocoSim(
         world=world,
@@ -479,3 +498,76 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
         target.to_np().flatten()[:3],
         atol=0.01,
     )
+
+
+# %% a pick-up failing after its grasp
+
+
+def _fail_the_lift() -> None:
+    """
+    Fail as a lift slipping out of the grip would.
+    """
+    raise PlanFailure()
+
+
+@dataclass
+class FailTheFirstLift(SequentialInsertion[PickUpAction]):
+    """
+    Fails the first pick-up it is offered once its object hangs off the gripper, right
+    before it lifts the object.
+    """
+
+    failed_once: bool = field(default=False, init=False)
+    """
+    Whether a pick-up was made to fail already.
+    """
+
+    @property
+    def position(self) -> InsertionPosition:
+        return InsertionPosition.BEFORE
+
+    def is_applicable(self, plan_node: PickUpAction) -> bool:
+        return not self.failed_once
+
+    def anchor(self, plan_node: PickUpAction) -> StatechartNode:
+        return plan_node.nodes[-1]
+
+    def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
+        self.failed_once = True
+        return [FunctionCall(function=_fail_the_lift, failure_types=(PlanFailure,))]
+
+
+def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
+    stationary_block_context,
+):
+    """
+    The box hangs off the gripper once the first pick-up failed, and the model moves it
+    with the gripper, so the next grasp passes its trial and runs, opening the gripper
+    around the box it holds.
+    """
+    world, view, extensions = stationary_block_context
+    arm = left_or_only_arm(view)
+    box_body = world.get_body_by_name("box1")
+    pick_up = StatementNode(
+        statement=a(PickUpAction)(
+            grasp=variable(
+                GraspCandidate,
+                domain=graspable_annotation(world, box_body).grasp_candidates(),
+            ),
+            arm=arm,
+        )
+    )
+    plan = Sequence(nodes=[ParkArmsAction(arms=view.all_arms), pick_up])
+    executor = simulated_executor(extensions, plan_adaptations=[FailTheFirstLift()])
+
+    executor.compile(statechart_of(executor, plan))
+    executor.execute()
+
+    first, second = pick_up.grounded_nodes
+    assert [child.life_cycle_state for child in pick_up.chosen_children] == [
+        LifeCycleValues.FAILED,
+        LifeCycleValues.SUCCEEDED,
+    ]
+    assert second.grasp is not first.grasp
+    [grasping] = [node for node in second.nodes if isinstance(node, GraspingAction)]
+    assert grasping.life_cycle_state == LifeCycleValues.SUCCEEDED

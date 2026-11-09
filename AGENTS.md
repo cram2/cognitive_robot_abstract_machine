@@ -15,12 +15,17 @@
 - Never duplicate code. Never put methods in a catch-all module such as `utils.py`; move them onto the class that owns the behaviour
 - Access attributes with `.`, never with `getattr`, and never wrap attribute access in try-except
 - Never use mutable objects as default arguments
+- A descriptor that manages a dataclass field subclasses `krrood.patterns.dataclass_field_descriptor.DataclassFieldDescriptor`, implementing `read` and `write`, and the owning class inherits `DataclassFieldDescriptorOwner` so its subclasses keep the descriptor
+- Never define `__set__` in a class other than `DataclassFieldDescriptor`, and never manage a dataclass field `value` or `_value` with a property setter `value` (checked by `krrood check`)
 - Never reimplement what the codebase or an existing dependency already provides. When searching for it, never cut off the output of grep or other searches; narrow the search instead
 
 ## Naming
 <!-- from NamingRules in krrood/development_tools/agents/shipped_rules/code_style.py -->
 - Names are technically correct, simple and descriptive, in that order. An inaccurate name is worse than a vague one, because a reader who trusts it stops reading
-- A name stays correct and understandable when read on its own, without its class or a keyword argument next to it - after `value = instance.attribute`, in a log line, in a traceback, or when passed on positionally. A `Pipe` field `size` says nothing once it leaves the class; `inner_diameter` does. A generic word that would fit anything never passes this test
+- The name of a field, method or function stays correct and understandable when read on its own, without its class or a keyword argument next to it - after `value = instance.attribute`, in a log line, in a traceback, or when passed on positionally. A `Pipe` field `size` says nothing once it leaves the class; `inner_diameter` does. A `Pipe` method `check` says nothing in a traceback, which never shows `Pipe.check`; `check_for_leaks` does. A generic word that would fit anything never passes this test
+- Never begin a function or method name with one of the prepositions `as_`, `for_`, `with_`, `of_`: the phrase it starts is only finished by the class name in front of it (checked by `krrood check`)
+- Never end a function or method name with a preposition that only its first argument finishes, such as `bottom_of(body)`: name what it returns or does, such as `bottom_height(body)`. A preposition that belongs to the verb, as in `look_for` or `is_contained_in`, is part of the name
+- Begin a function or method name with `from_` or `to_` only for an alternative constructor or a conversion, such as `from_json` or `to_json`
 - Use the plain word every reader already knows. Use a specialist, metaphorical or in-house term only where it is genuinely the precise word, never as shorthand between the people who were in the discussion
 - Where the domain or file format already has a word for something, use that word
 - Never abbreviate an identifier
@@ -90,18 +95,24 @@
 
 # Documentation
 <!-- from DocumentationRules in krrood/development_tools/agents/shipped_rules/documentation.py -->
-- Every class and method has meaningful, non-trivial documentation in reStructuredText. Every field has its own docstring directly below it, not a description in the class docstring
-- An override that keeps its base contract has no docstring and inherits the base one. One that changes the contract documents only the difference and references the overridden method with `:meth:`
+- Every module, class, function and field has a docstring. A field's docstring goes directly below the field, not in the class docstring. A method implementing an abstract method is exempt: the abstract method's docstring is enough (checked by `krrood check`)
+- Documentation is written in reStructuredText and is meaningful and non-trivial: it says something the name and the type hints do not
+- An implementation of an abstract method has no docstring and inherits the base one. An override of an implemented method documents only what differs from the base and references the overridden method with `:meth:`
 - A docstring states what the code does and its contract, short and to the point. It never contains:
   - how the code does it
   - the ways a caller can supply a value (for example, that it may also be given as a query instead of a concrete object)
   - the current callers or consumers ("used by X and Y") - that goes stale and reads as exhaustive
   - justification of design decisions, comparison with rejected or hypothetical designs, or review and implementation history
   - type information - the type hints carry it
-- Keep docstrings and comments short and never write walls of text. Comments are meaningful and DRY; remove comments that restate the code
+- A docstring holds at most 4 lines of prose, field lists and literal blocks aside, and a comment block at most 3 lines (checked by `krrood check`)
+- Comments are meaningful and DRY; remove comments that restate the code
 - Reference code with Sphinx roles (`:func:`, `:class:`, `:attr:`, `:meth:`), never with plain backticks, and use directives such as `.. note::` and `.. warning::` for notes and warnings
 - Never use all-caps words for emphasis in docstrings or comments; use RST emphasis (`*word*`). Genuine identifiers, acronyms and enum/constant names (`UUID`, `WHERE`, `Definiteness.DEFINITE`) are exempt
 - Always format modified Python files with ruff followed by docformatter, through the repository's pre-commit hook
+
+# Entity query language
+<!-- from EntityQueryLanguageRules in krrood/development_tools/agents/shipped_rules/entity_query_language.py -->
+- Pick `a` or `an` so the query reads as correct English with the entity it quantifies: `a(Drawer)` and `an(Interval.around)`, never `an(Drawer)` or `a(Interval.around)`
 
 # Imports
 <!-- from ImportsRules in krrood/development_tools/agents/shipped_rules/imports.py -->
@@ -113,6 +124,10 @@
 <!-- from RuleApplicationRules in krrood/development_tools/agents/shipped_rules/rule_application.py -->
 - Existing code that breaks these rules stays as it is unless a change touches it or the user asks for the cleanup. When you modify a function or class, bring that function or class in line with these rules as part of the change, and leave code the change does not otherwise modify alone. If the cleanup renames a method and so changes the API, ask the user first
 - When a rule seems wrong for the case at hand - a failing test that is itself wrong, an exception that has to be caught, a value that genuinely has to live at module level - ask the user before departing from it; never decide the exception on your own
+
+# Rule modelling
+<!-- from RuleModellingRules in krrood/development_tools/agents/shipped_rules/rule_application.py -->
+- When a script can check part of a rule, split the rule: the checkable part becomes a rule of its own that carries its checker, and the part only a person can judge stays a rule without one
 
 # Testing
 

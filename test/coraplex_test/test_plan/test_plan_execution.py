@@ -51,7 +51,7 @@ from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from ..conftest import physically_simulated_executor
@@ -340,7 +340,7 @@ def tiago_world_with_a_stretch(_tiago_world_setup) -> World:
     """
     world = deepcopy(_tiago_world_setup)
     RobotSpecification(
-        Stretch, world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
+        Stretch, localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
     ).spawn(world)
     return world
 

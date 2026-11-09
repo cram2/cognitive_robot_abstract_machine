@@ -42,7 +42,7 @@ class LidarCase:
         :return: This robot, annotated in a world parsed from its own description.
         """
         return self.robot.from_world(
-            URDFParser.from_file(self.robot.get_ros_file_path()).parse()
+            URDFParser.from_file(self.robot.get_ros_file_path()).create_world()
         )
 
 

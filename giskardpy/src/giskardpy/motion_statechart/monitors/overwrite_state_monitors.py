@@ -5,8 +5,8 @@ from typing_extensions import Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
 )

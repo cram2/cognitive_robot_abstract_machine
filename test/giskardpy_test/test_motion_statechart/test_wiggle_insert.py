@@ -19,7 +19,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.hsrb import HSRBJoint
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world import World
 from test.semantic_digital_twin_test.test_orm.test_orm import hsr_world_state_reset
 from giskardpy.motion_control import MotionControl
@@ -56,7 +56,7 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
         hole_normal=Vector3.Z(reference_frame=root),
         noise_translation=0.01,
         noise_angle=0.05,
-        down_velocity=0.05,
+        cruise_velocity=0.05,
         threshold=0.02,
     )
     statechart.add_node(wiggle)
@@ -127,7 +127,7 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
         hole_normal=Vector3.Z(reference_frame=root),
         noise_translation=0.05,
         noise_angle=0.2,
-        down_velocity=0.05,
+        cruise_velocity=0.05,
     )
     statechart.add_node(wiggle)
     statechart.add_node(EndMotion.when_true(wiggle))

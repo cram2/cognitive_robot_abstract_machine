@@ -55,11 +55,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Toaster,
     CoffeeMachine,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -976,7 +973,8 @@ class TestFactories(unittest.TestCase):
             cup = Cup.create_with_new_body_in_world(name="cup", world=world2)
 
         with self.assertRaises(MismatchingWorld):
-            cabinet.add_object(cup)
+            with world1.modify_world():
+                cabinet.add_object(cup)
 
     def test_double_door_view_point(self):
         world = World.create_with_root_body("root")

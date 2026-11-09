@@ -4,7 +4,7 @@ import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.symbolic_math.symbolic_math import FloatVariable
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     Point3,

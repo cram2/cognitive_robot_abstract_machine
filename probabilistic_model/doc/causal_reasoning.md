@@ -127,7 +127,7 @@ fitted circuit of any circuit type (see {ref}`sec-causal-circuit-types`) togethe
 - `causal_variables` / `effect_variables` -- the registered $X$ and $Y$ of
   {prf:ref}`def-backdoor-criterion`.
 - `marginal_determinism_tree`, a `MarginalDeterminismTreeNode` -- a binary tree over the
-  cause variables, built by `from_causal_graph` recursively bisecting the (priority-ordered)
+  cause variables, built by `from_variable_order` recursively bisecting the (priority-ordered)
   cause list. Each node records the variables in its subtree and a `query_set` (by default
   its own highest-priority variable); `all_query_sets()` flattens every node's `query_set`
   in pre-order, and their union is exactly the set of cause variables that need to satisfy
@@ -364,6 +364,12 @@ count can grow with the training data (unlike `SAMPLED`, capped by
 warns when that product is large, as a diagnostic against discovering the cost only at query
 time -- not a guarantee, since it is read off however the adjustment variables actually got
 grounded.
+
+## Learning the causal structure
+
+Backdoor adjustment is only correct for an adjustment set that meets the adjustment
+criterion in the true causal graph. {ref}`chapter:causal-structure` covers learning that
+graph from the training rows and choosing the set from it.
 
 ## Literature position
 

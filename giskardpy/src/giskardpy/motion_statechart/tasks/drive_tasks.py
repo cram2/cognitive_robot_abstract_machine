@@ -11,18 +11,16 @@ from dataclasses import dataclass, field
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianOrientation,
-    CartesianPosition,
-)
+from giskardpy.motion_statechart.weights import VelocityScale
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -88,9 +86,9 @@ class BasePosition(DrivenBaseTask):
     Drives the base along the floor to below the position of :attr:`goal_pose`.
     """
 
-    reference_velocity: float = CartesianPosition.default_reference_velocity
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Reference velocity for normalization in m/s.
+    Sets how fast the goal is approached, in m/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -108,7 +106,8 @@ class BasePosition(DrivenBaseTask):
             artifacts.geometry.add_position_constraint(
                 expression_current=base_coordinate,
                 expression_goal=goal_coordinate,
-                reference_velocity=self.reference_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 quadratic_weight=self.weight,
             )
         parent_V_base_to_goal = parent_P_goal - parent_P_base
@@ -124,9 +123,9 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
     :meth:`parent_R_goal` describes does.
     """
 
-    reference_velocity: float = CartesianOrientation.default_reference_velocity
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     @abstractmethod
@@ -150,7 +149,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
         artifacts.geometry.add_yaw_goal_constraint(
             frame_R_current=parent_R_base,
             frame_R_goal=parent_R_goal,
-            reference_velocity=self.reference_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         yaw_error = sm.shortest_angular_distance(

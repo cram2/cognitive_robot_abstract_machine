@@ -14,9 +14,7 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 
@@ -92,6 +90,7 @@ class PiecewiseConstantCurvatureConnection(Connection):
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -301,6 +300,7 @@ class CosseratRodConnection(Connection):
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,

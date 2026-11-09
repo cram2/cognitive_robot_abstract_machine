@@ -5,6 +5,7 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
@@ -303,60 +304,19 @@ class GiskardWorldUpdateNotReceivedError(ExecutionException):
     The position in Giskard's stream that was waited for.
     """
 
-    timeout: float
+    timeout: timedelta
     """
-    Seconds that were spent waiting.
+    The time that was spent waiting.
     """
 
     def error_message(self) -> str:
         return (
             f"Update #{self.awaited_sequence_number} of Giskard did not arrive within "
-            f"{self.timeout}s."
+            f"{self.timeout.total_seconds()}s."
         )
 
     def suggest_correction(self) -> str:
         return "Check that this world is still connected to the world sync topic."
-
-
-@dataclass
-class ExecutionPreemptedException(ExecutionException):
-    """
-    Raised when the execution of a goal is preempted.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that was preempted.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.namespace}' preempted. Stopping execution."
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class ExecutionTimeoutException(ExecutionException):
-    """
-    Raised when the execution of a goal takes too long.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that timed out.
-    """
-
-    reason: str
-    """
-    A description of why the execution timed out.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.namespace}' timed out. {self.reason}"
-
-    def suggest_correction(self) -> str:
-        return ""
 
 
 @dataclass
@@ -394,82 +354,6 @@ class UnserializableGoalError(ExecutionException):
 
     def suggest_correction(self) -> str:
         return ""
-
-
-@dataclass
-class ExecutionSucceededPrematurely(ExecutionException):
-    """
-    Raised when the execution finishes before the minimum execution time.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that finished too early.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.namespace}' executed too quickly, stopping execution."
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class FollowJointTrajectoryError(ExecutionException):
-    """
-    Raised when a follow joint trajectory action server fails to execute a goal.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that failed.
-    """
-
-    error_description: str
-    """
-    A human-readable description of the action server error code.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.namespace}' failed to execute goal. Error: '{self.error_description}'"
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class FollowJointTrajectory_INVALID_GOAL(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports an invalid goal.
-    """
-
-
-@dataclass
-class FollowJointTrajectory_INVALID_JOINTS(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports invalid joints.
-    """
-
-
-@dataclass
-class FollowJointTrajectory_OLD_HEADER_TIMESTAMP(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports an outdated header timestamp.
-    """
-
-
-@dataclass
-class FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports a path tolerance violation.
-    """
-
-
-@dataclass
-class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports a goal tolerance violation.
-    """
 
 
 @dataclass

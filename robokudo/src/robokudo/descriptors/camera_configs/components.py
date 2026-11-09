@@ -3,7 +3,7 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.types.cv import ColorToDepthRatio
 

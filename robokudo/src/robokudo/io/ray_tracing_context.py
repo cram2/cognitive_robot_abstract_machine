@@ -22,7 +22,7 @@ from robokudo.io.exceptions import (
 )
 from robokudo.utils.module_loader import ModuleLoader
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 

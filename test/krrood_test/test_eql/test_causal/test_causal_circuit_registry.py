@@ -48,7 +48,7 @@ def _build_pick_causal_circuit() -> CausalCircuit:
     )
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([arm], [success]),
+        MarginalDeterminismTreeNode.from_variable_order([arm]),
         [arm],
         [success],
     )

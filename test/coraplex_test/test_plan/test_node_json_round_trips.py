@@ -49,6 +49,7 @@ from coraplex.robot_plans.actions.core.navigation import (
     PathPlanningNavigateAction,
 )
 from coraplex.robot_plans.actions.core.pick_up import (
+    FixateObjectAction,
     GraspingAction,
     PickUpAction,
     ReachAction,
@@ -80,12 +81,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Tool,
     Whisk,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -93,7 +94,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..test_designator.test_multi_robot_action_designator import _handle_annotation
@@ -380,6 +381,10 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             lambda world: [
                 CloseAction(grasp=_handle(world).grasp_candidates()[0], arm=_arm(world))
             ],
+        ),
+        ActionRoundTripCase(
+            FixateObjectAction,
+            lambda world: [FixateObjectAction(end_effector=_arm(world).end_effector)],
         ),
         ActionRoundTripCase(
             MoveAndPickUpAction, lambda world: [_move_and_pick_up(world)]

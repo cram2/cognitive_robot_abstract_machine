@@ -14,7 +14,7 @@ from giskardpy.qp.exceptions import (
 )
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world import World
 
 CONTROL_FREQUENCIES = [20, 50, 100]
@@ -204,3 +204,19 @@ def test_peak_acceleration_follows_the_braking_time_at_every_control_frequency(
         2 * connection.dof.limits.upper.velocity / config.braking_time.total_seconds(),
         rel=COARSEST_GRID_TOLERANCE,
     )
+
+
+# %% front-loading of the executed velocity
+
+
+def test_without_a_weight_ramp_the_executed_velocity_is_the_mean_velocity():
+    config = QPControllerConfig(target_frequency=20, horizon_weight_gain_scalar=1)
+
+    assert config.executed_to_mean_velocity_ratio == pytest.approx(1)
+
+
+def test_a_steeper_weight_ramp_front_loads_the_executed_velocity_more():
+    flat = QPControllerConfig(target_frequency=20, horizon_weight_gain_scalar=0.5)
+    steep = QPControllerConfig(target_frequency=20, horizon_weight_gain_scalar=0.1)
+
+    assert steep.executed_to_mean_velocity_ratio > flat.executed_to_mean_velocity_ratio

@@ -40,7 +40,7 @@ class PredicateFragmentRequiredError(DataclassException):
 
     def error_message(self) -> str:
         return (
-            f"{self.node._type_.__name__!r} is a predicate but does not implement "
+            f"{self.node._factory_.__name__!r} is a predicate but does not implement "
             "`_verbalization_fragment_`, so it has no verbalization."
         )
 

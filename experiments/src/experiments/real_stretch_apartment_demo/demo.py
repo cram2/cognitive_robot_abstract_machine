@@ -66,8 +66,8 @@ from semantic_digital_twin.predefined_maps.apartment_environment import (
 )
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from cramph.composites import Sequence, StatementNode
 
@@ -108,10 +108,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     def scene_specification(self) -> WorldSpecification:
         """
-        :return: A world holding nothing but a map body, which :meth:`populate_scene`
-            furnishes.
+        :return: The furnished apartment.
         """
-        return WorldSpecification(world_parser=None)
+        return WorldSpecification(world_source=ApartmentEnvironment())
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -119,7 +118,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
         )
 
     def is_scene_populated(self, world: World) -> bool:
@@ -127,12 +126,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
 
     def populate_scene(self, world: World) -> None:
         """
-        Spawn the apartment and the cereal box on its shelf.
+        Spawn the cereal box on its shelf.
         """
-        ApartmentEnvironment().populate(world)
-
-        # %% cereal
-
         # The cereal is the one body perception moves, and a pose can only be written to
         # a connection that has the degrees of freedom to carry it, so it hangs off a
         # 6DoF connection rather than the default fixed one.

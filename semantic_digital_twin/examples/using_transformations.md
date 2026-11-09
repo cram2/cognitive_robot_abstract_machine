@@ -33,7 +33,7 @@ We will create a simple world with a square base plate and a small camera box mo
 
 ```{code-cell} ipython3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -159,5 +159,5 @@ rt.scene.show("jupyter")
 
 ## Where to go next
 - Style guide on transformations and naming: https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/style_guide.html
-- API docs for `HomogeneousTransformationMatrix`: https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/autoapi/semantic_digital_twin/spatial_types/spatial_types/index.html#semantic_digital_twin.spatial_types.spatial_types.HomogeneousTransformationMatrix
+- API docs for `HomogeneousTransformationMatrix`: https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/domain_models/krrood_spatial_math/src/krrood_spatial_math/spatial_types.py
 - Now try the exercise: [](using-transformations-exercise)

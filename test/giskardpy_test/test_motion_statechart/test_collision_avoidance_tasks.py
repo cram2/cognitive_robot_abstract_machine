@@ -74,13 +74,13 @@ from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.robots.daisy import DAiSy
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -1430,6 +1430,25 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
         f"Execution time is increasing: first half median {first_half_median:.4f}s, "
         f"second half median {second_half_median:.4f}s"
     )
+
+
+# %% rules for a single end effector
+
+
+def test_end_effector_rules_free_only_that_end_effector(pr2_world_copy) -> None:
+    """
+    The rules built for an end effector allow collisions for that end effector and
+    nothing else.
+    """
+    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    end_effector = robot.left_arm.end_effector
+
+    node = UpdateTemporaryCollisionRules.for_end_effector(end_effector)
+
+    assert [type(rule) for rule in node.temporary_rules] == [
+        AllowCollisionForEndEffector
+    ]
+    assert node.temporary_rules[0].end_effector is end_effector
 
 
 # %% rules in force while a rules node is built

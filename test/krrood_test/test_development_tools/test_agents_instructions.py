@@ -13,17 +13,26 @@ from krrood.development_tools.agents.repository_files import (
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.development_tools.agents.rule_module import RuleModule
+from krrood.development_tools.agents.shipped_rules.code_style import (
+    CodeStyleRules,
+    NamingRules,
+)
+from krrood.development_tools.agents.shipped_rules.documentation import (
+    DocumentationRules,
+)
 from krrood.development_tools.command_line import (
     CommandLine,
     ExitStatus,
     Option,
-    Subcommand,
 )
+from krrood.development_tools.subcommand import Subcommand
 from krrood.exceptions import DataclassException
 from krrood.patterns import path_enumeration
 
+from .dataset import rule_sections
 from .dataset.rule_sections import (
     DesignPrinciplesRules,
+    AssertionsRules,
     ErrorsRules,
     ReleasesThroughCIRules,
     VerificationRules,
@@ -49,7 +58,8 @@ def test_the_file_lists_the_rules_of_its_sections_under_their_headings(
     )
 
     assert instructions.text == DatasetFile.RULE_SECTIONS_TEXT.read_text().format(
-        source_path=DesignPrinciplesRules.source_path
+        source_path=DesignPrinciplesRules.source_path,
+        check_command=Subcommand.CHECK.invocation,
     )
 
 
@@ -59,6 +69,12 @@ def test_a_section_is_nested_in_the_section_its_parent_returns() -> None:
 
 def test_the_subsections_of_a_section_are_the_sections_nested_in_it() -> None:
     assert DesignPrinciplesRules.subsections == [ErrorsRules]
+
+
+def test_the_descendants_of_a_section_are_it_and_every_section_nested_under_it() -> (
+    None
+):
+    assert DesignPrinciplesRules.descendants == [DesignPrinciplesRules, ErrorsRules]
 
 
 def test_a_title_names_the_topic_keeping_acronyms_in_capitals() -> None:
@@ -84,6 +100,48 @@ def test_shipped_rules_name_no_cram_package(
     text = AgentsInstructions(repository_root, shipped_sections).text
 
     assert "cram" not in text.lower()
+
+
+# %% checkers
+
+
+def test_the_checkers_of_a_module_are_those_of_the_checked_rules_in_its_sections() -> (
+    None
+):
+    assert RuleModule(rule_sections).checkers == (
+        AssertionsRules.KEEP_ASSERTIONS_SHORT.checker,
+    )
+
+
+def test_a_rule_without_a_checker_has_none() -> None:
+    assert AssertionsRules.ASSERT_EXACTLY.checker is None
+
+
+def test_the_checkers_of_a_section_include_those_of_its_subsections() -> None:
+    assert VerificationRules.checkers == (
+        AssertionsRules.KEEP_ASSERTIONS_SHORT.checker,
+    )
+
+
+def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
+    """
+    The checkers come in the order of the sections and rules declaring them.
+    """
+    assert RuleModule(shipped_rules).checkers == (
+        CodeStyleRules.NO_HAND_WRITTEN_FIELD_ACCESSORS.checker,
+        NamingRules.NO_LEADING_PREPOSITIONS.checker,
+        DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
+        DocumentationRules.SHORT_PROSE.checker,
+    )
+
+
+def test_the_repository_instructions_have_the_checkers_of_all_their_rules(
+    project_rules_repository: Path,
+) -> None:
+    assert (
+        AgentsInstructions.from_repository(project_rules_repository).checkers
+        == RuleModule(shipped_rules).checkers
+    )
 
 
 # %% code named by rules

@@ -62,14 +62,16 @@ class DeserializedObjectTracker(
         """
         return key in self.tracked_objects or self._has_untracked(key)
 
-    def get(self, key: KeyType) -> TrackedType:
+    def get(self, key: KeyType, name: Any = None) -> TrackedType:
         """
         :param key: The key the document refers to an object with.
+        :param name: The name the reference to the object went by, which says which
+            object was meant when it cannot be found.
         :return: The object added for the key, or else the one :meth:`_get_untracked` finds.
         """
         if key in self.tracked_objects:
             return self.tracked_objects[key]
-        return self._get_untracked(key)
+        return self._get_untracked(key, name)
 
     def _has_untracked(self, key: KeyType) -> bool:
         """
@@ -78,13 +80,14 @@ class DeserializedObjectTracker(
         """
         return False
 
-    def _get_untracked(self, key: KeyType) -> TrackedType:
+    def _get_untracked(self, key: KeyType, name: Any = None) -> TrackedType:
         """
         Finds an object that was not deserialized from the document, for trackers that
         know another source of objects.
 
         :param key: A key no object was added for.
+        :param name: The name the reference to the object went by.
         :return: The object for the key.
         :raises UntrackedObjectError: If there is no such object.
         """
-        raise UntrackedObjectError(key=key)
+        raise UntrackedObjectError(key=key, name=name)

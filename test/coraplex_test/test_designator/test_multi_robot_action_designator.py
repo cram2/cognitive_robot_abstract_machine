@@ -128,13 +128,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -1586,6 +1586,34 @@ def test_a_squeeze_sends_the_fingers_past_the_width(
     statechart_of(physically_simulated_executor(extensions), pressing)
 
     assert pressing.goal.width == pytest.approx(touching.goal.width - 2 * squeeze)
+
+
+def test_fingers_squeezing_an_object_are_done_once_it_stops_them(
+    multiple_robot_apartment_context,
+) -> None:
+    """
+    A squeeze sends the fingers into the object, which they never reach, so fingers that
+    stopped moving against it count as done.
+    """
+    _, robot, extensions = multiple_robot_apartment_context
+    gripper = left_or_only_arm(robot).end_effector
+    pressing = MoveFingersToWidthAction(gripper=gripper, width=0.04, squeeze=0.001)
+
+    statechart_of(physically_simulated_executor(extensions), pressing)
+
+    assert pressing.goal.tolerate_stall
+
+
+def test_fingers_sent_only_to_a_width_have_to_reach_it(
+    multiple_robot_apartment_context,
+) -> None:
+    _, robot, extensions = multiple_robot_apartment_context
+    gripper = left_or_only_arm(robot).end_effector
+    touching = MoveFingersToWidthAction(gripper=gripper, width=0.04)
+
+    statechart_of(physically_simulated_executor(extensions), touching)
+
+    assert not touching.goal.tolerate_stall
 
 
 def test_fingers_sent_to_a_width_stand_that_far_apart(

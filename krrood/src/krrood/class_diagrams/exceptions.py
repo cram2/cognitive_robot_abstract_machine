@@ -1,3 +1,4 @@
+import inspect
 from dataclasses import dataclass
 
 
@@ -115,3 +116,59 @@ class FactoryMethodDecoratorError(DataclassException):
 
     def suggest_correction(self) -> str:
         return "Apply @factory_method as the outermost decorator, directly above @classmethod."
+
+
+@dataclass
+class ArgumentsPassableOnlyByPosition(DataclassException):
+    """
+    Raised when a call has to be written with keyword arguments alone, but some of its
+    arguments go to parameters that take them only by position.
+    """
+
+    parameters: inspect.Signature
+    """
+    The parameters of the callee.
+    """
+
+    parameter_names: tuple[str, ...]
+    """
+    The parameters that received arguments they take only by position.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The parameters {', '.join(self.parameter_names)} of {self.parameters} "
+            f"take their arguments only by position, so the call cannot be written "
+            f"with keyword arguments alone."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Let these parameters take their arguments by name: remove the '/' marker "
+            "or replace '*args' by named parameters."
+        )
+
+
+@dataclass
+class FieldIsUnMappedInClassDiagram(DataclassException):
+    """
+    Raised when a class in the class diagram has no field of a given name.
+    """
+
+    class_: type
+    """
+    The class that has no such field.
+    """
+
+    field_name: str
+    """
+    The name of the field it does not have.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Class {self.class_} has no field {self.field_name!r} in the class diagram"
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name a field the class declares, or add the class that declares it to the class diagram."
