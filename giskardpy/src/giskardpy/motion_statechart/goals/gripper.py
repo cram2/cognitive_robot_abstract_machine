@@ -190,8 +190,8 @@ class MoveGripper(MoveFingers, HasTwoFingerGripperParameters, HasThresholdParame
         return DistanceAlongAxis(
             name=f"{self.name}/width",
             root_link=fingertips.tool_frame,
-            reference_feature=fingertips.finger_P_facing_point,
-            controlled_feature=fingertips.thumb_P_facing_point,
+            reference_point=fingertips.finger_P_facing_point,
+            tip_point=fingertips.thumb_P_facing_point,
             axis=fingertips.tool_V_finger_to_thumb,
             distance=self.width,
             threshold=self.threshold,

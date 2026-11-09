@@ -18,8 +18,7 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
@@ -32,8 +31,7 @@ from krrood_spatial_math.spatial_types import (
 @dataclass(eq=False, repr=False, kw_only=True)
 class WiggleInsert(
     ConvergingTask,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
     HasCruiseVelocityParameter,
 ):
     """

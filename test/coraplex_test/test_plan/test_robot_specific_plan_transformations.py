@@ -383,10 +383,10 @@ def test_a_simulated_stretch_stays_in_front_of_the_container_it_closes(
     assert type(facing) is AlignPlanes
     assert facing.root_link is world.root
     assert facing.tip_link is robot.root
-    np.testing.assert_allclose(facing.reference_feature.to_np()[:3], [1, 0, 0])
-    assert facing.reference_feature.reference_frame is action.grasp.graspable.root
-    np.testing.assert_allclose(facing.controlled_feature.to_np()[:3], [0, -1, 0])
-    assert facing.controlled_feature.reference_frame is robot.root
+    np.testing.assert_allclose(facing.reference_normal.to_np()[:3], [1, 0, 0])
+    assert facing.reference_normal.reference_frame is action.grasp.graspable.root
+    np.testing.assert_allclose(facing.tip_normal.to_np()[:3], [0, -1, 0])
+    assert facing.tip_normal.reference_frame is robot.root
     assert type(close) is ArticulateGraspedMechanism
     assert close.tip_link is default_close.tip_link
     assert close.environment_link is default_close.environment_link

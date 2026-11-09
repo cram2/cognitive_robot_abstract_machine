@@ -2688,8 +2688,8 @@ class TestDistanceAlongAxis:
         motion_statechart.add_node(
             goal := DistanceAlongAxis(
                 root_link=prismatic_bot2.root,
-                reference_feature=Point3(reference_frame=reference),
-                controlled_feature=Point3(z=0.1, reference_frame=tip),
+                reference_point=Point3(reference_frame=reference),
+                tip_point=Point3(z=0.1, reference_frame=tip),
                 axis=Vector3.Z(reference_frame=prismatic_bot2.root),
                 distance=0.3,
                 threshold=0.001,
@@ -2704,7 +2704,7 @@ class TestDistanceAlongAxis:
             prismatic_bot2.transform(
                 target_frame=prismatic_bot2.root, spatial_object=point
             ).to_np()
-            for point in (goal.reference_feature, goal.controlled_feature)
+            for point in (goal.reference_point, goal.tip_point)
         )
         assert root_P_tip[2] - root_P_reference[2] == pytest.approx(
             goal.distance, abs=goal.threshold

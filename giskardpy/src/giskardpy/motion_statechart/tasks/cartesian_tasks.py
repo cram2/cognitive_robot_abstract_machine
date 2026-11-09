@@ -27,7 +27,6 @@ from giskardpy.motion_statechart.graph_node import (
 from giskardpy.motion_statechart.graph_node import Task, ConvergingTask
 from giskardpy.motion_statechart.mixins import (
     GoalType,
-    HasFeaturePairParameters,
     HasGoalBindingPolicyParameter,
     HasGoalParameter,
     HasPoseCruiseVelocityParameters,
@@ -39,6 +38,7 @@ from giskardpy.motion_statechart.mixins import (
     HasAngularVelocityLimitParameter,
     HasLinearVelocityLimitParameter,
     HasWeightParameter,
+    HasKinematicChainParameters,
 )
 from krrood.ormatic.utils import classproperty
 from krrood.symbolic_math.float_variable_data import FloatVariableData
@@ -66,8 +66,7 @@ from semantic_digital_twin.world_description.world_entity import (
 class CartesianTask(
     ConvergingTask,
     BindsGoalReferenceFrame[GoalType],
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
     HasCruiseVelocityParameter,
     ABC,
 ):
@@ -163,16 +162,23 @@ class CartesianPosition(CartesianTask[Point3]):
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class DistanceAlongAxis(
-    ConvergingTask,
-    HasRootLinkParameter,
-    HasFeaturePairParameters[Point3],
-    HasCruiseVelocityParameter,
+    ConvergingTask, HasRootLinkParameter, HasCruiseVelocityParameter
 ):
     """
     Move two points, each fixed on a link of its own, until they stand a given distance
     apart along an axis, leaving them free in every other direction.
 
     Both links may move. The axis is fixed in :attr:`root_link`.
+    """
+
+    reference_point: Point3
+    """
+    The point the distance is measured from, in the frame of the link it is fixed on.
+    """
+
+    tip_point: Point3
+    """
+    The point the distance is measured to, in the frame of the link it is fixed on.
     """
 
     axis: Vector3
@@ -182,9 +188,8 @@ class DistanceAlongAxis(
 
     distance: float
     """
-    How far, in metres, :attr:`controlled_feature` is to stand from
-    :attr:`reference_feature` along :attr:`axis`; negative where it is to stand against
-    the axis.
+    How far, in metres, :attr:`tip_point` is to stand from :attr:`reference_point` along
+    :attr:`axis`; negative where it is to stand against the axis.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -198,7 +203,7 @@ class DistanceAlongAxis(
                 self.root_link, point.reference_frame
             )
             @ point
-            for point in (self.reference_feature, self.controlled_feature)
+            for point in (self.reference_point, self.tip_point)
         )
         current_distance = (root_P_tip - root_P_reference) @ self.axis
         artifacts.constraints.add_equality_constraint(
@@ -721,7 +726,7 @@ class CartesianPose(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HoldLink(Task, HasRootLinkParameter, HasTipLinkParameter, ABC):
+class HoldLink(Task, HasKinematicChainParameters, ABC):
     """
     Keeps :attr:`tip_link` as it was relative to :attr:`root_link` when this task
     started.
@@ -871,8 +876,7 @@ class HoldPose(HoldLink, HasPoseThresholdParameters, HasPoseCruiseVelocityParame
 @dataclass(eq=False, repr=False, kw_only=True)
 class RigidCoupling(
     Task,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
 ):
     """
     Keeps :attr:`tip_link` at rest relative to :attr:`root_link` at every step of the
@@ -937,7 +941,7 @@ class RigidCoupling(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianPositionVelocityLimit(
-    Task, HasRootLinkParameter, HasTipLinkParameter, HasLinearVelocityLimitParameter
+    Task, HasKinematicChainParameters, HasLinearVelocityLimitParameter
 ):
     """
     Limit the Cartesian (translational) velocity of a tip link relative to a root link,
@@ -986,7 +990,7 @@ class CartesianPositionVelocityLimit(
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianRotationVelocityLimit(
-    Task, HasRootLinkParameter, HasTipLinkParameter, HasAngularVelocityLimitParameter
+    Task, HasKinematicChainParameters, HasAngularVelocityLimitParameter
 ):
     """
     Limit the angular velocity of a tip link relative to a root link, in rad/s.
@@ -1035,8 +1039,7 @@ class CartesianRotationVelocityLimit(
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianVelocityLimit(
     Parallel,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
     HasLinearVelocityLimitParameter,
     HasAngularVelocityLimitParameter,
     HasWeightParameter,

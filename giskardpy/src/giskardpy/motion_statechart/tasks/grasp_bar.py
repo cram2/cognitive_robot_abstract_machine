@@ -6,8 +6,7 @@ from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, ConvergingTask
 from giskardpy.motion_statechart.mixins import (
     HasPoseCruiseVelocityParameters,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
 )
 from krrood_spatial_math.spatial_types import Point3, Vector3
 
@@ -15,8 +14,7 @@ from krrood_spatial_math.spatial_types import Point3, Vector3
 @dataclass(eq=False, repr=False, kw_only=True)
 class GraspBar(
     ConvergingTask,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
     HasPoseCruiseVelocityParameters,
 ):
     """

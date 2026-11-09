@@ -72,8 +72,8 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
             AlignPlanes(
                 tip_link=torso_tip,
                 root_link=root,
-                controlled_feature=Vector3.X(torso_tip),
-                reference_feature=Vector3.Z(root),
+                tip_normal=Vector3.X(torso_tip),
+                reference_normal=Vector3.Z(root),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE.value,
             )
         ]
@@ -243,8 +243,8 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
                     AlignPlanes(
                         root_link=plan_node.world.root,
                         tip_link=robot_root,
-                        reference_feature=Vector3.X(handle),
-                        controlled_feature=Vector3.NEGATIVE_Y(robot_root),
+                        reference_normal=Vector3.X(handle),
+                        tip_normal=Vector3.NEGATIVE_Y(robot_root),
                     ),
                     ArticulateGraspedMechanism(
                         tip_link=tool_frame,

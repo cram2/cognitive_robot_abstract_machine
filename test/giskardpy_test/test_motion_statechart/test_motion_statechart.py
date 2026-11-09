@@ -512,14 +512,14 @@ class TestTemplates:
                     AlignPlanes(
                         root_link=map,
                         tip_link=r_tip,
-                        controlled_feature=Vector3.X(reference_frame=r_tip),
-                        reference_feature=Vector3.X(reference_frame=map),
+                        tip_normal=Vector3.X(reference_frame=r_tip),
+                        reference_normal=Vector3.X(reference_frame=map),
                     ),
                     AlignPlanes(
                         root_link=map,
                         tip_link=r_tip,
-                        controlled_feature=Vector3.Y(reference_frame=r_tip),
-                        reference_feature=Vector3.Z(reference_frame=map),
+                        tip_normal=Vector3.Y(reference_frame=r_tip),
+                        reference_normal=Vector3.Z(reference_frame=map),
                     ),
                 ]
             )

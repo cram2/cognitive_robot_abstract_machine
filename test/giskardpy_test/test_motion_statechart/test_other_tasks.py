@@ -124,8 +124,8 @@ class TestFeatureFunctions:
         height_goal = HeightGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -175,8 +175,8 @@ class TestFeatureFunctions:
         height_goal = HeightGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -230,8 +230,8 @@ class TestFeatureFunctions:
         reach_point = ReachPoint(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
         )
         statechart.add_node(reach_point)
         statechart.add_node(EndMotion.when_true(reach_point))
@@ -275,8 +275,8 @@ class TestFeatureFunctions:
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -330,8 +330,8 @@ class TestFeatureFunctions:
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -385,8 +385,8 @@ class TestFeatureFunctions:
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
@@ -444,16 +444,16 @@ class TestFeatureFunctions:
                 HeightGoal(
                     root_link=root,
                     tip_link=tip,
-                    controlled_feature=tip_point,
-                    reference_feature=reference_point,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
                     lower_limit=height_lower,
                     upper_limit=height_upper,
                 ),
                 DistanceGoal(
                     root_link=root,
                     tip_link=tip,
-                    controlled_feature=tip_point,
-                    reference_feature=reference_point,
+                    tip_point=tip_point,
+                    reference_point=reference_point,
                     lower_limit=distance_lower,
                     upper_limit=distance_upper,
                 ),
@@ -523,24 +523,24 @@ class TestFeatureFunctions:
         height_goal = HeightGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=height_lower,
             upper_limit=height_upper,
         )
         distance_goal = DistanceGoal(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_point,
-            reference_feature=reference_point,
+            tip_point=tip_point,
+            reference_point=reference_point,
             lower_limit=distance_lower,
             upper_limit=distance_upper,
         )
         align_perpendicular = AlignPerpendicular(
             root_link=root,
             tip_link=tip,
-            controlled_feature=tip_normal,
-            reference_feature=reference_normal,
+            tip_normal=tip_normal,
+            reference_normal=reference_normal,
             threshold=perpendicular_threshold,
         )
 
@@ -817,8 +817,8 @@ def test_align_planes(pr2_world_state_reset: World):
     align_planes = AlignPlanes(
         root_link=root,
         tip_link=tip,
-        reference_feature=goal_normal,
-        controlled_feature=tip_normal,
+        reference_normal=goal_normal,
+        tip_normal=tip_normal,
     )
     statechart.add_node(align_planes)
 
@@ -870,8 +870,8 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     align_perp = AlignPerpendicular(
         root_link=root,
         tip_link=tip,
-        reference_feature=goal_normal,
-        controlled_feature=tip_normal,
+        reference_normal=goal_normal,
+        tip_normal=tip_normal,
     )
     statechart.add_node(align_perp)
 
@@ -933,8 +933,8 @@ def test_angle_goal(pr2_world_state_reset: World):
     angle_goal = AngleGoal(
         root_link=root,
         tip_link=tip,
-        controlled_feature=tip_vector,
-        reference_feature=reference_vector,
+        tip_vector=tip_vector,
+        reference_vector=reference_vector,
         lower_angle=lower_angle,
         upper_angle=upper_angle,
     )

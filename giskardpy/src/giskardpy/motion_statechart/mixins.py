@@ -23,11 +23,6 @@ GoalType = TypeVar("GoalType")
 The type of what a node drives towards.
 """
 
-FeatureType = TypeVar("FeatureType")
-"""
-The type of the geometric features a node compares.
-"""
-
 # %% links of the kinematic chain
 
 
@@ -52,6 +47,13 @@ class HasTipLinkParameter:
     tip_link: KinematicStructureEntity
     """
     The tip of the kinematic chain, which is moved.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasKinematicChainParameters(HasRootLinkParameter, HasTipLinkParameter):
+    """
+    A node moving :attr:`tip_link` relative to :attr:`root_link`.
     """
 
 
@@ -238,25 +240,4 @@ class HasFingerStallToleranceParameters:
     in seconds.
 
     None keeps :attr:`~giskardpy.motion_statechart.monitors.monitors.LocalMinimumReached.minimum_time`.
-    """
-
-
-# %% pairs of geometric features
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class HasFeaturePairParameters(Generic[FeatureType], SubClassSafeGeneric):
-    """
-    A node moving one geometric feature relative to another.
-    """
-
-    controlled_feature: FeatureType
-    """
-    The feature that is moved, in the frame of the link it is fixed on.
-    """
-
-    reference_feature: FeatureType
-    """
-    The feature :attr:`controlled_feature` is measured against, in the frame of the
-    link it is fixed on.
     """

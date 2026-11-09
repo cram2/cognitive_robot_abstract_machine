@@ -82,8 +82,8 @@ def test_gripper_is_given_the_width_between_its_facing_points(pr2_world_copy) ->
 
     [width_task] = nodes
     assert isinstance(width_task, DistanceAlongAxis)
-    assert width_task.reference_feature.reference_frame is gripper.finger.tip
-    assert width_task.controlled_feature.reference_frame is gripper.thumb.tip
+    assert width_task.reference_point.reference_frame is gripper.finger.tip
+    assert width_task.tip_point.reference_frame is gripper.thumb.tip
     assert width_task.distance == goal.width
     assert width_task.threshold == goal.threshold
 

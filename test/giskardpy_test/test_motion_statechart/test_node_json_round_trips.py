@@ -304,8 +304,8 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 DistanceAlongAxis(
                     root_link=_root(world),
-                    reference_feature=_point(world),
-                    controlled_feature=_tip_point(world),
+                    reference_point=_point(world),
+                    tip_point=_tip_point(world),
                     axis=_root_axis(world),
                     distance=0.1,
                 )
@@ -401,8 +401,8 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 AlignPlanes(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    reference_feature=_root_axis(world),
-                    controlled_feature=_tip_axis(world),
+                    reference_normal=_root_axis(world),
+                    tip_normal=_tip_axis(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -510,8 +510,8 @@ def _feature_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 AlignPerpendicular(
                     **_feature_fields(world),
-                    controlled_feature=_tip_axis(world),
-                    reference_feature=_root_axis(world),
+                    tip_normal=_tip_axis(world),
+                    reference_normal=_root_axis(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -521,8 +521,8 @@ def _feature_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 AngleGoal(
                     **_feature_fields(world),
-                    controlled_feature=_tip_axis(world),
-                    reference_feature=_root_axis(world),
+                    tip_vector=_tip_axis(world),
+                    reference_vector=_root_axis(world),
                     lower_angle=0.1,
                     upper_angle=0.2,
                 )
@@ -534,8 +534,8 @@ def _feature_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 DistanceGoal(
                     **_feature_fields(world),
-                    controlled_feature=_tip_point(world),
-                    reference_feature=_point(world),
+                    tip_point=_tip_point(world),
+                    reference_point=_point(world),
                     lower_limit=0.1,
                     upper_limit=0.2,
                 )
@@ -547,8 +547,8 @@ def _feature_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 HeightGoal(
                     **_feature_fields(world),
-                    controlled_feature=_tip_point(world),
-                    reference_feature=_point(world),
+                    tip_point=_tip_point(world),
+                    reference_point=_point(world),
                     lower_limit=0.1,
                     upper_limit=0.2,
                 )
@@ -560,8 +560,8 @@ def _feature_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 ReachPoint(
                     **_feature_fields(world),
-                    controlled_feature=_tip_point(world),
-                    reference_feature=_point(world),
+                    tip_point=_tip_point(world),
+                    reference_point=_point(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -672,7 +672,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
                 VectorsAligned(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal_normal=_root_axis(world),
+                    reference_normal=_root_axis(world),
                     tip_normal=_tip_axis(world),
                 )
             ],

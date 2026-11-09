@@ -182,8 +182,8 @@ class ToolMotionAction(
             AlignPlanes(
                 tip_link=tip,
                 root_link=root,
-                controlled_feature=pair.tip_normal,
-                reference_feature=pair.goal_normal,
+                tip_normal=pair.tip_normal,
+                reference_normal=pair.goal_normal,
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE.value,
             )
             for pair in self._alignment_pairs

@@ -33,20 +33,28 @@ from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from giskardpy.motion_statechart.mixins import (
-    FeatureType,
     GoalType,
-    HasFeaturePairParameters,
     HasAngularVelocityLimitParameter,
     HasFingerStallToleranceParameters,
     HasGoalParameter,
     HasJointVelocityLimitParameter,
+    HasKinematicChainParameters,
     HasLinearVelocityLimitParameter,
     HasPoseCruiseVelocityParameters,
     HasPoseThresholdParameters,
     HasCruiseVelocityParameter,
+    HasRootLinkParameter,
     HasThresholdParameter,
+    HasTipLinkParameter,
     HasTwoFingerGripperParameters,
     HasWeightParameter,
+)
+from giskardpy.motion_statechart.monitors.cartesian_monitors import VectorsAligned
+from giskardpy.motion_statechart.monitors.feature_monitors import (
+    AngleMonitor,
+    DistanceMonitor,
+    HeightMonitor,
+    PerpendicularMonitor,
 )
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -144,17 +152,33 @@ def _declared_type(cls: type, field_name: str) -> object:
     return eval(field_type, vars(sys.modules[declaring_class.__module__]))
 
 
+def _feature_parameters(cls: type) -> dict[str, object]:
+    """
+    :param cls: A node class.
+    :return: The type of every point and vector `cls` takes, by the name it takes it as.
+    """
+    return {
+        field.name: _declared_type(cls, field.name)
+        for field in dataclasses.fields(cls)
+        if field.init and _declared_type(cls, field.name) in (Point3, Vector3)
+    }
+
+
 # %% one mixin per concept
 
 
-def test_no_parameter_mixin_inherits_another():
-    for mixin in _parameter_mixins():
-        inherited_mixins = [
+def test_only_the_kinematic_chain_combines_parameter_mixins():
+    combined_mixins = {
+        mixin: {
             other
             for other in _parameter_mixins()
             if other is not mixin and issubclass(mixin, other)
-        ]
-        assert inherited_mixins == [], mixin
+        }
+        for mixin in _parameter_mixins()
+    }
+    assert {mixin: others for mixin, others in combined_mixins.items() if others} == {
+        HasKinematicChainParameters: {HasRootLinkParameter, HasTipLinkParameter}
+    }
 
 
 @pytest.mark.parametrize(
@@ -171,12 +195,6 @@ def test_no_parameter_mixin_inherits_another():
         "maximum_velocity",
         "down_velocity",
         "translation_threshold",
-        "tip_point",
-        "reference_point",
-        "tip_vector",
-        "reference_vector",
-        "tip_normal",
-        "reference_normal",
         "up_axis",
         "finger_velocity",
         "tolerate_stall",
@@ -257,6 +275,16 @@ def test_every_root_and_tip_link_is_a_kinematic_structure_entity():
     } == {}
 
 
+def test_every_node_taking_a_root_and_a_tip_link_takes_them_as_a_kinematic_chain():
+    assert [
+        cls
+        for cls in _node_classes()
+        if issubclass(cls, HasRootLinkParameter)
+        and issubclass(cls, HasTipLinkParameter)
+        and not issubclass(cls, HasKinematicChainParameters)
+    ] == []
+
+
 # %% goals and their reference frames
 
 
@@ -305,17 +333,37 @@ def test_nodes_with_generic_parameters_are_told_apart_by_identity():
 
 
 @pytest.mark.parametrize(
-    "node_class, feature_type",
+    "node_class, feature_parameters",
     [
-        (AlignPerpendicular, Vector3),
-        (AngleGoal, Vector3),
-        (AlignPlanes, Vector3),
-        (DistanceGoal, Point3),
-        (HeightGoal, Point3),
-        (ReachPoint, Point3),
-        (DistanceAlongAxis, Point3),
+        (AlignPlanes, {"tip_normal": Vector3, "reference_normal": Vector3}),
+        (AlignPerpendicular, {"tip_normal": Vector3, "reference_normal": Vector3}),
+        (AngleGoal, {"tip_vector": Vector3, "reference_vector": Vector3}),
+        (DistanceGoal, {"tip_point": Point3, "reference_point": Point3}),
+        (HeightGoal, {"tip_point": Point3, "reference_point": Point3}),
+        (ReachPoint, {"tip_point": Point3, "reference_point": Point3}),
+        (
+            DistanceAlongAxis,
+            {"tip_point": Point3, "reference_point": Point3, "axis": Vector3},
+        ),
     ],
 )
-def test_a_node_binds_the_type_of_its_features(node_class: type, feature_type: type):
-    assert issubclass(node_class, HasFeaturePairParameters)
-    assert node_class.get_type_of_generic_parameter(FeatureType) is feature_type
+def test_a_node_takes_its_features_by_what_they_are(
+    node_class: type, feature_parameters: dict[str, type]
+):
+    assert _feature_parameters(node_class) == feature_parameters
+
+
+@pytest.mark.parametrize(
+    "task, monitor",
+    [
+        (AlignPlanes, VectorsAligned),
+        (AlignPerpendicular, PerpendicularMonitor),
+        (AngleGoal, AngleMonitor),
+        (DistanceGoal, DistanceMonitor),
+        (HeightGoal, HeightMonitor),
+    ],
+)
+def test_a_feature_task_takes_its_features_as_its_monitor_does(
+    task: type, monitor: type
+):
+    assert _feature_parameters(task) == _feature_parameters(monitor)

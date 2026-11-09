@@ -14,9 +14,9 @@ from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
-    HasRootLinkParameter,
     HasTipLinkParameter,
     HasWeightParameter,
+    HasKinematicChainParameters,
 )
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
@@ -29,8 +29,7 @@ from krrood_spatial_math.spatial_types import Point3, Vector3
 @dataclass(eq=False, repr=False, kw_only=True)
 class StayOnLineTask(
     ConvergingTask,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
     HasCruiseVelocityParameter,
 ):
     """
@@ -198,8 +197,8 @@ class InsertCylinder(
             name=f"{self.name}/reach top",
             root_link=root,
             tip_link=self.tip_link,
-            controlled_feature=self.tip_P_tool,
-            reference_feature=root_P_top,
+            tip_point=self.tip_P_tool,
+            reference_point=root_P_top,
             cruise_velocity=self.approach_cruise_velocity,
             weight=self.weight,
         )
@@ -207,8 +206,8 @@ class InsertCylinder(
             name=f"{self.name}/slightly tilted",
             root_link=root,
             tip_link=self.tip_link,
-            controlled_feature=self.tip_V_axis,
-            reference_feature=root_V_up,
+            tip_vector=self.tip_V_axis,
+            reference_vector=root_V_up,
             lower_angle=self.tilt,
             upper_angle=self.tilt,
             threshold=self.tilt_threshold,
@@ -227,8 +226,8 @@ class InsertCylinder(
             name=f"{self.name}/insert",
             root_link=root,
             tip_link=self.tip_link,
-            controlled_feature=self.tip_P_tool,
-            reference_feature=root_P_hole,
+            tip_point=self.tip_P_tool,
+            reference_point=root_P_hole,
             cruise_velocity=self.insertion_cruise_velocity,
             weight=self.weight,
         )
@@ -236,8 +235,8 @@ class InsertCylinder(
             name=f"{self.name}/tilt straight",
             root_link=root,
             tip_link=self.tip_link,
-            controlled_feature=self.tip_V_axis,
-            reference_feature=root_V_up,
+            tip_normal=self.tip_V_axis,
+            reference_normal=root_V_up,
             cruise_velocity=self.straightening_cruise_velocity,
             weight=self.weight,
         )

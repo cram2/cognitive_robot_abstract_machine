@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from abc import ABC
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import Point3, Vector3
@@ -14,22 +14,14 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
 )
 from giskardpy.motion_statechart.mixins import (
-    FeatureType,
-    HasFeaturePairParameters,
     HasCruiseVelocityParameter,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
 )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class FeatureFunctionGoal(
-    ConvergingTask,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
-    HasFeaturePairParameters[FeatureType],
-    HasCruiseVelocityParameter,
-    ABC,
+    ConvergingTask, HasKinematicChainParameters, HasCruiseVelocityParameter, ABC
 ):
     """
     Base for feature tasks operating on geometric features.
@@ -39,7 +31,30 @@ class FeatureFunctionGoal(
     visualizations are registered for them.
     """
 
+    controlled_feature: Point3 | Vector3 = field(init=False)
+    """
+    The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
+    """
+    reference_feature: Point3 | Vector3 = field(init=False)
+    """
+    The geometric feature (point or vector) that serves as reference, expressed in the root link frame.
+    """
+
+    @abstractmethod
+    def get_controlled_and_reference_features(
+        self,
+    ) -> tuple[Point3 | Vector3, Point3 | Vector3]:
+        """
+        Return the controlled and reference features.
+
+        :return: Tuple (controlled_feature, reference_feature), each a Point3 or Vector3.
+        """
+        raise NotImplementedError
+
     def build(self) -> MotionNodeArtifacts:
+        self.controlled_feature, self.reference_feature = (
+            self.get_controlled_and_reference_features()
+        )
         feature_debug_expressions: list[DebugExpression] = []
         root_reference_feature = self.context.world.transform(
             target_frame=self.root_link, spatial_object=self.reference_feature
@@ -101,18 +116,30 @@ class FeatureFunctionGoal(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AlignPerpendicular(FeatureFunctionGoal[Vector3]):
+class AlignPerpendicular(FeatureFunctionGoal):
     """
     Align two normal vectors to be perpendicular.
 
-    The goal drives the dot product of :attr:`controlled_feature` and
-    :attr:`reference_feature` to zero, and its error is the absolute dot product.
+    The goal drives the dot product of :attr:`tip_normal` and :attr:`reference_normal`
+    to zero, and its error is the absolute dot product.
+    """
+
+    tip_normal: Vector3
+    """
+    The normal vector to be controlled, defined in the tip link frame.
+    """
+    reference_normal: Vector3
+    """
+    The reference normal vector to align against, defined in the root link frame.
     """
 
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
     How fast the normals are turned perpendicular, in rad/s; not strictly enforced.
     """
+
+    def get_controlled_and_reference_features(self):
+        return self.tip_normal, self.reference_normal
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -136,25 +163,37 @@ class AlignPerpendicular(FeatureFunctionGoal[Vector3]):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HeightGoal(FeatureFunctionGoal[Point3]):
+class HeightGoal(FeatureFunctionGoal):
     """
-    Moves :attr:`controlled_feature` to be the specified distance away from
-    :attr:`reference_feature`
+    Moves :attr:`tip_point` to be the specified distance away from
+    :attr:`reference_point`
     along the z-axis of the map frame.
+    """
+
+    tip_point: Point3
+    """
+    Tip point to be controlled.
+    """
+    reference_point: Point3
+    """
+    Reference point to measure the distance against.
     """
 
     lower_limit: float
     """
-    Lower limit to control the distance away from :attr:`reference_feature`.
+    Lower limit to control the distance away from :attr:`reference_point`.
     """
     upper_limit: float
     """
-    Upper limit to control the distance away from :attr:`reference_feature`.
+    Upper limit to control the distance away from :attr:`reference_point`.
     """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
     """
+
+    def get_controlled_and_reference_features(self):
+        return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -182,25 +221,37 @@ class HeightGoal(FeatureFunctionGoal[Point3]):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DistanceGoal(FeatureFunctionGoal[Point3]):
+class DistanceGoal(FeatureFunctionGoal):
     """
-    Moves :attr:`controlled_feature` to be the specified distance away from
-    :attr:`reference_feature`
+    Moves :attr:`tip_point` to be the specified distance away from
+    :attr:`reference_point`
     measured in the x-y-plane of the map frame.
+    """
+
+    tip_point: Point3
+    """
+    Tip point to be controlled.
+    """
+    reference_point: Point3
+    """
+    Reference point to measure the distance against.
     """
 
     lower_limit: float
     """
-    Lower limit to control the distance away from :attr:`reference_feature`.
+    Lower limit to control the distance away from :attr:`reference_point`.
     """
     upper_limit: float
     """
-    Upper limit to control the distance away from :attr:`reference_feature`.
+    Upper limit to control the distance away from :attr:`reference_point`.
     """
     threshold: float = 0.0
     """
     How far outside the limits still counts as achieved.
     """
+
+    def get_controlled_and_reference_features(self):
+        return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -240,11 +291,23 @@ class DistanceGoal(FeatureFunctionGoal[Point3]):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ReachPoint(FeatureFunctionGoal[Point3]):
+class ReachPoint(FeatureFunctionGoal):
     """
     Drives a controlled point on the tip onto a reference point, with an error in
     meters.
     """
+
+    tip_point: Point3
+    """
+    The point to be controlled, defined in the tip link frame.
+    """
+    reference_point: Point3
+    """
+    The target point to reach, defined in the root link frame.
+    """
+
+    def get_controlled_and_reference_features(self) -> tuple[Point3, Point3]:
+        return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -266,10 +329,19 @@ class ReachPoint(FeatureFunctionGoal[Point3]):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AngleGoal(FeatureFunctionGoal[Vector3]):
+class AngleGoal(FeatureFunctionGoal):
     """
-    Controls the angle between :attr:`controlled_feature` and :attr:`reference_feature` to be between
+    Controls the angle between :attr:`tip_vector` and :attr:`reference_vector` to be between
     `lower_angle` and `upper_angle`.
+    """
+
+    tip_vector: Vector3
+    """
+    Tip vector to be controlled.
+    """
+    reference_vector: Vector3
+    """
+    Reference vector to measure the angle against.
     """
 
     lower_angle: float
@@ -289,6 +361,9 @@ class AngleGoal(FeatureFunctionGoal[Vector3]):
     """
     How far outside the limits still counts as achieved.
     """
+
+    def get_controlled_and_reference_features(self):
+        return self.tip_vector, self.reference_vector
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """

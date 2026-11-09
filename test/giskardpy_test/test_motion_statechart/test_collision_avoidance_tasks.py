@@ -1922,14 +1922,14 @@ def test_avoid_collision_box_between_3_boxes(
             AlignPlanes(
                 root_link=pr2_world_copy.root,
                 tip_link=box,
-                controlled_feature=Vector3.X(reference_frame=box),
-                reference_feature=Vector3.X(reference_frame=pr2_world_copy.root),
+                tip_normal=Vector3.X(reference_frame=box),
+                reference_normal=Vector3.X(reference_frame=pr2_world_copy.root),
             ),
             AlignPlanes(
                 root_link=pr2_world_copy.root,
                 tip_link=box,
-                controlled_feature=Vector3.Y(reference_frame=box),
-                reference_feature=Vector3.Y(reference_frame=pr2_world_copy.root),
+                tip_normal=Vector3.Y(reference_frame=box),
+                reference_normal=Vector3.Y(reference_frame=pr2_world_copy.root),
             ),
             ExternalCollisionAvoidance(robot=robot),
             local_min,

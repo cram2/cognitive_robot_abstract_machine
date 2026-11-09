@@ -202,11 +202,14 @@ def test_vectors_aligned(pr2_world_state_reset: World):
     drive = AlignPlanes(
         root_link=root,
         tip_link=tip,
-        reference_feature=goal_normal,
-        controlled_feature=tip_normal,
+        reference_normal=goal_normal,
+        tip_normal=tip_normal,
     )
     monitor = VectorsAligned(
-        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
+        root_link=root,
+        tip_link=tip,
+        reference_normal=goal_normal,
+        tip_normal=tip_normal,
     )
     statechart.add_nodes([drive, monitor])
     statechart.add_node(EndMotion.when_true(monitor))

@@ -6,14 +6,13 @@ import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.mixins import (
     HasGoalParameter,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
 )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class MaxManipulability(
-    ConvergingTask, HasRootLinkParameter, HasTipLinkParameter, HasGoalParameter[float]
+    ConvergingTask, HasKinematicChainParameters, HasGoalParameter[float]
 ):
     """
     This goal maximizes the manipulability of the kinematic chain between root_link and

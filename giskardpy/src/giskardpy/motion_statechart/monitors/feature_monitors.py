@@ -5,14 +5,16 @@ from dataclasses import field, dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.mixins import HasRootLinkParameter, HasTipLinkParameter
+from giskardpy.motion_statechart.mixins import (
+    HasKinematicChainParameters,
+)
 from cramph.node import NodeArtifacts
 from krrood_spatial_math.spatial_types import Point3, Vector3
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class FeatureFunctionMonitor(
-    EndedByOwner, MotionStatechartNode, HasRootLinkParameter, HasTipLinkParameter
+    EndedByOwner, MotionStatechartNode, HasKinematicChainParameters
 ):
     """
     Base for monitors that compare a controlled feature (attached to ``tip_link``) with a

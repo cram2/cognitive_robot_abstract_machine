@@ -8,10 +8,8 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
 )
 from giskardpy.motion_statechart.mixins import (
-    HasFeaturePairParameters,
     HasCruiseVelocityParameter,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
+    HasKinematicChainParameters,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.geometry import Color
@@ -19,18 +17,25 @@ from semantic_digital_twin.world_description.geometry import Color
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class AlignPlanes(
-    ConvergingTask,
-    HasRootLinkParameter,
-    HasTipLinkParameter,
-    HasFeaturePairParameters[Vector3],
-    HasCruiseVelocityParameter,
+    ConvergingTask, HasKinematicChainParameters, HasCruiseVelocityParameter
 ):
     """
     Will orient the plane fixed on :attr:`tip_link` to align with the plane fixed on
     :attr:`root_link`, with an error in radians.
 
-    The planes are represented by their normal vectors, :attr:`controlled_feature` and
-    :attr:`reference_feature`.
+    The planes are represented by their normal vectors, :attr:`tip_normal` and
+    :attr:`reference_normal`.
+    """
+
+    tip_normal: Vector3
+    """
+    Normal vector of the plane fixed on :attr:`tip_link`.
+    """
+
+    reference_normal: Vector3
+    """
+    Normal vector of the plane fixed on :attr:`root_link`, which the other plane is
+    aligned to.
     """
 
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
@@ -52,11 +57,11 @@ class AlignPlanes(
         """
         artifacts = MotionNodeArtifacts()
         tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.controlled_feature
+            target_frame=self.tip_link, spatial_object=self.tip_normal
         )
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.reference_feature
+            target_frame=self.root_link, spatial_object=self.reference_normal
         )
         root_V_root_normal.scale(1)
 
