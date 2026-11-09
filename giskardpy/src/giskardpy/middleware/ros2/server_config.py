@@ -31,6 +31,12 @@ class GiskardServerConfig:
     Draw the structure of every executed motion statechart, requires ``debug_mode``.
     """
 
+    publish_debug_expressions: bool = False
+    """
+    Publish the spatial debug expressions of the running nodes as RViz markers, requires
+    ``debug_mode``.
+    """
+
     idle_frequency: float = 20.0
     """
     Frequency in hertz at which Giskard waits for goals.

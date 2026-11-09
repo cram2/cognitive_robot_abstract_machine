@@ -164,6 +164,71 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
         return marker
 
 
+# %% evaluating spatial types
+
+
+@dataclass
+class CompiledSpatialTypeVisualizations:
+    """
+    Visualizations whose rendered expressions are compiled together once, so their
+    values are evaluated in one call of a function of their free variables.
+
+    .. warning:: Builds and evaluates CasADi expressions; use it from one thread only.
+    """
+
+    visualizations: list[SpatialTypeVisualization] = field(default_factory=list)
+    """
+    The visualizations, in the order :meth:`evaluate` returns their values.
+    """
+
+    _variables: list[FloatVariable] = field(init=False)
+    """
+    The free variables of the rendered expressions, in the order
+    :attr:`_compiled_rendered_values` takes their values.
+    """
+
+    _compiled_rendered_values: CompiledFunctionWithViews = field(init=False)
+    """
+    Evaluates the rendered expression of every visualization at once.
+    """
+
+    def __post_init__(self):
+        """
+        Compile the rendered expressions of :attr:`visualizations`.
+        """
+        rendered_expressions = [
+            SpatialTypeMarkerRenderer.find_spatial_type_renderer(
+                visualization.spatial_type
+            ).rendered_expression(visualization.spatial_type)
+            for visualization in self.visualizations
+        ]
+        self._variables = Matrix.vstack(rendered_expressions).free_variables()
+        self._compiled_rendered_values = CompiledFunctionWithViews(
+            expressions=rendered_expressions,
+            parameters=VariableParameters.from_lists(self._variables),
+        )
+
+    def evaluate(self) -> list[EvaluatedSpatialTypeVisualization]:
+        """
+        Evaluate every visualization against the current values of its variables.
+
+        :return: The visualizations with copies of their rendered values, which later
+            evaluations leave unchanged.
+        """
+        values = np.array(
+            [variable.resolve() for variable in self._variables], dtype=np.float64
+        )
+        rendered_values = self._compiled_rendered_values(values)
+        return [
+            EvaluatedSpatialTypeVisualization(
+                visualization=visualization, rendered_value=rendered_value.copy()
+            )
+            for visualization, rendered_value in zip(
+                self.visualizations, rendered_values
+            )
+        ]
+
+
 # %% live world-state visualization
 
 
@@ -182,45 +247,36 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     Publishes the evaluated spatial types on :attr:`node`.
     """
 
-    _requests: list[SpatialTypeVisualization] = field(init=False, default_factory=list)
+    _compiled_visualizations: CompiledSpatialTypeVisualizations = field(
+        init=False, default_factory=CompiledSpatialTypeVisualizations
+    )
     """
     The spatial types that are re-evaluated and republished on every state change.
-    """
-
-    _variables: list[FloatVariable] = field(init=False, default_factory=list)
-    """
-    The free variables of the registered spatial types, in the order
-    :attr:`_compiled_rendered_values` takes their values.
-    """
-
-    _compiled_rendered_values: CompiledFunctionWithViews = field(init=False)
-    """
-    Evaluates the rendered expression of every registered spatial type at once.
     """
 
     def __post_init__(self):
         super().__post_init__()
         self.marker_publisher = EvaluatedSpatialTypePublisher(node=self.node)
-        self._compile()
 
     def add(self, request: SpatialTypeVisualization) -> None:
         """
         Register a spatial type for visualization and publish immediately.
         """
-        self.set_requests([*self._requests, request])
+        self.add_all([request])
 
     def add_all(self, requests: Iterable[SpatialTypeVisualization]) -> None:
         """
         Register several spatial types for visualization and publish immediately.
         """
-        self.set_requests([*self._requests, *requests])
+        self.set_requests([*self._compiled_visualizations.visualizations, *requests])
 
     def set_requests(self, requests: Iterable[SpatialTypeVisualization]) -> None:
         """
         Replace all registered spatial types and publish immediately.
         """
-        self._requests = list(requests)
-        self._compile()
+        self._compiled_visualizations = CompiledSpatialTypeVisualizations(
+            visualizations=list(requests)
+        )
         self.publish()
 
     def clear(self) -> None:
@@ -240,35 +296,8 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         Evaluate all registered spatial types against the current world state and
         publish them, deleting the markers of spatial types no longer registered.
         """
-        values = np.array(
-            [variable.resolve() for variable in self._variables], dtype=np.float64
-        )
-        rendered_values = self._compiled_rendered_values(values)
         self.marker_publisher.publish(
-            [
-                EvaluatedSpatialTypeVisualization(
-                    visualization=request, rendered_value=rendered_value.copy()
-                )
-                for request, rendered_value in zip(self._requests, rendered_values)
-            ],
-            str(self._world.root.name),
-        )
-
-    def _compile(self) -> None:
-        """
-        Compile the rendered expressions of the registered spatial types into one
-        function of their free variables.
-        """
-        rendered_expressions = [
-            SpatialTypeMarkerRenderer.find_spatial_type_renderer(
-                request.spatial_type
-            ).rendered_expression(request.spatial_type)
-            for request in self._requests
-        ]
-        self._variables = Matrix.vstack(rendered_expressions).free_variables()
-        self._compiled_rendered_values = CompiledFunctionWithViews(
-            expressions=rendered_expressions,
-            parameters=VariableParameters.from_lists(self._variables),
+            self._compiled_visualizations.evaluate(), str(self._world.root.name)
         )
 
     @classmethod

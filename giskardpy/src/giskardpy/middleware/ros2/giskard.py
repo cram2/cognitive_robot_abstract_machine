@@ -9,6 +9,7 @@ import json
 from typing_extensions import Callable, Self
 
 import rclpy
+from rclpy.node import Node
 from json_msgs.action import JsonAction
 from std_msgs.msg import String
 from sqlalchemy.orm import sessionmaker
@@ -65,7 +66,10 @@ from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from cramph.composites import ChildChooserAccess
 from cramph.context import StatechartContext
-from cramph.executor import StatechartExecutor
+from cramph.executor import ExecutorExtension, StatechartExecutor
+from giskardpy.motion_statechart.debug_expression_publisher import (
+    DebugExpressionPublishing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +198,7 @@ class Giskard:
                 extensions=[
                     RosNodeAccess(rospy.get_node()),
                     MotionControl(qp_controller_config=self.qp_controller_config),
+                    *self.create_debug_extensions(rospy.get_node()),
                 ],
             )
 
@@ -272,6 +277,19 @@ class Giskard:
             ),
             10,
         )
+
+    def create_debug_extensions(self, node: Node) -> list[ExecutorExtension]:
+        """
+        Create the executor extensions of the debug output that is configured.
+
+        :param node: The ROS2 node the debug output is published on.
+        """
+        if (
+            not self.server_config.debug_mode
+            or not self.server_config.publish_debug_expressions
+        ):
+            return []
+        return [DebugExpressionPublishing(node)]
 
     def create_post_goal_plotters(self) -> list[PostGoalPlotter]:
         """

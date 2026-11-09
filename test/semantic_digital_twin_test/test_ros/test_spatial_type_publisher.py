@@ -13,6 +13,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_render
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
+    CompiledSpatialTypeVisualizations,
     EvaluatedSpatialTypeVisualization,
     EvaluatedSpatialTypePublisher,
     SpatialTypePublisher,
@@ -98,6 +99,61 @@ def test_marker_publisher_deletes_markers_no_longer_published(rclpy_node):
     assert [(marker.action, marker.ns) for marker in markers] == [
         (Marker.DELETE, "removed")
     ]
+
+
+# %% evaluating spatial types
+
+
+def test_compiled_visualizations_evaluate_the_current_variable_values(
+    cylinder_bot_world, monkeypatch
+):
+    """
+    Every evaluation reads the current variable values without recompiling.
+    """
+    dof = first_moving_dof(cylinder_bot_world)
+    compiled_visualizations = CompiledSpatialTypeVisualizations(
+        visualizations=[
+            SpatialTypeVisualization(
+                spatial_type=Point3(
+                    x=dof.variables.position, reference_frame=cylinder_bot_world.root
+                )
+            )
+        ]
+    )
+    monkeypatch.setattr(
+        SymbolicMathType, "evaluate", lambda self: pytest.fail("evaluate recompiles")
+    )
+
+    cylinder_bot_world.state[dof.id].position = 1.5
+    [evaluated] = compiled_visualizations.evaluate()
+
+    assert evaluated.rendered_value.tolist() == [1.5, 0, 0]
+
+
+def test_compiled_visualizations_return_values_later_evaluations_leave_unchanged(
+    cylinder_bot_world,
+):
+    """
+    The returned values are copies, so another thread may read them while the next
+    evaluation runs.
+    """
+    dof = first_moving_dof(cylinder_bot_world)
+    compiled_visualizations = CompiledSpatialTypeVisualizations(
+        visualizations=[
+            SpatialTypeVisualization(
+                spatial_type=Point3(
+                    x=dof.variables.position, reference_frame=cylinder_bot_world.root
+                )
+            )
+        ]
+    )
+    cylinder_bot_world.state[dof.id].position = 1.5
+    [first] = compiled_visualizations.evaluate()
+
+    cylinder_bot_world.state[dof.id].position = 2.5
+    compiled_visualizations.evaluate()
+
+    assert first.rendered_value.tolist() == [1.5, 0, 0]
 
 
 # %% live world-state visualization
@@ -210,7 +266,7 @@ def test_clear_deletes_previously_published_markers(rclpy_node, cylinder_bot_wor
     markers = fake.published[-1].markers
     assert all(marker.action == Marker.DELETE for marker in markers)
     assert {(marker.ns, marker.id) for marker in markers} == published_identities
-    assert publisher._requests == []
+    assert publisher._compiled_visualizations.visualizations == []
 
 
 def test_publish_deletes_only_removed_request_markers(rclpy_node, cylinder_bot_world):
@@ -270,7 +326,7 @@ def test_state_change_reuses_the_compiled_function(
     publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
     fake = capture(publisher)
     publisher.add(SpatialTypeVisualization(spatial_type=point))
-    compiled_function = publisher._compiled_rendered_values
+    compiled_function = publisher._compiled_visualizations
     monkeypatch.setattr(
         SymbolicMathType, "evaluate", lambda self: pytest.fail("evaluate recompiles")
     )
@@ -278,5 +334,5 @@ def test_state_change_reuses_the_compiled_function(
     cylinder_bot_world.state[dof.id].position = 1.5
     cylinder_bot_world.notify_state_change()
 
-    assert publisher._compiled_rendered_values is compiled_function
+    assert publisher._compiled_visualizations is compiled_function
     assert fake.published[-1].markers[0].pose.position.x == 1.5
