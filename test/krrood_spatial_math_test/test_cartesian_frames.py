@@ -35,19 +35,19 @@ def test_a_three_dimensional_cartesian_frame_declares_expressing_values_in_it():
 
 
 def test_a_reference_resolves_to_the_readers_frame(table_frame):
-    reference = CartesianFrame3DReference("reference_frame")
+    reference = CartesianFrame3DReference(subject="reference_frame")
     data = {}
-    reference.write(data, table_frame)
+    reference.write(data=data, identified_object=table_frame)
     known_frames = KnownFrames()
-    known_frames.add(table_frame.id, table_frame)
+    known_frames.add(key=table_frame.id, tracked_object=table_frame)
 
-    assert reference.resolve(data, **known_frames.create_kwargs()) is table_frame
+    assert reference.resolve(data=data, **known_frames.create_kwargs()) is table_frame
 
 
 def test_a_reference_cannot_be_resolved_without_a_resolver(table_frame):
-    reference = CartesianFrame3DReference("reference_frame")
+    reference = CartesianFrame3DReference(subject="reference_frame")
     data = {}
-    reference.write(data, table_frame)
+    reference.write(data=data, identified_object=table_frame)
 
     with pytest.raises(MissingCartesianFrame3DResolver):
-        reference.resolve(data)
+        reference.resolve(data=data)

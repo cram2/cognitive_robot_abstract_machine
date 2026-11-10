@@ -153,7 +153,9 @@ class ContainmentDetector(AbstractDetector):
         return {
             container
             for container in containers
-            if InsideOf(tracked_object, container).compute_containment_ratio()
+            if InsideOf(
+                body=tracked_object, other=container
+            ).compute_containment_ratio()
             > self.containment_threshold
         }
 
@@ -184,7 +186,9 @@ class ContainmentDetector(AbstractDetector):
                 body
                 for body in candidates
                 if tracked_object is not body
-                and InsideOf(tracked_object, body).compute_containment_ratio()
+                and InsideOf(
+                    body=tracked_object, other=body
+                ).compute_containment_ratio()
                 > self.containment_threshold
             }
             if containers:

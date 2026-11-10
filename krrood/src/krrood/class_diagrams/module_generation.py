@@ -10,7 +10,7 @@ from krrood.code_generation.formatting import run_black_on_file
 from krrood.utils import module_and_class_name, is_dynamic_class
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataclassRenderer:
     """
     Rendering definition to write dataclasses that have been created in memory into a
@@ -48,7 +48,7 @@ class DataclassRenderer:
                 self.imports.add(base.__module__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModuleRenderer:
     """
     Rendering definition to write dataclasses that have been created in memory into a
@@ -70,13 +70,13 @@ class ModuleRenderer:
             self.imports.update(clazz.imports)
 
     @classmethod
-    def from_dataclasses(cls, classes: list[type]):
-        dataclass_descriptions = [DataclassRenderer(clazz) for clazz in classes]
+    def from_dataclasses(cls, *, classes: list[type]):
+        dataclass_descriptions = [DataclassRenderer(type_=clazz) for clazz in classes]
         result = cls(classes=dataclass_descriptions)
         result._update_imports()
         return result
 
-    def write_to_file(self, path: Path):
+    def write_to_file(self, *, path: Path):
         """
         Write the module to a file.
 

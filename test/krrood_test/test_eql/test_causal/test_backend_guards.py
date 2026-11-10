@@ -15,7 +15,7 @@ from krrood.entity_query_language.exceptions import (
 from krrood.entity_query_language.factories import a, cause
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pick:
     arm: float
     grasped: bool
@@ -25,8 +25,8 @@ class Pick:
 
 
 def test_selective_backend_warns_and_finds_nothing_by_default():
-    apple = Pick(0.3, True)
-    match = a(Pick)(arm=cause, grasped=True).from_([apple])
+    apple = Pick(arm=0.3, grasped=True)
+    match = a(Pick)(arm=cause, grasped=True).from_(domain=[apple])
 
     with patch("krrood.entity_query_language.backends.logger.warning") as warning:
         results = list(match.evaluate(backend=EntityQueryLanguageBackend()))
@@ -37,8 +37,8 @@ def test_selective_backend_warns_and_finds_nothing_by_default():
 
 
 def test_selective_backend_raises_when_configured_to_raise():
-    apple = Pick(0.3, True)
-    match = a(Pick)(arm=cause, grasped=True).from_([apple])
+    apple = Pick(arm=0.3, grasped=True)
+    match = a(Pick)(arm=cause, grasped=True).from_(domain=[apple])
 
     backend = EntityQueryLanguageBackend(raise_on_unresolvable_cause=True)
     with pytest.raises(BackendCannotEvaluateCause):
@@ -46,7 +46,7 @@ def test_selective_backend_raises_when_configured_to_raise():
 
 
 def test_selective_backend_still_rejects_a_plain_ellipsis_attribute():
-    match = a(Pick)(arm=..., grasped=True).from_([Pick(0.3, True)])
+    match = a(Pick)(arm=..., grasped=True).from_(domain=[Pick(arm=0.3, grasped=True)])
     with pytest.raises(SelectiveBackendCannotResolveEllipsisMatch):
         list(match.evaluate(backend=EntityQueryLanguageBackend()))
 

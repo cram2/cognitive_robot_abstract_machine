@@ -21,7 +21,7 @@ from krrood.planning.fact import Fact
 # %% states
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class State(TermReader):
     """
     A valuation of ground terms that differs from the live objects only where it assigns a
@@ -83,10 +83,10 @@ class State(TermReader):
         """
         assignments = dict(self.assignments)
         for fact in facts:
-            assignments |= Fact.from_condition(fact).assignments()
+            assignments |= Fact.from_condition(condition=fact).assignments()
         return State(assignments=assignments)
 
-    def value_of_term(self, term: GroundTerm) -> TermValue | None:
+    def value_of_term(self, *, term: GroundTerm) -> TermValue | None:
         if term.function_key in self.assigned_functions and term in self.assignments:
-            return TermValue(self.assignments[term])
+            return TermValue(value=self.assignments[term])
         return term.live_term_value()

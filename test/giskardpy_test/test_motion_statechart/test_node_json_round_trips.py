@@ -12,16 +12,37 @@ from cramph.node import StatechartNode
 from giskardpy import motion_statechart
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart import ros2_nodes
-from giskardpy.motion_statechart.goals.base_pose_goals import (
+from giskardpy.motion_statechart.tasks.drive_tasks import (
     DifferentialDriveBaseGoal,
     HolonomicBaseGoal,
+    BaseHeading,
+    BaseOrientation,
+    BasePosition,
+    BaseTurnTowardsGoalPosition,
+    DrivenBaseTask,
 )
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.goals.collision_avoidance import (
-    ExternalCollisionAvoidance,
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
+    CartesianOrientation,
+    CartesianPose,
+    CartesianPosition,
+    CartesianPositionStraight,
+    CartesianPositionTrajectory,
+    CartesianPositionVelocityLimit,
+    CartesianRotationVelocityLimit,
+    CartesianVelocityLimit,
+    DistanceAlongAxis,
+    HoldOrientation,
+    HoldPose,
+    RigidCoupling,
+)
+from giskardpy.motion_statechart.monitors.collision_monitors import (
     ExternalCollisionDistanceMonitor,
-    SelfCollisionAvoidance,
     SelfCollisionDistanceMonitor,
+)
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    SelfCollisionAvoidance,
     SetInitialTemporaryCollisionRules,
     UpdateTemporaryCollisionRules,
     _CancelBecauseCollisionViolated,
@@ -31,14 +52,14 @@ from giskardpy.motion_statechart.goals.collision_avoidance import (
     _ExternalCollisionAvoidanceTask,
     _SelfCollisionAvoidanceTask,
 )
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingersToJointState,
     MoveGripper,
 )
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
-from giskardpy.motion_statechart.goals.cylinder_insertion import (
+from giskardpy.motion_statechart.tasks.cylinder_insertion import (
     InsertCylinder,
     StayOnLineTask,
 )
@@ -75,27 +96,9 @@ from giskardpy.motion_statechart.monitors.progress_monitors import (
     StillProgressing,
     _CancelBecauseNoProgress,
 )
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
-from giskardpy.motion_statechart.tasks.cartesian_tasks import (
-    CartesianOrientation,
-    CartesianPose,
-    CartesianPosition,
-    CartesianPositionStraight,
-    CartesianPositionTrajectory,
-    CartesianPositionVelocityLimit,
-    CartesianRotationVelocityLimit,
-    CartesianVelocityLimit,
-    DistanceAlongAxis,
-    HoldOrientation,
-    HoldPose,
-    RigidCoupling,
-)
-from giskardpy.motion_statechart.tasks.drive_tasks import (
-    BaseHeading,
-    BaseOrientation,
-    BasePosition,
-    BaseTurnTowardsGoalPosition,
-    DrivenBaseTask,
+from giskardpy.motion_statechart.tasks.align_planes import (
+    AlignPlanes,
+    KeepHeldBodyUpright,
 )
 from giskardpy.motion_statechart.tasks.feature_functions import (
     AlignPerpendicular,
@@ -251,6 +254,9 @@ def _feature_fields(world: World) -> dict[str, Body]:
 
 
 def _cartesian_cases() -> list[NodeRoundTripCase]:
+    """
+    :return: The cases of the nodes with a goal in Cartesian space.
+    """
     return [
         NodeRoundTripCase(
             CartesianPose,
@@ -410,6 +416,16 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             WorldFixture.PR2_WORLD,
         ),
         NodeRoundTripCase(
+            KeepHeldBodyUpright,
+            lambda world: [
+                KeepHeldBodyUpright(
+                    root_link=_root(world),
+                    end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+                )
+            ],
+            WorldFixture.PR2_WORLD,
+        ),
+        NodeRoundTripCase(
             Pointing,
             lambda world: [
                 Pointing(
@@ -495,12 +511,17 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             ArticulateGraspedMechanism,
             lambda world: [
                 ArticulateGraspedMechanism(
-                    environment_link=world.get_body_by_name("robot"),
-                    tip_link=world.get_body_by_name("robot2"),
+                    environment_link=world.get_body_by_name("torso_lift_link"),
+                    tip_link=world.get_semantic_annotations_by_type(EndEffector)[
+                        0
+                    ].tool_frame,
                     goal_joint_state=0.0,
+                    holding_end_effector=world.get_semantic_annotations_by_type(
+                        EndEffector
+                    )[0],
                 )
             ],
-            WorldFixture.PRISMATIC_BOT2,
+            WorldFixture.PR2_WORLD,
         ),
     ]
 

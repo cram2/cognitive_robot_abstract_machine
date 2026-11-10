@@ -5,11 +5,15 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing_extensions import ClassVar
 
 import numpy as np
+from typing_extensions import ClassVar
 
-from semantic_digital_twin.adapters.ros import rospy
+from cramph.composites import Parallel, Sequence
+from cramph.executor import Pacer, RealTimePacer
+from cramph.monitors import CheckTickCount
+from cramph.node import StatechartNode
+from cramph.statechart import Statechart
 from experiments.control_loop_experiments.control_loop_profiler import (
     CallTreeProfile,
     ControlLoopProfiler,
@@ -18,30 +22,21 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    WorldWithPR2Config,
-)
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.context import MotionControlContext
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
     UpdateTemporaryCollisionRules,
 )
-from cramph.composites import Parallel, Sequence
-from cramph.executor import Pacer, RealTimePacer
-from cramph.monitors import CheckTickCount
-from cramph.node import StatechartNode
-from krrood.ormatic.utils import classproperty
-from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetOdometry,
     SetSeedConfiguration,
 )
-from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.pointing import Pointing
@@ -50,15 +45,19 @@ from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
+from krrood.ormatic.utils import classproperty
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.adapters.ros import rospy
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
-from semantic_digital_twin.robots.pr2 import PR2Joint
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
-from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -207,10 +206,8 @@ class BenchmarkRobot(GiskardTester):
     def setup_giskard(self) -> Giskard:
         records_trajectory = self.plotter_mode.records_trajectory
         return Giskard(
-            world_config=WorldWithPR2Config(
-                urdf=load_xacro(
-                    "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-                )
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(PR2)]
             ),
             robot_interface_config=RealTimeStandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
@@ -705,7 +702,7 @@ class IsolatedBenchmarkSession(AbstractContextManager):
     def __enter__(self) -> IsolatedBenchmarkSession:
         SymbolGraph.clear()
         self._class_diagram = ClassDiagram(
-            recursive_subclasses(Symbol) + [World],
+            classes=recursive_subclasses(Symbol) + [World],
             introspector=DescriptorAwareIntrospector(),
         )
         SymbolGraph(_class_diagram=self._class_diagram)

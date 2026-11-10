@@ -25,16 +25,16 @@ last_world_id = -1
 
 def create_world(world_conf: WorldConf) -> World:
     global last_world_id
-    world = World(last_world_id + 1)
+    world = World(id=last_world_id + 1)
     last_world_id = world.id
 
     for body in world_conf.bodies:
         if isinstance(body, HandleConf):
-            world.bodies.append(Handle(body.name, size=body.size, world=world))
+            world.bodies.append(Handle(name=body.name, size=body.size, world=world))
         elif isinstance(body, ContainerConf):
-            world.bodies.append(Container(body.name, size=body.size, world=world))
+            world.bodies.append(Container(name=body.name, size=body.size, world=world))
         else:
-            world.bodies.append(Body(body.name, size=body.size, world=world))
+            world.bodies.append(Body(name=body.name, size=body.size, world=world))
     for connection in world_conf.connections:
         parent = next(
             (b for b in world.bodies if b.name == connection.parent.name), None

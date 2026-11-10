@@ -32,13 +32,13 @@ def _generate_interface(tmp_path):
     """
     Generate and import an ORMatic SQLAlchemy interface for the frozen classes.
     """
-    class_diagram = ClassDiagram([FrozenOuter, FrozenInner])
-    instance = ORMatic(class_diagram)
+    class_diagram = ClassDiagram(classes=[FrozenOuter, FrozenInner])
+    instance = ORMatic(class_dependency_graph=class_diagram)
     instance.make_all_tables()
 
     interface_file = tmp_path / "frozen_interface.py"
     with open(interface_file, "w") as f:
-        instance.to_sqlalchemy_file(f)
+        instance.to_sqlalchemy_file(file=f)
 
     spec = importlib.util.spec_from_file_location("frozen_interface", interface_file)
     module = importlib.util.module_from_spec(spec)

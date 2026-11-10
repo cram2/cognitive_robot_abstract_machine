@@ -45,21 +45,21 @@ class MorphologyProcessor(RewritePass):
     Reference: :cite:t:`gatt2009simplenlg` — the MorphologyProcessor realisation stage.
     """
 
-    def rewrite(self, leaf: VerbalizationFragment) -> VerbalizationFragment:
+    def rewrite(self, *, leaf: VerbalizationFragment) -> VerbalizationFragment:
         """:return: *leaf* with number and polarity realised, then reset; a leaf with no realisable
         feature is returned unchanged.
 
-        >>> MorphologyProcessor().rewrite(WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
+        >>> MorphologyProcessor().rewrite(leaf=WordFragment(text="Robot", number=GrammaticalNumber.PLURAL)).text
         'Robots'
-        >>> MorphologyProcessor().rewrite(WordFragment(text="Robot")).text
+        >>> MorphologyProcessor().rewrite(leaf=WordFragment(text="Robot")).text
         'Robot'
         """
         if not isinstance(leaf, (WordFragment, RoleFragment)):
             return leaf
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.VERB:
-            return self._realize_verb(leaf)
+            return self._realize_verb(leaf=leaf)
         if isinstance(leaf, RoleFragment) and leaf.role is SemanticRole.OPERATOR:
-            return self._realize_copula(leaf)
+            return self._realize_copula(leaf=leaf)
         if leaf.number is not GrammaticalNumber.PLURAL:
             return leaf
         return replace(
@@ -69,11 +69,11 @@ class MorphologyProcessor(RewritePass):
         )
 
     @staticmethod
-    def _realize_verb(leaf: RoleFragment) -> RoleFragment:
+    def _realize_verb(*, leaf: RoleFragment) -> RoleFragment:
         """:return: the ``VERB`` leaf's lemma realised — present 3rd-person singular (*"works"*),
         bare plural (*"work"*), or do-support negation (*"does not work"* / *"do not work"*).
 
-        >>> MorphologyProcessor()._realize_verb(RoleFragment(text="work", role=SemanticRole.VERB)).text
+        >>> MorphologyProcessor()._realize_verb(leaf=RoleFragment(text="work", role=SemanticRole.VERB)).text
         'works'
         """
         plural = leaf.number is GrammaticalNumber.PLURAL
@@ -87,12 +87,12 @@ class MorphologyProcessor(RewritePass):
         )
 
     @staticmethod
-    def _realize_copula(leaf: RoleFragment) -> RoleFragment:
+    def _realize_copula(*, leaf: RoleFragment) -> RoleFragment:
         """:return: an ``OPERATOR`` leaf with copula negation then plural suppletion applied; a
         non-copula operator (*"greater than"*) is returned unchanged but for its reset features.
 
         >>> MorphologyProcessor()._realize_copula(
-        ...     RoleFragment(text="is", role=SemanticRole.OPERATOR, negated=True)
+        ...     leaf=RoleFragment(text="is", role=SemanticRole.OPERATOR, negated=True)
         ... ).text
         'is not'
         """

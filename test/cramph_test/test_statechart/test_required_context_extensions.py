@@ -269,7 +269,7 @@ def test_a_composite_node_expanded_elsewhere_compiles_without_what_it_read_to_ex
     )
 
     received = Statechart.from_json(
-        expanded_elsewhere.to_json(), context=statechart_context
+        data=expanded_elsewhere.to_json(), context=statechart_context
     )
     received.compiler.compile()
 

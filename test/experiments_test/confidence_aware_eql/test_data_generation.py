@@ -31,7 +31,7 @@ def test_underspecified_query_has_exactly_one_mass_variable():
     would catch the change first.
     """
     query = a(Cup)(root=a(Body)(inertial=an(Inertial)(mass=...)))
-    parameters = UnderspecifiedParameters(query)
+    parameters = UnderspecifiedParameters(statement=query)
     assert len(parameters.variables) == 1
 
 

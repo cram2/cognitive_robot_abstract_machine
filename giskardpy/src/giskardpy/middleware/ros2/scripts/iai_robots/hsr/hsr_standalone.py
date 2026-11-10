@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
-    WorldWithHSRConfig,
-)
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
 def create_giskard() -> Giskard:
@@ -12,7 +12,9 @@ def create_giskard() -> Giskard:
     declares.
     """
     return Giskard.standalone(
-        world_config=WorldWithHSRConfig(),
+        world_source=WorldSpecification(
+            robots=[RobotSpecification.specify_real_robot(HSRB)]
+        ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )
 

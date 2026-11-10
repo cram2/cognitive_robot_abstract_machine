@@ -12,7 +12,7 @@ from krrood.symbol_graph.symbol_graph import Symbol
 from test.krrood_test.dataset.example_classes import GenericJSONSerializableClass
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RoleOverAValueStoredAsJson(Role[GenericJSONSerializableClass], Symbol):
     """
     Plays a part that the value it is about cannot play by itself.
