@@ -117,7 +117,7 @@ class VariableRule(PhraseRule):
         if not (is_enum or type_ in _PRIMITIVE_VALUE_TYPES):
             return None
         values = itertools.islice(
-            node._re_enterable_domain_generator_, MAX_SET_MEMBERS + 1
+            node._values_domain_.listed_values, MAX_SET_MEMBERS + 1
         )
         return one_of([RoleFragment.for_literal(value) for value in values])
 
