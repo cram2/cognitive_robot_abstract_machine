@@ -2570,7 +2570,7 @@ class SimulationAlreadyRunningError(UsageError):
         return "Stop the simulation before starting it again."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SnapshotDoesNotFitSimulationError(UsageError):
     """
     Raised when a simulation is restored from a snapshot of a simulation that was built

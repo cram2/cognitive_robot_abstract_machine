@@ -52,7 +52,7 @@ def divide_by_zero_script(cell_scripts: Path) -> Path:
 # %% a session driving a simulated pendulum
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PendulumSession:
     """
     A live session driving a simulated pendulum, and what its cells refer to.

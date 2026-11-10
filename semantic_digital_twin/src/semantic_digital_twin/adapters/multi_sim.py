@@ -3957,7 +3957,7 @@ class JointBackedConnection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoServoCommands:
     """
     What a :class:`MujocoSynchronizer` has commanded its actuators to at one moment.
@@ -4362,7 +4362,10 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         )
 
     def restore_world_state(
-        self, world_state: NDArray[numpy.float64], servo_commands: MujocoServoCommands
+        self,
+        *,
+        world_state: NDArray[numpy.float64],
+        servo_commands: MujocoServoCommands,
     ) -> None:
         """
         Put the world back to an earlier state and the actuators back to what they were
@@ -4714,7 +4717,7 @@ class MultiSim(ABC):
         return self.simulator.state == SimulatorState.RUNNING
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoSimulationSnapshot:
     """
     One moment of a MuJoCo simulation and of the world it simulates, from which
@@ -4800,7 +4803,7 @@ class MujocoSim(MultiSim):
                 servo_commands=self.synchronizer.servo_commands,
             )
 
-    def restore_snapshot(self, snapshot: MujocoSimulationSnapshot) -> None:
+    def restore_snapshot(self, *, snapshot: MujocoSimulationSnapshot) -> None:
         """
         Put the simulation and its world back to the moment of a snapshot, so that the
         physics continues from there exactly as it did after the snapshot was taken.
@@ -4812,10 +4815,13 @@ class MujocoSim(MultiSim):
         if snapshot.physics_state.shape != (
             self._physics_state_size,
         ) or snapshot.world_state.shape != (len(Derivatives), len(self.world.state)):
-            raise SnapshotDoesNotFitSimulationError(self.world.root.name.name)
+            raise SnapshotDoesNotFitSimulationError(
+                world_name=self.world.root.name.name
+            )
         with self.world._world_lock:
             self.synchronizer.restore_world_state(
-                snapshot.world_state, snapshot.servo_commands
+                world_state=snapshot.world_state,
+                servo_commands=snapshot.servo_commands,
             )
             with self.simulator._model_lock:
                 mujoco.mj_setState(

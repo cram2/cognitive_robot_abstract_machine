@@ -24,7 +24,7 @@ class CellMarker(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cell:
     """
     One step of a live session, as code.
@@ -41,7 +41,7 @@ class Cell:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CellScript:
     """
     The cells of a script, in the order they are written in.
@@ -53,7 +53,7 @@ class CellScript:
     """
 
     @classmethod
-    def from_file(cls, path: Path) -> Self:
+    def from_file(cls, *, path: Path) -> Self:
         """
         :param path: A script whose cells each begin with a line starting with
             :attr:`CellMarker.START`; text before the first such line is no cell.

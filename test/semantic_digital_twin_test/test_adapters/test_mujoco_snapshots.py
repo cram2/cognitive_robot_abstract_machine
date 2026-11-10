@@ -37,7 +37,7 @@ def test_a_restored_snapshot_puts_the_joint_back_where_it_was():
         world.notify_state_change()
         simulation.step_simulation(timedelta(seconds=1))
 
-        simulation.restore_snapshot(snapshot)
+        simulation.restore_snapshot(snapshot=snapshot)
 
         restored_position = simulation.simulator.get_joint_value("hinge").result
     finally:
@@ -68,7 +68,7 @@ def test_continuing_from_a_restored_snapshot_repeats_what_followed_it():
         world.notify_state_change()
         simulation.step_simulation(timedelta(seconds=1))
 
-        simulation.restore_snapshot(snapshot)
+        simulation.restore_snapshot(snapshot=snapshot)
         simulation.step_simulation(timedelta(seconds=0.3))
 
         second_continuation = simulation.simulator.get_joint_value("hinge").result
@@ -89,7 +89,7 @@ def test_a_snapshot_of_a_differently_built_simulation_is_refused():
     try:
         snapshot = servoed.take_snapshot()
         with pytest.raises(SnapshotDoesNotFitSimulationError):
-            unservoed.restore_snapshot(snapshot)
+            unservoed.restore_snapshot(snapshot=snapshot)
     finally:
         servoed.stop_simulation()
         unservoed.stop_simulation()

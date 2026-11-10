@@ -43,7 +43,7 @@ class StepStatus(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StepReport:
     """
     What a developer is told after a step: how its plan ended and where the robot is.
@@ -96,7 +96,7 @@ class StepReport:
 # %% performed cells
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerformedCell:
     """
     A cell a session performed, and the moment before it, to go back to.
@@ -126,7 +126,7 @@ class PerformedCell:
 # %% the session
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LiveSession:
     """
     A developer driving a simulated robot one cell at a time, with every moment before a
@@ -158,7 +158,7 @@ class LiveSession:
     The cells performed, first to last.
     """
 
-    def report(self, label: str, outcome: PlanOutcome | None = None) -> StepReport:
+    def report(self, *, label: str, outcome: PlanOutcome | None = None) -> StepReport:
         """
         Tell the developer how a step ended and where the robot is now, and keep that
         with the cell being performed.
@@ -178,7 +178,7 @@ class LiveSession:
         print(report.to_line())
         return report
 
-    def take_snapshot(self, name: str) -> MujocoSimulationSnapshot:
+    def take_snapshot(self, *, name: str) -> MujocoSimulationSnapshot:
         """
         Keep the current moment of the simulation under a name.
 
@@ -190,7 +190,7 @@ class LiveSession:
         self.snapshots[name] = snapshot
         return snapshot
 
-    def restore_snapshot(self, name: str) -> None:
+    def restore_snapshot(self, *, name: str) -> None:
         """
         Put the simulation back to a moment kept by :meth:`take_snapshot`.
 
@@ -198,10 +198,12 @@ class LiveSession:
         :raises UnknownSnapshotError: If no moment was kept under that name.
         """
         if name not in self.snapshots:
-            raise UnknownSnapshotError(name, list(self.snapshots))
-        self.simulation.restore_snapshot(self.snapshots[name])
+            raise UnknownSnapshotError(
+                snapshot_name=name, known_names=list(self.snapshots)
+            )
+        self.simulation.restore_snapshot(snapshot=self.snapshots[name])
 
-    def perform(self, cell: Cell, namespace: dict[str, Any]) -> None:
+    def perform(self, *, cell: Cell, namespace: dict[str, Any]) -> None:
         """
         Run a cell and keep it in :attr:`history`, together with the moment before it.
 
@@ -223,12 +225,12 @@ class LiveSession:
         :return: The cell that was dropped.
         :raises NoPerformedCellError: If no cell has been performed.
         """
-        last = self._performed_cell(len(self.history) - 1)
-        self.simulation.restore_snapshot(last.snapshot_before)
+        last = self._performed_cell(cell_index=len(self.history) - 1)
+        self.simulation.restore_snapshot(snapshot=last.snapshot_before)
         self.history.pop()
         return last.cell
 
-    def replay(self, first_cell: int, namespace: dict[str, Any]) -> None:
+    def replay(self, *, first_cell: int, namespace: dict[str, Any]) -> None:
         """
         Put the simulation back to the moment before a cell and perform that cell and
         every cell after it again.
@@ -237,19 +239,21 @@ class LiveSession:
         :param namespace: The names the cells' code runs with.
         :raises NoPerformedCellError: If no cell was performed at that position.
         """
-        first = self._performed_cell(first_cell)
+        first = self._performed_cell(cell_index=first_cell)
         cells = [performed.cell for performed in self.history[first_cell:]]
-        self.simulation.restore_snapshot(first.snapshot_before)
+        self.simulation.restore_snapshot(snapshot=first.snapshot_before)
         del self.history[first_cell:]
         for cell in cells:
-            self.perform(cell, namespace)
+            self.perform(cell=cell, namespace=namespace)
 
-    def _performed_cell(self, cell_index: int) -> PerformedCell:
+    def _performed_cell(self, *, cell_index: int) -> PerformedCell:
         """
         :param cell_index: A position in :attr:`history`.
         :return: The cell performed at that position.
         :raises NoPerformedCellError: If no cell was performed at that position.
         """
         if not 0 <= cell_index < len(self.history):
-            raise NoPerformedCellError(cell_index, len(self.history))
+            raise NoPerformedCellError(
+                cell_index=cell_index, performed_cells=len(self.history)
+            )
         return self.history[cell_index]

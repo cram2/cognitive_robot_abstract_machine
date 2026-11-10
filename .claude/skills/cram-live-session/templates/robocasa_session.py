@@ -8,35 +8,35 @@ import mujoco
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("physics_simulators").setLevel(logging.WARNING)
-from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
-    robocasa_version_assertions_relaxed,
-)
-
-with robocasa_version_assertions_relaxed():
-    from robocasa.models.scenes.scene_registry import LayoutType, StyleType
-
-from experiments.robocasa_kitchen_demo import (
-    _spawn_robot_and_prepare_pick_up,
-    load_kitchen,
-)
-from semantic_digital_twin.robots.pr2 import PR2
-
-world = load_kitchen(LayoutType.LAYOUT001, StyleType.STYLE001)
-_spawn_robot_and_prepare_pick_up(world)
-(robot,) = world.get_semantic_annotations_by_type(PR2)
-arm = robot.right_arm
-
-# %% cell physics
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.executors import PhysicallySimulatedPlanExecutor, PlanOutcome
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
+from experiments.live_session.session import LiveSession
+from experiments.robocasa_kitchen_demo import (
+    _spawn_robot_and_prepare_pick_up,
+    load_kitchen,
+)
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
+from semantic_digital_twin.adapters.robocasa_dataset.mujoco_compat import (
+    robocasa_version_assertions_relaxed,
+)
+from semantic_digital_twin.robots.pr2 import PR2
 
+with robocasa_version_assertions_relaxed():
+    from robocasa.models.scenes.scene_registry import LayoutType, StyleType
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("physics_simulators").setLevel(logging.WARNING)
+
+world = load_kitchen(layout=LayoutType.LAYOUT001, style=StyleType.STYLE001)
+_spawn_robot_and_prepare_pick_up(world=world)
+(robot,) = world.get_semantic_annotations_by_type(PR2)
+arm = robot.right_arm
+
+# %% cell physics
 simulation = MujocoSim(world=world, headless=True)
 simulation.start_stepped_simulation()
 simulation.step_simulation(timedelta(seconds=1))
@@ -50,7 +50,7 @@ def run(*actions: StatechartNode) -> PlanOutcome:
     :return: How the plan ended.
     """
     executor = PhysicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(robot)]),
+        StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot)]),
         simulation=simulation,
     )
     statechart = Statechart(context=executor.context)
@@ -62,12 +62,10 @@ def run(*actions: StatechartNode) -> PlanOutcome:
 
 
 # %% cell the live session
-from experiments.live_session.session import LiveSession
-
 session = LiveSession(
     simulation=simulation,
     tool_frame=arm.end_effector.tool_frame,
     robot_base=robot.root,
 )
-session.take_snapshot("composed")
-session.report("session started")
+session.take_snapshot(name="composed")
+session.report(label="session started")

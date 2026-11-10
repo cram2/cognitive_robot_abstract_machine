@@ -11,7 +11,7 @@ from krrood.exceptions import DataclassException
 # %% snapshots and cells
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownSnapshotError(DataclassException):
     """
     Raised when a session is asked to restore a snapshot under a name it has none under.
@@ -34,7 +34,7 @@ class UnknownSnapshotError(DataclassException):
         return f"Restore one of {self.known_names}, or take the snapshot first."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoPerformedCellError(DataclassException):
     """
     Raised when a session is asked to go back to a cell it has not performed.
