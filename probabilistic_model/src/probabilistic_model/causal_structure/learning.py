@@ -1,7 +1,7 @@
 """
 Learning a causal graph from the rows a model is fitted on, with the Peter-Clark
-algorithm or greedy equivalence search of causal-learn (Zheng et al., 2024), from a flat
-table or from the tables a relational circuit is fitted on.
+algorithm or greedy equivalence search of causal-learn :cite:p:`zheng2024causal`, from a
+flat table or from the tables a relational circuit is fitted on.
 """
 
 from __future__ import annotations
@@ -90,8 +90,7 @@ class GraphScore(StrEnum):
 
     BAYESIAN_DIRICHLET = "local_score_BDeu"
     """
-    The Bayesian Dirichlet equivalent uniform score (Heckerman, Geiger and Chickering,
-    1995).
+    The Bayesian Dirichlet equivalent uniform score :cite:p:`heckerman1995learning`.
     """
 
 
@@ -281,13 +280,13 @@ class PeterClarkStructureLearner(DiscretizedTableStructureLearner):
 @dataclass
 class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
     """
-    Greedy equivalence search (Chickering, 2002), which moves between equivalence
-    classes while that raises their score.
+    Greedy equivalence search :cite:p:`chickering2002optimal`, which moves between
+    equivalence classes while that raises their score.
 
     .. note::
         The domain causal knowledge does not restrict the search. It orients the edges
-        the search leaves undirected, followed by the orientations they imply (Meek,
-        1995).
+        the search leaves undirected, followed by the orientations they imply
+        :cite:p:`meek1995causal`.
     """
 
     score: GraphScore = GraphScore.BAYESIAN_DIRICHLET
