@@ -132,6 +132,36 @@ class EquivalenceClassTooLarge(ProbabilisticModelException):
         )
 
 
+# %% learning a graph
+
+
+@dataclass
+class TooFewVariablesToScore(ProbabilisticModelException):
+    """
+    Raised when a graph is to be learned by its score over fewer variables than the
+    score is defined for.
+    """
+
+    variable_count: int
+    """
+    How many variables the graph is to be learned over.
+    """
+
+    minimum_variable_count: int
+    """
+    How many the score needs.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The graph score needs at least {self.minimum_variable_count} variables "
+            f"that vary, but the table has {self.variable_count}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Learn the graph of this table with the Peter-Clark algorithm instead."
+
+
 # %% adjustment sets
 
 
