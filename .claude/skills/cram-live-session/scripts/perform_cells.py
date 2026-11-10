@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass, field
+from datetime import timedelta
 from pathlib import Path
 
 from jupyter_client import BlockingKernelClient
@@ -37,7 +38,7 @@ class KernelConnection:
     The connection file the kernel was started with.
     """
 
-    timeout_seconds: float
+    timeout: timedelta
     """
     How long one execution may take before the client gives up waiting for it.
     """
@@ -60,7 +61,7 @@ class KernelConnection:
         :return: Whether the kernel reported no error.
         """
         reply = self.client.execute_interactive(
-            code, output_hook=print_kernel_output, timeout=self.timeout_seconds
+            code, output_hook=print_kernel_output, timeout=self.timeout.total_seconds()
         )
         status = reply["content"]["status"]
         print(f"[status: {status}]", flush=True)
@@ -117,7 +118,9 @@ def main() -> None:
     parser.add_argument("--timeout-seconds", type=float, default=3600)
     arguments = parser.parse_args()
 
-    kernel = KernelConnection(arguments.connection_file, arguments.timeout_seconds)
+    kernel = KernelConnection(
+        arguments.connection_file, timedelta(seconds=arguments.timeout_seconds)
+    )
     if arguments.raw:
         sys.exit(0 if kernel.execute(arguments.script.read_text()) else 1)
     first, _, last = arguments.cells.partition(":")
