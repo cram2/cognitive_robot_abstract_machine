@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.ros.ros_graph import wait_for_future_to_complete
 from giskardpy.middleware.ros2.command_publishing import (
     JointGroupVelocityCommandPublisher,
@@ -83,7 +83,7 @@ class MockRobotDriver:
         Whether the controller manager is up and reports the velocity controller as
         active.
         """
-        node = rospy.get_node()
+        node = background_node.get_node()
         client = node.create_client(
             controller_manager_services.ListControllers,
             "controller_manager/list_controllers",
@@ -123,7 +123,9 @@ def mock_robot_driver() -> Iterator[MockRobotDriver]:
 
 
 @pytest.fixture()
-def mock_robot(mock_robot_driver: MockRobotDriver, init_rospy) -> MockRobotDriver:
+def mock_robot(
+    mock_robot_driver: MockRobotDriver, init_background_node
+) -> MockRobotDriver:
     """
     The mock robot, once it can be commanded.
     """
@@ -142,7 +144,7 @@ def connected_giskard(mock_robot) -> Iterator[Giskard]:
     """
     A Giskard that discovered the controllers of the mock robot.
     """
-    giskard = create_giskard(rospy.get_node())
+    giskard = create_giskard(background_node.get_node())
     giskard.setup()
     yield giskard
     giskard.close_world_model_ros_interface()
@@ -154,7 +156,7 @@ def test_discovery_leaves_the_node_on_the_executor_of_giskard(
     """
     Giskard only hears the robot and its clients while its own executor spins the node.
     """
-    assert rospy.get_node().executor is rospy.executor
+    assert background_node.get_node().executor is background_node.executor
 
 
 def test_discovery_commands_the_joints_of_the_active_velocity_controller(
@@ -179,7 +181,7 @@ class ControllerManagerRobotTester(GiskardTester):
     """
 
     def setup_giskard(self) -> Giskard:
-        return create_giskard(rospy.get_node())
+        return create_giskard(background_node.get_node())
 
 
 @pytest.fixture()

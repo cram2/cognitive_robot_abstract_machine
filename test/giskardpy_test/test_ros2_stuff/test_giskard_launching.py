@@ -10,7 +10,7 @@ import pytest
 import rclpy
 from rclpy.node import Node
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
@@ -77,10 +77,10 @@ def shut_ros_down_afterwards():
     """
     Shuts down the ros node a launched Giskard leaves behind.
     """
-    if rospy is None:
+    if background_node is None:
         pytest.skip("ROS not installed")
     yield
-    rospy.shutdown()
+    background_node.shutdown()
 
 
 def test_launching_builds_giskard_on_its_node_and_runs_it_until_shutdown(

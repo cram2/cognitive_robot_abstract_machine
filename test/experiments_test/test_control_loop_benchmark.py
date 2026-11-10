@@ -228,12 +228,12 @@ class TestPhaseBreakdown:
 
 
 @pytest.fixture()
-def cartesian_goal_profile(init_rospy) -> CallTreeProfile:
+def cartesian_goal_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(CartesianGoalScenario())
 
 
 @pytest.fixture()
-def long_sequence_profile(init_rospy) -> CallTreeProfile:
+def long_sequence_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(LongSequenceScenario())
 
 
@@ -256,7 +256,7 @@ class TestPhaseAccounting:
 
 
 @pytest.fixture()
-def benchmark_robot(init_rospy) -> Iterator[BenchmarkRobot]:
+def benchmark_robot(init_background_node) -> Iterator[BenchmarkRobot]:
     robot = BenchmarkRobot(
         plotter_mode=PlotterMode.PLAIN,
         target_frequency=ScenarioRunner.target_frequency,
@@ -308,7 +308,7 @@ class TestControlCycleBudget:
 
 
 @pytest.fixture()
-def deeply_nested_cascade_profile(init_rospy) -> CallTreeProfile:
+def deeply_nested_cascade_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(
         DeeplyNestedCascadeScenario()
     )

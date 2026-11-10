@@ -3,7 +3,7 @@ Finding topics, waiting for messages and calling services and parameters on a RO
 graph, through a node someone else owns.
 
 :class:`RosGraph` only uses a node: it never creates, spins or destroys one. Whoever runs
-the process owns the node, for example :mod:`semantic_digital_twin.adapters.ros.rospy`
+the process owns the node, for example :mod:`semantic_digital_twin.adapters.ros.background_node`
 or an application that registers its own node in
 :class:`~semantic_digital_twin.adapters.ros.node_registry.ROSNodeRegistry`.
 """

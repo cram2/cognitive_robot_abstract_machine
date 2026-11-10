@@ -2,7 +2,7 @@
 import argparse
 from dataclasses import dataclass, field
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.other_robots.garmi.configs import (
     GarmiInteractiveMarkerChain,
@@ -57,7 +57,7 @@ def main() -> None:
     # parse_known_args ignores ROS 2 arguments (--ros-args ...) that argparse does not know about.
     args, _ = parser.parse_known_args()
 
-    rospy.init_node("giskard")
+    background_node.init_node("giskard")
 
     giskard = GarmiGiskard(
         world_source=WorldSpecification(

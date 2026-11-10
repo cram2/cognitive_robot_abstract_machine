@@ -7,7 +7,7 @@ from typing_extensions import Any
 import pytest
 
 from cramph.executor import NoPacing
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
 from giskardpy.middleware.ros2.control_loop import ControlLoop
@@ -405,13 +405,15 @@ def add_moving_connection(world: World) -> None:
 
 
 @pytest.fixture()
-def control_loop(init_rospy) -> ControlLoopFixture:
+def control_loop(init_background_node) -> ControlLoopFixture:
     controlled_world = World(name="controlled")
     remote_world = World(name="remote")
     controlled_synchronizer = WorldSynchronizer(
-        node=rospy.get_node(), _world=controlled_world
+        node=background_node.get_node(), _world=controlled_world
     )
-    remote_synchronizer = WorldSynchronizer(node=rospy.get_node(), _world=remote_world)
+    remote_synchronizer = WorldSynchronizer(
+        node=background_node.get_node(), _world=remote_world
+    )
     time.sleep(0.3)
 
     # Build the structure on one side and let it propagate, so both worlds refer to the
@@ -451,7 +453,7 @@ def control_loop(init_rospy) -> ControlLoopFixture:
             executor=executor,
             action_server=action_server,
             client_watchdog=ClientWatchdog(
-                presence=HeartbeatPresence(node=rospy.get_node())
+                presence=HeartbeatPresence(node=background_node.get_node())
             ),
             feedback_publisher=ActionFeedbackPublisher(
                 executor=executor,
@@ -564,7 +566,7 @@ class CommandPublisherRecordingCalls(CommandPublisher):
 
 
 @pytest.fixture()
-def local_control_loop(init_rospy) -> ControlLoop:
+def local_control_loop(init_background_node) -> ControlLoop:
     """
     :return: A control loop running a long motion on a world no other process updates.
     """
@@ -588,7 +590,7 @@ def local_control_loop(init_rospy) -> ControlLoop:
         executor=executor,
         action_server=action_server,
         client_watchdog=ClientWatchdog(
-            presence=HeartbeatPresence(node=rospy.get_node())
+            presence=HeartbeatPresence(node=background_node.get_node())
         ),
         feedback_publisher=ActionFeedbackPublisher(
             executor=executor,

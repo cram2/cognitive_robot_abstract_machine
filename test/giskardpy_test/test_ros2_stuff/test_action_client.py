@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from typing_extensions import Any, Iterator
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler, GoalOutcome
 from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.exceptions import GoalRequestNotAnsweredError
@@ -263,7 +263,7 @@ def reject_feedback(feedback_message: Any) -> None:
 
 
 @pytest.fixture()
-def giskard_command_server(init_rospy) -> Iterator[ActionServerHandler]:
+def giskard_command_server(init_background_node) -> Iterator[ActionServerHandler]:
     """
     A real "giskard/command" action server that a client can send goals to.
     """
@@ -275,7 +275,7 @@ def giskard_command_server(init_rospy) -> Iterator[ActionServerHandler]:
 
 
 @pytest.fixture()
-def server_never_answering(init_rospy) -> Iterator[ServerNeverAnswering]:
+def server_never_answering(init_background_node) -> Iterator[ServerNeverAnswering]:
     """
     A server that is found but never answers, withdrawn again after the test.
     """
@@ -292,7 +292,7 @@ def client_of_server_never_answering(
     A client that gives up on a goal request after half a second.
     """
     client = GiskardActionClient(
-        rospy.get_node(),
+        background_node.get_node(),
         JsonAction,
         server_never_answering.action_name,
         goal_response_timeout=timedelta(seconds=0.5),
@@ -302,7 +302,7 @@ def client_of_server_never_answering(
 
 
 @pytest.fixture()
-def server_accepting_late(init_rospy) -> Iterator[ServerAcceptingLate]:
+def server_accepting_late(init_background_node) -> Iterator[ServerAcceptingLate]:
     """
     A server that takes a second to accept a goal, withdrawn again after the test.
     """
@@ -321,7 +321,7 @@ def client_of_server_accepting_late(
     A client that gives up on a goal request well before the server accepts it.
     """
     client = GiskardActionClient(
-        rospy.get_node(),
+        background_node.get_node(),
         JsonAction,
         server_accepting_late.action_name,
         goal_response_timeout=server_accepting_late.acceptance_delay / 4,
@@ -348,7 +348,9 @@ def server_sending_feedback(giskard_command_server) -> ServerAnsweringOneGoal:
 def test_an_error_of_the_feedback_callback_is_raised_to_the_sender_of_the_goal(
     server_sending_feedback: ServerAnsweringOneGoal,
 ) -> None:
-    client = GiskardActionClient(rospy.get_node(), JsonAction, "giskard/command")
+    client = GiskardActionClient(
+        background_node.get_node(), JsonAction, "giskard/command"
+    )
 
     with pytest.raises(FeedbackDeliberatelyRejected):
         client.send_goal(JsonAction.Goal(), feedback_callback=reject_feedback)
@@ -357,7 +359,9 @@ def test_an_error_of_the_feedback_callback_is_raised_to_the_sender_of_the_goal(
 def test_a_goal_whose_feedback_callback_failed_is_canceled(
     server_sending_feedback: ServerAnsweringOneGoal,
 ) -> None:
-    client = GiskardActionClient(rospy.get_node(), JsonAction, "giskard/command")
+    client = GiskardActionClient(
+        background_node.get_node(), JsonAction, "giskard/command"
+    )
 
     with pytest.raises(FeedbackDeliberatelyRejected):
         client.send_goal(JsonAction.Goal(), feedback_callback=reject_feedback)

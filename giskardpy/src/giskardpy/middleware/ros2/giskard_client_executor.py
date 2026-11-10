@@ -16,7 +16,7 @@ from cramph.composites import ChildChooserAccess
 from cramph.context import ContextExtension, StatechartContext
 from cramph.executor import Executor, ExecutorExtension
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceClient,
     child_choices_topic,
@@ -421,7 +421,7 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
             automatically_declare_parameters_from_overrides=self.automatically_declare_parameters_from_overrides,
             enable_logger_service=self.enable_logger_service,
         )
-        rospy.executor.add_node(self.node_handle)
+        background_node.executor.add_node(self.node_handle)
         super().__post_init__()
 
     def close(self) -> None:
@@ -432,5 +432,5 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
         destroyed node left registered there would break the next spin.
         """
         super().close()
-        rospy.executor.remove_node(self.node_handle)
+        background_node.executor.remove_node(self.node_handle)
         self.node_handle.destroy_node()

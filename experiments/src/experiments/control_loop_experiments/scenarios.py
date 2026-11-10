@@ -50,7 +50,7 @@ from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from krrood_spatial_math.spatial_types import Pose
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
@@ -706,11 +706,11 @@ class IsolatedBenchmarkSession(AbstractContextManager):
             introspector=DescriptorAwareIntrospector(),
         )
         SymbolGraph(_class_diagram=self._class_diagram)
-        rospy.init_node(self.node_name)
+        background_node.init_node(self.node_name)
         return self
 
     def __exit__(self, exception_type, exception, traceback) -> None:
-        rospy.shutdown()
+        background_node.shutdown()
         SymbolGraph.clear()
         self._class_diagram.clear()
 
