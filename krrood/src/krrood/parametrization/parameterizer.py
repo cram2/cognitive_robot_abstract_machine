@@ -310,6 +310,14 @@ class UnderspecifiedParameters(ModelQueryParameters):
     the model variable each feature is represented by.
     """
 
+    derived_adjustment_variables: dict[
+        random_events.variable.Variable, list[random_events.variable.Variable]
+    ] = field(init=False, default_factory=dict)
+    """
+    Per cause variable, the variables a learned causal structure chose to adjust for,
+    among those the query names, in place of those marked ``confounder``.
+    """
+
     def __post_init__(self):
         self.statement._get_expression_().build()
         self._random_event_compiler = WhereExpressionToRandomEventTranslator(
@@ -321,6 +329,31 @@ class UnderspecifiedParameters(ModelQueryParameters):
             )
         _ = self.variables  # make variables available
         self._extract_effect_variables_from_causes_effect_conditions()
+
+    def adjustment_variables_of(
+        self, cause_variable: random_events.variable.Variable
+    ) -> list[random_events.variable.Variable]:
+        """
+        :param cause_variable: A cause variable of the query.
+        :return: The variables intervening on it adjusts for: those a learned causal
+            structure chose for it, else those marked ``confounder``.
+        """
+        return self.derived_adjustment_variables.get(
+            cause_variable, self.search_confounder_variables
+        )
+
+    @property
+    def adjustment_variables(self) -> list[random_events.variable.Variable]:
+        """
+        :return: The variables any cause of the query adjusts for, each once.
+        """
+        return list(
+            dict.fromkeys(
+                variable
+                for cause_variable in self.search_cause_variables
+                for variable in self.adjustment_variables_of(cause_variable)
+            )
+        ) or list(self.search_confounder_variables)
 
     def _extract_effect_variables_from_causes_effect_conditions(self) -> None:
         """

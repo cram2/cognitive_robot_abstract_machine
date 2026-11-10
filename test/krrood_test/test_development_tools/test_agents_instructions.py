@@ -13,6 +13,10 @@ from krrood.development_tools.agents.repository_files import (
 )
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.development_tools.agents.rule_module import RuleModule
+from krrood.development_tools.agents.shipped_rules.code_style import (
+    CodeStyleRules,
+    NamingRules,
+)
 from krrood.development_tools.agents.shipped_rules.documentation import (
     DocumentationRules,
 )
@@ -120,7 +124,12 @@ def test_the_checkers_of_a_section_include_those_of_its_subsections() -> None:
 
 
 def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
+    """
+    The checkers come in the order of the sections and rules declaring them.
+    """
     assert RuleModule(shipped_rules).checkers == (
+        CodeStyleRules.NO_HAND_WRITTEN_FIELD_ACCESSORS.checker,
+        NamingRules.NO_LEADING_PREPOSITIONS.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
         DocumentationRules.SHORT_PROSE.checker,
     )
@@ -238,6 +247,28 @@ def test_a_package_lists_the_sections_its_modules_define_alphabetically(
         package.operations.DeploymentRules,
         package.operations.ReleasesRules,
     ]
+
+
+def test_the_project_rules_can_import_the_modules_of_their_repository(
+    repository_root: Path,
+    copy_into_temporary_directory: Callable[[DatasetFile, str], Path],
+    forget_project_rules: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    copy_into_temporary_directory(
+        DatasetFile.PROJECT_RULES_IMPORTING_REPOSITORY,
+        f"{RepositoryInstructionsFile.PROJECT_RULES}.py",
+    )
+    copy_into_temporary_directory(
+        DatasetFile.REPOSITORY_WORDING, "repository_wording.py"
+    )
+
+    project_rules = RuleModule.import_from(
+        repository_root, RepositoryInstructionsFile.PROJECT_RULES
+    )
+
+    assert project_rules.sections == [project_rules.module.ReviewRules]
 
 
 def test_the_project_rules_module_is_imported_once(

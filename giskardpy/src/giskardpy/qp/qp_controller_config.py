@@ -197,6 +197,30 @@ class QPControllerConfig:
         """
         return self.prediction_horizon - self.number_of_resting_steps
 
+    def horizon_weight_scale(self, step: int) -> float:
+        """
+        :param step: Index of a prediction horizon step.
+        :return: The fraction of a dof weight applied at that step, growing linearly
+            from :attr:`horizon_weight_gain_scalar` at the first step to 1 at the last
+            step of the control horizon.
+        """
+        gain = self.horizon_weight_gain_scalar
+        return gain + (1 - gain) * step / (self.control_horizon - 1)
+
+    @property
+    def executed_to_mean_velocity_ratio(self) -> float:
+        """
+        How much faster the executed first step of a plan moves than the plan's mean
+        velocity over the control horizon, while no jerk limit binds.
+
+        The cheaper early steps take a share of the motion inversely proportional to
+        their :meth:`horizon_weight_scale`.
+        """
+        inverse_scales = [
+            1 / self.horizon_weight_scale(step) for step in range(self.control_horizon)
+        ]
+        return inverse_scales[0] / (sum(inverse_scales) / self.control_horizon)
+
     @classmethod
     def create_with_simulation_defaults(cls):
         """

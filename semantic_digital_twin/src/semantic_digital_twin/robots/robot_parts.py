@@ -16,7 +16,6 @@ from typing_extensions import (
     TypeVar,
     Union,
     Unpack,
-    cast,
     get_args,
     get_origin,
 )
@@ -65,6 +64,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.input_synchronization import InputSynchronizer
 from semantic_digital_twin.robots.exceptions import (
     MissingDriveConnectionError,
+    RobotDescriptionMissingError,
 )
 from semantic_digital_twin.robots.input_source import (
     BasePoseSource,
@@ -77,7 +77,6 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasEndEffector,
     HasInputSource,
     HasLeftRightArm,
-    HasMobileBase,
     HasSensors,
     RobotPartMixin,
     TGenericEndEffector,
@@ -115,6 +114,7 @@ from semantic_digital_twin.world_description.geometry import (
 )
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
+    DriveVelocityLimits,
     JointDrive,
     JointServo,
 )
@@ -1075,6 +1075,45 @@ class MobileBase(
         """
         return None
 
+    @classproperty
+    def odometry_body_name(cls) -> str:
+        """
+        The name of the frame the real robot reports the odometry of this base relative
+        to.
+        """
+        return "odom"
+
+    @classproperty
+    def drive_velocity_limits(cls) -> DriveVelocityLimits:
+        """
+        How fast the drive of the real robot may move this base.
+        """
+        return DriveVelocityLimits(translation=0.2, rotation=0.2)
+
+    @classmethod
+    def create_drive(
+        cls,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+    ) -> TGenericDrive:
+        """
+        Create the drive this base declares, limited to :attr:`drive_velocity_limits`.
+
+        :param world: The world the drive's degrees of freedom are added to.
+        :param parent: The body the base drives relative to.
+        :param child: The root of the base's robot.
+        :return: The created drive.
+        """
+        limits = cls.drive_velocity_limits
+        return cls.get_drive_connection_type().create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            translation_velocity_limits=limits.translation,
+            rotation_velocity_limits=limits.rotation,
+        )
+
     def _setup_servos(self) -> None:
         drive = self._robot.drive
         if drive is None:
@@ -1278,10 +1317,15 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         :return: This robot, in a world holding nothing but it, read from its own
             description: the URDF :meth:`get_ros_file_path` points to, unless the robot
             is described in another format.
+        :raises RobotDescriptionMissingError: If this robot declares no description
+            file.
         """
+        description_file_path = cls.get_ros_file_path()
+        if not description_file_path:
+            raise RobotDescriptionMissingError(robot_class=cls)
         return cls.from_world(
             URDFParser.from_file(
-                cls.get_ros_file_path(),
+                description_file_path,
                 use_visual_as_collision_backup=cls.uses_visual_as_collision_backup,
             ).create_world()
         )
@@ -1293,21 +1337,6 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         Returns the name of the root body of the robot in the world, which serves as the
         entry point for traversing the robot's kinematic structure.
         """
-
-    @classmethod
-    def get_drive_connection_type(cls) -> type[Connection]:
-        """
-        The connection type attaching this robot to its ``odom`` frame.
-
-        :return: The mobile base's drive connection type, or :class:`FixedConnection`
-            when the robot has no mobile base and is therefore rigidly attached.
-        """
-        if not issubclass(cls, HasMobileBase):
-            return FixedConnection
-        mobile_base_type = cast(
-            MobileBase, get_generic_type_parameters(cls, HasMobileBase)[0]
-        )
-        return mobile_base_type.get_drive_connection_type()
 
     def setup_robot_part_semantic_annotations(self) -> None:
         """

@@ -127,3 +127,39 @@ def test_continuous_columns_are_tested_after_discretization():
         ("season", "ice_cream_sales"),
         ("season", "drowning_incidents"),
     }
+
+
+# %% orienting an edge by the tiers
+
+
+@pytest.mark.parametrize(
+    "cause, adjacent, parent",
+    [
+        ("B", "A", "A"),
+        ("A", "B", "A"),
+        ("C", "B", "C"),
+        ("D", "A", "D"),
+        ("A", "D", "A"),
+    ],
+    ids=[
+        "adjacent_node_in_an_earlier_tier_reverses_the_edge",
+        "cause_in_an_earlier_tier_keeps_it",
+        "same_tier_keeps_it",
+        "cause_without_tier_keeps_it",
+        "adjacent_node_without_tier_keeps_it",
+    ],
+)
+def test_edge_is_reversed_only_where_the_tiers_say_so(
+    cause: str, adjacent: str, parent: str
+):
+    domain_knowledge = DomainCausalKnowledge(tiers=[["A"], ["B", "C"]])
+    node_of = {
+        name: GraphNode(variable=Integer(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        for name in (cause, adjacent)
+    }
+
+    edge = domain_knowledge.orient_edge(node_of[cause], node_of[adjacent])
+
+    assert edge == GraphEdge.directed_edge(
+        node_of[parent], node_of[({cause, adjacent} - {parent}).pop()]
+    )

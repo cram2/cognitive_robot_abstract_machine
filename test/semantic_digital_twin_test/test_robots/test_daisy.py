@@ -1,3 +1,11 @@
+"""
+Tests of the DAiSy robot description.
+"""
+
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 from semantic_digital_twin.datastructures.definitions import GripperState
@@ -6,7 +14,6 @@ from semantic_digital_twin.robots.griplink_gripper import (
     GriplinkFlexConfiguration,
     GriplinkPresetConfiguration,
 )
-
 
 # %% griplink configurations
 
@@ -54,3 +61,25 @@ def test_daisy_grippers_serve_no_state_without_a_griplink_endpoint(daisy_world):
 
     for end_effector in daisy.all_end_effectors:
         assert end_effector.action_topic_serving(None) is None
+
+
+# %% importing without ROS
+
+
+def test_daisy_is_importable_without_griplink_interfaces():
+    """
+    The DAiSy robot description loads in a process without the ROS griplink action
+    package, so code and tests that never command the real grippers run without ROS.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).parent / "daisy_import_without_griplink_interfaces.py"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == DAiSy.__name__

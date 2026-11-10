@@ -1,3 +1,7 @@
+"""
+Nodes and exceptions with fixed, simple behaviour that tests build statecharts from.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -37,6 +41,19 @@ class NodeAssertionError(StatechartError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class NodeAssertionErrorNamingANode(NodeAssertionError):
+    """
+    Raised by test statechart nodes when a behaviour they assert on is violated by one
+    particular node.
+    """
+
+    node: StatechartNode
+    """
+    The node that violated the assertion.
+    """
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

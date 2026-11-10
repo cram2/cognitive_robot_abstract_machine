@@ -17,14 +17,15 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.adapters.ros.messages import MetaData
     from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
         HasSupportingSurface,
     )
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-    from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
+    from semantic_digital_twin.grasping.object_relative_grasp import (
+        ObjectRelativeGrasp,
+    )
     from semantic_digital_twin.robots.robot_parts import (
         AbstractRobot,
         AbstractRobotPart,
@@ -1432,49 +1433,6 @@ class SynchronizerNotConnectedError(UsageError):
 
 
 @dataclass
-class WorldUpdateReferencesUnknownEntityError(UsageError):
-    """
-    Raised when an update refers to an entity this world never received, which leaves
-    everything the missing update carried out of reach.
-    """
-
-    publisher: MetaData
-    """
-    The synchronizer whose update could not be applied.
-    """
-
-    entity_id: UUID
-    """
-    The entity the update refers to.
-
-    Only its id is known, because the update that created it never arrived.
-    """
-
-    entity_name: PrefixedName | None
-    """
-    The name the update calls that entity, or ``None`` where it carries none.
-    """
-
-    def error_message(self) -> str:
-        named_entity = (
-            f"'{self.entity_name}' ({self.entity_id})"
-            if self.entity_name is not None
-            else f"'{self.entity_id}'"
-        )
-        return (
-            f"The update of '{self.publisher.node_name}' refers to the entity "
-            f"{named_entity}, which this world never received."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Create the synchronizer of a world before modifying that world: changes made "
-            "before it exists reach nobody, and every later change that builds on them "
-            "cannot be applied."
-        )
-
-
-@dataclass
 class WorldHasMultipleSynchronizersError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but several of them publish
@@ -2392,36 +2350,6 @@ class ExerciseVerificationFailed(UsageError):
 
 
 @dataclass
-class DriveVelocityLimitsOnUndrivenRobot(UsageError):
-    """
-    Raised when drive velocity limits are given for a robot that is attached to its
-    localization frame rigidly rather than by a drive.
-    """
-
-    robot_type_name: str
-    """
-    The name of the robot type the limits were given for.
-    """
-
-    connection_type_name: str
-    """
-    The name of the connection type that robot attaches to its localization frame with.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.robot_type_name}' attaches to its localization frame with a "
-            f"'{self.connection_type_name}', which carries no velocity limits."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "leave the drive velocity limits unset, or give the robot a mobile base "
-            "whose drive can carry them."
-        )
-
-
-@dataclass
 class NothingHeld(UsageError):
     """
     Raised when the grasp of a gripper that holds nothing is asked for.
@@ -2468,12 +2396,12 @@ class NoGraspGeometry(UsageError):
 
 
 @dataclass
-class SurfaceGraspNotOnSurfaceError(UsageError):
+class GraspNotOnObjectError(UsageError):
     """
-    Raised when a surface grasp names a point the object's grasp surface does not reach.
+    Raised when a grasp names a place that does not reach the surface of the object.
     """
 
-    surface_grasp: SurfaceGrasp
+    grasp: ObjectRelativeGrasp
     """
     The grasp that missed.
     """
@@ -2484,16 +2412,12 @@ class SurfaceGraspNotOnSurfaceError(UsageError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"No surface of '{self.graspable.name}' lies at azimuth "
-            f"{self.surface_grasp.azimuth:.3f} rad and height "
-            f"{self.surface_grasp.height:.3f} of its bounding box."
-        )
+        return f"{self.grasp} does not reach the surface of '{self.graspable.name}'."
 
     def suggest_correction(self) -> str:
         return (
-            "keep the height of a surface grasp between 0 and 1, and check with "
-            "SurfaceGrasp.reaches_surface_of before asking for its grasp candidate."
+            "keep the parameters of the grasp within the bounds its strategy states, and "
+            "check with reaches_surface_of before asking for its grasp candidate."
         )
 
 
