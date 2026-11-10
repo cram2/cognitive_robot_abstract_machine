@@ -9,6 +9,7 @@ from enum import StrEnum
 from functools import partial
 
 import pytest
+from control_msgs.action import ParallelGripperCommand
 from geometry_msgs.msg import WrenchStamped
 from griplink_interfaces.action import Flexgrip, Grip
 from nav2_msgs.action import NavigateToPose
@@ -16,7 +17,7 @@ from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 from typing_extensions import Any, Iterator
-from control_msgs.action import ParallelGripperCommand
+
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
@@ -30,10 +31,10 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkFlexActionServerTask,
     GriplinkPresetActionServerTask,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
-    NavigateActionServerTask,
+from giskardpy.motion_statechart.ros2_nodes.robotiq import (
     RobotiqGripperActionServerTask,
 )
+from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
 from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
     PublishOnStart,
     TopicNode,
@@ -63,7 +64,7 @@ class RosName(StrEnum):
     NAVIGATION_ACTION = "navigate"
     GRIP_ACTION = "grip"
     FLEXGRIP_ACTION = "flexgrip"
-    ROBOTIQ_ACTION = "robotiq_gripper"
+    ROBOTIQ_GRIPPER_ACTION = "robotiq_gripper"
 
 
 def _cases() -> list[NodeRoundTripCase]:
@@ -126,11 +127,7 @@ def _cases() -> list[NodeRoundTripCase]:
             RobotiqGripperActionServerTask,
             lambda world: [
                 RobotiqGripperActionServerTask(
-                    action_topic=RosName.ROBOTIQ_ACTION,
-                    message_type=ParallelGripperCommand,
-                    target_position=0.04,
-                    target_velocity=10.0,
-                    target_effort=50.0,
+                    action_topic=RosName.ROBOTIQ_GRIPPER_ACTION, target_position=0.03
                 )
             ],
         ),
@@ -173,9 +170,9 @@ def navigation_action_server(rclpy_node: Node) -> Iterator[ActionServer]:
 
 
 @pytest.fixture(autouse=True)
-def griplink_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
+def gripper_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
     """
-    :return: The action servers the griplink tasks wait for before they are built.
+    :return: The action servers the gripper tasks wait for before they are built.
     """
     servers = [
         ActionServer(
@@ -184,6 +181,7 @@ def griplink_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
         for action, name in (
             (Grip, RosName.GRIP_ACTION),
             (Flexgrip, RosName.FLEXGRIP_ACTION),
+            (ParallelGripperCommand, RosName.ROBOTIQ_GRIPPER_ACTION),
         )
     ]
     yield servers
@@ -228,21 +226,6 @@ def receiving_executor(
         context=StatechartContext(world=request.getfixturevalue(case.world_fixture)),
         extensions=[RosNodeAccess(rclpy_node), MotionControl()],
     )
-
-
-@pytest.fixture(autouse=True)
-def robotiq_action_server(rclpy_node: Node) -> Iterator[ActionServer]:
-    """
-    :return: The action server the robotiq task waits for before it is built.
-    """
-    server = ActionServer(
-        rclpy_node,
-        ParallelGripperCommand,
-        RosName.ROBOTIQ_ACTION,
-        partial(_finish_the_goal_at_once, ParallelGripperCommand),
-    )
-    yield server
-    server.destroy()
 
 
 # %% round trips

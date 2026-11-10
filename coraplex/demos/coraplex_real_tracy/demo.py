@@ -3,6 +3,7 @@ import signal
 import subprocess
 import threading
 import time
+from enum import StrEnum
 
 import numpy as np
 import rclpy
@@ -35,11 +36,36 @@ from coraplex.plans.executors import (
     RealRobotPlanExecutor,
     KinematicallySimulatedPlanExecutor,
 )
+from coraplex.robot_plans.plan_transformations import (
+    CloseFingersToObjectWidth,
+    DetectWithRoboKudo,
+)
+from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
 from cramph.statechart import Statechart
 from cramph.composites import Sequence
 
+
+class TracyGiskardLaunchFile(StrEnum):
+    """
+    The launch files of ``giskardpy_ros`` that bring up a giskard for Tracy.
+    """
+
+    STANDALONE = "giskardpy_tracy_standalone.launch.py"
+    """
+    A giskard that simulates Tracy instead of commanding it, with nothing serving the
+    gripper actions.
+    """
+
+    VELOCITY = "giskardpy_tracy_velocity.launch.py"
+    """
+    A giskard that commands the velocity controllers of the real Tracy.
+    """
+
+
+giskard_launch_file = TracyGiskardLaunchFile.STANDALONE
+
 giskard_process = subprocess.Popen(
-    ["ros2", "launch", "giskardpy_ros", "giskardpy_tracy_standalone.launch.py"],
+    ["ros2", "launch", "giskardpy_ros", giskard_launch_file],
     start_new_session=True,
 )
 
@@ -145,12 +171,20 @@ with world.modify_world():
     )
 
 # The executor needs the ROS node to reach the real robot
-executor_type: type[PlanExecutor] = (
-    RealRobotPlanExecutor if controls_real_robot else KinematicallySimulatedPlanExecutor
-)
-executor = executor_type(
-    StatechartContext.with_extensions(world, [RobotAccess(tracy)]), ros_node=node
-)
+context = StatechartContext.with_extensions(world, [RobotAccess(tracy)])
+executor: PlanExecutor
+if controls_real_robot:
+    real_robot_plan_adaptations = [CloseFingersToObjectWidth(), DetectWithRoboKudo()]
+    # Nothing serves the gripper actions while giskard simulates Tracy.
+    if giskard_launch_file is not TracyGiskardLaunchFile.STANDALONE:
+        real_robot_plan_adaptations.insert(
+            0, DriveRobotiqGrippersThroughTheirActionServers()
+        )
+    executor = RealRobotPlanExecutor(
+        context, ros_node=node, plan_adaptations=real_robot_plan_adaptations
+    )
+else:
+    executor = KinematicallySimulatedPlanExecutor(context, ros_node=node)
 
 plan = Sequence(
     nodes=[

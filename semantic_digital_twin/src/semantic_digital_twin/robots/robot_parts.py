@@ -517,6 +517,22 @@ class ServoedRobotPart(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
+class HasGripperActionServers(AbstractRobotPart, ABC):
+    """
+    A gripper whose real hardware moves through ROS actions its driver serves, rather
+    than through commands for its joints.
+    """
+
+    @abstractmethod
+    def action_topic_serving(self, state_type: JointStateType | None) -> str | None:
+        """
+        :param state_type: The state to bring the gripper into.
+        :return: The name the driver serves the action bringing the gripper into
+            `state_type` under, None if it serves none for that state.
+        """
+
+
+@dataclass(eq=False)
 class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC):
     """
     A kinematic chain is a robot part that consists of a chain of bodies and connections

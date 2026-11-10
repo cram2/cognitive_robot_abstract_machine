@@ -36,6 +36,9 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTorso,
     HasTwoFingers,
 )
+from semantic_digital_twin.robots.robotiq_85_gripper import (
+    HasParallelGripperCommandServer,
+)
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     ServoedRobotPart,
@@ -65,6 +68,16 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 # %% Robot parts
+
+
+class TiagoParallelGripperCommandTopic(StrEnum):
+    """
+    The names the drivers of the Tiago's grippers serve their parallel gripper command
+    actions under, one driver per gripper.
+    """
+
+    LEFT_GRIPPER = "gripper_left_controller/gripper_cmd"
+    RIGHT_GRIPPER = "gripper_right_controller/gripper_cmd"
 
 
 class TiagoJoint(JointName):
@@ -190,9 +203,10 @@ class TiagoRightIndexFinger(Finger):
 
 
 @dataclass(eq=False)
-class TiagoGripper(EndEffector, ABC):
+class TiagoGripper(EndEffector, HasParallelGripperCommandServer, ABC):
     """
-    A gripper of a Tiago, whose joints all follow the one joint its controller commands.
+    A Robotiq gripper of a Tiago, whose joints all follow the one joint its controller
+    commands.
     """
 
     @classproperty
@@ -250,6 +264,10 @@ class TiagoLeftGripper(
     def finger_joint(cls) -> TiagoJoint:
         return TiagoJoint.LEFT_GRIPPER_FINGER
 
+    @classproperty
+    def parallel_gripper_command_topic(cls) -> str:
+        return TiagoParallelGripperCommandTopic.LEFT_GRIPPER
+
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
         cls, robot_root: KinematicStructureEntity
@@ -271,6 +289,10 @@ class TiagoRightGripper(
     @classproperty
     def finger_joint(cls) -> TiagoJoint:
         return TiagoJoint.RIGHT_GRIPPER_FINGER
+
+    @classproperty
+    def parallel_gripper_command_topic(cls) -> str:
+        return TiagoParallelGripperCommandTopic.RIGHT_GRIPPER
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
