@@ -679,8 +679,13 @@ class CartesianOrientation(CartesianTask):
             quadratic_weight=self.weight,
         )
 
+        # the goal axes are drawn at the tip, next to the current ones
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_R_goal, current=root_R_current
+            artifacts,
+            goal=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                point=root_T_current.position, rotation_matrix=root_R_goal
+            ),
+            current=root_T_current,
         )
 
         artifacts.error = sm.abs(root_R_current.rotational_distance(root_R_goal))

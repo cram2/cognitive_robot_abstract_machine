@@ -2622,8 +2622,8 @@ class TestDebugExpressions:
         current = debug_expression_by_name(
             artifacts.debug_expressions, "orient/current"
         )
-        assert isinstance(goal.expression, RotationMatrix)
-        assert isinstance(current.expression, RotationMatrix)
+        assert isinstance(goal.expression, HomogeneousTransformationMatrix)
+        assert isinstance(current.expression, HomogeneousTransformationMatrix)
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 

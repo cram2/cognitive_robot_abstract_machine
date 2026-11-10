@@ -10,6 +10,7 @@ import sys
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
+import numpy as np
 import pytest
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -40,10 +41,13 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianOrientation
+from giskardpy.motion_statechart.tasks.feature_functions import AlignPerpendicular
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, RotationMatrix, Vector3
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import OmniDrive
 from ..motion_control_context import add_to_statechart_with_motion_control
 
 # %% statecharts whose nodes register debug expressions
@@ -180,6 +184,48 @@ def align_planes_task(world: World) -> AlignPlanes:
         tip_normal=Vector3.Z(reference_frame=tip),
         name="align",
     )
+
+
+def cartesian_orientation_task(world: World) -> CartesianOrientation:
+    """
+    A task turning the bot about the z axis of the root.
+    """
+    return CartesianOrientation(
+        root_link=world.root,
+        tip_link=world.get_body_by_name("bot"),
+        goal_orientation=RotationMatrix.from_rpy(yaw=1, reference_frame=world.root),
+        name="orientation",
+    )
+
+
+def align_perpendicular_task(world: World) -> AlignPerpendicular:
+    """
+    A task turning the x axis of the bot perpendicular to the x axis of the root.
+    """
+    return AlignPerpendicular(
+        root_link=world.root,
+        tip_link=world.get_body_by_name("bot"),
+        tip_normal=Vector3.X(reference_frame=world.get_body_by_name("bot")),
+        reference_normal=Vector3.X(reference_frame=world.root),
+        name="perpendicular",
+    )
+
+
+def marker_origins_in_root(markers: list[Marker], world: World) -> list[list[float]]:
+    """
+    Where each of `markers` starts, expressed in the root frame of `world`.
+    """
+    origins = []
+    for marker in markers:
+        root_T_frame = world.compute_forward_kinematics_np(
+            world.root,
+            world.get_kinematic_structure_entity_by_name(marker.header.frame_id),
+        )
+        position = marker.pose.position
+        origins.append(
+            (root_T_frame @ [position.x, position.y, position.z, 1])[:3].tolist()
+        )
+    return origins
 
 
 def tick_until_running(
@@ -538,6 +584,44 @@ def test_executor_with_motion_control_publishes_the_running_tasks(
         for visualization in publishing._visualizations_per_node[task]
     ] == ["align/current_normal", "align/goal_normal"]
     assert published_namespaces(publishing) == collected_namespaces(publishing, task)
+
+
+@pytest.mark.parametrize(
+    "create_task",
+    [cartesian_orientation_task, align_planes_task, align_perpendicular_task],
+)
+def test_orientations_and_vectors_of_a_task_are_drawn_at_its_tip(
+    rclpy_node, publishing, cylinder_bot_world, create_task
+):
+    """
+    A task's debug markers that have no position of their own start at its tip, not at
+    the origin of the frame they are expressed in.
+    """
+    drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
+    cylinder_bot_world.state[drive.x.id].position = 1.0
+    cylinder_bot_world.state[drive.y.id].position = 0.5
+    cylinder_bot_world.state[drive.yaw.id].position = 0.3
+    cylinder_bot_world.notify_state_change()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=cylinder_bot_world),
+        extensions=[RosNodeAccess(rclpy_node), MotionControl(), publishing],
+    )
+    statechart = Statechart(context=executor.context)
+    task = create_task(cylinder_bot_world)
+    statechart.add_node(task)
+    executor.compile(statechart)
+    fake = FakeMarkerPublisher()
+    publishing._marker_publisher.marker_publisher.publisher = fake
+
+    executor.tick()
+    publishing._marker_publisher.wait_until_published()
+
+    root_P_tip = cylinder_bot_world.compute_forward_kinematics_np(
+        cylinder_bot_world.root, task.tip_link
+    )[:3, 3]
+    origins = marker_origins_in_root(fake.published[-1].markers, cylinder_bot_world)
+    assert len(origins) > 0
+    np.testing.assert_allclose(origins, [root_P_tip] * len(origins), atol=1e-9)
 
 
 def test_executor_skips_debug_expressions_by_default(rclpy_node, cylinder_bot_world):

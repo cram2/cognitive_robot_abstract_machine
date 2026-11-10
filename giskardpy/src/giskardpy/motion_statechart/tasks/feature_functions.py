@@ -81,13 +81,12 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
             )
         elif isinstance(self.controlled_feature, Vector3):
             self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
-            self.root_V_controlled_feature.visualisation_frame = (
-                self.controlled_feature.visualisation_frame
-            )
             feature_debug_expressions.append(
                 DebugExpression(
                     name="root_V_controlled_feature",
-                    expression=self.root_V_controlled_feature,
+                    expression=self._vector_to_draw(
+                        self.root_V_controlled_feature, self.controlled_feature
+                    ),
                     color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
                 )
             )
@@ -103,13 +102,12 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
             )
         elif isinstance(self.reference_feature, Vector3):
             self.root_V_reference_feature = root_reference_feature
-            self.root_V_reference_feature.visualisation_frame = (
-                self.reference_feature.visualisation_frame
-            )
             feature_debug_expressions.append(
                 DebugExpression(
                     name="root_V_reference_feature",
-                    expression=self.root_V_reference_feature,
+                    expression=self._vector_to_draw(
+                        self.root_V_reference_feature, self.reference_feature
+                    ),
                     color=Color.from_rgba(red=0, green=1, blue=0, opacity=1),
                 )
             )
@@ -117,6 +115,21 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
         artifacts = super().build()
         artifacts.debug_expressions.extend(feature_debug_expressions)
         return artifacts
+
+    def _vector_to_draw(self, root_V_feature: Vector3, feature: Vector3) -> Vector3:
+        """
+        :param root_V_feature: `feature` expressed in :attr:`root_link`.
+        :param feature: The vector feature as the task was given it.
+        :return: A copy of `root_V_feature` drawn from the visualisation frame of
+            `feature`, or from :attr:`tip_link` if it has none.
+        """
+        vector_to_draw = Vector3.from_iterable(root_V_feature)
+        vector_to_draw.visualisation_frame = (
+            feature.visualisation_frame
+            if feature.visualisation_frame is not None
+            else self.tip_link
+        )
+        return vector_to_draw
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
