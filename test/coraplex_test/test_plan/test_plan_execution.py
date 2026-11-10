@@ -407,6 +407,7 @@ def test_a_prepared_plan_records_the_temporary_collision_rules_in_force(
     taken out of force again.
     """
     world, robot_view, extensions = pr2_apartment_context
+    rules_before = list(world.collision_manager.temporary_rules)
     rule = _wrist_allowed_near_the_sink(world)
     world.collision_manager.put_temporary_rules_in_force([rule])
     plan = _prepared_plan(extensions)
@@ -414,7 +415,7 @@ def test_a_prepared_plan_records_the_temporary_collision_rules_in_force(
 
     [record] = plan.statechart.get_nodes_by_type(CollisionRulesInForce)
 
-    assert record.temporary_rules == [rule]
+    assert record.temporary_rules == [*rules_before, rule]
 
 
 def test_a_prepared_plan_records_the_ignore_collision_rules_in_force(
@@ -462,6 +463,7 @@ def test_running_a_plan_leaves_the_collision_rules_in_force_as_they_were(
     pr2_apartment_context,
 ) -> None:
     world, robot_view, extensions = pr2_apartment_context
+    rules_before = list(world.collision_manager.temporary_rules)
     rule = _wrist_allowed_near_the_sink(world)
     world.collision_manager.put_temporary_rules_in_force([rule])
     executor = simulated_executor(extensions)
@@ -472,13 +474,14 @@ def test_running_a_plan_leaves_the_collision_rules_in_force_as_they_were(
     temporary_rules_after_the_run = list(world.collision_manager.temporary_rules)
     world.collision_manager.take_temporary_rules_out_of_force([rule])
 
-    assert temporary_rules_after_the_run == [rule]
+    assert temporary_rules_after_the_run == [*rules_before, rule]
 
 
 def test_a_stored_plan_keeps_the_collision_rules_it_ran_with(
     pr2_apartment_context, coraplex_testing_session
 ) -> None:
     world, robot_view, extensions = pr2_apartment_context
+    rules_before = list(world.collision_manager.temporary_rules)
     rule = _wrist_allowed_near_the_sink(world)
     world.collision_manager.put_temporary_rules_in_force([rule])
     executor = simulated_executor(extensions)
@@ -495,21 +498,19 @@ def test_a_stored_plan_keeps_the_collision_rules_it_ran_with(
         coraplex_testing_session.scalars(select(StatechartMappingDAO)).one().from_dao()
     )
     [record] = statechart_read_back.get_nodes_by_type(CollisionRulesInForce)
+    *_, read_back = record.temporary_rules
 
-    assert [
-        (
-            type(read_back),
-            [body.name for body in read_back.body_group_a],
-            [body.name for body in read_back.body_group_b],
-        )
-        for read_back in record.temporary_rules
-    ] == [
-        (
-            type(rule),
-            [body.name for body in rule.body_group_a],
-            [body.name for body in rule.body_group_b],
-        )
+    assert [type(rule_read_back) for rule_read_back in record.temporary_rules] == [
+        *[type(rule_before) for rule_before in rules_before],
+        type(rule),
     ]
+    assert (
+        [body.name for body in read_back.body_group_a],
+        [body.name for body in read_back.body_group_b],
+    ) == (
+        [body.name for body in rule.body_group_a],
+        [body.name for body in rule.body_group_b],
+    )
 
 
 # %% avoiding collisions in a world with several robots
