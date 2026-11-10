@@ -33,14 +33,14 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.mark.parametrize(
-    "world_T_odom",
+    "world_T_odometry",
     [
         HomogeneousTransformationMatrix(),
         HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=-0.5, yaw=numpy.pi / 2),
     ],
     ids=["odom_at_the_root", "localized_odom"],
 )
-def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odom):
+def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odometry):
     """
     A base pose goal in the frame of the world's root is reached by the base in the
     physics, with the odom placed at the root or away from and turned against it.
@@ -50,7 +50,7 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odom)
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    pr2 = RobotSpecification(PR2, world_T_odom=world_T_odom).spawn(world)
+    pr2 = RobotSpecification(PR2, localization_pose=world_T_odometry).spawn(world)
     world_T_start = world.compute_forward_kinematics_np(world.root, pr2.root)
     goal = Pose.from_xyz_rpy(
         x=world_T_start[0, 3] + 0.5,

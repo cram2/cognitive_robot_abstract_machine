@@ -17,7 +17,6 @@ from giskardpy.middleware.ros2.command_publishing import (
     TwistStampedFormat,
     JointGroupVelocityCommandPublisher,
     JointMinimumVelocities,
-    JointVelocityCommandPublisher,
     MinimumVelocity,
 )
 from giskardpy.middleware.ros2.control_loop import ControlLoop
@@ -290,32 +289,6 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                 minimum_linear_velocity=MinimumVelocity(minimum_linear_velocity),
                 minimum_angular_velocity=MinimumVelocity(minimum_angular_velocity),
                 command_format=command_format,
-            )
-        )
-
-    def add_joint_velocity_controller(
-        self,
-        namespaces: list[str],
-        minimum_valid_velocity: float = 0.0,
-        minimum_velocity_overrides: dict[str, float] | None = None,
-    ):
-        """
-        Tell Giskard how it can send velocities to joints.
-
-        :param namespaces: A list of namespaces where Giskard can find the topics and
-            parameters.
-        :param minimum_valid_velocity: magnitude that smaller joint velocities are
-            raised to so the hardware moves. ``0.0`` disables raising.
-        :param minimum_velocity_overrides: minimum magnitude per joint name, overriding
-            ``minimum_valid_velocity``; ``0.0`` exempts a joint.
-        """
-        self.control_loop.command_publishers.append(
-            JointVelocityCommandPublisher(
-                world=self.world,
-                namespaces=namespaces,
-                minimum_velocities=JointMinimumVelocities.from_magnitudes(
-                    minimum_valid_velocity, minimum_velocity_overrides
-                ),
             )
         )
 

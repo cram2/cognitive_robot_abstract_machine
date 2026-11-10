@@ -75,7 +75,11 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
     their source.
 - `relational_checks.ExampleToPartCheck.dependences(tables)` tests the independence a relational circuit
   assumes: an instance's attributes reach its parts' attributes only through the
-  aggregation statistics.
+  aggregation statistics. Given to `RelationalCausalStructureLearner` as its
+  `example_to_part_check`, every pair that stays dependent given the statistics and any
+  one other attribute the dependence could run through becomes an edge of the learned
+  graph, from the instance attribute to the part attribute unless the tiers place the
+  part attribute first.
 
 ## Using it from a query
 
@@ -106,7 +110,8 @@ Learning the structure from observational data has limits:
   recorded.
 - **The relational assumption.** A relational circuit lets an instance's attributes
   affect its parts only through the aggregation statistics, and the relational learner
-  follows it. `ExampleToPartCheck` reports where the data disagrees.
+  follows it unless it is given an `ExampleToPartCheck`, which adds the edges where the
+  data disagrees.
 - **Interventions on counts.** Setting an aggregation statistic is ambiguous once it
   has parents among the part attributes, since many configurations of the parts give
   the same count (Spirtes and Scheines, 2004).

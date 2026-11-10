@@ -50,8 +50,20 @@ class NodeStatesAtTick:
     order.
     """
 
+    cancelling_node_index: int | None = None
+    """
+    The index of the node whose cancellation ended the statechart with these values,
+    None if they did not end it.
+    """
+
+    cancellation_error: Exception | None = None
+    """
+    The exception the cancellation ended the statechart with, None if the values did not
+    end it.
+    """
+
     @classmethod
-    def of_item(cls, item: StateHistoryItem) -> Self:
+    def from_item(cls, item: StateHistoryItem) -> Self:
         """
         :param item: A snapshot of a statechart's state.
         :return: The values the snapshot holds.
@@ -60,6 +72,10 @@ class NodeStatesAtTick:
             tick_count=item.tick_count,
             life_cycle_values=item.life_cycle_state.data.tolist(),
             observation_values=item.observation_state.data.tolist(),
+            cancelling_node_index=(
+                None if item.cancelled_by is None else item.cancelled_by.index
+            ),
+            cancellation_error=item.cancellation_error,
         )
 
     def item_of(self, statechart: Statechart) -> StateHistoryItem:
@@ -77,6 +93,12 @@ class NodeStatesAtTick:
                 statechart=statechart,
                 data=np.array(self.observation_values, dtype=np.float64),
             ),
+            cancelled_by=(
+                None
+                if self.cancelling_node_index is None
+                else statechart.get_node_by_index(self.cancelling_node_index)
+            ),
+            cancellation_error=self.cancellation_error,
         )
 
 
@@ -125,7 +147,7 @@ class StatechartMapping(AlternativeMapping[Statechart]):
             passes_per_nesting_level=obj.passes_per_nesting_level,
             structure=json.dumps(obj.to_json()),
             state_history=[
-                NodeStatesAtTick.of_item(item) for item in obj.state_history.items
+                NodeStatesAtTick.from_item(item) for item in obj.state_history.items
             ],
         )
 
