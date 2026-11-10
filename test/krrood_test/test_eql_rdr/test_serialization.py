@@ -185,7 +185,7 @@ def test_recorded_corner_case_is_embedded_in_the_generated_source():
     rdr = _flat_tree_rdr()
     rule_node = walk_rules_in_emission_order(rdr.query._conditions_root_)[0]
     corner_case = Animal("cat", has_fur=True, can_fly=False)
-    rdr.corner_cases.record(rule_node, corner_case)
+    rdr.corner_cases.record_corner_case(rule_node, corner_case)
 
     source = rdr_to_python(rdr)
     namespace = _exec_generated_module(source)
@@ -197,7 +197,7 @@ def test_recorded_corner_case_with_an_enum_field_round_trips_through_the_generat
     rdr = _flat_tree_rdr()
     rule_node = walk_rules_in_emission_order(rdr.query._conditions_root_)[0]
     corner_case = Animal("cat", has_fur=True, can_fly=False, habitat=Species.MAMMAL)
-    rdr.corner_cases.record(rule_node, corner_case)
+    rdr.corner_cases.record_corner_case(rule_node, corner_case)
 
     source = rdr_to_python(rdr)
     namespace = _exec_generated_module(source)
