@@ -88,7 +88,6 @@ class ParameterTakingPackage(StrEnum):
     """
 
     ACTIONS = "coraplex.robot_plans.actions"
-    GOALS = "giskardpy.motion_statechart.goals"
     TASKS = "giskardpy.motion_statechart.tasks"
     MONITORS = "giskardpy.motion_statechart.monitors"
 

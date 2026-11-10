@@ -584,7 +584,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         annotated_variable_from_init: list[AnnotatedVariable] = [
             from_json(annotated_variable)
             for annotated_variable in data["annotated_variables_from_init"]

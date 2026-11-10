@@ -450,9 +450,9 @@ def test_has_left_right_arm_mixin(pr2_world_state_reset):
     left_arm_chain = list(pr2.left_arm.bodies)
     right_arm_chain = list(pr2.right_arm.bodies)
     assert LeftOf(
-        left_arm_chain[1].center_of_mass,
-        right_arm_chain[1].center_of_mass,
-        pr2.root.global_transform,
+        point=left_arm_chain[1].center_of_mass,
+        other=right_arm_chain[1].center_of_mass,
+        point_of_view=pr2.root.global_transform,
     )()
 
 

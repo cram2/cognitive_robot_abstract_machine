@@ -39,7 +39,8 @@ def test_probable_variable_with_concrete_kwarg():
     instance = prob_q.construct_instance()
 
     correct_instance = KRROODPose(
-        KRROODPosition(..., ..., ...), KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+        position=KRROODPosition(x=..., y=..., z=...),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
 
     assert instance == correct_instance
@@ -58,7 +59,8 @@ def test_new_underspecified_with_factory():
     prob_q._get_expression_().build()
     r = prob_q.construct_instance()
     assert r == KRROODPose(
-        KRROODPosition(..., ..., ...), KRROODOrientation(0.0, 0.0, 0.0, 1.0)
+        position=KRROODPosition(x=..., y=..., z=...),
+        orientation=KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0),
     )
 
 
@@ -72,35 +74,41 @@ def test_match_constructs_an_instance_from_bindings_of_its_nested_pattern():
         position=a(KRROODPosition)(x=..., y=stated_y, z=stated_z),
         orientation=orientation,
     )
-    x = query._find_assigned_variable_("KRROODPose.position.x")
-    instance = query._construct_instance_from_bindings_({x._id_: bound_x})
+    x = query._find_assigned_variable_(access_path_name="KRROODPose.position.x")
+    instance = query._construct_instance_from_bindings_(bindings={x._id_: bound_x})
     assert instance == KRROODPose(
-        KRROODPosition(bound_x, stated_y, stated_z), orientation
+        position=KRROODPosition(x=bound_x, y=stated_y, z=stated_z),
+        orientation=orientation,
     )
 
 
 def test_match_constructs_list_elements_from_bindings():
     stated_x, bound_y, bound_z = 1.0, 0.0, 3.0
-    stated_position = KRROODPosition(1, 2, 3)
+    stated_position = KRROODPosition(x=1, y=2, z=3)
     some_strings = ["a", "b"]
     query = a(KRROODPositions)(
         positions=[a(KRROODPosition)(x=stated_x, y=..., z=...), stated_position],
         some_strings=some_strings,
     )
-    y = query._find_assigned_variable_("KRROODPositions.positions[0].y")
-    z = query._find_assigned_variable_("KRROODPositions.positions[0].z")
+    y = query._find_assigned_variable_(
+        access_path_name="KRROODPositions.positions[0].y"
+    )
+    z = query._find_assigned_variable_(
+        access_path_name="KRROODPositions.positions[0].z"
+    )
     instance = query._construct_instance_from_bindings_(
-        {y._id_: bound_y, z._id_: bound_z}
+        bindings={y._id_: bound_y, z._id_: bound_z}
     )
     assert instance == KRROODPositions(
-        [KRROODPosition(stated_x, bound_y, bound_z), stated_position], some_strings
+        positions=[KRROODPosition(x=stated_x, y=bound_y, z=bound_z), stated_position],
+        some_strings=some_strings,
     )
 
 
 def test_constructing_from_bindings_leaves_the_pattern_unchanged():
     query = a(KRROODPosition)(x=..., y=1.0, z=2.0)
-    x = query._find_assigned_variable_("KRROODPosition.x")
-    query._construct_instance_from_bindings_({x._id_: 5.0})
+    x = query._find_assigned_variable_(access_path_name="KRROODPosition.x")
+    query._construct_instance_from_bindings_(bindings={x._id_: 5.0})
     assert query._kwargs_ == {"x": ..., "y": 1.0, "z": 2.0}
     assert x._value_ is ...
 
@@ -108,7 +116,7 @@ def test_constructing_from_bindings_leaves_the_pattern_unchanged():
 def test_constructing_from_bindings_rejects_an_unbound_pattern_variable():
     query = a(Rectangle)(width=variable(int, [1, 2]), height=3)
     with pytest.raises(UnboundPatternVariable):
-        query._construct_instance_from_bindings_({})
+        query._construct_instance_from_bindings_(bindings={})
 
 
 # %% finding the variable a pattern assigns to an attribute
@@ -117,12 +125,12 @@ def test_constructing_from_bindings_rejects_an_unbound_pattern_variable():
 def test_match_finds_the_variable_its_pattern_assigns_to_an_attribute():
     stated_y, stated_z, bound_x = 1.0, 2.0, 5.0
     query = a(KRROODPosition)(x=..., y=stated_y, z=stated_z)
-    x = query._find_assigned_variable_("KRROODPosition.x")
-    instance = query._construct_instance_from_bindings_({x._id_: bound_x})
-    assert instance == KRROODPosition(bound_x, stated_y, stated_z)
+    x = query._find_assigned_variable_(access_path_name="KRROODPosition.x")
+    instance = query._construct_instance_from_bindings_(bindings={x._id_: bound_x})
+    assert instance == KRROODPosition(x=bound_x, y=stated_y, z=stated_z)
 
 
 def test_finding_the_variable_of_an_attribute_the_pattern_lacks_is_refused():
     query = a(KRROODPosition)(x=..., y=1.0, z=2.0)
     with pytest.raises(NoAttributeWithAccessPathName):
-        query._find_assigned_variable_("KRROODPosition.w")
+        query._find_assigned_variable_(access_path_name="KRROODPosition.w")

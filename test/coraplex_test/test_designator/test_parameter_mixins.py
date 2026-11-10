@@ -30,8 +30,8 @@ from coraplex.robot_plans.mixins import (
     HasPlanarGoalPoseParameter,
     MovesToolCenterPoint,
 )
-from giskardpy.motion_statechart.goals.base_pose_goals import DrivenBaseGoal
-from giskardpy.motion_statechart.goals.gripper import MoveFingers, MoveGripper
+from giskardpy.motion_statechart.tasks.drive_tasks import DrivenBaseGoal
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart import mixins as node_mixins
 from giskardpy.motion_statechart.mixins import (
     HasFingerStallToleranceParameters,
@@ -129,6 +129,9 @@ def combined_mixins(mixin: type) -> set[type]:
     parameter_mixins_named("Parameter"),
 )
 def test_a_single_parameter_mixin_declares_one_field_and_combines_none(mixin: type):
+    """
+    A mixin named for one parameter holds that parameter and nothing it inherits.
+    """
     assert len(own_fields(mixin)) == 1
     assert combined_mixins(mixin) == set()
 

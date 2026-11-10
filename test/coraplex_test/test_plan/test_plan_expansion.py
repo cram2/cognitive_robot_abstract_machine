@@ -26,7 +26,7 @@ from cramph.node import CancelStatechart, StatechartNode
 from cramph.nodes_for_testing import ConstFalseNode
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPosition,

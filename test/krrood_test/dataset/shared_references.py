@@ -11,7 +11,7 @@ from krrood.adapters.json_serializer import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeyedElement(SubclassJSONSerializer):
     """
     An element that every reference within one JSON document resolves to a single
@@ -24,26 +24,26 @@ class KeyedElement(SubclassJSONSerializer):
     """
 
     def to_json(self) -> Dict[str, Any]:
-        return DataclassJSONSerializer.to_json(self)
+        return DataclassJSONSerializer.to_json(instance=self)
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
-        tracker = KeyedElementTracker.from_kwargs(kwargs)
-        element = DataclassJSONSerializer.from_json(data, clazz=cls, **kwargs)
-        if tracker.has(element.key):
-            return tracker.get(element.key)
-        tracker.add(element.key, element)
+    def _from_json(cls, *, data: Dict[str, Any], **kwargs) -> Self:
+        tracker = KeyedElementTracker.from_kwargs(from_json_kwargs=kwargs)
+        element = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
+        if tracker.has(key=element.key):
+            return tracker.get(key=element.key)
+        tracker.add(key=element.key, tracked_object=element)
         return element
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeyedElementTracker(DeserializedObjectTracker[str, KeyedElement]):
     """
     The keyed elements deserialized from one JSON document.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OtherKeyedElementTracker(DeserializedObjectTracker[str, KeyedElement]):
     """
     A second tracker type, to tell apart the keyword argument slots of different
@@ -51,7 +51,7 @@ class OtherKeyedElementTracker(DeserializedObjectTracker[str, KeyedElement]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ElementReferencedTwice:
     """
     Refers to one keyed element from two fields.

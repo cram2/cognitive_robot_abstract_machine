@@ -50,10 +50,10 @@ from cramph.context import ContextExtension, StatechartContext
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from giskardpy.motion_statechart.monitors.feature_monitors import DistanceMonitor
@@ -567,7 +567,11 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
         )
         return flat_variable(
-            GraspsByCloseness(graspable, where_the_robot_stands, number_of_grasps=None)
+            GraspsByCloseness(
+                graspable=graspable,
+                standing_position=where_the_robot_stands,
+                number_of_grasps=None,
+            )
         )
 
     def _lay_the_milk_into_the_drawer(

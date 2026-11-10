@@ -8,7 +8,7 @@ from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MoveFingersToJointState,
     MoveGripper,

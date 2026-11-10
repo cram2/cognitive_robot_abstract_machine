@@ -61,7 +61,7 @@ def get_fit_scrdr(
             use_loaded_answers=load_answers, answers_save_path=isolated_filename
         )
         if load_answers:
-            expert.load_answers(isolated_filename)
+            expert.load_answers(path=isolated_filename)
 
         targets = (
             [None for _ in cases] if targets is None or len(targets) == 0 else targets
@@ -69,24 +69,24 @@ def get_fit_scrdr(
         scrdr = SingleClassRDR()
         case_queries = [
             CaseQuery(
-                case,
-                attribute_name,
-                (attribute_type,),
-                True,
+                original_case=case,
+                attribute_name=attribute_name,
+                _attribute_types=(attribute_type,),
+                mutually_exclusive=True,
                 _target=target,
             )
             for case, target in zip(cases, targets)
         ]
         scrdr.fit(
-            case_queries,
+            case_queries=case_queries,
             expert=expert,
             animate_tree=draw_tree,
             update_existing_rules=update_existing_rules,
         )
         if save_answers:
-            expert.save_answers(filename)
+            expert.save_answers(path=filename)
     for case_query in case_queries:
-        cat = scrdr.classify(case_query.case)
+        cat = scrdr.classify(case=case_query.case)
         assert cat == case_query.target_value
     return scrdr, case_queries
 
@@ -112,31 +112,31 @@ def get_fit_mcrdr(
             use_loaded_answers=load_answers, answers_save_path=isolated_filename
         )
         if load_answers:
-            expert.load_answers(isolated_filename)
+            expert.load_answers(path=isolated_filename)
         targets = (
             [None for _ in cases] if targets is None or len(targets) == 0 else targets
         )
         mcrdr = MultiClassRDR()
         case_queries = [
             CaseQuery(
-                case,
-                attribute_name,
-                (attribute_type,),
-                mutually_exclusive,
+                original_case=case,
+                attribute_name=attribute_name,
+                _attribute_types=(attribute_type,),
+                mutually_exclusive=mutually_exclusive,
                 _target=target,
             )
             for case, target in zip(cases, targets)
         ]
         mcrdr.fit(
-            case_queries,
+            case_queries=case_queries,
             expert=expert,
             animate_tree=draw_tree,
             update_existing_rules=update_existing_rules,
         )
         if save_answers:
-            expert.save_answers(filename)
+            expert.save_answers(path=filename)
     for case_query in case_queries:
-        cat = mcrdr.classify(case_query.case)
+        cat = mcrdr.classify(case=case_query.case)
         assert make_set(cat) == make_set(case_query.target_value)
     return mcrdr
 
@@ -163,12 +163,12 @@ def get_fit_grdr(
             answers_save_path=isolated_filename,
         )
         if load_answers:
-            expert.load_answers(isolated_filename)
+            expert.load_answers(path=isolated_filename)
 
         fit_scrdr, _ = get_fit_scrdr(cases, targets, draw_tree=False)
 
         grdr = GeneralRDR()
-        grdr.add_rdr(fit_scrdr)
+        grdr.add_rdr(rdr=fit_scrdr)
 
         n = 20
         true_targets = [get_habitat(x, t) for x, t in zip(cases[:n], targets[:n])]
@@ -178,25 +178,25 @@ def get_fit_grdr(
             all_targets = true_targets
         case_queries = [
             CaseQuery(
-                case,
-                name,
-                (Species,) if name == "species" else (Habitat,),
-                True if name == "species" else False,
+                original_case=case,
+                attribute_name=name,
+                _attribute_types=(Species,) if name == "species" else (Habitat,),
+                mutually_exclusive=True if name == "species" else False,
                 _target=target,
             )
             for case, targets in zip(cases[:n], all_targets)
             for name, target in targets.items()
         ]
         grdr.fit(
-            case_queries,
+            case_queries=case_queries,
             expert=expert,
             animate_tree=draw_tree,
             update_existing_rules=update_existing_rules,
         )
         if save_answers:
-            expert.save_answers(filename)
+            expert.save_answers(path=filename)
     for case, case_targets in zip(cases[:n], true_targets):
-        cat = grdr.classify(case)
+        cat = grdr.classify(case=case)
         for cat_name, cat_val in cat.items():
             if cat_name in case_targets:
                 assert make_set(cat_val) == make_set(case_targets[cat_name])

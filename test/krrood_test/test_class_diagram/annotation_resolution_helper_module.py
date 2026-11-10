@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .annotation_resolution_fallback_target import FallbackTarget
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Occupant(Symbol):
     """
     The class the name ``Occupant`` is bound to in this module.
@@ -29,7 +29,7 @@ class Occupant(Symbol):
     name: str = ""
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class OccupiedBase(Symbol):
     """
     A base class declaring a field typed by this module's ``Occupant``.
@@ -38,7 +38,7 @@ class OccupiedBase(Symbol):
     occupants: set[Occupant] = field(default_factory=set)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FallbackHolder(Symbol):
     """
     Declares a field whose type name is bound in no runtime namespace of this module.

@@ -16,7 +16,7 @@ from giskardpy.motion_statechart.exceptions import (
     NoGriplinkEndpoint,
     UnknownGriplinkActionError,
 )
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
@@ -32,7 +32,7 @@ from semantic_digital_twin.robots.griplink_gripper import (
     GriplinkGripPreset,
     GriplinkPresetConfiguration,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import ActionServerTask
+from giskardpy.motion_statechart.ros2_nodes.action_servers import ActionServerTask
 
 logger = logging.getLogger(__name__)
 

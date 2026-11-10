@@ -1,4 +1,6 @@
-"""Base class for Jinja2-based Python code generation."""
+"""
+Base class for Jinja2-based Python code generation.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +9,7 @@ from dataclasses import dataclass, field
 import jinja2
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CodeGenerator:
     """Base class for Jinja2-based code generation.
 
@@ -29,10 +31,14 @@ class CodeGenerator:
     """
 
     template_directory: str
-    """Absolute path to the templates directory."""
+    """
+    Absolute path to the templates directory.
+    """
 
     environment: jinja2.Environment = field(init=False, default=None)
-    """The Jinja2 :class:`~jinja2.Environment` used to load and render templates."""
+    """
+    The Jinja2 :class:`~jinja2.Environment` used to load and render templates.
+    """
 
     def __post_init__(self):
         self.environment = jinja2.Environment(
@@ -41,10 +47,12 @@ class CodeGenerator:
             lstrip_blocks=True,
         )
 
-    def render(self, template_name: str, **context: object) -> str:
-        """Load *template_name* and render it with *context*.
+    def render(self, *, template_name: str, **context: object) -> str:
+        """
+        Load *template_name* and render it with *context*.
 
-        :param template_name: The ``.py.jinja`` file name (e.g. ``"rdr_module.py.jinja"``).
+        :param template_name: The ``.py.jinja`` file name (e.g.
+            ``"rdr_module.py.jinja"``).
         :param context: Keyword arguments passed to the template as variables.
         :returns: The rendered source string.
         """

@@ -24,6 +24,7 @@ from krrood.entity_query_language.factories import (
     flat_variable,
 )
 from krrood.inheritance_path_length import inheritance_path_length
+
 try:
     from random_events.interval import SimpleInterval, Bound
 except ImportError as e:
@@ -69,9 +70,9 @@ def test_aggregate_distinct(handles_and_containers_world):
 @pytest.fixture
 def test_numbers():
     test_numbers = [
-        NamedNumbers("A", [1, 2, 3]),
-        NamedNumbers("B", [4, 2]),
-        NamedNumbers("C", [5]),
+        NamedNumbers(name="A", numbers=[1, 2, 3]),
+        NamedNumbers(name="B", numbers=[4, 2]),
+        NamedNumbers(name="C", numbers=[5]),
     ]
     return test_numbers
 
@@ -241,7 +242,7 @@ def test_sum_grouped_by(handles_and_containers_world):
 
     query = a(
         set_of(
-            total_characters := eql.sum(length(drawer.handle.name)),
+            total_characters := eql.sum(length(iterable=drawer.handle.name)),
             cabinet,
         ).grouped_by(cabinet)
     )
@@ -327,8 +328,8 @@ def test_count_variable_in_grouped_by_variables_selectnig_only_the_count(
 def test_count_with_duplicates(handles_and_containers_world):
     world = handles_and_containers_world
     cabinet_with_duplicate_drawers = Cabinet(
-        next(b for b in world.bodies if isinstance(b, Container)),
-        [
+        container=next(b for b in world.bodies if isinstance(b, Container)),
+        drawers=[
             next(d for d in world.views if isinstance(d, Drawer)),
             next(d for d in world.views if isinstance(d, Drawer)),
         ],
@@ -415,18 +416,18 @@ def test_max_min_without_entity():
 
 @pytest.fixture
 def departments_and_employees():
-    d1 = Department("HR")
-    d2 = Department("IT")
-    d3 = Department("Finance")
+    d1 = Department(name="HR")
+    d2 = Department(name="IT")
+    d3 = Department(name="Finance")
 
-    e1 = Employee("John", d1, 10000)
-    e2 = Employee("Anna", d1, 20000)
+    e1 = Employee(name="John", department=d1, salary=10000)
+    e2 = Employee(name="Anna", department=d1, salary=20000)
 
-    e3 = Employee("Anna", d2, 20000, 20000)
-    e4 = Employee("Mary", d2, 30000, 30000)
+    e3 = Employee(name="Anna", department=d2, salary=20000, starting_salary=20000)
+    e4 = Employee(name="Mary", department=d2, salary=30000, starting_salary=30000)
 
-    e5 = Employee("Peter", d3, 30000)
-    e6 = Employee("Paul", d3, 40000)
+    e5 = Employee(name="Peter", department=d3, salary=30000)
+    e6 = Employee(name="Paul", department=d3, salary=40000)
 
     departments = [d1, d2, d3]
     employees = [e1, e2, e3, e4, e5, e6]
@@ -592,7 +593,7 @@ def test_order_by_aggregation(handles_and_containers_world):
     query = an(
         entity(cabinet)
         .grouped_by(cabinet)
-        .ordered_by(eql.count(drawer), descending=True)
+        .ordered_by(variable=eql.count(drawer), descending=True)
     )
     assert query.tolist() == sorted(
         cabinet.tolist(), key=lambda c: len(c.drawers), reverse=True
@@ -710,21 +711,21 @@ def test_mode_and_multi_mode(
 
 
 def test_nearest_object_type():
-    @dataclass
+    @dataclass(kw_only=True)
     class BaseObject: ...
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Object1(BaseObject): ...
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Object2(BaseObject): ...
 
-    @dataclass
+    @dataclass(kw_only=True)
     class Level2Object(Object1): ...
 
     @symbolic_function
     def symbolic_distance(type1: type, type2: type) -> int | None:
-        return inheritance_path_length(type1, type2)
+        return inheritance_path_length(child_class=type1, parent_class=type2)
 
     @symbolic_function
     def eql_mro(object_: Any) -> tuple[type]:

@@ -407,7 +407,9 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
             ),
         ],
     )
-    plans = list(EntityQueryLanguageGenerativeBackend().evaluate(plan_generator))
+    plans = list(
+        EntityQueryLanguageGenerativeBackend().evaluate(expression=plan_generator)
+    )
     assert len(plans) == len(list(target_locations._domain_)) * len(robot.all_arms)
 
 
@@ -721,7 +723,7 @@ def test_a_step_keeps_its_own_limit_over_the_contexts(
             probe_key=register_probe(),
             dof_id=world.degrees_of_freedom[0].id,
             fail_on_attempt_number=variable_from([1, 2, None]),
-        ).limit(3)
+        ).limit(n=3)
     )
     executor = simulated_executor(extensions)
 

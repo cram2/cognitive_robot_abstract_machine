@@ -26,7 +26,7 @@ from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
 from giskardpy.motion_statechart.context import MotionControlContext
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
     UpdateTemporaryCollisionRules,
@@ -702,7 +702,7 @@ class IsolatedBenchmarkSession(AbstractContextManager):
     def __enter__(self) -> IsolatedBenchmarkSession:
         SymbolGraph.clear()
         self._class_diagram = ClassDiagram(
-            recursive_subclasses(Symbol) + [World],
+            classes=recursive_subclasses(Symbol) + [World],
             introspector=DescriptorAwareIntrospector(),
         )
         SymbolGraph(_class_diagram=self._class_diagram)

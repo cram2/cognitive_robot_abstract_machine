@@ -36,7 +36,7 @@ class TemplateFile(PathEnumeration):
 # %% generation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AgentsInstructions:
     """
     The ``AGENTS.md`` of one repository, listing the rules of the given sections.
@@ -53,18 +53,19 @@ class AgentsInstructions:
     """
 
     @classmethod
-    def from_repository(cls, repository_root: Path) -> AgentsInstructions:
+    def from_repository(cls, *, repository_root: Path) -> AgentsInstructions:
         """
         :param repository_root: The directory holding the repository's ``AGENTS.md``.
         :return: The file listing the sections krrood ships, then the repository's own.
         """
-        sections = RuleModule(shipped_rules).sections
+        sections = RuleModule(module=shipped_rules).sections
         project_rules = RuleModule.import_from(
-            repository_root, RepositoryInstructionsFile.PROJECT_RULES
+            directory=repository_root,
+            module_name=RepositoryInstructionsFile.PROJECT_RULES,
         )
         if project_rules is not None:
             sections += project_rules.sections
-        return cls(repository_root, sections)
+        return cls(repository_root=repository_root, sections=sections)
 
     @property
     def checkers(self) -> tuple[CodeRuleChecker, ...]:
@@ -88,8 +89,8 @@ class AgentsInstructions:
         The content ``AGENTS.md`` must have: the rules of :attr:`sections`, under their
         headings, in the order they are declared.
         """
-        return CodeGenerator(str(TemplateFile.AGENTS.parent)).render(
-            TemplateFile.AGENTS.name,
+        return CodeGenerator(template_directory=str(TemplateFile.AGENTS.parent)).render(
+            template_name=TemplateFile.AGENTS.name,
             sections=self.sections,
             check_command=Subcommand.CHECK.invocation,
         )

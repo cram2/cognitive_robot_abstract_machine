@@ -17,7 +17,7 @@ from coraplex.robot_plans.actions.base import Action
 from cramph.node import StatechartNode
 from cramph.world_modification_nodes import MoveBranch
 from cramph.composites import Parallel
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )

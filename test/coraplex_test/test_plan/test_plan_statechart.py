@@ -569,7 +569,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
@@ -595,7 +595,7 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )

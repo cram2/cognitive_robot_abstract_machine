@@ -707,7 +707,6 @@ def test_thread_payload_monitor_surfaces_compute_exception() -> None:
 
 
 class TestStatechartLogic:
-
     def test_transition_triggers(self, tmp_path) -> None:
         kin_sim = StatechartExecutor(StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
@@ -1113,7 +1112,7 @@ class TestStatechartLogic:
         json_str = json.dumps(json_data)
         new_json_data = json.loads(json_str)
         msc_copy = Statechart.from_json(
-            new_json_data, context=StatechartContext(world=World())
+            data=new_json_data, context=StatechartContext(world=World())
         )
 
         for node in msc.nodes:
@@ -1557,7 +1556,6 @@ class TestEndStatechart:
 
 
 class TestTemplates:
-
     def test_sequence_goal(self, tmp_path) -> None:
         """
         Every step but the first starts on the tick its predecessor succeeds.
@@ -2312,8 +2310,8 @@ def _evaluate_in(
     """
     return float(
         expression.substitute(
-            [node.life_cycle_variable for node in life_cycle_states],
-            [Scalar(state) for state in life_cycle_states.values()],
+            old_variables=[node.life_cycle_variable for node in life_cycle_states],
+            new_variables=[Scalar(state) for state in life_cycle_states.values()],
         )
     )
 
@@ -3527,8 +3525,8 @@ class TestIsFailedOrInterrupted:
         """
         node = ConstTrueNode()
         substituted = sm.Scalar(node.is_failed_or_interrupted).substitute(
-            [node.is_failed, node.is_interrupted],
-            [
+            old_variables=[node.is_failed, node.is_interrupted],
+            new_variables=[
                 float(LifeCyclePredicate.IS_FAILED.truth_value(life_cycle_state)),
                 float(LifeCyclePredicate.IS_INTERRUPTED.truth_value(life_cycle_state)),
             ],
@@ -3629,7 +3627,7 @@ class TestObservationPredicates:
         variable = FloatVariable(name="observation")
 
         answer = predicate.expression(variable).substitute(
-            [variable], [float(observation)]
+            old_variables=[variable], new_variables=[float(observation)]
         )
 
         assert ObservationStateValues(float(answer)) == expected
@@ -3780,7 +3778,7 @@ class TestEagerStateVariables:
         json_data = msc.create_structure_copy().to_json()
         new_json_data = json.loads(json.dumps(json_data))
         msc_copy = Statechart.from_json(
-            new_json_data, context=StatechartContext(world=World())
+            data=new_json_data, context=StatechartContext(world=World())
         )
         msc_copy.compiler.add_transitions()
 

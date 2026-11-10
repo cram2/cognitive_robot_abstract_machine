@@ -96,7 +96,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         """
         :return: The type of action that is trained.
         """
-        return type(self).get_type_of_generic_parameter(TrainedAction)
+        return type(self).get_type_of_generic_parameter(parameter=TrainedAction)
 
     @abstractmethod
     def setup_world(self, *kwargs) -> World:
@@ -227,7 +227,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             arm=variable(Arm, world.semantic_annotations),
         )
 
-        move_to_reach.limit(limit)
+        move_to_reach.limit(n=limit)
 
         if self.model_path:
             query_backend = self.setup_backend_from_path(move_to_reach)
@@ -256,21 +256,25 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         :param underspecified_action: The underspecified action to create a backend for.
         :return: The probabilistic backend
         """
-        parameters = UnderspecifiedParameters(underspecified_action)
+        parameters = UnderspecifiedParameters(statement=underspecified_action)
         robot_x = parameters.variable_of(
-            underspecified_action.target_pose_offset_robot.position.x
+            attribute=underspecified_action.target_pose_offset_robot.position.x
         )
         robot_y = parameters.variable_of(
-            underspecified_action.target_pose_offset_robot.position.y
+            attribute=underspecified_action.target_pose_offset_robot.position.y
         )
-        hip_rotation = parameters.variable_of(underspecified_action.hip_rotation)
+        hip_rotation = parameters.variable_of(
+            attribute=underspecified_action.hip_rotation
+        )
 
         distribution = fully_factorized(
             variances={robot_x: 0.5, robot_y: 0.5, hip_rotation: 0.1},
             variables=parameters.variables.values(),
         )
 
-        return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
+        return ProbabilisticBackend(
+            model_registry=DictRegistry(models={self.action_type: distribution})
+        )
 
     def setup_backend_from_path(self, underspecified_action: Match):
         """
@@ -285,7 +289,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             distribution: ProbabilisticCircuit = from_json(json.load(f))
 
         # expand model with new variables
-        parameters = UnderspecifiedParameters(underspecified_action)
+        parameters = UnderspecifiedParameters(statement=underspecified_action)
         variables_not_in_parameters = set(parameters.variables.values()) - set(
             distribution.variables
         )
@@ -296,4 +300,6 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             distribution, distribution_for_variables_not_in_parameters
         )
 
-        return ProbabilisticBackend(DictRegistry({self.action_type: distribution}))
+        return ProbabilisticBackend(
+            model_registry=DictRegistry(models={self.action_type: distribution})
+        )

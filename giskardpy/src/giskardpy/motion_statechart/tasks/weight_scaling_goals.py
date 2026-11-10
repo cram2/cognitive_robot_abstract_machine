@@ -36,8 +36,8 @@ class MaxManipulability(ConvergingTask, HasKinematicChainParameters):
 
         joint_symbols = root_P_tip.free_variables()
         position_expression = sm.vstack([root_P_tip])
-        jacobian = position_expression.jacobian(joint_symbols)
-        jacobian_gram = jacobian.dot(jacobian.T)
+        jacobian = position_expression.jacobian(variables=joint_symbols)
+        jacobian_gram = jacobian.dot(other=jacobian.T)
         manipulability = sm.sqrt(jacobian_gram.det())
 
         artifacts.geometry.add_position_constraint(

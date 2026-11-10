@@ -14,7 +14,7 @@ def allowed_intervals(statement: Match) -> dict[str, Interval]:
         every value the statement allows it.
     """
     allowed = UnderspecifiedParameters(
-        statement
+        statement=statement
     ).truncation_assignments_from_where_conditions.bounding_box()
     return {
         variable.name.rsplit(".", 1)[-1]: allowed[variable]

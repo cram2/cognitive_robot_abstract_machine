@@ -22,7 +22,7 @@ from krrood.entity_query_language.utils import T
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Concatenation(EvaluatesChildrenInSequence, CanBehaveLikeAVariable[T]):
     """
     Concatenation of two or more variables.
@@ -48,10 +48,10 @@ class Concatenation(EvaluatesChildrenInSequence, CanBehaveLikeAVariable[T]):
         super().__post_init__()
         self._var_ = self
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         yield from (
-            result.update({self._id_: result.previous_operation_result.value})
-            for result in super()._evaluate__(sources)
+            result.update(other={self._id_: result.previous_operation_result.value})
+            for result in super()._evaluate__(sources=sources)
         )
 
     @property

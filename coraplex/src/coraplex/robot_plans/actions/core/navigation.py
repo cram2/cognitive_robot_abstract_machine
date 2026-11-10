@@ -20,7 +20,7 @@ from coraplex.robot_plans.mixins import (
     ReattachesBranches,
 )
 from cramph.composites import Parallel, PausedUntilTrue
-from giskardpy.motion_statechart.goals.base_pose_goals import (
+from giskardpy.motion_statechart.tasks.drive_tasks import (
     MobileBasePoseGoal,
     DifferentialDriveBaseGoal,
     HolonomicBaseGoal,
@@ -326,7 +326,8 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         current_floor = [
             floor
             for floor in self.world.get_semantic_annotations_by_type(Level)
-            if InsideOf(self.robot.bodies_with_collision[0], floor.root)() > 0.9
+            if InsideOf(body=self.robot.bodies_with_collision[0], other=floor.root)()
+            > 0.9
         ]
         if len(current_floor) == 0:
             raise NotOnASingleLevelException("Robot is not on any recognized floor.")

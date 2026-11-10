@@ -13,7 +13,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_entity import Connection
 from cramph.node import SucceedsOnObservingTrue
 from giskardpy.motion_statechart.exceptions import UnexpectedWorldEntityCountError
-from giskardpy.motion_statechart.goals.base_pose_goals import MobileBasePoseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import MobileBasePoseGoal
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState

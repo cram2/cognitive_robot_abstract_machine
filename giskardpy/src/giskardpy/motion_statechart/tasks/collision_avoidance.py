@@ -48,7 +48,6 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from krrood_spatial_math.spatial_types import Vector3
-from semantic_digital_twin.world_description.world_entity import Body
 
 # %% shared by self and external collision avoidance
 
@@ -356,55 +355,6 @@ class ExternalCollisionAvoidance(CollisionAvoidance):
         )
 
 
-@dataclass(eq=False, repr=False, kw_only=True)
-class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
-    """
-    Monitors the distance to the closest external object for a specific collision group
-    of a body. Turns True if the distance falls below :attr:`distance_threshold`.
-
-    .. note:: the input bodies are only used to look up the collision groups.
-    """
-
-    body: Body
-    """
-    The robot body to monitor.
-    """
-
-    distance_threshold: float
-    """
-    The distance in meters below which this monitor turns True.
-    """
-
-    collision_index: int = 0
-    """Index of the closest collision (0 = closest, 1 = second closest, etc.)."""
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def build_artifacts(self) -> MotionNodeArtifacts:
-        # 1. Access the shared external collision manager
-        # This automatically registers the manager with the CollisionManager
-        manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_external_collision_manager(self.context)
-
-        # 2. Register the body to ensure the manager tracks its collisions
-        manager.register_group_of_body(self.body)
-        group = manager.get_collision_group(self.body)
-
-        # 3. Retrieve the symbolic variable for the contact distance
-        distance_symbol = manager.get_contact_distance_symbol(
-            AvoidedExternalContact(group=group, rank=self.collision_index)
-        )
-
-        # 4. Return an observation artifact
-        # The node's observation_variable will be True when distance < distance_threshold
-        return MotionNodeArtifacts(
-            observation=distance_symbol < self.distance_threshold
-        )
-
-
 # %% temporary collision rules
 
 
@@ -651,50 +601,4 @@ class SelfCollisionAvoidance(CollisionAvoidance):
     ) -> _CancelBecauseSelfCollisionViolated:
         return _CancelBecauseSelfCollisionViolated(
             name="self collision violated", tasks=[task]
-        )
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
-    """
-    Monitors the distance to the closest external object for the group of a body.
-
-    Turns True if the distance falls below :attr:`distance_threshold`.
-    .. note:: the input bodies are only used to look up the collision groups.
-    """
-
-    body_a: Body
-    """
-    First robot body to monitor.
-    """
-
-    body_b: Body
-    """
-    Second robot body to monitor.
-    """
-
-    distance_threshold: float
-    """
-    The distance in meters below which this monitor turns True.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def build_artifacts(self) -> MotionNodeArtifacts:
-        manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_self_collision_manager(self.context)
-
-        manager.register_groups_of_body_combination(self.body_a, self.body_b)
-        combination = manager.body_pair_to_group_pair(self.body_a, self.body_b)
-
-        # The contacts of a combination are ranked, so the first is the closest.
-        distance_symbol = manager.get_contact_distance_symbol(
-            manager.avoided_contacts_of(combination)[0]
-        )
-
-        return MotionNodeArtifacts(
-            observation=distance_symbol < self.distance_threshold
         )

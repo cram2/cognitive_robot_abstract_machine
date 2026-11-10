@@ -14,22 +14,21 @@ from types import ModuleType
 
 import pytest
 
-from giskardpy.motion_statechart import goals, mixins, monitors, tasks
-from giskardpy.motion_statechart.goals.base_pose_goals import (
+from giskardpy.motion_statechart import mixins, monitors, tasks
+from giskardpy.motion_statechart.tasks.drive_tasks import (
     DrivenBaseGoal,
     HolonomicBaseGoal,
 )
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MoveFingersToJointState,
     MoveGripper,
 )
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from giskardpy.motion_statechart.mixins import (
@@ -70,6 +69,7 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianOrientation,
     CartesianPose,
+    CartesianPoseStraight,
     CartesianPosition,
     CartesianPositionTrajectory,
     CartesianPositionVelocityLimit,
@@ -123,12 +123,10 @@ def _classes_defined_in(package: ModuleType) -> list[type]:
 
 def _node_classes() -> list[type]:
     """
-    :return: Every dataclass among the tasks, goals and monitors.
+    :return: Every dataclass among the tasks and monitors.
     """
     return [
-        cls
-        for package in (tasks, goals, monitors)
-        for cls in _classes_defined_in(package)
+        cls for package in (tasks, monitors) for cls in _classes_defined_in(package)
     ]
 
 
@@ -309,6 +307,9 @@ def test_every_node_taking_a_root_and_a_tip_link_takes_them_as_a_kinematic_chain
     ],
 )
 def test_a_goal_comes_from_the_mixin_of_its_kind(node_class: type, mixin: type):
+    """
+    A node names its goal for what kind of goal it is, as every node of that kind does.
+    """
     assert issubclass(node_class, mixin)
 
 
@@ -339,6 +340,10 @@ def _goal_mixins_of(node_class: type) -> set[type]:
     ],
 )
 def test_a_monitor_takes_its_goal_as_its_task_does(task: type, monitor: type):
+    """
+    A monitor observing whether a task's goal is reached is given that goal the same
+    way.
+    """
     assert _goal_mixins_of(monitor) == _goal_mixins_of(task)
 
 
@@ -351,18 +356,27 @@ def test_a_monitor_takes_its_goal_as_its_task_does(task: type, monitor: type):
     ],
 )
 def test_a_monitor_reads_its_goal_frame_as_its_task_does(task: type, monitor: type):
+    """
+    A monitor reads a goal frame that may move when its task does.
+    """
     assert issubclass(monitor, HasGoalBindingPolicyParameter) == issubclass(
         task, HasGoalBindingPolicyParameter
     )
 
 
 def test_a_manipulability_goal_names_what_it_drives_towards():
+    """
+    The value is the manipulability the task drives towards, not a threshold.
+    """
     assert "goal_manipulability" in {
         field.name for field in dataclasses.fields(MaxManipulability)
     }
 
 
 def test_a_grasped_mechanism_names_the_position_it_drives_to():
+    """
+    The value is a position of the degree of freedom, not a joint state.
+    """
     assert "goal_position" in {
         field.name for field in dataclasses.fields(ArticulateGraspedMechanism)
     }
@@ -378,7 +392,7 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
     assert task.goal_reference_frame is goal_frame
 
 
-def test_nodes_with_generic_parameters_are_told_apart_by_identity():
+def test_nodes_with_equal_parameters_are_told_apart_by_identity():
     root, tip = Body(name=PrefixedName("root")), Body(name=PrefixedName("tip"))
     goal = Point3(reference_frame=root)
     first = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal)

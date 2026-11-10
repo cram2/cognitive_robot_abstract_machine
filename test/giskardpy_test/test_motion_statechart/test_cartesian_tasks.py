@@ -9,21 +9,12 @@ from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from cramph.data_types import ObservationStateValues, LifeCycleValues
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from cramph.composites import Sequence, Parallel
-from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
-from cramph.node import CancelStatechart, StatechartNode
-from giskardpy.motion_statechart.monitors.cartesian_monitors import PositionReached
-from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
-from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
-    SetSeedConfiguration,
+from giskardpy.motion_statechart.tasks.drive_tasks import (
+    DifferentialDriveBaseGoal,
+    DrivenBaseTask,
 )
-from cramph.statechart import (
-    Statechart,
-)
-from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianPose,
     HoldOrientation,
     HoldPose,
@@ -36,7 +27,18 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
     DistanceAlongAxis,
 )
-from giskardpy.motion_statechart.tasks.drive_tasks import DrivenBaseTask
+from cramph.composites import Sequence, Parallel
+from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
+from cramph.node import CancelStatechart, StatechartNode
+from giskardpy.motion_statechart.monitors.cartesian_monitors import PositionReached
+from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
+    SetSeedConfiguration,
+)
+from cramph.statechart import (
+    Statechart,
+)
+from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName

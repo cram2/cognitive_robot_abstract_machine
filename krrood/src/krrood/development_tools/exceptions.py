@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FormatterNotInstalled(DataclassException):
     """
     Raised when a formatting tool the formatter runs is not installed for the running
@@ -28,7 +28,7 @@ class FormatterNotInstalled(DataclassException):
         return 'Install the formatting tools with `pip install "krrood[development-tools]"`.'
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GitCommandFailed(DataclassException):
     """
     Raised when a git command the development tools depend on exits with an error.
