@@ -365,6 +365,7 @@ class Giskard:
             self.world_fetcher.close()
         if self.motion_server is not None:
             self.motion_server.client_watchdog.presence.stop()
+            self.motion_server.action_server.close()
         if self.tf_publisher is not None:
             self.tf_publisher.stop()
         if self.viz_marker_publisher is not None:

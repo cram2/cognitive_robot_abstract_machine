@@ -2739,6 +2739,14 @@ class CancelStatechart(TerminalNode):
         """
         return self._pending_exception is not None
 
+    @property
+    def pending_exception(self) -> Exception | None:
+        """
+        :return: The exception this node started with in the current tick and is still
+            to raise, None if there is none.
+        """
+        return self._pending_exception
+
     def raise_pending_exception(self) -> None:
         """
         Raises the exception this node started with in the current tick, if any.

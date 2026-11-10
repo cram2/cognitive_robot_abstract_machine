@@ -19,8 +19,11 @@ from krrood.symbolic_math.exceptions import (
     NotColumnVectorError,
     NotEnoughArgumentsError,
     NotSquareMatrixError,
+    UnhashableExpressionError,
 )
 from krrood.symbolic_math.symbolic_math import VariableParameters
+from krrood.utils import is_hashable
+from ..dataset.symbolic_type_with_inherited_hash import SymbolicTypeWithInheritedHash
 from .reference_implementations import (
     normalize_angle_positive,
     shortest_angular_distance,
@@ -820,27 +823,70 @@ class TestExpression:
 
 
 class TestSymbolicType:
+    """
+    Behaviour every symbolic type shares, whatever its shape.
+    """
+
     def test_substitute(self):
+        """
+        Substituting variables replaces them throughout the expression.
+        """
         a, b, c, d = sm.create_float_variables(["a", "b", "c", "d"])
         expr = a * b
         expr_substituted = expr.substitute(old_variables=[a, b], new_variables=[c, d])
         assert expr_substituted == c * d
 
     def test_create_variables(self):
+        """
+        Variables created from names carry those names.
+        """
         result = sm.create_float_variables(["a", "b", "c"])
         assert str(result[0]) == "a"
         assert str(result[1]) == "b"
         assert str(result[2]) == "c"
 
     def test_create_variables2(self):
+        """
+        Variables created from a count are numbered from zero.
+        """
         result = sm.create_float_variables(3)
         assert str(result[0]) == "s_0"
         assert str(result[1]) == "s_1"
         assert str(result[2]) == "s_2"
 
     def test_to_str(self):
+        """
+        The readable form shows the expression in casadi's notation.
+        """
         expr = sm.FloatVariable(name="muh") * sm.Scalar(23)
         assert expr.pretty_str() == [["(23*muh)"]]
+
+    def test_a_scalar_hashes_as_its_casadi_expression(self):
+        """
+        A scalar keeps the hash of the casadi expression it wraps.
+        """
+        scalar = SymbolicTypeWithInheritedHash.from_casadi_sx(casadi_sx=ca.SX(2))
+        assert hash(scalar) == hash(scalar.casadi_sx)
+
+    def test_hashing_a_non_scalar_raises_a_type_error(self):
+        """
+        Hashing an expression of more than one entry raises the error for it.
+        """
+        column = SymbolicTypeWithInheritedHash.from_casadi_sx(
+            casadi_sx=ca.SX([1, 0, 0])
+        )
+        with pytest.raises(UnhashableExpressionError):
+            hash(column)
+
+    def test_a_non_scalar_is_not_hashable(self):
+        """
+        A check for hashability, which expects a :class:`TypeError`, reports an
+        expression of more than one entry as not hashable.
+        """
+        column = SymbolicTypeWithInheritedHash.from_casadi_sx(
+            casadi_sx=ca.SX([1, 0, 0])
+        )
+        assert not is_hashable(column)
 
 
 class TestCompiledFunction:

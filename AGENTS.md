@@ -193,7 +193,7 @@
 - `ormatic_interface.py` files are generated, never written, and git-ignored (see `.gitignore`). Never edit them, and never read them to debug an ORM problem; regenerate them with `scripts/regenerate_all_orm.py` instead
 - The test suite builds them for its runs; a local checkout builds them with `scripts/regenerate_all_orm.py`
 - Never track one again: git refuses to overwrite a tracked path a checkout has generated its own copy of, which makes every branch switch fail
-- Pass `--orm-build never` to the test runs you start, and regenerate them with `scripts/regenerate_all_orm.py` when a change needs it
+- Set `CRAM_ORM_BUILD=never` in the environment of the test runs you start, and regenerate them with `scripts/regenerate_all_orm.py` when a change needs it; the `--orm-build` option is rejected when `--confcutdir` excludes `test/conftest.py`, which registers it
 - When regenerating the ORM interfaces does not fix an ORM problem, ask the developer
 - If an ORM import creates an import cycle, ask the user if a local import is fine
 

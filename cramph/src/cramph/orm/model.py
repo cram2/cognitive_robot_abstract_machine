@@ -56,6 +56,12 @@ class NodeStatesAtTick:
     None if they did not end it.
     """
 
+    cancellation_error: Exception | None = None
+    """
+    The exception the cancellation ended the statechart with, None if the values did not
+    end it.
+    """
+
     @classmethod
     def from_item(cls, item: StateHistoryItem) -> Self:
         """
@@ -69,6 +75,7 @@ class NodeStatesAtTick:
             cancelling_node_index=(
                 None if item.cancelled_by is None else item.cancelled_by.index
             ),
+            cancellation_error=item.cancellation_error,
         )
 
     def item_of(self, statechart: Statechart) -> StateHistoryItem:
@@ -91,6 +98,7 @@ class NodeStatesAtTick:
                 if self.cancelling_node_index is None
                 else statechart.get_node_by_index(self.cancelling_node_index)
             ),
+            cancellation_error=self.cancellation_error,
         )
 
 

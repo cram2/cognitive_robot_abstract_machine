@@ -1,7 +1,7 @@
 """
 Learning a causal graph from the rows a model is fitted on, with the Peter-Clark
-algorithm of causal-learn (Zheng et al., 2024), from a flat table or from the tables a
-relational circuit is fitted on.
+algorithm or greedy equivalence search of causal-learn :cite:p:`zheng2024causal`, from a
+flat table or from the tables a relational circuit is fitted on.
 """
 
 from __future__ import annotations
@@ -11,12 +11,19 @@ from dataclasses import dataclass, field, replace
 from enum import IntEnum, StrEnum
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+from causallearn.graph.GraphClass import CausalGraph as CausalLearnGraph
 from causallearn.graph.GraphNode import GraphNode as CausalLearnNode
 from causallearn.search.ConstraintBased.PC import pc as peter_clark
+from causallearn.search.ScoreBased.GES import ges as greedy_equivalence_search
 from causallearn.utils.PCUtils.BackgroundKnowledge import (
     BackgroundKnowledge as CausalLearnKnowledge,
 )
+from causallearn.utils.PCUtils.BackgroundKnowledgeOrientUtils import (
+    orient_by_background_knowledge,
+)
+from causallearn.utils.PCUtils.Meek import meek
 from typing_extensions import Any
 
 from krrood.class_diagrams.causal_relation import (
@@ -28,6 +35,7 @@ from krrood.class_diagrams.causal_relation import (
 )
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.ormatic.utils import classproperty
 from krrood.parametrization.feature_extraction.feature_extractor import (
     FeatureExtractor,
 )
@@ -36,6 +44,7 @@ from probabilistic_model.causal_structure.domain_causal_knowledge import (
     DomainCausalKnowledge,
 )
 from probabilistic_model.causal_structure.discretization import Discretizer
+from probabilistic_model.causal_structure.exceptions import TooFewVariablesToScore
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
     EdgeMark,
@@ -70,6 +79,18 @@ class ConditionalIndependenceTest(StrEnum):
     CHI_SQUARED = "chisq"
     """
     Pearson's χ² test.
+    """
+
+
+class GraphScore(StrEnum):
+    """
+    The scores greedy equivalence search can rate a graph of discretized columns by, by
+    the name causal-learn gives them.
+    """
+
+    BAYESIAN_DIRICHLET_EQUIVALENT_UNIFORM = "local_score_BDeu"
+    """
+    The Bayesian Dirichlet equivalent uniform score :cite:p:`heckerman1995learning`.
     """
 
 
@@ -118,27 +139,14 @@ class CausalStructureLearner(ABC):
 
 
 @dataclass
-class PeterClarkStructureLearner(CausalStructureLearner):
+class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
     """
-    The Peter-Clark algorithm in its order-independent form, on the table's columns
-    discretized into a few levels each.
-    """
-
-    significance_level: float = 0.05
-    """
-    The level below which a test's p-value rejects independence.
-    """
-
-    independence_test: ConditionalIndependenceTest = (
-        ConditionalIndependenceTest.G_SQUARED
-    )
-    """
-    The conditional independence test.
+    Learns a causal graph from the table's columns discretized into a few levels each.
     """
 
     discretizer: Discretizer = field(default_factory=Discretizer)
     """
-    How the columns are turned into levels before testing.
+    How the columns are turned into levels before learning.
     """
 
     def learn(
@@ -148,8 +156,8 @@ class PeterClarkStructureLearner(CausalStructureLearner):
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         """
-        Deterministic copies and columns that never vary are left out of the tests; a
-        copy is restored as a child of its source, and a constant column stays without
+        Deterministic copies and columns that never vary are left out of the learning;
+        a copy is restored as a child of its source, and a constant column stays without
         edges.
         """
         node_of = {node.name: node for node in nodes}
@@ -161,33 +169,42 @@ class PeterClarkStructureLearner(CausalStructureLearner):
             if node.name not in copies and rows[node.name].nunique() > 1
         ]
         tested_names = [node.name for node in tested]
-        codes = self.discretizer.fit_transform(rows[tested_names])
-        graph = peter_clark(
-            codes.to_numpy(dtype=np.int64),
-            self.significance_level,
-            self.independence_test,
-            stable=True,
-            show_progress=False,
-            node_names=tested_names,
-            background_knowledge=self.to_causal_learn_knowledge(
-                domain_knowledge.restricted_to(tested_names)
-            ),
-        ).G.graph
+        levels = self.discretizer.fit_transform(rows[tested_names])
         return CausalGraph.from_edges(
             nodes,
-            self.read_adjacency_matrix(graph, tested)
+            self.learn_edges(
+                levels.to_numpy(dtype=np.int64),
+                tested,
+                self.to_causal_learn_knowledge(
+                    domain_knowledge.restricted_to(tested_names)
+                ),
+            )
             + [
                 GraphEdge.directed_edge(node_of[copy.source], node_of[copy.copy])
                 for copy in domain_knowledge.deterministic_copies
             ],
         )
 
+    @abstractmethod
+    def learn_edges(
+        self,
+        levels: npt.NDArray[np.integer],
+        nodes: list[GraphNode],
+        domain_knowledge: CausalLearnKnowledge,
+    ) -> list[GraphEdge]:
+        """
+        :param levels: The discretized columns, one per node, in the order of the nodes.
+        :param nodes: The nodes to learn the edges between.
+        :param domain_knowledge: What is known about them in advance.
+        :return: The learned edges between them.
+        """
+
     @staticmethod
     def to_causal_learn_knowledge(
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalLearnKnowledge:
         """
-        :param domain_knowledge: Domain knowledge about the tested variables.
+        :param domain_knowledge: Domain knowledge about the learned variables.
         :return: The same knowledge as causal-learn takes it.
         """
         translated = CausalLearnKnowledge()
@@ -206,7 +223,7 @@ class PeterClarkStructureLearner(CausalStructureLearner):
 
     @staticmethod
     def read_adjacency_matrix(
-        graph: np.ndarray, nodes: list[GraphNode]
+        graph: npt.NDArray[np.integer], nodes: list[GraphNode]
     ) -> list[GraphEdge]:
         """
         :param graph: causal-learn's adjacency matrix over the nodes.
@@ -222,6 +239,85 @@ class PeterClarkStructureLearner(CausalStructureLearner):
             )
             for first, second in np.argwhere(np.triu(graph != 0, k=1))
         ]
+
+
+@dataclass
+class PeterClarkStructureLearner(DiscretizedTableStructureLearner):
+    """
+    The Peter-Clark algorithm in its order-independent form.
+    """
+
+    significance_level: float = 0.05
+    """
+    The level below which a test's p-value rejects independence.
+    """
+
+    independence_test: ConditionalIndependenceTest = (
+        ConditionalIndependenceTest.G_SQUARED
+    )
+    """
+    The conditional independence test.
+    """
+
+    def learn_edges(
+        self,
+        levels: npt.NDArray[np.integer],
+        nodes: list[GraphNode],
+        domain_knowledge: CausalLearnKnowledge,
+    ) -> list[GraphEdge]:
+        graph = peter_clark(
+            levels,
+            self.significance_level,
+            self.independence_test,
+            stable=True,
+            show_progress=False,
+            node_names=[node.name for node in nodes],
+            background_knowledge=domain_knowledge,
+        ).G.graph
+        return self.read_adjacency_matrix(graph, nodes)
+
+
+@dataclass
+class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
+    """
+    Greedy equivalence search :cite:p:`chickering2002optimal`, which moves between
+    equivalence classes while that raises their score.
+
+    .. note::
+        The domain causal knowledge does not restrict the search. It orients the edges
+        the search leaves undirected, followed by the orientations they imply
+        :cite:p:`meek1995causal`.
+    """
+
+    score: GraphScore = GraphScore.BAYESIAN_DIRICHLET_EQUIVALENT_UNIFORM
+    """
+    The score of a graph.
+    """
+
+    @classproperty
+    def minimum_variable_count(cls) -> int:
+        """
+        :return: The fewest variables causal-learn's score is defined for.
+        """
+        return 3
+
+    def learn_edges(
+        self,
+        levels: npt.NDArray[np.integer],
+        nodes: list[GraphNode],
+        domain_knowledge: CausalLearnKnowledge,
+    ) -> list[GraphEdge]:
+        """
+        :raises TooFewVariablesToScore: If there are fewer than
+            :attr:`minimum_variable_count` nodes.
+        """
+        if len(nodes) < self.minimum_variable_count:
+            raise TooFewVariablesToScore(len(nodes), self.minimum_variable_count)
+        names = [node.name for node in nodes]
+        graph = CausalLearnGraph(len(names), names)
+        graph.G = greedy_equivalence_search(levels, self.score, node_names=names)["G"]
+        orient_by_background_knowledge(graph, domain_knowledge)
+        return self.read_adjacency_matrix(meek(graph, domain_knowledge).G.graph, nodes)
 
 
 # %% what is learned

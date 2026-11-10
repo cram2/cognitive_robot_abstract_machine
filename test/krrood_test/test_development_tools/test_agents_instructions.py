@@ -299,6 +299,28 @@ def test_a_package_lists_the_sections_its_modules_define_alphabetically(
     ]
 
 
+def test_the_project_rules_can_import_the_modules_of_their_repository(
+    repository_root: Path,
+    copy_into_temporary_directory: Callable[[DatasetFile, str], Path],
+    forget_project_rules: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    copy_into_temporary_directory(
+        DatasetFile.PROJECT_RULES_IMPORTING_REPOSITORY,
+        f"{RepositoryInstructionsFile.PROJECT_RULES}.py",
+    )
+    copy_into_temporary_directory(
+        DatasetFile.REPOSITORY_WORDING, "repository_wording.py"
+    )
+
+    project_rules = RuleModule.import_from(
+        directory=repository_root, module_name=RepositoryInstructionsFile.PROJECT_RULES
+    )
+
+    assert project_rules.sections == [project_rules.module.ReviewRules]
+
+
 def test_the_project_rules_module_is_imported_once(
     project_rules_repository: Path,
 ) -> None:

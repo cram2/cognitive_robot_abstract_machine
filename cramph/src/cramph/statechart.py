@@ -805,7 +805,7 @@ class Statechart(SubclassJSONSerializer):
         Ends the statechart if a :class:`CancelStatechart` node started in the current
         tick: every other node still running or paused is interrupted, which is recorded
         as the last snapshot of :attr:`state_history`, naming the first such cancel
-        node, and then that node's exception is raised.
+        node and its exception, and then that exception is raised.
         """
         cancelling_node = next(
             (node for node in self._cancel_nodes if node.has_pending_exception), None
@@ -821,6 +821,7 @@ class Statechart(SubclassJSONSerializer):
                     life_cycle_state=self.life_cycle_state,
                     observation_state=self.observation_state,
                     cancelled_by=cancelling_node,
+                    cancellation_error=cancelling_node.pending_exception,
                 )
             )
         finally:

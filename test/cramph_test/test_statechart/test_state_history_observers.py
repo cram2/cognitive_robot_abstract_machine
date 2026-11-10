@@ -283,6 +283,11 @@ class ChartCancelledWithNodesInEveryState:
     A node that had not started.
     """
 
+    raised: NodeAssertionError
+    """
+    The exception the cancellation raised.
+    """
+
 
 @pytest.fixture
 def chart_cancelled_with_nodes_in_every_state(
@@ -304,7 +309,7 @@ def chart_cancelled_with_nodes_in_every_state(
     chart.add_nodes([running, paused, succeeded, not_started, cancel])
     executor = StatechartExecutor(statechart_context)
     executor.compile(statechart=chart)
-    with pytest.raises(NodeAssertionError):
+    with pytest.raises(NodeAssertionError) as raised:
         executor.tick()
     return ChartCancelledWithNodesInEveryState(
         chart=chart,
@@ -313,6 +318,7 @@ def chart_cancelled_with_nodes_in_every_state(
         paused=paused,
         succeeded=succeeded,
         not_started=not_started,
+        raised=raised.value,
     )
 
 
@@ -367,6 +373,20 @@ def test_cancellation_record_names_the_cancelling_node(
     *earlier, final = cancelled.chart.state_history.items
     assert [item.cancelled_by for item in earlier] == [None] * len(earlier)
     assert final.cancelled_by is cancelled.cancel
+
+
+def test_cancellation_record_keeps_the_raised_exception(
+    chart_cancelled_with_nodes_in_every_state: ChartCancelledWithNodesInEveryState,
+) -> None:
+    """
+    Only the record of the cancellation keeps the exception the chart was cancelled
+    with, so the reason survives once the exception itself is gone.
+    """
+    cancelled = chart_cancelled_with_nodes_in_every_state
+
+    *earlier, final = cancelled.chart.state_history.items
+    assert [item.cancellation_error for item in earlier] == [None] * len(earlier)
+    assert final.cancellation_error is cancelled.raised
 
 
 def test_cancellation_runs_the_end_callback_of_interrupted_nodes(

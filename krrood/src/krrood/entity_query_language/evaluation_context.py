@@ -362,6 +362,19 @@ class EvaluationContext:
     exhausted or closed.
     """
 
+    outer_visible_variables_cache: dict[
+        uuid.UUID, tuple[weakref.ref[SymbolicExpression], ...]
+    ] = field(default_factory=dict)
+    """
+    Memoizes, per quantifier id, the variables of that quantifier that also occur
+    elsewhere in the query being evaluated. They depend on the query around the
+    quantifier, so they are fixed during one evaluation but can differ once the query is
+    rebuilt.
+
+    ..warning:: Held through weak references, for the same reason as
+        :attr:`expression_index_cache`.
+    """
+
     def is_child_of_truth_value_operator(
         self, *, expression: SymbolicExpression
     ) -> bool:

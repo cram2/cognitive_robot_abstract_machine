@@ -1,3 +1,7 @@
+"""
+Fixing forward kinematics to the values they have at one moment of a motion.
+"""
+
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -90,6 +94,18 @@ class ForwardKinematicsBinding:
         self.root = root
         self.root_T_tip.reference_frame = root
         self._set_root_T_tip(new_root_T_root @ self._bound_root_T_tip)
+
+    def change_tip(self, tip: KinematicStructureEntity, world: World) -> None:
+        """
+        Measure the chain up to `tip`, such as once a task knows only when it starts which
+        entity ends the chain.
+
+        :param tip: The new tip of the chain.
+        :param world: The world used for computing the forward kinematics.
+        """
+        self.tip = tip
+        self.root_T_tip.child_frame = tip
+        self.bind(world)
 
     def bind(self, world: World) -> None:
         """
