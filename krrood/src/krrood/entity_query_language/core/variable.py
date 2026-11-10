@@ -80,7 +80,7 @@ class DomainValue(Generic[T]):
     The value the variable takes.
     """
 
-    origin: OperationResult
+    sources: OperationResult
     """
     The result the value was found under, whose bindings the variable's result keeps.
     """
@@ -92,7 +92,7 @@ class VariableDomain(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def values_with_origins(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
+    def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
         """
         :param sources: The bindings the variable is evaluated under.
         :return: Every value the variable takes under ``sources``.
@@ -113,7 +113,7 @@ class ListedValues(ReEnterableLazyIterable[T], VariableDomain[T]):
     A domain of given values, each read as it is in every evaluation.
     """
 
-    def values_with_origins(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
+    def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
         return (DomainValue(value, sources) for value in self)
 
     @property
@@ -185,7 +185,7 @@ class ExpressionDomain(VariableDomain[T]):
     The type the values are instances of, or no type filter when it is not a class.
     """
 
-    def values_with_origins(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
+    def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
         for result in self.expression._evaluate_(sources):
             elements = result.value if is_iterable(result.value) else (result.value,)
             if isclass(self.element_type):
@@ -287,9 +287,9 @@ class Variable(CanHaveDomainSource[T]):
         """
         Yield an OperationResult for each value of the domain.
         """
-        for domain_value in self._values_domain_.values_with_origins(sources):
-            bindings = domain_value.origin.bindings | {self._id_: domain_value.value}
-            yield self._build_operation_result_(bindings, domain_value.origin)
+        for domain_value in self._values_domain_.values_with_sources(sources):
+            bindings = domain_value.sources.bindings | {self._id_: domain_value.value}
+            yield self._build_operation_result_(bindings, domain_value.sources)
 
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
