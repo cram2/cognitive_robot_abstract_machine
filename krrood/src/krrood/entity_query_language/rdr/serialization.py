@@ -21,6 +21,7 @@ from uuid import UUID
 from typing_extensions import Any, Callable, Dict, List, Optional, Set, Type, Union
 
 from krrood.code_generation import ast_helpers
+from krrood.code_generation.dataclass_source import ObjectSource
 from krrood.code_generation.function_case import FunctionCaseGenerator
 from krrood.code_generation.generator import CodeGenerator
 from krrood.code_generation.imports import get_imports_from_types
@@ -43,7 +44,7 @@ from krrood.entity_query_language.factories import (
 )
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import AND, OR, Not
-from krrood.entity_query_language.rdr.corner_case import CaseSource, CornerCaseStore
+from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
 from krrood.entity_query_language.rdr.exceptions import (
     EmptyRuleTreeError,
     UnsupportedNodeForSerialization,
@@ -405,7 +406,7 @@ def _emit_rule_body(
 
 
 def _render_corner_cases_source(
-    corner_case_sources: Dict[int, CaseSource], referenced_types: Set[type]
+    corner_case_sources: Dict[int, ObjectSource], referenced_types: Set[type]
 ) -> str:
     """Render the ``{index: constructor, ...}`` corner-case dict literal.
 
