@@ -87,6 +87,15 @@ class DrivenBaseGoal(
     The base moved, by the drive attaching its robot to its parent.
     """
 
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix | None = (
+        expanded_child_field(default=None)
+    )
+    """
+    Differs from :attr:`BindsGoalReferenceFrame.root_T_goal_reference_frame` in being
+    created by :meth:`expand` and sent along with this goal once it expanded, since the
+    tasks of :attr:`motion` are expressed over it.
+    """
+
     @property
     def driven_body(self) -> KinematicStructureEntity:
         """

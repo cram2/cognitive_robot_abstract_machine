@@ -26,7 +26,6 @@ from giskardpy.motion_statechart.mixins import (
 )
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from giskardpy.qp.constraint_collection import ConstraintCollection
-from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     Scalar,
@@ -387,7 +386,6 @@ class BindsGoalReferenceFrame(
         default=None,
         init=False,
         repr=False,
-        metadata=JSONMetadata(serialize=True).as_dict(),
     )
     """
     The pose of :attr:`goal_reference_frame` relative to :attr:`goal_binding_root`, as
