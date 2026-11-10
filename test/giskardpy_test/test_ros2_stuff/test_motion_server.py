@@ -28,7 +28,9 @@ from semantic_digital_twin.input_synchronization import (
 )
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
 from giskardpy.middleware.ros2.motion_server import MotionServer
-from giskardpy.middleware.ros2.post_goal_plotters import PostGoalPlotter
+from giskardpy.motion_statechart.debug_expression_publisher import (
+    DebugExpressionPublishing,
+)
 from giskardpy.middleware.ros2.world_updates import OutgoingWorldUpdates
 from cramph.exceptions import SelfInStartConditionError
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -44,7 +46,7 @@ from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
-from cramph.executor import StatechartExecutor
+from cramph.executor import ExecutorExtension, StatechartExecutor
 
 
 from .test_client_presence import SteppingClock, heartbeat_of, let_heartbeats_stop
@@ -540,43 +542,13 @@ class PendingModelChangeInjector(InputSynchronizer):
         return False
 
 
-@dataclass
-class RecordingPlotter(PostGoalPlotter):
-    """
-    Records for which goals debug plots were requested.
-    """
-
-    plotted_goal_ids: list[int] = field(default_factory=list)
-    """
-    The goal ids that were plotted.
-    """
-
-    def plot(self, goal_id: int) -> None:
-        self.plotted_goal_ids.append(goal_id)
-
-
-@dataclass
-class FailingPlotter(PostGoalPlotter):
-    """
-    Fails while drawing its plot, standing in for a broken plotting backend.
-    """
-
-    def plot(self, goal_id: int) -> None:
-        raise BrokenPlotError()
-
-
-class BrokenPlotError(Exception):
-    """
-    Raised by :class:`FailingPlotter`.
-    """
-
-
 # %% fixtures
 
 
-def create_executor() -> StatechartExecutor:
+def create_executor(*additional_extensions: ExecutorExtension) -> StatechartExecutor:
     """
-    Build an executor that simulates as fast as possible in an empty world.
+    Build an executor that simulates as fast as possible in an empty world, with
+    `additional_extensions` after motion control.
     """
     return StatechartExecutor(
         context=StatechartContext(world=World()),
@@ -584,7 +556,8 @@ def create_executor() -> StatechartExecutor:
         extensions=[
             MotionControl(
                 qp_controller_config=QPControllerConfig.create_with_simulation_defaults()
-            )
+            ),
+            *additional_extensions,
         ],
     )
 
@@ -600,6 +573,7 @@ def create_goal_json(
     seconds: float = 0.5,
     required_position: StreamPosition | None = None,
     client: MetaData | None = None,
+    publishes_debug_expressions: bool = False,
 ) -> str:
     """
     Build the json of a goal whose motion ends after the given simulated time.
@@ -613,7 +587,10 @@ def create_goal_json(
     if client is None:
         client = MetaData(node_name="unwatched_client", process_id=0)
     goal = MotionGoal.for_motion_statechart(
-        motion_statechart, client=client, required_position=required_position
+        motion_statechart,
+        client=client,
+        required_position=required_position,
+        publishes_debug_expressions=publishes_debug_expressions,
     )
     return json.dumps(goal.to_json())
 
@@ -635,13 +612,16 @@ class MotionServerFixture:
     command_publisher: RecordingCommandPublisher
     idle_input: RecordingInputSynchronizer
     control_input: RecordingInputSynchronizer
-    plotter: RecordingPlotter
+    debug_expression_publishing: DebugExpressionPublishing
     cycle_counter: CycleCounter
 
 
 @pytest.fixture()
 def motion_server(init_rospy) -> MotionServerFixture:
-    executor = create_executor()
+    debug_expression_publishing = DebugExpressionPublishing(
+        rospy.get_node(), publishes_markers=False
+    )
+    executor = create_executor(debug_expression_publishing)
     world = executor.context.world
     action_server = GoalQueueMimic()
     world_updates = WorldUpdatesMimic(executor=executor)
@@ -672,7 +652,6 @@ def motion_server(init_rospy) -> MotionServerFixture:
         command_publishers=[command_publisher],
     )
     idle_input = RecordingInputSynchronizer(world=world, executor=executor)
-    plotter = RecordingPlotter(executor=executor)
     server = MotionServer(
         executor=executor,
         action_server=action_server,
@@ -683,7 +662,7 @@ def motion_server(init_rospy) -> MotionServerFixture:
         feedback_publisher=feedback_publisher,
         inputs=WorldStateInputs(world=world, synchronizers=[idle_input]),
         cycle_counter=cycle_counter,
-        post_goal_plotters=[plotter],
+        debug_expression_publishing=debug_expression_publishing,
     )
     return MotionServerFixture(
         executor=executor,
@@ -697,7 +676,7 @@ def motion_server(init_rospy) -> MotionServerFixture:
         command_publisher=command_publisher,
         idle_input=idle_input,
         control_input=control_input,
-        plotter=plotter,
+        debug_expression_publishing=debug_expression_publishing,
         cycle_counter=cycle_counter,
     )
 
@@ -930,17 +909,6 @@ class TestCleanupAfterGoal:
 
         assert motion_server.command_publisher.stop_count == 1
 
-    def test_debug_plots_are_written_for_the_goal(
-        self, motion_server: MotionServerFixture
-    ):
-        motion_server.action_server.goal_json = create_goal_json()
-
-        motion_server.motion_server.run_idle_cycle()
-
-        assert motion_server.plotter.plotted_goal_ids == [
-            motion_server.action_server.goal_id
-        ]
-
     def test_feedback_is_published_at_the_end_of_the_goal(
         self, motion_server: MotionServerFixture
     ):
@@ -950,51 +918,25 @@ class TestCleanupAfterGoal:
 
         assert len(motion_server.action_server.feedback_messages) > 0
 
-    def test_a_failing_plotter_still_answers_the_client(
-        self, motion_server: MotionServerFixture
+
+class TestDebugExpressions:
+    """
+    Each goal decides whether the debug expressions of its running nodes are published.
+    """
+
+    @pytest.mark.parametrize("publishes_debug_expressions", [True, False])
+    def test_the_goal_switches_publishing_its_debug_expressions(
+        self, motion_server: MotionServerFixture, publishes_debug_expressions
     ):
-        motion_server.motion_server.post_goal_plotters = [
-            FailingPlotter(executor=motion_server.executor)
-        ]
-        motion_server.action_server.goal_json = create_goal_json()
+        publishing = motion_server.debug_expression_publishing
+        publishing.publishes_markers = not publishes_debug_expressions
+        motion_server.action_server.goal_json = create_goal_json(
+            publishes_debug_expressions=publishes_debug_expressions
+        )
 
         motion_server.motion_server.run_idle_cycle()
 
-        assert len(motion_server.action_server.sent_results) == 1
-
-    def test_a_failing_plotter_keeps_the_server_taking_goals(
-        self, motion_server: MotionServerFixture
-    ):
-        """
-        A debug plot is a diagnostic, so it may never escape the idle cycle: an
-        exception here would end the loop that serves goals and leave every later client
-        waiting forever.
-        """
-        motion_server.motion_server.post_goal_plotters = [
-            FailingPlotter(executor=motion_server.executor)
-        ]
-        motion_server.action_server.goal_json = create_goal_json()
-        motion_server.motion_server.run_idle_cycle()
-
-        motion_server.action_server.goal_json = create_goal_json()
-        motion_server.motion_server.run_idle_cycle()
-
-        assert len(motion_server.action_server.sent_results) == 2
-
-    def test_a_failing_plotter_does_not_stop_the_remaining_plotters(
-        self, motion_server: MotionServerFixture
-    ):
-        motion_server.motion_server.post_goal_plotters = [
-            FailingPlotter(executor=motion_server.executor),
-            motion_server.plotter,
-        ]
-        motion_server.action_server.goal_json = create_goal_json()
-
-        motion_server.motion_server.run_idle_cycle()
-
-        assert motion_server.plotter.plotted_goal_ids == [
-            motion_server.action_server.goal_id
-        ]
+        assert publishing.publishes_markers is publishes_debug_expressions
 
 
 class TestStateFeedback:

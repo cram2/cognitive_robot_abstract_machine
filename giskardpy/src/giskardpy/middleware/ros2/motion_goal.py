@@ -47,12 +47,19 @@ class MotionGoal(SubclassJSONSerializer):
     wait for.
     """
 
+    publishes_debug_expressions: bool = field(default=False, kw_only=True)
+    """
+    Whether Giskard publishes the spatial debug expressions of the running nodes as RViz
+    markers while it executes this goal.
+    """
+
     @classmethod
     def for_motion_statechart(
         cls,
         motion_statechart: Statechart,
         client: MetaData,
         required_position: StreamPosition | None = None,
+        publishes_debug_expressions: bool = False,
     ) -> MotionGoal:
         """
         Build the goal that asks for the given motion statechart.
@@ -61,6 +68,7 @@ class MotionGoal(SubclassJSONSerializer):
             motion_statechart_json_data=motion_statechart.to_json(),
             client=client,
             required_position=required_position,
+            publishes_debug_expressions=publishes_debug_expressions,
         )
 
     def to_json(self, **kwargs) -> dict[str, Any]:
@@ -73,6 +81,7 @@ class MotionGoal(SubclassJSONSerializer):
                 if self.required_position is None
                 else to_json(self.required_position, **kwargs)
             ),
+            "publishes_debug_expressions": self.publishes_debug_expressions,
         }
 
     @classmethod
@@ -87,6 +96,7 @@ class MotionGoal(SubclassJSONSerializer):
             required_position=(
                 None if required_position is None else from_json(required_position)
             ),
+            publishes_debug_expressions=data["publishes_debug_expressions"],
         )
 
     def parse_motion_statechart(self, **kwargs: Any) -> Statechart:

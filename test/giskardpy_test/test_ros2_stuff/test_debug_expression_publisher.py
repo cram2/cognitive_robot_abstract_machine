@@ -22,12 +22,6 @@ from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.node import EndedByOwner
 from cramph.statechart import Statechart
-from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.robot_interface_config import (
-    StandAloneRobotInterfaceConfig,
-)
-from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.model.world_config import EmptyWorld
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.debug_expression_publisher import (
     DebugExpressionPublishing,
@@ -43,7 +37,6 @@ from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianOrientation
 from giskardpy.motion_statechart.tasks.feature_functions import AlignPerpendicular
-from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood_spatial_math.spatial_types import Point3, RotationMatrix, Vector3
 from semantic_digital_twin.world import World
@@ -484,6 +477,29 @@ def test_markers_show_the_current_values_without_recompiling(
     assert sphere.pose.position.x == 1.5
 
 
+def test_switched_off_publishing_neither_collects_nor_publishes(
+    publishing, cylinder_bot_world, monkeypatch
+):
+    """
+    A statechart compiled while publishing is off costs no evaluation and shows no
+    markers.
+    """
+    publishing.publishes_markers = False
+    executor = create_executor(cylinder_bot_world, publishing)
+    nodes = NodesStartingInTurn.build(executor.context)
+    monkeypatch.setattr(
+        publishing._marker_publisher,
+        "submit",
+        lambda submission: pytest.fail("switched off publishing submitted markers"),
+    )
+
+    executor.compile(nodes.statechart)
+    tick_until_running(executor, nodes.second)
+    executor.finish_run()
+
+    assert publishing._visualizations_per_node == {}
+
+
 def test_the_end_of_a_run_deletes_the_markers(publishing, cylinder_bot_world):
     """
     No marker stays shown once a run stopped.
@@ -632,35 +648,3 @@ def test_executor_skips_debug_expressions_by_default(rclpy_node, cylinder_bot_wo
 
     with pytest.raises(MissingExecutorExtensionError):
         executor.require_extension(DebugExpressionPublishing)
-
-
-@pytest.mark.parametrize(
-    ("debug_mode", "publish_debug_expressions", "expected_extension_types"),
-    [
-        (True, True, [DebugExpressionPublishing]),
-        (True, False, []),
-        (False, True, []),
-    ],
-)
-def test_giskard_publishes_debug_expressions_only_in_debug_mode(
-    rclpy_node, debug_mode, publish_debug_expressions, expected_extension_types
-):
-    """
-    Debug expressions are published only when both switches are on.
-    """
-    server_config = GiskardServerConfig(
-        publish_debug_expressions=publish_debug_expressions
-    )
-    server_config.debug_mode = debug_mode
-    giskard = Giskard(
-        world_config=EmptyWorld(),
-        server_config=server_config,
-        robot_interface_config=StandAloneRobotInterfaceConfig(),
-        qp_controller_config=QPControllerConfig(target_frequency=50),
-    )
-
-    extension_types = [
-        type(extension) for extension in giskard.create_debug_extensions(rclpy_node)
-    ]
-
-    assert extension_types == expected_extension_types

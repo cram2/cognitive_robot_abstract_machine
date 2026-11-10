@@ -84,10 +84,7 @@ class PR2Tester(GiskardTester):
         return Giskard(
             world_config=WorldWithPR2Config(urdf=robot_desc),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=True,
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig(
                 target_frequency=20,
             ),

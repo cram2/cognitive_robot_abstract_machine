@@ -16,7 +16,6 @@ from experiments.control_loop_experiments.scenarios import (
     CartesianGoalScenario,
     DeeplyNestedCascadeScenario,
     LongSequenceScenario,
-    PlotterMode,
     ScenarioRunner,
 )
 from experiments.experiment_definitions import MeanAndStandardDeviation, Unit
@@ -108,10 +107,9 @@ class TestRepetitionAggregation:
             make_profile([0.02, 0.04], [0.005, 0.015], compile_duration=0.6),
         ]
 
-        result = ControlLoopBenchmarkResult.from_profiles(PlotterMode.PLAIN, profiles)
+        result = ControlLoopBenchmarkResult.from_profiles(profiles)
 
         assert result.scenario_name == "measured_motion"
-        assert result.plotter_mode is PlotterMode.PLAIN
         # cycle means are 20 ms and 30 ms, so the budget of 50 ms is 40% and 60% used
         assert result.cycle_mean == MeanAndStandardDeviation.from_measurements(
             [0.02, 0.03], unit=Unit.SECONDS
@@ -132,7 +130,7 @@ class TestRepetitionAggregation:
             make_profile([0.01, 0.03], [0.005, 0.015]),
         ]
 
-        result = ControlLoopBenchmarkResult.from_profiles(PlotterMode.DEBUG, profiles)
+        result = ControlLoopBenchmarkResult.from_profiles(profiles)
 
         assert result.cycle_maximum == MeanAndStandardDeviation.from_measurements(
             [0.09, 0.03], unit=Unit.SECONDS
@@ -140,12 +138,11 @@ class TestRepetitionAggregation:
 
     def test_a_configuration_that_was_never_measured_is_rejected(self):
         with pytest.raises(NoProfilesMeasuredError):
-            ControlLoopBenchmarkResult.from_profiles(PlotterMode.PLAIN, [])
+            ControlLoopBenchmarkResult.from_profiles([])
 
     def test_every_measurement_becomes_a_column(self):
         assert ControlLoopBenchmarkResult.get_column_names() == [
             "scenario_name",
-            "plotter_mode",
             "control_cycles",
             "cycle_mean",
             "cycle_p95",
@@ -164,14 +161,6 @@ class TestFailureReporting:
     A benchmark that fails after minutes of measuring has to say which configuration
     broke and what to run to see why.
     """
-
-    def test_missing_repetitions_name_the_plotter_mode(self):
-        error = NoProfilesMeasuredError(plotter_mode=PlotterMode.DEBUG)
-
-        assert error.error_message() == (
-            "No repetition was measured under the debug plotter mode, so there is "
-            "nothing to aggregate."
-        )
 
     def test_failed_measurement_names_the_scenario_and_the_return_code(self):
         error = MeasurementProcessFailedError(
@@ -229,12 +218,12 @@ class TestPhaseBreakdown:
 
 @pytest.fixture()
 def cartesian_goal_profile(init_rospy) -> CallTreeProfile:
-    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(CartesianGoalScenario())
+    return ScenarioRunner().run(CartesianGoalScenario())
 
 
 @pytest.fixture()
 def long_sequence_profile(init_rospy) -> CallTreeProfile:
-    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(LongSequenceScenario())
+    return ScenarioRunner().run(LongSequenceScenario())
 
 
 @pytest.mark.slow
@@ -257,10 +246,7 @@ class TestPhaseAccounting:
 
 @pytest.fixture()
 def benchmark_robot(init_rospy) -> Iterator[BenchmarkRobot]:
-    robot = BenchmarkRobot(
-        plotter_mode=PlotterMode.PLAIN,
-        target_frequency=ScenarioRunner.target_frequency,
-    )
+    robot = BenchmarkRobot(target_frequency=ScenarioRunner.target_frequency)
     yield robot
     robot.close()
 
@@ -309,9 +295,7 @@ class TestControlCycleBudget:
 
 @pytest.fixture()
 def deeply_nested_cascade_profile(init_rospy) -> CallTreeProfile:
-    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(
-        DeeplyNestedCascadeScenario()
-    )
+    return ScenarioRunner().run(DeeplyNestedCascadeScenario())
 
 
 @pytest.mark.slow

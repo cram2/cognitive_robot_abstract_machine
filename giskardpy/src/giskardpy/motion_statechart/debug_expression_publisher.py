@@ -169,8 +169,8 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     They are evaluated on the control loop at :attr:`publish_frequency` and rendered and
     published on a thread of its own.
 
-    .. warning:: Use it only while debugging, because the evaluation slows down the
-        control loop.
+    .. warning:: Switch on :attr:`publishes_markers` only while debugging, because the
+        evaluation slows down the control loop.
     """
 
     ros_node: Node
@@ -181,6 +181,12 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     publish_frequency: float = 10.0
     """
     How often per second of control time the markers are published.
+    """
+
+    publishes_markers: bool = True
+    """
+    Whether the statecharts compiled from now on publish their debug expressions; while
+    off, none are collected, evaluated or published.
     """
 
     _marker_publisher: BackgroundMarkerPublisher = field(init=False)
@@ -228,6 +234,8 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         replacing those of the previous one.
         """
         self._release_visualizations()
+        if not self.publishes_markers:
+            return
         world = executor.context.world
         for node in executor.statechart.get_nodes_by_type(MotionStatechartNode):
             visualizations = [
@@ -243,6 +251,8 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         Publish the debug expressions of the running nodes, if a publish period passed
         since the last publish.
         """
+        if not self.publishes_markers:
+            return
         ticks_between_publishes = max(
             1,
             round(
@@ -279,14 +289,15 @@ class DebugExpressionPublishing(TickingExecutorExtension):
 
     def after_run(self, executor: StatechartExecutor) -> None:
         """
-        Delete the published markers.
+        Delete the markers published since compiling.
         """
-        self._marker_publisher.submit(
-            MarkerSubmission(
-                evaluated_visualizations=[],
-                root_frame_name=str(executor.context.world.root.name),
+        if self._last_published_tick is not None:
+            self._marker_publisher.submit(
+                MarkerSubmission(
+                    evaluated_visualizations=[],
+                    root_frame_name=str(executor.context.world.root.name),
+                )
             )
-        )
         self._release_visualizations()
 
     def _release_visualizations(self) -> None:

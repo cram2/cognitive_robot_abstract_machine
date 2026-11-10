@@ -275,7 +275,7 @@ class StretchTester(GiskardTester):
                 urdf=load_xacro(Stretch.get_ros_file_path())
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(debug_mode=True),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 

@@ -74,7 +74,7 @@ def test_a_standalone_giskard_simulates_the_robot_of_its_world() -> None:
     assert giskard.world_config is world_config
     assert giskard.qp_controller_config is qp_controller_config
     assert type(giskard.robot_interface_config) is StandAloneRobotInterfaceConfig
-    assert giskard.server_config == GiskardServerConfig(debug_mode=True)
+    assert giskard.server_config == GiskardServerConfig()
 
 
 # %% launching a Giskard

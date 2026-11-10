@@ -54,6 +54,11 @@ class ServerAnsweringOneGoal:
     Whether the client asked to cancel the goal before it was answered.
     """
 
+    received_goal_message: JsonAction.Goal | None = field(init=False, default=None)
+    """
+    The goal the client sent, None until it arrived.
+    """
+
     thread: Thread = field(init=False)
     """
     The thread serving the goal.
@@ -69,6 +74,7 @@ class ServerAnsweringOneGoal:
         """
         self._wait_until(self.action_server.has_goal)
         self.action_server.accept_goal()
+        self.received_goal_message = self.action_server.goal_msg
         if self.feedback_json is not None:
             self.action_server.send_feedback(
                 JsonAction.Feedback(feedback=self.feedback_json)

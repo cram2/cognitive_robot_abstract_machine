@@ -47,11 +47,7 @@ class HSRTester(GiskardTester):
         return Giskard(
             world_config=WorldWithHSRConfig(urdf=robot_desc),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(
-                debug_mode=True,
-                plot_gantt_chart=True,
-                plot_trajectory=True,
-            ),
+            server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
         )
 

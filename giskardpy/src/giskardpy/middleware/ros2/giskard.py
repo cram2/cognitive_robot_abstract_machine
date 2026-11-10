@@ -9,7 +9,6 @@ import json
 from typing_extensions import Callable, Self
 
 import rclpy
-from rclpy.node import Node
 from json_msgs.action import JsonAction
 from std_msgs.msg import String
 from sqlalchemy.orm import sessionmaker
@@ -29,12 +28,6 @@ from giskardpy.middleware.ros2.graceful_shutdown import GracefulShutdownSignals
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.motion_server import MotionServer
-from giskardpy.middleware.ros2.post_goal_plotters import (
-    GoalGanttChartPlotter,
-    GoalTrajectoryPlotter,
-    MotionStatechartPlotter,
-    PostGoalPlotter,
-)
 from giskardpy.middleware.ros2.robot_interface_config import (
     RobotInterfaceConfig,
     StandAloneRobotInterfaceConfig,
@@ -66,7 +59,7 @@ from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from cramph.composites import ChildChooserAccess
 from cramph.context import StatechartContext
-from cramph.executor import ExecutorExtension, StatechartExecutor
+from cramph.executor import StatechartExecutor
 from giskardpy.motion_statechart.debug_expression_publisher import (
     DebugExpressionPublishing,
 )
@@ -106,6 +99,11 @@ class Giskard:
     executor: StatechartExecutor = field(init=False)
     """
     Runs the motion statecharts of the goals.
+    """
+
+    debug_expression_publishing: DebugExpressionPublishing = field(init=False)
+    """
+    Publishes the debug expressions of the goals that ask for them.
     """
 
     motion_server: MotionServer | None = field(init=False, default=None)
@@ -157,13 +155,12 @@ class Giskard:
             attached to the world.
         :param qp_controller_config: The control frequency and the tuning of the
             controller.
-        :return: A Giskard that simulates the robot instead of commanding it, with
-            debug output enabled.
+        :return: A Giskard that simulates the robot instead of commanding it.
         """
         return cls(
             world_config=world_config,
             robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(debug_mode=True),
+            server_config=GiskardServerConfig(),
             qp_controller_config=qp_controller_config,
         )
 
@@ -189,6 +186,9 @@ class Giskard:
         """
         node_logger = rospy.get_node().get_logger()
         node_logger.info("Building the world.")
+        self.debug_expression_publishing = DebugExpressionPublishing(
+            rospy.get_node(), publishes_markers=False
+        )
         with self.world_config.world.modify_world():
             self.world_config.setup_world()
             clear_memoization_cache(self.world_config.world)
@@ -198,7 +198,7 @@ class Giskard:
                 extensions=[
                     RosNodeAccess(rospy.get_node()),
                     MotionControl(qp_controller_config=self.qp_controller_config),
-                    *self.create_debug_extensions(rospy.get_node()),
+                    self.debug_expression_publishing,
                 ],
             )
 
@@ -254,7 +254,7 @@ class Giskard:
             inputs=WorldStateInputs(world=world),
             cycle_counter=cycle_counter,
             idle_frequency=self.server_config.idle_frequency,
-            post_goal_plotters=self.create_post_goal_plotters(),
+            debug_expression_publishing=self.debug_expression_publishing,
         )
 
     def receive_child_choices(
@@ -277,37 +277,6 @@ class Giskard:
             ),
             10,
         )
-
-    def create_debug_extensions(self, node: Node) -> list[ExecutorExtension]:
-        """
-        Create the executor extensions of the debug output that is configured.
-
-        :param node: The ROS2 node the debug output is published on.
-        """
-        if (
-            not self.server_config.debug_mode
-            or not self.server_config.publish_debug_expressions
-        ):
-            return []
-        return [DebugExpressionPublishing(node)]
-
-    def create_post_goal_plotters(self) -> list[PostGoalPlotter]:
-        """
-        Create the debug plotters that are configured and let them record what they
-        need.
-        """
-        if not self.server_config.debug_mode:
-            return []
-        plotters: list[PostGoalPlotter] = []
-        if self.server_config.plot_trajectory:
-            plotters.append(GoalTrajectoryPlotter(executor=self.executor))
-        if self.server_config.plot_gantt_chart:
-            plotters.append(GoalGanttChartPlotter(executor=self.executor))
-        if self.server_config.plot_motion_statechart:
-            plotters.append(MotionStatechartPlotter(executor=self.executor))
-        for plotter in plotters:
-            plotter.start_recording()
-        return plotters
 
     def setup_world_model_ros_interface(self):
         try:
