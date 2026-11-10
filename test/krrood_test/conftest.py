@@ -30,9 +30,13 @@ from .dataset import (
     example_classes,
     semantic_world_like_classes,
     alternative_mappings_construction_order,
+    annotated_fields,
+    chained_exceptions,
+    dataclass_field_descriptors,
     clashing_field_names,
     classes_with_generic,
     identity_hashed_values_created_on_access,
+    interface_typed_fields,
     single_value_classes,
 )
 from .dataset.example_classes import (
@@ -71,10 +75,6 @@ def generate_sqlalchemy_interface():
 
     # collect all classes that need persistence
     all_classes = {c.clazz for c in symbol_graph._class_diagram.wrapped_classes}
-    all_classes |= {
-        alternative_mapping.original_class()
-        for alternative_mapping in recursive_subclasses(AlternativeMapping)
-    }
     all_classes |= set(classes_of_module(krrood.symbol_graph.symbol_graph))
     all_classes |= set(classes_of_module(example_classes))
     all_classes |= set(classes_of_module(semantic_world_like_classes))
@@ -85,10 +85,14 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(classes_for_testing_role_recursion_error))
     all_classes |= set(classes_of_module(roles_over_a_value_stored_as_json))
     all_classes |= set(classes_of_module(alternative_mappings_construction_order))
+    all_classes |= set(classes_of_module(annotated_fields))
+    all_classes |= set(classes_of_module(chained_exceptions))
+    all_classes |= set(classes_of_module(dataclass_field_descriptors))
     all_classes |= set(classes_of_module(clashing_field_names))
     all_classes |= set(classes_of_module(classes_with_generic))
     all_classes |= set(classes_of_module(single_value_classes))
     all_classes |= set(classes_of_module(identity_hashed_values_created_on_access))
+    all_classes |= set(classes_of_module(interface_typed_fields))
     all_classes |= {Symbol, Role}
 
     # remove classes that don't need persistence
@@ -101,6 +105,12 @@ def generate_sqlalchemy_interface():
         c
         for c in all_classes
         if is_dataclass(c) and not issubclass(c, AlternativeMapping)
+    }
+
+    # a mapped class need not be a dataclass, such as an interface its mappings share
+    all_classes |= {
+        alternative_mapping.original_class()
+        for alternative_mapping in recursive_subclasses(AlternativeMapping)
     }
 
     all_classes |= {FunctionType}

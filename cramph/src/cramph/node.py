@@ -1,3 +1,8 @@
+"""
+The nodes of a statechart, the conditions of their transitions and the variables those
+conditions read.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -5,7 +10,7 @@ import logging
 import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
-from dataclasses import MISSING, field, dataclass
+from dataclasses import MISSING, field, dataclass, fields
 
 from typing_extensions import (
     Any,
@@ -557,6 +562,32 @@ class DerivedConditionVariable(ConditionVariable, ABC):
             variables, [variable.expression() for variable in variables]
         )
 
+    @classmethod
+    def reading_counterparts(
+        cls,
+        condition: Scalar,
+        counterpart_of: Callable[[StatechartNode], StatechartNode | None],
+    ) -> Scalar:
+        """
+        :param condition: A transition condition.
+        :param counterpart_of: The node standing in for a node `condition` reads, or
+            None if no node does.
+        :return: `condition` reading the counterpart of every node it reads, and the
+            current value of every test on a node without one.
+        """
+        variables: list[DerivedConditionVariable] = condition.free_variables()
+        if not variables:
+            return condition
+        replacements = []
+        for variable in variables:
+            counterpart = counterpart_of(variable.statechart_node)
+            replacements.append(
+                Scalar(float(variable.resolve()))
+                if counterpart is None
+                else variable.for_node(counterpart)
+            )
+        return Scalar(condition).substitute(variables, replacements)
+
 
 @dataclass(repr=False, eq=False, init=False)
 class LifeCyclePredicateVariable(DerivedConditionVariable):
@@ -998,6 +1029,19 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             ancestors.append(ancestor)
             ancestor = ancestor.parent_node
         return ancestors
+
+    def find_upwards(
+        self, predicate: Callable[[StatechartNode], bool]
+    ) -> StatechartNode | None:
+        """
+        :param predicate: Whether a node is the one looked for.
+        :return: This node, or the closest node above it, for which `predicate` holds,
+            or None if it holds for none of them.
+        """
+        return next(
+            (node for node in [self, *self.path] if predicate(node)),
+            None,
+        )
 
     @property
     def depth(self) -> int:
@@ -2007,11 +2051,86 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return f"{self.name}#{self.index}"
 
+    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+        """
+        :param rebuild: Builds the nodes this node holds anew and rebinds what it refers
+            to.
+        :return: A node of no statechart constructed like this one, holding every node
+            and every list of nodes among its constructor arguments built anew, or None
+            if `rebuild` leaves out such a node or every node of such a list.
+        """
+        arguments = {
+            # a field known only by its name can only be read with getattr
+            constructor_field.name: getattr(self, constructor_field.name)
+            for constructor_field in fields(self)
+            if constructor_field.init
+        }
+        held_nodes = {
+            name: rebuild.rebuilt(value)
+            for name, value in arguments.items()
+            if isinstance(value, StatechartNode)
+        }
+        held_node_lists = {
+            name: rebuild.rebuilt_children(self, value)
+            for name, value in arguments.items()
+            if isinstance(value, list)
+            and value
+            and all(isinstance(element, StatechartNode) for element in value)
+        }
+        if any(node is None for node in held_nodes.values()) or not all(
+            held_node_lists.values()
+        ):
+            return None
+        other_arguments = {
+            name: value
+            for name, value in arguments.items()
+            if name not in held_nodes and name not in held_node_lists
+        }
+        return type(self)(
+            **rebuild.rebound(other_arguments), **held_nodes, **held_node_lists
+        )
+
     def __repr__(self) -> str:
         return self.unique_name
 
 
 GenericStatechartNode = TypeVar("GenericStatechartNode", bound=StatechartNode)
+
+
+# %% building nodes anew
+
+
+@dataclass
+class NodeRebuild(ABC):
+    """
+    Builds nodes of a statechart anew, as nodes of no statechart, from the arguments
+    they were constructed with, see :meth:`StatechartNode.rebuilt_by`.
+    """
+
+    @abstractmethod
+    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+        """
+        :param node: A node a node being built anew holds or refers to.
+        :return: `node` built anew, the same node each time `node` is asked for, or
+            None if it is left out.
+        """
+
+    @abstractmethod
+    def rebuilt_children(
+        self, owner: StatechartNode, children: list[StatechartNode]
+    ) -> list[StatechartNode]:
+        """
+        :param owner: The node holding `children`.
+        :param children: The nodes `owner` holds, in their order.
+        :return: `children` built anew, without those left out.
+        """
+
+    @abstractmethod
+    def rebound(self, value: Any) -> Any:
+        """
+        :param value: A node of no statechart, or anything it was constructed with.
+        :return: `value` referring to what the nodes built anew refer to.
+        """
 
 
 # %% how a node ends
@@ -2608,6 +2727,22 @@ class CancelStatechart(TerminalNode):
 
     def on_start(self) -> None:
         self._pending_exception = self.create_exception()
+
+    @property
+    def has_pending_exception(self) -> bool:
+        """
+        :return: Whether this node started in the current tick, so its exception is
+            still to be raised.
+        """
+        return self._pending_exception is not None
+
+    @property
+    def pending_exception(self) -> Exception | None:
+        """
+        :return: The exception this node started with in the current tick and is still
+            to raise, None if there is none.
+        """
+        return self._pending_exception
 
     def raise_pending_exception(self) -> None:
         """

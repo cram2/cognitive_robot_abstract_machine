@@ -7,13 +7,23 @@ expressions.
 
 from __future__ import annotations
 
+import collections.abc
 import operator
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
 from inspect import isclass
-from typing_extensions import TYPE_CHECKING, Generic, Iterable, Any, get_args, Self
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Self,
+    get_args,
+    get_origin,
+)
 
 
 from random_events.variable import (
@@ -23,7 +33,7 @@ from random_events.variable import (
     variable_from_name_and_type,
 )
 
-from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.class_diagrams.utils import common_base_class, get_type_hints_of_object
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.entity_query_language.core.base_expressions import (
@@ -34,6 +44,14 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
     SymbolicExpression,
     UnificationDict,
+)
+from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.ground_term import (
+    AttributeTerm,
+    CallTerm,
+    GroundTermExpression,
+    GroundTermType,
+    IndexTerm,
 )
 from krrood.entity_query_language.exceptions import (
     MultipleValuesAlongAccessPath,
@@ -165,7 +183,9 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
         return self._symbolic_expression_._get_mapped_variable_(indexing, key)
 
     def __call__(self, *args, **kwargs) -> Call[T]:
-        return self._symbolic_expression_._get_mapped_variable_(Call, args, kwargs)
+        return self._symbolic_expression_._get_mapped_variable_(
+            Call, CallArguments(args, kwargs)
+        )
 
     def __eq__(self, other) -> Comparator:
         return Comparator(self._symbolic_expression_, other, operator.eq)
@@ -313,7 +333,10 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         :return: The retrieved or created MappedVariable instance.
         """
         cache_item = MappedVariableCacheItem(
-            type_, CallSignature.of(type_).bind(self, *args, **kwargs)
+            type_,
+            CallSignature.from_callable(type_).bind(
+                CallArguments((self, *args), kwargs)
+            ),
         )
         if cache_item in self._known_mapped_variables_:
             return self._known_mapped_variables_[cache_item]
@@ -564,7 +587,7 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
 
 @dataclass(eq=False, repr=False)
-class SingleValueMapping(MappedVariable[T], ABC):
+class SingleValueMapping(MappedVariable[T], GroundTermExpression[GroundTermType], ABC):
     """
     A mapping that reaches a single value, fully determined by the expression it is
     applied to and its own arguments.
@@ -578,6 +601,17 @@ class SingleValueMapping(MappedVariable[T], ABC):
         when nothing is stored under that key.
     """
 
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return (self._child_,)
+
+    def _apply_mapping_(
+        self, value: Any, sources: OperationResult | None = None
+    ) -> Iterable[T]:
+        term_value = EvaluationContext.current_value_of_term(self._ground_term_(value))
+        if term_value is not None:
+            yield term_value.value
+
     def _apply_mapping_on_external_value_(self, value: Any) -> Iterable[T]:
         """
         :param value: A value outside query evaluation.
@@ -587,7 +621,7 @@ class SingleValueMapping(MappedVariable[T], ABC):
 
 
 @dataclass(eq=False, repr=False)
-class Attribute(SingleValueMapping[T]):
+class Attribute(SingleValueMapping[T, AttributeTerm]):
     """
     A symbolic attribute that can be used to access attributes of symbolic variables.
 
@@ -613,11 +647,8 @@ class Attribute(SingleValueMapping[T]):
         """
         self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
 
-    def _apply_mapping_(
-        self, value: Any, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        if hasattr(value, self._attribute_name_):
-            yield getattr(value, self._attribute_name_)
+    def _ground_term_(self, instance: Any) -> AttributeTerm:
+        return AttributeTerm(instance, self._attribute_name_)
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(
@@ -700,19 +731,14 @@ class Index(MappedVariable[T], ABC):
 
 
 @dataclass(eq=False, repr=False)
-class IndexByValue(Index[T], SingleValueMapping[T]):
+class IndexByValue(Index[T], SingleValueMapping[T, IndexTerm]):
     """
     Indexing by a key that is a plain value, which reaches the one element stored under
     it.
     """
 
-    def _apply_mapping_(
-        self, value: Any, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        try:
-            yield value[self._key_]
-        except IndexError:  # break iterator if the key does not exist
-            return
+    def _ground_term_(self, container: Any) -> IndexTerm:
+        return IndexTerm(container, self._key_)
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(IndexByValue, _key_=self._key_)
@@ -722,7 +748,7 @@ class IndexByValue(Index[T], SingleValueMapping[T]):
 
 
 @dataclass(eq=False, repr=False)
-class IndexByExpression(Index[T]):
+class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
     """
     Indexing by a key that is itself an expression, which reaches one element per value
     that expression takes.
@@ -731,50 +757,46 @@ class IndexByExpression(Index[T]):
     indexing it by one of them reaches the single value bound to it.
     """
 
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return self._child_, self._key_
+
+    def _ground_term_(self, container: Any, key: Any) -> IndexTerm:
+        return IndexTerm(container, key)
+
     def _apply_mapping_(
         self, value: Any, sources: OperationResult | None = None
     ) -> Iterable[T]:
-        try:
-            if isinstance(value, UnificationDict) and self._key_ in value:
-                yield value[self._key_]
-                return
-            for key in self._key_._evaluate_(sources):
-                yield value[key.value]
-        except IndexError:  # break iterator if the key does not exist
+        if isinstance(value, UnificationDict) and self._key_ in value:
+            yield value[self._key_]
             return
+        for key in self._key_._evaluate_(sources):
+            term_value = EvaluationContext.current_value_of_term(
+                self._ground_term_(value, key.value)
+            )
+            if term_value is not None:
+                yield term_value.value
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
         return child._get_mapped_variable_(IndexByExpression, _key_=self._key_)
 
 
 @dataclass(eq=False, repr=False)
-class Call(SingleValueMapping[T]):
+class Call(SingleValueMapping[T, CallTerm]):
     """
     A variable created through a function call operation on its child variable.
     """
 
-    _args_: tuple[Any, ...] = field(default_factory=tuple)
+    _arguments_: CallArguments = field(default_factory=CallArguments)
     """
-    The arguments to call the method with.
-    """
-
-    _kwargs_: dict[str, Any] = field(default_factory=dict)
-    """
-    The keyword arguments to call the method with.
+    The arguments the called value is called with.
     """
 
-    def _apply_mapping_(
-        self, value: Any, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        if len(self._args_) > 0 or len(self._kwargs_) > 0:
-            yield value(*self._args_, **self._kwargs_)
-        else:
-            yield value()
+    def _ground_term_(self, callee: Callable[..., Any]) -> CallTerm:
+        return CallTerm.from_call(callee, self._arguments_)
 
     def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
-        return child._get_mapped_variable_(
-            Call, _args_=self._args_, _kwargs_=self._kwargs_
-        )
+        return child._get_mapped_variable_(Call, self._arguments_)
 
     @property
     def _name_(self):
@@ -823,6 +845,37 @@ class FlatVariable(MappedVariable[T]):
     the iteration belongs to the node itself: each flattening written is a variable of
     its own, and two of them range over the elements independently.
     """
+
+    def _update_type_(self) -> None:
+        """
+        Update the `_type_` attribute with the type of the elements that iterating the
+        child's value yields, when the child's type is a parameterized iterable, else
+        with the child's type.
+
+        A dictionary yields its key type, and a tuple whose positions have different
+        types yields their lowest common base class.
+        """
+        super()._update_type_()
+        collection_type = get_origin(self._type_)
+        element_types = get_args(self._type_)
+        if not (
+            isclass(collection_type)
+            and issubclass(collection_type, collections.abc.Iterable)
+            and element_types
+        ):
+            return
+        if issubclass(collection_type, collections.abc.Mapping):
+            self._type_ = element_types[0]
+            return
+        distinct_element_types = [
+            element_type
+            for element_type in dict.fromkeys(element_types)
+            if element_type is not Ellipsis
+        ]
+        if len(distinct_element_types) == 1:
+            self._type_ = distinct_element_types[0]
+            return
+        self._type_ = common_base_class(distinct_element_types)
 
     def _apply_mapping_(
         self, value: Iterable[T], sources: OperationResult | None = None

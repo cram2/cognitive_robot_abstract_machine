@@ -9,9 +9,9 @@ def main() -> None:
     The demo is skipped when DAiSy is not installed.
     """
     try:
-        from semantic_digital_twin.utils import daisy_installed
+        from semantic_digital_twin.robots.daisy import DAiSy
 
-        if not daisy_installed():
+        if not DAiSy.is_description_installed():
             print("DAiSy is not installed, skipping the gripper demo.")
             return
 

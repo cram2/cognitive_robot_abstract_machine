@@ -391,6 +391,42 @@ def test_screw_connection_copy_with_new_parent_preserves_screw_pitch(
     assert copied_connection.parent is new_parent
 
 
+# %% re-parenting keeps the connection name
+
+
+@pytest.mark.parametrize(
+    "connection_type, additional_arguments",
+    [
+        (FixedConnection, {}),
+        (Connection6DoF, {}),
+        (OmniDrive, {}),
+        (DifferentialDrive, {}),
+        (RevoluteConnection, {"axis": Vector3.Z()}),
+        (PrismaticConnection, {"axis": Vector3.X()}),
+        (ScrewConnection, {"axis": Vector3.Z(), "screw_pitch": 0.01}),
+    ],
+)
+def test_copy_with_new_parent_keeps_name(
+    world_with_two_bodies, connection_type, additional_arguments
+):
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = connection_type.create_with_dofs(
+            world,
+            parent,
+            child,
+            name=PrefixedName("named_connection"),
+            **additional_arguments,
+        )
+        world.add_connection(connection)
+
+    copied_connection = connection.copy_with_new_parent(
+        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+    )
+
+    assert copied_connection.name == connection.name
+
+
 # %% create_with_dofs parameter forwarding
 
 

@@ -16,7 +16,6 @@ published before.
 from __future__ import annotations
 
 from cramph.data_types import StatechartPayloadKey
-import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 from threading import Lock
@@ -35,6 +34,7 @@ from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.exceptions import StatechartOutOfStepError
 from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayloadKey
 from giskardpy.middleware.ros2.world_updates import (
+    CatchingUpWithGiskard,
     ClientWorldUpdates,
     IncomingWorldUpdates,
 )
@@ -279,6 +279,45 @@ class ChildSentByClient(ChildChooser[CompositeNodeChoosingItsChild]):
 # %% the client's side
 
 
+@dataclass(frozen=True)
+class ChildRequest:
+    """
+    A node of a running goal reporting that it waits for its next child.
+    """
+
+    goal_id: int
+    """
+    The goal the node belongs to.
+    """
+
+    node_index: int
+    """
+    The index of the node in the statechart of the goal.
+    """
+
+    child_count: int
+    """
+    How many children the node held when it reported, which tells its requests apart.
+    """
+
+    @classmethod
+    def from_feedback(cls, feedback: dict[str, Any]) -> list[Self]:
+        """
+        :param feedback: The feedback of a running goal.
+        :return: The request of every node the feedback reports as waiting for a child.
+        """
+        return [
+            cls(
+                goal_id=feedback[StatechartPayloadKey.GOAL_ID],
+                node_index=int(index),
+                child_count=child_count,
+            )
+            for index, child_count in feedback[
+                MotionStatechartPayloadKey.WAITING_FOR_CHILD
+            ].items()
+        ]
+
+
 @dataclass
 class ChildChoiceClient:
     """
@@ -307,76 +346,146 @@ class ChildChoiceClient:
     The change of the client's world every choice is made on.
     """
 
-    _answered: set[tuple[int, int, int]] = field(
-        default_factory=set, init=False, repr=False
-    )
+    _answered: set[ChildRequest] = field(default_factory=set, init=False, repr=False)
     """
-    Every request answered, as goal, node index and the number of children the node held.
+    Every request answered, including those of the nodes a choice answered before they
+    asked, see :meth:`_choose`.
     """
 
-    _waiting_for_changes_since: float | None = field(
-        default=None, init=False, repr=False
-    )
+    _catching_up: CatchingUpWithGiskard = field(init=False, repr=False)
     """
-    The :func:`time.monotonic` time the client started waiting for its world to catch up
-    with Giskard's, or ``None`` if it is not waiting.
+    Tells whether the client's world caught up with the changes the feedback reports.
     """
+
+    def __post_init__(self) -> None:
+        self._catching_up = CatchingUpWithGiskard(world_updates=self.world_updates)
 
     def answer(self, feedback: dict[str, Any]) -> list[ChildChoiceMessage]:
         """
         :param feedback: The feedback of the running goal.
         :return: A choice for every node waiting for a child that was not answered
-            before, none while the client's world does not contain the changes the
-            feedback reports. A choice that is still pending is asked for again next
+            before, and for every node one of these choices answered too, see
+            :meth:`_choose`; none while the client's world does not contain the changes
+            the feedback reports. A choice that is still pending is asked for again next
             time.
-        :raises GiskardWorldUpdateNotReceivedError: If the client's world does not
-            catch up within the timeout of :attr:`world_updates`.
+        :raises GiskardWorldUpdateNotReceivedError: If a change the feedback reports
+            does not reach the client's world within the timeout of
+            :attr:`world_updates` while a request waits for an answer.
         """
-        if self._waiting_for_changes_since is None:
-            self._waiting_for_changes_since = time.monotonic()
-        if not self.world_updates.has_applied_the_changes_reported_in(
-            feedback, self._waiting_for_changes_since
-        ):
+        requests = [
+            request
+            for request in ChildRequest.from_feedback(feedback)
+            if request not in self._answered
+        ]
+        if not requests:
             return []
-        self._waiting_for_changes_since = None
-        goal_id = feedback[StatechartPayloadKey.GOAL_ID]
+        if not self._catching_up.has_applied_the_changes_reported_in(feedback):
+            return []
         messages = []
-        for index, child_count in feedback[
-            MotionStatechartPayloadKey.WAITING_FOR_CHILD
-        ].items():
-            request = (goal_id, int(index), child_count)
+        for request in requests:
             if request in self._answered:
                 continue
-            message = self._choose(
-                goal_id, self.statechart.get_node_by_index(int(index))
+            messages += self._choose(
+                request.goal_id, self.statechart.get_node_by_index(request.node_index)
             )
-            if message is None:
-                continue
-            self._answered.add(request)
-            messages.append(message)
         return messages
 
     def _choose(
         self, goal_id: int, node: CompositeNodeChoosingItsChild
-    ) -> ChildChoiceMessage | None:
+    ) -> list[ChildChoiceMessage]:
         """
-        Choose the next child of `node` on the client's copy.
+        Choose the next child of `node` on the client's copy, and note the request of
+        every node the choice answered as answered.
 
-        :return: The message telling Giskard about the choice, or ``None`` if it is
-            pending.
+        A choice may hand other nodes their child, or leave them without one, before
+        they ask, so each of them gets a message of its own, which the running side
+        takes as its answer.
+
+        :return: The messages telling Giskard about the choice: one for every node it
+            gave a child, in the order their children joined the copy, then one for
+            every node it left without a child; empty if the choice is pending.
         """
-        first_node_index = len(self.statechart.nodes)
+        choosing_nodes = self.statechart.get_nodes_by_type(
+            CompositeNodeChoosingItsChild
+        )
+        children_before = {
+            choosing_node: len(choosing_node.children)
+            for choosing_node in choosing_nodes
+        }
+        out_of_children_before = {
+            choosing_node
+            for choosing_node in choosing_nodes
+            if choosing_node.ran_out_of_children
+        }
         if not node.choose_child_with(self.child_chooser_access.chooser_for(node)):
-            return None
-        nodes = (
-            None
-            if node.ran_out_of_children
-            else self.statechart.nodes_from_to_json(first_node_index)
+            return []
+        given_a_child = sorted(
+            (
+                choosing_node
+                for choosing_node in choosing_nodes
+                if choosing_node.latest_child is not None
+                and len(choosing_node.children) > children_before[choosing_node]
+            ),
+            key=lambda choosing_node: choosing_node.latest_child.index,
         )
-        return ChildChoiceMessage(
-            goal_id=goal_id,
-            node_index=node.index,
-            first_node_index=first_node_index,
-            nodes=nodes,
-            required_position=self.required_position,
+        left_without_a_child = [
+            choosing_node
+            for choosing_node in choosing_nodes
+            if choosing_node.ran_out_of_children
+            and choosing_node not in out_of_children_before
+        ]
+        messages = self._messages_answering(
+            goal_id, given_a_child, left_without_a_child
         )
+        self._answered |= {
+            ChildRequest(
+                goal_id=goal_id,
+                node_index=answered.index,
+                child_count=children_before[answered],
+            )
+            for answered in [*given_a_child, *left_without_a_child]
+        }
+        return messages
+
+    def _messages_answering(
+        self,
+        goal_id: int,
+        given_a_child: list[CompositeNodeChoosingItsChild],
+        left_without_a_child: list[CompositeNodeChoosingItsChild],
+    ) -> list[ChildChoiceMessage]:
+        """
+        :param goal_id: The goal the nodes belong to.
+        :param given_a_child: The nodes one choice gave a child, in the order their
+            children joined the copy, each child with the nodes after it up to the next
+            one's.
+        :param left_without_a_child: The nodes the choice left without a child.
+        :return: One message for each node of `given_a_child`, then one for each of
+            `left_without_a_child`.
+        """
+        chosen_child_indices = [
+            answered.latest_child.index for answered in given_a_child
+        ]
+        stop_node_indices = [*chosen_child_indices[1:], len(self.statechart.nodes)]
+        return [
+            ChildChoiceMessage(
+                goal_id=goal_id,
+                node_index=answered.index,
+                first_node_index=chosen_child_index,
+                nodes=self.statechart.nodes_from_to_json(
+                    chosen_child_index, stop_node_index
+                ),
+                required_position=self.required_position,
+            )
+            for answered, chosen_child_index, stop_node_index in zip(
+                given_a_child, chosen_child_indices, stop_node_indices
+            )
+        ] + [
+            ChildChoiceMessage(
+                goal_id=goal_id,
+                node_index=answered.index,
+                first_node_index=len(self.statechart.nodes),
+                nodes=None,
+                required_position=self.required_position,
+            )
+            for answered in left_without_a_child
+        ]
