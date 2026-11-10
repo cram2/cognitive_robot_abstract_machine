@@ -43,7 +43,7 @@ from cramph.nodes_for_testing import (
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (

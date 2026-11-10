@@ -14,7 +14,7 @@ from coraplex.robot_plans.actions.base import (
 )
 from coraplex.robot_plans.mixins import ReattachesBranches
 from cramph.composites import Parallel, PausedUntilTrue
-from giskardpy.motion_statechart.goals.base_pose_goals import (
+from giskardpy.motion_statechart.tasks.drive_tasks import (
     MobileBasePoseGoal,
     DifferentialDriveBaseGoal,
     HolonomicBaseGoal,

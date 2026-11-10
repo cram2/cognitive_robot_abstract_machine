@@ -144,7 +144,7 @@ class PickUpAction(
     tolerate_grasp_stall: bool = False
     """
     Whether the CLOSE motion's completion also tolerates a stalled grasp (see
-    :attr:`~giskardpy.motion_statechart.goals.gripper.MoveFingers.tolerate_stall`).
+    :attr:`~giskardpy.motion_statechart.tasks.gripper.MoveFingers.tolerate_stall`).
 
     Opt-in rather than always on: building the stall monitor needs a velocity variable
     for every one of the gripper's connections, which is not guaranteed for every robot
@@ -239,7 +239,7 @@ class GraspingAction(
     tolerate_grasp_stall: bool = False
     """
     Whether the CLOSE motion's completion also tolerates a stalled grasp (see
-    :attr:`~giskardpy.motion_statechart.goals.gripper.MoveFingers.tolerate_stall`).
+    :attr:`~giskardpy.motion_statechart.tasks.gripper.MoveFingers.tolerate_stall`).
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:

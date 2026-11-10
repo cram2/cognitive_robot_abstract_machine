@@ -20,7 +20,7 @@ from giskardpy.middleware.ros2.franka_gripper_tasks import (
     GripperGraspTask,
     GripperMoveTask,
 )
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.garmi import GarmiLeftGripper, GarmiRightGripper
