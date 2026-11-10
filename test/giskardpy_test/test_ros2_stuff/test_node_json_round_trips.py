@@ -126,7 +126,7 @@ def _cases() -> list[NodeRoundTripCase]:
             RobotiqGripperActionServerTask,
             lambda world: [
                 RobotiqGripperActionServerTask(
-                    action_topic=RosName.ROBOTIC_ACTION,
+                    action_topic=RosName.ROBOTIQ_ACTION,
                     message_type=ParallelGripperCommand,
                     target_position=0.04,
                     target_velocity=10.0,
