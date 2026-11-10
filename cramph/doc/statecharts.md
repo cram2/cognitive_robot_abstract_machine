@@ -570,7 +570,9 @@ The statechart ends once an `EndStatechart` node is running and observes True, w
 as soon as it runs. A `CancelStatechart` node ends the statechart by raising its exception at
 the end of the tick it starts in. Before it raises, every other node still running or paused
 is INTERRUPTED and its `on_end` callback runs, and this is recorded as the last item of the
-state history, whose `cancelled_by` names the `CancelStatechart` node.
+state history, whose `cancelled_by` names the `CancelStatechart` node and whose
+`cancellation_error` keeps the exception it raised, so a stored statechart still says why it
+was cancelled.
 
 An `EndStatechart` must be added at the top level of the statechart; adding it to a composite
 node raises `EndInCompositeNodeError`. A `CancelStatechart` may be placed anywhere.
