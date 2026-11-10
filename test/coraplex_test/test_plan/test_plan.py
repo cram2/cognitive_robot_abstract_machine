@@ -108,7 +108,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
         approach_clearance=0.05,
     )
 
-    parameters = UnderspecifiedParameters(pick_up_description)
+    parameters = UnderspecifiedParameters(statement=pick_up_description)
 
     [approach_clearance] = [
         v for v in parameters.variables.values() if v.name.endswith("clearance")

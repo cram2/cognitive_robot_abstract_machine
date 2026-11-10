@@ -195,7 +195,7 @@ def test_every_parameter_of_a_surface_grasp_needs_bounds():
         list(
             statement.evaluate(
                 backend=ProbabilisticBackend(
-                    UniformPriorRegistry(), number_of_samples=1
+                    model_registry=UniformPriorRegistry(), number_of_samples=1
                 )
             )
         )
@@ -211,11 +211,11 @@ def test_a_carton_is_grasped_up_to_half_its_narrower_side_deep(carton):
 
 def test_a_grasp_from_any_side_lies_within_the_bounds_asked(carton):
     strategy = GraspFromAnySide(
-        height=Bounds(0.3, 0.7),
-        depth=Bounds(0.1, 0.4),
-        yaw=Bounds(0.5, 1.5),
-        pitch=Bounds(0.1, 0.3),
-        roll=Bounds(-0.2, 0.1),
+        height=Bounds(lower=0.3, upper=0.7),
+        depth=Bounds(lower=0.1, upper=0.4),
+        yaw=Bounds(lower=0.5, upper=1.5),
+        pitch=Bounds(lower=0.1, upper=0.3),
+        roll=Bounds(lower=-0.2, upper=0.1),
     )
     allowed = allowed_intervals(strategy.statement(carton))
     narrower_extent = min(CARTON_EXTENTS[:2])
@@ -282,7 +282,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
             slip=small_twist(rng, 0.0 if raised else -0.2),
         )
     return RelationalCircuitRegistry(
-        RelationalProbabilisticCircuit(
+        relational_probabilistic_circuit=RelationalProbabilisticCircuit(
             learning_method=JointProbabilityTree(minimum_samples_per_leaf=20)
         ).fit(grasps, SurfaceGrasp)
     )

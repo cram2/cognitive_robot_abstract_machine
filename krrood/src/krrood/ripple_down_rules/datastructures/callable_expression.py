@@ -25,7 +25,8 @@ from krrood.ripple_down_rules.utils import (
 
 class VariableVisitor(ast.NodeVisitor):
     """
-    A visitor to extract all variables and comparisons from a python expression represented as an AST tree.
+    A visitor to extract all variables and comparisons from a python expression
+    represented as an AST tree.
     """
 
     compares: list[tuple[ast.Name | ast.Call, ast.cmpop, ast.Name | ast.Call]]
@@ -124,8 +125,9 @@ class CallableExpression:
         :param expression_tree: The AST tree parsed from the user input.
         :param scope: The scope to use for the callable expression.
         :param conclusion: The conclusion to use for the callable expression.
-        :param mutually_exclusive: If True, the conclusion is mutually exclusive, i.e. the callable expression can only
-            return one conclusion. If False, the callable expression can return multiple conclusions.
+        :param mutually_exclusive: If True, the conclusion is mutually exclusive, i.e.
+            the callable expression can only return one conclusion. If False, the
+            callable expression can return multiple conclusions.
         """
         if user_input is None and conclusion is None:
             raise ValueError("Either user_input or conclusion must be provided.")
@@ -167,7 +169,7 @@ class CallableExpression:
         self.mutually_exclusive: bool = mutually_exclusive
 
     @classmethod
-    def get_encapsulating_function(cls, postfix: str = "") -> str:
+    def get_encapsulating_function(cls, *, postfix: str = "") -> str:
         """
         Get the encapsulating function that is used to wrap the user input.
         """
@@ -207,9 +209,10 @@ class CallableExpression:
                 f"Error during evaluation: {e}, user_input: {self.user_input}"
             )
 
-    def combine_with(self, other: CallableExpression) -> CallableExpression:
+    def combine_with(self, *, other: CallableExpression) -> CallableExpression:
         """
-        Combine this callable expression with another callable expression using the 'and' operator.
+        Combine this callable expression with another callable expression using the
+        'and' operator.
         """
         cond1_user_input = self.user_input.replace(
             self.get_encapsulating_function(), "def _cond1(case):"
@@ -228,7 +231,7 @@ class CallableExpression:
             mutually_exclusive=self.mutually_exclusive,
         )
 
-    def update_user_input_from_file(self, file_path: str, function_name: str):
+    def update_user_input_from_file(self, *, file_path: str, function_name: str):
         """
         Update the user input from a file.
         """
@@ -243,13 +246,14 @@ class CallableExpression:
             return
         self.user_input = self.get_encapsulating_function() + "\n" + new_function_body
 
-    def write_to_python_file(self, file_path: str, append: bool = False):
+    def write_to_python_file(self, *, file_path: str, append: bool = False):
         """
         Write the callable expression to a python file.
 
-        :param file_path: The path to the file where the callable expression will be written.
-        :param append: If True, the callable expression will be appended to the file. If False,
-         the file will be overwritten.
+        :param file_path: The path to the file where the callable expression will be
+            written.
+        :param append: If True, the callable expression will be appended to the file. If
+            False, the file will be overwritten.
         """
         imports = "\n".join(get_imports_from_scope(self.scope))
         if append and os.path.exists(file_path):
@@ -310,7 +314,8 @@ class CallableExpression:
 
     def __str__(self):
         """
-        Return the user string where each compare is written in a line using compare column offset start and end.
+        Return the user string where each compare is written in a line using compare
+        column offset start and end.
         """
         if self.user_input is None:
             return str(self.conclusion)
@@ -329,7 +334,8 @@ class CallableExpression:
 
 def compile_expression_to_code(expression_tree: AST) -> Any:
     """
-    Compile an expression tree that was parsed from string into code that can be executed using 'eval(code)'
+    Compile an expression tree that was parsed from string into code that can be
+    executed using 'eval(code)'.
 
     :param expression_tree: The parsed expression tree.
     :return: The code that was compiled from the expression tree.

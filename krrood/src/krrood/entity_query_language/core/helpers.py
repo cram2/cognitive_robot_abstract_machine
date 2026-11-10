@@ -35,7 +35,7 @@ def _resolve_domain(type_: type[T], domain: DomainType | None) -> DomainType | N
         Otherwise ``domain`` unchanged.
     """
     if domain is not None and is_iterable(domain):
-        return InstanceFilteredDomain(type_, domain)
+        return InstanceFilteredDomain(type_=type_, domain=domain)
     if domain is None and issubclass(type_, Symbol):
-        return SymbolGraph().get_instances_of_type(type_)
+        return SymbolGraph().get_instances_of_type(type_=type_)
     return domain

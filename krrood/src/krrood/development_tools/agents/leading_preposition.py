@@ -17,7 +17,7 @@ from krrood.ormatic.utils import classproperty
 # %% the check
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class LeadingPrepositionChecker(CodeRuleChecker):
     """
     Finds every function and method whose first word, leading underscores aside, is one
@@ -33,7 +33,7 @@ class LeadingPrepositionChecker(CodeRuleChecker):
         return Prepositions.AS, Prepositions.FOR, Prepositions.WITH, Prepositions.OF
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+    def violations(self, *, path: Path) -> Iterator[CodeRuleViolation]:
         leading_words = {preposition.text for preposition in self.leading_prepositions}
         for node in ast.walk(ast.parse(path.read_text())):
             if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
@@ -42,9 +42,9 @@ class LeadingPrepositionChecker(CodeRuleChecker):
             if first_word not in leading_words:
                 continue
             yield CodeRuleViolation(
-                path,
-                node.lineno,
-                node.end_lineno,
-                f"`{node.name}` begins with the preposition `{first_word}`; name what "
+                path=path,
+                first_line=node.lineno,
+                last_line=node.end_lineno,
+                description=f"`{node.name}` begins with the preposition `{first_word}`; name what "
                 f"it does as a verb phrase",
             )

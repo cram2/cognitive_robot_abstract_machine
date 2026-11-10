@@ -175,7 +175,7 @@ class DrawerOpening(
         return [
             drawer
             for drawer in world.get_semantic_annotations_by_type(Drawer)
-            if InsideOf(object_body, drawer.root).compute_containment_ratio()
+            if InsideOf(body=object_body, other=drawer.root).compute_containment_ratio()
             > self.minimum_containment_ratio
             and drawer.opening_ratio < self.minimum_opening_ratio
         ]
@@ -321,10 +321,10 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
             grounding.
         """
         grasp = move_and_pick_up.pick_up.grasp.apply_mapping_on_external_root(
-            move_and_pick_up
+            instance=move_and_pick_up
         )
         arm = move_and_pick_up.pick_up.arm.apply_mapping_on_external_root(
-            move_and_pick_up
+            instance=move_and_pick_up
         )
         if not isinstance(arm, Arm):
             return None

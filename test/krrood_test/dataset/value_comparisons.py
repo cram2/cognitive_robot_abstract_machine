@@ -19,7 +19,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsGreaterThan(Predicate):
     """
     Whether a value exceeds a bound.
@@ -40,12 +40,16 @@ class IsGreaterThan(Predicate):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
-        return clause(Noun(fields["value"]), Verb("exceed"), Noun(fields["bound"]))
+        return clause(
+            Noun(content=fields["value"]),
+            Verb(lemma="exceed"),
+            Noun(content=fields["bound"]),
+        )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsGreaterThanByMargin(Predicate):
     """
     Whether a value exceeds a bound by more than a margin.
@@ -71,6 +75,10 @@ class IsGreaterThanByMargin(Predicate):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
-        return clause(Noun(fields["value"]), Verb("exceed"), Noun(fields["bound"]))
+        return clause(
+            Noun(content=fields["value"]),
+            Verb(lemma="exceed"),
+            Noun(content=fields["bound"]),
+        )

@@ -182,10 +182,14 @@ class WiggleInsert(ConvergingTask):
             f"{self.name}_rand_translation"
         )
         self._random_translation.reference_frame = self.root_link
-        self.context.float_variable_data.register_expression(self._random_translation)
+        self.context.float_variable_data.register_expression(
+            expression=self._random_translation
+        )
 
         self._random_angle = symbolic_math.FloatVariable(f"{self.name}_rand_angle")
-        self.context.float_variable_data.register_expression(self._random_angle)
+        self.context.float_variable_data.register_expression(
+            expression=self._random_angle
+        )
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -262,9 +266,11 @@ class WiggleInsert(ConvergingTask):
             translation = self._random_sample_translation()
             angle = self._random_sample_angle()
         self.context.float_variable_data.set_value(
-            self._random_translation, translation
+            expression=self._random_translation, value=translation
         )
-        self.context.float_variable_data.set_value(self._random_angle, angle)
+        self.context.float_variable_data.set_value(
+            expression=self._random_angle, value=angle
+        )
         return None
 
     def _random_sample_angle(self) -> float:

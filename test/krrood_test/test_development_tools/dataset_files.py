@@ -15,6 +15,7 @@ from .dataset.missing_docstrings import (
     no_module_docstring,
     undocumented_definitions,
 )
+from .dataset.positional_parameters import positional_definitions
 from .dataset.prose_length import (
     comment_blocks,
     fields_and_literal_blocks,
@@ -140,6 +141,26 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+
+class PositionalParametersSnippet(PathEnumeration):
+    """
+    The Python sources the keyword-only checks read.
+    """
+
+    POSITIONAL_DEFINITIONS = Path(positional_definitions.__file__)
+    """
+    A module with positional and keyword-only dataclasses and methods, and the ones the
+    rules exempt.
+    """
+
+    UNIMPORTABLE_DEFINITIONS = Path(positional_definitions.__file__).with_name(
+        "unimportable_definitions.py"
+    )
+    """
+    A module that raises when imported, with a positional dataclass, a positional method
+    of a class without bases and one of a class with a base.
     """
 
 

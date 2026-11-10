@@ -57,11 +57,11 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         variables = SortedSet(
             from_json(variable, **kwargs) for variable in data["variables"]
         )
-        root = DifferentiableLayer.from_json(data["root"], **kwargs)
+        root = DifferentiableLayer.from_json(data=data["root"], **kwargs)
         return cls(variables, root)
 
     def fit(
@@ -128,9 +128,9 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
             classes are assumed to be uniformly distributed.
         :return: The full probabilistic circuit.
         """
-        assert (
-            len(class_variable.domain.simple_sets) == self.root.number_of_nodes
-        ), "The number of classes must match the number of sum units."
+        assert len(class_variable.domain.simple_sets) == self.root.number_of_nodes, (
+            "The number of classes must match the number of sum units."
+        )
 
         number_of_classes = self.root.number_of_nodes
 

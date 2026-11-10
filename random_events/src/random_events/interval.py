@@ -150,7 +150,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_data(
             data["lower"], data["upper"], Bound[data["left"]], Bound[data["right"]]
         )

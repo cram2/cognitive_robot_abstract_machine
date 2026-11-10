@@ -357,10 +357,10 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_simple_sets(
             *[
-                AbstractSimpleSet.from_json(simple_set)
+                AbstractSimpleSet.from_json(data=simple_set)
                 for simple_set in data["simple_sets"]
             ]
         )

@@ -74,7 +74,11 @@ class MovesContainerByItsHandle(
         )
         return a(cls)(
             grasp=flat_variable(
-                GraspsByCloseness(handle, where_the_robot_stands, number_of_grasps=None)
+                GraspsByCloseness(
+                    graspable=handle,
+                    standing_position=where_the_robot_stands,
+                    number_of_grasps=None,
+                )
             ),
             arm=arm,
         )

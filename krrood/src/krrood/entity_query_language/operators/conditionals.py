@@ -13,7 +13,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CaseWhen(Selectable):
     """
     Represents a conditional expression: CASE WHEN condition THEN value ELSE else_value END.
@@ -59,22 +59,24 @@ class CaseWhen(Selectable):
             )
         super().__post_init__()
 
-    def _replace_child_field_(self, old: Any, new: Any) -> None:
+    def _replace_child_field_(self, *, old_child: Any, new_child: Any) -> None:
         """
         Replace every operand that holds *old* with *new*.
         """
         operands = (self.condition, self.then_value, self.else_value)
-        if all(operand is None or operand._id_ != old._id_ for operand in operands):
+        if all(
+            operand is None or operand._id_ != old_child._id_ for operand in operands
+        ):
             raise ValueError(
-                f"Child {old} not found in CaseWhen — "
+                f"Child {old_child} not found in CaseWhen — "
                 f"expected one of: condition, then_value, else_value"
             )
-        if self.condition._id_ == old._id_:
-            self.condition = new
-        if self.then_value._id_ == old._id_:
-            self.then_value = new
-        if self.else_value is not None and self.else_value._id_ == old._id_:
-            self.else_value = new
+        if self.condition._id_ == old_child._id_:
+            self.condition = new_child
+        if self.then_value._id_ == old_child._id_:
+            self.then_value = new_child
+        if self.else_value is not None and self.else_value._id_ == old_child._id_:
+            self.else_value = new_child
 
     def _name_(self) -> str:
         """
@@ -82,14 +84,14 @@ class CaseWhen(Selectable):
         """
         return "case_when"
 
-    def _evaluate__(self, sources: Any) -> Any:
+    def _evaluate__(self, *, sources: Any) -> Any:
         """
         Evaluate the condition locally in Python.
 
         :param sources: The variable bindings for evaluation
         :return: then_value if condition is true, else_value otherwise
         """
-        cond_result = self.condition._evaluate__(sources)
+        cond_result = self.condition._evaluate__(sources=sources)
         is_true = (
             bool(cond_result)
             if not isinstance(cond_result, list)
@@ -97,7 +99,7 @@ class CaseWhen(Selectable):
         )
 
         if is_true:
-            return self.then_value._evaluate__(sources)
+            return self.then_value._evaluate__(sources=sources)
         if self.else_value is not None:
-            return self.else_value._evaluate__(sources)
+            return self.else_value._evaluate__(sources=sources)
         return None

@@ -422,8 +422,8 @@ class CompiledTick:
             )
             if node.parent_node is not None:
                 life_cycles = life_cycles.substitute(
-                    [node.parent_node.life_cycle_variable],
-                    [next_life_cycles[node.parent_node_index]],
+                    old_variables=[node.parent_node.life_cycle_variable],
+                    new_variables=[next_life_cycles[node.parent_node_index]],
                 )
             next_life_cycles[node.index], forced_life_cycles[node.index] = life_cycles
         return next_life_cycles, forced_life_cycles
@@ -461,9 +461,9 @@ class CompiledTick:
         """
         life_cycles = DerivedConditionVariable.substitute_in(life_cycles)
         return life_cycles.substitute(
-            [node.observation_variable for node in self._nodes]
+            old_variables=[node.observation_variable for node in self._nodes]
             + [node.last_observation for node in self._nodes],
-            observations + last_observations,
+            new_variables=observations + last_observations,
         )
 
     def settle(self) -> list[LifeCycleChange]:

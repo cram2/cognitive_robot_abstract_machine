@@ -80,7 +80,7 @@ def test_sent_nodes_join_a_running_statechart_and_read_its_nodes(
 ) -> None:
     sender = _two_node_statechart()
     receiver = Statechart.from_json(
-        _sent_through_json(sender.to_json()), context=statechart_executor.context
+        data=_sent_through_json(sender.to_json()), context=statechart_executor.context
     )
     statechart_executor.compile(receiver)
     for _ in range(4):
