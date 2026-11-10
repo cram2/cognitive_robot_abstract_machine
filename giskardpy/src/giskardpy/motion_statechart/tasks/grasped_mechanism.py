@@ -14,7 +14,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.node import CompositeNode, NodeArtifacts
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (

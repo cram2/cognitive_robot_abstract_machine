@@ -63,22 +63,22 @@ from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpeni
 from cramph.node import StatechartNode
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
-from giskardpy.motion_statechart.goals.gripper import MoveFingers, MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
-from giskardpy.motion_statechart.goals.base_pose_goals import HolonomicBaseGoal
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
-    ArticulateGraspedMechanism,
-)
-from giskardpy.motion_statechart.tasks.align_planes import KeepHeldBodyUpright
+from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianPose,
     CartesianPositionVelocityLimit,
     HoldPose,
 )
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
+    ArticulateGraspedMechanism,
+)
+from giskardpy.motion_statechart.tasks.align_planes import KeepHeldBodyUpright
 from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
     JointVelocityLimit,

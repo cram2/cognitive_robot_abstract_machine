@@ -20,7 +20,7 @@ from coraplex.robot_plans.mixins import (
     OperatesGripper,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule

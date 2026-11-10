@@ -27,7 +27,7 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from semantic_digital_twin.world import World
 
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+from giskardpy.motion_statechart.ros2_nodes.action_servers import (
     RobotiqGripperActionServerTask,
 )
 
