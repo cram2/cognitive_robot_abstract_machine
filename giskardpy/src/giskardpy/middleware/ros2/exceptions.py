@@ -315,6 +315,79 @@ class ExecutionAbortedException(ExecutionException):
 
 
 @dataclass
+class GoalRequestNotAnsweredError(ExecutionException):
+    """
+    Raised when no action server answered a goal request in time.
+
+    A server whose node is no longer spun still advertises its action, so a client can
+    find it and send its goal there, where nobody will ever accept or reject it.
+    """
+
+    action_name: str
+    """
+    The action the goal was sent to.
+    """
+
+    timeout: timedelta
+    """
+    How long the client waited for the answer.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No server of '{self.action_name}' accepted or rejected the goal within "
+            f"{self.timeout.total_seconds()}s."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Check that exactly one running server offers '{self.action_name}', for "
+            f"example with 'ros2 action info', then send the goal again."
+        )
+
+
+@dataclass
+class ActionClientClosedError(ExecutionException):
+    """
+    Raised when a goal is sent through an action client that was closed.
+    """
+
+    action_name: str
+    """
+    The action the closed client was built for.
+    """
+
+    def error_message(self) -> str:
+        return f"The client of '{self.action_name}' was closed and sends no more goals."
+
+    def suggest_correction(self) -> str:
+        return "Build a new client for the action and send the goal through it."
+
+
+@dataclass
+class UnexpectedGoalStatusError(ExecutionException):
+    """
+    Raised when a goal ends in a status that a finished goal cannot have.
+    """
+
+    action_name: str
+    """
+    The action the goal was sent to.
+    """
+
+    status: int
+    """
+    The :class:`action_msgs.msg.GoalStatus` the goal reported.
+    """
+
+    def error_message(self) -> str:
+        return f"A goal of '{self.action_name}' ended with status {self.status}."
+
+    def suggest_correction(self) -> str:
+        return "Report this to the maintainers of the action server."
+
+
+@dataclass
 class UnserializableGoalError(ExecutionException):
     """
     Stands in for the error a goal failed with when that error could not be serialized,

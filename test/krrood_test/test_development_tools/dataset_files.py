@@ -62,6 +62,19 @@ class DatasetFile(PathEnumeration):
     A module declaring a repository's own rules.
     """
 
+    PROJECT_RULES_IMPORTING_REPOSITORY = (
+        Path(__file__).parent / "dataset" / "project_rules_importing_repository.py"
+    )
+    """
+    A module declaring a repository's own rules from the wording of another module of
+    that repository.
+    """
+
+    REPOSITORY_WORDING = Path(__file__).parent / "dataset" / "repository_wording.py"
+    """
+    The module of the repository that :attr:`PROJECT_RULES_IMPORTING_REPOSITORY` imports.
+    """
+
     PROJECT_RULES_PACKAGE = Path(__file__).parent / "dataset" / "project_rules_package"
     """
     A package declaring a repository's own rules in several modules.

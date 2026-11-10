@@ -33,6 +33,9 @@ class RuleModule:
         """
         Import a module or package from a directory, once per process.
 
+        The directory joins the import path, so the module can import the rest of its
+        repository without the repository being installed.
+
         :param directory: The directory holding the module or package.
         :param module_name: The name of the module or package.
         :return: The imported module; none if the directory holds neither.
@@ -44,6 +47,8 @@ class RuleModule:
             return None
         if module_name in sys.modules:
             return cls(sys.modules[module_name])
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
         module = importlib.util.module_from_spec(specification)
         sys.modules[module_name] = module
         specification.loader.exec_module(module)

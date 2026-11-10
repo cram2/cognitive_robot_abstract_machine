@@ -142,9 +142,9 @@ class ActionServerHandler:
     Result of the currently accepted goal.
     """
 
-    _action_server: ActionServer = field(init=False)
+    _action_server: ActionServer | None = field(init=False, default=None)
     """
-    The rclpy action server this handler wraps.
+    The rclpy action server this handler wraps, ``None`` once :meth:`close` withdrew it.
     """
 
     def __post_init__(self):
@@ -156,6 +156,18 @@ class ActionServerHandler:
             goal_callback=self.default_goal_callback,
             cancel_callback=self.cancel_callback,
         )
+
+    def close(self) -> None:
+        """
+        Withdraw the action from the ROS graph, so that its node can be destroyed and no
+        client finds a server that nobody answers any more.
+
+        Closing a handler that is already closed does nothing.
+        """
+        if self._action_server is None:
+            return
+        self._action_server.destroy()
+        self._action_server = None
 
     def loginfo(self, message: str, goal_id: int | None = None) -> None:
         """

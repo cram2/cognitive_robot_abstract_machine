@@ -1,3 +1,7 @@
+"""
+The errors symbolic math raises.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -38,6 +42,24 @@ class UnsupportedOperationError(SymbolicMathError, TypeError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class UnhashableExpressionError(SymbolicMathError, TypeError):
+    """
+    Raised when an expression that is not a scalar is hashed.
+    """
+
+    expression: SymbolicMathType
+    """
+    The expression that was hashed.
+    """
+
+    def error_message(self) -> str:
+        return f"cannot hash a {self.expression.__class__.__name__} of shape {self.expression.shape}, only a scalar expression has a hash"
+
+    def suggest_correction(self) -> str:
+        return "Compare the expression by identity, or hash one scalar entry of it."
 
 
 @dataclass

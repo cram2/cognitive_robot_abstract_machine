@@ -322,11 +322,13 @@ class GiskardClientExecutor(Executor):
 
     def close(self) -> None:
         """
-        Stop announcing this client's heartbeat to Giskard, if it announces one.
+        Withdraw the action client from the ROS graph and stop announcing this client's
+        heartbeat to Giskard, if it announces one.
 
         Does not touch :attr:`node_handle`: it was given to this executor by its caller,
         who owns its lifecycle.
         """
+        self._client.close()
         if self.heartbeat_publisher is None:
             return
         self.heartbeat_publisher.stop()

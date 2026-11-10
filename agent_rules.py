@@ -35,8 +35,10 @@ class GeneratedORMInterfacesRules(Section):
     )
 
     NEVER_BUILD_IN_TEST_RUNS = (
-        "Pass `--orm-build never` to the test runs you start, and regenerate them "
-        "with `scripts/regenerate_all_orm.py` when a change needs it"
+        "Set `CRAM_ORM_BUILD=never` in the environment of the test runs you start, "
+        "and regenerate them with `scripts/regenerate_all_orm.py` when a change needs "
+        "it; the `--orm-build` option is rejected when `--confcutdir` excludes "
+        "`test/conftest.py`, which registers it"
     )
 
     ASK_ABOUT_PERSISTENT_ORM_PROBLEMS = (
