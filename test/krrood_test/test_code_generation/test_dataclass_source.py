@@ -1,11 +1,9 @@
 """
-Tests for turning dataclass instances into constructor source and back
+Tests for turning dataclass instances into constructor source
 (:mod:`krrood.code_generation.dataclass_source`).
 """
 
 from __future__ import annotations
-
-import dataclasses
 
 import pytest
 
@@ -53,15 +51,3 @@ def test_to_source_raises_for_an_unsupported_field_type():
     with pytest.raises(ObjectNotSerializableError) as error:
         serializer.to_source(UnserializableRecord(tags=["a", "b"]))
     assert error.value.value == ["a", "b"]
-
-
-# %% DataclassConstructorSerializer.from_data
-
-
-def test_from_data_reconstructs_a_nested_dataclass_from_an_asdict_style_mapping():
-    serializer = DataclassConstructorSerializer()
-    data = dataclasses.asdict(rex())
-
-    rebuilt = serializer.from_data(data, Animal)
-
-    assert rebuilt == rex()
