@@ -9,6 +9,7 @@ from enum import StrEnum
 from functools import partial
 
 import pytest
+from control_msgs.action import ParallelGripperCommand
 from geometry_msgs.msg import WrenchStamped
 from griplink_interfaces.action import Flexgrip, Grip
 from nav2_msgs.action import NavigateToPose
@@ -30,7 +31,10 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkFlexActionServerTask,
     GriplinkPresetActionServerTask,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import NavigateActionServerTask
+from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+    NavigateActionServerTask,
+    RobotiqGripperActionServerTask,
+)
 from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
     PublishOnStart,
     TopicNode,
@@ -60,6 +64,7 @@ class RosName(StrEnum):
     NAVIGATION_ACTION = "navigate"
     GRIP_ACTION = "grip"
     FLEXGRIP_ACTION = "flexgrip"
+    ROBOTIQ_GRIPPER_ACTION = "robotiq_gripper"
 
 
 def _cases() -> list[NodeRoundTripCase]:
@@ -118,6 +123,14 @@ def _cases() -> list[NodeRoundTripCase]:
                 )
             ],
         ),
+        NodeRoundTripCase(
+            RobotiqGripperActionServerTask,
+            lambda world: [
+                RobotiqGripperActionServerTask(
+                    action_topic=RosName.ROBOTIQ_GRIPPER_ACTION, target_position=0.03
+                )
+            ],
+        ),
     ]
 
 
@@ -157,9 +170,9 @@ def navigation_action_server(rclpy_node: Node) -> Iterator[ActionServer]:
 
 
 @pytest.fixture(autouse=True)
-def griplink_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
+def gripper_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
     """
-    :return: The action servers the griplink tasks wait for before they are built.
+    :return: The action servers the gripper tasks wait for before they are built.
     """
     servers = [
         ActionServer(
@@ -168,6 +181,7 @@ def griplink_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
         for action, name in (
             (Grip, RosName.GRIP_ACTION),
             (Flexgrip, RosName.FLEXGRIP_ACTION),
+            (ParallelGripperCommand, RosName.ROBOTIQ_GRIPPER_ACTION),
         )
     ]
     yield servers
