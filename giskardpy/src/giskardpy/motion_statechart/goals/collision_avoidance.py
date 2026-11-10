@@ -6,6 +6,8 @@ from abc import ABC
 
 from itertools import combinations
 
+from typing_extensions import TYPE_CHECKING, Self
+
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.ormatic.utils import classproperty
@@ -36,6 +38,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
+    AllowCollisionRule,
     AvoidSelfCollisions,
 )
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
@@ -49,6 +52,11 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import Body
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.collision_checking.collision_manager import (
+        CollisionManager,
+    )
 
 # %% shared by self and external collision avoidance
 
@@ -474,6 +482,53 @@ class SetInitialTemporaryCollisionRules(SucceedsOnObservingTrue, MotionStatechar
 
     def on_start(self) -> None:
         self.context.world.collision_manager.set_collision_matrix(self.collision_matrix)
+
+
+# %% recording the collision rules in force
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class CollisionRulesInForce(SucceedsOnObservingTrue, MotionStatechartNode):
+    """
+    The collision rules of a world at one moment, whatever put them in force, so a
+    stored statechart says what its motions were allowed to come close to.
+
+    It leaves the rules in force as they are.
+    """
+
+    default_rules: list[CollisionRule]
+    """
+    The rules that were applied first, so every other rule overrode them.
+    """
+
+    temporary_rules: list[CollisionRule]
+    """
+    The task specific rules that were applied after :attr:`default_rules`.
+    """
+
+    ignore_collision_rules: list[AllowCollisionRule]
+    """
+    The rules allowing collisions that were applied last, so no other rule overrode
+    them.
+    """
+
+    @classmethod
+    def from_collision_manager(cls, collision_manager: CollisionManager) -> Self:
+        """
+        :param collision_manager: The collision manager whose rules are recorded.
+        :return: A record of the rules in force in `collision_manager` now, which
+            later changes to those rules leave as it is.
+        """
+        return cls(
+            default_rules=list(collision_manager.default_rules),
+            temporary_rules=list(collision_manager.temporary_rules),
+            ignore_collision_rules=list(collision_manager.ignore_collision_rules),
+        )
+
+    def build_artifacts(self) -> MotionNodeArtifacts:
+        artifacts = MotionNodeArtifacts()
+        artifacts.observation = sm.Scalar.const_true()
+        return artifacts
 
 
 # %% self collision avoidance

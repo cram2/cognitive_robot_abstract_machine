@@ -29,6 +29,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
 )
 from cramph.composites import Sequence
+from cramph.context import ContextExtension
 from cramph.exceptions import (
     DuplicateContextExtensionError,
     StatechartOfDifferentContextError,
@@ -43,11 +44,16 @@ from sqlalchemy import select
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.goals.collision_avoidance import (
+    CollisionRulesInForce,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import StillProgressing
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
+    AvoidCollisionBetweenGroups,
+)
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.pr2 import PR2Joint
@@ -366,6 +372,144 @@ def test_a_plan_that_violates_collision_avoidance_fails_as_a_plan_failure(
         executor.execute()
 
     assert failure.value.violation is violation
+
+
+# %% recording the collision rules in force
+
+
+def _wrist_allowed_near_the_sink(world: World) -> AllowCollisionBetweenGroups:
+    """
+    :param world: The PR2 apartment world.
+    :return: A new rule letting the right wrist of the PR2 touch the sink.
+    """
+    return AllowCollisionBetweenGroups(
+        body_group_a=[world.get_body_by_name("r_wrist_roll_link")],
+        body_group_b=[world.get_body_by_name("sink")],
+    )
+
+
+def _prepared_plan(extensions: list[ContextExtension]) -> MoveTorsoAction:
+    """
+    :param extensions: The context extensions of the plan.
+    :return: A plan prepared by a new simulated executor.
+    """
+    plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
+    executor = simulated_executor(extensions)
+    executor.prepare(statechart_of(executor, plan))
+    return plan
+
+
+def test_a_prepared_plan_records_the_temporary_collision_rules_in_force(
+    pr2_apartment_context,
+) -> None:
+    """
+    The record keeps the rules in force when the plan was prepared, after they were
+    taken out of force again.
+    """
+    world, robot_view, extensions = pr2_apartment_context
+    rule = _wrist_allowed_near_the_sink(world)
+    world.collision_manager.put_temporary_rules_in_force([rule])
+    plan = _prepared_plan(extensions)
+    world.collision_manager.take_temporary_rules_out_of_force([rule])
+
+    [record] = plan.statechart.get_nodes_by_type(CollisionRulesInForce)
+
+    assert record.temporary_rules == [rule]
+
+
+def test_a_prepared_plan_records_the_ignore_collision_rules_in_force(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    collision_manager = world.collision_manager
+    rules_before = list(collision_manager.ignore_collision_rules)
+    rule = _wrist_allowed_near_the_sink(world)
+    with world.modify_world():
+        collision_manager.add_ignore_collision_rule(rule)
+    plan = _prepared_plan(extensions)
+    with world.modify_world():
+        collision_manager.ignore_collision_rules.remove(rule)
+
+    [record] = plan.statechart.get_nodes_by_type(CollisionRulesInForce)
+
+    assert record.ignore_collision_rules == [*rules_before, rule]
+
+
+def test_a_prepared_plan_records_the_default_collision_rules_in_force(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    collision_manager = world.collision_manager
+    rules_before = list(collision_manager.default_rules)
+    rule = AvoidCollisionBetweenGroups(
+        buffer_zone_distance=0.1,
+        violated_distance=0.0,
+        body_group_a=[world.get_body_by_name("r_wrist_roll_link")],
+        body_group_b=[world.get_body_by_name("walls")],
+    )
+    with world.modify_world():
+        collision_manager.add_default_rule(rule)
+    plan = _prepared_plan(extensions)
+    with world.modify_world():
+        collision_manager.default_rules.remove(rule)
+
+    [record] = plan.statechart.get_nodes_by_type(CollisionRulesInForce)
+
+    assert record.default_rules == [*rules_before, rule]
+
+
+def test_running_a_plan_leaves_the_collision_rules_in_force_as_they_were(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    rule = _wrist_allowed_near_the_sink(world)
+    world.collision_manager.put_temporary_rules_in_force([rule])
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+    executor.execute()
+    temporary_rules_after_the_run = list(world.collision_manager.temporary_rules)
+    world.collision_manager.take_temporary_rules_out_of_force([rule])
+
+    assert temporary_rules_after_the_run == [rule]
+
+
+def test_a_stored_plan_keeps_the_collision_rules_it_ran_with(
+    pr2_apartment_context, coraplex_testing_session
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    rule = _wrist_allowed_near_the_sink(world)
+    world.collision_manager.put_temporary_rules_in_force([rule])
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+    executor.execute()
+    world.collision_manager.take_temporary_rules_out_of_force([rule])
+
+    coraplex_testing_session.add(to_dao(executor.statechart))
+    coraplex_testing_session.commit()
+    coraplex_testing_session.expunge_all()
+    statechart_read_back = (
+        coraplex_testing_session.scalars(select(StatechartMappingDAO)).one().from_dao()
+    )
+    [record] = statechart_read_back.get_nodes_by_type(CollisionRulesInForce)
+
+    assert [
+        (
+            type(read_back),
+            [body.name for body in read_back.body_group_a],
+            [body.name for body in read_back.body_group_b],
+        )
+        for read_back in record.temporary_rules
+    ] == [
+        (
+            type(rule),
+            [body.name for body in rule.body_group_a],
+            [body.name for body in rule.body_group_b],
+        )
+    ]
 
 
 # %% avoiding collisions in a world with several robots

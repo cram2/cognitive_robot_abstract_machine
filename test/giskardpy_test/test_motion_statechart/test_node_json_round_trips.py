@@ -18,6 +18,7 @@ from giskardpy.motion_statechart.goals.base_pose_goals import (
 )
 from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
 from giskardpy.motion_statechart.goals.collision_avoidance import (
+    CollisionRulesInForce,
     ExternalCollisionAvoidance,
     ExternalCollisionDistanceMonitor,
     SelfCollisionAvoidance,
@@ -121,6 +122,7 @@ from giskardpy.motion_statechart.tasks.wiggle_insert import WiggleInsert
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionBetweenGroups,
     AvoidCollisionBetweenGroups,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
@@ -823,6 +825,26 @@ def _joint_and_base_cases() -> list[NodeRoundTripCase]:
 
 def _collision_cases() -> list[NodeRoundTripCase]:
     return [
+        NodeRoundTripCase(
+            CollisionRulesInForce,
+            lambda world: [
+                CollisionRulesInForce(
+                    default_rules=[_collision_rule(world)],
+                    temporary_rules=[_collision_rule(world)],
+                    ignore_collision_rules=[
+                        AllowCollisionBetweenGroups(
+                            body_group_a=[_robot(world).root],
+                            body_group_b=[
+                                world.get_kinematic_structure_entity_by_name(
+                                    "environment"
+                                )
+                            ],
+                        )
+                    ],
+                )
+            ],
+            WorldFixture.CYLINDER_BOT_WORLD,
+        ),
         NodeRoundTripCase(
             UpdateTemporaryCollisionRules,
             lambda world: [

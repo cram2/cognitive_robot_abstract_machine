@@ -55,6 +55,7 @@ from giskardpy.motion_statechart.exceptions import (
     NoProgressError,
 )
 from giskardpy.motion_statechart.goals.collision_avoidance import (
+    CollisionRulesInForce,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
@@ -87,9 +88,11 @@ class PlanExecutor(Executor, ABC):
     added unless one is there; the executor replaces the latter with one offering every
     node to :attr:`robot_adaptations` and :attr:`plan_adaptations` first. A context
     serves one executor. :meth:`compile` adds what a plan runs with: the collision
-    avoidance of the robot of :attr:`context` if asked for, one
-    :class:`~giskardpy.motion_statechart.graph_node.EndMotion` once every plan node
-    succeeded or one of them ended without succeeding, and the stall detection.
+    avoidance of the robot of :attr:`context` if asked for, a
+    :class:`~giskardpy.motion_statechart.goals.collision_avoidance.CollisionRulesInForce`
+    of the world, one :class:`~giskardpy.motion_statechart.graph_node.EndMotion` once
+    every plan node succeeded or one of them ended without succeeding, and the stall
+    detection.
     Underspecified actions are grounded while it runs, see
     :class:`~coraplex.plans.underspecified.UnderspecifiedChildChooser`.
     """
@@ -202,6 +205,11 @@ class PlanExecutor(Executor, ABC):
             rewriting.rewrite(plan_node)
         # a transformation may have put a plan node below a node holding it
         self.plan_nodes = list(statechart.top_level_nodes)
+        statechart.add_node(
+            CollisionRulesInForce.from_collision_manager(
+                self.context.world.collision_manager
+            )
+        )
         if self.collision_avoidance:
             robot = self.context.require_extension(RobotAccess).robot
             statechart.add_node(ExternalCollisionAvoidance(robot=robot))
