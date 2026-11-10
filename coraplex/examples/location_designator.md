@@ -95,7 +95,7 @@ location = ReachabilityLocation(
     context=context,
 )
 
-run(NavigateAction(target_location=location.ground()))
+run(NavigateAction(goal_pose=location.ground()))
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
@@ -148,7 +148,7 @@ location = VisibilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
 )
 
-run(NavigateAction(target_location=location.ground()))
+run(NavigateAction(goal_pose=location.ground()))
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
@@ -183,7 +183,7 @@ from cramph.composites import StatementNode
 from krrood.entity_query_language.factories import a, variable
 
 navigate = a(NavigateAction)(
-    target_location=variable(
+    goal_pose=variable(
         Pose2D,
         domain=ReachabilityLocation(
             Pose(reference_frame=world.get_body_by_name("milk.stl")),

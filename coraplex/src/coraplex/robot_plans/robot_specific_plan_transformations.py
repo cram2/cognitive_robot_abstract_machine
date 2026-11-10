@@ -190,7 +190,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             name=plan_node.name,
             root_link=plan_node.root_link,
             tip_link=plan_node.tip_link,
-            goal=plan_node.goal,
+            goal_pose=plan_node.goal_pose,
             position_threshold=plan_node.position_threshold,
             orientation_threshold=plan_node.orientation_threshold,
             binding_policy=plan_node.binding_policy,
@@ -240,7 +240,7 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
                         name="Keep holding handle",
                         root_link=handle,
                         tip_link=tool_frame,
-                        goal=Pose(reference_frame=tool_frame),
+                        goal_pose=Pose(reference_frame=tool_frame),
                     ),
                     AlignPlanes(
                         root_link=plan_node.world.root,
@@ -251,7 +251,7 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
                     ArticulateGraspedMechanism(
                         tip_link=tool_frame,
                         environment_link=handle,
-                        goal=closing_goal.goal,
+                        goal_position=closing_goal.goal_position,
                     ),
                 ]
             ),

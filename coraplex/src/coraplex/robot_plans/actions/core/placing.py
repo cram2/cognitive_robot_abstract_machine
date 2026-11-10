@@ -10,13 +10,12 @@ from coraplex.exceptions import HeldBodyIsNotGraspable, ObjectIsNotHeld
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.composites import Parallel
+from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from coraplex.robot_plans.mixins import (
     HasArmParameter,
     HasGraspApproachParameters,
-    HasGraspDetectionThresholdParameter,
     HasPlaceTuningParameters,
-    HasTargetPoseParameter,
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
@@ -37,23 +36,13 @@ class PlaceAction(
     ReattachesBranches,
     SequentialAction,
     HasArmParameter,
-    HasTargetPoseParameter,
+    HasGoalPoseParameter,
     HasGraspApproachParameters,
     HasPlaceTuningParameters,
-    HasGraspDetectionThresholdParameter,
 ):
     """
-    Puts down what :attr:`arm` holds, so that the object ends up at :attr:`target_pose`
+    Puts down what :attr:`arm` holds, so that the object ends up at :attr:`goal_pose`
     however it is held.
-    """
-
-    # TODO: nothing reads this field or the inherited grasp_detection_threshold; decide
-    # whether PlaceAction needs them.
-    grasp_release_threshold: float = 0.1
-    """
-    Maximum fraction of sampled rays between the gripper's fingers that may still hit
-    the object for it to count as released (see
-    :func:`~semantic_digital_twin.reasoning.robot_predicates.is_body_gripped`).
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -69,7 +58,7 @@ class PlaceAction(
         # A release runs the grasp backwards: down from above the target, then out
         # along the way the grasp was approached.
         poses = self.grasp_pose_sequence(
-            grasp.moved_to(self.target_pose), self.arm.end_effector, grasp
+            grasp.moved_to(self.goal_pose), self.arm.end_effector, grasp
         )
 
         return [
@@ -109,20 +98,25 @@ class PlaceAction(
         """
         The grasp :attr:`arm` holds its object by when this place runs.
 
-        That is the grasp of the latest pick-up of :attr:`arm` before this place;
-        without one, the grasp its gripper has on what it holds now.
+        That is the grasp of the latest pick-up of :attr:`arm` before this place, unless
+        a place of :attr:`arm` came after it; without either, the grasp its gripper has
+        on what it holds now.
 
         :return: The grasp, which names the object.
-        :raises ObjectIsNotHeld: If the gripper holds nothing and no pick-up of
-            :attr:`arm` precedes this place.
+        :raises ObjectIsNotHeld: If a place of :attr:`arm` precedes this one with no
+            pick-up of :attr:`arm` in between, or if the gripper holds nothing and no
+            pick-up of :attr:`arm` precedes this place.
         :raises HeldBodyIsNotGraspable: If what the gripper holds is the root of no
             annotation that can be grasped.
         """
-        for previous_pick in self.statechart.get_preceding_nodes_by_type(
-            self, PickUpAction
+        for previous in self.statechart.get_preceding_nodes_by_type(
+            self, PickUpAction | PlaceAction
         ):
-            if previous_pick.arm is self.arm:
-                return previous_pick.grasp
+            if previous.arm is not self.arm:
+                continue
+            if isinstance(previous, PlaceAction):
+                raise ObjectIsNotHeld(self.arm)
+            return previous.grasp
         end_effector = self.arm.end_effector
         held_body = end_effector.held_body
         if held_body is None:

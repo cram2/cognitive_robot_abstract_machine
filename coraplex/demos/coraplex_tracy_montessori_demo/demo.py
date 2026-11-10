@@ -455,7 +455,7 @@ class ShapeSortingPlan:
             actions.append(
                 PlaceAction(
                     arm=arm,
-                    target_pose=self.release_pose_over(hole, context.world),
+                    goal_pose=self.release_pose_over(hole, context.world),
                 )
             )
         actions.append(ParkArmsAction(arms=robot.all_arms))

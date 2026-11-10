@@ -34,7 +34,9 @@ def test_joint_goal_inside_limits_reached(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: goal}))
+    joint_goal = JointPositionList(
+        goal_state=JointState.from_mapping({connection: goal})
+    )
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -59,7 +61,7 @@ def test_joint_goal_clamped_to_upper_limit(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal=JointState.from_mapping({connection: goal_beyond_limit})
+        goal_state=JointState.from_mapping({connection: goal_beyond_limit})
     )
     statechart.add_node(joint_goal)
     end = EndMotion()
@@ -84,7 +86,7 @@ def test_joint_goal_clamped_to_lower_limit(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal=JointState.from_mapping({connection: goal_beyond_limit})
+        goal_state=JointState.from_mapping({connection: goal_beyond_limit})
     )
     statechart.add_node(joint_goal)
     end = EndMotion()
@@ -111,7 +113,9 @@ def test_joint_above_upper_limit_recovers(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: goal}))
+    joint_goal = JointPositionList(
+        goal_state=JointState.from_mapping({connection: goal})
+    )
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -138,7 +142,9 @@ def test_joint_below_lower_limit_recovers(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: goal}))
+    joint_goal = JointPositionList(
+        goal_state=JointState.from_mapping({connection: goal})
+    )
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -173,7 +179,7 @@ def test_multiple_joints_outside_limits_recover(pr2_world_state_reset):
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(goal=JointState.from_mapping(goals))
+    joint_goal = JointPositionList(goal_state=JointState.from_mapping(goals))
     statechart.add_node(joint_goal)
     end = EndMotion()
     statechart.add_node(end)
@@ -186,9 +192,9 @@ def test_multiple_joints_outside_limits_recover(pr2_world_state_reset):
         lower = conn.dof.limits.lower.position
         upper = conn.dof.limits.upper.position
         assert np.isclose(conn.position, goal, atol=0.01), f"{conn.name} not at goal"
-        assert (
-            lower - 0.01 <= conn.position <= upper + 0.01
-        ), f"{conn.name} outside limits"
+        assert lower - 0.01 <= conn.position <= upper + 0.01, (
+            f"{conn.name} outside limits"
+        )
 
 
 def _default_config() -> QPControllerConfig:
@@ -226,12 +232,12 @@ def test_dof_limits_joint_near_upper_limit(prismatic_bot):
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        upper_vel[0] < 0.9
-    ), "Upper velocity at t=0 must be reduced near the upper position limit"
-    assert np.isclose(
-        lower_vel[0], -VELOCITY_LIMIT, atol=1e-3
-    ), "Lower velocity is unconstrained going away from the limit"
+    assert upper_vel[0] < 0.9, (
+        "Upper velocity at t=0 must be reduced near the upper position limit"
+    )
+    assert np.isclose(lower_vel[0], -VELOCITY_LIMIT, atol=1e-3), (
+        "Lower velocity is unconstrained going away from the limit"
+    )
 
 
 def test_dof_limits_joint_near_lower_limit(prismatic_bot):
@@ -241,12 +247,12 @@ def test_dof_limits_joint_near_lower_limit(prismatic_bot):
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        lower_vel[0] > -0.9
-    ), "Lower velocity at t=0 must be reduced (less negative) near the lower position limit"
-    assert np.isclose(
-        upper_vel[0], VELOCITY_LIMIT, atol=1e-3
-    ), "Upper velocity is unconstrained going away from the limit"
+    assert lower_vel[0] > -0.9, (
+        "Lower velocity at t=0 must be reduced (less negative) near the lower position limit"
+    )
+    assert np.isclose(upper_vel[0], VELOCITY_LIMIT, atol=1e-3), (
+        "Upper velocity is unconstrained going away from the limit"
+    )
 
 
 def test_dof_limits_joint_above_upper_limit(prismatic_bot):
@@ -255,9 +261,9 @@ def test_dof_limits_joint_above_upper_limit(prismatic_bot):
     limits = _compute_limits(prismatic_bot)
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        upper_vel[0] <= 0.0
-    ), "Upper velocity must be non-positive when joint is above the upper limit"
+    assert upper_vel[0] <= 0.0, (
+        "Upper velocity must be non-positive when joint is above the upper limit"
+    )
 
 
 def test_dof_limits_joint_below_lower_limit(prismatic_bot):
@@ -266,9 +272,9 @@ def test_dof_limits_joint_below_lower_limit(prismatic_bot):
     limits = _compute_limits(prismatic_bot)
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        lower_vel[0] >= 0.0
-    ), "Lower velocity must be non-negative when joint is below the lower limit"
+    assert lower_vel[0] >= 0.0, (
+        "Lower velocity must be non-negative when joint is below the lower limit"
+    )
 
 
 def test_dof_limits_integrating_upper_velocity_bounds_stays_within_position_limit(
@@ -283,9 +289,9 @@ def test_dof_limits_integrating_upper_velocity_bounds_stays_within_position_limi
     upper_vel_bounds = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
     final_position = initial_position + DT * np.sum(upper_vel_bounds)
-    assert (
-        final_position <= POSITION_UPPER_LIMIT + 1e-3
-    ), "Integrating the upper velocity bounds must not overshoot the upper position limit"
+    assert final_position <= POSITION_UPPER_LIMIT + 1e-3, (
+        "Integrating the upper velocity bounds must not overshoot the upper position limit"
+    )
 
 
 def test_dof_limits_jerk_is_relaxed_when_braking_is_insufficient(prismatic_bot):
@@ -296,9 +302,9 @@ def test_dof_limits_jerk_is_relaxed_when_braking_is_insufficient(prismatic_bot):
     limits = _compute_limits(prismatic_bot)
     jerk_upper_at_t0 = limits.upper_bounds.evaluate()[NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        jerk_upper_at_t0 > EXPECTED_JERK_LIMIT
-    ), "Jerk limit at t=0 must be relaxed when normal braking cannot prevent a position limit violation"
+    assert jerk_upper_at_t0 > EXPECTED_JERK_LIMIT, (
+        "Jerk limit at t=0 must be relaxed when normal braking cannot prevent a position limit violation"
+    )
 
 
 def test_dof_limits_no_position_limits(prismatic_world_no_position_limits):
@@ -306,12 +312,12 @@ def test_dof_limits_no_position_limits(prismatic_world_no_position_limits):
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert np.allclose(
-        upper_vel, VELOCITY_LIMIT, atol=1e-3
-    ), "Without position limits, upper velocity bounds must be flat"
-    assert np.allclose(
-        lower_vel, -VELOCITY_LIMIT, atol=1e-3
-    ), "Without position limits, lower velocity bounds must be flat"
+    assert np.allclose(upper_vel, VELOCITY_LIMIT, atol=1e-3), (
+        "Without position limits, upper velocity bounds must be flat"
+    )
+    assert np.allclose(lower_vel, -VELOCITY_LIMIT, atol=1e-3), (
+        "Without position limits, lower velocity bounds must be flat"
+    )
 
 
 # %% reaching a position limit
@@ -333,7 +339,7 @@ def test_joint_goal_at_upper_limit_is_reached(prismatic_bot):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal=JointState.from_mapping({connection: upper}),
+        goal_state=JointState.from_mapping({connection: upper}),
         threshold=LIMIT_REACHING_TOLERANCE,
     )
     statechart.add_node(joint_goal)

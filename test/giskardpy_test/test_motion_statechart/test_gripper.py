@@ -92,13 +92,13 @@ def test_fingers_driven_to_a_joint_state_are_given_that_state(pr2_world_copy) ->
     goal_state = _left_gripper(pr2_world_copy).get_joint_state_by_type(
         GripperState.CLOSE
     )
-    goal = MoveFingersToJointState(goal=goal_state)
+    goal = MoveFingersToJointState(goal_state=goal_state)
 
     nodes = _expanded_nodes(goal, pr2_world_copy)
 
     [joint_goal] = nodes
     assert isinstance(joint_goal, JointPositionList)
-    assert joint_goal.goal == goal_state
+    assert joint_goal.goal_state == goal_state
 
 
 def test_gripper_commands_nothing_besides_the_fingers_by_default(
@@ -268,7 +268,7 @@ def test_fingers_reach_the_commanded_joint_state(pr2_world_state_reset) -> None:
         GripperState.OPEN
     )
 
-    _run(MoveFingersToJointState(goal=goal_state), pr2_world_state_reset)
+    _run(MoveFingersToJointState(goal_state=goal_state), pr2_world_state_reset)
 
     reached = [connection.position for connection in goal_state.connections]
     np.testing.assert_allclose(reached, goal_state.target_values, atol=1e-3)

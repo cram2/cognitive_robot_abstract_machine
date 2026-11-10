@@ -125,7 +125,7 @@ def straighten_torso(robot: AbstractRobot) -> JointPositionList:
         parcel upright while it drives.
     """
     return JointPositionList(
-        goal=JointState.from_mapping(
+        goal_state=JointState.from_mapping(
             {connection: 0.0 for connection in robot.torso.active_connections}
         )
     )
@@ -167,9 +167,7 @@ def build_statechart(
         Sequence(
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
-                NavigateAction(
-                    target_location=standing_pose_in_front_of(source, world)
-                ),
+                NavigateAction(goal_pose=standing_pose_in_front_of(source, world)),
                 PickUpAction(
                     grasp=GraspCandidate.from_body_origin(parcel),
                     arm=robot.torso.left_arm,
@@ -177,16 +175,12 @@ def build_statechart(
                 ParkArmsAction(arms=robot.all_arms),
                 straighten_torso(robot),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
-                        yaw=turn, reference_frame=robot.root
-                    )
+                    goal_pose=Pose2D.from_xy_yaw(yaw=turn, reference_frame=robot.root)
                 ),
-                NavigateAction(
-                    target_location=standing_pose_in_front_of(destination, world)
-                ),
+                NavigateAction(goal_pose=standing_pose_in_front_of(destination, world)),
                 PlaceAction(
                     arm=robot.torso.left_arm,
-                    target_pose=Pose(
+                    goal_pose=Pose(
                         destination.position,
                         destination.quaternion,
                         reference_frame=world.root,

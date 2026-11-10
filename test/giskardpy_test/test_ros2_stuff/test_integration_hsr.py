@@ -88,7 +88,7 @@ def test_move_base(giskard: HSRTester) -> None:
                 CartesianPose(
                     root_link=giskard.default_root,
                     tip_link=giskard.base_footprint,
-                    goal=Pose.from_xyz_axis_angle(
+                    goal_pose=Pose.from_xyz_axis_angle(
                         x=1.0,
                         axis=Vector3.Z(),
                         angle=pi,

@@ -707,7 +707,7 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
         arm=robot.left_arm,
-        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
     statechart_of(simulated_executor(extensions), Sequence(nodes=[pick_up, place]))
@@ -745,7 +745,7 @@ def test_fixating_an_object_keeps_the_gripper_where_it_is(simple_pr2_context) ->
     assert type(holding) is CartesianPose
     assert holding.root_link is world.root
     assert holding.tip_link is tool_frame
-    assert holding.goal.reference_frame is tool_frame
+    assert holding.goal_pose.reference_frame is tool_frame
     [rule] = action.temporary_collision_rules
     assert rule.end_effector is end_effector
 
@@ -809,7 +809,7 @@ def test_a_place_reattaches_and_retracts_as_its_own_steps(
     pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
     place = PlaceAction(
         arm=robot.left_arm,
-        target_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
 
     statechart_of(simulated_executor(extensions), Sequence(nodes=[pick_up, place]))

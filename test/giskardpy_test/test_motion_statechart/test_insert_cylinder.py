@@ -81,7 +81,9 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
         pre_grasp_height=0.1,
     )
     close_gripper = JointPositionList(
-        goal=robot.right_arm.end_effector.get_joint_state_by_type(GripperState.CLOSE)
+        goal_state=robot.right_arm.end_effector.get_joint_state_by_type(
+            GripperState.CLOSE
+        )
     )
     statechart.add_node(sequence := Sequence(nodes=[close_gripper, goal]))
     statechart.add_node(EndMotion.when_true(sequence))

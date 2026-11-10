@@ -162,7 +162,7 @@ def test_joint_goal(tmp_path):
     )
     statechart = Statechart(context=executor.context)
 
-    task1 = JointPositionList(goal=JointState.from_mapping({root_C_tip: 1}))
+    task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 1}))
     always_true = ConstTrueNode()
     statechart.add_node(always_true)
     statechart.add_node(task1)
@@ -215,7 +215,7 @@ def test_continuous_joint(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal=JointState.from_mapping(
+        goal_state=JointState.from_mapping(
             {
                 r_wrist_roll_joint: -np.pi,
                 l_wrist_roll_joint: -2.1 * np.pi,
@@ -250,7 +250,7 @@ def test_revolute_joint(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal=JointState.from_mapping(
+        goal_state=JointState.from_mapping(
             {
                 head_pan_joint: 0.042,
                 head_tilt_joint: -0.37,
@@ -286,7 +286,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     statechart.add_nodes(
         [
             joint_goal := JointPositionList(
-                goal=JointState.from_mapping({head_pan_joint: 0.5}),
+                goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
             ),
             JointVelocityLimit(
                 connections=[head_pan_joint], max_joint_velocity=max_velocity
@@ -323,12 +323,12 @@ def test_joint_sequence(pr2_world_state_reset):
         sequence := Sequence(
             nodes=[
                 JointPositionList(
-                    goal=JointState.from_str_dict(
+                    goal_state=JointState.from_str_dict(
                         {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
                     )
                 ),
                 JointPositionList(
-                    goal=JointState.from_str_dict(
+                    goal_state=JointState.from_str_dict(
                         {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
                     )
                 ),
@@ -358,7 +358,7 @@ def test_daisy_arm_reaches_its_park_state(
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(joint_goal := JointPositionList(goal=park_state))
+    statechart.add_node(joint_goal := JointPositionList(goal_state=park_state))
     statechart.add_node(EndMotion.when_true(joint_goal))
 
     executor.compile(statechart=statechart)
@@ -402,7 +402,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     statechart.add_nodes(
         [
             joint_goal := JointPositionList(
-                goal=JointState.from_mapping({head_pan_joint: 0.5})
+                goal_state=JointState.from_mapping({head_pan_joint: 0.5})
             ),
             JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.0),
         ]
@@ -458,7 +458,7 @@ def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         goal := JointPositionList(
-            goal=JointState.from_mapping({joint: 1.0 for joint in joints})
+            goal_state=JointState.from_mapping({joint: 1.0 for joint in joints})
         )
     )
     executor.compile(statechart=statechart)

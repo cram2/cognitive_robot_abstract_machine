@@ -84,7 +84,7 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
         node for node in goals_of(back_off) if isinstance(node, CartesianPose)
     ]
     np.testing.assert_allclose(
-        back_off_goal.goal.to_np(),
+        back_off_goal.goal_pose.to_np(),
         action.back_off_pose(grasp.grasp_pose, arm.end_effector).to_np(),
         atol=1e-9,
     )

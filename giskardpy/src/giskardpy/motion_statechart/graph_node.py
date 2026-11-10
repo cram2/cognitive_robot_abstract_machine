@@ -18,9 +18,7 @@ from cramph.node import EndedByOwner
 from cramph.context import StatechartContext
 from giskardpy.motion_statechart.exceptions import MissingErrorSignalError
 from giskardpy.motion_statechart.mixins import (
-    GoalType,
     HasGoalBindingPolicyParameter,
-    HasGoalParameter,
     HasThresholdParameter,
     HasWeightParameter,
 )
@@ -371,12 +369,7 @@ class ConvergingTask(Task, HasThresholdParameter, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class BindsGoalReferenceFrame(
-    StatechartNode,
-    HasGoalParameter[GoalType],
-    HasGoalBindingPolicyParameter,
-    ABC,
-):
+class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC):
     """
     A node whose goal is given in a frame that may move, and which reads where that
     frame lies as :attr:`binding_policy` says.
@@ -401,11 +394,11 @@ class BindsGoalReferenceFrame(
     """
 
     @property
+    @abstractmethod
     def goal_reference_frame(self) -> KinematicStructureEntity:
         """
-        :return: The frame :attr:`goal` is given in.
+        :return: The frame the goal of this node is given in.
         """
-        return self.goal.reference_frame
 
     @property
     @abstractmethod

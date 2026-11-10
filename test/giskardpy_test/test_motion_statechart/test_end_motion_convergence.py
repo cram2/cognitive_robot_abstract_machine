@@ -21,7 +21,7 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
     goal = CartesianPose(
         root_link=cylinder_bot_world.root,
         tip_link=tip,
-        goal=Pose.from_xyz_rpy(x=1, reference_frame=cylinder_bot_world.root),
+        goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=cylinder_bot_world.root),
         position_threshold=0.01,
     )
     motion_statechart.add_node(goal)

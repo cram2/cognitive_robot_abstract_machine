@@ -53,7 +53,7 @@ def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
         nodes=[
             ParkArmsAction(arms=hsrb.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
-            NavigateAction(target_location=goal),
+            NavigateAction(goal_pose=goal),
         ]
     )
 

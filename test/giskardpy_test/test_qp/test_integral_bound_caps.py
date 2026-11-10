@@ -117,7 +117,9 @@ def control_cycles_to_reach_joint_goal(world: World, with_floor: bool) -> int:
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     motion_statechart = Statechart(context=executor.context)
-    joint_goal = JointPositionList(goal=JointState.from_mapping({connection: 0.9}))
+    joint_goal = JointPositionList(
+        goal_state=JointState.from_mapping({connection: 0.9})
+    )
     motion_statechart.add_node(joint_goal)
     if with_floor:
         motion_statechart.add_node(FarAwayFloor(degree_of_freedom=connection.dof))
@@ -167,7 +169,7 @@ def cruise_speed_of_a_far_joint_goal(
     motion_statechart = Statechart(context=executor.context)
     motion_statechart.add_node(
         JointPositionList(
-            goal=JointState.from_mapping({connection: 500.0}),
+            goal_state=JointState.from_mapping({connection: 500.0}),
             cruise_velocity=cruise_velocity,
         )
     )
@@ -246,7 +248,7 @@ def penetration_into_ceiling(
     ceiling_position = 0.3
     motion_statechart.add_node(
         JointPositionList(
-            goal=JointState.from_mapping(
+            goal_state=JointState.from_mapping(
                 {connection: ceiling_position + goal_above_ceiling}
             ),
             cruise_velocity=goal_cruise_velocity,

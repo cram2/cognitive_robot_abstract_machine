@@ -365,7 +365,7 @@ class CartesianGoalScenario(BenchmarkScenario):
             cartesian_goal := CartesianPose(
                 root_link=robot.get_kinematic_structure_entity("base_footprint"),
                 tip_link=tip,
-                goal=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=-0.2, reference_frame=tip
                 ),
             )
@@ -404,7 +404,7 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
             CartesianPose(
                 root_link=robot.default_root,
                 tip_link=robot.get_kinematic_structure_entity("r_gripper_tool_frame"),
-                goal=Pose.from_xyz_axis_angle(
+                goal_pose=Pose.from_xyz_axis_angle(
                     x=0.8,
                     y=-0.38,
                     z=0.84,
@@ -460,7 +460,7 @@ class ApartmentDrivingScenario(BenchmarkScenario):
             cartesian_goal := CartesianPose(
                 root_link=robot.get_kinematic_structure_entity("map"),
                 tip_link=base,
-                goal=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.4, y=-2.0, reference_frame=base
                 ),
             )
@@ -510,7 +510,7 @@ class KitchenPointingScenario(BenchmarkScenario):
                     Pointing(
                         root_link=map_frame,
                         tip_link=camera,
-                        goal=handle_point,
+                        goal_point=handle_point,
                         pointing_axis=pointing_axis,
                     ),
                     Parallel(
@@ -518,7 +518,7 @@ class KitchenPointingScenario(BenchmarkScenario):
                             Pointing(
                                 root_link=map_frame,
                                 tip_link=camera,
-                                goal=handle_point,
+                                goal_point=handle_point,
                                 pointing_axis=pointing_axis,
                             ),
                             CartesianPose(
@@ -526,7 +526,7 @@ class KitchenPointingScenario(BenchmarkScenario):
                                 tip_link=robot.get_kinematic_structure_entity(
                                     "base_footprint"
                                 ),
-                                goal=HomogeneousTransformationMatrix.from_xyz_axis_angle(
+                                goal_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
                                     y=2.0,
                                     axis=Vector3.Z(),
                                     angle=1,
@@ -536,7 +536,7 @@ class KitchenPointingScenario(BenchmarkScenario):
                                 ),
                             ),
                             JointPositionList(
-                                goal=JointState.from_str_dict(
+                                goal_state=JointState.from_str_dict(
                                     arm_pose, world=robot.api.world
                                 )
                             ),
@@ -580,7 +580,7 @@ class LongSequenceScenario(BenchmarkScenario):
             CartesianPose(
                 root_link=robot.get_kinematic_structure_entity("base_footprint"),
                 tip_link=tips[index % len(tips)],
-                goal=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tips[index % len(tips)]
                 ),
             )
@@ -639,7 +639,7 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
             waypoint = CartesianPose(
                 root_link=robot.get_kinematic_structure_entity("base_footprint"),
                 tip_link=tip,
-                goal=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tip
                 ),
             )

@@ -21,7 +21,7 @@ def _task_moving_the_bot(world: World, name: str) -> CartesianPosition:
         name=name,
         root_link=world.root,
         tip_link=world.get_kinematic_structure_entity_by_name("bot"),
-        goal=Point3(0, 0, 0, reference_frame=world.root),
+        goal_point=Point3(0, 0, 0, reference_frame=world.root),
     )
 
 

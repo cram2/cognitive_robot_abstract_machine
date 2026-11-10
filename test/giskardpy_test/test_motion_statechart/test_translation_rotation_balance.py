@@ -210,7 +210,7 @@ def run_pose_goal(
     Moves the tip to a pose goal at `offset` and records its errors on every cycle, for
     at most `maximum_cycles`.
     """
-    goal = CartesianPose(root_link=root, tip_link=tip, goal=offset.goal_pose(tip))
+    goal = CartesianPose(root_link=root, tip_link=tip, goal_pose=offset.goal_pose(tip))
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )

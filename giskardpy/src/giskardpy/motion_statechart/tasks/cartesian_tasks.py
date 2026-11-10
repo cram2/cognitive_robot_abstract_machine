@@ -26,9 +26,11 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from giskardpy.motion_statechart.graph_node import Task, ConvergingTask
 from giskardpy.motion_statechart.mixins import (
-    GoalType,
     HasGoalBindingPolicyParameter,
-    HasGoalParameter,
+    HasGoalOrientationParameter,
+    HasGoalPointParameter,
+    HasGoalPointsParameter,
+    HasGoalPoseParameter,
     HasPoseCruiseVelocityParameters,
     HasPoseThresholdParameters,
     HasCruiseVelocityParameter,
@@ -53,7 +55,6 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     RotationMatrix,
     Vector3,
-    Pose,
     SpatialType,
 )
 from semantic_digital_twin.world_description.geometry import Color
@@ -65,7 +66,7 @@ from semantic_digital_twin.world_description.world_entity import (
 @dataclass(eq=False, repr=False, kw_only=True)
 class CartesianTask(
     ConvergingTask,
-    BindsGoalReferenceFrame[GoalType],
+    BindsGoalReferenceFrame,
     HasKinematicChainParameters,
     HasCruiseVelocityParameter,
     ABC,
@@ -120,7 +121,7 @@ class CartesianTask(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPosition(CartesianTask[Point3]):
+class CartesianPosition(CartesianTask, HasGoalPointParameter):
     """
     Move a tip link to a goal position in 3D space, with an error in meters.
 
@@ -128,6 +129,10 @@ class CartesianPosition(CartesianTask[Point3]):
 
     .. warning:: This task does not constrain orientation.
     """
+
+    @property
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_point.reference_frame
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -137,7 +142,7 @@ class CartesianPosition(CartesianTask[Point3]):
             and the goal point.
         """
         artifacts = MotionNodeArtifacts()
-        root_P_goal = self.root_T_goal_reference_frame @ self.goal
+        root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
 
         # Get current tip position in root frame
         root_P_current = self.context.world.compose_forward_kinematics_expression(
@@ -218,10 +223,9 @@ class DistanceAlongAxis(
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPositionTrajectory(CartesianTask[list[Point3]]):
+class CartesianPositionTrajectory(CartesianTask, HasGoalPointsParameter):
     """
-    Move a tip link along the points of :attr:`goal` to its last one, with an error in
-    meters.
+    Move a tip link along :attr:`goal_points` to the last one, with an error in meters.
 
     .. warning:: the trajectory is assumed to be dense and smooth.
     """
@@ -271,8 +275,8 @@ class CartesianPositionTrajectory(CartesianTask[list[Point3]]):
 
     @cached_property
     def goal_reference_frame(self) -> KinematicStructureEntity:
-        reference_frame = self.goal[0].reference_frame
-        for point in self.goal[1:]:
+        reference_frame = self.goal_points[0].reference_frame
+        for point in self.goal_points[1:]:
             if point.reference_frame != reference_frame:
                 raise GoalPointsReferenceFrameMismatchError(
                     node=self,
@@ -282,7 +286,9 @@ class CartesianPositionTrajectory(CartesianTask[list[Point3]]):
         return reference_frame
 
     def _goal_points_to_np(self):
-        self._goal_points_np = np.array([point.to_np()[:-1] for point in self.goal])
+        self._goal_points_np = np.array(
+            [point.to_np()[:-1] for point in self.goal_points]
+        )
 
     def set_up(self) -> None:
         """
@@ -496,12 +502,12 @@ class CartesianPositionTrajectory(CartesianTask[list[Point3]]):
         )
         float_variable_data.set_value(
             self.goal_reference_frame_P_current_target_point,
-            self.goal[self.current_index].to_np()[:-1],
+            self.goal_points[self.current_index].to_np()[:-1],
         )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianPositionStraight(CartesianTask[Point3]):
+class CartesianPositionStraight(CartesianTask, HasGoalPointParameter):
     """
     Move a tip link to a goal position along a straight line, with an error in meters.
 
@@ -509,17 +515,19 @@ class CartesianPositionStraight(CartesianTask[Point3]):
     line towards the goal, useful for tasks requiring linear trajectories.
     """
 
+    @property
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_point.reference_frame
+
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
     Cost of falling behind on the line; leaving the line costs
     :attr:`lateral_weight_factor` times as much.
     """
-
     _line_start_binding: ForwardKinematicsBinding = field(init=False)
     """
     Binding for the tip pose the line starts at.
     """
-
     lateral_weight_factor: float = 2
     """
     How much more expensive leaving the line is than falling behind on it.
@@ -560,7 +568,7 @@ class CartesianPositionStraight(CartesianTask[Point3]):
             and the goal point.
         """
         artifacts = MotionNodeArtifacts()
-        root_P_goal = self.root_T_goal_reference_frame @ self.goal
+        root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_line_start = self._line_start_binding.root_T_tip.position
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
             self.root_link, self.tip_link
@@ -608,7 +616,7 @@ class CartesianPositionStraight(CartesianTask[Point3]):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class CartesianOrientation(CartesianTask[RotationMatrix]):
+class CartesianOrientation(CartesianTask, HasGoalOrientationParameter):
     """
     Rotate a tip link to match a goal orientation, with an error in radians.
 
@@ -617,6 +625,10 @@ class CartesianOrientation(CartesianTask[RotationMatrix]):
 
     .. warning:: This task does not constrain position.
     """
+
+    @property
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_orientation.reference_frame
 
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
@@ -631,7 +643,7 @@ class CartesianOrientation(CartesianTask[RotationMatrix]):
             orientation and the goal orientation.
         """
         artifacts = MotionNodeArtifacts()
-        root_R_goal = self.root_T_goal_reference_frame @ self.goal
+        root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
 
         # Get current tip orientation in root frame
         root_T_current = self.context.world.compose_forward_kinematics_expression(
@@ -659,7 +671,7 @@ class CartesianOrientation(CartesianTask[RotationMatrix]):
 class CartesianPose(
     Parallel,
     HasTipLinkParameter,
-    HasGoalParameter[Pose],
+    HasGoalPoseParameter,
     HasGoalBindingPolicyParameter,
     HasPoseThresholdParameters,
     HasPoseCruiseVelocityParameters,
@@ -667,7 +679,7 @@ class CartesianPose(
 ):
     """
     This goal will use the kinematic chain between root and tip link to move tip_link
-    into the 6D :attr:`goal`.
+    into the 6D :attr:`goal_pose`.
 
     Position and orientation are separate tasks, because an error in meters and an error
     in radians cannot be compared against one threshold. This goal is the parallel
@@ -706,7 +718,7 @@ class CartesianPose(
                 name=f"{self.name}/position",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal=self.goal.position,
+                goal_point=self.goal_pose.position,
                 cruise_velocity=self.cruise_linear_velocity,
                 threshold=self.position_threshold,
                 weight=self.weight,
@@ -716,7 +728,7 @@ class CartesianPose(
                 name=f"{self.name}/orientation",
                 root_link=self.root_link,
                 tip_link=self.tip_link,
-                goal=self.goal.rotation_matrix,
+                goal_orientation=self.goal_pose.rotation_matrix,
                 cruise_velocity=self.cruise_angular_velocity,
                 threshold=self.orientation_threshold,
                 weight=self.weight,

@@ -227,17 +227,17 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
                 open_door,
                 ParkArmsAction(arms=self.robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=2.81, y=-3.76, reference_frame=self.world.root
                     )
                 ),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=-0.75, y=-3.33, reference_frame=self.world.root
                     )
                 ),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=0, y=0.8, reference_frame=self.world.root
                     )
                 ),
@@ -250,7 +250,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     arm=arm,
-                    target_location=self.place_pose,
+                    goal_pose=self.place_pose,
                 ),
             ]
         )
@@ -314,7 +314,7 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
             arm=self.arm,
         )
         present_book = NavigateAction(
-            target_location=Pose2D.from_pose(self.robot_starting_pose)
+            goal_pose=Pose2D.from_pose(self.robot_starting_pose)
         )
 
         return Sequence(nodes=[open_door, mpa, present_book])
@@ -390,7 +390,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
             standing_position=Pose2D.from_xy_yaw(
                 x=5.48, y=6.96, reference_frame=self.world.root
             ),
-            target_location=target_pose,
+            goal_pose=target_pose,
             arm=self.arm,
         )
 
@@ -443,12 +443,12 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
     @property
     def plan(self) -> StatechartNode:
         navigate1 = NavigateAction(
-            target_location=Pose2D.from_xy_yaw(
+            goal_pose=Pose2D.from_xy_yaw(
                 x=2.86, y=5.89, reference_frame=self.world.root
             )
         )
         navigate2 = NavigateAction(
-            target_location=Pose2D.from_xy_yaw(
+            goal_pose=Pose2D.from_xy_yaw(
                 x=2.86, y=5.89, reference_frame=self.world.root
             )
         )
@@ -460,9 +460,7 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
 
         open_door = Sage10kOpenDoor(door=self.main_entrance)
         park_arms = ParkArmsAction(arms=[self.arm])
-        present = NavigateAction(
-            target_location=Pose2D.from_pose(self.robot_starting_pose)
-        )
+        present = NavigateAction(goal_pose=Pose2D.from_pose(self.robot_starting_pose))
 
         return Sequence(
             nodes=[open_door, park_arms, navigate1, mpu, park_arms, navigate2, present]
@@ -532,7 +530,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
             standing_position=Pose2D.from_xy_yaw(
                 x=0.605, y=2.115, yaw=-1.5708, reference_frame=self.world.root
             ),
-            target_location=place_target_pose,
+            goal_pose=place_target_pose,
             arm=self.arm,
         )
 
@@ -589,12 +587,12 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
     @property
     def plan(self) -> StatechartNode:
         navigate1 = NavigateAction(
-            target_location=Pose2D.from_xy_yaw(
+            goal_pose=Pose2D.from_xy_yaw(
                 x=1.27, y=4.45, reference_frame=self.world.root
             )
         )
         navigate2 = NavigateAction(
-            target_location=Pose2D.from_xy_yaw(
+            goal_pose=Pose2D.from_xy_yaw(
                 x=1.27, y=4.45, reference_frame=self.world.root
             )
         )
@@ -606,9 +604,7 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
         open_door = Sage10kOpenDoor(door=self.main_entrance)
         park_arms = ParkArmsAction(arms=[self.arm])
-        present = NavigateAction(
-            target_location=Pose2D.from_pose(self.robot_starting_pose)
-        )
+        present = NavigateAction(goal_pose=Pose2D.from_pose(self.robot_starting_pose))
 
         return Sequence(
             nodes=[
@@ -644,7 +640,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
                 open_door,
                 ParkArmsAction(arms=self.robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=0.81, y=4.81, reference_frame=self.world.root
                     )
                 ),
@@ -655,18 +651,18 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=0.81, y=4.81, reference_frame=self.world.root
                     )
                 ),
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     arm=arm,
-                    target_location=self.place_pose,
+                    goal_pose=self.place_pose,
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=0.48, y=4.81, reference_frame=self.world.root
                     )
                 ),
@@ -766,7 +762,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
                 open_door,
                 ParkArmsAction(arms=self.robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=12, y=8.13, reference_frame=self.world.root
                     )
                 ),
@@ -779,10 +775,10 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     arm=arm,
-                    target_location=self.place_pose,
+                    goal_pose=self.place_pose,
                 ),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=12, y=8.13, reference_frame=self.world.root
                     )
                 ),
@@ -876,11 +872,11 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
                     arm=arm,
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
-                NavigateAction(target_location=navigate),
+                NavigateAction(goal_pose=navigate),
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     arm=arm,
-                    target_location=self.place_pose,
+                    goal_pose=self.place_pose,
                 ),
             ]
         )

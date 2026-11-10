@@ -8,8 +8,8 @@ from giskardpy.motion_statechart.exceptions import EmptyGoalStateError
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.graph_node import ConvergingTask
 from giskardpy.motion_statechart.mixins import (
-    HasGoalParameter,
     HasCruiseVelocityParameter,
+    HasGoalStateParameter,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.connections import (
@@ -20,7 +20,7 @@ from semantic_digital_twin.world_description.connections import (
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class JointPositionList(
-    ConvergingTask, HasGoalParameter[JointState], HasCruiseVelocityParameter
+    ConvergingTask, HasGoalStateParameter, HasCruiseVelocityParameter
 ):
     """
     Moves the robot to a given joint position.
@@ -43,12 +43,12 @@ class JointPositionList(
             position error, so the task succeeds only once every joint is within the
             threshold.
         """
-        if len(self.goal) == 0:
+        if len(self.goal_state) == 0:
             raise EmptyGoalStateError(node=self)
 
         artifacts = MotionNodeArtifacts()
         errors = []
-        for connection, target in self.goal.items():
+        for connection, target in self.goal_state.items():
             current = connection.dof.variables.position
             target = self.apply_limits_to_target(target, connection)
             if (

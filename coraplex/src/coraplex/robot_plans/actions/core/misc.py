@@ -177,9 +177,9 @@ class MoveToReach(
 
     def create_steps(self) -> list[StatechartNode]:
         return [
-            NavigateAction(target_location=self.standing_pose),
+            NavigateAction(goal_pose=self.standing_pose),
             MoveManipulatorAction(
-                target_pose=self.arm.end_effector.tool_frame_goal_for_grasp(
+                goal_pose=self.arm.end_effector.tool_frame_goal_for_grasp(
                     self.reference_T_grasp
                 ),
                 arm=self.arm,

@@ -71,7 +71,7 @@ def _position_goal(world: World, tip: Body, name: str) -> CartesianPosition:
     return CartesianPosition(
         root_link=world.root,
         tip_link=tip,
-        goal=Point3(x=5, reference_frame=world.root),
+        goal_point=Point3(x=5, reference_frame=world.root),
         name=name,
     )
 

@@ -9,7 +9,7 @@ from cramph.node import StatechartNode
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from giskardpy.motion_statechart.mixins import (
     HasFingerStallToleranceParameters,
-    HasGoalParameter,
+    HasGoalStateParameter,
     HasJointVelocityLimitParameter,
     HasThresholdParameter,
     HasTwoFingerGripperParameters,
@@ -21,7 +21,6 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
     JointVelocityLimit,
 )
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
@@ -100,7 +99,7 @@ class MoveFingers(
                 tolerate_finger_stall=tolerate_finger_stall,
             )
         return MoveFingersToJointState(
-            goal=configuration.joint_state,
+            goal_state=configuration.joint_state,
             max_joint_velocity=configuration.finger_velocity,
             finger_stall_minimum_time=finger_stall_minimum_time,
             tolerate_finger_stall=tolerate_finger_stall,
@@ -199,18 +198,18 @@ class MoveGripper(MoveFingers, HasTwoFingerGripperParameters, HasThresholdParame
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveFingersToJointState(MoveFingers, HasGoalParameter[JointState]):
+class MoveFingersToJointState(MoveFingers, HasGoalStateParameter):
     """
-    Drive the fingers of a hand to the joint state :attr:`goal`, for a hand whose
+    Drive the fingers of a hand to the joint state :attr:`goal_state`, for a hand whose
     fingers do not close to a single width.
     """
 
     @property
     def finger_connections(self) -> list[ActiveConnection1DOF]:
-        return list(self.goal.connections)
+        return list(self.goal_state.connections)
 
     def create_finger_task(self) -> JointPositionList:
         """
-        :return: A new task driving the fingers to :attr:`goal`.
+        :return: A new task driving the fingers to :attr:`goal_state`.
         """
-        return JointPositionList(goal=self.goal)
+        return JointPositionList(goal_state=self.goal_state)

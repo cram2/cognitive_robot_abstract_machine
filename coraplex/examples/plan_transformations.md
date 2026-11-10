@@ -261,7 +261,7 @@ plan_transformations = [ParkArmsBeforeNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(target_location=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+        nodes=[NavigateAction(goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -272,7 +272,7 @@ The parking is part of the plan like any other action, so it is performed with i
 
 ```python
 navigate = Sequence(
-    nodes=[NavigateAction(target_location=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+    nodes=[NavigateAction(goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
 )
 
 executor, statechart = statechart_for(navigate)
@@ -306,7 +306,7 @@ plan_transformations = [ParkArmsAfterNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(target_location=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+        nodes=[NavigateAction(goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -335,14 +335,14 @@ class LookAtTheGoalWhileNavigating(ParallelInsertion[NavigateAction]):
         return plan_node
 
     def nodes_to_insert(self, plan_node: NavigateAction) -> List[StatechartNode]:
-        return [LookAtAction(target=plan_node.target_location.pose)]
+        return [LookAtAction(target=plan_node.goal_pose.pose)]
 
 
 plan_transformations = [LookAtTheGoalWhileNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(target_location=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+        nodes=[NavigateAction(goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -368,7 +368,7 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
 
     def is_applicable(self, plan_node: NavigateAction) -> bool:
         navigate = plan_node
-        target = navigate.world.transform(navigate.target_location, navigate.world.root)
+        target = navigate.world.transform(navigate.goal_pose, navigate.world.root)
         distance = navigate.robot.root.global_pose.position.euclidean_distance(
             target.pose.position
         )
@@ -378,7 +378,7 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
 ```python
 plan_transformations = [ParkArmsBeforeLongDrives()]
 
-navigate = expand(Sequence(nodes=[NavigateAction(target_location=Pose2D.from_pose(pr2.root.global_pose))]))
+navigate = expand(Sequence(nodes=[NavigateAction(goal_pose=Pose2D.from_pose(pr2.root.global_pose))]))
 
 show(navigate)
 ```

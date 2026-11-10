@@ -89,7 +89,7 @@ goal = CartesianPose(
     name="move_to_goal", 
     root_link=root_link, 
     tip_link=tip_link, 
-    goal=goal_pose
+    goal_pose=goal_pose
 )
 
 statechart.add_node(goal)

@@ -53,7 +53,7 @@ def test_a_carry_runs_against_a_controller_in_another_process(
     )
     carry = CarryAction(
         navigate=NavigateAction(
-            target_location=Pose.from_xyz_rpy(x=0.3, reference_frame=stretch.root)
+            goal_pose=Pose.from_xyz_rpy(x=0.3, reference_frame=stretch.root)
         ),
         holding_arms=[arm],
     )

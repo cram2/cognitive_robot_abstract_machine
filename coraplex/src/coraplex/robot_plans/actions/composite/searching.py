@@ -112,7 +112,7 @@ class SearchAction(SequentialAction):
         ]
         return cls(
             navigate=a(NavigateAction)(
-                target_location=variable(
+                goal_pose=variable(
                     Pose2D,
                     domain=VisibilityLocation(
                         target_pose=target_location, context=context

@@ -294,7 +294,7 @@ def _peak_acceleration_moving_to(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        JointPositionList(goal=JointState.from_mapping({connection: goal}))
+        JointPositionList(goal_state=JointState.from_mapping({connection: goal}))
     )
     executor.compile(statechart=statechart)
     accelerations = []

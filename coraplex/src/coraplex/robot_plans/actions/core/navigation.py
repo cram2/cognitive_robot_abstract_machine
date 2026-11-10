@@ -16,7 +16,7 @@ from coraplex.robot_plans.actions.base import (
 from coraplex.robot_plans.mixins import (
     HasCameraParameter,
     HasLookTargetParameter,
-    HasNavigationTargetParameter,
+    HasPlanarGoalPoseParameter,
     ReattachesBranches,
 )
 from cramph.composites import Parallel, PausedUntilTrue
@@ -72,7 +72,7 @@ class DrivesBase(Action, HasThresholdParameter, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class NavigateAction(DrivesBase, GoalAction, HasNavigationTargetParameter):
+class NavigateAction(DrivesBase, GoalAction, HasPlanarGoalPoseParameter):
     """
     Navigates the Robot to a position.
     """
@@ -80,7 +80,7 @@ class NavigateAction(DrivesBase, GoalAction, HasNavigationTargetParameter):
     def create_goal(self) -> StatechartNode:
         return self.base_goal_type.moving_base_of(
             self.robot,
-            self.robot.mobile_base.pose_facing(self.target_location),
+            self.robot.mobile_base.pose_facing(self.goal_pose),
             self.threshold,
         )
 
@@ -97,7 +97,7 @@ class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
         pointing = Pointing(
             root_link=self.robot.get_torso().root,
             tip_link=camera.root,
-            goal=self._world_P_target(),
+            goal_point=self._world_P_target(),
             pointing_axis=camera.viewing_direction,
         )
         return [pointing, *self.keep_base_still()]
@@ -131,7 +131,7 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
             Pointing(
                 root_link=self.world.root,
                 tip_link=self.robot.root,
-                goal=self._target_at_base_height(),
+                goal_point=self._target_at_base_height(),
                 pointing_axis=Vector3(
                     *self.robot.mobile_base.forward_axis.to_np()[:3],
                     reference_frame=self.robot.root,
@@ -140,7 +140,7 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
             CartesianPosition(
                 root_link=self.world.root,
                 tip_link=self.robot.root,
-                goal=Point3(reference_frame=self.robot.root),
+                goal_point=Point3(reference_frame=self.robot.root),
             ),
         ]
 
@@ -156,7 +156,7 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class PathPlanningNavigateAction(
-    DrivesBase, SequentialAction, HasNavigationTargetParameter
+    DrivesBase, SequentialAction, HasPlanarGoalPoseParameter
 ):
     """
     Navigates the robot to a pose along a path through the environment's free space.
@@ -247,7 +247,7 @@ class PathPlanningNavigateAction(
             )
             for waypoint, next_waypoint in zip(waypoints[1:], waypoints[2:])
         ]
-        return poses + [self.target_location]
+        return poses + [self.goal_pose]
 
     def _waypoints(self) -> list[Point2]:
         """
@@ -264,7 +264,7 @@ class PathPlanningNavigateAction(
             bloat_obstacles=self.robot.mobile_base.base_radius,
         )
         return free_space.path_from_to(
-            Point2.from_pose(base_pose), self.target_location.position
+            Point2.from_pose(base_pose), self.goal_pose.position
         )
 
 
@@ -299,19 +299,17 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
 
     def create_steps(self) -> list[StatechartNode]:
         return [
-            NavigateAction(target_location=self._pose_infront_of_elevator),
+            NavigateAction(goal_pose=self._pose_infront_of_elevator),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self._current_floor),
                 monitored_node=NavigateAction(
-                    target_location=Pose2D(reference_frame=self.elevator.root)
+                    goal_pose=Pose2D(reference_frame=self.elevator.root)
                 ),
             ),
             *self.reattach(self.robot.root, self.elevator.root),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self.target_floor),
-                monitored_node=NavigateAction(
-                    target_location=self._pose_infront_of_elevator
-                ),
+                monitored_node=NavigateAction(goal_pose=self._pose_infront_of_elevator),
             ),
             *self.reattach(self.robot.root, self.world.root),
         ]

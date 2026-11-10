@@ -1,9 +1,10 @@
 import dataclasses
+import inspect
+from types import ModuleType
 
 import pytest
 
 from coraplex.robot_plans import mixins
-from coraplex.robot_plans.actions.base import Action
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
@@ -25,15 +26,16 @@ from coraplex.robot_plans.mixins import (
     HasGraspApproachParameters,
     HasGraspCandidateParameter,
     HasGripperConfigurationParameter,
-    HasNavigationTargetParameter,
     HasPlaceTuningParameters,
-    HasTargetPoseParameter,
+    HasPlanarGoalPoseParameter,
     MovesToolCenterPoint,
 )
 from giskardpy.motion_statechart.goals.base_pose_goals import DrivenBaseGoal
 from giskardpy.motion_statechart.goals.gripper import MoveFingers, MoveGripper
+from giskardpy.motion_statechart import mixins as node_mixins
 from giskardpy.motion_statechart.mixins import (
     HasFingerStallToleranceParameters,
+    HasGoalPoseParameter,
     HasJointVelocityLimitParameter,
     HasPoseThresholdParameters,
     HasThresholdParameter,
@@ -41,6 +43,7 @@ from giskardpy.motion_statechart.mixins import (
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
@@ -77,21 +80,77 @@ def field_names(designator_type: type) -> set[str]:
 # %% one mixin per parameter
 
 
-def test_parameter_mixins_do_not_stack_other_parameter_mixins():
+def mixins_defined_in(module: ModuleType) -> set[type]:
     """
-    Each parameter mixin declares its own parameters only, so an action names every
-    parameter mixin it has.
+    :return: The parameter mixins `module` defines, recognised by their names.
+    """
+    return {
+        cls
+        for _, cls in inspect.getmembers(module, inspect.isclass)
+        if cls.__module__ == module.__name__
+        and cls.__name__.startswith("Has")
+        and cls.__name__.endswith(("Parameter", "Parameters"))
+    }
 
-    The actions the module also defines are not mixins.
+
+def all_parameter_mixins() -> set[type]:
     """
-    for mixin in vars(mixins).values():
-        if not isinstance(mixin, type) or not issubclass(
-            mixin, DesignatorParameterMixin
-        ):
-            continue
-        if mixin is DesignatorParameterMixin or issubclass(mixin, Action):
-            continue
-        assert mixin.__bases__ == (DesignatorParameterMixin,)
+    :return: The parameter mixins of the actions and of the motion statechart nodes.
+    """
+    return mixins_defined_in(mixins) | mixins_defined_in(node_mixins)
+
+
+def parameter_mixins_named(suffix: str) -> list[type]:
+    """
+    :return: The parameter mixins whose names end in `suffix`, in a fixed order.
+    """
+    return sorted(
+        (mixin for mixin in all_parameter_mixins() if mixin.__name__.endswith(suffix)),
+        key=lambda mixin: mixin.__qualname__,
+    )
+
+
+def own_fields(mixin: type) -> set[str]:
+    """
+    :return: The names of the fields `mixin` declares itself.
+    """
+    return set(vars(mixin).get("__annotations__", {}))
+
+
+def combined_mixins(mixin: type) -> set[type]:
+    """
+    :return: The other parameter mixins `mixin` inherits.
+    """
+    return {base for base in mixin.__mro__[1:] if base in all_parameter_mixins()}
+
+
+@pytest.mark.parametrize(
+    "mixin",
+    parameter_mixins_named("Parameter"),
+)
+def test_a_single_parameter_mixin_declares_one_field_and_combines_none(mixin: type):
+    assert len(own_fields(mixin)) == 1
+    assert combined_mixins(mixin) == set()
+
+
+@pytest.mark.parametrize(
+    "mixin",
+    parameter_mixins_named("Parameters"),
+)
+def test_a_bundle_either_declares_its_fields_or_combines_single_parameter_mixins(
+    mixin: type,
+):
+    """
+    A bundle holds parameters that always come together: either as fields of its own, or
+    as the single parameter mixins it combines, never both.
+    """
+    combined = combined_mixins(mixin)
+    if combined:
+        assert own_fields(mixin) == set()
+        assert all(base.__name__.endswith("Parameter") for base in combined)
+        assert len(combined) > 1
+    else:
+        assert len(own_fields(mixin)) > 1
 
 
 def test_action_inherits_parameter_mixins():
@@ -157,7 +216,6 @@ def test_inherited_parameters_keep_their_declared_types():
     types = field_types(PlaceAction)
 
     assert types["arm"] is HasArmParameter.__annotations__["arm"]
-    assert types["target_pose"] is HasTargetPoseParameter.__annotations__["target_pose"]
     assert (
         types["placing_linear_velocity"]
         == HasPlaceTuningParameters.__annotations__["placing_linear_velocity"]
@@ -189,15 +247,15 @@ def test_behaviours_without_a_tool_center_point_goal_have_no_tolerances():
         assert "position_threshold" not in field_names(action_type)
 
 
-def test_navigation_actions_take_the_same_target():
+def test_navigation_actions_take_the_same_goal():
     """
-    Driving the base, whether straight or along a planned path, takes the same target.
+    Driving the base, whether straight or along a planned path, takes the same goal.
     """
     for navigation in (NavigateAction, PathPlanningNavigateAction):
-        assert issubclass(navigation, HasNavigationTargetParameter)
+        assert issubclass(navigation, HasPlanarGoalPoseParameter)
         assert (
-            field_types(navigation)["target_location"]
-            == HasNavigationTargetParameter.__annotations__["target_location"]
+            field_types(navigation)["goal_pose"]
+            == HasPlanarGoalPoseParameter.__annotations__["goal_pose"]
         )
 
 
@@ -213,6 +271,7 @@ def test_navigation_actions_take_the_same_target():
         (GraspingAction, MoveFingers, HasFingerStallToleranceParameters),
         (ParkArmsAction, MoveFingers, HasJointVelocityLimitParameter),
         (DrivesBase, DrivenBaseGoal, HasThresholdParameter),
+        (MoveManipulatorAction, CartesianPose, HasGoalPoseParameter),
     ],
 )
 def test_an_action_shares_the_parameter_mixin_of_the_node_it_builds(
@@ -230,3 +289,11 @@ def test_parameters_inherited_from_node_mixins_resolve_to_their_types():
     hints = get_type_hints_of_object(PickUpAction)
     assert hints["position_threshold"] is float
     assert hints["tolerate_finger_stall"] is bool
+    assert get_type_hints_of_object(PlaceAction)["goal_pose"] is Pose
+
+
+def test_a_place_takes_its_goal_as_a_pose_goal_does():
+    """
+    Where a place puts the object down is the same kind of goal a pose goal drives to.
+    """
+    assert issubclass(PlaceAction, HasGoalPoseParameter)

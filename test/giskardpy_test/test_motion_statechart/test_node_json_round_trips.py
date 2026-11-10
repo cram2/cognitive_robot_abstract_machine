@@ -204,7 +204,9 @@ def _orientation(world: World) -> RotationMatrix:
 
 
 def _joint_goal(world: World) -> JointPositionList:
-    return JointPositionList(goal=JointState.from_mapping({_connection(world): 0.5}))
+    return JointPositionList(
+        goal_state=JointState.from_mapping({_connection(world): 0.5})
+    )
 
 
 def _driven_base_node(node_type: type[DrivenBaseTask], world: World) -> DrivenBaseTask:
@@ -214,7 +216,7 @@ def _driven_base_node(node_type: type[DrivenBaseTask], world: World) -> DrivenBa
     """
     return node_type(
         driven_body=world.get_connections_by_type(DifferentialDrive)[0].child,
-        goal=_pose(world),
+        goal_pose=_pose(world),
         parent_T_goal_reference_frame=HomogeneousTransformationMatrix(
             reference_frame=_root(world)
         ),
@@ -260,7 +262,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPose,
             lambda world: [
                 CartesianPose(
-                    root_link=_root(world), tip_link=_tip(world), goal=_pose(world)
+                    root_link=_root(world), tip_link=_tip(world), goal_pose=_pose(world)
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -270,7 +272,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 HolonomicBaseGoal(
                     mobile_base=world.get_semantic_annotations_by_type(MobileBase)[0],
-                    goal=_pose(world),
+                    goal_pose=_pose(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -279,7 +281,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             CartesianPoseStraight,
             lambda world: [
                 CartesianPoseStraight(
-                    root_link=_root(world), tip_link=_tip(world), goal=_pose(world)
+                    root_link=_root(world), tip_link=_tip(world), goal_pose=_pose(world)
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -300,7 +302,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 CartesianPosition(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal=_point(world),
+                    goal_point=_point(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -324,7 +326,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 CartesianPositionStraight(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal=_point(world),
+                    goal_point=_point(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -335,7 +337,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 CartesianPositionTrajectory(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal=[_point(world), _point(world)],
+                    goal_points=[_point(world), _point(world)],
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -346,7 +348,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 CartesianOrientation(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal=_orientation(world),
+                    goal_orientation=_orientation(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -381,7 +383,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 DifferentialDriveBaseGoal(
                     mobile_base=world.get_semantic_annotations_by_type(MobileBase)[0],
-                    goal=_pose(world),
+                    goal_pose=_pose(world),
                 )
             ],
             WorldFixture.CYLINDER_BOT_DIFF_WORLD,
@@ -429,7 +431,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 Pointing(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal=_point(world),
+                    goal_point=_point(world),
                     pointing_axis=_tip_axis(world),
                 )
             ],
@@ -441,7 +443,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 PointingCone(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal=_point(world),
+                    goal_point=_point(world),
                     pointing_axis=_tip_axis(world),
                 )
             ],
@@ -513,7 +515,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                     tip_link=world.get_semantic_annotations_by_type(EndEffector)[
                         0
                     ].tool_frame,
-                    goal=0.0,
+                    goal_position=0.0,
                     holding_end_effector=world.get_semantic_annotations_by_type(
                         EndEffector
                     )[0],
@@ -809,7 +811,7 @@ def _joint_and_base_cases() -> list[NodeRoundTripCase]:
             MoveFingersToJointState,
             lambda world: [
                 MoveFingersToJointState(
-                    goal=world.get_semantic_annotations_by_type(EndEffector)[
+                    goal_state=world.get_semantic_annotations_by_type(EndEffector)[
                         0
                     ].get_joint_state_by_type(GripperState.CLOSE),
                 )

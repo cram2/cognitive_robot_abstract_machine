@@ -132,7 +132,7 @@ def test_mixing_action_expands_to_aligned_motion(tool_action_world):
 
     assert len(goals) == 1
     trajectory = _trajectory_of(goals[0])
-    assert len(trajectory.goal) > 0
+    assert len(trajectory.goal_points) > 0
     assert len(_alignments_of(goals[0])) == 1
     assert trajectory.tip_link == whisk.get_tool_frame()
 
@@ -158,8 +158,8 @@ def test_cutting_action_pointer_stride_reduces_waypoints(tool_action_world):
     dense_goal = _tool_path_goals(dense_action, extensions)[0]
     strided_goal = _tool_path_goals(strided_action, extensions)[0]
 
-    dense_points = _trajectory_of(dense_goal).goal
-    strided_points = _trajectory_of(strided_goal).goal
+    dense_points = _trajectory_of(dense_goal).goal_points
+    strided_points = _trajectory_of(strided_goal).goal_points
     assert len(dense_points) > 0
     assert len(strided_points) == pytest.approx(len(dense_points) / 10, abs=1)
     assert len(_alignments_of(dense_goal)) == 2
@@ -200,7 +200,7 @@ def test_wiping_action_around_target_pose(tool_action_world):
     goals = _tool_path_goals(action, extensions)
 
     assert len(goals) == 1
-    assert len(_trajectory_of(goals[0]).goal) > 0
+    assert len(_trajectory_of(goals[0]).goal_points) > 0
     assert len(_alignments_of(goals[0])) == 1
 
 
@@ -418,9 +418,7 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose2D.from_xy_yaw(
-                    x=1.85, y=2.2, reference_frame=world.root
-                )
+                goal_pose=Pose2D.from_xy_yaw(x=1.85, y=2.2, reference_frame=world.root)
             ),
             wiping,
         ]

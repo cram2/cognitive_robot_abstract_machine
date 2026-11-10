@@ -57,18 +57,18 @@ class TransportAction(SequentialAction):
     def from_graspable_by_closest_grasps(
         cls,
         graspable: IsGraspable,
-        target_location: Pose,
+        goal_pose: Pose,
         arm: Arm,
         context: StatechartContext,
         number_of_grasps: int = GraspsByCloseness.number_of_grasps,
     ) -> Self:
         """
-        A transport that takes `graspable` to `target_location`, standing wherever each
-        step can be carried out from and taking the object by the grasps closest to the
-        robot there.
+        A transport that takes `graspable` to `goal_pose`, standing wherever each step
+        can be carried out from and taking the object by the grasps closest to the robot
+        there.
 
         :param graspable: The object to transport.
-        :param target_location: Where to put the object down.
+        :param goal_pose: Where to put the object down.
         :param arm: The arm that carries the object.
         :param context: The context of the plan the steps run in, whose robot performs
             them.
@@ -87,10 +87,10 @@ class TransportAction(SequentialAction):
             place=a(MoveAndPlaceAction)(
                 carry=a(CarryAction)(
                     navigate=a(NavigateAction)(
-                        target_location=variable(
+                        goal_pose=variable(
                             Pose2D,
                             domain=ReachabilityLocation(
-                                target_pose=target_location,
+                                target_pose=goal_pose,
                                 arm=arm,
                                 context=context,
                             ),
@@ -99,10 +99,10 @@ class TransportAction(SequentialAction):
                     holding_arms=[arm],
                 ),
                 face_and_look_at=a(FaceAndLookAtAction)(
-                    face_at=a(FaceAtAction)(target=target_location),
-                    look_at=a(LookAtAction)(target=target_location),
+                    face_at=a(FaceAtAction)(target=goal_pose),
+                    look_at=a(LookAtAction)(target=goal_pose),
                 ),
-                place=a(PlaceAction)(arm=arm, target_pose=target_location),
+                place=a(PlaceAction)(arm=arm, goal_pose=goal_pose),
             ),
         )
 
@@ -166,25 +166,25 @@ class MoveAndPlaceAction(SequentialAction):
     def from_standing_position(
         cls,
         standing_position: Pose2D,
-        target_location: Pose,
+        goal_pose: Pose,
         arm: Arm,
     ) -> Self:
         """
         :param standing_position: Where the robot stands while placing.
-        :param target_location: Where to put the object down.
+        :param goal_pose: Where to put the object down.
         :param arm: The arm that holds the object.
         :return: The step placing the object from `standing_position`.
         """
         return cls(
             carry=CarryAction(
-                navigate=NavigateAction(target_location=standing_position),
+                navigate=NavigateAction(goal_pose=standing_position),
                 holding_arms=[arm],
             ),
             face_and_look_at=FaceAndLookAtAction(
-                face_at=FaceAtAction(target=target_location),
-                look_at=LookAtAction(target=target_location),
+                face_at=FaceAtAction(target=goal_pose),
+                look_at=LookAtAction(target=goal_pose),
             ),
-            place=PlaceAction(arm=arm, target_pose=target_location),
+            place=PlaceAction(arm=arm, goal_pose=goal_pose),
         )
 
     def create_steps(self) -> list[StatechartNode]:
@@ -235,7 +235,7 @@ class MoveAndPickUpAction(SequentialAction):
         """
         object_pose = Pose(reference_frame=grasp.graspable.root)
         return cls(
-            navigate=NavigateAction(target_location=standing_position),
+            navigate=NavigateAction(goal_pose=standing_position),
             face_and_look_at=FaceAndLookAtAction(
                 face_at=FaceAtAction(target=object_pose),
                 look_at=LookAtAction(target=object_pose),
@@ -276,7 +276,7 @@ class MoveAndPickUpAction(SequentialAction):
             ),
         )
         return a(cls)(
-            navigate=a(NavigateAction)(target_location=standing_position),
+            navigate=a(NavigateAction)(goal_pose=standing_position),
             face_and_look_at=a(FaceAndLookAtAction)(
                 face_at=a(FaceAtAction)(target=object_pose),
                 look_at=a(LookAtAction)(target=object_pose),
@@ -330,7 +330,7 @@ class MoveAndOpenAction(SequentialAction):
         """
         handle_pose = Pose(reference_frame=grasp.graspable.root)
         return cls(
-            navigate=NavigateAction(target_location=standing_position),
+            navigate=NavigateAction(goal_pose=standing_position),
             face_and_look_at=FaceAndLookAtAction(
                 face_at=FaceAtAction(target=handle_pose),
                 look_at=LookAtAction(target=handle_pose),
@@ -370,7 +370,7 @@ class MoveAndOpenAction(SequentialAction):
             ),
         )
         return a(cls)(
-            navigate=a(NavigateAction)(target_location=standing_position),
+            navigate=a(NavigateAction)(goal_pose=standing_position),
             face_and_look_at=a(FaceAndLookAtAction)(
                 face_at=a(FaceAtAction)(target=handle_pose),
                 look_at=a(LookAtAction)(target=handle_pose),

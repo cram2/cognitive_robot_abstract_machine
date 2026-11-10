@@ -91,7 +91,7 @@ description = TransportAction(
     ),
     place=MoveAndPlaceAction.from_standing_position(
         standing_position=Pose2D.from_xy_yaw(x=1.64, y=3.24, reference_frame=world.root),
-        target_location=Pose.from_xyz_quaternion(
+        goal_pose=Pose.from_xyz_quaternion(
             2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root
         ),
         arm=pr2_view.left_arm,

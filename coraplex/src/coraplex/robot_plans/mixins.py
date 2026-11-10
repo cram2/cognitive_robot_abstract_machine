@@ -113,27 +113,15 @@ class HasToolParameter(DesignatorParameterMixin):
 
 
 @dataclass(kw_only=True, eq=False)
-class HasNavigationTargetParameter(DesignatorParameterMixin):
+class HasPlanarGoalPoseParameter(DesignatorParameterMixin):
     """
     Mixin for actions that drive the robot's base to a spot on the floor.
     """
 
-    target_location: Pose2D
+    goal_pose: Pose2D
     """
     Where the robot's base ends up on the floor, and which way the robot faces, given as
     the heading of the pose.
-    """
-
-
-@dataclass(kw_only=True, eq=False)
-class HasTargetPoseParameter(DesignatorParameterMixin):
-    """
-    Mixin for actions that bring something an arm moves to a pose.
-    """
-
-    target_pose: Pose
-    """
-    The pose the action brings what it moves to.
     """
 
 
@@ -528,7 +516,7 @@ class MovesToolCenterPoint(Action, HasPoseThresholdParameters, ABC):
         return CartesianPose(
             root_link=root,
             tip_link=tip,
-            goal=target,
+            goal_pose=target,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
         )

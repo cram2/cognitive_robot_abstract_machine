@@ -90,7 +90,7 @@ def _pick_up_the_milk(
     milk_pose = milk.root.global_pose
     return a(MoveAndPickUpAction)(
         navigate=a(NavigateAction)(
-            target_location=variable(
+            goal_pose=variable(
                 Pose2D,
                 domain=ReachabilityLocation(
                     Pose(reference_frame=milk.root),
@@ -116,7 +116,7 @@ def _place_at(target: Pose, extensions: list[ContextExtension]) -> MoveAndPlaceA
     return a(MoveAndPlaceAction)(
         carry=a(CarryAction)(
             navigate=a(NavigateAction)(
-                target_location=variable(
+                goal_pose=variable(
                     Pose2D,
                     domain=ReachabilityLocation(
                         target,
@@ -131,7 +131,7 @@ def _place_at(target: Pose, extensions: list[ContextExtension]) -> MoveAndPlaceA
             face_at=a(FaceAtAction)(target=target),
             look_at=a(LookAtAction)(target=target),
         ),
-        place=a(PlaceAction)(arm=robot.right_arm, target_pose=target),
+        place=a(PlaceAction)(arm=robot.right_arm, goal_pose=target),
     )
 
 
@@ -140,7 +140,7 @@ def _standing_positions(navigate: Match) -> ReachabilityLocation:
     :param navigate: The statement of a drive to where the robot stands.
     :return: The location the standing pose of `navigate` is sampled from.
     """
-    return navigate._kwargs_["target_location"]._domain_.domain
+    return navigate._kwargs_["goal_pose"]._domain_.domain
 
 
 def _transport_of_the_milk(
@@ -221,7 +221,7 @@ def pick_and_place_of_the_milk(world: World, arm: Arm) -> PickAndPlaceAction:
         ),
         place=a(PlaceAction)(
             arm=arm,
-            target_pose=Pose(reference_frame=world.root),
+            goal_pose=Pose(reference_frame=world.root),
         ),
     )
 
@@ -382,12 +382,12 @@ def _assert_each_standing_pose_keeps_the_closest_grasps(
     """
     pick_ups_by_standing_pose = {}
     for pick_up in pick_ups:
-        standing_position = pick_up.navigate.target_location
+        standing_position = pick_up.navigate.goal_pose
         pick_ups_by_standing_pose.setdefault(
             tuple(np.round(standing_position.to_np(), 6).ravel()), []
         ).append(pick_up)
     for pick_ups_from_one_pose in pick_ups_by_standing_pose.values():
-        standing_position = pick_ups_from_one_pose[0].navigate.target_location
+        standing_position = pick_ups_from_one_pose[0].navigate.goal_pose
         closest = {
             _grasp_signature(grasp)
             for grasp in GraspsByCloseness(
@@ -416,10 +416,10 @@ def _assert_each_standing_pose_tries_its_grasps_closest_first(
     world = graspable.root._world
     world_T_object = graspable.root.global_transform.to_np()
     for _, steps_from_one_pose in itertools.groupby(
-        steps, key=lambda step: id(step.navigate.target_location)
+        steps, key=lambda step: id(step.navigate.goal_pose)
     ):
         steps_from_one_pose = list(steps_from_one_pose)
-        standing_position = steps_from_one_pose[0].navigate.target_location
+        standing_position = steps_from_one_pose[0].navigate.goal_pose
         world_P_standing = world.transform(standing_position.pose, world.root).to_np()[
             :, 3
         ]
@@ -558,7 +558,7 @@ def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_gras
         )
     )
 
-    assert len({id(pick_up.navigate.target_location) for pick_up in pick_ups}) == 2
+    assert len({id(pick_up.navigate.goal_pose) for pick_up in pick_ups}) == 2
     _assert_each_standing_pose_keeps_the_closest_grasps(
         pick_ups, milk, GraspsByCloseness.number_of_grasps
     )
@@ -583,7 +583,7 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
         )
     )
 
-    assert len({id(pick_up.navigate.target_location) for pick_up in pick_ups}) == 2
+    assert len({id(pick_up.navigate.goal_pose) for pick_up in pick_ups}) == 2
     _assert_each_standing_pose_keeps_the_closest_grasps(
         pick_ups, milk, NON_DEFAULT_NUMBER_OF_GRASPS
     )
@@ -794,12 +794,12 @@ def test_a_move_and_place_from_a_standing_position_places_with_the_given_arm(
         standing_position, target, robot.left_arm
     )
 
-    assert move_and_place.carry.navigate.target_location is standing_position
+    assert move_and_place.carry.navigate.goal_pose is standing_position
     assert move_and_place.carry.holding_arms == [robot.left_arm]
     assert move_and_place.face_and_look_at.face_at.target is target
     assert move_and_place.face_and_look_at.look_at.target is target
     assert move_and_place.place.arm is robot.left_arm
-    assert move_and_place.place.target_pose is target
+    assert move_and_place.place.goal_pose is target
 
 
 def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
@@ -814,7 +814,7 @@ def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
         standing_position, grasp, robot.left_arm
     )
 
-    assert move_and_open.navigate.target_location is standing_position
+    assert move_and_open.navigate.goal_pose is standing_position
     assert move_and_open.open_container.grasp is grasp
     assert move_and_open.open_container.arm is robot.left_arm
 
@@ -889,7 +889,7 @@ def test_a_move_and_open_tries_the_grasps_from_each_standing_pose_closest_first(
         )
     )
 
-    assert len({id(opening.navigate.target_location) for opening in openings}) == 2
+    assert len({id(opening.navigate.goal_pose) for opening in openings}) == 2
     _assert_each_standing_pose_tries_its_grasps_closest_first(
         openings, lambda opening: opening.open_container.grasp, handle
     )
@@ -909,8 +909,7 @@ def _navigation_targets(action: Action) -> list[Pose]:
         of the actions it is built from.
     """
     return [
-        node.target_location
-        for node in action.statechart.get_nodes_by_type(NavigateAction)
+        node.goal_pose for node in action.statechart.get_nodes_by_type(NavigateAction)
     ]
 
 
@@ -930,7 +929,7 @@ def _placing_the_held_milk(
     _hold_the_milk(world, robot.left_arm)
     return MoveAndPlaceAction.from_standing_position(
         standing_position=_standing_pose(world),
-        target_location=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
+        goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
         arm=robot.left_arm,
     )
 
@@ -984,7 +983,7 @@ def test_facing_after_navigating_turns_where_the_robot_was_sent(
     target = Pose.from_xyz_rpy(4.0, 2.5, 0.9, reference_frame=world.root)
     plan = Sequence(
         nodes=[
-            NavigateAction(target_location=_standing_pose(world)),
+            NavigateAction(goal_pose=_standing_pose(world)),
             FaceAtAction(target=target),
         ]
     )
@@ -1005,7 +1004,7 @@ def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
     milk = world.get_semantic_annotations_by_type(Milk)[0].root
     plan = Sequence(
         nodes=[
-            NavigateAction(target_location=_standing_pose(world)),
+            NavigateAction(goal_pose=_standing_pose(world)),
             FaceAtAction(target=Pose(reference_frame=milk)),
         ]
     )
@@ -1021,7 +1020,7 @@ def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it
     target = Pose.from_xyz_rpy(4.0, 2.5, 0.9, reference_frame=world.root)
     plan = Sequence(
         nodes=[
-            NavigateAction(target_location=_standing_pose(world)),
+            NavigateAction(goal_pose=_standing_pose(world)),
             FaceAndLookAtAction(
                 face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
             ),

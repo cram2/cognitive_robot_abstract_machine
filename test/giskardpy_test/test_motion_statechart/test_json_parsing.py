@@ -69,7 +69,7 @@ def _create_executor(world: World) -> StatechartExecutor:
 def test_to_json_joint_position_list(mini_world):
     connection = mini_world.connections[0]
     node = JointPositionList(
-        goal=JointState.from_mapping({connection: 0.5}),
+        goal_state=JointState.from_mapping({connection: 0.5}),
         threshold=0.5,
     )
     json_data = to_json(node)
@@ -79,7 +79,7 @@ def test_to_json_joint_position_list(mini_world):
     node_copy = from_json(new_json_data, **tracker.create_kwargs())
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
-    assert node_copy.goal == node.goal
+    assert node_copy.goal_state == node.goal_state
 
 
 def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
@@ -87,7 +87,7 @@ def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
     node = CartesianPositionStraight(
         root_link=root,
         tip_link=tip,
-        goal=Point3(1, 0, 0, reference_frame=root),
+        goal_point=Point3(1, 0, 0, reference_frame=root),
     )
     new_json_data = json.loads(json.dumps(to_json(node)))
     tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
@@ -124,7 +124,7 @@ def test_executing_json_parsed_statechart(tmp_path):
 
     statechart = Statechart(context=_create_executor(world).context)
 
-    task1 = JointPositionList(goal=JointState.from_mapping({root_C_tip: 0.5}))
+    task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 0.5}))
     always_true = ConstTrueNode()
     statechart.add_node(always_true)
     statechart.add_node(task1)
@@ -171,7 +171,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     cart_goal = CartesianPose(
         root_link=root,
         tip_link=tip,
-        goal=tip_goal,
+        goal_pose=tip_goal,
     )
     statechart.add_node(cart_goal)
     end = EndMotion()
@@ -203,7 +203,9 @@ def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(
     statechart = Statechart(context=_create_executor(mini_world).context)
     statechart.add_nodes(
         [
-            task := JointPositionList(goal=JointState.from_mapping({connection: 0.5})),
+            task := JointPositionList(
+                goal_state=JointState.from_mapping({connection: 0.5})
+            ),
             monitor := LocalMinimumReached(),
             end := EndMotion.when_true(task),
         ]
@@ -258,7 +260,7 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
             mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                 MobileBase
             )[0],
-            goal=goal_pose,
+            goal_pose=goal_pose,
             threshold=0.05,
         )
     )
@@ -296,7 +298,9 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
             mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                 MobileBase
             )[0],
-            goal=Pose.from_xyz_rpy(x=1, reference_frame=cylinder_bot_diff_world.root),
+            goal_pose=Pose.from_xyz_rpy(
+                x=1, reference_frame=cylinder_bot_diff_world.root
+            ),
             threshold=0.05,
         )
     )
@@ -305,7 +309,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
             mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                 MobileBase
             )[0],
-            goal=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
+            goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
             threshold=0.05,
         )
     )

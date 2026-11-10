@@ -17,6 +17,7 @@ from cramph.node import (
 from giskardpy.motion_statechart.exceptions import RobotWithoutMobileBaseError
 from giskardpy.motion_statechart.graph_node import BindsGoalReferenceFrame
 from giskardpy.motion_statechart.mixins import (
+    HasGoalPoseParameter,
     HasThresholdParameter,
     HasWeightParameter,
 )
@@ -48,13 +49,15 @@ class MobileBasePoseGoal(ABC):
 
     @classmethod
     @abstractmethod
-    def moving_base_of(cls, robot: AbstractRobot, goal: Pose, threshold: float) -> Self:
+    def moving_base_of(
+        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
+    ) -> Self:
         """
-        :param robot: The robot whose base is put at `goal`.
-        :param goal: Where the root of `robot` should end up.
-        :param threshold: How far the base may be from `goal`, in meters and in
+        :param robot: The robot whose base is put at `goal_pose`.
+        :param goal_pose: Where the root of `robot` should end up.
+        :param threshold: How far the base may be from `goal_pose`, in meters and in
             radians, to count as arrived.
-        :return: A new node putting the base of `robot` at `goal`.
+        :return: A new node putting the base of `robot` at `goal_pose`.
         """
 
 
@@ -67,14 +70,15 @@ class DrivenBaseGoal(
     FailsOnObservingFalse,
     CompositeNode,
     MobileBasePoseGoal,
-    BindsGoalReferenceFrame[Pose],
+    BindsGoalReferenceFrame,
+    HasGoalPoseParameter,
     HasWeightParameter,
     HasThresholdParameter,
     ABC,
 ):
     """
     Drives a base along the floor and turns it about the vertical until it stands below
-    :attr:`goal`, facing its way. Its threshold holds in meters and in radians.
+    :attr:`goal_pose`, facing its way. Its threshold holds in meters and in radians.
 
     The base is moved relative to the body it is attached to, as it is whenever the
     tasks are built, so the goal follows a base moved under another parent while the
@@ -95,6 +99,10 @@ class DrivenBaseGoal(
     created by :meth:`expand` and sent along with this goal once it expanded, since the
     tasks of :attr:`motion` are expressed over it.
     """
+
+    @property
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        return self.goal_pose.reference_frame
 
     @property
     def driven_body(self) -> KinematicStructureEntity:
@@ -119,7 +127,9 @@ class DrivenBaseGoal(
         """
 
     @classmethod
-    def moving_base_of(cls, robot: AbstractRobot, goal: Pose, threshold: float) -> Self:
+    def moving_base_of(
+        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
+    ) -> Self:
         """
         Differs from :meth:`MobileBasePoseGoal.moving_base_of` in requiring `robot` to
         have a mobile base.
@@ -128,7 +138,9 @@ class DrivenBaseGoal(
         """
         if not isinstance(robot, HasMobileBase) or robot.mobile_base is None:
             raise RobotWithoutMobileBaseError(robot=robot)
-        return cls(mobile_base=robot.mobile_base, goal=goal, threshold=threshold)
+        return cls(
+            mobile_base=robot.mobile_base, goal_pose=goal_pose, threshold=threshold
+        )
 
     @property
     def _drive_parent(self) -> KinematicStructureEntity:
@@ -161,7 +173,7 @@ class DrivenBaseGoal(
         self._create_motion(
             dict(
                 driven_body=self.driven_body,
-                goal=self.goal,
+                goal_pose=self.goal_pose,
                 parent_T_goal_reference_frame=self.root_T_goal_reference_frame,
                 weight=self.weight,
                 threshold=self.threshold,

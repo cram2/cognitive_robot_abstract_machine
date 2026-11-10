@@ -160,7 +160,7 @@ class OpenAction(MovesContainerByItsHandle):
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
             environment_link=self.grasp.graspable.root,
-            goal=self.mechanism.dof.limits.upper.position,
+            goal_position=self.mechanism.dof.limits.upper.position,
         )
 
 
@@ -180,5 +180,5 @@ class CloseAction(MovesContainerByItsHandle):
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
             environment_link=self.grasp.graspable.root,
-            goal=self.closed_joint_position,
+            goal_position=self.closed_joint_position,
         )

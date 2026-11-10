@@ -13,8 +13,8 @@ from giskardpy.motion_statechart.binding_policy import ForwardKinematicsBinding
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.mixins import (
-    HasGoalParameter,
     HasCruiseVelocityParameter,
+    HasGoalPoseParameter,
 )
 from giskardpy.motion_statechart.weights import VelocityScale
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -34,11 +34,11 @@ from semantic_digital_twin.world_description.world_entity import (
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class DrivenBaseTask(
-    ConvergingTask, HasGoalParameter[Pose], HasCruiseVelocityParameter, ABC
+    ConvergingTask, HasGoalPoseParameter, HasCruiseVelocityParameter, ABC
 ):
     """
-    Moves the base a drive carries towards :attr:`goal`, relative to the parent of the
-    drive as it is whenever the task is built.
+    Moves the base a drive carries towards :attr:`goal_pose`, relative to the parent of
+    the drive as it is whenever the task is built.
 
     A base moved under another parent while the statechart runs is therefore driven
     relative to that parent, and the joints above the drive are never moved for it.
@@ -51,8 +51,8 @@ class DrivenBaseTask(
 
     parent_T_goal_reference_frame: HomogeneousTransformationMatrix
     """
-    The pose of the reference frame of :attr:`goal` relative to the parent of the drive,
-    as the goal running this task fixed it.
+    The pose of the reference frame of :attr:`goal_pose` relative to the parent of the
+    drive, as the goal running this task fixed it.
     """
 
     @property
@@ -65,9 +65,9 @@ class DrivenBaseTask(
     @property
     def parent_T_goal(self) -> Pose:
         """
-        :return: :attr:`goal` relative to :attr:`drive_parent`.
+        :return: :attr:`goal_pose` relative to :attr:`drive_parent`.
         """
-        parent_T_goal = self.parent_T_goal_reference_frame @ self.goal
+        parent_T_goal = self.parent_T_goal_reference_frame @ self.goal_pose
         parent_T_goal.reference_frame = self.drive_parent
         return parent_T_goal
 
@@ -84,8 +84,8 @@ class DrivenBaseTask(
 @dataclass(eq=False, repr=False, kw_only=True)
 class BasePosition(DrivenBaseTask):
     """
-    Drives the base along the floor to below the position of :attr:`goal`, with an error
-    in meters.
+    Drives the base along the floor to below the position of :attr:`goal_pose`, with an
+    error in meters.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -159,7 +159,7 @@ class DrivenBaseRotation(DrivenBaseTask, ABC):
 @dataclass(eq=False, repr=False, kw_only=True)
 class BaseOrientation(DrivenBaseRotation):
     """
-    Turns the base to the orientation of :attr:`goal`.
+    Turns the base to the orientation of :attr:`goal_pose`.
     """
 
     def parent_R_goal(
@@ -171,8 +171,8 @@ class BaseOrientation(DrivenBaseRotation):
 @dataclass(eq=False, repr=False, kw_only=True)
 class BaseHeading(DrivenBaseRotation):
     """
-    Turns the front of the base towards the position of :attr:`goal`, from wherever the
-    base is.
+    Turns the front of the base towards the position of :attr:`goal_pose`, from wherever
+    the base is.
     """
 
     def parent_R_goal(
@@ -194,7 +194,7 @@ class BaseHeading(DrivenBaseRotation):
         """
         :param parent_T_base: The pose of the base relative to the drive's parent.
         :return: The point relative to the drive's parent the base faces the position of
-            :attr:`goal` from.
+            :attr:`goal_pose` from.
         """
         return parent_T_base.position
 
@@ -202,9 +202,9 @@ class BaseHeading(DrivenBaseRotation):
 @dataclass(eq=False, repr=False, kw_only=True)
 class BaseTurnTowardsGoalPosition(BaseHeading):
     """
-    Turns the front of the base towards the position of :attr:`goal`, as seen from where
-    the base stood when the task started, so that driving does not bring the base closer
-    to facing it.
+    Turns the front of the base towards the position of :attr:`goal_pose`, as seen from
+    where the base stood when the task started, so that driving does not bring the base
+    closer to facing it.
     """
 
     _parent_T_start_binding: ForwardKinematicsBinding = field(init=False, repr=False)

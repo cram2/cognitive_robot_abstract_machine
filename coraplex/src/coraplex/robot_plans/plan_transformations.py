@@ -221,7 +221,7 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
         for drawer in self._closed_drawers_containing(graspable, plan_node.world):
             nodes.extend(self.opening_nodes(drawer, plan_node.arm, plan_node.context))
         drive_to_the_object = a(NavigateAction)(
-            target_location=variable(
+            goal_pose=variable(
                 Pose2D,
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.

@@ -35,7 +35,7 @@ def simple_plan(pr2_apartment_context):
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose2D.from_xy_yaw(1.6, 1.9, reference_frame=world.root)
+                goal_pose=Pose2D.from_xy_yaw(1.6, 1.9, reference_frame=world.root)
             ),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(arms=robot_view.all_arms),
@@ -121,7 +121,7 @@ def complex_plan(pr2_apartment_context):
             standing_position=Pose2D.from_xy_yaw(
                 x=1.8, y=2.54, reference_frame=world.root
             ),
-            target_location=Pose.from_xyz_quaternion(
+            goal_pose=Pose.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             arm=robot_view.left_arm,

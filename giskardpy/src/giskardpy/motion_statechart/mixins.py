@@ -7,21 +7,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Generic, TypeVar
-
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-
-GoalType = TypeVar("GoalType")
-"""
-The type of what a node drives towards.
-"""
 
 # %% links of the kinematic chain
 
@@ -76,14 +70,62 @@ class HasWeightParameter:
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalParameter(Generic[GoalType], SubClassSafeGeneric):
+class HasGoalPoseParameter:
     """
-    A node driving something towards a goal.
+    A node bringing something to a pose.
     """
 
-    goal: GoalType
+    goal_pose: Pose
     """
-    What this node drives towards.
+    The pose this node brings what it moves to.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasGoalPointParameter:
+    """
+    A node bringing the tip of a kinematic chain to a point, or aiming it at one.
+    """
+
+    goal_point: Point3
+    """
+    The point the tip is brought to or aimed at.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasGoalPointsParameter:
+    """
+    A node moving the tip of a kinematic chain along a sequence of points.
+    """
+
+    goal_points: list[Point3]
+    """
+    The points the tip passes in order, all in one reference frame, ending at the last.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasGoalOrientationParameter:
+    """
+    A node turning the tip of a kinematic chain to an orientation.
+    """
+
+    goal_orientation: RotationMatrix
+    """
+    The orientation the tip is turned to.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class HasGoalStateParameter:
+    """
+    A node moving joints to positions of their own.
+    """
+
+    goal_state: JointState
+    """
+    The position each joint is moved to.
     """
 
 

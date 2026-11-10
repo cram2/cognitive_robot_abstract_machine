@@ -638,7 +638,7 @@ def test_pointing(pr2_world_state_reset: World):
     pointing = Pointing(
         root_link=root,
         tip_link=tip,
-        goal=goal_point,
+        goal_point=goal_point,
         pointing_axis=pointing_axis,
     )
     statechart.add_node(pointing)
@@ -686,7 +686,7 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     pointing = Pointing(
         root_link=base,
         tip_link=head,
-        goal=goal_point,
+        goal_point=goal_point,
         pointing_axis=Vector3.X(reference_frame=head),
     )
     statechart.add_node(pointing)
@@ -739,10 +739,12 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     pointing = Pointing(
         root_link=base,
         tip_link=head,
-        goal=world_T_region.position,
+        goal_point=world_T_region.position,
         pointing_axis=Vector3.X(reference_frame=head),
     )
-    region_goal = JointPositionList(goal=JointState.from_mapping({region_joint: 0.8}))
+    region_goal = JointPositionList(
+        goal_state=JointState.from_mapping({region_joint: 0.8})
+    )
     statechart.add_node(both := Parallel(nodes=[pointing, region_goal]))
     end = EndMotion()
     end.start_condition = both.observes_true
@@ -778,7 +780,7 @@ def test_pointing_cone(pr2_world_state_reset: World):
     pointing_cone = PointingCone(
         root_link=root,
         tip_link=tip,
-        goal=goal_point,
+        goal_point=goal_point,
         pointing_axis=pointing_axis,
         cone_theta=cone_theta,
     )
@@ -1082,7 +1084,7 @@ class TestArticulateGraspedMechanism:
             open_goal := ArticulateGraspedMechanism(
                 environment_link=prismatic_bot2.get_body_by_name("robot"),
                 tip_link=prismatic_bot2.get_body_by_name("robot2"),
-                goal=0.0,
+                goal_position=0.0,
             )
         )
         executor.compile(statechart=motion_statechart)
@@ -1147,7 +1149,7 @@ class TestArticulateGraspedMechanism:
                         CartesianPose(
                             root_link=pr2_world_copy.root,
                             tip_link=r_tip,
-                            goal=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
                             ),
                         ),
@@ -1156,7 +1158,7 @@ class TestArticulateGraspedMechanism:
                                 ArticulateGraspedMechanism(
                                     tip_link=r_tip,
                                     environment_link=handle,
-                                    goal=open_goal,
+                                    goal_position=open_goal,
                                 ),
                                 JointPositionReached(
                                     connection=root_C_hinge,
@@ -1170,7 +1172,7 @@ class TestArticulateGraspedMechanism:
                                 ArticulateGraspedMechanism(
                                     tip_link=r_tip,
                                     environment_link=handle,
-                                    goal=close_goal,
+                                    goal_position=close_goal,
                                 ),
                                 JointPositionReached(
                                     connection=root_C_hinge,
@@ -1232,14 +1234,14 @@ class TestArticulateGraspedMechanism:
                     CartesianPose(
                         root_link=world.root,
                         tip_link=tip,
-                        goal=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                             yaw=np.pi, reference_frame=handle.root
                         ),
                     ),
                     opening := ArticulateGraspedMechanism(
                         tip_link=tip,
                         environment_link=handle.root,
-                        goal=open_position,
+                        goal_position=open_position,
                     ),
                 ]
             )
@@ -1322,14 +1324,14 @@ class TestArticulateGraspedMechanism:
                         CartesianPose(
                             root_link=pr2_world_copy.root,
                             tip_link=r_tip,
-                            goal=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 reference_frame=cap_body
                             ),
                         ),
                         open := ArticulateGraspedMechanism(
                             tip_link=r_tip,
                             environment_link=cap_body,
-                            goal=unscrew_goal,
+                            goal_position=unscrew_goal,
                         ),
                     ]
                 ),
@@ -1368,7 +1370,7 @@ class TestArticulateGraspedMechanism:
                 close := ArticulateGraspedMechanism(
                     tip_link=r_tip,
                     environment_link=cap_body,
-                    goal=tightened_goal_joint_state,
+                    goal_position=tightened_goal_joint_state,
                 ),
             ]
         )
@@ -1408,7 +1410,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal=0.0,
+            goal_position=0.0,
         )
 
         nodes = self._expanded_nodes(goal, prismatic_bot)
@@ -1430,7 +1432,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal=0.0,
+            goal_position=0.0,
             mechanism_weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             grasp_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
@@ -1457,7 +1459,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=end_effector.tool_frame,
             environment_link=pr2_world_copy.get_body_by_name("torso_lift_link"),
-            goal=0.0,
+            goal_position=0.0,
             holding_end_effector=end_effector,
         )
 
@@ -1480,7 +1482,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=prismatic_bot.get_body_by_name("robot"),
-            goal=0.0,
+            goal_position=0.0,
         )
 
         Statechart(context=create_context_with_motion_control(prismatic_bot)).add_node(
@@ -1505,12 +1507,12 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal=within_limits,
+            goal_position=within_limits,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal == within_limits
+        assert goal.goal_position == within_limits
 
     def test_a_goal_beyond_the_upper_limit_is_clamped_to_it(self, prismatic_bot):
         """
@@ -1521,21 +1523,21 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal=1e3,
+            goal_position=1e3,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal == goal.connection.dof.limits.upper.position
+        assert goal.goal_position == goal.connection.dof.limits.upper.position
 
     def test_a_goal_below_the_lower_limit_is_clamped_to_it(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal=-1e3,
+            goal_position=-1e3,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal == goal.connection.dof.limits.lower.position
+        assert goal.goal_position == goal.connection.dof.limits.lower.position

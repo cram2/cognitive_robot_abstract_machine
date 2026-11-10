@@ -23,7 +23,6 @@ from coraplex.robot_plans.mixins import (
     HasArmParameter,
     HasGripperCollisionParameter,
     HasGripperConfigurationParameter,
-    HasTargetPoseParameter,
     HasTorsoStateParameter,
     MovesToolCenterPoint,
     OperatesGripper,
@@ -32,6 +31,7 @@ from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.mixins import (
+    HasGoalPoseParameter,
     HasJointVelocityLimitParameter,
     HasThresholdParameter,
     HasTwoFingerGripperParameters,
@@ -56,7 +56,7 @@ class MoveTorsoAction(SequentialAction, HasTorsoStateParameter):
 
     def create_steps(self) -> list[StatechartNode]:
         joint_state = self.robot.get_torso().get_joint_state_by_type(self.torso_state)
-        return [JointPositionList(goal=joint_state)]
+        return [JointPositionList(goal_state=joint_state)]
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -130,7 +130,7 @@ class ParkArmsAction(ParallelAction, HasJointVelocityLimitParameter):
 
     def create_steps(self) -> list[StatechartNode]:
         park_state = self.park_joint_state()
-        joint_goal = JointPositionList(goal=park_state)
+        joint_goal = JointPositionList(goal_state=park_state)
         if self.max_joint_velocity is None:
             return [joint_goal]
         return [
@@ -193,7 +193,7 @@ class FollowToolCenterPointPathAction(
         return CartesianPose(
             root_link=self.controlled_root,
             tip_link=self.arm.end_effector.tool_frame,
-            goal=target,
+            goal_pose=target,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
         )
@@ -211,11 +211,11 @@ class MoveManipulatorAction(
     MovesToolCenterPoint,
     GoalAction,
     HasArmParameter,
-    HasTargetPoseParameter,
+    HasGoalPoseParameter,
     HasGripperCollisionParameter,
 ):
     """
-    Move the end effector of :attr:`arm` to :attr:`target_pose`.
+    Move the end effector of :attr:`arm` to :attr:`goal_pose`.
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -231,7 +231,7 @@ class MoveManipulatorAction(
         goal = CartesianPose(
             root_link=self.controlled_root,
             tip_link=self.arm.end_effector.tool_frame,
-            goal=self.target_pose,
+            goal_pose=self.goal_pose,
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
             binding_policy=GoalBindingPolicy.Bind_on_start,

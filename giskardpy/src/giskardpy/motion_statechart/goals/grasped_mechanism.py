@@ -13,7 +13,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.mixins import HasGoalParameter, HasTipLinkParameter
+from giskardpy.motion_statechart.mixins import HasTipLinkParameter
 from cramph.node import CompositeNode, NodeArtifacts
 from giskardpy.motion_statechart.goals.collision_avoidance import (
     UpdateTemporaryCollisionRules,
@@ -26,17 +26,13 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ArticulateGraspedMechanism(
-    EndedByOwner, CompositeNode, HasTipLinkParameter, HasGoalParameter[float]
-):
+class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParameter):
     """
     Drive the degree of freedom of a 1-dof mechanism in an environment to a position
     while keeping the end effector fixed relative to the grasped part. The mechanism
     moves only as fast as the end effector can move with it.
 
-    :attr:`goal` is the position the degree of freedom is driven to, clamped to its
-    limits once this goal expands, and :attr:`tip_link` is the end effector grasping the
-    part.
+    :attr:`tip_link` is the end effector grasping the part.
 
     Assumes that the grasped part (e.g. a handle or a bottle cap) has already been
     grasped. Works with any mechanism whose grasped part hangs below an
@@ -48,6 +44,12 @@ class ArticulateGraspedMechanism(
     environment_link: KinematicStructureEntity
     """
     Name of the handle that was grasped.
+    """
+
+    goal_position: float
+    """
+    The position the degree of freedom is driven to, in rad or m; clamped to its limits
+    once this goal expands.
     """
 
     holding_end_effector: EndEffector | None = None
@@ -81,8 +83,8 @@ class ArticulateGraspedMechanism(
             ActiveConnection1DOF
         )
         limits = self.connection.dof.limits
-        self.goal = float(
-            np.clip(self.goal, limits.lower.position, limits.upper.position)
+        self.goal_position = float(
+            np.clip(self.goal_position, limits.lower.position, limits.upper.position)
         )
 
         allowances = []
@@ -97,14 +99,16 @@ class ArticulateGraspedMechanism(
                 *allowances,
                 JointPositionList(
                     name="hinge goal",
-                    goal=JointState.from_mapping({self.connection: self.goal}),
+                    goal_state=JointState.from_mapping(
+                        {self.connection: self.goal_position}
+                    ),
                     weight=self.mechanism_weight,
                 ),
                 CartesianPose(
                     name="hold handle",
                     root_link=self.environment_link,
                     tip_link=self.tip_link,
-                    goal=Pose(reference_frame=self.tip_link),
+                    goal_pose=Pose(reference_frame=self.tip_link),
                     weight=self.grasp_weight,
                 ),
                 RigidCoupling(

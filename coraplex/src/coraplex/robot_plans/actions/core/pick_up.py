@@ -293,7 +293,7 @@ class FixateObjectAction(ParallelAction):
                 name="Keep the gripper in place",
                 root_link=self.world.root,
                 tip_link=tool_frame,
-                goal=Pose(reference_frame=tool_frame),
+                goal_pose=Pose(reference_frame=tool_frame),
                 # Holding on has to matter more than keeping clear of what is held.
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             )

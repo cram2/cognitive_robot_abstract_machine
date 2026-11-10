@@ -191,7 +191,7 @@ class ToolMotionAction(
         trajectory = CartesianPositionTrajectory(
             root_link=root,
             tip_link=tip,
-            goal=self._waypoints,
+            goal_points=self._waypoints,
             maximum_skip_ahead=self.maximum_skip_ahead,
             weight=float(DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE),
             threshold=self.position_threshold,

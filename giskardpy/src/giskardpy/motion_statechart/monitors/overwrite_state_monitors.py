@@ -68,14 +68,16 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
     """
 
     @classmethod
-    def moving_base_of(cls, robot: AbstractRobot, goal: Pose, threshold: float) -> Self:
+    def moving_base_of(
+        cls, robot: AbstractRobot, goal_pose: Pose, threshold: float
+    ) -> Self:
         """
         Differs from :meth:`MobileBasePoseGoal.moving_base_of` in setting the odometry
         of the drive attaching `robot` to its parent, which puts the base exactly at
-        `goal` at once, so `threshold` is ignored.
+        `goal_pose` at once, so `threshold` is ignored.
         """
         return cls(
-            base_pose=goal.homogeneous_matrix,
+            base_pose=goal_pose.homogeneous_matrix,
             odom_connection=robot.root.parent_connection,
         )
 

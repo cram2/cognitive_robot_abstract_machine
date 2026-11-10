@@ -188,7 +188,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                                 CartesianPosition(
                                     root_link=root_link,
                                     tip_link=hpl,
-                                    goal=Point3(
+                                    goal_point=Point3(
                                         x=0.5, z=0.4, reference_frame=root_link
                                     ),
                                     weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,

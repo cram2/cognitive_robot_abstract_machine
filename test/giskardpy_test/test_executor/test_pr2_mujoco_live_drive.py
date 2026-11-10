@@ -58,7 +58,9 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
         yaw=Rotation.from_matrix(world_T_start[:3, :3]).as_euler("xyz")[2] + 0.5,
         reference_frame=world.root,
     )
-    drive_to_goal = CartesianPose(root_link=world.root, tip_link=pr2.root, goal=goal)
+    drive_to_goal = CartesianPose(
+        root_link=world.root, tip_link=pr2.root, goal_pose=goal
+    )
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:

@@ -33,10 +33,14 @@ from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from giskardpy.motion_statechart.mixins import (
-    GoalType,
     HasAngularVelocityLimitParameter,
     HasFingerStallToleranceParameters,
-    HasGoalParameter,
+    HasGoalBindingPolicyParameter,
+    HasGoalOrientationParameter,
+    HasGoalPointParameter,
+    HasGoalPointsParameter,
+    HasGoalPoseParameter,
+    HasGoalStateParameter,
     HasJointVelocityLimitParameter,
     HasKinematicChainParameters,
     HasLinearVelocityLimitParameter,
@@ -49,7 +53,13 @@ from giskardpy.motion_statechart.mixins import (
     HasTwoFingerGripperParameters,
     HasWeightParameter,
 )
-from giskardpy.motion_statechart.monitors.cartesian_monitors import VectorsAligned
+from giskardpy.motion_statechart.monitors.cartesian_monitors import (
+    OrientationReached,
+    PointingAt,
+    PoseReached,
+    PositionReached,
+    VectorsAligned,
+)
 from giskardpy.motion_statechart.monitors.feature_monitors import (
     AngleMonitor,
     DistanceMonitor,
@@ -85,9 +95,8 @@ from giskardpy.motion_statechart.tasks.pointing import Pointing, PointingCone
 from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulability
 from giskardpy.motion_statechart.tasks.wiggle_insert import WiggleInsert
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -185,11 +194,7 @@ def test_only_the_kinematic_chain_combines_parameter_mixins():
 @pytest.mark.parametrize(
     "retired_name",
     [
-        "goal_point",
-        "goal_points",
-        "goal_orientation",
-        "goal_pose",
-        "goal_state",
+        "goal",
         "goal_joint_state",
         "goal_normal",
         "manipulability_threshold",
@@ -205,8 +210,7 @@ def test_only_the_kinematic_chain_combines_parameter_mixins():
 def test_one_concept_has_one_name(retired_name: str):
     nodes_with_retired_name = [
         cls
-        for package in (tasks, goals)
-        for cls in _classes_defined_in(package)
+        for cls in _node_classes()
         if retired_name in {field.name for field in dataclasses.fields(cls)}
     ]
     assert nodes_with_retired_name == []
@@ -290,25 +294,78 @@ def test_every_node_taking_a_root_and_a_tip_link_takes_them_as_a_kinematic_chain
 
 
 @pytest.mark.parametrize(
-    "node_class, goal_type",
+    "node_class, mixin",
     [
-        (CartesianPosition, Point3),
-        (CartesianOrientation, RotationMatrix),
-        (CartesianPositionTrajectory, list[Point3]),
-        (Pointing, Point3),
-        (PointingCone, Point3),
-        (CartesianPose, Pose),
-        (CartesianPoseStraight, Pose),
-        (HolonomicBaseGoal, Pose),
-        (JointPositionList, JointState),
-        (MoveFingersToJointState, JointState),
-        (ArticulateGraspedMechanism, float),
-        (MaxManipulability, float),
+        (CartesianPosition, HasGoalPointParameter),
+        (Pointing, HasGoalPointParameter),
+        (PointingCone, HasGoalPointParameter),
+        (CartesianOrientation, HasGoalOrientationParameter),
+        (CartesianPositionTrajectory, HasGoalPointsParameter),
+        (CartesianPose, HasGoalPoseParameter),
+        (CartesianPoseStraight, HasGoalPoseParameter),
+        (HolonomicBaseGoal, HasGoalPoseParameter),
+        (JointPositionList, HasGoalStateParameter),
+        (MoveFingersToJointState, HasGoalStateParameter),
     ],
 )
-def test_a_node_binds_the_type_of_its_goal(node_class: type, goal_type: object):
-    assert issubclass(node_class, HasGoalParameter)
-    assert node_class.get_type_of_generic_parameter(GoalType) == goal_type
+def test_a_goal_comes_from_the_mixin_of_its_kind(node_class: type, mixin: type):
+    assert issubclass(node_class, mixin)
+
+
+def _goal_mixins_of(node_class: type) -> set[type]:
+    """
+    :return: The mixins of the goals `node_class` takes.
+    """
+    return {
+        mixin
+        for mixin in (
+            HasGoalPointParameter,
+            HasGoalPointsParameter,
+            HasGoalOrientationParameter,
+            HasGoalPoseParameter,
+            HasGoalStateParameter,
+        )
+        if issubclass(node_class, mixin)
+    }
+
+
+@pytest.mark.parametrize(
+    "task, monitor",
+    [
+        (CartesianPose, PoseReached),
+        (CartesianPosition, PositionReached),
+        (CartesianOrientation, OrientationReached),
+        (Pointing, PointingAt),
+    ],
+)
+def test_a_monitor_takes_its_goal_as_its_task_does(task: type, monitor: type):
+    assert _goal_mixins_of(monitor) == _goal_mixins_of(task)
+
+
+@pytest.mark.parametrize(
+    "task, monitor",
+    [
+        (CartesianPose, PoseReached),
+        (CartesianPosition, PositionReached),
+        (CartesianOrientation, OrientationReached),
+    ],
+)
+def test_a_monitor_reads_its_goal_frame_as_its_task_does(task: type, monitor: type):
+    assert issubclass(monitor, HasGoalBindingPolicyParameter) == issubclass(
+        task, HasGoalBindingPolicyParameter
+    )
+
+
+def test_a_manipulability_goal_names_what_it_drives_towards():
+    assert "goal_manipulability" in {
+        field.name for field in dataclasses.fields(MaxManipulability)
+    }
+
+
+def test_a_grasped_mechanism_names_the_position_it_drives_to():
+    assert "goal_position" in {
+        field.name for field in dataclasses.fields(ArticulateGraspedMechanism)
+    }
 
 
 def test_the_goal_reference_frame_is_the_frame_of_the_goal():
@@ -316,7 +373,7 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
     task = CartesianPosition(
         root_link=Body(name=PrefixedName("root")),
         tip_link=Body(name=PrefixedName("tip")),
-        goal=Point3(reference_frame=goal_frame),
+        goal_point=Point3(reference_frame=goal_frame),
     )
     assert task.goal_reference_frame is goal_frame
 
@@ -324,8 +381,8 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
 def test_nodes_with_generic_parameters_are_told_apart_by_identity():
     root, tip = Body(name=PrefixedName("root")), Body(name=PrefixedName("tip"))
     goal = Point3(reference_frame=root)
-    first = CartesianPosition(root_link=root, tip_link=tip, goal=goal)
-    second = CartesianPosition(root_link=root, tip_link=tip, goal=goal)
+    first = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal)
+    second = CartesianPosition(root_link=root, tip_link=tip, goal_point=goal)
     assert first != second
     assert len({first, second}) == 2
 

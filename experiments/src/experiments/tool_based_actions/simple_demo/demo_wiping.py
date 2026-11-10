@@ -52,7 +52,7 @@ def main() -> None:
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                target_location=Pose2D.from_xy_yaw(
+                goal_pose=Pose2D.from_xy_yaw(
                     *BASE_POSITION_XYZ[:2], reference_frame=world.root
                 )
             ),

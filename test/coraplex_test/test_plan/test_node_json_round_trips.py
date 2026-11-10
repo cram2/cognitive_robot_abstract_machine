@@ -184,7 +184,7 @@ def _whole_scene(world: World) -> VolumetricBoundingBox:
 
 
 def _navigate(world: World) -> NavigateAction:
-    return NavigateAction(target_location=Pose2D.from_pose(_pose(world)))
+    return NavigateAction(goal_pose=Pose2D.from_pose(_pose(world)))
 
 
 def _face_and_look_at(world: World) -> FaceAndLookAtAction:
@@ -202,7 +202,7 @@ def _place(world: World) -> PlaceAction:
     """
     :return: A place with the arm of `world`, which has to follow :func:`_pick_up`.
     """
-    return PlaceAction(arm=_arm(world), target_pose=_pose(world))
+    return PlaceAction(arm=_arm(world), goal_pose=_pose(world))
 
 
 def _move_and_pick_up(world: World) -> MoveAndPickUpAction:
@@ -297,7 +297,7 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             MoveManipulatorAction,
             lambda world: [
                 MoveManipulatorAction(
-                    target_pose=_pose(world),
+                    goal_pose=_pose(world),
                     arm=_arm(world),
                     allow_gripper_collision=False,
                 )
@@ -332,9 +332,7 @@ def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
         ActionRoundTripCase(
             PathPlanningNavigateAction,
             lambda world: [
-                PathPlanningNavigateAction(
-                    target_location=Pose2D.from_pose(_pose(world))
-                )
+                PathPlanningNavigateAction(goal_pose=Pose2D.from_pose(_pose(world)))
             ],
         ),
         ActionRoundTripCase(

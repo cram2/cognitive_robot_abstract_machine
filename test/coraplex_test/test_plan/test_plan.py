@@ -66,7 +66,7 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     )
 
     navigate_action = a(NavigateAction)(
-        target_location=target_location,
+        goal_pose=target_location,
     )
     # navigate_action.resolve()
 

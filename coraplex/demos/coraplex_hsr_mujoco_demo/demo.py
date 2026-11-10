@@ -210,10 +210,10 @@ class MilkTransportDemonstration(RobotDemonstration):
                 nodes=[
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     ParkArmsAction(arms=hsrb.all_arms),
-                    NavigateAction(target_location=taking_pose),
+                    NavigateAction(goal_pose=taking_pose),
                     PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
-                    NavigateAction(target_location=self._standing_pose_facing(target)),
-                    PlaceAction(arm=arm, target_pose=target),
+                    NavigateAction(goal_pose=self._standing_pose_facing(target)),
+                    PlaceAction(arm=arm, goal_pose=target),
                     ParkArmsAction(arms=hsrb.all_arms),
                 ]
             )

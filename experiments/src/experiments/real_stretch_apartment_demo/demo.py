@@ -175,7 +175,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
@@ -184,7 +184,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        target_location=Pose2D.from_xy_yaw(
+                        goal_pose=Pose2D.from_xy_yaw(
                             x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                         )
                     )
@@ -204,13 +204,13 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
                 PlaceAction(
                     arm=arm,
-                    target_pose=Pose.from_xyz_rpy(
+                    goal_pose=Pose.from_xyz_rpy(
                         x=0.1,
                         z=0.56,
                         yaw=np.pi,
@@ -224,7 +224,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
@@ -233,7 +233,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        target_location=Pose2D.from_xy_yaw(
+                        goal_pose=Pose2D.from_xy_yaw(
                             x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                         )
                     )
@@ -255,14 +255,14 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    target_location=Pose2D.from_xy_yaw(
+                    goal_pose=Pose2D.from_xy_yaw(
                         x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
                 StatementNode(
                     statement=a(PlaceAction)(
                         arm=arm,
-                        target_pose=CEREAL_SHELF_LAYER_T_CEREAL.pose,
+                        goal_pose=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                     )
                 ),
                 ParkArmsAction(arms=robot.all_arms),

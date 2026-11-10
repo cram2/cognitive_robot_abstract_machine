@@ -233,7 +233,9 @@ def tool_center_point_goal(
         tip_link=(
             left_or_only_arm(robot) if arm is None else arm
         ).end_effector.tool_frame,
-        goal=(Pose(reference_frame=robot._world.root) if target is None else target),
+        goal_pose=(
+            Pose(reference_frame=robot._world.root) if target is None else target
+        ),
     )
 
 

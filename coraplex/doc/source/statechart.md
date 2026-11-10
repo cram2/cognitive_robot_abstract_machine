@@ -22,7 +22,7 @@ statechart:
 ```python
 from cramph.composites import Sequence
 
-plan = Sequence(nodes=[ParkArmsAction(arms=robot.all_arms), NavigateAction(target_location=target_pose)])
+plan = Sequence(nodes=[ParkArmsAction(arms=robot.all_arms), NavigateAction(goal_pose=target_pose)])
 ```
 
 ## How the statechart is shaped

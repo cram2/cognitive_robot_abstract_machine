@@ -40,9 +40,7 @@ def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose2D.from_xy_yaw(
-                    x=1, y=-1, reference_frame=copy_world.root
-                )
+                goal_pose=Pose2D.from_xy_yaw(x=1, y=-1, reference_frame=copy_world.root)
             )
         ]
     )
