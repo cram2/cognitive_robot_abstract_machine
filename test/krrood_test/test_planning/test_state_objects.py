@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from krrood.entity_query_language.factories import a, literal, variable
+from krrood.entity_query_language.factories import a, literal, variable, variable_from
 from krrood.planning.state import State
 
 from ..dataset.objects_created_for_a_state import PlannedFixedConnection
@@ -181,8 +181,8 @@ def test_removed_object_leaves_the_collections_the_state_assigns(
     assert result == [*kept, planned]
 
 
-def test_removed_object_stays_in_a_captured_list(planned_connection_world):
-    removed = planned_connection_world.fixed_connections[0]
+def test_removed_object_leaves_a_captured_list(planned_connection_world):
+    removed, *kept = planned_connection_world.fixed_connections
     state = State().with_objects_removed(removed)
 
     result = (
@@ -191,7 +191,27 @@ def test_removed_object_stays_in_a_captured_list(planned_connection_world):
         .tolist(state=state)
     )
 
-    assert result == planned_connection_world.fixed_connections
+    assert result == kept
+
+
+def test_removed_object_leaves_an_untyped_domain(planned_connection_world):
+    removed, *kept = planned_connection_world.fixed_connections
+    state = State().with_objects_removed(removed)
+
+    result = variable_from(planned_connection_world.fixed_connections).tolist(
+        state=state
+    )
+
+    assert result == kept
+
+
+def test_literal_still_names_a_removed_object(planned_connection_world):
+    removed = planned_connection_world.fixed_connections[0]
+    state = State().with_objects_removed(removed)
+
+    result = literal(removed).tolist(state=state)
+
+    assert result == [removed]
 
 
 def test_world_collection_reads_the_collection_the_state_assigns(

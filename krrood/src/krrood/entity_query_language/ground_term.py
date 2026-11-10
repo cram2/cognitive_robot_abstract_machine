@@ -413,11 +413,18 @@ class TermReader(Interface):
         """
 
     @abstractmethod
-    def instances_of(self, type_: type[T], live_instances: Iterable[T]) -> Iterator[T]:
+    def existing_values(self, values: Iterable[T]) -> Iterator[T]:
+        """
+        :param values: Values of a domain, as the live objects hold them.
+        :return: The values of *values* that exist in the evaluation, in their order.
+        """
+
+    @abstractmethod
+    def added_instances_of(self, type_: type[T]) -> Iterator[T]:
         """
         :param type_: The type whose instances to read.
-        :param live_instances: The instances of *type_* the live symbol graph holds.
-        :return: The instances of *type_* that exist in the evaluation.
+        :return: The instances of *type_* that exist in the evaluation in addition to
+            the live ones.
         """
 
 
@@ -430,5 +437,8 @@ class LiveTermReader(TermReader):
     def value_of_term(self, term: GroundTerm) -> TermValue | None:
         return term.live_term_value()
 
-    def instances_of(self, type_: type[T], live_instances: Iterable[T]) -> Iterator[T]:
-        return iter(live_instances)
+    def existing_values(self, values: Iterable[T]) -> Iterator[T]:
+        return iter(values)
+
+    def added_instances_of(self, type_: type[T]) -> Iterator[T]:
+        return iter(())

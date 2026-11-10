@@ -33,10 +33,7 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.evaluation_context import EvaluationContext
 from krrood.entity_query_language.ground_term import CallTerm, GroundTermExpression
-from krrood.entity_query_language.cache_data import (
-    ReEnterableIterable,
-    ReEnterableLazyIterable,
-)
+from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.exceptions import (
@@ -68,35 +65,47 @@ for each of its bindings, holds them.
 
 
 @dataclass
-class InstancesOfType(ReEnterableIterable[T]):
+class ExistingValues(ReEnterableLazyIterable[T]):
     """
-    The domain of every instance of a type in the evaluation that iterates it: the
-    instances the evaluation's
-    :class:`~krrood.entity_query_language.ground_term.TermReader` reads, which outside a
-    state are those the live :class:`~krrood.symbol_graph.symbol_graph.SymbolGraph`
-    holds.
+    A domain whose values are read, in every evaluation that iterates it, through the
+    evaluation's :class:`~krrood.entity_query_language.ground_term.TermReader`, so a
+    value that does not exist in the evaluation, such as an object a state removes, is
+    left out.
     """
 
-    type_: type[T]
+    def __iter__(self) -> Iterator[T]:
+        return EvaluationContext.current_term_reader().existing_values(
+            super().__iter__()
+        )
+
+
+@dataclass
+class InstancesOfType(ExistingValues[T]):
+    """
+    The domain of every instance of a type in the evaluation that iterates it: the
+    instances the live :class:`~krrood.symbol_graph.symbol_graph.SymbolGraph` holds that
+    exist in the evaluation, then those the evaluation adds.
+    """
+
+    type_: type[T] = field(kw_only=True)
     """
     The type whose instances make up the domain.
     """
 
-    live_instances: ReEnterableLazyIterable[T] = field(
-        init=False, default_factory=ReEnterableLazyIterable
-    )
-    """
-    The instances of :attr:`type_` the live symbol graph holds, read once and kept.
-    """
-
     def __post_init__(self):
-        self.live_instances.set_iterable(
-            SymbolGraph().get_instances_of_type(self.type_)
-        )
+        self.set_iterable(SymbolGraph().get_instances_of_type(self.type_))
 
     def __iter__(self) -> Iterator[T]:
-        return EvaluationContext.current_term_reader().instances_of(
-            self.type_, self.live_instances
+        existing_ids = set()
+        for instance in super().__iter__():
+            existing_ids.add(id(instance))
+            yield instance
+        yield from (
+            added
+            for added in EvaluationContext.current_term_reader().added_instances_of(
+                self.type_
+            )
+            if id(added) not in existing_ids
         )
 
 
@@ -137,8 +146,8 @@ class Variable(CanHaveDomainSource[T]):
     The original domain value.
     """
 
-    _re_enterable_domain_generator_: ReEnterableIterable[T] = field(
-        init=False, default_factory=ReEnterableLazyIterable, repr=False
+    _re_enterable_domain_generator_: ReEnterableLazyIterable[T] = field(
+        init=False, default_factory=ExistingValues, repr=False
     )
     """
     The re-enterable generator of values for this variable.
@@ -158,18 +167,17 @@ class Variable(CanHaveDomainSource[T]):
 
     def _update_domain_(self, domain):
         """
-        Set the domain, keeping a :class:`ReEnterableIterable` as it is and wrapping any
-        other value in a :class:`ReEnterableLazyIterable`.
+        Set the domain, keeping a :class:`ReEnterableLazyIterable` as it is and reading
+        any other value as the only values of the domain, so a domain that replaces
+        :class:`InstancesOfType` is not extended by the instances an evaluation adds.
         """
-        if isinstance(domain, ReEnterableIterable):
+        if isinstance(domain, ReEnterableLazyIterable):
             self._re_enterable_domain_generator_ = domain
             return
         if not is_iterable(domain):
             domain = [domain]
-        if not isinstance(
-            self._re_enterable_domain_generator_, ReEnterableLazyIterable
-        ):
-            self._re_enterable_domain_generator_ = ReEnterableLazyIterable()
+        if isinstance(self._re_enterable_domain_generator_, InstancesOfType):
+            self._re_enterable_domain_generator_ = ExistingValues()
         self._re_enterable_domain_generator_.set_iterable(domain)
 
     def _evaluate__(
@@ -216,6 +224,14 @@ class Literal(Variable[T]):
     The domain of the literal.
 
     It is constructed from the `_value_` and is always a singleton iterable.
+    """
+
+    _re_enterable_domain_generator_: ReEnterableLazyIterable[T] = field(
+        init=False, default_factory=ReEnterableLazyIterable, repr=False
+    )
+    """
+    The literal's value, read even in an evaluation in which it does not exist, since a
+    literal names one object rather than ranging over a domain.
     """
 
     _name__: str | None = field(default=None, kw_only=True)

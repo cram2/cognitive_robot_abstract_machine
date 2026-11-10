@@ -34,5 +34,5 @@ def _resolve_domain(type_: type[T], domain: Iterable[T] | None) -> Iterable[T] |
     if domain is not None and is_iterable(domain):
         return InstanceFilteredDomain(type_, domain)
     if domain is None and issubclass(type_, Symbol):
-        return InstancesOfType(type_)
+        return InstancesOfType(type_=type_)
     return domain

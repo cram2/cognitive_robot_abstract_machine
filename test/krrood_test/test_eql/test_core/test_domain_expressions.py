@@ -14,12 +14,12 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.factories import (
     a,
-    an,
     flat_variable,
     set_of,
     variable,
     variable_from,
 )
+from krrood.entity_query_language.predicate import HasType
 
 from ...dataset.semantic_world_like_classes import (
     Body,
@@ -108,9 +108,11 @@ def test_match_keeps_only_the_elements_of_its_type(two_worlds):
 
 def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
     world = variable(World, two_worlds.worlds)
-    connection = variable(FixedConnection, world.connections)
+    connection = variable_from(world.connections)
 
-    result = set_of(world, connection).tolist()
+    result = (
+        set_of(world, connection).where(HasType(connection, FixedConnection)).tolist()
+    )
 
     assert [(row[world], row[connection]) for row in result] == [
         (two_worlds.first, two_worlds.first.connections[0]),
@@ -120,7 +122,7 @@ def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
 
 def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
     world = variable(World, two_worlds.worlds)
-    body = an(Body).from_(world.bodies)
+    body = a(Body).from_(world.bodies)
 
     result = body.where(body.name == "handle 2").tolist()
 
@@ -130,14 +132,14 @@ def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
 def test_match_with_a_pattern_ranges_over_its_domain_expression(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = an(Body)(name="handle 2").from_(world.bodies).tolist()
+    result = a(Body)(name="handle 2").from_(world.bodies).tolist()
 
     assert result == [two_worlds.second.bodies[1]]
 
 
 def test_domain_expression_after_a_where_condition_is_rejected(two_worlds):
     world = variable(World, two_worlds.worlds)
-    body = an(Body)
+    body = a(Body)
     body.where(body.name == "handle 2")
 
     with pytest.raises(DomainExpressionAfterWhereCondition):
@@ -150,7 +152,7 @@ def test_domain_expression_after_a_where_condition_is_rejected(two_worlds):
 def test_variable_from_an_expression_ranges_over_its_elements(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = a(variable_from(world.bodies)).tolist()
+    result = variable_from(world.bodies).tolist()
 
     assert result == [*two_worlds.first.bodies, *two_worlds.second.bodies]
 
@@ -158,6 +160,6 @@ def test_variable_from_an_expression_ranges_over_its_elements(two_worlds):
 def test_flattening_keeps_values_that_are_not_collections(two_worlds):
     body = variable(Body, two_worlds.first.bodies)
 
-    result = a(flat_variable(body.name)).tolist()
+    result = flat_variable(body.name).tolist()
 
     assert result == [live_body.name for live_body in two_worlds.first.bodies]

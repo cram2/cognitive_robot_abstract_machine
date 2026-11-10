@@ -894,42 +894,6 @@ class FlatVariable(MappedVariable[T]):
         return f"Flatten({self._child_._name_})"
 
 
-@dataclass(eq=False, repr=False)
-class InstanceFilteredFlatVariable(FlatVariable[T]):
-    """
-    A :class:`FlatVariable` that keeps only the elements that are instances of
-    :attr:`_element_type_`.
-    """
-
-    _element_type_: type[T] = field(kw_only=True)
-    """
-    The type every value of this variable is an instance of.
-    """
-
-    def _update_type_(self) -> None:
-        """
-        Set ``_type_`` to :attr:`_element_type_` rather than to the child's type, as
-        :meth:`MappedVariable._update_type_` does.
-        """
-        self._type_ = self._element_type_
-
-    def _apply_mapping_(
-        self, value: Iterable[T] | T, sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        yield from (
-            element
-            for element in super()._apply_mapping_(value, sources)
-            if isinstance(element, self._element_type_)
-        )
-
-    def _rebuild_on_(self, child: CanBehaveLikeAVariable) -> MappedVariable:
-        return InstanceFilteredFlatVariable(child, _element_type_=self._element_type_)
-
-    @cached_property
-    def _name_(self) -> str:
-        return self._element_type_.__name__
-
-
 @dataclass(frozen=True)
 class MappedVariableCacheItem:
     """

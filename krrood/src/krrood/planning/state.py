@@ -10,6 +10,7 @@ from functools import cached_property
 
 from typing_extensions import Any, Iterable, Iterator
 
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.ground_term import (
     FunctionKey,
@@ -49,9 +50,9 @@ class State(TermReader):
 
     A state also adds and removes objects, as a difference from the live symbol graph.
     A variable without a domain ranges over the objects of the state the query is
-    evaluated with. A ground term whose value is a list, tuple or set reads without the
-    objects the state removes; a domain captured as a concrete collection is never
-    filtered.
+    evaluated with. A variable's domain, and a ground term whose value is a collection of
+    elements, read without the objects the state removes; a literal still names its
+    object.
 
     .. note:: An unassigned derived ground term follows the state only where its value comes
         from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
@@ -166,11 +167,11 @@ class State(TermReader):
     def without_removed_objects(self, value: Any) -> Any:
         """
         :param value: The value of a ground term.
-        :return: *value* without the objects this state removes when it is a list, tuple,
-            set or frozenset that holds any of them, as a new collection of the same type;
+        :return: *value* without the objects this state removes when it is a collection
+            of elements that holds any of them, as a new collection of the same type;
             otherwise *value* itself.
         """
-        if type(value) not in (list, tuple, set, frozenset):
+        if not isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
             return value
         if not any(id(element) in self.removed_objects for element in value):
             return value
@@ -178,21 +179,10 @@ class State(TermReader):
             element for element in value if id(element) not in self.removed_objects
         )
 
-    def instances_of(self, type_: type[T], live_instances: Iterable[T]) -> Iterator[T]:
-        """
-        :param type_: The type whose instances to read.
-        :param live_instances: The instances of *type_* the live symbol graph holds.
-        :return: The live instances this state does not remove, in their order, then
-            the instances of *type_* it adds that are not live, in the order they were
-            added.
-        """
-        live_ids = set()
-        for instance in live_instances:
-            live_ids.add(id(instance))
-            if id(instance) not in self.removed_objects:
-                yield instance
-        yield from (
-            added
-            for identifier, added in self.added_objects.items()
-            if identifier not in live_ids and isinstance(added, type_)
+    def existing_values(self, values: Iterable[T]) -> Iterator[T]:
+        return (value for value in values if id(value) not in self.removed_objects)
+
+    def added_instances_of(self, type_: type[T]) -> Iterator[T]:
+        return (
+            added for added in self.added_objects.values() if isinstance(added, type_)
         )

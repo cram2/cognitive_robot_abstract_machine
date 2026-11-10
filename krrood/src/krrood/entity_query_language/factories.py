@@ -33,7 +33,6 @@ from krrood.entity_query_language.operators.causal import (
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     FlatVariable,
-    InstanceFilteredFlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
     Attribute,
@@ -194,7 +193,7 @@ def probability_of(
 
 def variable(
     type_: type[T],
-    domain: DomainType | None = None,
+    domain: Iterable[T] | None = None,
 ) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -209,17 +208,12 @@ def variable(
         evaluated with a state.
 
     :param type_: The type of variable.
-    :param domain: Iterable of potential values for the variable, an expression whose
-        value, for each of its bindings, holds them, or None. If None, the domain is
-        every instance of a Symbol type in the evaluation; for other types the variable
-        should not be evaluated by EQL but by another evaluator (e.g., EQL To SQL
-        converter in Ormatic).
+    :param domain: Iterable of potential values for the variable, or None. If None, the
+        domain is every instance of a Symbol type in the evaluation; for other types the
+        variable should not be evaluated by EQL but by another evaluator (e.g., EQL To
+        SQL converter in Ormatic).
     :return: A Variable that can be queried for.
     """
-    if isinstance(domain, HasSymbolicOperations):
-        return InstanceFilteredFlatVariable(
-            domain._symbolic_expression_, _element_type_=type_
-        )
     return Variable(
         _type_=type_,
         _domain_=_resolve_domain(type_, domain),
