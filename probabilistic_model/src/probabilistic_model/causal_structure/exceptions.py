@@ -111,30 +111,24 @@ class InconsistentGraph(ProbabilisticModelException):
 @dataclass
 class EquivalenceClassTooLarge(ProbabilisticModelException):
     """
-    Raised when a graph has more undirected edges than the graphs it stands for can be
-    listed over.
+    Raised when a graph stands for more directed acyclic graphs than are listed.
     """
 
-    undirected_edge_count: int
+    maximum_member_graphs: int
     """
-    How many undirected edges the graph has.
-    """
-
-    maximum_undirected_edges: int
-    """
-    How many it may have.
+    How many are listed.
     """
 
     def error_message(self) -> str:
         return (
-            f"The graph has {self.undirected_edge_count} undirected edges, more than "
-            f"the {self.maximum_undirected_edges} its member graphs are listed over."
+            f"The graph stands for more than {self.maximum_member_graphs} directed "
+            f"acyclic graphs."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Orient edges with background knowledge, or raise the graph's "
-            "maximum_undirected_edges."
+            "Orient edges with domain causal knowledge, or raise the graph's "
+            "maximum_member_graphs."
         )
 
 

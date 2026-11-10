@@ -45,7 +45,7 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
 - `graph.CausalGraph` holds a graph whose edges may be directed or undirected. An
   undirected edge is one the data cannot orient, so the graph stands for every
   directed acyclic graph that orients those edges without adding a collider:
-  `member_graphs()` lists them.
+  `member_graphs()` lists them, up to `maximum_member_graphs` of them.
 - `identification.AdjustmentSelector` checks the adjustment criterion (Shpitser,
   VanderWeele and Robins, 2010; Perković et al., 2015) in every member graph. Its
   `identify` returns one of:
