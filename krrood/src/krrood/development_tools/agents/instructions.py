@@ -1,10 +1,11 @@
 """
 Generates a repository's ``AGENTS.md`` from the rules krrood ships and the rules the
-repository declares.
+repository declares, and the ``SKILL.md`` of each skill the repository declares.
 """
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from krrood.development_tools.agents.repository_files import (
 from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
 from krrood.development_tools.agents.rule_module import RuleModule
+from krrood.development_tools.agents.skill import Skill
 from krrood.development_tools.subcommand import Subcommand
 from krrood.patterns.path_enumeration import PathEnumeration
 
@@ -32,12 +34,60 @@ class TemplateFile(PathEnumeration):
     The content of ``AGENTS.md``: rules under the headings of their sections.
     """
 
+    SKILL = Path(__file__).parent / "templates" / "skill.md.jinja"
+    """
+    The content of a ``SKILL.md``: the skill's front matter, introduction and sections.
+    """
 
-# %% generation
+
+# %% generated files
+
+
+class GeneratedInstructions(ABC):
+    """
+    An instructions file whose whole content is generated.
+    """
+
+    @property
+    @abstractmethod
+    def path(self) -> Path:
+        """
+        Where the file lies.
+        """
+
+    @property
+    @abstractmethod
+    def text(self) -> str:
+        """
+        The content the file must have.
+        """
+
+    def is_current(self) -> bool:
+        """
+        :return: Whether the file exists and equals :attr:`text`.
+        """
+        if not self.path.is_file():
+            return False
+        return self.path.read_text(encoding="utf-8") == self.text
+
+    def write(self) -> bool:
+        """
+        Write the file, and the directories it lies in, replacing whatever it held.
+
+        :return: Whether the file changed.
+        """
+        if self.is_current():
+            return False
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(self.text, encoding="utf-8")
+        return True
+
+
+# %% AGENTS.md
 
 
 @dataclass(kw_only=True)
-class AgentsInstructions:
+class AgentsInstructions(GeneratedInstructions):
     """
     The ``AGENTS.md`` of one repository, listing the rules of the given sections.
     """
@@ -78,38 +128,80 @@ class AgentsInstructions:
 
     @property
     def path(self) -> Path:
-        """
-        The path of the repository's ``AGENTS.md``.
-        """
         return self.repository_root / RepositoryInstructionsFile.AGENTS
 
     @property
     def text(self) -> str:
-        """
-        The content ``AGENTS.md`` must have: the rules of :attr:`sections`, under their
-        headings, in the order they are declared.
-        """
         return CodeGenerator(template_directory=str(TemplateFile.AGENTS.parent)).render(
             template_name=TemplateFile.AGENTS.name,
             sections=self.sections,
             check_command=Subcommand.CHECK.invocation,
         )
 
-    def is_current(self) -> bool:
-        """
-        :return: Whether ``AGENTS.md`` exists and equals :attr:`text`.
-        """
-        if not self.path.is_file():
-            return False
-        return self.path.read_text(encoding="utf-8") == self.text
 
-    def write(self) -> bool:
-        """
-        Write ``AGENTS.md``, replacing whatever it held.
+# %% skills
 
-        :return: Whether the file changed.
+
+@dataclass(kw_only=True)
+class SkillInstructions(GeneratedInstructions):
+    """
+    The ``SKILL.md`` of one skill of a repository.
+    """
+
+    repository_root: Path
+    """
+    The directory holding the repository's skills directory.
+    """
+
+    skill: type[Skill]
+    """
+    The skill the file instructs.
+    """
+
+    @property
+    def path(self) -> Path:
+        return (
+            self.repository_root
+            / RepositoryInstructionsFile.SKILLS
+            / self.skill.name
+            / RepositoryInstructionsFile.SKILL
+        )
+
+    @property
+    def text(self) -> str:
+        return CodeGenerator(template_directory=str(TemplateFile.SKILL.parent)).render(
+            template_name=TemplateFile.SKILL.name,
+            skill=self.skill,
+            generate_command=Subcommand.SKILLS.invocation,
+            check_command=Subcommand.CHECK.invocation,
+        )
+
+
+@dataclass(kw_only=True)
+class RepositorySkills:
+    """
+    The skills a repository declares in its :attr:`RepositoryInstructionsFile.PROJECT_SKILLS`
+    module.
+    """
+
+    repository_root: Path
+    """
+    The directory holding the module and the skills directory.
+    """
+
+    @property
+    def instructions(self) -> list[SkillInstructions]:
         """
-        if self.is_current():
-            return False
-        self.path.write_text(self.text, encoding="utf-8")
-        return True
+        The ``SKILL.md`` of every declared skill; none if the repository has no such
+        module.
+        """
+        project_skills = RuleModule.import_from(
+            directory=self.repository_root,
+            module_name=RepositoryInstructionsFile.PROJECT_SKILLS,
+        )
+        if project_skills is None:
+            return []
+        return [
+            SkillInstructions(repository_root=self.repository_root, skill=skill)
+            for skill in project_skills.skills
+        ]
