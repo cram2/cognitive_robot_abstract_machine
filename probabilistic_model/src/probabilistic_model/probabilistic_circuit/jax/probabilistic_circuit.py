@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing_extensions import Self, Any
+from typing_extensions import Self, Any, Callable
 
 import optax
 from jax.experimental.sparse import BCOO
@@ -81,27 +81,50 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
             learning rate of 1e-3 is used.
         """
 
-        @eqx.filter_jit
         def loss(root: DifferentiableLayer, x: jax.Array) -> jax.Array:
             return -jnp.mean(root.log_likelihood_of_nodes(x))
 
+        self.minimize(loss, (data,), epochs, optimizer)
+
+    def minimize(
+        self,
+        loss: Callable[..., jax.Array],
+        arguments: tuple[jax.Array, ...],
+        epochs: int,
+        optimizer: optax.GradientTransformation | None,
+    ) -> None:
+        """
+        Minimize a loss of the root layer by gradient descent, one compiled step per
+        epoch.
+
+        :param loss: The scalar loss of the root layer and the arguments.
+        :param arguments: The arrays the loss takes after the root layer.
+        :param epochs: The number of epochs.
+        :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
+            learning rate of 1e-3 is used.
+        """
         if optimizer is None:
             optimizer = optax.adam(1e-3)
 
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
-
-        progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
-
-        for _ in progress_bar:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(self.root, data)
-
+        @eqx.filter_jit
+        def step(
+            root: DifferentiableLayer,
+            optimizer_state: optax.OptState,
+            *arguments: jax.Array,
+        ) -> tuple[DifferentiableLayer, optax.OptState, jax.Array]:
+            loss_value, gradients = eqx.filter_value_and_grad(loss)(root, *arguments)
             updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(self.root, eqx.is_inexact_array)
+                gradients, optimizer_state, eqx.filter(root, eqx.is_inexact_array)
             )
-            self.root = eqx.apply_updates(self.root, updates)
-            progress_bar.set_postfix_str(
-                f"Negative average log-likelihood: {loss_value}"
+            return eqx.apply_updates(root, updates), optimizer_state, loss_value
+
+        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
+        progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
+        for _ in progress_bar:
+            self.root, optimizer_state, loss_value = step(
+                self.root, optimizer_state, *arguments
             )
+            progress_bar.set_postfix_str(f"Loss: {loss_value}")
 
 
 @dataclass
@@ -201,24 +224,7 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
             learning rate of 1e-3 is used.
         """
 
-        @eqx.filter_jit
         def loss(root: DifferentiableLayer, x: jax.Array, y: jax.Array) -> jax.Array:
             return -jnp.mean(root.log_likelihood_of_nodes(x)[y])
 
-        if optimizer is None:
-            optimizer = optax.adam(1e-3)
-
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
-
-        progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
-
-        for _ in progress_bar:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(
-                self.root, data, labels
-            )
-
-            updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(self.root, eqx.is_inexact_array)
-            )
-            self.root = eqx.apply_updates(self.root, updates)
-            progress_bar.set_postfix_str(f"Cross Entropy: {loss_value}")
+        self.minimize(loss, (data, labels), epochs, optimizer)
