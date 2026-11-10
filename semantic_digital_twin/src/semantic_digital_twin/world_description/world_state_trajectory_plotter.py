@@ -11,7 +11,7 @@ from giskardpy.utils.utils import create_path
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
     WorldState,

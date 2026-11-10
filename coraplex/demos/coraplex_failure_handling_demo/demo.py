@@ -43,8 +43,8 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
 )

@@ -11,9 +11,6 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.scripts.iai_robots.pr2.configs import (
-    WorldWithPR2Config,
-)
 from giskardpy.middleware.ros2.giskard import Giskard
 from semantic_digital_twin.adapters.ros.rospy import wait_for_future_to_complete
 from giskardpy.middleware.ros2.utils.utils import load_xacro
@@ -40,9 +37,7 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from krrood.symbolic_math import symbolic_math as sm
 from semantic_digital_twin.robots.pr2 import PR2Joint
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
@@ -51,6 +46,9 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 from .test_client_presence import wait_until
+from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
 @dataclass
@@ -84,7 +82,9 @@ class PR2Tester(GiskardTester):
             "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
         )
         return Giskard(
-            world_config=WorldWithPR2Config(urdf=robot_desc),
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(PR2, urdf=robot_desc)]
+            ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
                 debug_mode=True,

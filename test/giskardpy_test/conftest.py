@@ -21,8 +21,8 @@ from krrood.symbolic_math.symbolic_math import logic_and
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.spatial_types import Vector3, HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
+from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -37,9 +37,13 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import (
     Body,
 )
-from semantic_digital_twin.robots.daisy import DAiSyJoint
-from semantic_digital_twin.robots.hsrb import HSRBJoint
-from semantic_digital_twin.robots.pr2 import PR2Joint
+from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
+from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
+from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 
 
 @pytest.fixture()
@@ -159,6 +163,16 @@ def default_daisy_pose() -> dict[str, float]:
         DAiSyJoint.RIGHT_WRIST_2: 0,
         DAiSyJoint.RIGHT_WRIST_3: 0,
     }
+
+
+@pytest.fixture()
+def orientation_speed_ratio_tolerance() -> float:
+    """
+    :return: How much faster a far away orientation goal may turn than a close one.
+        Both turn at the speed the cruise velocity sets once they are under way; the
+        margin covers that the closer goal starts braking sooner.
+    """
+    return 1.15
 
 
 @pytest.fixture(scope="function")
@@ -339,3 +353,46 @@ def prismatic_world_with_low_jerk_limit(request):
             )
         ]
     )
+
+
+# %% worlds of single robots as Giskard sets them up
+
+
+@pytest.fixture()
+def pr2_world_specification() -> WorldSpecification:
+    """
+    The PR2 alone, as Giskard sets it up.
+    """
+    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(PR2)])
+
+
+@pytest.fixture()
+def hsr_world_specification() -> WorldSpecification:
+    """
+    The HSR alone, as Giskard sets it up.
+    """
+    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(HSRB)])
+
+
+@pytest.fixture()
+def stretch_world_specification() -> WorldSpecification:
+    """
+    Stretch alone, as Giskard sets it up.
+    """
+    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(Stretch)])
+
+
+@pytest.fixture()
+def tracy_world_specification() -> WorldSpecification:
+    """
+    Tracy alone, as Giskard sets it up.
+    """
+    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(Tracy)])
+
+
+@pytest.fixture()
+def daisy_world_specification() -> WorldSpecification:
+    """
+    DAiSy alone, as Giskard sets it up.
+    """
+    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(DAiSy)])

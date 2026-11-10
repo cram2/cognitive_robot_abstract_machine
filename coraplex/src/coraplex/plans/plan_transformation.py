@@ -259,6 +259,15 @@ class PlanRewriting(ContextExtension):
                 rewritten = rewritten.parent_node
         return rewritten
 
+    def treat_as_offered(self, node: StatechartNode) -> None:
+        """
+        Keep the transformations from rewriting `node`, although the nodes below it are
+        still offered to them.
+
+        :param node: A node of the plan.
+        """
+        self._offered.add(node)
+
     def _next_node_to_offer(self, root: StatechartNode) -> StatechartNode | None:
         """
         :param root: The part of the plan being rewritten.

@@ -1,3 +1,7 @@
+"""
+Demonstrations of the HSRB acting in the scenes of the Sage10k dataset.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field
@@ -37,7 +41,8 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types import Point3, Pose, Vector3
+from krrood_spatial_math.spatial_types import Point3, Pose, Vector3
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from cramph.composites import Sequence
@@ -198,7 +203,11 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         return main_entrance
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, drives to the bottle, picks it up and places it in the
+        bin.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -241,6 +250,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
             ]
@@ -370,7 +380,10 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
         return target.first()
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks the book up and places it next to the couch.
+        """
         target_pose = Pose.from_xyz_rpy(
             x=5.48, y=7.46, z=0.8, yaw=-np.pi / 2, reference_frame=self.world.root
         )
@@ -386,6 +399,7 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
             ),
             target_location=target_pose,
             object_designator=self.book_to_pick,
+            arm=self.arm,
         )
 
         return Sequence(nodes=[open_door, mpu, mpp])
@@ -413,7 +427,7 @@ class Sage10kTropicalWarehouse(Sage10kAbstractDemoHSRB):
     def target_to_pick(self) -> NaturalLanguageWithTypeDescription:
 
         @symbolic_function
-        def planar_distance(point1: Point3, point2: Point3):
+        def planar_distance(point1: Point3, point2: Point3) -> Scalar:
             return point1.euclidean_distance(point2)
 
         point_guess = Pose.from_xyz_rpy(
@@ -483,7 +497,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
     def target_to_pick(self) -> NaturalLanguageWithTypeDescription:
 
         @symbolic_function
-        def planar_distance(point1: Point3, point2: Point3):
+        def planar_distance(point1: Point3, point2: Point3) -> Scalar:
             return point1.euclidean_distance(point2)
 
         point_guess = Pose.from_xyz_rpy(
@@ -506,6 +520,9 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
 
     @property
     def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, picks the target up and places it.
+        """
         mpu = MoveAndPickUpAction.from_standing_position(
             standing_position=self.pickup_navigation_pose,
             grasp=self.target_to_pick.grasp_candidates()[0],
@@ -523,6 +540,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
             ),
             target_location=place_target_pose,
             object_designator=self.target_to_pick,
+            arm=self.arm,
         )
 
         return Sequence(
@@ -554,7 +572,7 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
     def target_to_pick(self) -> NaturalLanguageWithTypeDescription:
 
         @symbolic_function
-        def planar_distance(point1: Point3, point2: Point3):
+        def planar_distance(point1: Point3, point2: Point3) -> Scalar:
             return point1.euclidean_distance(point2)
 
         point_guess = Pose.from_xyz_rpy(
@@ -612,10 +630,17 @@ class Sage10kEclecticResidence(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
+    """
+    Move an object within the southwestern store.
+    """
+
     scene_url = Sage10kActionableScenes.SOUTHWESTERN_STORE
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, moves the object of interest and drives on.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -642,6 +667,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
                 ParkArmsAction(arms=self.robot.all_arms),
@@ -657,7 +683,7 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
     @property
     def object_of_interest(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
-        def planar_distance(point1: Point3, point2: Point3):
+        def planar_distance(point1: Point3, point2: Point3) -> Scalar:
             return point1.euclidean_distance(point2)
 
         near_pose = Pose.from_xyz_rpy(
@@ -727,10 +753,17 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
+    """
+    Move an object within the brutalist store.
+    """
+
     scene_url = Sage10kActionableScenes.BRUTALIST_STORE
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance, moves the object of interest and drives on.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
@@ -752,6 +785,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
                 NavigateAction(
@@ -766,7 +800,7 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
     @property
     def object_of_interest(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
-        def planar_distance(point1: Point3, point2: Point3):
+        def planar_distance(point1: Point3, point2: Point3) -> Scalar:
             return point1.euclidean_distance(point2)
 
         near_pose = Pose.from_xyz_rpy(
@@ -824,10 +858,17 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
 
 @dataclass
 class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
+    """
+    Move an object within the American buffet restaurant.
+    """
+
     scene_url = Sage10kActionableScenes.AMERICAN_BUFFET_RESTAURANT
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
+        """
+        Opens the main entrance and moves the object of interest.
+        """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
         navigate = Pose.from_xyz_rpy(x=5.14, y=2.85, reference_frame=self.world.root)
@@ -846,6 +887,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
                 MoveAndPlaceAction.from_standing_position(
                     standing_position=self.place_navigation_pose,
                     object_designator=self.object_of_interest,
+                    arm=arm,
                     target_location=self.place_pose,
                 ),
             ]
@@ -859,7 +901,7 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
     @property
     def object_of_interest(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
-        def planar_distance(point1: Point3, point2: Point3):
+        def planar_distance(point1: Point3, point2: Point3) -> Scalar:
             return point1.euclidean_distance(point2)
 
         pose = Pose.from_xyz_rpy(x=4.06, y=8.64, reference_frame=self.world.root)

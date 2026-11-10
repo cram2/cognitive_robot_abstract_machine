@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 
+from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
 
 
@@ -32,6 +33,9 @@ class RuleModule:
         """
         Import a module or package from a directory, once per process.
 
+        The directory joins the import path, so the module can import the rest of its
+        repository without the repository being installed.
+
         :param directory: The directory holding the module or package.
         :param module_name: The name of the module or package.
         :return: The imported module; none if the directory holds neither.
@@ -43,6 +47,8 @@ class RuleModule:
             return None
         if module_name in sys.modules:
             return cls(sys.modules[module_name])
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
         module = importlib.util.module_from_spec(specification)
         sys.modules[module_name] = module
         specification.loader.exec_module(module)
@@ -80,3 +86,12 @@ class RuleModule:
             and value.parent is None
         ]
         return sorted(sections, key=lambda section: section.title)
+
+    @property
+    def checkers(self) -> tuple[CodeRuleChecker, ...]:
+        """
+        The checker of every rule in :attr:`sections` and the sections nested in them.
+        """
+        return tuple(
+            checker for section in self.sections for checker in section.checkers
+        )

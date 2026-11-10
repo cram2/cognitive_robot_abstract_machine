@@ -60,8 +60,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 # %% what the scene is built from
@@ -287,7 +287,7 @@ class BulletWorldDemonstration(RobotDemonstration):
         :return: The PR2, placed at :attr:`robot_start` through its odom.
         """
         return RobotSpecification(
-            semantic_annotation_type=self.used_robot, world_T_odom=self.robot_start
+            semantic_annotation_type=self.used_robot, localization_pose=self.robot_start
         )
 
     def is_scene_populated(self, world: World) -> bool:

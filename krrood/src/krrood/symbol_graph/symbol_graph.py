@@ -1,3 +1,8 @@
+"""
+The symbol graph: every live instance of a :class:`Symbol` subclass and the relations
+between them.
+"""
+
 from __future__ import annotations
 
 import os
@@ -29,6 +34,7 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
     DescriptorAwareIntrospector,
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.patterns.dataclass_field_descriptor import DataclassFieldDescriptorOwner
 from typing_extensions import Generic
 from krrood.singleton import SingletonMeta
 from krrood.utils import recursive_subclasses
@@ -50,7 +56,7 @@ class GraphType(StrEnum):
 
 
 @dataclass(eq=False)
-class Symbol:
+class Symbol(DataclassFieldDescriptorOwner):
     """Base class for things that can be cached in the symbol graph."""
 
     _cache_instances_: ClassVar[bool] = True
@@ -235,11 +241,12 @@ class SymbolGraph(metaclass=SingletonMeta):
     Used for faster access when only the WrappedInstance.instance is available.
     """
 
-    _class_to_wrapped_instances: defaultdict[type, list[WrappedInstance]] = field(
-        init=False, default_factory=lambda: defaultdict(list)
+    _class_to_wrapped_instances: defaultdict[type, dict[int, WrappedInstance]] = field(
+        init=False, default_factory=lambda: defaultdict(dict)
     )
     """
-    A dictionary that sorts the wrapped instances by the type inside them.
+    The wrapped instances of each type, by their node index, in the order they were added.
+
     This enables quick behavior similar to selecting everything from an entire table in SQL.
     """
 
@@ -293,20 +300,20 @@ class SymbolGraph(metaclass=SingletonMeta):
         wrapped_instance.index = self._instance_graph.add_node(wrapped_instance)
         wrapped_instance.symbol_graph = self
         self._instance_index[id(wrapped_instance.instance)] = wrapped_instance
-        self._class_to_wrapped_instances[wrapped_instance.instance_type].append(
-            wrapped_instance
-        )
+        self._class_to_wrapped_instances[wrapped_instance.instance_type][
+            wrapped_instance.index
+        ] = wrapped_instance
 
-    def remove_node(self, wrapped_instance: WrappedInstance):
+    def remove_node(self, wrapped_instance: WrappedInstance) -> None:
         """
         Remove a wrapped instance from the cache.
 
         :param wrapped_instance: The instance to remove.
         """
         self._instance_index.pop(id(wrapped_instance.instance), None)
-        self._class_to_wrapped_instances[wrapped_instance.instance_type].remove(
-            wrapped_instance
-        )
+        del self._class_to_wrapped_instances[wrapped_instance.instance_type][
+            wrapped_instance.index
+        ]
         self._instance_graph.remove_node(wrapped_instance.index)
 
     def remove_dead_instances(self):
@@ -324,7 +331,7 @@ class SymbolGraph(metaclass=SingletonMeta):
         yield from (
             instance.instance
             for cls in [type_] + recursive_subclasses(type_)
-            for instance in list(self._class_to_wrapped_instances[cls])
+            for instance in list(self._class_to_wrapped_instances[cls].values())
         )
 
     def get_wrapped_instance(self, instance: Any) -> WrappedInstance | None:

@@ -9,6 +9,7 @@ import trimesh.boolean
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import FloatVariable
+from krrood_spatial_math.exceptions import MissingCartesianFrame3DResolver
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -18,14 +19,14 @@ from semantic_digital_twin.exceptions import (
     WorldEntityWithIDNotInKwargs,
     MissingWorldError,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.world_description.derivatives import Derivatives
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point2,
     Pose,
@@ -135,7 +136,7 @@ def test_KinematicStructureEntityNotInKwargs():
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(MissingWorldError):
+    with pytest.raises(MissingCartesianFrame3DResolver):
         Point3.from_json(json_data, **kwargs)
 
 
@@ -405,7 +406,7 @@ def test_json_serialization_with_mesh():
                 "milk.stl",
             )
         )
-        .parse()
+        .create_world()
         .root
     )
 

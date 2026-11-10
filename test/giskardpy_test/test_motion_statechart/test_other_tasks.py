@@ -1,3 +1,7 @@
+"""
+Motion tasks driving a robot in a simulated world until they reach their goal.
+"""
+
 from dataclasses import fields
 from math import radians
 
@@ -10,6 +14,13 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
+from semantic_digital_twin.robots.pr2 import PR2
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
@@ -19,9 +30,13 @@ from giskardpy.motion_statechart.monitors.progress_monitors import StillProgress
 from cramph.statechart import (
     Statechart,
 )
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.align_planes import (
+    AlignPlanes,
+    KeepHeldBodyUpright,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
+    RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.feature_functions import (
@@ -37,6 +52,7 @@ from giskardpy.motion_statechart.tasks.pointing import (
     PointingCone,
 )
 from semantic_digital_twin.specifications.connections import (
+    PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
     ScrewConnectionSpecification,
 )
@@ -44,18 +60,24 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Door,
+    Drawer,
     Bottle,
     BottleCap,
 )
 from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
 )
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    PrismaticConnection,
+)
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -143,9 +165,9 @@ class TestFeatureFunctions:
         )
         height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
 
-        assert (
-            lower_limit <= height_diff <= upper_limit
-        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= height_diff <= upper_limit, (
+            f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_height_goal_negative_bounds(self, pr2_world_state_reset: World):
         """
@@ -194,9 +216,9 @@ class TestFeatureFunctions:
         )
         height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
 
-        assert (
-            lower_limit <= height_diff <= upper_limit
-        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= height_diff <= upper_limit, (
+            f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_reach_point_drives_offset_point_onto_reference(
         self, pr2_world_state_reset: World
@@ -296,9 +318,9 @@ class TestFeatureFunctions:
         # Distance in x-y plane only (ignore z)
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            lower_limit <= horizontal_distance <= upper_limit
-        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= horizontal_distance <= upper_limit, (
+            f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
         """
@@ -350,9 +372,9 @@ class TestFeatureFunctions:
         diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            lower_limit <= horizontal_distance <= upper_limit
-        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= horizontal_distance <= upper_limit, (
+            f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
         """
@@ -406,9 +428,9 @@ class TestFeatureFunctions:
 
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            lower_limit <= horizontal_distance <= upper_limit
-        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= horizontal_distance <= upper_limit, (
+            f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_height_and_distance_combined(self, pr2_world_state_reset: World):
         """
@@ -476,12 +498,12 @@ class TestFeatureFunctions:
         height_diff = diff[2]
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            height_lower <= height_diff <= height_upper
-        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
-        assert (
-            distance_lower <= horizontal_distance <= distance_upper
-        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        assert height_lower <= height_diff <= height_upper, (
+            f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        )
+        assert distance_lower <= horizontal_distance <= distance_upper, (
+            f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        )
 
     def test_distance_height_angle_perpendicular_combined(
         self, pr2_world_state_reset: World
@@ -566,12 +588,12 @@ class TestFeatureFunctions:
         height_diff = diff[2]
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            height_lower <= height_diff <= height_upper
-        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
-        assert (
-            distance_lower <= horizontal_distance <= distance_upper
-        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        assert height_lower <= height_diff <= height_upper, (
+            f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        )
+        assert distance_lower <= horizontal_distance <= distance_upper, (
+            f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        )
 
         root_V_tip_normal = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=tip_normal
@@ -793,9 +815,9 @@ def test_pointing_cone(pr2_world_state_reset: World):
 
     angle = angle_between_vector(v_pointing, v_goal)
 
-    assert (
-        angle <= cone_theta + pointing_cone.threshold
-    ), f"PointingCone failed: final angle {angle:.6f} rad > cone_theta {cone_theta:.6f} rad"
+    assert angle <= cone_theta + pointing_cone.threshold, (
+        f"PointingCone failed: final angle {angle:.6f} rad > cone_theta {cone_theta:.6f} rad"
+    )
 
 
 def test_align_planes(pr2_world_state_reset: World):
@@ -843,9 +865,87 @@ def test_align_planes(pr2_world_state_reset: World):
 
     angle = angle_between_vector(v_tip, v_goal)
 
+    assert angle <= align_planes.threshold, (
+        f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+    )
+
+
+def _run_keep_held_body_upright(world: World) -> KeepHeldBodyUpright:
+    """
+    :param world: A world holding an end effector.
+    :return: The task after it ran in `world` until it observed its goal as reached.
+    """
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    statechart = Statechart(context=executor.context)
+    keep_upright = KeepHeldBodyUpright(
+        root_link=world.root,
+        end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+    )
+    statechart.add_node(keep_upright)
+    end = EndMotion()
+    statechart.add_node(end)
+    end.start_condition = keep_upright.observes_true
+    executor.compile(statechart=statechart)
+    executor.tick_until_end()
+    return keep_upright
+
+
+def _tilt_of_axis(world_R_frame: np.ndarray, frame_V_axis: np.ndarray) -> float:
+    """
+    :param world_R_frame: The orientation of a frame in the world.
+    :param frame_V_axis: A unit vector in that frame.
+    :return: The angle in radians between the vector and the world's z-axis.
+    """
+    return float(np.arccos(np.clip((world_R_frame @ frame_V_axis)[2], -1.0, 1.0)))
+
+
+def test_keep_held_body_upright_turns_the_body_upright(pr2_world_state_reset: World):
+    """
+    A body tilted against the tool frame ends upright, not the tool frame itself.
+    """
+    world = pr2_world_state_reset
+    tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
+    held_body = Body(name=PrefixedName("held_body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(held_body)
+        world.add_connection(
+            FixedConnection(
+                parent=tool_frame,
+                child=held_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    roll=0.4, pitch=0.3, reference_frame=tool_frame
+                ),
+            )
+        )
+
+    keep_upright = _run_keep_held_body_upright(world)
+
     assert (
-        angle <= align_planes.threshold
-    ), f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+        _tilt_of_axis(held_body.global_pose.to_np()[:3, :3], np.array([0.0, 0.0, 1.0]))
+        <= keep_upright.threshold
+    )
+
+
+def test_keep_held_body_upright_holding_nothing_keeps_the_tool_frame_as_it_is(
+    pr2_world_state_reset: World,
+):
+    """
+    With no body below the tool frame, the direction up in it at the start stays up.
+    """
+    world = pr2_world_state_reset
+    tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
+    up_in_tool_frame = tool_frame.global_pose.to_np()[:3, :3].T @ np.array(
+        [0.0, 0.0, 1.0]
+    )
+
+    keep_upright = _run_keep_held_body_upright(world)
+
+    assert (
+        _tilt_of_axis(tool_frame.global_pose.to_np()[:3, :3], up_in_tool_frame)
+        <= keep_upright.threshold
+    )
 
 
 def test_align_perpendicular(pr2_world_state_reset: World):
@@ -959,9 +1059,9 @@ def test_angle_goal(pr2_world_state_reset: World):
 
     angle = angle_between_vector(v_tip, v_ref)
 
-    assert (
-        lower_angle <= angle <= upper_angle
-    ), f"AngleGoal failed: final angle {angle:.6f} rad not in [{lower_angle:.6f}, {upper_angle:.6f}]"
+    assert lower_angle <= angle <= upper_angle, (
+        f"AngleGoal failed: final angle {angle:.6f} rad not in [{lower_angle:.6f}, {upper_angle:.6f}]"
+    )
 
 
 class TestArticulateGraspedMechanism:
@@ -1090,6 +1190,81 @@ class TestArticulateGraspedMechanism:
 
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED
+
+    def test_a_drawer_faster_than_the_arm_stays_with_the_gripper(self, pr2_world_copy):
+        """
+        A drawer that may move faster than the arm, with no acceleration or jerk limit,
+        moves only as fast as the gripper holding it.
+        """
+        world = pr2_world_copy
+        open_position = 0.4
+        world_T_drawer = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=1.5, z=1, yaw=np.pi, reference_frame=world.root
+        )
+        with world.modify_world():
+            drawer = Drawer.create_with_new_body_in_world(
+                name="drawer",
+                world=world,
+                world_root_T_self=world_T_drawer,
+                parent_connection_specification=PrismaticConnectionSpecification(
+                    axis=Vector3.X(),
+                    dof_limits=DegreeOfFreedomLimits(
+                        lower=DerivativeMap(position=0.0, velocity=-10.0),
+                        upper=DerivativeMap(position=open_position, velocity=10.0),
+                    ),
+                ),
+            )
+            handle = Handle.create_with_new_body_in_world(
+                name="handle", world=world, world_root_T_self=world_T_drawer
+            )
+            drawer.add(handle)
+        tip = world.get_body_by_name("r_gripper_tool_frame")
+
+        executor = StatechartExecutor(
+            context=StatechartContext(world=world),
+            extensions=[MotionControl()],
+        )
+        statechart = Statechart(context=executor.context)
+        statechart.add_node(
+            Sequence(
+                nodes=[
+                    CartesianPose(
+                        root_link=world.root,
+                        tip_link=tip,
+                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            yaw=np.pi, reference_frame=handle.root
+                        ),
+                    ),
+                    opening := ArticulateGraspedMechanism(
+                        tip_link=tip,
+                        environment_link=handle.root,
+                        goal_joint_state=open_position,
+                    ),
+                ]
+            )
+        )
+        statechart.add_node(EndMotion.when_true(statechart.nodes[0]))
+        executor.compile(statechart=statechart)
+
+        handle_P_tip_when_grasped = None
+        largest_drift = 0.0
+        for _ in range(1_000):
+            executor.tick()
+            if executor.statechart.is_ended():
+                break
+            if opening.life_cycle_state != LifeCycleValues.RUNNING:
+                continue
+            handle_P_tip = world.compute_forward_kinematics_np(handle.root, tip)[:3, 3]
+            if handle_P_tip_when_grasped is None:
+                handle_P_tip_when_grasped = handle_P_tip
+            largest_drift = max(
+                largest_drift,
+                float(np.linalg.norm(handle_P_tip - handle_P_tip_when_grasped)),
+            )
+
+        [hold] = [node for node in opening.nodes if isinstance(node, CartesianPose)]
+        assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert largest_drift <= hold.translation_threshold
 
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03
@@ -1267,6 +1442,57 @@ class TestArticulateGraspedMechanism:
         grasp_node = next(node for node in nodes if isinstance(node, CartesianPose))
         assert mechanism_node.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
         assert grasp_node.weight == DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
+
+    def test_the_end_effector_holding_the_grasped_part_may_touch_its_surroundings(
+        self, pr2_world_copy
+    ):
+        """
+        Holding on to the grasped part means touching it and what it is mounted on, so
+        the end effector holding it is let off collision avoidance while the goal runs.
+        """
+        end_effector = pr2_world_copy.get_semantic_annotations_by_type(PR2)[
+            0
+        ].right_arm.end_effector
+        goal = ArticulateGraspedMechanism(
+            tip_link=end_effector.tool_frame,
+            environment_link=pr2_world_copy.get_body_by_name("torso_lift_link"),
+            goal_joint_state=0.0,
+            holding_end_effector=end_effector,
+        )
+
+        Statechart(context=create_context_with_motion_control(pr2_world_copy)).add_node(
+            goal
+        )
+
+        nodes = goal.nodes
+
+        [allowance] = [
+            node for node in nodes if isinstance(node, UpdateTemporaryCollisionRules)
+        ]
+        assert [
+            (type(rule), rule.end_effector) for rule in allowance.temporary_rules
+        ] == [(AllowCollisionForEndEffector, end_effector)]
+
+    def test_without_an_end_effector_holding_the_grasped_part_nothing_is_let_off_collision_avoidance(
+        self, prismatic_bot
+    ):
+        goal = ArticulateGraspedMechanism(
+            tip_link=prismatic_bot.root,
+            environment_link=prismatic_bot.get_body_by_name("robot"),
+            goal_joint_state=0.0,
+        )
+
+        Statechart(context=create_context_with_motion_control(prismatic_bot)).add_node(
+            goal
+        )
+
+        nodes = goal.nodes
+
+        assert [type(node) for node in nodes] == [
+            JointPositionList,
+            CartesianPose,
+            RigidCoupling,
+        ]
 
     def test_a_goal_within_the_limits_is_kept(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")

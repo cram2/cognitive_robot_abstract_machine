@@ -20,7 +20,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext

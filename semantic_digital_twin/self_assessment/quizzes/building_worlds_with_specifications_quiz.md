@@ -85,7 +85,7 @@ questions = [
       ],
     },
     {
-      "question": "What does WorldSpecification.to_domain_object return on repeated calls?",
+      "question": "What does WorldSpecification.create_world return on repeated calls?",
       "type": "multiple_choice",
       "answers": [
         {"answer": "A fresh, independent world each time; the stored environment is deep-copied", "correct": True},

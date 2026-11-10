@@ -18,12 +18,11 @@ from typing_extensions import Self, TypeVar, Generic, Union
 from control_msgs.msg import MultiDOFCommand
 from geometry_msgs.msg import Twist, TwistStamped
 from rclpy.publisher import Publisher
-from std_msgs.msg import Float64, Float64MultiArray
+from std_msgs.msg import Float64MultiArray
 
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.adapters.ros import rospy
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
-from giskardpy.middleware.ros2.ros2_interface import get_parameters
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -394,92 +393,6 @@ class CommandPublisher(ABC):
         """
         Publish zero velocities so the robot comes to a halt.
         """
-
-
-@dataclass
-class JointVelocityCommandPublisher(CommandPublisher):
-    """
-    Publishes one velocity per joint, each on its own topic.
-    """
-
-    world: World
-    """
-    The world holding the commanded velocities.
-    """
-
-    namespaces: list[str]
-    """
-    Namespaces of the velocity controllers; each offers a ``command`` topic and a
-    ``joint`` parameter.
-    """
-
-    minimum_velocities: JointMinimumVelocities = field(
-        default_factory=JointMinimumVelocities
-    )
-    """
-    Minimum velocities of the commanded joints.
-    """
-
-    connections: list[ActiveConnection1DOF] = field(init=False, default_factory=list)
-    """
-    The controlled connections, in the same order as ``namespaces``.
-    """
-
-    publishers: list[Publisher] = field(init=False, default_factory=list)
-    """
-    The command publishers, in the same order as ``namespaces``.
-    """
-
-    commands: list[JointVelocityCommand] = field(init=False, default_factory=list)
-    """
-    What to send for every connection.
-    """
-
-    velocity_reader: StateVelocityReader = field(init=False)
-    """
-    Reads the commanded velocities from the world state.
-    """
-
-    message: Float64 = field(init=False, default_factory=Float64)
-    """
-    The message reused for every publication.
-    """
-
-    def __post_init__(self):
-        for namespace in self.namespaces:
-            self.publishers.append(
-                rospy.get_node().create_publisher(Float64, f"/{namespace}/command", 10)
-            )
-            joint_name = (
-                get_parameters(parameters=["joint"], node_name=namespace)
-                .values[0]
-                .string_value
-            )
-            connection: ActiveConnection1DOF = self.world.get_connection_by_name(
-                joint_name
-            )
-            connection.has_hardware_interface = True
-            self.connections.append(connection)
-        self.commands = JointVelocityCommand.for_connections(
-            self.connections, self.minimum_velocities
-        )
-        self.velocity_reader = StateVelocityReader(
-            world=self.world,
-            degrees_of_freedom=[connection.raw_dof for connection in self.connections],
-        )
-
-    def publish(self) -> None:
-        state_velocities = self.velocity_reader.velocities()
-        for publisher, command, state_velocity in zip(
-            self.publishers, self.commands, state_velocities
-        ):
-            self.message.data = command.from_state_velocity(state_velocity)
-            publisher.publish(self.message)
-
-    def stop(self) -> None:
-        self.message.data = 0.0
-        for publisher in self.publishers:
-            publisher.publish(self.message)
 
 
 @dataclass

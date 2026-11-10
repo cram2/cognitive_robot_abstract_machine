@@ -11,7 +11,7 @@ from segmind.datastructures.object_tracker import (
     ObjectTrackerFactory,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Aperture
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 

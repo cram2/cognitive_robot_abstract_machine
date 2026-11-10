@@ -55,6 +55,7 @@ from krrood.symbolic_math.exceptions import (
     UnsupportedOperationError,
     WrongDimensionsError,
     CannotConvertToStringError,
+    UnhashableExpressionError,
 )
 
 EPS: float = sys.float_info.epsilon * 4.0
@@ -567,6 +568,12 @@ class SymbolicMathType(ABC):
         return str(self.casadi_sx)
 
     def __hash__(self) -> int:
+        """
+        :return: The hash of the casadi expression.
+        :raises UnhashableExpressionError: If the expression is not a scalar.
+        """
+        if not self.is_scalar():
+            raise UnhashableExpressionError(self)
         return hash(self.casadi_sx)
 
     def pretty_str(self) -> list[list[str]]:
@@ -1456,7 +1463,7 @@ class FloatVariableTracker(DeserializedObjectTracker[UUID, FloatVariable]):
     def _has_untracked(self, key: UUID) -> bool:
         return key in FloatVariable._registry_by_id
 
-    def _get_untracked(self, key: UUID) -> FloatVariable:
+    def _get_untracked(self, key: UUID, name: Any = None) -> FloatVariable:
         return FloatVariable._registry_by_id[key]
 
 

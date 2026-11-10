@@ -18,7 +18,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.connections import (
     FixedConnectionSpecification,

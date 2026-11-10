@@ -1,3 +1,8 @@
+"""
+Collision avoidance keeps bodies apart, and reports the contacts it could not keep
+apart.
+"""
+
 import time
 from collections.abc import Iterable
 from copy import deepcopy
@@ -29,6 +34,12 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.nodes_for_testing import ConstFalseNode
 from giskardpy.motion_statechart.graph_node import EndMotion, Task
 from cramph.node import CancelStatechart, StatechartNode
+from cramph.orm.ormatic_interface import StatechartMappingDAO
+from giskardpy.orm.ormatic_interface import Base
+from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.utils import create_engine
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -74,13 +85,13 @@ from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.robots.daisy import DAiSy
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -1184,9 +1195,14 @@ def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
     assert observer.collision_check_count > 0
 
 
-def test_hard_constraints_violated(
+@pytest.fixture
+def executor_driving_into_obstacles(
     cylinder_bot_world: World, statechart_origin: StatechartOrigin
-) -> None:
+) -> StatechartExecutor:
+    """
+    :return: An executor compiled with a motion that drives the bot between obstacles
+        closer than collision avoidance allows.
+    """
     root = cylinder_bot_world.root
     with cylinder_bot_world.modify_world():
         env2 = Body(
@@ -1284,10 +1300,48 @@ def test_hard_constraints_violated(
     statechart.add_node(EndMotion.when_true(local_min))
 
     executor.compile(statechart=statechart_origin.hand_over(statechart, executor))
+    return executor
 
+
+def test_hard_constraints_violated(
+    executor_driving_into_obstacles: StatechartExecutor,
+) -> None:
+    """
+    A motion that brings bodies closer than allowed is cancelled, naming each of them.
+    """
     with pytest.raises(CollisionViolatedError) as exc_info:
-        executor.tick_until_end()
+        executor_driving_into_obstacles.tick_until_end()
     assert len(exc_info.value.violated_collisions) == 2
+
+
+def test_violated_body_pairs_survive_storing_the_history(
+    executor_driving_into_obstacles: StatechartExecutor,
+) -> None:
+    """
+    The body pairs that came too close are still known once the state history is stored
+    and read back.
+    """
+    with pytest.raises(CollisionViolatedError) as exc_info:
+        executor_driving_into_obstacles.tick_until_end()
+    statechart = executor_driving_into_obstacles.statechart
+
+    session = Session(create_engine("sqlite:///:memory:"))
+    Base.metadata.create_all(bind=session.bind)
+    session.add(to_dao(statechart))
+    session.commit()
+    session.expunge_all()
+    statechart_read_back = (
+        session.scalars(select(StatechartMappingDAO)).one().from_dao()
+    )
+    read_back = statechart_read_back.state_history.latest_item.cancellation_error
+
+    assert [
+        (violation.closest_points.body_a, violation.closest_points.body_b)
+        for violation in read_back.violated_collisions
+    ] == [
+        (violation.closest_points.body_a, violation.closest_points.body_b)
+        for violation in exc_info.value.violated_collisions
+    ]
 
 
 @pytest.mark.parametrize(
@@ -1430,6 +1484,25 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
         f"Execution time is increasing: first half median {first_half_median:.4f}s, "
         f"second half median {second_half_median:.4f}s"
     )
+
+
+# %% rules for a single end effector
+
+
+def test_end_effector_rules_free_only_that_end_effector(pr2_world_copy) -> None:
+    """
+    The rules built for an end effector allow collisions for that end effector and
+    nothing else.
+    """
+    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    end_effector = robot.left_arm.end_effector
+
+    node = UpdateTemporaryCollisionRules.for_end_effector(end_effector)
+
+    assert [type(rule) for rule in node.temporary_rules] == [
+        AllowCollisionForEndEffector
+    ]
+    assert node.temporary_rules[0].end_effector is end_effector
 
 
 # %% rules in force while a rules node is built

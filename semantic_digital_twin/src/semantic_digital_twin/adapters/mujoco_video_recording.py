@@ -174,6 +174,11 @@ class MujocoVideoRecorder:
     Frames captured since the last :meth:`start`.
     """
 
+    _renderer: mujoco.Renderer | None = field(init=False, default=None, repr=False)
+    """
+    Renders the frames of the current recording, present only while recording.
+    """
+
     _auto_attached_camera: MujocoCamera | None = field(
         init=False, default=None, repr=False
     )
@@ -247,6 +252,9 @@ class MujocoVideoRecorder:
 
         self._frame_capture_callback.stop()
         self._frame_capture_callback = None
+        if self._renderer is not None:
+            self._renderer.close()
+            self._renderer = None
         self._multi_sim.simulator.stop()
         self._multi_sim = None
 
@@ -320,12 +328,26 @@ class MujocoVideoRecorder:
         simulator = self._multi_sim.simulator
         with simulator._model_lock:
             mujoco.mj_forward(simulator._mj_model, simulator._mj_data)
-            capture_result = simulator.capture_rgb(
-                camera_name=self.camera.name,
-                height=self.resolution.height,
-                width=self.resolution.width,
-            )
-        self._frames.append(capture_result.result)
+            renderer = self._renderer_for(simulator._mj_model)
+            renderer.update_scene(simulator._mj_data, camera=self.camera.name)
+            self._frames.append(renderer.render())
+
+    def _renderer_for(self, model: mujoco.MjModel) -> mujoco.Renderer:
+        """
+        The renderer of :attr:`resolution` for ``model``, kept across frames and built
+        anew only when the simulator has recompiled its model.
+
+        :param model: The model the next frame is rendered from.
+        :return: A renderer bound to ``model``.
+        """
+        if self._renderer is not None and self._renderer.model is model:
+            return self._renderer
+        if self._renderer is not None:
+            self._renderer.close()
+        self._renderer = mujoco.Renderer(
+            model, self.resolution.height, self.resolution.width
+        )
+        return self._renderer
 
     def _attach_overview_camera(self) -> MujocoCamera:
         """

@@ -44,7 +44,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -494,8 +494,9 @@ def test_camera_observation_creates_standalone_camera_without_world_pose(
     assert cameras == [cas.camera_observation.camera]
     assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
     assert cas.camera_observation.world_T_camera is None
-    assert cas.camera_observation.effective_camera_model.distortion.to_ordered_coefficients() == tuple(
-        camera_info.d
+    assert (
+        cas.camera_observation.effective_camera_model.distortion.to_ordered_coefficients()
+        == tuple(camera_info.d)
     )
 
 

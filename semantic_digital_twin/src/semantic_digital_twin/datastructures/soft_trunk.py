@@ -23,10 +23,7 @@ from semantic_digital_twin.world_description.soft_connections import (
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World

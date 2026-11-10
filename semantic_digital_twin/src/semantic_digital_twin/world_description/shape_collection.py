@@ -15,10 +15,7 @@ from typing_extensions import TYPE_CHECKING
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.product_algebra import Event, SimpleEvent
 from semantic_digital_twin.exceptions import MismatchingWorld
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     AxisAlignedBox,
@@ -275,9 +272,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         if not self.reference_frame:
             raise ValueError("BoundingBoxCollection must have a reference frame.")
         for box in self.bounding_boxes:
-            assert (
-                box.origin.reference_frame == self.reference_frame
-            ), "All bounding boxes must have the same reference frame."
+            assert box.origin.reference_frame == self.reference_frame, (
+                "All bounding boxes must have the same reference frame."
+            )
 
     def __iter__(self) -> Iterator[BoxT]:
         return iter(self.bounding_boxes)
@@ -311,9 +308,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         :param other: The other bounding box collection.
         :return: The merged bounding box collection.
         """
-        assert (
-            self.reference_frame == other.reference_frame
-        ), "The reference frames of the bounding box collections must be the same."
+        assert self.reference_frame == other.reference_frame, (
+            "The reference frames of the bounding box collections must be the same."
+        )
         return type(self)(
             reference_frame=self.reference_frame,
             shapes=self.bounding_boxes + other.bounding_boxes,
@@ -421,9 +418,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         if len(shapes) == 0:
             return cls(shapes=[])
         for shape in shapes:
-            assert (
-                shape.origin.reference_frame == shapes[0].origin.reference_frame
-            ), "All shapes must have the same reference frame."
+            assert shape.origin.reference_frame == shapes[0].origin.reference_frame, (
+                "All shapes must have the same reference frame."
+            )
 
         local_bbs = [shape.local_frame_bounding_box for shape in shapes]
         return cls(

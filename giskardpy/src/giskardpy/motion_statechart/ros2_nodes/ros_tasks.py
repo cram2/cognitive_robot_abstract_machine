@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from control_msgs.action import ParallelGripperCommand
 from geometry_msgs.msg import (
     PoseStamped as ROSPoseStamped,
     Pose as ROSPose,
@@ -18,7 +19,6 @@ except ModuleNotFoundError:
 from rclpy.action import ActionClient
 from std_msgs.msg import Header
 from typing_extensions import TypeVar, Generic
-
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner
@@ -27,7 +27,7 @@ from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
@@ -213,4 +213,106 @@ class NavigateActionServerTask(
                 if self._result.error_code == NavigateToPose.Result.NONE
                 else ObservationStateValues.FALSE
             )
+        return ObservationStateValues.UNKNOWN
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class RobotiqGripperActionServerTask(
+    ActionServerTask[
+        ParallelGripperCommand,
+        ParallelGripperCommand.Goal,
+        ParallelGripperCommand.Result,
+        ParallelGripperCommand.Feedback,
+    ]
+):
+    """
+    Node for calling a Robotiq ROS2 action server using the
+    control_msgs/ParallelGripperCommand interface.
+    """
+
+    message_type: type[ParallelGripperCommand] = field(
+        default=ParallelGripperCommand, kw_only=True
+    )
+    """
+    The ROS2 action interface type.
+    """
+
+    target_position: float
+    """
+    Desired gripper opening width in meters (e.g., 0.0 for fully open, 0.085 for fully
+    closed).
+    """
+
+    target_velocity: float = 10.0
+    """
+    Desired gripper joint velocity in radians per second.
+    """
+
+    target_effort: float = 50.0
+    """
+    Maximum gripping force or effort applied by the fingers (in Newtons / effort units,
+    up to 125.0).
+    """
+
+    _goal_accepted: bool = field(init=False, default=False)
+    _done: bool = field(init=False, default=False)
+
+    def build_action_goal(self) -> None:
+        """
+        Build the ParallelGripperCommand goal message to send to the action server.
+        """
+        self._action_goal = ParallelGripperCommand.Goal()
+        self._action_goal.command.position = [float(self.target_position)]
+        self._action_goal.command.velocity = [float(self.target_velocity)]
+        self._action_goal.command.effort = [float(self.target_effort)]
+        self._goal_accepted = False
+        self._done = False
+
+    def goal_response_callback(self, future):
+        """
+        Handles the server's response to the goal submission.
+        """
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            logger.error("Gripper goal rejected by action server")
+            self._goal_accepted = False
+            self._done = True
+            return
+
+        self._goal_accepted = True
+        logger.info("Gripper goal accepted, waiting for result...")
+
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.result_callback)
+
+    def result_callback(self, future):
+        """
+        Stores the action result and marks execution as done.
+        """
+        super().result_callback(future)
+        self._done = True
+        if self._result and hasattr(self._result, "result"):
+            logger.info(
+                f"Gripper action finished. "
+                f"Reached goal: {self._result.result.reached_goal}, "
+                f"Stalled: {self._result.result.stalled}"
+            )
+
+    def on_tick(self) -> ObservationStateValues:
+        """
+        Observes whether the gripper action succeeded (reached goal or stalled on
+        object).
+        """
+        # If goal was rejected, fail immediately
+        if self._done and not self._goal_accepted:
+            return ObservationStateValues.FALSE
+
+        # If completed and result was received
+        if self._done and self._result is not None:
+            action_result = getattr(self._result, "result", self._result)
+            if action_result is not None:
+                if action_result.reached_goal or action_result.stalled:
+                    return ObservationStateValues.TRUE
+                return ObservationStateValues.FALSE
+
         return ObservationStateValues.UNKNOWN

@@ -45,12 +45,7 @@ from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
 )
 from semantic_digital_twin.robots.pr2 import PR2
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Point2,
-    Point3,
-    Pose,
-    Pose2D,
-)
+from krrood_spatial_math.spatial_types import Point2, Point3, Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -192,7 +187,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         pr2_file = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
 
         urdf_parser = URDFParser.from_file(file_path=pr2_file)
-        world_with_urdf = urdf_parser.parse()
+        world_with_urdf = urdf_parser.create_world()
         pr2 = PR2.from_world(world_with_urdf)
 
         with world_with_urdf.modify_world():

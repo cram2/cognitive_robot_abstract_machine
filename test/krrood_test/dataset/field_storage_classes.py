@@ -38,6 +38,11 @@ class FieldsOfEveryStorage:
     A class.
     """
 
+    kinds: List[Type[StorageLeaf]]
+    """
+    A collection of classes.
+    """
+
     leaf: StorageLeaf
     """
     A reference to an instance of a mapped class.

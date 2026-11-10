@@ -60,7 +60,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
     The variables that are used to craft criteria.
     """
 
-    min_samples_per_leaf: int | float = field(default=1)
+    minimum_samples_per_leaf: int | float = field(default=1)
     """
     The minimum number of samples to create another sum node.
 
@@ -68,17 +68,17 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
     number of samples total.
     """
 
-    min_impurity_improvement: float = field(default=0.0)
+    minimum_impurity_improvement: float = field(default=0.0)
     """
     The minimum impurity improvement to create another sum node.
     """
 
-    max_leaves: int | float = field(default=float("inf"))
+    maximum_leaves: int | float = field(default=float("inf"))
     """
     The maximum number of leaves.
     """
 
-    max_depth: int | float = field(default=float("inf"))
+    maximum_depth: int | float = field(default=float("inf"))
     """
     The maximum depth of the tree.
     """
@@ -180,14 +180,14 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
                 self.features = tuple(sorted(set(features)))
 
     @property
-    def min_samples_leaf(self):
+    def minimum_samples_leaf(self):
         """
         The minimum number of samples to create another sum node.
         """
-        if self.min_samples_per_leaf < 1.0:
-            return math.ceil(self.min_samples_per_leaf * self.total_samples)
+        if self.minimum_samples_per_leaf < 1.0:
+            return math.ceil(self.minimum_samples_per_leaf * self.total_samples)
         else:
-            return self.min_samples_per_leaf
+            return self.minimum_samples_per_leaf
 
     @property
     def numeric_variables(self):
@@ -304,14 +304,16 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
         """
         number_of_samples = end - start
         # if the inducing in this step results in inadmissible nodes, skip the impurity calculation
-        if depth >= self.max_depth or number_of_samples < 2 * self.min_samples_leaf:
-            max_gain = -float("inf")
+        if (
+            depth >= self.maximum_depth
+            or number_of_samples < 2 * self.minimum_samples_leaf
+        ):
+            maximum_gain = -float("inf")
         else:
-            max_gain = self.impurity.compute_best_split(start, end)
+            maximum_gain = self.impurity.compute_best_split(start, end)
 
         # if the max gain is insufficient
-        if max_gain <= self.min_impurity_improvement:
-
+        if maximum_gain <= self.minimum_impurity_improvement:
             # create decomposable product node
             other_rows = np.concatenate([self.indices[:start], self.indices[end:]])
             leaf_node = self.create_leaf_node(
@@ -394,8 +396,8 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             if isinstance(annotated_variable.variable, Continuous):
                 distribution = NygaInduction(
                     annotated_variable.variable,
-                    min_likelihood_improvement=annotated_variable.min_likelihood_improvement,
-                    min_samples_per_quantile=annotated_variable.min_samples_per_quantile,
+                    split_penalty_factor=annotated_variable.split_penalty_factor,
+                    minimum_samples_per_quantile=annotated_variable.minimum_samples_per_quantile,
                 )
                 if other_data is not None:
                     distribution.support = self.leaf_support(
@@ -451,7 +453,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
 
         An impurity object is used to calculate the best split.
         """
-        min_samples_leaf = self.min_samples_leaf
+        minimum_samples_leaf = self.minimum_samples_leaf
 
         numeric_vars = np.array(
             [
@@ -496,23 +498,23 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             [len(variable.domain.simple_sets) for variable in self.symbolic_variables],
             dtype=np.int64,
         )
-        max_variances = np.array(
+        maximum_variances = np.array(
             [
-                (annotated_variable.max_standard_deviation or 0.0) ** 2
+                (annotated_variable.maximum_standard_deviation or 0.0) ** 2
                 for annotated_variable in self.annotated_variables
                 if annotated_variable.variable in self.numeric_targets
             ],
             dtype=np.float64,
         )
 
-        min_impurity_improvement = np.array(
+        minimum_impurity_improvement = np.array(
             [
-                annotated_variable.min_impurity_improvement
+                annotated_variable.minimum_impurity_improvement
                 for annotated_variable in self.annotated_variables
                 if annotated_variable.variable in self.numeric_features
             ]
             + [
-                annotated_variable.min_impurity_improvement
+                annotated_variable.minimum_impurity_improvement
                 for annotated_variable in self.annotated_variables
                 if annotated_variable.variable in self.symbolic_features
             ],
@@ -528,7 +530,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             dependency_indices[idx_var] = idc_dep
 
         return Impurity(
-            min_samples_leaf,
+            minimum_samples_leaf,
             numeric_vars,
             symbolic_vars,
             invert_impurity,
@@ -537,8 +539,8 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             numeric_features,
             symbolic_features,
             symbols,
-            max_variances,
-            min_impurity_improvement,
+            maximum_variances,
+            minimum_impurity_improvement,
             dependency_indices,
         )
 
@@ -558,9 +560,9 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             annotated_variables=self.annotated_variables,
             targets=self.targets,
             features=self.features,
-            min_samples_per_leaf=self.min_samples_leaf,
-            min_impurity_improvement=self.min_impurity_improvement,
-            max_depth=self.max_depth,
+            minimum_samples_per_leaf=self.minimum_samples_leaf,
+            minimum_impurity_improvement=self.minimum_impurity_improvement,
+            maximum_depth=self.maximum_depth,
             dependencies=self.dependencies,
         )
         return result
@@ -572,10 +574,10 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
         ]
         result["targets"] = [variable.name for variable in self.targets]
         result["features"] = [variable.name for variable in self.features]
-        result["min_samples_per_leaf"] = self.min_samples_per_leaf
-        result["min_impurity_improvement"] = self.min_impurity_improvement
-        result["max_leaves"] = self.max_leaves
-        result["max_depth"] = self.max_depth
+        result["minimum_samples_per_leaf"] = self.minimum_samples_per_leaf
+        result["minimum_impurity_improvement"] = self.minimum_impurity_improvement
+        result["maximum_leaves"] = self.maximum_leaves
+        result["maximum_depth"] = self.maximum_depth
         result["dependencies"] = self._variable_dependencies_to_json()
         result["total_samples"] = self.total_samples
         result["probabilistic_circuit"] = to_json(self.probabilistic_circuit)
@@ -597,10 +599,10 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
         features: list[Variable] = [
             name_to_variable_map[name] for name in data["features"]
         ]
-        _min_samples_leaf = data["min_samples_per_leaf"]
-        min_impurity_improvement = data["min_impurity_improvement"]
-        max_leaves = data["max_leaves"]
-        max_depth = data["max_depth"]
+        minimum_samples_per_leaf = data["minimum_samples_per_leaf"]
+        minimum_impurity_improvement = data["minimum_impurity_improvement"]
+        maximum_leaves = data["maximum_leaves"]
+        maximum_depth = data["maximum_depth"]
         dependencies = VariableMap(
             {
                 name_to_variable_map[name]: [
@@ -613,10 +615,10 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
             annotated_variables=annotated_variable_from_init,
             targets=targets,
             features=features,
-            min_samples_per_leaf=_min_samples_leaf,
-            min_impurity_improvement=min_impurity_improvement,
-            max_leaves=max_leaves,
-            max_depth=max_depth,
+            minimum_samples_per_leaf=minimum_samples_per_leaf,
+            minimum_impurity_improvement=minimum_impurity_improvement,
+            maximum_leaves=maximum_leaves,
+            maximum_depth=maximum_depth,
             dependencies=dependencies,
         )
         result.total_samples = data["total_samples"]
