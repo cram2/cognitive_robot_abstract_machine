@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from coraplex.plans.executors import PlanOutcome
@@ -24,21 +23,20 @@ from .conftest import PendulumSession
 
 
 def test_a_report_shows_where_the_tool_and_the_base_are(
-    pendulum_session: PendulumSession,
+    pendulum_session: PendulumSession, capsys: pytest.CaptureFixture[str]
 ):
+    """
+    The positions are read from the world when the report is shown, not kept with it.
+    """
     session = pendulum_session.session
+    tool_position = session.tool_frame.global_pose.position.to_np()[:3]
+    base_position = session.robot_base.global_pose.position.to_np()[:3]
 
     report = session.report(label="looked")
 
-    assert report.tool_position.reference_frame is pendulum_session.world.root
-    np.testing.assert_array_equal(
-        report.tool_position.to_np(),
-        session.tool_frame.global_pose.position.to_np(),
-    )
-    assert report.base_position.reference_frame is pendulum_session.world.root
-    np.testing.assert_array_equal(
-        report.base_position.to_np(),
-        session.robot_base.global_pose.position.to_np(),
+    assert capsys.readouterr().out == (
+        f"{report.to_line()} tool {tool_position.round(3)} "
+        f"base {base_position.round(3)}\n"
     )
 
 

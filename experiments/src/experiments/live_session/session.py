@@ -16,7 +16,6 @@ from experiments.live_session.exceptions import (
     NoPerformedCellError,
     UnknownSnapshotError,
 )
-from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoSimulationSnapshot
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -45,7 +44,7 @@ class StepStatus(StrEnum):
 @dataclass(kw_only=True)
 class StepReport:
     """
-    What a developer is told after a step: how its plan ended and where the robot is.
+    What a developer is told after a step about how its plan ended.
     """
 
     label: str
@@ -56,16 +55,6 @@ class StepReport:
     outcome: PlanOutcome | None
     """
     How the plan the step ran ended; ``None`` if it ran none.
-    """
-
-    tool_position: Point3
-    """
-    Where the tool frame was afterwards, in the world's root frame.
-    """
-
-    base_position: Point3
-    """
-    Where the robot's base was afterwards, in the world's root frame.
     """
 
     @property
@@ -81,15 +70,10 @@ class StepReport:
 
     def to_line(self) -> str:
         """
-        :return: The report as one line of text, its columns aligned with every other
-            report's.
+        :return: The label and the status as one line of text, their columns aligned
+            with every other report's.
         """
-        return "%-34s %-34s tool %s base %s" % (
-            self.label,
-            self.status,
-            self.tool_position.to_np()[:3].round(3),
-            self.base_position.to_np()[:3].round(3),
-        )
+        return "%-34s %-34s" % (self.label, self.status)
 
 
 # %% performed cells
@@ -159,22 +143,22 @@ class LiveSession:
 
     def report(self, *, label: str, outcome: PlanOutcome | None = None) -> StepReport:
         """
-        Tell the developer how a step ended and where the robot is now, and keep that
-        with the cell being performed.
+        Tell the developer how a step ended and where the tool and the base are now, and
+        keep how it ended with the cell being performed.
 
         :param label: What the step did.
         :param outcome: How the plan the step ran ended, if it ran one.
         :return: The report.
         """
-        report = StepReport(
-            label=label,
-            outcome=outcome,
-            tool_position=self.tool_frame.global_pose.position,
-            base_position=self.robot_base.global_pose.position,
-        )
+        report = StepReport(label=label, outcome=outcome)
         if self.history and not self.history[-1].finished:
             self.history[-1].reports.append(report)
-        print(report.to_line())
+        tool_position = self.tool_frame.global_pose.position.to_np()[:3]
+        base_position = self.robot_base.global_pose.position.to_np()[:3]
+        print(
+            f"{report.to_line()} tool {tool_position.round(3)} "
+            f"base {base_position.round(3)}"
+        )
         return report
 
     def take_snapshot(self, *, name: str) -> MujocoSimulationSnapshot:

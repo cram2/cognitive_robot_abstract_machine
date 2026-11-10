@@ -36,7 +36,7 @@ The data structures live in CRAM (`experiments.live_session`, and the snapshot o
 ## Data structures
 <!-- from DataStructuresRules in agent_skills.py -->
 - `experiments.live_session.session.LiveSession(simulation=..., tool_frame=..., robot_base=...)` is `session` in the kernel:
-  - `report(label=..., outcome=None) -> StepReport` logs one aligned line (label, status, tool and base position) and keeps it with the running cell
+  - `report(label=..., outcome=None) -> StepReport` prints one aligned line (label, status, and where the tool and the base are now) and keeps the label and outcome with the running cell
   - `perform(cell=..., namespace=...)` takes a snapshot, then runs the cell in the kernel's `globals()`; `perform_cells.py` calls it
   - `history: list[PerformedCell]` holds every performed cell with its `cell`, `snapshot_before`, `reports` and `finished` (false if it raised)
   - `revert_last_cell() -> Cell` goes back to the moment before the last cell, which is dropped

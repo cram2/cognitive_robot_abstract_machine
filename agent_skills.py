@@ -127,9 +127,9 @@ class DataStructuresRules(Section):
         "`experiments.live_session.session.LiveSession(simulation=..., "
         "tool_frame=..., robot_base=...)` is `session` in the kernel:",
         (
-            "`report(label=..., outcome=None) -> StepReport` logs one aligned line "
-            "(label, status, tool and base position) and keeps it with the running "
-            "cell",
+            "`report(label=..., outcome=None) -> StepReport` prints one aligned line "
+            "(label, status, and where the tool and the base are now) and keeps the "
+            "label and outcome with the running cell",
             "`perform(cell=..., namespace=...)` takes a snapshot, then runs the cell "
             "in the kernel's `globals()`; `perform_cells.py` calls it",
             "`history: list[PerformedCell]` holds every performed cell with its "
