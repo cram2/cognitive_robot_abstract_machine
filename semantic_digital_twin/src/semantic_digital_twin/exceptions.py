@@ -2571,6 +2571,31 @@ class SimulationAlreadyRunningError(UsageError):
 
 
 @dataclass
+class SnapshotDoesNotFitSimulationError(UsageError):
+    """
+    Raised when a simulation is restored from a snapshot of a simulation that was built
+    from a different world.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation the snapshot was restored into.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The snapshot was not taken of the simulation of the world rooted at "
+            f"{self.world_name}: its physics or world state has a different size."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Restore only snapshots taken of this simulation, after the last change to "
+            "its world's model."
+        )
+
+
+@dataclass
 class ObjectHasNoWidthWithoutCollision(UsageError):
     """
     Raised when the width of an object is asked for, while the object carries no
