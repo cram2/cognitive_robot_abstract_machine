@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-import numpy as np
 import pytest
 
 pytest.importorskip("griplink_interfaces")
@@ -26,19 +25,10 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkPresetActionServerTask,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.daisy import DAiSy, DAiSyLeftGripper
 from semantic_digital_twin.robots.griplink_gripper import GriplinkFlexConfiguration
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
-from semantic_digital_twin.world_description.connections import Connection6DoF
-from semantic_digital_twin.world_description.geometry import Box, Scale
-from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
 
-from .test_robot_specific_plan_transformations import prepared
+from .test_robot_specific_plan_transformations import prepared, top_down_grasp_of_a_box
 from ...plan_running import robot_executor, robot_extensions, world_of
 
 # %% helpers
@@ -69,34 +59,6 @@ def left_gripper_of(extensions: list[ContextExtension]) -> DAiSyLeftGripper:
         world_of(extensions)
         .get_semantic_annotations_by_type(DAiSy)[0]
         .left_arm.end_effector
-    )
-
-
-def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidate:
-    """
-    :return: A grasp reaching down onto a new box on the table in front of the left arm
-        of the DAiSy in `extensions`.
-    """
-    world = world_of(extensions)
-    box = Body(
-        name=PrefixedName("box"),
-        collision=ShapeCollection([Box(scale=Scale(0.05, 0.05, 0.1))]),
-    )
-    with world.modify_world():
-        world.add_connection(
-            Connection6DoF.create_with_dofs(
-                world=world,
-                parent=world.root,
-                child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    0.6, 1.0, 0.9
-                ),
-            )
-        )
-        graspable = HasGraspCandidates(root=box)
-        world.add_semantic_annotations([graspable])
-    return GraspCandidate(
-        graspable, Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box)
     )
 
 

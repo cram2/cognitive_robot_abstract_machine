@@ -1,9 +1,14 @@
+import pytest
+
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.griplink_gripper import (
     GriplinkFlexConfiguration,
     GriplinkPresetConfiguration,
 )
+
+
+# %% griplink configurations
 
 
 def test_daisy_grippers_build_griplink_configurations(daisy_world):
@@ -24,3 +29,28 @@ def test_daisy_grippers_build_griplink_configurations(daisy_world):
         assert isinstance(open_configuration, GriplinkPresetConfiguration)
         assert isinstance(close_configuration, GriplinkPresetConfiguration)
         assert isinstance(flex_close_configuration, GriplinkFlexConfiguration)
+
+
+# %% action topics
+
+
+@pytest.mark.parametrize(
+    "state", [GripperState.OPEN, GripperState.CLOSE, GripperState.FLEXCLOSE]
+)
+def test_daisy_grippers_serve_each_state_under_the_topic_of_its_griplink_endpoint(
+    daisy_world, state
+):
+    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+
+    for end_effector in daisy.all_end_effectors:
+        assert (
+            end_effector.action_topic_serving(state)
+            == end_effector.griplink_endpoint(state).action_topic
+        )
+
+
+def test_daisy_grippers_serve_no_state_without_a_griplink_endpoint(daisy_world):
+    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+
+    for end_effector in daisy.all_end_effectors:
+        assert end_effector.action_topic_serving(None) is None

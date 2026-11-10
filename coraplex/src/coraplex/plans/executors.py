@@ -37,6 +37,7 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepTheTorsoUprightWhileUsingATool,
     MoveStretchToolCenterPointInAStraightLine,
 )
+from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
@@ -496,8 +497,9 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         kw_only=True,
     )
     """
-    The plan transformations adapting every plan to being performed in physics. Unless
-    one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
+    The plan transformations adapting every plan to being performed in physics.
+
+    Unless one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
     is put first that squeezes by the
     :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.squeeze` of the
     robot's two-finger grippers.
@@ -548,7 +550,11 @@ class RealRobotPlanExecutor(PlanExecutor):
     """
 
     plan_adaptations: list[PlanTransformation] = field(
-        default_factory=lambda: [CloseFingersToObjectWidth(), DetectWithRoboKudo()],
+        default_factory=lambda: [
+            DriveRobotiqGrippersThroughTheirActionServers(),
+            CloseFingersToObjectWidth(),
+            DetectWithRoboKudo(),
+        ],
         kw_only=True,
     )
 

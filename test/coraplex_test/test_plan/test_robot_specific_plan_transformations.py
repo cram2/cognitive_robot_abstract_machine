@@ -58,6 +58,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.world_description.connections import Connection6DoF
+from semantic_digital_twin.world_description.geometry import Box, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ...plan_running import (
@@ -122,6 +127,34 @@ def prepared(
     """
     executor.prepare(statechart_of(executor, plan))
     return plan
+
+
+def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidate:
+    """
+    :return: A grasp reaching down onto a new box added to the world of the robot in
+        `extensions`.
+    """
+    world = world_of(extensions)
+    box = Body(
+        name=PrefixedName("box"),
+        collision=ShapeCollection([Box(scale=Scale(0.05, 0.05, 0.1))]),
+    )
+    with world.modify_world():
+        world.add_connection(
+            Connection6DoF.create_with_dofs(
+                world=world,
+                parent=world.root,
+                child=box,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    0.6, 1.0, 0.9
+                ),
+            )
+        )
+        graspable = HasGraspCandidates(root=box)
+        world.add_semantic_annotations([graspable])
+    return GraspCandidate(
+        graspable, Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box)
+    )
 
 
 def navigation_to(world: World, **parameters) -> NavigateAction:
