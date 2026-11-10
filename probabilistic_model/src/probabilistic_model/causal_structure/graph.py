@@ -520,9 +520,10 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             return [directed]
         colliders = self.unshielded_colliders()
         members = []
-        partial_orientations = [(directed, 0)]
+        partial_orientations = [directed]
         while partial_orientations:
-            partial, oriented_count = partial_orientations.pop()
+            partial = partial_orientations.pop()
+            oriented_count = len(partial.edges()) - len(directed.edges())
             if oriented_count == len(undirected):
                 if len(members) == self.maximum_member_graphs:
                     raise EquivalenceClassTooLarge(self.maximum_member_graphs)
@@ -533,7 +534,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
                 extended = partial.copy()
                 extended.add_edge(parent, child)
                 if extended.is_acyclic and self.colliders_of(extended) == colliders:
-                    partial_orientations.append((extended, oriented_count + 1))
+                    partial_orientations.append(extended)
         return members
 
     def undirected_edges_in_connected_order(self) -> list[GraphEdge]:

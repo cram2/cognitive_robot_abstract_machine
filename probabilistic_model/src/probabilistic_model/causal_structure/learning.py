@@ -11,6 +11,7 @@ from dataclasses import dataclass, field, replace
 from enum import IntEnum, StrEnum
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from causallearn.graph.GraphClass import CausalGraph as CausalLearnGraph
 from causallearn.graph.GraphNode import GraphNode as CausalLearnNode
@@ -188,7 +189,7 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
     @abstractmethod
     def learn_edges(
         self,
-        levels: np.ndarray,
+        levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
     ) -> list[GraphEdge]:
@@ -223,7 +224,7 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
 
     @staticmethod
     def read_adjacency_matrix(
-        graph: np.ndarray, nodes: list[GraphNode]
+        graph: npt.NDArray[np.integer], nodes: list[GraphNode]
     ) -> list[GraphEdge]:
         """
         :param graph: causal-learn's adjacency matrix over the nodes.
@@ -261,7 +262,7 @@ class PeterClarkStructureLearner(DiscretizedTableStructureLearner):
 
     def learn_edges(
         self,
-        levels: np.ndarray,
+        levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
     ) -> list[GraphEdge]:
@@ -303,7 +304,7 @@ class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
 
     def learn_edges(
         self,
-        levels: np.ndarray,
+        levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
     ) -> list[GraphEdge]:
