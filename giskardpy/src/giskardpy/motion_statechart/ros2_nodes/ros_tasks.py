@@ -307,14 +307,12 @@ class RobotiqGripperActionServerTask(
         if self._done and not self._goal_accepted:
             return ObservationStateValues.FALSE
 
-        # If action has completed and we have a result object
-        if self._done and self._result and hasattr(self._result, "result"):
-            action_result = self._result.result
-
-            # The action succeeds if the target width is reached, or if the fingers
-            # stalled against an object (grasp established) or mechanical limit.
-            if action_result.reached_goal or action_result.stalled:
-                return ObservationStateValues.TRUE
-            return ObservationStateValues.FALSE
+        # If completed and result was received
+        if self._done and self._result is not None:
+            action_result = getattr(self._result, "result", self._result)
+            if action_result is not None:
+                if action_result.reached_goal or action_result.stalled:
+                    return ObservationStateValues.TRUE
+                return ObservationStateValues.FALSE
 
         return ObservationStateValues.UNKNOWN
