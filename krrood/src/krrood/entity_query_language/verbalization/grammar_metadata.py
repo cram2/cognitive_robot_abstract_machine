@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GrammarMetadata(FieldMetadata):
     """
     Grammar / verbalization hints for a field.
@@ -30,8 +30,8 @@ class GrammarMetadata(FieldMetadata):
 
     is_identifying_field: bool = False
     """
-    ``True`` when this field identifies its instance for verbalization (*"a specific <Type> with
-    <field> '<value>'"*).
+    ``True`` when this field identifies its instance for verbalization (*"a specific
+    <Type> with <field> '<value>'"*).
     """
 
     display_name: str | None = None
@@ -42,8 +42,8 @@ class GrammarMetadata(FieldMetadata):
 
     boolean_predicate: BooleanPredicate | None = None
     """
-    How a boolean field reads as a predicate — *"has milk"* / *"produces milk"* / *"is operational"*
-    — overriding the default heuristic.
+    How a boolean field reads as a predicate — *"has milk"* / *"produces milk"* / *"is
+    operational"* — overriding the default heuristic.
 
     ``None`` lets the verbalizer infer the form from the attribute name's shape.
     """

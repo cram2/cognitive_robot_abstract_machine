@@ -440,7 +440,7 @@ def control_loop(init_rospy) -> ControlLoopFixture:
     motion_statechart.add_node(EndMotion.when_true(counter))
     executor.compile(
         Statechart.from_json(
-            json.loads(json.dumps(motion_statechart.to_json())),
+            data=json.loads(json.dumps(motion_statechart.to_json())),
             context=executor.context,
         )
     )

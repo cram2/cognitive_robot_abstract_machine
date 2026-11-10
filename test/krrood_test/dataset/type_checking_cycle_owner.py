@@ -21,14 +21,14 @@ if TYPE_CHECKING:
 TContent = TypeVar("TContent")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Content:
     """
     The value a holder keeps.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HolderWithGenericContent(Generic[TContent], SubClassSafeGeneric):
     """
     A holder whose content type is bound by its subclasses.
@@ -45,7 +45,7 @@ class HolderWithGenericContent(Generic[TContent], SubClassSafeGeneric):
     checking.
     """
 
-    def place_into(self, container: ContainerOfBoundHolder) -> None:
+    def place_into(self, *, container: ContainerOfBoundHolder) -> None:
         """
         :param container: The container, a class from the module that imports this one
             back, that this holder is placed in.
@@ -53,7 +53,7 @@ class HolderWithGenericContent(Generic[TContent], SubClassSafeGeneric):
         container.holders.append(self)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HolderBindingItsContent(HolderWithGenericContent[Content]):
     """
     A holder that binds its content type while this module is still being imported.

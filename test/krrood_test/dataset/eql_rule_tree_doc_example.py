@@ -1,22 +1,22 @@
 from dataclasses import dataclass
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class ExampleConnection:
     type_code: int
     name: str
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class ExampleView:
     connection: ExampleConnection
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ExampleFixedView(ExampleView):
     pass
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ExampleRevoluteView(ExampleView):
     pass

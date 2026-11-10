@@ -80,7 +80,7 @@ class ForwardKinematicsBinding:
             )
         self.root_T_tip.reference_frame = self.root
         self.root_T_tip.child_frame = self.tip
-        self.float_variable_data.register_expression(self.root_T_tip)
+        self.float_variable_data.register_expression(expression=self.root_T_tip)
 
     def change_root(self, root: KinematicStructureEntity, world: World) -> None:
         """
@@ -123,5 +123,5 @@ class ForwardKinematicsBinding:
         """
         self._bound_root_T_tip = root_T_tip
         self.float_variable_data.set_value(
-            self.root_T_tip, root_T_tip[:3, :4].T.flatten()
+            expression=self.root_T_tip, value=root_T_tip[:3, :4].T.flatten()
         )

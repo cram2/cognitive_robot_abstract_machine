@@ -140,7 +140,7 @@ def test_executing_json_parsed_statechart(tmp_path):
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
     executor = _create_executor(world)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **tracker.create_kwargs()
+        data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
 
     executor.compile(statechart=statechart_copy)
@@ -186,7 +186,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     kwargs = tracker.create_kwargs()
     executor = _create_executor(pr2_world_state_reset)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **kwargs
+        data=new_json_data, context=executor.context, **kwargs
     )
 
     executor.compile(statechart=statechart_copy)
@@ -239,7 +239,7 @@ def test_nested_sequence_goal_json_round_trip_compilation() -> None:
     new_json_data = json.loads(json_str)
 
     executor = _create_executor(World())
-    statechart_copy = Statechart.from_json(new_json_data, context=executor.context)
+    statechart_copy = Statechart.from_json(data=new_json_data, context=executor.context)
     executor.compile(statechart=statechart_copy)
 
 
@@ -271,7 +271,7 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
     executor = _create_executor(cylinder_bot_diff_world)
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **tracker.create_kwargs()
+        data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
     goal_copy = statechart_copy.get_node_by_index(goal.index)
     executor.compile(statechart=statechart_copy)
@@ -321,7 +321,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     executor = _create_executor(cylinder_bot_diff_world)
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
     statechart_copy = Statechart.from_json(
-        new_json_data, context=executor.context, **tracker.create_kwargs()
+        data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
     second_leg_copy = statechart_copy.get_node_by_index(second_leg.index)
     executor.compile(statechart=statechart_copy)

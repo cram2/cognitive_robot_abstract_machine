@@ -879,7 +879,7 @@ class TestGoalResult:
         motion_statechart = motion_server.executor.statechart
         assert (
             LastObservationState.from_json(
-                result[StatechartPayloadKey.LAST_OBSERVATION_STATE],
+                data=result[StatechartPayloadKey.LAST_OBSERVATION_STATE],
                 statechart=motion_statechart,
             )
             == motion_statechart.last_observation_state

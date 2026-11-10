@@ -40,7 +40,7 @@ class Formatter(StrEnum):
     RUFF = "ruff"
     DOCFORMATTER = "docformatter"
 
-    def run(self, arguments: Sequence[str], file_path: Path) -> int:
+    def run(self, *, arguments: Sequence[str], file_path: Path) -> int:
         """
         Run this tool on ``file_path`` with the interpreter running this code.
 
@@ -51,7 +51,7 @@ class Formatter(StrEnum):
             interpreter.
         """
         if importlib.util.find_spec(self) is None:
-            raise FormatterNotInstalled(self)
+            raise FormatterNotInstalled(tool_module=self)
         return subprocess.run(
             [sys.executable, "-m", self, *arguments, str(file_path)],
             capture_output=True,
@@ -104,7 +104,7 @@ class DocformatterExitCode(IntEnum):
 # %% formatting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FileFormattingOutcome:
     """
     The result of formatting a single file.
@@ -140,14 +140,14 @@ class FileFormattingOutcome:
         return self.final_content != self.original_content
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DocstringFormatter:
     """
     Formats files with ruff, and their docstrings with docformatter where docformatter
     agrees with ruff.
     """
 
-    def format_file(self, path: Path) -> FileFormattingOutcome:
+    def format_file(self, *, path: Path) -> FileFormattingOutcome:
         """
         Compute the formatted content of one file without writing it back.
 
@@ -160,19 +160,22 @@ class DocstringFormatter:
             scratch_path = Path(scratch_directory) / path.name
             scratch_path.write_text(original_content)
 
-            if not self._run_ruff(scratch_path):
+            if not self._run_ruff(file_path=scratch_path):
                 return FileFormattingOutcome(
-                    path, original_content, original_content, False
+                    path=path,
+                    original_content=original_content,
+                    final_content=original_content,
+                    docstrings_reformatted=False,
                 )
             ruff_only_content = scratch_path.read_text()
 
-            docformatter_succeeded = self._run_docformatter(scratch_path)
+            docformatter_succeeded = self._run_docformatter(file_path=scratch_path)
             after_docformatter_content = (
                 scratch_path.read_text() if docformatter_succeeded else None
             )
 
             ruff_succeeded_again = docformatter_succeeded and self._run_ruff(
-                scratch_path
+                file_path=scratch_path
             )
             reconverged_content = (
                 scratch_path.read_text() if ruff_succeeded_again else None
@@ -192,7 +195,7 @@ class DocstringFormatter:
             docstrings_reformatted=docstrings_are_stable,
         )
 
-    def format_files(self, paths: Sequence[Path]) -> bool:
+    def format_files(self, *, paths: Sequence[Path]) -> bool:
         """
         Format each file, writing back changes and reporting discarded docstring
         changes.
@@ -203,7 +206,7 @@ class DocstringFormatter:
         any_file_changed = False
 
         for path in tqdm(paths, desc="Formatting"):
-            outcome = self.format_file(path)
+            outcome = self.format_file(path=path)
             if not outcome.changed:
                 continue
 
@@ -220,22 +223,27 @@ class DocstringFormatter:
         return any_file_changed
 
     @staticmethod
-    def _run_ruff(file_path: Path) -> bool:
+    def _run_ruff(*, file_path: Path) -> bool:
         """
         Format ``file_path`` with ruff, in place.
 
         :param file_path: The file to format.
         :return: Whether ruff accepted and formatted the file.
         """
-        return Formatter.RUFF.run(list(RuffArgument), file_path) == RuffExitCode.SUCCESS
+        return (
+            Formatter.RUFF.run(arguments=list(RuffArgument), file_path=file_path)
+            == RuffExitCode.SUCCESS
+        )
 
     @staticmethod
-    def _run_docformatter(file_path: Path) -> bool:
+    def _run_docformatter(*, file_path: Path) -> bool:
         """
         Format ``file_path``'s docstrings with docformatter, in place.
 
         :param file_path: The file to format.
         :return: Whether docformatter ran successfully.
         """
-        exit_code = Formatter.DOCFORMATTER.run(list(DocformatterOption), file_path)
+        exit_code = Formatter.DOCFORMATTER.run(
+            arguments=list(DocformatterOption), file_path=file_path
+        )
         return exit_code in list(DocformatterExitCode)

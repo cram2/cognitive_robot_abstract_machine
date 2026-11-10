@@ -2063,7 +2063,7 @@ def test_a_carry_runs_where_the_statechart_was_received(
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=receiver.context,
         world=world,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),

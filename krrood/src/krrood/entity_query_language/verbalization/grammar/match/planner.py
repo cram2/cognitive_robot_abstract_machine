@@ -16,7 +16,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AttributeAssignment:
     """
     One ``object.attribute == value`` equality from a match's construction pattern.
@@ -46,7 +46,7 @@ class AttributeAssignment:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AttributeGroup:
     """
     The equality assignments that share one object — e.g. the *x*, *y*, *z* of one
@@ -70,7 +70,7 @@ class AttributeGroup:
         """:return: The assignments with a concrete value (the *"given that …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
-        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=...)).plan()
+        >>> plan = MatchPlanner(node=a(Robot)(name="R2", battery=...)).plan()
         >>> len(plan.groups[0].concrete)
         1
         """
@@ -81,14 +81,14 @@ class AttributeGroup:
         """:return: The Ellipsis assignments (the *"predict …"* part).
 
         >>> from krrood.entity_query_language.verbalization.grammar.match.planner import MatchPlanner
-        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=...)).plan()
+        >>> plan = MatchPlanner(node=a(Robot)(name="R2", battery=...)).plan()
         >>> len(plan.groups[0].predicted)
         1
         """
         return [a for a in self.assignments if a.is_predicted]
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class MatchPlan:
     """
     The *what to say* decomposition of a match: what it selects, the grouped
@@ -127,7 +127,7 @@ class MatchPlan:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MatchPlanner(Planner[Match, MatchPlan]):
     """
     Decompose a ``Match`` into a ``MatchPlan``: split the construction-pattern
@@ -137,7 +137,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
 
     Reference: :cite:t:`reiter2000building` — content determination + aggregation (microplanning).
 
-    >>> plan = MatchPlanner(a(Robot)(name="R2", battery=80)).plan()
+    >>> plan = MatchPlanner(node=a(Robot)(name="R2", battery=80)).plan()
     >>> len(plan.groups), len(plan.groups[0].assignments)
     (1, 2)
     """
@@ -145,7 +145,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
     def plan(self) -> MatchPlan:
         """:return: The match plan.
 
-        >>> plan = MatchPlanner(a(Robot)(name="R2", battery=80)).plan()
+        >>> plan = MatchPlanner(node=a(Robot)(name="R2", battery=80)).plan()
         >>> (type(plan.selection).__name__, len(plan.groups))
         ('Variable', 1)
         """
@@ -154,7 +154,8 @@ class MatchPlanner(Planner[Match, MatchPlan]):
         # Aggregate single-hop equalities by their object via the shared owner-grouping primitive;
         # conditions that are not such an equality (``_as_assignment`` → ``None``) are the remainder.
         owner_groups, other = group_by_owner(
-            list(match._conditions_), self._as_assignment
+            list(match._conditions_),
+            lambda condition: self._as_assignment(condition=condition),
         )
         groups = [
             AttributeGroup(object=group.owner, assignments=group.items)
@@ -169,6 +170,7 @@ class MatchPlanner(Planner[Match, MatchPlan]):
 
     @staticmethod
     def _as_assignment(
+        *,
         condition: SymbolicExpression,
     ) -> tuple[SymbolicExpression, AttributeAssignment] | None:
         """
@@ -178,9 +180,9 @@ class MatchPlanner(Planner[Match, MatchPlan]):
             match's attributes aggregate per sub-object (``pose.position.x/y/z`` group under
             ``pose.position``) — else ``None`` (a non-equality or non-attribute condition).
 
-        >>> MatchPlanner._as_assignment(variable(Robot, []).battery > 50) is None
+        >>> MatchPlanner._as_assignment(condition=variable(Robot, []).battery > 50) is None
         True
-        >>> owner, assignment = MatchPlanner._as_assignment(variable(Robot, []).name == "R2")
+        >>> owner, assignment = MatchPlanner._as_assignment(condition=variable(Robot, []).name == "R2")
         >>> assignment.is_predicted
         False
         """

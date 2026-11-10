@@ -663,7 +663,7 @@ def test_an_action_is_sent_with_its_collision_allowances(simple_pr2_context) -> 
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )

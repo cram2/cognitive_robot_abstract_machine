@@ -37,5 +37,5 @@ class DifferentiableUniformLayer(DifferentiableContinuousLayerWithConstrainedSup
         return jax.vmap(self.log_likelihood_of_nodes_single)(x)
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(data["variable"], jnp.array(data["interval"]))

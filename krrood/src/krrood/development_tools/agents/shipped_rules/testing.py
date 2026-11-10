@@ -29,8 +29,8 @@ class WritingTestsRules(Section):
 
     WRITE_TESTS_WITH_PYTEST = (
         "Write tests with pytest: plain test functions or classes, pytest "
-        f"fixtures, {CodeReference(pytest.raises, pytest).path} and plain `assert`; "
-        f"never {CodeReference(unittest.TestCase, unittest).path} "
+        f"fixtures, {CodeReference(target=pytest.raises, public_module=pytest).path} and plain `assert`; "
+        f"never {CodeReference(target=unittest.TestCase, public_module=unittest).path} "
         "or its assertion methods"
     )
 
@@ -72,7 +72,7 @@ class AssertionsRules(Section):
 
     ASSERT_AGAINST_THE_DEFINITION = (
         "Assert against the definition, not a retyped copy of it: the enum member, "
-        f"the {CodeReference(classproperty).name}, or the value from the fixture the code under test "
+        f"the {CodeReference(target=classproperty).name}, or the value from the fixture the code under test "
         "consumed. Where a type distinguishes the case - a distinct exception "
         "class, an enum member - assert the type instead of matching message text. "
         "A retyped literal keeps passing when the original changes"

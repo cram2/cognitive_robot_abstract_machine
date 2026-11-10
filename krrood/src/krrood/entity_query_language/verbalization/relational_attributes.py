@@ -26,7 +26,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 _RELATIONAL_PREPOSITIONS = {preposition.text for preposition in Prepositions} - {"of"}
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RelationVerb:
     """
     A relational field's verb, split into its parts — so callers can either strand the

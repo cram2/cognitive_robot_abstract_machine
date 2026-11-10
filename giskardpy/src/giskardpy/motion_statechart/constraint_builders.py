@@ -138,7 +138,7 @@ class GeometricConstraintBuilder:
         # step at most VelocityScale.ROTATION, read as an angle, towards the goal,
         # so the error stays tangential and away from the singularity at pi
         angle_limited = sm.min(angle, VelocityScale.ROTATION)
-        angle_limited = angle_limited.safe_division(angle)
+        angle_limited = angle_limited.safe_division(other=angle)
         root_V_goal_normal_intermediate = frame_V_current.slerp(
             frame_V_goal, angle_limited
         )

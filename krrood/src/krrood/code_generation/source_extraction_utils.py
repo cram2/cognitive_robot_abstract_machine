@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # Extraction result types
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LineSpan:
     """
     The inclusive start and end line numbers of a definition in its source.
@@ -45,7 +45,7 @@ class LineSpan:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtractedDefinition:
     """
     A single function or class definition extracted from source code.
@@ -74,7 +74,7 @@ class ExtractedDefinition:
         return "\n".join(self.lines)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtractedSource:
     """
     The definitions extracted from a piece of Python source code.
@@ -85,7 +85,7 @@ class ExtractedSource:
     The extracted definitions, in the order they appear in the source.
     """
 
-    def source_of(self, name: str) -> str:
+    def source_of(self, *, name: str) -> str:
         """
         Return the extracted source of the definition named *name*, joined into a single
         string.
@@ -265,8 +265,9 @@ def _format_import_lines(
     import_modules: set[str], from_imports: dict[str, set[str]]
 ) -> list[str]:
     """
-    Render collected import data as sorted ``import``/``from ... import`` line
-    strings.
+    Render collected import data as sorted ``import``/``from ...
+
+    import`` line strings.
 
     :param import_modules: The plain-imported module names.
     :param from_imports: The ``from``-module name to imported-names mapping.
@@ -373,7 +374,7 @@ def _extract_definitions(
             ExtractedDefinition(
                 name=node.name,
                 lines=definition_lines,
-                line_span=LineSpan(node.lineno, node.end_lineno),
+                line_span=LineSpan(start_line=node.lineno, end_line=node.end_lineno),
             )
         )
         if names and len(extracted.definitions) >= len(names):

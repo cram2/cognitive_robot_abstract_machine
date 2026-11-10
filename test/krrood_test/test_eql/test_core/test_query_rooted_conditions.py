@@ -71,7 +71,7 @@ def test_match_condition_rooted_at_the_lowered_query_filters(
     handles_and_containers_world,
 ):
     bodies = handles_and_containers_world.bodies
-    match = a(Body).from_(bodies)
+    match = a(Body).from_(domain=bodies)
     match.where(match.size > 1)
 
     assert match.tolist() == [body for body in bodies if body.size > 1]
@@ -171,9 +171,9 @@ def test_query_rooted_predicate_over_two_attributes_filters():
     Each query-rooted attribute a predicate takes follows the row being filtered.
     """
     values = [0.0, 1.0, 2.0]
-    positions = [KRROODPosition(x, y, 0.0) for x in values for y in values]
+    positions = [KRROODPosition(x=x, y=y, z=0.0) for x in values for y in values]
     query = entity(variable(KRROODPosition, domain=positions))
-    query.where(IsGreaterThan(query.x, query.y))
+    query.where(IsGreaterThan(value=query.x, bound=query.y))
 
     assert query.tolist() == [
         position for position in positions if position.x > position.y

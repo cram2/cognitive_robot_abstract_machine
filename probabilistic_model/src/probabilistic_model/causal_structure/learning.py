@@ -327,8 +327,10 @@ class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
 class LearnedCausalStructure:
     """
     The causal structure learned for one class, ready to choose the variables a causal
-    query about the class adjusts for. Its edges are the causal relations of the class
-    in a class diagram, read as they are when asked.
+    query about the class adjusts for.
+
+    Its edges are the causal relations of the class in a class diagram, read as they are
+    when asked.
     """
 
     relations: CausalRelationsOfClass
@@ -352,7 +354,7 @@ class LearnedCausalStructure:
         """
         :return: What chooses an adjustment set from the class's causal relations.
         """
-        return AdjustmentSelector(self.relations.causal_graph(self.nodes))
+        return AdjustmentSelector(self.relations.causal_graph(nodes=self.nodes))
 
 
 # %% learning from a relational circuit's tables
@@ -389,8 +391,9 @@ class RelationalCausalStructureLearner:
     example_to_part_check: ExampleToPartCheck | None = None
     """
     What finds the instance attributes that depend on a part attribute even given the
-    aggregation statistics and any one other attribute the dependence could run
-    through. Each such pair is joined by an edge from the instance attribute to the part
+    aggregation statistics and any one other attribute the dependence could run through.
+
+    Each such pair is joined by an edge from the instance attribute to the part
     attribute, as the circuit draws an instance before its parts, unless the domain
     causal knowledge's tiers place the part attribute first.
     """
@@ -428,9 +431,9 @@ class RelationalCausalStructureLearner:
         ]
         example_names = [node.name for node in example_nodes]
         example_graph = self.learner.learn(
-            tables.example_rows,
-            example_nodes,
-            domain_knowledge.restricted_to(example_names),
+            rows=tables.example_rows,
+            nodes=example_nodes,
+            domain_knowledge=domain_knowledge.restricted_to(example_names),
         )
         nodes, edges = list(example_nodes), example_graph.edges()
         for part, table in tables.part_tables.items():
@@ -467,17 +470,18 @@ class RelationalCausalStructureLearner:
         :return: The causal relations of the class.
         """
         relations = CausalRelationsOfClass(
-            self.class_diagram, self.class_diagram.get_wrapped_class(circuit.class_)
+            class_diagram=self.class_diagram,
+            owner=self.class_diagram.get_wrapped_class(clazz=circuit.class_),
         )
         endpoints = self.create_endpoints(circuit.feature_extractor, None)
         for part, template in circuit.exchangeable_distribution_templates.items():
             endpoints += self.create_endpoints(
                 template.template_distribution.feature_extractor,
-                relations.owner.get_field(part),
+                relations.owner.get_field(name=part),
             )
         endpoint_of = {endpoint.name: endpoint for endpoint in endpoints}
         relations.replace_relations(
-            [
+            relations=[
                 CausalRelation(
                     source=relations.owner,
                     target=relations.owner,
@@ -504,12 +508,13 @@ class RelationalCausalStructureLearner:
         prefix = () if collection is None else (collection,)
         return [
             (
-                StatisticEndpoint(feature, collection)
+                StatisticEndpoint(statistic=feature, collection=collection)
                 if feature in extractor.aggregation_features
                 else AttributeEndpoint(
-                    prefix
+                    fields=prefix
                     + AttributeEndpoint.along(
-                        self.class_diagram, feature._access_path_
+                        class_diagram=self.class_diagram,
+                        access_path=feature._access_path_,
                     ).fields
                 )
             )
@@ -573,7 +578,9 @@ class RelationalCausalStructureLearner:
         )
         names = [node.name for node in statistic_nodes + part_nodes]
         graph = self.learner.learn(
-            renamed, statistic_nodes + part_nodes, domain_knowledge.restricted_to(names)
+            rows=renamed,
+            nodes=statistic_nodes + part_nodes,
+            domain_knowledge=domain_knowledge.restricted_to(names),
         )
         return [
             edge

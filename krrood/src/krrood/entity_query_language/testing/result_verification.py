@@ -39,7 +39,7 @@ def placeholder_operands(cls: type[SymbolicCallable]) -> dict[str, Any]:
     for field_ in dataclass_fields(cls):
         if not field_.init:
             continue
-        endpoint = WrappedField(wrapped_class, field_).type_endpoint
+        endpoint = WrappedField(clazz=wrapped_class, field=field_).type_endpoint
         placeholder_type = (
             endpoint if isinstance(endpoint, type) and endpoint is not Any else object
         )
@@ -62,7 +62,7 @@ def first_order_form(cls: type[SymbolicCallable]) -> str:
     return verbalize_expression(cls(**placeholder_operands(cls)))
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class VerbalizationResult:
     """
     One symbolic callable and the sentence it verbalizes to — a committed snapshot
@@ -80,7 +80,7 @@ class VerbalizationResult:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class VerbalizationResultsOfPackage:
     """
     Exhaustive verbalization-result check for the symbolic callables a package defines.
@@ -123,7 +123,7 @@ class VerbalizationResultsOfPackage:
         return tuple(sorted(discovered, key=module_and_class_name))
 
     @staticmethod
-    def has_fragment(cls: type[SymbolicCallable]) -> bool:
+    def has_fragment(*, cls: type[SymbolicCallable]) -> bool:
         """
         :param cls: The symbolic callable to check.
         :return: whether *cls* decided its result by implementing its own fragment.
@@ -132,7 +132,7 @@ class VerbalizationResultsOfPackage:
             cls._verbalization_fragment_, Verbalizable._verbalization_fragment_
         )
 
-    def placeholder_operands(self, cls: type[SymbolicCallable]) -> dict[str, Any]:
+    def placeholder_operands(self, *, cls: type[SymbolicCallable]) -> dict[str, Any]:
         """
         :param cls: The symbolic callable to build operands for.
         :return: :func:`placeholder_operands` for *cls*, with *cls*'s own
@@ -145,12 +145,12 @@ class VerbalizationResultsOfPackage:
         operands.update(self.operand_overrides.get(cls, {}))
         return operands
 
-    def rendered_result(self, cls: type[SymbolicCallable]) -> str:
+    def rendered_result(self, *, cls: type[SymbolicCallable]) -> str:
         """
         :param cls: The symbolic callable to render.
         :return: the sentence *cls* renders with this snapshot's (possibly overridden) operands.
         """
-        return verbalize_expression(cls(**self.placeholder_operands(cls)))
+        return verbalize_expression(cls(**self.placeholder_operands(cls=cls)))
 
     def assert_results_cover_every_callable(self) -> None:
         """
@@ -160,7 +160,7 @@ class VerbalizationResultsOfPackage:
         discovered = {
             module_and_class_name(cls)
             for cls in self.discovered_callables()
-            if self.has_fragment(cls)
+            if self.has_fragment(cls=cls)
         }
         declared = {
             module_and_class_name(result.callable_class) for result in self.results
@@ -179,11 +179,11 @@ class VerbalizationResultsOfPackage:
         """
         mismatches = {
             module_and_class_name(result.callable_class): self.rendered_result(
-                result.callable_class
+                cls=result.callable_class
             )
             for result in self.results
-            if self.has_fragment(result.callable_class)
-            and self.rendered_result(result.callable_class) != result.sentence
+            if self.has_fragment(cls=result.callable_class)
+            and self.rendered_result(cls=result.callable_class) != result.sentence
         }
         assert not mismatches, (
             "Verbalization results changed. Update the sentence for each of these in the snapshot "

@@ -292,7 +292,7 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
             for body in candidates:
                 if body is tracked_object:
                     continue
-                if relation.from_subject_object(tracked_object, body)():
+                if relation.from_subject_object(subject=tracked_object, object_=body)():
                     related_bodies.setdefault(tracked_object, set()).add(body)
         return related_bodies
 

@@ -35,7 +35,7 @@ MODULE_LEVEL_SENTINEL = "module_global_value"
 
 def test_stack_frame_scope_not_captured_by_default():
     fi = inspect.stack()[0]
-    frame = StackFrame.from_frame_info(fi)
+    frame = StackFrame.from_frame_info(frame_info=fi)
     assert frame.global_namespace is None
     assert frame.local_namespace is None
     assert frame.scope == {}
@@ -44,7 +44,7 @@ def test_stack_frame_scope_not_captured_by_default():
 def test_stack_frame_scope_captured_when_requested():
     local_token = "local_value"  # noqa: F841 — referenced via captured scope
     fi = inspect.stack()[0]
-    frame = StackFrame.from_frame_info(fi, capture_scope=True)
+    frame = StackFrame.from_frame_info(frame_info=fi, capture_scope=True)
 
     assert frame.local_namespace is not None and frame.global_namespace is not None
     assert frame.local_namespace["local_token"] == "local_value"
@@ -56,7 +56,7 @@ def test_stack_frame_scope_captured_when_requested():
 
 def test_stack_frame_scope_is_a_copy_not_live_reference():
     fi = inspect.stack()[0]
-    frame = StackFrame.from_frame_info(fi, capture_scope=True)
+    frame = StackFrame.from_frame_info(frame_info=fi, capture_scope=True)
     # Mutating the snapshot must not touch the real globals.
     frame.global_namespace["MODULE_LEVEL_SENTINEL"] = "mutated"
     assert MODULE_LEVEL_SENTINEL == "module_global_value"
@@ -64,7 +64,15 @@ def test_stack_frame_scope_is_a_copy_not_live_reference():
 
 def test_stack_frame_positional_construction_still_works():
     # Pre-existing call sites construct StackFrame positionally with 7 args.
-    frame = StackFrame("f.py", 1, "fn", None, None, None, "mod")
+    frame = StackFrame(
+        filename="f.py",
+        lineno=1,
+        function_name="fn",
+        code_snippet=None,
+        class_object=None,
+        function_object=None,
+        module_name="mod",
+    )
     assert frame.global_namespace is None and frame.local_namespace is None
 
 

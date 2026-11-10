@@ -155,7 +155,7 @@ def test_velocity_limit_has_its_two_limits_after_a_json_round_trip(
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
     executor = _create_executor(cylinder_bot_world)
     statechart_copy = Statechart.from_json(
-        json_data, context=executor.context, **tracker.create_kwargs()
+        data=json_data, context=executor.context, **tracker.create_kwargs()
     )
     (limit_copy,) = statechart_copy.top_level_nodes
     executor.compile(statechart=statechart_copy)
