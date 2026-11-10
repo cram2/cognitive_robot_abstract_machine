@@ -1,3 +1,8 @@
+"""
+The enumerations and value types a statechart is described with: life cycle and
+observation states, transition kinds, predicates and serialization keys.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -63,6 +68,12 @@ class StatechartJSONKey(StrEnum):
     """
     The indices of the children of every node that is the parent of a node the document
     holds, in the order the parent holds them, by the index of the parent.
+    """
+
+    CHOSEN_CHILDREN = "chosen_children"
+    """
+    The indices of the children every node choosing its child that the document holds
+    has chosen, in the order it chose them, by the index of the node.
     """
 
 
@@ -162,9 +173,11 @@ class LifeCycleValues(IntEnum):
 
     INTERRUPTED = 5, Color.from_hex("#F97316"), "■"
     """
-    The node's interrupt condition held, or an ancestor ended and took it down with it.
+    The node's interrupt condition held, an ancestor ended and took it down with it, or
+    a :class:`~cramph.node.CancelStatechart` ended the statechart while it was running
+    or paused.
 
-    Neither is a judgement of the node itself.
+    None of these is a judgement of the node itself.
     """
 
     def __new__(cls, value: int, color: Color, badge: str) -> LifeCycleValues:

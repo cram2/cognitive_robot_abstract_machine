@@ -1,5 +1,11 @@
+"""
+Every action performed by each of the robots the plans are written for.
+"""
+
 from copy import deepcopy
 from dataclasses import dataclass, field
+
+import json
 
 import numpy as np
 import pytest
@@ -10,6 +16,7 @@ from coraplex.datastructures.enums import DetectionTechnique
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.exceptions import NoFloorBelowRobot
 from coraplex.plans.plan_transformation import PlanRewriting
+from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
 from cramph.threaded_nodes import FunctionCall
@@ -66,6 +73,7 @@ from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStrai
 from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
+from giskardpy.motion_statechart.tasks.align_planes import KeepHeldBodyUpright
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPositionVelocityLimit,
@@ -155,7 +163,11 @@ from ...plan_running import (
     simulated_executor,
     statechart_of,
 )
-from cramph.context import ContextExtension
+from cramph.context import ContextExtension, StatechartContext
+from giskardpy.motion_control import MotionControl
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from krrood.entity_query_language.factories import a
 
 # %% standing a robot next to something
@@ -1864,9 +1876,14 @@ def drive_ahead(robot: AbstractRobot) -> NavigateAction:
 
 
 def test_a_tilted_cup_in_a_gripper_ends_upright(multiple_robot_apartment_context):
+    """
+    A cup held before the plan starts is turned upright during the drive.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     cup = cup_held_tilted(robot)
-    carry = CarryAction(navigate=drive_ahead(robot))
+    carry = CarryAction(
+        navigate=drive_ahead(robot), holding_arms=[left_or_only_arm(robot)]
+    )
 
     run_plan(carry, extensions)
 
@@ -1876,12 +1893,16 @@ def test_a_tilted_cup_in_a_gripper_ends_upright(multiple_robot_apartment_context
 def test_a_cup_picked_up_earlier_in_the_plan_ends_upright(
     multiple_robot_apartment_context,
 ):
+    """
+    The carry expands before the pick-up runs and finds the cup when it starts.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     cup = cup_in_reach(robot, "tilted_cup", roll=0.3)
-    carry = CarryAction(navigate=drive_ahead(robot))
+    arm = left_or_only_arm(robot)
+    carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[arm])
 
     run_plan(
-        Sequence(nodes=[PickUpAction.from_above(cup, left_or_only_arm(robot)), carry]),
+        Sequence(nodes=[PickUpAction.from_above(cup, arm), carry]),
         [*extensions, PlanRewriting(transformations=[ParkArmsBeforeFirstAction()])],
     )
 
@@ -1895,8 +1916,11 @@ def test_a_cup_picked_up_earlier_in_the_plan_ends_upright(
 def test_a_robot_holding_nothing_drives_with_its_arms_parked(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    Without a holding arm, the drive and the parking of every arm are all a carry does.
+    """
     _, robot, extensions = multiple_robot_apartment_context
-    carry = CarryAction(navigate=drive_ahead(robot))
+    carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[])
 
     run_plan(carry, extensions)
 
@@ -1909,9 +1933,13 @@ def test_a_robot_holding_nothing_drives_with_its_arms_parked(
 def test_only_the_arms_holding_nothing_are_parked(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    A holding arm stays out of the parking, which would swing its object around.
+    """
     _, robot, extensions = multiple_robot_apartment_context
     cup_held_tilted(robot)
-    carry = CarryAction(navigate=drive_ahead(robot))
+    holding_arm = left_or_only_arm(robot)
+    carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[holding_arm])
 
     run_plan(carry, extensions)
 
@@ -1921,20 +1949,53 @@ def test_only_the_arms_holding_nothing_are_parked(
         if isinstance(node, ParkArmsAction)
         for arm in node.arms
     ]
-    holding_arm = left_or_only_arm(robot)
     assert parked_arms == [arm for arm in robot.all_arms if arm is not holding_arm]
 
 
-def test_a_carry_holds_only_its_drive_until_it_starts(
+def test_a_carry_holds_all_its_steps_once_it_expanded(
     multiple_robot_apartment_context,
 ) -> None:
+    """
+    Nothing is held yet when the carry expands, and it needs no step added later.
+    """
     _, robot, extensions = multiple_robot_apartment_context
-    cup_held_tilted(robot)
-    carry = CarryAction(navigate=drive_ahead(robot))
+    arm = left_or_only_arm(robot)
+    carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[arm])
 
     expand(carry, extensions)
 
-    assert carry.nodes == [carry.navigate]
+    assert carry.nodes[0] is carry.navigate
+    assert [
+        node.end_effector
+        for node in carry.nodes
+        if isinstance(node, KeepHeldBodyUpright)
+    ] == [arm.end_effector]
+
+
+def test_an_arm_with_nothing_below_its_tool_frame_is_not_parked(
+    multiple_robot_apartment_context,
+) -> None:
+    """
+    An object contact alone carries is not in the world model, so its arm has to stay
+    where the plan left it.
+    """
+    world, robot, extensions = multiple_robot_apartment_context
+    arm = left_or_only_arm(robot)
+    tool_frame = arm.end_effector.tool_frame
+    world_R_tool_before = tool_frame.global_pose.to_np()[:3, :3]
+    up_in_tool = world_R_tool_before.T @ np.array([0.0, 0.0, 1.0])
+    carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[arm])
+
+    run_plan(carry, extensions)
+
+    up_in_world = tool_frame.global_pose.to_np()[:3, :3] @ up_in_tool
+    assert np.arccos(np.clip(up_in_world[2], -1.0, 1.0)) <= carry.upright_threshold
+    assert arm not in [
+        parked
+        for node in carry.nodes
+        if isinstance(node, ParkArmsAction)
+        for parked in node.arms
+    ]
 
 
 def test_a_cup_picked_up_by_a_statement_ends_upright(
@@ -1946,7 +2007,7 @@ def test_a_cup_picked_up_by_a_statement_ends_upright(
     _, robot, extensions = multiple_robot_apartment_context
     cup = cup_in_reach(robot, "tilted_cup", roll=0.3)
     arm = left_or_only_arm(robot)
-    carry = CarryAction(navigate=drive_ahead(robot))
+    carry = CarryAction(navigate=drive_ahead(robot), holding_arms=[arm])
 
     run_plan(
         Sequence(
@@ -1965,6 +2026,65 @@ def test_a_cup_picked_up_by_a_statement_ends_upright(
     )
 
 
+def test_a_carry_grounded_from_a_statement_ends_upright(
+    multiple_robot_apartment_context,
+) -> None:
+    """
+    The monitor giving up on a grounded carry watches its arm steps too, so it does not
+    fire once the drive arrived while the arms still move.
+    """
+    _, robot, extensions = multiple_robot_apartment_context
+    cup = cup_held_tilted(robot)
+
+    run_plan(
+        Sequence(
+            nodes=[
+                a(CarryAction)(
+                    navigate=a(NavigateAction)(
+                        target_location=drive_ahead(robot).target_location
+                    ),
+                    holding_arms=[left_or_only_arm(robot)],
+                )
+            ]
+        ),
+        extensions,
+    )
+
+    assert tilt_from_upright(cup.root) <= CarryAction.upright_threshold
+
+
+def test_a_carry_runs_where_the_statechart_was_received(
+    multiple_robot_apartment_context,
+) -> None:
+    """
+    Giskard ticks a statechart it received through JSON, in a context that does not hold
+    the robot, and reports the state of as many nodes as the sender holds.
+    """
+    world, robot, extensions = multiple_robot_apartment_context
+    cup = cup_held_tilted(robot)
+    carry = CarryAction(
+        navigate=drive_ahead(robot), holding_arms=[left_or_only_arm(robot)]
+    )
+    sender = simulated_executor(extensions)
+    sent = statechart_of(sender, carry)
+    sender.prepare(sent)
+    receiver = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+
+    received = Statechart.from_json(
+        json.loads(json.dumps(sent.to_json())),
+        context=receiver.context,
+        world=world,
+        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+    )
+    receiver.compile(received)
+    receiver.tick_until_end(timeout=10_000)
+
+    assert len(received.nodes) == len(sent.nodes)
+    assert tilt_from_upright(cup.root) <= carry.upright_threshold
+
+
 def test_a_placing_carries_its_object_to_where_it_stands(
     multiple_robot_apartment_context,
 ) -> None:
@@ -1976,7 +2096,9 @@ def test_a_placing_carries_its_object_to_where_it_stands(
     cup_held_tilted(robot)
     target = Pose.from_xyz_rpy(x=0.8, z=0.8, reference_frame=robot.root)
     move_and_place = MoveAndPlaceAction(
-        carry=CarryAction(navigate=drive_ahead(robot)),
+        carry=CarryAction(
+            navigate=drive_ahead(robot), holding_arms=[left_or_only_arm(robot)]
+        ),
         face_and_look_at=FaceAndLookAtAction(
             face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
         ),

@@ -1,3 +1,7 @@
+"""
+Demonstrations of the HSRB acting in the scenes of the Sage10k dataset.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field
@@ -199,9 +203,10 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         return main_entrance
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
         """
-        :return: The plan that opens the main entrance, picks up the object of interest and puts it down at :attr:`place_pose`.
+        Opens the main entrance, drives to the bottle, picks it up and places it in the
+        bin.
         """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
@@ -368,9 +373,9 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
         return target.first()
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
         """
-        :return: The plan that opens the main entrance, picks up :attr:`book_to_pick` and puts it down in front of where the robot then stands.
+        Opens the main entrance, picks the book up and places it next to the couch.
         """
         target_pose = Pose.from_xyz_rpy(
             x=5.48, y=7.46, z=0.8, yaw=-np.pi / 2, reference_frame=self.world.root
@@ -510,7 +515,7 @@ class Sage10kVaporwave(Sage10kAbstractDemoHSRB):
     @property
     def plan(self) -> StatechartNode:
         """
-        :return: The plan that opens the main entrance, picks up :attr:`target_to_pick` and puts it down, with the arm parked in between.
+        Opens the main entrance, picks the target up and places it.
         """
         mpu = MoveAndPickUpAction.from_standing_position(
             standing_position=self.pickup_navigation_pose,
@@ -627,9 +632,9 @@ class Sage10kSouthwesternStoreDemo(Sage10kAbstractDemoHSRB):
     scene_url = Sage10kActionableScenes.SOUTHWESTERN_STORE
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
         """
-        :return: The plan that opens the main entrance, picks up :attr:`object_of_interest` and puts it down at :attr:`place_pose`.
+        Opens the main entrance, moves the object of interest and drives on.
         """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
@@ -749,9 +754,9 @@ class Sage10kBrutalistStoreDemo(Sage10kAbstractDemoHSRB):
     scene_url = Sage10kActionableScenes.BRUTALIST_STORE
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
         """
-        :return: The plan that opens the main entrance, picks up :attr:`object_of_interest` and puts it down at :attr:`place_pose`.
+        Opens the main entrance, moves the object of interest and drives on.
         """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)
@@ -853,9 +858,9 @@ class Sage10kAmericanBuffetDemo(Sage10kAbstractDemoHSRB):
     scene_url = Sage10kActionableScenes.AMERICAN_BUFFET_RESTAURANT
 
     @property
-    def plan(self):
+    def plan(self) -> StatechartNode:
         """
-        :return: The plan that opens the main entrance, picks up :attr:`object_of_interest` and puts it down at :attr:`place_pose`.
+        Opens the main entrance and moves the object of interest.
         """
         arm = self.arm
         open_door = Sage10kOpenDoor(door=self.main_entrance)

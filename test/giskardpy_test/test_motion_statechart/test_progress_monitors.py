@@ -1,3 +1,7 @@
+"""
+Tests of detecting that the tasks of a motion stopped approaching their goals.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -132,6 +136,11 @@ class NodeWithDeclaredDependencies(EndedByOwner, MotionStatechartNode):
 
 
 class TestStallDetection:
+    """
+    A motion whose tasks stop approaching their goals is cancelled, naming the stuck
+    tasks.
+    """
+
     def test_stall_cancels_the_motion(self, pr2_world_state_reset: World):
         """
         An arm that has extended as far as it can stops closing on its goal, so the
@@ -319,7 +328,7 @@ class TestStallDetection:
         with pytest.raises(NoProgressError) as exception_info:
             executor.tick_until_end(2000)
 
-        assert progressing.stalled_tasks == [unreachable]
+        assert exception_info.value.stalled_tasks == [unreachable]
         assert unreachable.unique_name in str(exception_info.value)
         assert reachable.unique_name not in str(exception_info.value)
 
@@ -370,7 +379,7 @@ class TestStallDetection:
         with pytest.raises(NoProgressError) as exception_info:
             executor.tick_until_end(2000)
 
-        assert progressing.stalled_tasks == [unreachable]
+        assert exception_info.value.stalled_tasks == [unreachable]
         assert holding.unique_name not in str(exception_info.value)
 
     def test_a_motion_whose_running_tasks_all_reached_their_goals_is_not_stalled(

@@ -96,6 +96,10 @@ Key Points:
 - When a plan step encounters a description, it grounds it using the current world and robot.
 - If a step fails, the plan can try the next candidate, choose a fallback, or escalate to recovery.
 
+How an underspecified `a(...)` statement is grounded while the plan runs - on its own, together with the statements
+that start beside it in a parallel, and again after its action failed - is described in
+[Grounding Underspecified Statements](underspecified_grounding.md).
+
 ## Benefits you get
 
 Designator should provide a natural and easy to use interface to define robot behavior. This behavior should generally

@@ -1,20 +1,30 @@
+import threading
 from dataclasses import dataclass
+from enum import Enum
 from uuid import UUID, uuid4
 
 import pytest
-from typing_extensions import Callable, Dict, Iterator, List
+from typing_extensions import Callable, ClassVar, Dict, Iterator, List
 
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
 )
 from krrood.entity_query_language.factories import a, variable, variable_from
-from cramph.composites import ChildChooserAccess, Sequence, StatementNode
+from cramph.composites import (
+    ChildChooserAccess,
+    Parallel,
+    Sequence,
+    StatementNode,
+)
+from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
 from cramph.exceptions import MissingExecutorExtensionError
+from cramph.monitors import CountTicks
 from cramph.node import StatechartNode
 
 from coraplex.datastructures.enums import ActionTrialVisualization
+from coraplex.exceptions import MotionDidNotFinish
 from coraplex.plans.failures import (
     CandidateLimitReached,
     EmptyUnderspecified,
@@ -26,8 +36,11 @@ from cramph.threaded_nodes import FunctionCall
 from cramph.state_history import StateHistory, StateHistoryObserver
 from coraplex.plans.underspecified import (
     ActionTrial,
+    CandidateHandOver,
+    SubtreeRebuild,
     UnderspecifiedChildChooser,
 )
+from krrood.entity_query_language.query.match import Match
 from coraplex.robot_plans.actions.base import SequentialAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction, ReachAction
@@ -172,6 +185,160 @@ class RecordingAction(SequentialAction):
         world.notify_state_change()
         if len(probe.calls) == self.fail_on_attempt_number:
             raise self.reported_failure()
+
+
+# %% mimics claiming slots side by side
+
+
+class SlotPosition(float, Enum):
+    """
+    The positions a degree of freedom standing for a slot is put at.
+    """
+
+    CLAIMED = 0.4242
+    """
+    The slot is taken, unlike at any position a degree of freedom of the robot starts
+    at.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ClaimSlot(FunctionCall):
+    """
+    Claims one of the slots that degrees of freedom stand for, in the world of the
+    statechart it runs in, and fails if one claimed it first.
+
+    It records every attempt to its probe, if it has one, and fails after claiming on
+    the attempt it is told to, as a grasp knocking the object over would.
+    """
+
+    _claiming: ClassVar[threading.Lock] = threading.Lock()
+    """
+    Makes looking at a slot and claiming it one step for every instance, since the
+    nodes started on one tick run side by side in threads of their own.
+    """
+
+    slot: int
+    """
+    The index of the slot this node claims.
+    """
+
+    slot_dof_ids: tuple[UUID, ...]
+    """
+    Ids of the degrees of freedom that stand for the slots.
+    """
+
+    probe_key: UUID | None = None
+    """
+    Id of the :class:`TrialProbe` the attempts are recorded to, None for none.
+    """
+
+    fail_on_attempt_number: int | None = None
+    """
+    Fail after claiming once the probe has recorded this many attempts; never if None.
+    """
+
+    function: Callable[[], None] | None = None
+    """
+    Unused, since :meth:`run` claims the slot.
+    """
+
+    failure_types: tuple[type[BaseException], ...] = (PlanFailure,)
+
+    def run(self) -> None:
+        world = self.context.world
+        state = world.state[self.slot_dof_ids[self.slot]]
+        if self.probe_key is not None:
+            probe = _registered_probes[self.probe_key]
+            probe.calls.append(TrialCall(world=world, position_at_entry=state.position))
+        with self._claiming:
+            if state.position == SlotPosition.CLAIMED:
+                raise PlanFailure()
+            state.position = SlotPosition.CLAIMED
+            world.notify_state_change()
+        if (
+            self.probe_key is not None
+            and len(probe.calls) == self.fail_on_attempt_number
+        ):
+            raise PlanFailure()
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ClaimSlotAction(SequentialAction):
+    """
+    Claims one of the slots, after waiting a number of ticks, see :class:`ClaimSlot`.
+
+    Two of them only succeed side by side when they claim different slots, although
+    each succeeds on its own with any free slot.
+    """
+
+    slot: int
+    """
+    The index of the slot this action claims.
+    """
+
+    slot_dof_ids: tuple[UUID, ...]
+    """
+    Ids of the degrees of freedom that stand for the slots.
+    """
+
+    ticks_before_claiming: int = 0
+    """
+    How many ticks the action waits before it claims the slot.
+    """
+
+    probe_key: UUID | None = None
+    """
+    Id of the :class:`TrialProbe` the attempts are recorded to, None for none.
+    """
+
+    fail_on_attempt_number: int | None = None
+    """
+    Fail after claiming once the probe has recorded this many attempts; never if None.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        waiting = (
+            [CountTicks(ticks=self.ticks_before_claiming)]
+            if self.ticks_before_claiming > 0
+            else []
+        )
+        return [
+            *waiting,
+            ClaimSlot(
+                slot=self.slot,
+                slot_dof_ids=self.slot_dof_ids,
+                probe_key=self.probe_key,
+                fail_on_attempt_number=self.fail_on_attempt_number,
+            ),
+        ]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ClaimSlotThroughAStatementAction(SequentialAction):
+    """
+    Claims a slot through a statement among its steps, as an action leaves part of
+    what it does to be grounded once that part starts.
+    """
+
+    slot: int
+    """
+    The index of the slot this action claims.
+    """
+
+    slot_dof_ids: tuple[UUID, ...]
+    """
+    Ids of the degrees of freedom that stand for the slots.
+    """
+
+    def create_steps(self) -> list[StatechartNode]:
+        return [
+            StatementNode(
+                statement=a(ClaimSlotAction)(
+                    slot=self.slot, slot_dof_ids=self.slot_dof_ids
+                )
+            )
+        ]
 
 
 def test_underspecified_action(apartment_world_pr2_copy_with_context):
@@ -441,7 +608,13 @@ def _child_chooser_of(plan: StatechartNode) -> UnderspecifiedChildChooser:
     :return: The chooser grounding the underspecified steps of the statechart running
         `plan`.
     """
-    [chooser] = plan.statechart.context.require_extension(ChildChooserAccess).choosers
+    [chooser] = [
+        chooser
+        for chooser in plan.statechart.context.require_extension(
+            ChildChooserAccess
+        ).choosers
+        if isinstance(chooser, UnderspecifiedChildChooser)
+    ]
     return chooser
 
 
@@ -810,7 +983,7 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    assert trial.succeeds(action)
+    assert trial.succeeds(SubtreeRebuild(root=action, candidates={}))
     trial.discard()
 
 
@@ -850,3 +1023,676 @@ def test_a_candidate_that_cannot_keep_its_clearance_is_discarded(
 
     assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
     assert plan.grounded_nodes[-1].fail_on_attempt_number is None
+
+
+# %% which statements of a parallel are grounded together
+
+
+def _slot_dof_ids(world: World) -> tuple[UUID, ...]:
+    """
+    :return: Ids of the degrees of freedom that stand for four slots.
+    """
+    return tuple(dof.id for dof in world.degrees_of_freedom[:4])
+
+
+def _statement_claiming_one_of(
+    slots: list[int], slot_dof_ids: tuple[UUID, ...], **parameters
+) -> Match[ClaimSlotAction]:
+    """
+    :return: A statement claiming one of `slots`, ranked in that order, with
+        `parameters` fixed.
+    """
+    return a(ClaimSlotAction)(
+        slot=variable_from(slots), slot_dof_ids=slot_dof_ids, **parameters
+    )
+
+
+def _prepared(
+    plan: StatechartNode, extensions: list[ContextExtension]
+) -> KinematicallySimulatedPlanExecutor:
+    """
+    :return: An executor that prepared `plan` without running it.
+    """
+    executor = simulated_executor(extensions)
+    executor.prepare(statechart_of(executor, plan))
+    return executor
+
+
+def _grounded_with(statement: StatementNode) -> list[StatementNode]:
+    """
+    :return: The statements grounded together with `statement` once it asks for its
+        child.
+    """
+    return UnderspecifiedChildChooser.statements_grounded_with(statement)
+
+
+def test_the_statements_of_a_parallel_are_grounded_together(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[_statement_claiming_one_of([0, 1], slot_dof_ids) for _ in range(2)]
+    )
+    first, second = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+
+    _prepared(plan, extensions)
+
+    assert plan.nodes == [side_by_side]
+    assert _grounded_with(first) == [first, second]
+    assert _grounded_with(second) == [first, second]
+
+
+def test_the_statements_of_a_top_level_parallel_are_grounded_together(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[_statement_claiming_one_of([0, 1], slot_dof_ids) for _ in range(2)]
+    )
+
+    executor = _prepared(side_by_side, extensions)
+
+    assert executor.plan_nodes == [side_by_side]
+    assert _grounded_with(side_by_side.nodes[0]) == side_by_side.nodes
+
+
+def test_a_statement_later_in_a_branch_is_grounded_alone(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    branch = Sequence(
+        nodes=[
+            ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+            _statement_claiming_one_of([2], slot_dof_ids),
+        ]
+    )
+    side_by_side = Parallel(
+        nodes=[_statement_claiming_one_of([0], slot_dof_ids), branch]
+    )
+    statement, _ = side_by_side.nodes
+    _, later = branch.nodes
+    plan = Sequence(nodes=[side_by_side])
+
+    _prepared(plan, extensions)
+
+    assert _grounded_with(statement) == [statement]
+    assert _grounded_with(later) == [later]
+
+
+def test_a_branch_without_a_statement_starting_with_it_stays_in_the_parallel(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Only the statements are grounded together, so the other branches start with the
+    parallel, such as a node letting a gripper touch its surroundings meanwhile.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[
+            _statement_claiming_one_of([0], slot_dof_ids),
+            ClaimSlotAction(slot=2, slot_dof_ids=slot_dof_ids),
+            _statement_claiming_one_of([1], slot_dof_ids),
+        ]
+    )
+    first, beside, second = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+
+    _prepared(plan, extensions)
+
+    assert plan.nodes == [side_by_side]
+    assert side_by_side.nodes == [first, beside, second]
+    assert _grounded_with(first) == [first, second]
+
+
+def test_the_statements_of_a_parallel_needing_a_number_of_successes_are_grounded_together(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[
+            _statement_claiming_one_of([0], slot_dof_ids),
+            ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+            _statement_claiming_one_of([2], slot_dof_ids),
+        ],
+        minimum_success=1,
+    )
+    first, _, second = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+
+    _prepared(plan, extensions)
+
+    assert _grounded_with(first) == [first, second]
+
+
+def test_the_statements_of_a_parallel_inside_a_parallel_are_grounded_with_the_outer_one(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    inner = Parallel(nodes=[_statement_claiming_one_of([0], slot_dof_ids)])
+    outer = Parallel(nodes=[inner, _statement_claiming_one_of([1], slot_dof_ids)])
+    plan = Sequence(nodes=[outer])
+
+    _prepared(plan, extensions)
+
+    assert _grounded_with(inner.nodes[0]) == [inner.nodes[0], outer.nodes[1]]
+
+
+def test_the_statements_of_a_parallel_later_in_a_branch_are_grounded_together(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    inner = Parallel(
+        nodes=[_statement_claiming_one_of([1], slot_dof_ids) for _ in range(2)]
+    )
+    outer = Parallel(
+        nodes=[
+            _statement_claiming_one_of([0], slot_dof_ids),
+            Sequence(nodes=[ClaimSlotAction(slot=2, slot_dof_ids=slot_dof_ids), inner]),
+        ]
+    )
+    plan = Sequence(nodes=[outer])
+
+    _prepared(plan, extensions)
+
+    assert _grounded_with(inner.nodes[0]) == inner.nodes
+
+
+def test_a_statement_that_chose_is_grounded_alone_until_its_parallel_is_reset(
+    apartment_world_pr2_copy_with_context,
+):
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    side_by_side = Parallel(
+        nodes=[_statement_claiming_one_of([0, 1], slot_dof_ids) for _ in range(2)]
+    )
+    first, second = side_by_side.nodes
+    plan = Sequence(nodes=[side_by_side])
+    _prepared(plan, extensions)
+    for slot, statement in enumerate(side_by_side.nodes):
+        statement.choose_child_with(
+            CandidateHandOver(
+                candidate=ClaimSlotAction(slot=slot, slot_dof_ids=slot_dof_ids)
+            )
+        )
+    grounded_before_the_reset = _grounded_with(first)
+
+    for statement in side_by_side.nodes:
+        statement.on_reset()
+
+    assert grounded_before_the_reset == [first]
+    assert _grounded_with(first) == [first, second]
+
+
+# %% grounding the statements of a parallel together
+
+
+def _statements_of(plan: Sequence) -> list[StatementNode]:
+    """
+    :return: The statements among the children of the one parallel `plan` runs, in
+        their order.
+    """
+    [parallel] = plan.nodes
+    return [node for node in parallel.nodes if isinstance(node, StatementNode)]
+
+
+def test_statements_side_by_side_are_grounded_together(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The slot each statement ranks first works on its own, but not beside the other, so
+    they settle on different slots before either runs, rather than one of them failing
+    for real first.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of([0, 1], slot_dof_ids) for _ in range(2)
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    statements = _statements_of(plan)
+    assert [statement.grounded_nodes[0].slot for statement in statements] == [0, 1]
+    assert all(len(statement.chosen_children) == 1 for statement in statements)
+
+
+def test_nodes_beside_statements_are_part_of_their_trial(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A node that is not an action claims the slot the statement ranks first, so the
+    statement settles on the other one before it runs.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of([0, 1], slot_dof_ids),
+                    ClaimSlot(slot=0, slot_dof_ids=slot_dof_ids),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [statement] = [
+        node for node in _statements_of(plan) if isinstance(node, StatementNode)
+    ]
+    assert statement.grounded_nodes[0].slot == 1
+    assert len(statement.chosen_children) == 1
+
+
+def test_a_candidate_grounding_a_statement_of_its_own_is_tried_beside_the_others(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The candidate leaves the slot it claims to a statement among its steps, which its
+    trial grounds as running it does.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    a(ClaimSlotThroughAStatementAction)(
+                        slot=variable_from([0]), slot_dof_ids=slot_dof_ids
+                    ),
+                    ClaimSlot(slot=1, slot_dof_ids=slot_dof_ids),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [statement] = [
+        node for node in _statements_of(plan) if isinstance(node, StatementNode)
+    ]
+    assert len(statement.chosen_children) == 1
+    assert world.state[slot_dof_ids[0]].position == SlotPosition.CLAIMED
+
+
+# %% a branch failing while its parallel runs
+
+
+def test_only_the_failed_statement_is_grounded_again_after_the_other_branch_succeeded(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Opening a drawer fails after the pick-up beside it succeeded: the opening is
+    grounded again, while the pick-up, which cannot be repeated, runs only once.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    failing_probe = register_probe()
+    succeeding_probe = register_probe()
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [2, 3],
+                        slot_dof_ids,
+                        ticks_before_claiming=5,
+                        probe_key=failing_probe,
+                        fail_on_attempt_number=2,
+                    ),
+                    _statement_claiming_one_of(
+                        [1], slot_dof_ids, probe_key=succeeding_probe
+                    ),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    failed, succeeded = _statements_of(plan)
+    assert [node.slot for node in failed.grounded_nodes] == [2, 3]
+    assert len(succeeded.chosen_children) == 1
+    trial, real = _registered_probes[succeeding_probe].calls
+    assert trial.world is not world
+    assert real.world is world
+
+
+def test_a_statement_grounded_together_proposes_no_candidate_it_ran_again(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The statement grounded together with the one beside it goes on from the candidate
+    its parallel handed it once that one failed, as a statement grounding on its own
+    goes on from the candidate it ran, so no attempt of its claims a slot it claimed
+    already.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    failing_probe = register_probe()
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [2, 3],
+                        slot_dof_ids,
+                        ticks_before_claiming=5,
+                        probe_key=failing_probe,
+                        fail_on_attempt_number=2,
+                    ),
+                    _statement_claiming_one_of([1], slot_dof_ids),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    failed, _ = _statements_of(plan)
+    assert [node.slot for node in failed.grounded_nodes] == [2, 3]
+    assert [
+        call.position_at_entry == SlotPosition.CLAIMED
+        for call in _registered_probes[failing_probe].calls
+    ] == [False, False, False, False]
+
+
+def test_a_statement_grounded_again_is_tried_without_what_already_ended(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the failed statement claimed slot 1 and ended, so it is not tried
+    again beside the statement's next slot, where it would find its slot taken.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [2, 3],
+                        slot_dof_ids,
+                        ticks_before_claiming=5,
+                        probe_key=register_probe(),
+                        fail_on_attempt_number=2,
+                    ),
+                    ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [grounded] = _statements_of(plan)
+    assert [node.slot for node in grounded.grounded_nodes] == [2, 3]
+
+
+def test_a_statement_grounded_again_is_tried_needing_only_the_successes_still_missing(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the failed statement succeeded and ended, so the statement's
+    next slot is tried needing one success, not the two its parallel needed at first.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [2, 3],
+                        slot_dof_ids,
+                        ticks_before_claiming=5,
+                        probe_key=register_probe(),
+                        fail_on_attempt_number=2,
+                    ),
+                    ClaimSlotAction(slot=1, slot_dof_ids=slot_dof_ids),
+                ],
+                minimum_success=2,
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [grounded] = _statements_of(plan)
+    assert [node.slot for node in grounded.grounded_nodes] == [2, 3]
+
+
+def test_a_statement_grounded_again_is_tried_beside_what_still_runs(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the failed statement claims slot 1 later on, so the statement,
+    whose first slot it left claimed, settles on slot 2 rather than on slot 1, which
+    works on its own.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    statement = _statement_claiming_one_of(
+        [0, 1, 2],
+        slot_dof_ids,
+        probe_key=register_probe(),
+        fail_on_attempt_number=2,
+    )
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    statement,
+                    ClaimSlotAction(
+                        slot=1, slot_dof_ids=slot_dof_ids, ticks_before_claiming=20
+                    ),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [grounded] = _statements_of(plan)
+    assert [node.slot for node in grounded.grounded_nodes] == [0, 2]
+
+
+def test_a_statement_starting_later_in_a_branch_is_tried_beside_what_still_runs(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the statement claims slot 1 later on, so the statement settles on
+    slot 2 rather than on slot 1, which works on its own.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    branch = Sequence(
+        nodes=[
+            CountTicks(ticks=3),
+            _statement_claiming_one_of([1, 2], slot_dof_ids),
+        ]
+    )
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    branch,
+                    ClaimSlotAction(
+                        slot=1, slot_dof_ids=slot_dof_ids, ticks_before_claiming=20
+                    ),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [statement] = branch.nodes[1:]
+    assert [node.slot for node in statement.grounded_nodes] == [2]
+
+
+def test_a_statement_is_tried_beside_a_parallel_grounded_together_that_still_runs(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The parallel beside the statement grounded its own statement to claim slot 1 later
+    on, so the statement settles on slot 2 rather than on slot 1, which works on its
+    own.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    branch = Sequence(
+        nodes=[
+            CountTicks(ticks=3),
+            _statement_claiming_one_of([1, 2], slot_dof_ids),
+        ]
+    )
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    branch,
+                    Sequence(
+                        nodes=[
+                            CountTicks(ticks=1),
+                            Parallel(
+                                nodes=[
+                                    _statement_claiming_one_of(
+                                        [1], slot_dof_ids, ticks_before_claiming=20
+                                    )
+                                ]
+                            ),
+                        ]
+                    ),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [statement] = branch.nodes[1:]
+    assert [node.slot for node in statement.grounded_nodes] == [2]
+
+
+def test_a_failed_statement_out_of_candidates_fails_its_parallel(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The statement has no slot left once its only one is claimed, so the plan fails for
+    that statement, and the branch beside it, which succeeded, is not run again.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    succeeding_probe = register_probe()
+    failing = _statement_claiming_one_of(
+        [2],
+        slot_dof_ids,
+        ticks_before_claiming=5,
+        probe_key=register_probe(),
+        fail_on_attempt_number=2,
+    )
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    failing,
+                    _statement_claiming_one_of(
+                        [1], slot_dof_ids, probe_key=succeeding_probe
+                    ),
+                ]
+            )
+        ]
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(EmptyUnderspecified) as failure:
+        executor.compile(statechart_of(executor, plan))
+        executor.execute()
+
+    assert type(failure.value) is EmptyUnderspecified
+    assert failure.value.node.statement is failing
+    [grounding] = plan.nodes
+    assert grounding.life_cycle_state == LifeCycleValues.FAILED
+    assert len(_registered_probes[succeeding_probe].calls) == 2
+
+
+def test_a_failing_branch_without_a_statement_fails_its_parallel_without_running_it_again(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the statement fails, and nothing grounds it anew, so the parallel
+    fails, rather than being grounded again with the statement's next candidate and run
+    once more.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    statement_probe = register_probe()
+    plan = Sequence(
+        nodes=[
+            Parallel(
+                nodes=[
+                    _statement_claiming_one_of(
+                        [1, 2], slot_dof_ids, probe_key=statement_probe
+                    ),
+                    RecordingAction(
+                        probe_key=register_probe(),
+                        dof_id=world.degrees_of_freedom[5].id,
+                        fail_on_attempt_number=2,
+                    ),
+                ]
+            )
+        ]
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(MotionDidNotFinish):
+        executor.compile(statechart_of(executor, plan))
+        executor.execute()
+
+    [parallel] = plan.nodes
+    [statement] = _statements_of(plan)
+    assert parallel.life_cycle_state == LifeCycleValues.FAILED
+    assert len(statement.chosen_children) == 1
+    assert len(_registered_probes[statement_probe].calls) == 2
+
+
+# %% a trial keeps the conditions of the plan
+
+
+def test_a_trial_keeps_a_start_condition_wired_to_a_node_beside_it(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The action beside the statement starts only once the statement failed, which it
+    does not, so the statement's trial does not start it either.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    slot_dof_ids = _slot_dof_ids(world)
+    fallback_probe = register_probe()
+    statement = StatementNode(statement=_statement_claiming_one_of([0], slot_dof_ids))
+    fallback = RecordingAction(
+        probe_key=fallback_probe, dof_id=world.degrees_of_freedom[5].id
+    )
+    fallback.start_condition = statement.is_failed
+    plan = Sequence(nodes=[Parallel(nodes=[statement, fallback], minimum_success=1)])
+
+    run_plan(plan, extensions)
+
+    assert statement.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert _registered_probes[fallback_probe].calls == []

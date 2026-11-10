@@ -1,3 +1,7 @@
+"""
+Motion tasks driving a robot in a simulated world until they reach their goal.
+"""
+
 from dataclasses import fields
 from math import radians
 
@@ -10,6 +14,13 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 from giskardpy.motion_statechart.goals.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
+)
+from semantic_digital_twin.robots.pr2 import PR2
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
@@ -19,9 +30,13 @@ from giskardpy.motion_statechart.monitors.progress_monitors import StillProgress
 from cramph.statechart import (
     Statechart,
 )
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.align_planes import (
+    AlignPlanes,
+    KeepHeldBodyUpright,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
+    RigidCoupling,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.motion_statechart.tasks.feature_functions import (
@@ -55,8 +70,12 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
     Point3,
 )
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    PrismaticConnection,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -852,6 +871,84 @@ def test_align_planes(pr2_world_state_reset: World):
     )
 
 
+def _run_keep_held_body_upright(world: World) -> KeepHeldBodyUpright:
+    """
+    :param world: A world holding an end effector.
+    :return: The task after it ran in `world` until it observed its goal as reached.
+    """
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world), extensions=[MotionControl()]
+    )
+    statechart = Statechart(context=executor.context)
+    keep_upright = KeepHeldBodyUpright(
+        root_link=world.root,
+        end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+    )
+    statechart.add_node(keep_upright)
+    end = EndMotion()
+    statechart.add_node(end)
+    end.start_condition = keep_upright.observes_true
+    executor.compile(statechart=statechart)
+    executor.tick_until_end()
+    return keep_upright
+
+
+def _tilt_of_axis(world_R_frame: np.ndarray, frame_V_axis: np.ndarray) -> float:
+    """
+    :param world_R_frame: The orientation of a frame in the world.
+    :param frame_V_axis: A unit vector in that frame.
+    :return: The angle in radians between the vector and the world's z-axis.
+    """
+    return float(np.arccos(np.clip((world_R_frame @ frame_V_axis)[2], -1.0, 1.0)))
+
+
+def test_keep_held_body_upright_turns_the_body_upright(pr2_world_state_reset: World):
+    """
+    A body tilted against the tool frame ends upright, not the tool frame itself.
+    """
+    world = pr2_world_state_reset
+    tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
+    held_body = Body(name=PrefixedName("held_body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(held_body)
+        world.add_connection(
+            FixedConnection(
+                parent=tool_frame,
+                child=held_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    roll=0.4, pitch=0.3, reference_frame=tool_frame
+                ),
+            )
+        )
+
+    keep_upright = _run_keep_held_body_upright(world)
+
+    assert (
+        _tilt_of_axis(held_body.global_pose.to_np()[:3, :3], np.array([0.0, 0.0, 1.0]))
+        <= keep_upright.threshold
+    )
+
+
+def test_keep_held_body_upright_holding_nothing_keeps_the_tool_frame_as_it_is(
+    pr2_world_state_reset: World,
+):
+    """
+    With no body below the tool frame, the direction up in it at the start stays up.
+    """
+    world = pr2_world_state_reset
+    tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
+    up_in_tool_frame = tool_frame.global_pose.to_np()[:3, :3].T @ np.array(
+        [0.0, 0.0, 1.0]
+    )
+
+    keep_upright = _run_keep_held_body_upright(world)
+
+    assert (
+        _tilt_of_axis(tool_frame.global_pose.to_np()[:3, :3], up_in_tool_frame)
+        <= keep_upright.threshold
+    )
+
+
 def test_align_perpendicular(pr2_world_state_reset: World):
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
@@ -1346,6 +1443,57 @@ class TestArticulateGraspedMechanism:
         grasp_node = next(node for node in nodes if isinstance(node, CartesianPose))
         assert mechanism_node.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
         assert grasp_node.weight == DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
+
+    def test_the_end_effector_holding_the_grasped_part_may_touch_its_surroundings(
+        self, pr2_world_copy
+    ):
+        """
+        Holding on to the grasped part means touching it and what it is mounted on, so
+        the end effector holding it is let off collision avoidance while the goal runs.
+        """
+        end_effector = pr2_world_copy.get_semantic_annotations_by_type(PR2)[
+            0
+        ].right_arm.end_effector
+        goal = ArticulateGraspedMechanism(
+            tip_link=end_effector.tool_frame,
+            environment_link=pr2_world_copy.get_body_by_name("torso_lift_link"),
+            goal=0.0,
+            holding_end_effector=end_effector,
+        )
+
+        Statechart(context=create_context_with_motion_control(pr2_world_copy)).add_node(
+            goal
+        )
+
+        nodes = goal.nodes
+
+        [allowance] = [
+            node for node in nodes if isinstance(node, UpdateTemporaryCollisionRules)
+        ]
+        assert [
+            (type(rule), rule.end_effector) for rule in allowance.temporary_rules
+        ] == [(AllowCollisionForEndEffector, end_effector)]
+
+    def test_without_an_end_effector_holding_the_grasped_part_nothing_is_let_off_collision_avoidance(
+        self, prismatic_bot
+    ):
+        goal = ArticulateGraspedMechanism(
+            tip_link=prismatic_bot.root,
+            environment_link=prismatic_bot.get_body_by_name("robot"),
+            goal=0.0,
+        )
+
+        Statechart(context=create_context_with_motion_control(prismatic_bot)).add_node(
+            goal
+        )
+
+        nodes = goal.nodes
+
+        assert [type(node) for node in nodes] == [
+            JointPositionList,
+            CartesianPose,
+            RigidCoupling,
+        ]
 
     def test_a_goal_within_the_limits_is_kept(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")

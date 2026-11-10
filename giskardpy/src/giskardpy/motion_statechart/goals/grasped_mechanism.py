@@ -6,6 +6,7 @@ import numpy as np
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
 from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -14,6 +15,9 @@ from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.mixins import HasGoalParameter, HasTipLinkParameter
 from cramph.node import CompositeNode, NodeArtifacts
+from giskardpy.motion_statechart.goals.collision_avoidance import (
+    UpdateTemporaryCollisionRules,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     RigidCoupling,
@@ -37,11 +41,19 @@ class ArticulateGraspedMechanism(
     Assumes that the grasped part (e.g. a handle or a bottle cap) has already been
     grasped. Works with any mechanism whose grasped part hangs below an
     :class:`ActiveConnection1DOF`, e.g. drawers, doors, or screw caps.
+
+    While it runs, :attr:`holding_end_effector`, if given, may touch its surroundings.
     """
 
     environment_link: KinematicStructureEntity
     """
     Name of the handle that was grasped.
+    """
+
+    holding_end_effector: EndEffector | None = None
+    """
+    The end effector holding the grasped part, which is let off collision avoidance
+    while this goal runs, or None to keep every collision check.
     """
 
     mechanism_weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
@@ -73,8 +85,16 @@ class ArticulateGraspedMechanism(
             np.clip(self.goal, limits.lower.position, limits.upper.position)
         )
 
+        allowances = []
+        if self.holding_end_effector is not None:
+            allowances.append(
+                UpdateTemporaryCollisionRules.for_end_effector(
+                    self.holding_end_effector
+                )
+            )
         self._add_children_to_statechart(
             [
+                *allowances,
                 JointPositionList(
                     name="hinge goal",
                     goal=JointState.from_mapping({self.connection: self.goal}),

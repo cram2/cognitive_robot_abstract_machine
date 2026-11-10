@@ -5,6 +5,7 @@ import pandas as pd
 
 from probabilistic_model.causal_structure.relational_checks import (
     ExampleToPartCheck,
+    PartAttributeAdjacency,
 )
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     PartTrainingTable,
@@ -64,6 +65,26 @@ def room_tables(
     )
 
 
+def room_tables_with_noisy_copies(seed: int = 0) -> RelationalTrainingTables:
+    """
+    :param seed: Seed of the draw.
+    :return: The tables of :func:`room_tables`, with ``warm`` setting the parts' ``wet``
+        attribute directly, plus ``sunny``, which reads ``warm`` wrong a quarter of the
+        time, and each part's ``dripping``, which reads ``wet`` wrong a tenth of the time.
+    """
+    tables = room_tables(attribute_drives_parts=True, instance_count=300, seed=seed)
+    random_state = np.random.default_rng(seed + 1)
+    warm = tables.example_rows["Room.warm"].to_numpy()
+    tables.example_rows.insert(
+        1, "Room.sunny", warm ^ (random_state.random(len(warm)) < 0.25)
+    )
+    part_rows = tables.part_tables["parts"].rows
+    part_rows["dripping"] = part_rows["wet"] ^ (
+        random_state.random(len(part_rows)) < 0.1
+    )
+    return tables
+
+
 # %% the check
 
 
@@ -88,3 +109,49 @@ def test_attribute_independent_of_parts_is_no_dependence():
         ExampleToPartCheck().dependences(room_tables(attribute_drives_parts=False))
         == []
     )
+
+
+# %% the dependences that remain given another attribute
+
+
+def test_noisy_copies_depend_on_the_parts_before_conditioning():
+    tables = room_tables_with_noisy_copies()
+
+    assert {
+        (dependence.example_attribute, dependence.part_attribute)
+        for dependence in ExampleToPartCheck().dependences(tables)
+    } == {
+        ("Room.warm", "wet"),
+        ("Room.warm", "dripping"),
+        ("Room.sunny", "wet"),
+        ("Room.sunny", "dripping"),
+    }
+
+
+def test_copy_of_the_driving_attribute_is_dropped_given_it():
+    tables = room_tables_with_noisy_copies()
+
+    dependences = ExampleToPartCheck().dependences_given_another_attribute(
+        tables.example_rows,
+        "parts",
+        tables.part_tables["parts"],
+        PartAttributeAdjacency(),
+    )
+
+    assert {dependence.example_attribute for dependence in dependences} == {"Room.warm"}
+
+
+def test_part_attribute_reached_through_an_adjacent_one_is_dropped_given_it():
+    tables = room_tables_with_noisy_copies()
+
+    dependences = ExampleToPartCheck().dependences_given_another_attribute(
+        tables.example_rows,
+        "parts",
+        tables.part_tables["parts"],
+        PartAttributeAdjacency({"wet": {"dripping"}, "dripping": {"wet"}}),
+    )
+
+    assert [
+        (dependence.example_attribute, dependence.part_attribute)
+        for dependence in dependences
+    ] == [("Room.warm", "wet")]

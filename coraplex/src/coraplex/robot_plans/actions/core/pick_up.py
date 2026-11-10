@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from coraplex.robot_plans.actions.base import SequentialAction
+from coraplex.robot_plans.actions.base import ParallelAction, SequentialAction
 from cramph.composites import Parallel
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.mixins import HasFingerStallToleranceParameters
@@ -20,6 +20,9 @@ from coraplex.robot_plans.mixins import (
     OperatesGripper,
     ReattachesBranches,
 )
+from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from giskardpy.motion_statechart.weights import DefaultWeights
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
@@ -27,7 +30,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
-from semantic_digital_twin.robots.robot_parts import Arm
+from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from krrood_spatial_math.spatial_types import RotationMatrix
 from krrood_spatial_math.spatial_types import Pose
 
@@ -249,3 +252,49 @@ class GraspingAction(
                 ),
             ]
         )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class FixateObjectAction(ParallelAction):
+    """
+    Keeps what a gripper holds exactly where it is, by keeping the gripper where it is
+    when the action starts, whether the object hangs off the gripper or not, such as the
+    handle of a drawer the gripper holds open.
+
+    Like the task it holds, it leaves its end to its owner: beside other nodes in a
+    parallel it keeps the object in place for as long as the parallel runs, while a
+    sequence ends it as soon as the gripper holds still.
+    """
+
+    end_effector: EndEffector
+    """
+    The gripper that holds the object.
+    """
+
+    @property
+    def inherent_success_condition(self) -> Scalar:
+        """
+        Differs from :attr:`~coraplex.robot_plans.actions.base.ParallelAction.inherent_s
+        uccess_condition` in never ending the action itself, because ending it lets the
+        object go.
+        """
+        return Scalar.const_false()
+
+    def create_temporary_collision_rules(self) -> list[CollisionRule]:
+        """
+        :return: An allowance for the gripper to touch the object it is around.
+        """
+        return [AllowCollisionForEndEffector(end_effector=self.end_effector)]
+
+    def create_steps(self) -> list[StatechartNode]:
+        tool_frame = self.end_effector.tool_frame
+        return [
+            CartesianPose(
+                name="Keep the gripper in place",
+                root_link=self.world.root,
+                tip_link=tool_frame,
+                goal=Pose(reference_frame=tool_frame),
+                # Holding on has to matter more than keeping clear of what is held.
+                weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
+            )
+        ]

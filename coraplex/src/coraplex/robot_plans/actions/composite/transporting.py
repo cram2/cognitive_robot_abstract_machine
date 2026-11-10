@@ -1,3 +1,7 @@
+"""
+Actions that take an object or open a container from where the robot stands.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -91,7 +95,8 @@ class TransportAction(SequentialAction):
                                 context=context,
                             ),
                         )
-                    )
+                    ),
+                    holding_arms=[arm],
                 ),
                 face_and_look_at=a(FaceAndLookAtAction)(
                     face_at=a(FaceAtAction)(target=target_location),
@@ -172,7 +177,8 @@ class MoveAndPlaceAction(SequentialAction):
         """
         return cls(
             carry=CarryAction(
-                navigate=NavigateAction(target_location=standing_position)
+                navigate=NavigateAction(target_location=standing_position),
+                holding_arms=[arm],
             ),
             face_and_look_at=FaceAndLookAtAction(
                 face_at=FaceAtAction(target=target_location),

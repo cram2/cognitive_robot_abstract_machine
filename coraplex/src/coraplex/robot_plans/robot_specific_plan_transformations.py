@@ -168,14 +168,16 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
     def is_applicable(self, plan_node: CartesianPose) -> bool:
         if type(plan_node) is not CartesianPose:
             return False
-        owner = next(
-            (
-                node
-                for node in plan_node.path
-                if isinstance(node, Action)
-                or not isinstance(node, ControlStructureNode)
-            ),
-            None,
+        parent = plan_node.parent_node
+        owner = (
+            None
+            if parent is None
+            else parent.find_upwards(
+                lambda node: (
+                    isinstance(node, Action)
+                    or not isinstance(node, ControlStructureNode)
+                )
+            )
         )
         return (
             isinstance(owner, MovesToolCenterPoint)

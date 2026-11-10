@@ -124,7 +124,8 @@ def _place_at(target: Pose, extensions: list[ContextExtension]) -> MoveAndPlaceA
                         context=context_of(extensions),
                     ),
                 )
-            )
+            ),
+            holding_arms=[robot.right_arm],
         ),
         face_and_look_at=a(FaceAndLookAtAction)(
             face_at=a(FaceAtAction)(target=target),
@@ -200,6 +201,9 @@ def test_a_transport_of_a_graspable_stands_around_the_object_then_the_target(
     )
     assert pick_up_location.target_pose.reference_frame is milk.root
     assert place_location.target_pose is target
+    assert transport.place._kwargs_["carry"]._kwargs_["holding_arms"] == [
+        robot.right_arm
+    ]
 
 
 # %% picking up and placing without moving
@@ -791,6 +795,7 @@ def test_a_move_and_place_from_a_standing_position_places_with_the_given_arm(
     )
 
     assert move_and_place.carry.navigate.target_location is standing_position
+    assert move_and_place.carry.holding_arms == [robot.left_arm]
     assert move_and_place.face_and_look_at.face_at.target is target
     assert move_and_place.face_and_look_at.look_at.target is target
     assert move_and_place.place.arm is robot.left_arm

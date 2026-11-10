@@ -150,10 +150,21 @@ def test_universal_quantifier_is_true_when_every_value_satisfies_the_condition()
     assert truth_values(for_all(quantified_value, quantified_value > 5)) == [True]
 
 
-def test_universal_quantifier_yields_nothing_when_a_value_fails_the_condition():
+def test_universal_quantifier_is_false_when_a_value_fails_the_condition():
+    """
+    Like the existential quantifier, a failed universal reports False (negation as
+    failure) rather than yielding nothing, so an enclosing disjunction or rule
+    alternative still evaluates its other branch.
+    """
     quantified_value = variable_from([3, 7])
 
-    assert truth_values(for_all(quantified_value, quantified_value > 5)) == []
+    assert truth_values(for_all(quantified_value, quantified_value > 5)) == [False]
+
+
+def test_universal_quantifier_over_no_values_is_vacuously_true():
+    quantified_value = variable_from([])
+
+    assert truth_values(for_all(quantified_value, quantified_value > 5)) == [True]
 
 
 # %% union
