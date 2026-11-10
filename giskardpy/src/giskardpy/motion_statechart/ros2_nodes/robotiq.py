@@ -24,11 +24,13 @@ from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
-from semantic_digital_twin.robots.robotiq_85_gripper import HasGripperCommandServer
+from semantic_digital_twin.robots.robotiq_85_gripper import (
+    HasParallelGripperCommandServer,
+)
 
 logger = logging.getLogger(__name__)
 
-# %% the gripper command action server task
+# %% the parallel gripper command action server task
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -88,15 +90,15 @@ class RobotiqGripperActionServerTask(
     ) -> StatechartNode:
         """
         Differs from :meth:`MovesGripperToConfiguration.moving_gripper_to` in driving a
-        two-finger :class:`HasGripperCommandServer` through its server, to the width of
-        `configuration`; a stall always counts as done.
+        two-finger :class:`HasParallelGripperCommandServer` through its server, to the
+        width of `configuration`; a stall always counts as done.
 
         Any other configuration is reached as :meth:`MoveFingers.moving_gripper_to`
         reaches it.
         """
         end_effector = configuration.end_effector
         if not (
-            isinstance(end_effector, HasGripperCommandServer)
+            isinstance(end_effector, HasParallelGripperCommandServer)
             and isinstance(end_effector, HasTwoFingers)
         ):
             return MoveFingers.moving_gripper_to(

@@ -36,7 +36,9 @@ from semantic_digital_twin.robots.robot_part_mixins import (
     HasTorso,
     HasTwoFingers,
 )
-from semantic_digital_twin.robots.robotiq_85_gripper import HasGripperCommandServer
+from semantic_digital_twin.robots.robotiq_85_gripper import (
+    HasParallelGripperCommandServer,
+)
 from semantic_digital_twin.robots.robot_parts import (
     AbstractRobot,
     ServoedRobotPart,
@@ -68,10 +70,10 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% Robot parts
 
 
-class TiagoGripperCommandAction(StrEnum):
+class TiagoParallelGripperCommandTopic(StrEnum):
     """
-    The names the drivers of the Tiago's grippers serve their gripper command actions
-    under, one driver per gripper.
+    The names the drivers of the Tiago's grippers serve their parallel gripper command
+    actions under, one driver per gripper.
     """
 
     LEFT_GRIPPER = "gripper_left_controller/gripper_cmd"
@@ -201,7 +203,7 @@ class TiagoRightIndexFinger(Finger):
 
 
 @dataclass(eq=False)
-class TiagoGripper(EndEffector, HasGripperCommandServer, ABC):
+class TiagoGripper(EndEffector, HasParallelGripperCommandServer, ABC):
     """
     A Robotiq gripper of a Tiago, whose joints all follow the one joint its controller
     commands.
@@ -263,8 +265,8 @@ class TiagoLeftGripper(
         return TiagoJoint.LEFT_GRIPPER_FINGER
 
     @classproperty
-    def command_action_topic(cls) -> str:
-        return TiagoGripperCommandAction.LEFT_GRIPPER
+    def parallel_gripper_command_topic(cls) -> str:
+        return TiagoParallelGripperCommandTopic.LEFT_GRIPPER
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -289,8 +291,8 @@ class TiagoRightGripper(
         return TiagoJoint.RIGHT_GRIPPER_FINGER
 
     @classproperty
-    def command_action_topic(cls) -> str:
-        return TiagoGripperCommandAction.RIGHT_GRIPPER
+    def parallel_gripper_command_topic(cls) -> str:
+        return TiagoParallelGripperCommandTopic.RIGHT_GRIPPER
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(

@@ -39,7 +39,7 @@ from semantic_digital_twin.robots.robot_parts import (
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
 from semantic_digital_twin.robots.robotiq_85_gripper import (
-    HasGripperCommandServer,
+    HasParallelGripperCommandServer,
     Robotiq85Gripper,
 )
 from semantic_digital_twin.robots.ur10e_arm import UR10eArm
@@ -86,10 +86,10 @@ class TracyController(StrEnum):
     """
 
 
-class TracyGripperCommandAction(StrEnum):
+class TracyParallelGripperCommandTopic(StrEnum):
     """
-    The names the drivers of the Tracy's grippers serve their gripper command actions
-    under, one driver per gripper.
+    The names the drivers of the Tracy's grippers serve their parallel gripper command
+    actions under, one driver per gripper.
     """
 
     LEFT_GRIPPER = "left_gripper/robotiq_gripper_controller/gripper_cmd"
@@ -245,11 +245,11 @@ class TracyRightGripperRightFinger(Finger):
 @dataclass(eq=False)
 class TracyLeftGripper(
     Robotiq85Gripper[TracyLeftGripperLeftFinger, TracyLeftGripperRightFinger],
-    HasGripperCommandServer,
+    HasParallelGripperCommandServer,
 ):
     @classproperty
-    def command_action_topic(cls) -> str:
-        return TracyGripperCommandAction.LEFT_GRIPPER
+    def parallel_gripper_command_topic(cls) -> str:
+        return TracyParallelGripperCommandTopic.LEFT_GRIPPER
 
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -306,11 +306,11 @@ class TracyLeftGripper(
 @dataclass(eq=False)
 class TracyRightGripper(
     Robotiq85Gripper[TracyRightGripperLeftFinger, TracyRightGripperRightFinger],
-    HasGripperCommandServer,
+    HasParallelGripperCommandServer,
 ):
     @classproperty
-    def command_action_topic(cls) -> str:
-        return TracyGripperCommandAction.RIGHT_GRIPPER
+    def parallel_gripper_command_topic(cls) -> str:
+        return TracyParallelGripperCommandTopic.RIGHT_GRIPPER
 
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()

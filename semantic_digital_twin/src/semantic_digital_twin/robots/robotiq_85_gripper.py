@@ -24,11 +24,11 @@ from semantic_digital_twin.world_description.connection_properties import (
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
-# %% driving a gripper through a gripper command server
+# %% driving a gripper through a parallel gripper command server
 
 
 @dataclass(eq=False)
-class HasGripperCommandServer(HasGripperActionServers, ABC):
+class HasParallelGripperCommandServer(HasGripperActionServers, ABC):
     """
     A gripper whose driver serves a ``control_msgs/ParallelGripperCommand`` action,
     which brings the real gripper into every state.
@@ -36,13 +36,13 @@ class HasGripperCommandServer(HasGripperActionServers, ABC):
 
     @classproperty
     @abstractmethod
-    def command_action_topic(cls) -> str:
+    def parallel_gripper_command_topic(cls) -> str:
         """
-        The name the driver serves the gripper command action under.
+        The name the driver serves the parallel gripper command action under.
         """
 
     def action_topic_serving(self, state_type: JointStateType | None) -> str:
-        return self.command_action_topic
+        return self.parallel_gripper_command_topic
 
 
 # %% the Robotiq 2F-85

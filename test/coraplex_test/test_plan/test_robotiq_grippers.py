@@ -1,6 +1,6 @@
 """
-Real robots driving their grippers through gripper command action servers, skipped where
-``control_msgs`` is not installed.
+Real robots driving their grippers through parallel gripper command action servers,
+skipped where ``control_msgs`` is not installed.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from giskardpy.motion_statechart.ros2_nodes.robotiq import (
     RobotiqGripperActionServerTask,
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
+from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tiago import Tiago
 from semantic_digital_twin.robots.tracy import Tracy
@@ -43,8 +44,8 @@ from ...plan_running import (
 )
 def extensions(request) -> list[ContextExtension]:
     """
-    The context extensions of the plans of a robot whose grippers have a gripper command
-    server.
+    The context extensions of the plans of a robot whose grippers have a parallel
+    gripper command server.
     """
     robot_type: type[AbstractRobot]
     robot_type, world_fixture = request.param
@@ -56,7 +57,7 @@ def extensions(request) -> list[ContextExtension]:
 
 
 @pytest.mark.parametrize("state", [GripperState.OPEN, GripperState.CLOSE])
-def test_a_real_robot_moves_its_gripper_through_the_gripper_command_server(
+def test_a_real_robot_moves_its_gripper_through_the_parallel_gripper_command_server(
     extensions, state
 ) -> None:
     gripper = robot_of(extensions).all_arms[0].end_effector
@@ -67,7 +68,7 @@ def test_a_real_robot_moves_its_gripper_through_the_gripper_command_server(
     )
 
     assert type(action.goal) is RobotiqGripperActionServerTask
-    assert action.goal.action_topic == gripper.command_action_topic
+    assert action.goal.action_topic == gripper.parallel_gripper_command_topic
     assert action.goal.target_position == gripper.separation_at(
         configuration.joint_state
     )
@@ -87,10 +88,30 @@ def test_a_simulated_robot_moves_its_fingers_with_a_giskard_goal(extensions) -> 
     assert type(action.goal) is type(MoveFingers.moving_gripper_to(configuration))
 
 
+def test_a_real_robot_whose_grippers_take_other_action_messages_keeps_its_finger_goals(
+    daisy_world,
+) -> None:
+    extensions = robot_extensions(
+        deepcopy(daisy_world).get_semantic_annotations_by_type(DAiSy)[0]
+    )
+    configuration = (
+        robot_of(extensions)
+        .all_arms[0]
+        .end_effector.default_configuration(GripperState.CLOSE)
+    )
+
+    action = prepared(
+        SetGripperAction(configuration=configuration), robot_executor(extensions)
+    )
+
+    assert action.gripper_goal_type is MoveFingers
+    assert type(action.goal) is type(MoveFingers.moving_gripper_to(configuration))
+
+
 # %% grasping
 
 
-def test_a_real_robot_opens_and_shuts_its_gripper_on_a_grasp_through_the_gripper_command_server(
+def test_a_real_robot_opens_and_shuts_its_gripper_on_a_grasp_through_the_parallel_gripper_command_server(
     extensions,
 ) -> None:
     grasp = top_down_grasp_of_a_box(extensions)
