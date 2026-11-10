@@ -190,7 +190,9 @@ def nyga_layered_circuit(nyga_data) -> DifferentiableLayeredCircuit:
     """
     A Nyga distribution fitted to :func:`nyga_data`, converted to layers.
     """
-    circuit = NygaInduction(Continuous("x"), min_samples_per_quantile=10).fit(nyga_data)
+    circuit = NygaInduction(Continuous("x"), minimum_samples_per_quantile=10).fit(
+        nyga_data
+    )
     layered = CircuitRepresentations().convert(circuit, DifferentiableLayeredCircuit)
     layered.root.validate()
     return layered

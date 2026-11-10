@@ -331,7 +331,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if (
             isinstance(grasp, FlatVariable)
             and isinstance(grasp._child_, InstantiatedVariable)
-            and grasp._child_._type_ is GraspsByCloseness
+            and grasp._child_._factory_ is GraspsByCloseness
         ):
             return PickUpTarget(graspable=grasp._child_._kwargs_["graspable"], arm=arm)
         grasps = grasp._domain_ if isinstance(grasp, Variable) else [grasp]
@@ -396,11 +396,12 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
             sequence runs `plan_node`, so the parking ends before anything running
             alongside `plan_node` starts.
         """
-        holders = [plan_node, *plan_node.path]
-        return next(
-            (holder for holder in holders if isinstance(holder.parent_node, Sequence)),
-            holders[-1],
+        step = plan_node.find_upwards(
+            lambda holder: isinstance(holder.parent_node, Sequence)
         )
+        if step is not None:
+            return step
+        return plan_node.path[-1] if plan_node.path else plan_node
 
     def nodes_to_insert(self, plan_node: Action) -> list[StatechartNode]:
         return [ParkArmsAction(arms=plan_node.robot.all_arms)]

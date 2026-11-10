@@ -22,6 +22,7 @@ from krrood.entity_query_language.ground_term import (
     GroundTerm,
     LiveTermReader,
     TermReader,
+    TermValue,
 )
 
 if TYPE_CHECKING:
@@ -55,25 +56,6 @@ def set_evaluation_context(
         :meth:`contextvars.ContextVar.reset` to restore the previous value.
     """
     return _evaluation_context_var.set(evaluation_context)
-
-
-def current_term_reader() -> TermReader:
-    """
-    :return: The current evaluation context's :attr:`EvaluationContext.term_reader`, or
-        a :class:`LiveTermReader` outside an evaluation.
-    """
-    evaluation_context = get_evaluation_context()
-    if evaluation_context is None:
-        return LiveTermReader()
-    return evaluation_context.term_reader
-
-
-def values_in_current_context(term: GroundTerm) -> Iterator[Any]:
-    """
-    :param term: The ground term to read.
-    :return: The value of *term* as :func:`current_term_reader` reads it.
-    """
-    return current_term_reader().values_of(term)
 
 
 class EvaluationObserver(ABC):
@@ -380,6 +362,19 @@ class EvaluationContext:
     exhausted or closed.
     """
 
+    outer_visible_variables_cache: dict[
+        uuid.UUID, tuple[weakref.ref[SymbolicExpression], ...]
+    ] = field(default_factory=dict)
+    """
+    Memoizes, per quantifier id, the variables of that quantifier that also occur
+    elsewhere in the query being evaluated. They depend on the query around the
+    quantifier, so they are fixed during one evaluation but can differ once the query is
+    rebuilt.
+
+    ..warning:: Held through weak references, for the same reason as
+        :attr:`expression_index_cache`.
+    """
+
     def is_child_of_truth_value_operator(self, expression: SymbolicExpression) -> bool:
         """
         :param expression: The symbolic expression to test.
@@ -399,6 +394,26 @@ class EvaluationContext:
             yield
         finally:
             _evaluation_context_var.reset(context_token)
+
+    @classmethod
+    def current_term_reader(cls) -> TermReader:
+        """
+        :return: The current evaluation context's :attr:`term_reader`, or a
+            :class:`~krrood.entity_query_language.ground_term.LiveTermReader` outside an
+            evaluation.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return LiveTermReader()
+        return evaluation_context.term_reader
+
+    @classmethod
+    def current_value_of_term(cls, term: GroundTerm) -> TermValue | None:
+        """
+        :param term: The ground term to read.
+        :return: The value of *term* as :meth:`current_term_reader` reads it.
+        """
+        return cls.current_term_reader().value_of_term(term)
 
     @classmethod
     def iterate_reading_from(

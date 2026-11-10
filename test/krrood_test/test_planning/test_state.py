@@ -1,8 +1,8 @@
 """
 Tests for evaluating queries with a :class:`~krrood.planning.state.State`.
 
-A query reads the values the state's facts give fluents - attributes, indexed elements,
-calls, symbolic functions and predicates - and live values for every other fluent.
+A query reads the values the state's facts give ground terms - attributes, indexed elements,
+calls, symbolic functions and predicates - and live values for every other ground term.
 """
 
 from __future__ import annotations
@@ -10,7 +10,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from sqlalchemy.orm import sessionmaker
+from typing_extensions import Callable
 
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageGenerativeBackend,
+    ProbabilisticBackend,
+    QueryBackend,
+    SQLAlchemyBackend,
+)
+from krrood.entity_query_language.exceptions import BackendCannotReadState
 from krrood.entity_query_language.factories import (
     a,
     flat_variable,
@@ -18,6 +27,7 @@ from krrood.entity_query_language.factories import (
     not_,
     the,
     variable,
+    variable_from,
 )
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.planning.exceptions import (
@@ -25,7 +35,7 @@ from krrood.planning.exceptions import (
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
     FactValueIsNotConstant,
-    MissingFluent,
+    MissingGroundTerm,
 )
 from krrood.planning.state import State
 
@@ -33,10 +43,12 @@ from ..dataset.setting_with_side_effects import (
     AttributeReadThroughProperty,
     AttributeSetThroughProperty,
     AttributesSetThroughSetattr,
+    ElementsInAnImmutableContainer,
     ElementsSetThroughSetitem,
     FrozenAttributes,
     SlottedAttributes,
 )
+from ..dataset.objects_compared_by_value import PointComparedByValue
 from ..dataset.blocks_world import (
     Block,
     IsOn,
@@ -132,7 +144,7 @@ def test_query_under_state_reads_assigned_value(two_towers):
     assert result == [two_towers.b]
 
 
-def test_unassigned_fluents_keep_their_live_values(two_towers):
+def test_unassigned_ground_terms_keep_their_live_values(two_towers):
     result = blocks_on(two_towers.blocks, two_towers.table, two_towers.b_on_c)
 
     assert result == [two_towers.a]
@@ -150,7 +162,7 @@ def test_query_outside_state_reads_live_values(two_towers):
     assert blocks_on(two_towers.blocks, two_towers.c) == []
 
 
-# %% fluents of every kind
+# %% ground terms of every kind
 
 
 def test_query_reads_assigned_indexed_element(two_towers):
@@ -161,7 +173,7 @@ def test_query_reads_assigned_indexed_element(two_towers):
     assert result == [two_towers.c]
 
 
-def test_index_by_expression_reads_the_same_fluent_as_index_by_value(two_towers):
+def test_index_by_expression_reads_the_same_ground_term_as_index_by_value(two_towers):
     state = State().with_facts(literal(two_towers.shelf).slots[0] == two_towers.c)
     slot = variable(int, [0, 1])
 
@@ -221,7 +233,9 @@ def test_query_reads_assigned_symbolic_function_class(two_towers):
 # %% facts about every binding of a variable
 
 
-def test_fact_about_a_variable_assigns_the_fluent_of_each_of_its_values(two_towers):
+def test_fact_about_a_variable_assigns_the_ground_term_of_each_of_its_values(
+    two_towers,
+):
     state = State().with_facts(
         variable(Block, [two_towers.a, two_towers.b]).support == two_towers.c
     )
@@ -231,7 +245,7 @@ def test_fact_about_a_variable_assigns_the_fluent_of_each_of_its_values(two_towe
     assert result == [two_towers.a, two_towers.b]
 
 
-def test_fact_about_a_match_assigns_only_the_fluents_of_its_matches(two_towers):
+def test_fact_about_a_match_assigns_only_the_ground_terms_of_its_matches(two_towers):
     state = State().with_facts(
         a(Block)(support=two_towers.table).from_(two_towers.blocks).support
         == two_towers.c
@@ -258,17 +272,17 @@ def test_fact_with_an_expression_index_assigns_every_element_it_reaches(two_towe
 
 
 def test_assigning_an_attribute_the_instance_lacks_is_rejected(two_towers):
-    with pytest.raises(MissingFluent):
+    with pytest.raises(MissingGroundTerm):
         State().with_facts(literal(two_towers.table).support == two_towers.a)
 
 
 def test_assigning_an_element_the_container_lacks_is_rejected(two_towers):
-    with pytest.raises(MissingFluent):
+    with pytest.raises(MissingGroundTerm):
         State().with_facts(literal(two_towers.shelf).slots[5] == two_towers.c)
 
 
 @pytest.mark.parametrize(
-    "fluent",
+    "ground_term",
     [
         lambda: literal(AttributeSetThroughProperty()).is_lit,
         lambda: literal(AttributesSetThroughSetattr()).status,
@@ -276,22 +290,23 @@ def test_assigning_an_element_the_container_lacks_is_rejected(two_towers):
     ],
     ids=["property setter", "__setattr__", "__setitem__"],
 )
-def test_assigning_a_fluent_whose_setting_runs_code_is_rejected(fluent):
+def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term):
     with pytest.raises(AssignmentBypassesSetter):
-        State().with_facts(fluent() == True)
+        State().with_facts(ground_term() == True)
 
 
 @pytest.mark.parametrize(
-    "fluent",
+    "ground_term",
     [
         lambda: literal(SlottedAttributes(1.0)).coordinate,
         lambda: literal(FrozenAttributes(1.0)).coordinate,
         lambda: literal(AttributeReadThroughProperty(1.0)).diameter,
+        lambda: literal(ElementsInAnImmutableContainer((0.0, 1.0))).end_points[0],
     ],
-    ids=["slot", "frozen dataclass", "read-only property"],
+    ids=["slot", "frozen dataclass", "read-only property", "immutable container"],
 )
-def test_assigning_a_fluent_that_is_only_stored_is_accepted(fluent):
-    expression = fluent()
+def test_assigning_a_ground_term_whose_setting_runs_no_code_is_accepted(ground_term):
+    expression = ground_term()
     state = State().with_facts(expression == 5.0)
 
     assert expression.tolist(state=state) == [5.0]
@@ -314,10 +329,10 @@ def test_a_fact_cannot_take_its_value_from_an_expression(two_towers):
         )
 
 
-# %% one fluent, written in several ways
+# %% one ground term, written in several ways
 
 
-def test_call_names_one_fluent_however_its_arguments_are_passed(two_towers):
+def test_call_names_one_ground_term_however_its_arguments_are_passed(two_towers):
     block = literal(two_towers.a)
     positional = State().with_facts(block.rests_on(two_towers.table) == False)
     by_name = State().with_facts(block.rests_on(support=two_towers.table) == False)
@@ -328,7 +343,7 @@ def test_call_names_one_fluent_however_its_arguments_are_passed(two_towers):
     assert positional == by_name == with_default
 
 
-def test_different_arguments_name_different_fluents(two_towers):
+def test_different_arguments_name_different_ground_terms(two_towers):
     block = literal(two_towers.a)
 
     assert State().with_facts(
@@ -349,7 +364,7 @@ def test_assignment_by_keyword_is_read_by_a_positional_call(two_towers):
     assert result == [two_towers.b]
 
 
-def test_fluent_reached_through_another_object_is_the_same_fluent(two_towers):
+def test_ground_term_reached_through_another_object_is_the_same_ground_term(two_towers):
     direct = State().with_facts(
         literal(two_towers.a).rests_on(two_towers.table) == False
     )
@@ -366,10 +381,10 @@ def test_fluent_reached_through_another_object_is_the_same_fluent(two_towers):
 # %% how arguments are compared
 
 
-def test_fluents_identify_unhashable_instances_by_identity(two_towers):
+def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
     """
-    Two blocks that compare equal are still different objects, so assigning a fluent of
-    one never assigns the other.
+    Two blocks that compare equal are still different objects, so assigning a ground
+    term of one never assigns the other.
     """
     first = Block("d", two_towers.table)
     second = Block("d", two_towers.table)
@@ -380,10 +395,10 @@ def test_fluents_identify_unhashable_instances_by_identity(two_towers):
     assert result == [second]
 
 
-def test_fluents_identify_list_arguments_by_identity(two_towers):
+def test_ground_terms_identify_list_arguments_by_identity(two_towers):
     """
-    Two lists with the same elements are still different objects, so assigning a fluent
-    called with one never assigns the fluent called with the other.
+    Two lists with the same elements are still different objects, so assigning a ground
+    term called with one never assigns the ground term called with the other.
     """
     first = [two_towers.b]
     second = [two_towers.b]
@@ -396,7 +411,7 @@ def test_fluents_identify_list_arguments_by_identity(two_towers):
     assert heights == [[7], [tallest_tower(second)]]
 
 
-def test_fluents_compare_hashable_arguments_by_value(two_towers):
+def test_ground_terms_compare_hashable_arguments_by_value(two_towers):
     key = 1
     equal_key = int("1")
     slots = literal(two_towers.shelf).slots
@@ -406,7 +421,37 @@ def test_fluents_compare_hashable_arguments_by_value(two_towers):
     )
 
 
-# %% fluents read through other fluents
+@pytest.mark.parametrize(
+    "ground_term_of",
+    [
+        lambda point: literal(point).coordinate,
+        lambda point: literal(point).shifted_by(1.0),
+    ],
+    ids=["attribute", "method call"],
+)
+def test_equal_objects_never_share_their_ground_terms(ground_term_of):
+    """
+    The object a ground term belongs to is compared by identity, so assigning a ground
+    term of one object never assigns that of an equal but distinct object.
+    """
+    first = PointComparedByValue(1.0)
+    second = PointComparedByValue(1.0)
+    state = State().with_facts(ground_term_of(first) == 7.0)
+
+    assert ground_term_of(second).tolist(state=state) == [
+        ground_term_of(second).tolist()[0]
+    ]
+
+
+def test_equal_containers_never_share_their_elements():
+    first = ElementsInAnImmutableContainer(tuple([0.0, 1.0]))
+    second = ElementsInAnImmutableContainer(tuple([0.0, 1.0]))
+    state = State().with_facts(literal(first).end_points[0] == 7.0)
+
+    assert literal(second).end_points[0].tolist(state=state) == [second.end_points[0]]
+
+
+# %% ground terms read through other ground terms
 
 
 def test_attribute_of_an_assigned_attribute_reads_the_new_value(two_towers):
@@ -457,12 +502,12 @@ def test_index_into_an_assigned_collection_reads_its_new_elements(two_towers):
     assert result == [two_towers.c]
 
 
-# %% assigned derived fluents
+# %% assigned derived ground terms
 
 
 def test_assigned_predicate_overrides_what_it_derives(two_towers):
-    """
-    An assigned fluent is not recomputed, even where it is derived from other fluents:
+    """An assigned ground term is not recomputed, even where it is derived from
+    other ground terms:
 
     ``c`` rests on ``a``, yet the state says it rests on the table.
     """
@@ -544,6 +589,38 @@ def test_query_started_during_another_evaluation_reads_state(two_towers):
     )
 
     assert result == [two_towers.a, two_towers.c]
+
+
+# %% backends and states
+
+
+def test_generative_backend_reads_state(two_towers):
+    state = State().with_facts(literal(two_towers.c).support == two_towers.table)
+    generated = a(Block)(name=variable_from(["d", "e"]), support=two_towers.table)
+    generated.where(literal(two_towers.c).support == two_towers.table)
+
+    result = generated.tolist(
+        backend=EntityQueryLanguageGenerativeBackend(), state=state
+    )
+
+    assert [block.name for block in result] == ["d", "e"]
+
+
+@pytest.mark.parametrize(
+    "create_backend",
+    [
+        lambda: SQLAlchemyBackend(sessionmaker()),
+        lambda: ProbabilisticBackend(),
+    ],
+    ids=["sql", "probabilistic"],
+)
+def test_backend_that_cannot_read_a_state_refuses_one(
+    two_towers, create_backend: Callable[[], QueryBackend]
+):
+    query = a(Block).from_(two_towers.blocks)
+
+    with pytest.raises(BackendCannotReadState):
+        query.evaluate(backend=create_backend(), state=State())
 
 
 # %% building states

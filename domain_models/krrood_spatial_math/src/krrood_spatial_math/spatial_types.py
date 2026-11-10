@@ -889,12 +889,12 @@ class RotationMatrix(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         """
         :return: The rotation this matrix describes.
         """
-        return self.quaternion.axis_angle
+        return AxisAngle.from_rotation_matrix(self)
 
     @property
     def angle(self) -> sm.Scalar:
         """
-        :return: The angle of the rotation around its axis in radians, in [0, 2 pi].
+        :return: The angle of the rotation around its axis in radians, in [0, pi].
         """
         return self.axis_angle.angle
 
@@ -1494,6 +1494,32 @@ class Line3:
     """
     The direction the line runs in, in the same reference frame as :attr:`point`.
     """
+
+
+@dataclass(eq=False)
+class LineSegment3:
+    """
+    A straight line in 3D space between two points.
+    """
+
+    start: Point3
+    """
+    The point the segment runs from.
+    """
+
+    end: Point3
+    """
+    The point the segment runs to, in the same reference frame as :attr:`start`.
+    """
+
+    @property
+    def direction(self) -> Vector3:
+        """
+        :return: The unit vector from :attr:`start` towards :attr:`end`.
+        """
+        direction = self.end - self.start
+        direction.scale(1)
+        return direction
 
 
 @dataclass(frozen=True)
@@ -2361,6 +2387,63 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             reference_frame=quaternion.reference_frame,
         )
 
+    @classmethod
+    def from_rotation_matrix(cls, rotation_matrix: RotationMatrix) -> AxisAngle:
+        """
+        The identity rotation has no axis of its own and is read as a rotation by zero
+        around the z-axis.
+
+        :param rotation_matrix: The rotation to describe.
+        :return: The rotation the matrix describes, with an angle in [0, pi].
+        """
+        rotation = rotation_matrix.generic_matrix[:3, :3]
+        cosine = (rotation.trace() - 1) / 2
+        # the guards keep the derivative finite where acos has none
+        angle = sm.if_greater_eq(
+            cosine,
+            1,
+            sm.Scalar(0),
+            sm.if_less_eq(cosine, -1, sm.Scalar(np.pi), sm.acos(cosine)),
+        )
+
+        # 2 sin(angle) times the axis, which vanishes at half a turn
+        scaled_axis = Vector3(
+            x=rotation[2, 1] - rotation[1, 2],
+            y=rotation[0, 2] - rotation[2, 0],
+            z=rotation[1, 0] - rotation[0, 1],
+        )
+        scaled_axis_length = scaled_axis.norm()
+        axis_within_quarter_turn = sm.if_eq_zero(
+            scaled_axis_length,
+            Vector3.Z(),
+            scaled_axis / sm.if_eq_zero(scaled_axis_length, 1, scaled_axis_length),
+        )
+
+        # (1 - cos(angle)) times the axis times its transpose, which vanishes at no
+        # turn; its column with the largest diagonal entry is the axis up to its sign
+        axis_outer_product = (rotation + rotation.T) / 2 - sm.Matrix.eye(3) * cosine
+        columns = [
+            Vector3(*(axis_outer_product[row, column] for row in range(3)))
+            for column in range(3)
+        ]
+        largest_column = sm.if_greater(
+            rotation[2, 2],
+            sm.max(rotation[0, 0], rotation[1, 1]),
+            columns[2],
+            sm.if_greater(rotation[1, 1], rotation[0, 0], columns[1], columns[0]),
+        )
+        axis_up_to_sign = largest_column / largest_column.norm()
+        axis_beyond_quarter_turn = sm.if_less(
+            axis_up_to_sign @ scaled_axis, 0, -axis_up_to_sign, axis_up_to_sign
+        )
+
+        axis = sm.if_greater_zero(
+            cosine, axis_within_quarter_turn, axis_beyond_quarter_turn
+        )
+        return cls(
+            axis=axis, angle=angle, reference_frame=rotation_matrix.reference_frame
+        )
+
     @property
     def axis(self) -> Vector3:
         """
@@ -2390,6 +2473,100 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The rotation this axis angle describes.
         """
         return RotationMatrix.from_axis_angle(self)
+
+
+@dataclass(eq=False, init=False, repr=False)
+class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+    """
+    How a rigid body moved: a translation and a rotation vector, both along the axes of
+    its reference frame.
+    """
+
+    def __init__(
+        self,
+        translation: Vector3 | None = None,
+        rotation_vector: Vector3 | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+    ):
+        """
+        :param translation: How far and in which direction the body moved, in meters.
+            Defaults to no translation.
+        :param rotation_vector: The axis the body turned around, scaled by the angle it
+            turned by in radians. Defaults to no rotation.
+        :param reference_frame: The frame along whose axes the body moved.
+        """
+        if translation is None:
+            translation = Vector3()
+        if rotation_vector is None:
+            rotation_vector = Vector3()
+        self.casadi_sx = sm.to_sx(
+            [
+                translation.x,
+                translation.y,
+                translation.z,
+                rotation_vector.x,
+                rotation_vector.y,
+                rotation_vector.z,
+            ]
+        )
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    def _verify_type(self):
+        if self.shape != (6, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            translation=Vector3(*data["translation"]),
+            rotation_vector=Vector3(*data["rotation_vector"]),
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            "translation": self.translation.to_np()[:3].tolist(),
+            "rotation_vector": self.rotation_vector.to_np()[:3].tolist(),
+        }
+
+    @classmethod
+    def from_transformation(cls, start_T_end: HomogeneousTransformationMatrix) -> Twist:
+        """
+        :param start_T_end: Where the body ended up, relative to where it started.
+        :return: The motion from the start to the end, in the reference frame of
+            ``start_T_end``, turning by an angle in [0, pi].
+        """
+        rotation = start_T_end.axis_angle
+        return cls(
+            translation=Vector3.from_iterable(start_T_end.position),
+            rotation_vector=rotation.axis * rotation.angle,
+            reference_frame=start_T_end.reference_frame,
+        )
+
+    @property
+    def translation(self) -> Vector3:
+        """
+        :return: How far and in which direction the body moved, in meters.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def rotation_vector(self) -> Vector3:
+        """
+        :return: The axis the body turned around, scaled by the angle it turned by in
+            radians.
+        """
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
 
 
 @dataclass(eq=False, init=False, repr=False)

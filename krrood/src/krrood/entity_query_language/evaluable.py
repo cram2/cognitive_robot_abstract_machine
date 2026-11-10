@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from typing_extensions import Iterator, TYPE_CHECKING
 
 from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.exceptions import BackendCannotReadState
 from krrood.entity_query_language.utils import make_list
 
 if TYPE_CHECKING:
@@ -49,11 +50,15 @@ class Evaluable(ABC):
         :param state: What the evaluation reads the values of attributes, indexes, calls
             and predicates from; their live values when omitted.
         :return: An iterator over the results.
+        :raises BackendCannotReadState: If a state is given to a backend that cannot
+            read one.
         """
         if backend is None:
             from krrood.entity_query_language.backends import EntityQueryLanguageBackend
 
             backend = EntityQueryLanguageBackend()
+        if state is not None and not backend.reads_state:
+            raise BackendCannotReadState(type(backend))
         return EvaluationContext.iterate_reading_from(state, backend.evaluate(self))
 
     def tolist(

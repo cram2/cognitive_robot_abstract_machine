@@ -112,6 +112,19 @@ class FrozenAttributes:
 
 
 @dataclass
+class ElementsInAnImmutableContainer:
+    """
+    A segment whose end points are stored in a tuple, which cannot be changed on the
+    live object.
+    """
+
+    end_points: tuple[float, float]
+    """
+    Where the segment starts and ends on a line.
+    """
+
+
+@dataclass
 class AttributeReadThroughProperty:
     """
     A circle whose diameter is computed and cannot be set on the live object.

@@ -18,7 +18,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
-from inspect import ismethod, isfunction, isclass
+from inspect import isclass
 from typing_extensions import (
     Callable,
     Generic,
@@ -26,7 +26,6 @@ from typing_extensions import (
     Self,
     Iterator,
     Iterable,
-    assert_never,
     Any,
 )
 
@@ -69,6 +68,7 @@ from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
 from krrood.symbol_graph.helpers import get_field_type_endpoint
 
@@ -288,24 +288,17 @@ class Match(
     """
 
     def __post_init__(self):
-        if self._declared_type_ is None:
-            self._initialize_type_()
+        """
+        Take the matched type from :attr:`_factory_` when none was declared.
 
-    def _initialize_type_(self):
+        :raises MatchTypeCannotBeDetermined: If :attr:`_factory_` names no type it
+            builds.
         """
-        Initialize the type of the match based on the provided information in- place.
-        """
-        if isclass(self._factory_):
-            self._declared_type_ = self._factory_
-        elif ismethod(self._factory_):
-            self._declared_type_ = self._factory_.__class__
-        elif isfunction(self._factory_):
-            type_ = get_type_hints_of_object(self._factory_).get("return")
-            if type_ is None or not isclass(type_):
-                raise MatchTypeCannotBeDetermined(self)
-            self._declared_type_ = type_
-        else:
-            assert_never(self._factory_)
+        if self._declared_type_ is not None:
+            return
+        self._declared_type_ = self._type_built_by_(self._factory_)
+        if self._declared_type_ is None:
+            raise MatchTypeCannotBeDetermined(self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> T | Self:
         """
@@ -700,7 +693,7 @@ class Match(
         :return: Whether that keyword is left out of construction, decided once per
             factory, matched class, keyword and value type.
         """
-        if HasFactoryAndKwargs._factory_takes_keyword_(factory, keyword):
+        if CallSignature.from_callable(factory).accepts_keyword(keyword):
             return False
         return keyword in dir(matched_type) or issubclass(value_type, CausalRoleMarker)
 
@@ -952,6 +945,14 @@ class AttributeMatch(AbstractMatchExpression[T]):
             attr = attr[self.index_access]
         self._variable_ = attr
         return attr
+
+    @property
+    def is_assigned_to_ellipsis(self) -> bool:
+        """
+        Whether the attribute is assigned ``...`` itself; a collection holding ``...``
+        as an element does not count.
+        """
+        return self.assigned_value is ...
 
     @cached_property
     def is_type_filter_needed(self):

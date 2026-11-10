@@ -18,7 +18,7 @@ from krrood.exceptions import DataclassException
 @dataclass
 class ConditionIsNotAFact(DataclassException):
     """
-    A condition that does not fix the value of a fluent was given as a fact.
+    A condition that does not fix the value of a ground term was given as a fact.
     """
 
     condition: Any
@@ -27,7 +27,7 @@ class ConditionIsNotAFact(DataclassException):
     """
 
     def error_message(self) -> str:
-        return f"{self.condition} does not fix the value of a fluent."
+        return f"{self.condition} does not fix the value of a ground term."
 
     def suggest_correction(self) -> str:
         return (
@@ -39,8 +39,8 @@ class ConditionIsNotAFact(DataclassException):
 @dataclass
 class ComparisonIsNotAnEquality(ConditionIsNotAFact):
     """
-    A fact compares a fluent by other than equality, which constrains its value without
-    fixing it.
+    A fact compares a ground term by other than equality, which constrains its value
+    without fixing it.
     """
 
     condition: Comparator
@@ -51,12 +51,12 @@ class ComparisonIsNotAnEquality(ConditionIsNotAFact):
     def error_message(self) -> str:
         return (
             f"{self.condition} compares with '{self.condition._name_}', which does not "
-            "fix the value of the fluent; only '==' does."
+            "fix the value of the ground term; only '==' does."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "Compare the fluent with '==' to give it a value. To state that the "
+            "Compare the ground term with '==' to give it a value. To state that the "
             "comparison holds, write it as the body of a predicate and state the "
             "predicate: that assigns the predicate itself, not the values it compares."
         )
@@ -65,7 +65,7 @@ class ComparisonIsNotAnEquality(ConditionIsNotAFact):
 @dataclass
 class FactValueIsNotConstant(DataclassException):
     """
-    A fact compares a fluent with an expression instead of with a value.
+    A fact compares a ground term with an expression instead of with a value.
     """
 
     condition: Any
@@ -74,22 +74,22 @@ class FactValueIsNotConstant(DataclassException):
     """
 
     def error_message(self) -> str:
-        return f"The value {self.condition} gives its fluent is not a constant."
+        return f"The value {self.condition} gives its ground term is not a constant."
 
     def suggest_correction(self) -> str:
-        return "Compare the fluent with a plain value."
+        return "Compare the ground term with a plain value."
 
 
 @dataclass
-class MissingFluent(DataclassException):
+class MissingGroundTerm(DataclassException):
     """
-    A fact gives a value to a fluent that does not exist, such as an attribute the
+    A fact gives a value to a ground term that does not exist, such as an attribute the
     instance does not have.
     """
 
     term: GroundTerm
     """
-    The fluent that does not exist.
+    The ground term that does not exist.
     """
 
     def error_message(self) -> str:
@@ -102,23 +102,23 @@ class MissingFluent(DataclassException):
 @dataclass
 class AssignmentBypassesSetter(DataclassException):
     """
-    A fact gives a value to a fluent that live objects set through code of their own
-    class, such as a property setter, which a state never runs.
+    A fact gives a value to a ground term that live objects set through code of their
+    own class, such as a property setter, which a state never runs.
     """
 
     term: GroundTerm
     """
-    The fluent whose setting runs code.
+    The ground term whose setting runs code.
     """
 
     def error_message(self) -> str:
         return (
             f"Setting {self.term} on a live object runs code of its class, which may "
-            "change more than this fluent; a state would only store the value."
+            "change more than this ground term; a state would only store the value."
         )
 
     def suggest_correction(self) -> str:
         return (
             "Assign the plain fields the setter stores, and state what else it changes "
-            "as derived fluents (EQL rules or symbolic functions) or as further facts."
+            "as derived ground terms (EQL rules or symbolic functions) or as further facts."
         )

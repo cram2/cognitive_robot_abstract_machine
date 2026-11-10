@@ -1,6 +1,6 @@
 """
-States that assign values to fluents, and add and remove objects, without changing live
-objects.
+States that assign values to ground terms, and add and remove objects, without changing
+live objects.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from krrood.entity_query_language.ground_term import (
     FunctionKey,
     GroundTerm,
     TermReader,
+    TermValue,
 )
 from krrood.entity_query_language.utils import T
 from krrood.planning.fact import Fact
@@ -25,14 +26,14 @@ from krrood.planning.fact import Fact
 @dataclass(frozen=True)
 class State(TermReader):
     """
-    A valuation of fluents that differs from the live objects only where it assigns a
+    A valuation of ground terms that differs from the live objects only where it assigns a
     value.
 
-    A fluent is a :class:`~krrood.entity_query_language.ground_term.GroundTerm`: an
-    attribute of an instance, an indexed element, or the result of a call, a symbolic
-    function or a predicate for concrete arguments. A query evaluated with this state
-    reads the assigned value of every assigned fluent, and the live value of every
-    other. The live objects are never changed.
+    A *fluent* is a ground term
+    (:class:`~krrood.entity_query_language.ground_term.GroundTerm`) whose value a state
+    can change, and the :class:`~krrood.entity_query_language.ground_term.FunctionKey` it
+    applies is its fluent symbol. A query evaluated with this state reads the assigned
+    value of every assigned fluent and the live value of every other.
 
     >>> from dataclasses import dataclass
     >>> from krrood.entity_query_language.factories import a, literal
@@ -48,23 +49,23 @@ class State(TermReader):
 
     A state also adds and removes objects, as a difference from the live symbol graph.
     A variable without a domain ranges over the objects of the state the query is
-    evaluated with. A fluent whose value is a list, tuple or set reads without the
+    evaluated with. A ground term whose value is a list, tuple or set reads without the
     objects the state removes; a domain captured as a concrete collection is never
     filtered.
 
-    .. note:: An unassigned derived fluent follows the state only where its value comes
+    .. note:: An unassigned derived ground term follows the state only where its value comes
         from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
         arguments, as in ``is_table(block.support)``. A Python body that reads an
         attribute directly, such as ``self.block.support``, reads the live value.
 
-    .. warning:: An assigned fluent keeps its value even where it is derived from other
-        fluents, so assigning a predicate overrides what it would compute from the
-        fluents it reads, also after those change.
+    .. warning:: An assigned ground term keeps its value even where it is derived from other
+        ground terms, so assigning a predicate overrides what it would compute from the
+        ground terms it reads, also after those change.
     """
 
     assignments: dict[GroundTerm, Any] = field(default_factory=dict)
     """
-    The value of every fluent this state changes.
+    The value of every ground term this state changes.
 
     Never mutated; a changed state is a new :class:`State`.
     """
@@ -98,17 +99,17 @@ class State(TermReader):
     def assigned_functions(self) -> frozenset[FunctionKey]:
         """
         :return: The :attr:`~krrood.entity_query_language.ground_term.GroundTerm.function_key`
-            of every fluent this state assigns.
+            of every ground term this state assigns.
         """
         return frozenset(term.function_key for term in self.assignments)
 
     def with_facts(self, *facts: SymbolicExpression) -> State:
         """
-        :param facts: Conditions that each fix the value of fluents, as
+        :param facts: Conditions that each fix the value of ground terms, as
             :meth:`~krrood.planning.fact.Fact.from_condition` reads them. A fact whose
-            expression has variables fixes the fluent for every binding of them.
+            expression has variables fixes the ground term for every binding of them.
         :return: A new state that assigns the values *facts* state on top of this
-            state's own assignments, a later value winning where two assign a fluent.
+            state's own assignments, a later value winning where two assign a ground term.
         """
         assignments = dict(self.assignments)
         for fact in facts:
@@ -154,15 +155,17 @@ class State(TermReader):
             | {id(removed): removed for removed in objects},
         )
 
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+    def value_of_term(self, term: GroundTerm) -> TermValue | None:
         if term.function_key in self.assigned_functions and term in self.assignments:
-            yield self.without_removed_objects(self.assignments[term])
-            return
-        yield from map(self.without_removed_objects, term.live_values())
+            return TermValue(self.without_removed_objects(self.assignments[term]))
+        live_term_value = term.live_term_value()
+        if live_term_value is None:
+            return None
+        return TermValue(self.without_removed_objects(live_term_value.value))
 
     def without_removed_objects(self, value: Any) -> Any:
         """
-        :param value: The value of a fluent.
+        :param value: The value of a ground term.
         :return: *value* without the objects this state removes when it is a list, tuple,
             set or frozenset that holds any of them, as a new collection of the same type;
             otherwise *value* itself.

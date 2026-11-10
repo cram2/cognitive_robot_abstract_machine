@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from krrood_spatial_math.spatial_types import Point3, Vector3
@@ -26,9 +27,9 @@ class Pointing(CartesianTask):
     The axis of tip_link that will be used for pointing.
     """
 
-    max_velocity: float = 0.3
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     threshold: float = 0.01
@@ -71,7 +72,7 @@ class Pointing(CartesianTask):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=tip_V_goal_axis,
             frame_V_goal=tip_V_pointing_axis,
-            reference_velocity=self.max_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(
@@ -103,9 +104,9 @@ class PointingCone(CartesianTask):
     Slack cone region in radians.
     """
 
-    max_velocity: float = 0.3
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     threshold: float = 0.01
@@ -151,7 +152,7 @@ class PointingCone(CartesianTask):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_pointing_axis,
             frame_V_goal=root_V_goal_axis_proj,
-            reference_velocity=self.max_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(

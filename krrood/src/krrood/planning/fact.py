@@ -1,5 +1,5 @@
 """
-Facts - conditions that fix the value of fluents - and the assignments they state.
+Facts - conditions that fix the value of ground terms - and the assignments they state.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from krrood.planning.exceptions import (
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
     FactValueIsNotConstant,
-    MissingFluent,
+    MissingGroundTerm,
 )
 
 # %% facts
@@ -30,18 +30,18 @@ from krrood.planning.exceptions import (
 @dataclass(frozen=True)
 class Fact:
     """
-    The value of the fluent an expression reads, for every binding of the expression's
-    operands.
+    The value of the ground term an expression reads, for every binding of the
+    expression's operands.
     """
 
     expression: GroundTermExpression
     """
-    The expression whose fluents are given the value.
+    The expression whose ground terms are given the value.
     """
 
     value: Any
     """
-    The value every fluent of :attr:`expression` has.
+    The value every ground term of :attr:`expression` has.
     """
 
     @classmethod
@@ -51,7 +51,7 @@ class Fact:
             :func:`~krrood.entity_query_language.factories.not_` of a predicate, which
             does not.
         :return: The fact *condition* states.
-        :raises ComparisonIsNotAnEquality: If *condition* compares a fluent by other
+        :raises ComparisonIsNotAnEquality: If *condition* compares a ground term by other
             than equality.
         :raises ConditionIsNotAFact: If *condition* has none of these forms.
         :raises FactValueIsNotConstant: If *condition* compares with an expression
@@ -88,7 +88,7 @@ class Fact:
         """
         :return: :attr:`value` for the ground term :attr:`expression` reads under each
             binding of its operands.
-        :raises MissingFluent: If one of these ground terms does not exist.
+        :raises MissingGroundTerm: If one of these ground terms does not exist.
         :raises AssignmentBypassesSetter: If live objects set one of these ground terms
             through code of their own class.
         """
@@ -99,7 +99,7 @@ class Fact:
                 *(row[operand] for operand in operands)
             )
             if not term.has_live_value():
-                raise MissingFluent(term)
+                raise MissingGroundTerm(term)
             if term.setting_runs_code():
                 raise AssignmentBypassesSetter(term)
             assignments[term] = self.value

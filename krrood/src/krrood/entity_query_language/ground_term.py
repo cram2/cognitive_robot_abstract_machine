@@ -25,9 +25,11 @@ from typing_extensions import (
     TypeVar,
 )
 
-from krrood.entity_query_language.call_arguments import CallArguments
+from krrood.class_diagrams.call_arguments import CallArguments
+from krrood.class_diagrams.call_signature import CallSignature
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import T
+from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import ensure_hashable
 
@@ -35,6 +37,38 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 
 # %% ground terms
+
+
+@dataclass(frozen=True)
+class TermValue:
+    """
+    The value a ground term has, where it has one.
+    """
+
+    value: Any
+    """
+    The value, which may itself be ``None``.
+    """
+
+
+@dataclass(frozen=True, eq=False)
+class ObjectIdentity:
+    """
+    The identity of an object, which no other object shares, however the two compare.
+    """
+
+    identified_object: Any
+    """
+    The object.
+    """
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ObjectIdentity):
+            return NotImplemented
+        return self.identified_object is other.identified_object
+
+    def __hash__(self) -> int:
+        return id(self.identified_object)
 
 
 @dataclass(frozen=True)
@@ -61,15 +95,18 @@ class GroundTerm(ABC):
     A function applied to concrete arguments.
 
     Two ground terms are equal when they apply the same function to the same arguments,
-    however the arguments were passed and including defaults that were left out.
-    Hashable arguments are compared by value and all others by identity, so two objects
-    that compare equal but cannot be hashed are different arguments.
+    however the arguments were passed and including defaults that were left out. The
+    object a ground term belongs to - an attribute's instance, an index's container, a
+    method's receiver - is compared by identity. Every other argument is compared with
+    ``==`` where it is hashable, and by identity where it is not.
 
     >>> def area(width: float, height: float = 1.0) -> float:
     ...     return width * height
-    >>> CallTerm(area, (2.0,)) == CallTerm(area, (), {"width": 2.0, "height": 1.0})
+    >>> CallTerm(area, CallArguments((2.0,))) == CallTerm(
+    ...     area, CallArguments((), {"width": 2.0, "height": 1.0})
+    ... )
     True
-    >>> CallTerm(area, (2.0,)).live_value()
+    >>> CallTerm(area, CallArguments((2.0,))).live_value()
     2.0
     """
 
@@ -131,12 +168,13 @@ class GroundTerm(ABC):
             :meth:`has_live_value` holds.
         """
 
-    def live_values(self) -> Iterator[Any]:
+    def live_term_value(self) -> TermValue | None:
         """
-        :return: The value this ground term currently has, or nothing when it has none.
+        :return: The value this ground term currently has, or ``None`` when it has none.
         """
-        if self.has_live_value():
-            yield self.live_value()
+        if not self.has_live_value():
+            return None
+        return TermValue(self.live_value())
 
 
 @dataclass(frozen=True, eq=False)
@@ -161,17 +199,16 @@ class AttributeTerm(GroundTerm):
 
     @property
     def normalized_arguments(self) -> tuple[Hashable, ...]:
-        return (ensure_hashable(self.instance),)
+        return (ObjectIdentity(self.instance),)
 
     def has_live_value(self) -> bool:
         return hasattr(self.instance, self.attribute_name)
 
     def setting_runs_code(self) -> bool:
-        """
-        Setting runs code where the class overrides :meth:`object.__setattr__`, other
-        than to freeze a dataclass, or where the attribute is a descriptor with a setter
-        that is neither a slot nor a read-only property.
-        """
+        """Setting runs code where the class overrides
+        :meth:`object.__setattr__`, other than to freeze a dataclass, or where
+        the attribute is a descriptor with a setter that is neither a slot nor
+        a read-only property."""
         owner = type(self.instance)
         is_frozen_dataclass = is_dataclass(owner) and owner.__dataclass_params__.frozen
         if owner.__setattr__ is not object.__setattr__ and not is_frozen_dataclass:
@@ -195,7 +232,8 @@ class IndexTerm(GroundTerm):
 
     container: Any
     """
-    The container that stores the element.
+    The object that stores the element, such as a sequence or a mapping: anything that
+    supports reading an element by key, whether or not it supports assigning one.
     """
 
     key: Any
@@ -209,14 +247,19 @@ class IndexTerm(GroundTerm):
 
     @property
     def normalized_arguments(self) -> tuple[Hashable, ...]:
-        return ensure_hashable(self.container), ensure_hashable(self.key)
+        return ObjectIdentity(self.container), ensure_hashable(self.key)
 
     def setting_runs_code(self) -> bool:
         """
         Setting runs code where the container's class defines its own item assignment
-        instead of inheriting a builtin one.
+        instead of inheriting a builtin one, and never where it has no item assignment.
         """
-        return not isinstance(type(self.container).__setitem__, WrapperDescriptorType)
+        item_assignment = inspect.getattr_static(
+            type(self.container), "__setitem__", None
+        )
+        return item_assignment is not None and not isinstance(
+            item_assignment, WrapperDescriptorType
+        )
 
     def has_live_value(self) -> bool:
         """
@@ -248,34 +291,29 @@ class CallTerm(GroundTerm):
     What is called.
     """
 
-    arguments: tuple[Any, ...] = ()
+    arguments: CallArguments = field(default_factory=CallArguments)
     """
-    The positional arguments of the call.
-    """
-
-    keyword_arguments: dict[str, Any] = field(default_factory=dict)
-    """
-    The keyword arguments of the call.
+    The arguments of the call, as they were passed.
     """
 
     @classmethod
     def from_call(
-        cls, callee: Callable[..., Any], *arguments: Any, **keyword_arguments: Any
+        cls, callee: Callable[..., Any], arguments: CallArguments
     ) -> CallTerm:
         """
         :param callee: A function, a bound method, a class, or a function decorated
             with :func:`~krrood.entity_query_language.predicate.symbolic_function`.
-        :param arguments: The positional arguments of the call.
-        :param keyword_arguments: The keyword arguments of the call.
-        :return: The result of calling *callee* with the given arguments, as queries
-            reach it.
+        :param arguments: The arguments of the call.
+        :return: The result of calling *callee* with *arguments*, as queries reach it.
         """
         if inspect.ismethod(callee):
-            arguments = (callee.__self__, *arguments)
+            arguments = CallArguments(
+                (callee.__self__, *arguments.positional), arguments.keyword
+            )
             callee = callee.__func__
         if inspect.isclass(callee) and issubclass(callee, HasBoundValue):
-            return BoundValueTerm(callee, arguments, keyword_arguments)
-        return CallTerm(inspect.unwrap(callee), arguments, keyword_arguments)
+            return BoundValueTerm(callee, arguments)
+        return CallTerm(inspect.unwrap(callee), arguments)
 
     @property
     def function(self) -> Hashable:
@@ -287,12 +325,30 @@ class CallTerm(GroundTerm):
         Passing an argument by position or by name, or leaving out one that has a
         default, gives the same arguments.
         """
-        return CallArguments.bound_to(
-            self.callee, self.arguments, self.keyword_arguments
-        ).key_by(ensure_hashable)
+        arguments = CallSignature.from_callable(self.callee).bind(self.arguments)
+        normalized = arguments.key_by(ensure_hashable)
+        if not self._first_argument_is_receiver(arguments):
+            return normalized
+        return ObjectIdentity(arguments.positional[0]), *normalized[1:]
+
+    def _first_argument_is_receiver(self, arguments: CallArguments) -> bool:
+        """
+        :param arguments: The arguments of the call, bound to the signature.
+        :return: Whether :attr:`callee` is a method the class of the first argument
+            defines, so the first argument is its receiver.
+        """
+        if not (inspect.isfunction(self.callee) and arguments.positional):
+            return False
+        definition = inspect.getattr_static(
+            type(arguments.positional[0]), self.callee.__name__, None
+        )
+        return (
+            not isinstance(definition, staticmethod)
+            and inspect.unwrap(definition) is self.callee
+        )
 
     def live_value(self) -> Any:
-        return self.callee(*self.arguments, **self.keyword_arguments)
+        return self.callee(*self.arguments.positional, **self.arguments.keyword)
 
 
 @dataclass(frozen=True, eq=False)
@@ -309,10 +365,9 @@ class BoundValueTerm(CallTerm):
     """
 
     def live_value(self) -> Any:
-        bound_arguments = CallArguments.signature_of(self.callee).bind(
-            *self.arguments, **self.keyword_arguments
+        return self.callee._bound_value_(
+            **CallSignature.from_callable(self.callee).bind_by_name(self.arguments)
         )
-        return self.callee._bound_value_(**bound_arguments.arguments)
 
 
 # %% expressions that read ground terms
@@ -345,16 +400,16 @@ class GroundTermExpression(Generic[GroundTermType], SubClassSafeGeneric):
 # %% reading ground terms
 
 
-class TermReader(ABC):
+class TermReader(Interface):
     """
     Reads the value of a ground term, and the instances of a type, during an evaluation.
     """
 
     @abstractmethod
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
+    def value_of_term(self, term: GroundTerm) -> TermValue | None:
         """
         :param term: The ground term to read.
-        :return: The value of *term*, or nothing when it has none.
+        :return: The value of *term*, or ``None`` when it has none.
         """
 
     @abstractmethod
@@ -372,8 +427,8 @@ class LiveTermReader(TermReader):
     Reads the value a ground term currently has on the live objects.
     """
 
-    def values_of(self, term: GroundTerm) -> Iterator[Any]:
-        return term.live_values()
+    def value_of_term(self, term: GroundTerm) -> TermValue | None:
+        return term.live_term_value()
 
     def instances_of(self, type_: type[T], live_instances: Iterable[T]) -> Iterator[T]:
         return iter(live_instances)

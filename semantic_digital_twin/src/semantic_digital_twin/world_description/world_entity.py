@@ -17,13 +17,13 @@ import trimesh.boolean
 from typing_extensions import TYPE_CHECKING
 from typing_extensions import TypeVar, Any, Self, ClassVar
 
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     ReferenceWriter,
     SubclassJSONSerializer,
     to_json,
     from_json,
-    list_like_classes,
 )
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.entity_query_language.predicate import Symbol
@@ -283,7 +283,7 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 current_result = value.__class__(
                     [_resolve_item(item, world) for item in value]
                 )
@@ -832,7 +832,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         for field_ in introspector.discover(self.__class__):
             value = getattr(self, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for item in value:
                     result.extend(_resolve_item(item))
             else:
@@ -930,7 +930,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
 
             if isinstance(value, SemanticAnnotation):
                 dependencies.add(value)
-            elif isinstance(value, list_like_classes):
+            elif isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for item in value:
                     if isinstance(item, SemanticAnnotation):
                         dependencies.add(item)
@@ -1255,12 +1255,13 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         """
         Create a copy of this connection re-parented under ``new_parent``, using
         ``parent_T_connection_expression`` as the new parent offset and keeping the same
-        child and ``connection_T_child_expression``.
+        name, child and ``connection_T_child_expression``.
 
         Subclasses carrying extra state (e.g. an active degree of freedom) override this
         to preserve it. Used to move a branch without collapsing its connection.
         """
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,

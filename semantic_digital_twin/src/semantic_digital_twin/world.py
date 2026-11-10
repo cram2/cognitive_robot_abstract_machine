@@ -31,7 +31,7 @@ from typing_extensions import (
 )
 from typing_extensions import List
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.caching import memoize, clear_memoization_cache
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
@@ -1055,7 +1055,7 @@ class World(HasSimulatorProperties):
         for field_ in introspector.discover(semantic_annotation.__class__):
             value = getattr(semantic_annotation, field_.public_name)
 
-            if isinstance(value, list_like_classes):
+            if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):
                 for value_ in value:
                     if not isinstance(value_, SemanticAnnotation):
                         continue
@@ -2134,21 +2134,21 @@ class World(HasSimulatorProperties):
         self, kinematic_structure_entity: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
-        Computes all child entities of a given KinematicStructureEntity in the world
-        recursively.
+        Computes the entities below a given KinematicStructureEntity in the world.
 
         :param kinematic_structure_entity: The KinematicStructureEntity for which to
-            compute children.
-        :return: A list of all child KinematicStructureEntities.
+            compute descendants.
+        :return: Every descendant once, each after its parent.
         """
-        children = self.compute_child_kinematic_structure_entities(
+        descendants = []
+        for child in self.compute_child_kinematic_structure_entities(
             kinematic_structure_entity
-        )
-        for child in children:
-            children.extend(
+        ):
+            descendants.append(child)
+            descendants.extend(
                 self.compute_descendent_child_kinematic_structure_entities(child)
             )
-        return children
+        return descendants
 
     @memoize
     def compute_child_kinematic_structure_entities(
