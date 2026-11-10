@@ -6,8 +6,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any, Tuple, Type
-
 from krrood.exceptions import DataclassException
 
 
@@ -142,38 +140,3 @@ class UndeclaredInferenceTarget(DataclassException):
             f"Make {self.case_type.__name__} a dataclass that declares "
             f"{self.attribute_name} as a field."
         )
-
-
-# %% corner-case serialization
-
-
-@dataclass
-class CaseNotSerializableError(DataclassException):
-    """
-    Raised when a :class:`~krrood.entity_query_language.rdr.corner_case.CaseSerializer`
-    cannot emit constructor source for a value.
-    """
-
-    value: Any
-    """
-    The field value that could not be serialized.
-    """
-
-    supported_types: Tuple[Type, ...]
-    """
-    The scalar types the serializer does support (``None`` and nested dataclasses are
-    always supported in addition to these, so are not part of this list).
-    """
-
-    def error_message(self) -> str:
-        type_names = ", ".join(
-            supported_type.__name__ for supported_type in self.supported_types
-        )
-        return (
-            f"Cannot serialize value of type {type(self.value).__name__!r} to Python "
-            f"constructor source. Only None, {type_names} members, and nested "
-            "dataclasses are supported."
-        )
-
-    def suggest_correction(self) -> str:
-        return "For other types, implement a custom CaseSerializer."
