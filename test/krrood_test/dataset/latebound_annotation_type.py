@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LateBoundAnnotationType:
     """
     A field type imported only under ``TYPE_CHECKING`` by another module.

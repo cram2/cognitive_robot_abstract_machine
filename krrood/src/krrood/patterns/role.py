@@ -19,7 +19,7 @@ from krrood.symbol_graph.symbol_graph import Symbol
 from krrood.utils import get_generic_type_parameters
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Role(Symbol, Generic[T], SubClassSafeGeneric):
     """
     Base class for the Role design pattern.
@@ -72,7 +72,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
     False
     >>> len({person, student})
     2
-    >>> bool(IsSameSemanticEntity(person, student))
+    >>> bool(IsSameSemanticEntity(first_entity=person, second_entity=student))
     True
     """
 
@@ -159,7 +159,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         # call with ``hasattr`` so the chain runs only when a base actually defines it.
         if hasattr(super(), "__post_init__"):
             super().__post_init__()
-        type(self)._role_registry.register(self)
+        type(self)._role_registry.register(role=self)
 
     def __getattr__(self, item: str) -> Any:
         """
@@ -181,10 +181,10 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         if not isinstance(role_taker, Role) and is_factory_method(
             type(role_taker), item
         ):
-            return self._delegated_factory_guard(role_taker, item)
+            return self._delegated_factory_guard(role_taker=role_taker, item=item)
         return getattr(role_taker, item)
 
-    def _delegated_factory_guard(self, role_taker: T, item: str):
+    def _delegated_factory_guard(self, *, role_taker: T, item: str):
         """
         Build a callable that refuses to run a role-taker factory method delegated
         through a role.
@@ -234,18 +234,20 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
 
     @classmethod
     def has_role(
-        cls, role_taker: T, role_types: type[Role] | tuple[type[Role], ...]
+        cls, *, role_taker: T, role_types: type[Role] | tuple[type[Role], ...]
     ) -> bool:
         """
         :param role_taker: The role taker instance to query.
         :param role_types: The type or tuple of types of roles to check for.
         :return: Whether the role taker has any of the given role type(s).
         """
-        return any(cls.yield_taker_roles_of_type(role_taker, role_types))
+        return any(
+            cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_types)
+        )
 
     @classmethod
     def roles_for(
-        cls, role_taker: T, role_type: type[Role] | None = None
+        cls, *, role_taker: T, role_type: type[Role] | None = None
     ) -> list[Role]:
         """
         :param role_taker: The role taker instance to query.
@@ -253,29 +255,33 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         :return: All roles of the given type for the role taker instance.
         """
         role_type = role_type or Role
-        return list(cls.yield_taker_roles_of_type(role_taker, role_type))
+        return list(
+            cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_type)
+        )
 
     @property
     def role_taker_roles(self) -> list[Role]:
         """
         :return: All roles of this role's role taker instance.
         """
-        return self.get_taker_roles_of_type(self.role_taker, Role)
+        return self.get_taker_roles_of_type(role_taker=self.role_taker, role_type=Role)
 
     @classmethod
     def get_taker_roles_of_type(
-        cls, role_taker: T, role_type: type[Role[T]]
+        cls, *, role_taker: T, role_type: type[Role[T]]
     ) -> list[Role[T]]:
         """
         :param role_taker: The role taker instance to query.
         :param role_type: The type of roles to return.
         :return: All roles of the given type for the role taker instance.
         """
-        return list(cls.yield_taker_roles_of_type(role_taker, role_type))
+        return list(
+            cls.yield_taker_roles_of_type(role_taker=role_taker, role_types=role_type)
+        )
 
     @classmethod
     def yield_taker_roles_of_type(
-        cls, role_taker: T, role_types: type[Role[T]] | tuple[type[Role[T]], ...]
+        cls, *, role_taker: T, role_types: type[Role[T]] | tuple[type[Role[T]], ...]
     ) -> Iterator[Role[T]]:
         """
         :param role_taker: The role taker instance to query.
@@ -284,7 +290,7 @@ class Role(Symbol, Generic[T], SubClassSafeGeneric):
         """
         yield from (
             role
-            for role in cls._role_registry.roles_of(role_taker)
+            for role in cls._role_registry.roles_of(role_taker=role_taker)
             if isinstance(role, role_types)
         )
 

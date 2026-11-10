@@ -20,8 +20,8 @@ def test_annotated_field_resolves_to_the_annotated_type():
     """
     A field typed ``Annotated[T, ...]`` resolves to ``T``.
     """
-    class_diagram = ClassDiagram([AnnotatedFieldOwner, AnnotatedFieldMember])
-    owner = class_diagram.get_wrapped_class(AnnotatedFieldOwner)
+    class_diagram = ClassDiagram(classes=[AnnotatedFieldOwner, AnnotatedFieldMember])
+    owner = class_diagram.get_wrapped_class(clazz=AnnotatedFieldOwner)
 
     resolved_types = {
         wrapped_field.name: wrapped_field.resolved_type

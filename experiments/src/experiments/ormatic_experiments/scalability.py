@@ -223,15 +223,15 @@ def _ormatic_scalability_experiment(
     begin = time.perf_counter()
 
     class_diagram = ClassDiagram(
-        list(sorted(filtered_classes, key=lambda c: c.__name__, reverse=True))
+        classes=list(sorted(filtered_classes, key=lambda c: c.__name__, reverse=True))
     )
 
     class_diagram_creation_time = time.perf_counter()
 
     ormatic = ORMatic(
-        class_diagram,
+        class_dependency_graph=class_diagram,
         interface_information=OrmaticInterfaceInformation(
-            type_mappings=TypeDict(type_mappings),
+            type_mappings=TypeDict(_dict=type_mappings),
             alternative_mappings=alternative_mappings,
         ),
     )
@@ -240,7 +240,7 @@ def _ormatic_scalability_experiment(
     ormatic_reasoning_time = time.perf_counter()
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py") as f:
-        ormatic.to_sqlalchemy_file(f)
+        ormatic.to_sqlalchemy_file(file=f)
 
     writing_to_file_time = time.perf_counter()
 

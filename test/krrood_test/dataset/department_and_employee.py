@@ -5,12 +5,12 @@ from typing_extensions import Optional
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Department(Symbol):
     name: str
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Employee(Symbol):
     name: str
     department: Department

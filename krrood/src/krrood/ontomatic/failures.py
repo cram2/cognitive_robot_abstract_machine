@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnMonitoredContainerTypeForDescriptor(Exception):
     """
     Raised when a descriptor is used on a field with a container type that is not

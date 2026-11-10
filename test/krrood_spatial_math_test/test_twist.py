@@ -100,7 +100,7 @@ def test_a_deserialized_twist_refers_to_the_readers_frame(table_frame):
         )
     )
     known_frames = KnownFrames()
-    known_frames.add(table_frame.id, table_frame)
+    known_frames.add(key=table_frame.id, tracked_object=table_frame)
 
     twist_copy = from_json(
         json.loads(json.dumps(to_json(twist))), **known_frames.create_kwargs()

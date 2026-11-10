@@ -217,6 +217,6 @@ def to_dao(
 
     dao_clazz = get_data_access_object_class(type(source_object))
     if dao_clazz is None:
-        raise NoDAOFoundError(source_object)
+        raise NoDAOFoundError(obj=source_object)
     state = state or ToDataAccessObjectState()
-    return dao_clazz.to_dao(source_object, state)
+    return dao_clazz.to_dao(source_object=source_object, state=state)

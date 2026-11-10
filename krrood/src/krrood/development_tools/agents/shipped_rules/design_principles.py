@@ -41,7 +41,7 @@ class DesignPrinciplesRules(Section):
             (
                 "Interface Segregation: many small interfaces over one large one. An "
                 "interface is an explicit superclass or mixin, never a "
-                f"{CodeReference(Protocol).name}"
+                f"{CodeReference(target=Protocol).name}"
             ),
             (
                 "Dependency Inversion: depend on abstractions, not concrete "
@@ -81,7 +81,7 @@ class MethodsRules(Section):
     NO_FORWARDING_METHODS = (
         "Never write a method that only forwards to or renames another call. A "
         "one-line method is allowed only when it implements an abstract method or "
-        f"a {CodeReference(classproperty).name}, caches its result, or removes duplication - and in the "
+        f"a {CodeReference(target=classproperty).name}, caches its result, or removes duplication - and in the "
         "last case, first try to abstract the duplicated code itself"
     )
 
@@ -135,9 +135,9 @@ class ExceptionModellingRules(Section):
     )
 
     SUBCLASS_THE_KRROOD_BASE_CLASS = (
-        f"Custom exceptions subclass {CodeReference(DataclassException).path}, "
-        f"implementing its {CodeReference(DataclassException.error_message).name} "
-        f"and {CodeReference(DataclassException.suggest_correction).name}"
+        f"Custom exceptions subclass {CodeReference(target=DataclassException).path}, "
+        f"implementing its {CodeReference(target=DataclassException.error_message).name} "
+        f"and {CodeReference(target=DataclassException.suggest_correction).name}"
     )
 
 
@@ -152,7 +152,7 @@ class ConstantsAndClassLevelValuesRules(Section):
 
     NO_GLOBAL_OR_CLASS_VARIABLES = (
         "Never use global variables, module-level constants or "
-        f"{CodeReference(ClassVar).name}. Instead:",
+        f"{CodeReference(target=ClassVar).name}. Instead:",
         (
             "A fixed set of related values is a module-level enum",
             (
@@ -162,9 +162,9 @@ class ConstantsAndClassLevelValuesRules(Section):
                 "float = 20.0` as a field instead of declaring "
                 "`DEFAULT_TARGET_TEMPERATURE: ClassVar[float] = 20.0`"
             ),
-            f"A constant that belongs to a class is a {CodeReference(classproperty).name}",
+            f"A constant that belongs to a class is a {CodeReference(target=classproperty).name}",
             (
-                f"{CodeReference(ClassVar).name} is allowed only for state that explicitly has to be shared "
+                f"{CodeReference(target=ClassVar).name} is allowed only for state that explicitly has to be shared "
                 "and mutable across every instance of a class. This almost never "
                 "applies"
             ),
@@ -172,8 +172,8 @@ class ConstantsAndClassLevelValuesRules(Section):
     )
 
     USE_KRROOD_CLASSPROPERTY = (
-        f"Use the {CodeReference(classproperty).name} "
-        f"{CodeReference(krrood).name} provides"
+        f"Use the {CodeReference(target=classproperty).name} "
+        f"{CodeReference(target=krrood).name} provides"
     )
 
 
@@ -195,19 +195,19 @@ class StructuredDataRules(Section):
     NAMED_STRINGS_ARE_ENUMS = (
         "A string that names a fixed thing - a payload key, a state, a label, a "
         "filename, an environment variable, a command flag, a status - is a "
-        f"{CodeReference(StrEnum).name} member. A value spelled in two places has no single source to "
+        f"{CodeReference(target=StrEnum).name} member. A value spelled in two places has no single source to "
         "rename, and nothing fails when the two drift apart"
     )
 
     TYPED_ENUM_VALUES = (
         "When the values are more than text - paths, numbers - give the enum "
         "values of that type, mixing the type in "
-        f"({CodeReference(IntEnum).name}, {CodeReference(StrEnum).name})"
+        f"({CodeReference(target=IntEnum).name}, {CodeReference(target=StrEnum).name})"
     )
 
     NO_MAGIC_NUMBERS = (
         "A magic number becomes an enum member, a field default or a "
-        f"{CodeReference(classproperty).name}; a bare literal that carries meaning is unreadable where "
+        f"{CodeReference(target=classproperty).name}; a bare literal that carries meaning is unreadable where "
         "it is used and unsearchable everywhere else"
     )
 
@@ -229,8 +229,8 @@ class StructuredDataRules(Section):
     )
 
     SUBCLASS_PATH_ENUMERATION = (
-        f"A path enum subclasses {CodeReference(PathEnumeration).path}, so every "
-        f"path derived from a member is a plain {CodeReference(Path).name}; its "
+        f"A path enum subclasses {CodeReference(target=PathEnumeration).path}, so every "
+        f"path derived from a member is a plain {CodeReference(target=Path).name}; its "
         "members' `name` is the path's last component, so read the member name "
         "as `_name_`"
     )
@@ -247,14 +247,14 @@ class SerializationRules(Section):
 
     ROUND_TRIP_JSON_WITH_KRROOD = (
         "JSON that our own classes round-trip goes through "
-        f"{CodeReference(json_serializer).path}: use "
-        f"{CodeReference(DataclassJSONSerializer).name} wherever it can "
+        f"{CodeReference(target=json_serializer).path}: use "
+        f"{CodeReference(target=DataclassJSONSerializer).name} wherever it can "
         "(de)serialize the class; where a class needs more, subclass "
-        f"{CodeReference(SubclassJSONSerializer).name} and build on "
-        f"{CodeReference(DataclassJSONSerializer).name}'s "
-        f"{CodeReference(DataclassJSONSerializer.to_json).name}/"
-        f"{CodeReference(DataclassJSONSerializer.from_json).name}. Never "
+        f"{CodeReference(target=SubclassJSONSerializer).name} and build on "
+        f"{CodeReference(target=DataclassJSONSerializer).name}'s "
+        f"{CodeReference(target=DataclassJSONSerializer.to_json).name}/"
+        f"{CodeReference(target=DataclassJSONSerializer.from_json).name}. Never "
         "hand-write field-by-field "
-        f"{CodeReference(SubclassJSONSerializer.to_json).name}/"
-        f"{CodeReference(SubclassJSONSerializer.from_json).name}"
+        f"{CodeReference(target=SubclassJSONSerializer.to_json).name}/"
+        f"{CodeReference(target=SubclassJSONSerializer.from_json).name}"
     )
