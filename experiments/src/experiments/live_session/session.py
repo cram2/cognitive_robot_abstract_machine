@@ -8,8 +8,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-import numpy as np
-from numpy.typing import NDArray
 from typing_extensions import Any
 
 from coraplex.plans.executors import PlanOutcome
@@ -18,6 +16,7 @@ from experiments.live_session.exceptions import (
     NoPerformedCellError,
     UnknownSnapshotError,
 )
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoSimulationSnapshot
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -59,14 +58,14 @@ class StepReport:
     How the plan the step ran ended; ``None`` if it ran none.
     """
 
-    tool_position: NDArray[np.float64]
+    tool_position: Point3
     """
-    Where the tool frame was afterwards, in the world's frame.
+    Where the tool frame was afterwards, in the world's root frame.
     """
 
-    base_position: NDArray[np.float64]
+    base_position: Point3
     """
-    Where the robot's base was afterwards, in the world's frame.
+    Where the robot's base was afterwards, in the world's root frame.
     """
 
     @property
@@ -88,8 +87,8 @@ class StepReport:
         return "%-34s %-34s tool %s base %s" % (
             self.label,
             self.status,
-            self.tool_position.round(3),
-            self.base_position.round(3),
+            self.tool_position.to_np()[:3].round(3),
+            self.base_position.to_np()[:3].round(3),
         )
 
 
@@ -170,8 +169,8 @@ class LiveSession:
         report = StepReport(
             label=label,
             outcome=outcome,
-            tool_position=self.tool_frame.global_pose.to_np()[:3, 3],
-            base_position=self.robot_base.global_pose.to_np()[:3, 3],
+            tool_position=self.tool_frame.global_pose.position,
+            base_position=self.robot_base.global_pose.position,
         )
         if self.history and not self.history[-1].finished:
             self.history[-1].reports.append(report)

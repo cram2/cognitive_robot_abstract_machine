@@ -30,11 +30,15 @@ def test_a_report_shows_where_the_tool_and_the_base_are(
 
     report = session.report(label="looked")
 
+    assert report.tool_position.reference_frame is pendulum_session.world.root
     np.testing.assert_array_equal(
-        report.tool_position, session.tool_frame.global_pose.to_np()[:3, 3]
+        report.tool_position.to_np(),
+        session.tool_frame.global_pose.position.to_np(),
     )
+    assert report.base_position.reference_frame is pendulum_session.world.root
     np.testing.assert_array_equal(
-        report.base_position, session.robot_base.global_pose.to_np()[:3, 3]
+        report.base_position.to_np(),
+        session.robot_base.global_pose.position.to_np(),
     )
 
 
