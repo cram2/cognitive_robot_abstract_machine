@@ -39,7 +39,7 @@ from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
     WaitForMessage,
 )
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 from ..motion_control_context import create_context_with_motion_control
 from ...statechart_json_round_trip import (

@@ -4,23 +4,21 @@ from time import sleep
 
 import numpy as np
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
+import krrood_spatial_math.spatial_types as cas
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutorNode
-from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    WorldWithStretchConfigDiffDrive,
-)
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -271,8 +269,8 @@ class StretchTester(GiskardTester):
 
     def setup_giskard(self) -> Giskard:
         return Giskard(
-            world_config=WorldWithStretchConfigDiffDrive(
-                urdf=load_xacro(Stretch.get_ros_file_path())
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(Stretch)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(debug_mode=True),

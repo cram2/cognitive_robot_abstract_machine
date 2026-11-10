@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from krrood.exceptions import DataclassException
-from semantic_digital_twin.spatial_types.spatial_types import SpatialType
+from krrood_spatial_math.spatial_types import SpatialType
 
 
 @dataclass

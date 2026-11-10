@@ -16,7 +16,6 @@ import robokudo.defs
 from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
-import robokudo.utils.data_downloader
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.storage import StorageWriter
 from robokudo.cas import CASViews
@@ -25,7 +24,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.io.storage import Storage, StorageDocumentField
 import robokudo.utils.tree_execution
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
@@ -37,11 +36,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _build_writer_pipeline(db_name: str) -> Pipeline:
+def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
-        target_dir=robokudo.utils.data_downloader.test_data_path() / Path("data"),
+        target_dir=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
     camera_config = file_reader_descriptor.parameters.camera_config
@@ -88,7 +87,9 @@ def _build_reader_pipeline(db_name: str) -> Pipeline:
 
 
 class TestStorageRoundtripPipeline:
-    def test_store_and_replay_sensor_data_roundtrip(self) -> None:
+    def test_store_and_replay_sensor_data_roundtrip(
+        self, cup_on_counter_directory: Path
+    ) -> None:
         rk_world.init_world_with_entity_tracker()
         db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
         storage = Storage(db_name)
@@ -99,7 +100,7 @@ class TestStorageRoundtripPipeline:
             f"{robokudo.defs.TEST_ROS_NODE_NAME}_reader_{uuid.uuid4().hex}"
         )
         try:
-            writer_pipeline = _build_writer_pipeline(db_name)
+            writer_pipeline = _build_writer_pipeline(db_name, cup_on_counter_directory)
             writer_status = robokudo.utils.tree_execution.run_tree_once(
                 writer_pipeline, writer_node
             )

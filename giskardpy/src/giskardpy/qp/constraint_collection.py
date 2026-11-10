@@ -13,6 +13,7 @@ from cramph.data_types import LifeCycleValues
 from giskardpy.motion_statechart.exceptions import (
     InvalidConstraintExpressionShapeError,
 )
+from giskardpy.qp.bound_cap import BoundCap, ScalarBoundCap
 from giskardpy.qp.constraint import (
     GiskardConstraint,
     GiskardEqualityConstraint,
@@ -146,19 +147,23 @@ class ConstraintCollection:
         task_expression: sm.SymbolicScalar,
         equality_bound: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
-        reference_velocity: sm.ScalarData,
+        cruise_velocity: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
+        bound_cap: BoundCap | None = None,
     ) -> None:
         """
         Add a task constraint to the motion problem.
 
         This should be used for most constraints. It will not strictly stick to the
-        reference velocity, but requires only a single constraint in the final
+        cruise velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the
-            weight, will not be strictly enforced.
+        :param cruise_velocity: used by Giskard to limit the error, will not be
+            strictly enforced.
+        :param velocity_scale: the speed at which task_expression typically
+            changes, which scales quadratic_weight
         :param task_expression: defines the task function
         :param equality_bound: goal for the derivative of task_expression
         :param quadratic_weight: how expensive it is to violate this constraint
@@ -168,6 +173,8 @@ class ConstraintCollection:
             unless you know what you are doing
         :param upper_slack_limit: how much the upper error can be violated, don't use
             unless you know what you are doing
+        :param bound_cap: how the bound is limited to what may be demanded within the
+            control horizon; caps the bound on its own if not given
         """
         if task_expression.shape != (1, 1):
             raise InvalidConstraintExpressionShapeError(list(task_expression.shape))
@@ -182,7 +189,9 @@ class ConstraintCollection:
             name=name,
             expression=task_expression,
             bound=equality_bound,
-            normalization_factor=reference_velocity,
+            bound_cap=bound_cap if bound_cap is not None else ScalarBoundCap(),
+            cruise_velocity=cruise_velocity,
+            velocity_scale=velocity_scale,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
@@ -193,7 +202,8 @@ class ConstraintCollection:
 
     def add_inequality_constraint(
         self,
-        reference_velocity: sm.ScalarData,
+        cruise_velocity: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         lower_error: sm.ScalarData,
         upper_error: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
@@ -207,10 +217,14 @@ class ConstraintCollection:
         Add a task constraint to the motion problem.
 
         This should be used for most constraints. It will not strictly stick to the
-        reference velocity, but requires only a single constraint in the final
+        cruise velocity, but requires only a single constraint in the final
         optimization problem and is therefore faster.
-        :param reference_velocity: used by Giskard to limit the error and normalize the
-            weight, will not be strictly enforced.
+        :param cruise_velocity: used by Giskard to cap a
+            bound that demands motion (a positive lower or a negative upper error) to what
+            is reachable at this velocity. A bound that only permits motion is not capped.
+            Will not be strictly enforced.
+        :param velocity_scale: the speed at which task_expression typically
+            changes, which scales quadratic_weight
         :param lower_error: lower bound for the error of expression
         :param upper_error: upper bound for the error of expression
         :param quadratic_weight:
@@ -233,7 +247,8 @@ class ConstraintCollection:
         constraint = GiskardInequalityConstraint(
             name=name,
             expression=task_expression,
-            normalization_factor=reference_velocity,
+            cruise_velocity=cruise_velocity,
+            velocity_scale=velocity_scale,
             quadratic_weight=quadratic_weight,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
@@ -250,7 +265,7 @@ class ConstraintCollection:
         upper_velocity_limit: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
-        velocity_limit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -264,8 +279,8 @@ class ConstraintCollection:
         :param upper_velocity_limit:
         :param quadratic_weight:
         :param task_expression:
-        :param velocity_limit: Used for normalizing the expression, like
-            reference_velocity, must be positive
+        :param velocity_scale: the speed at which task_expression typically changes,
+            which scales quadratic_weight
         :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:
@@ -277,7 +292,7 @@ class ConstraintCollection:
             lower_bound=lower_velocity_limit,
             upper_bound=upper_velocity_limit,
             quadratic_weight=quadratic_weight,
-            normalization_factor=velocity_limit,
+            velocity_scale=velocity_scale,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
@@ -289,7 +304,7 @@ class ConstraintCollection:
         velocity_goal: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
-        velocity_limit: sm.ScalarData,
+        velocity_scale: sm.ScalarData,
         name: str | None = None,
         lower_slack_limit: sm.ScalarData = -LargeNumber,
         upper_slack_limit: sm.ScalarData = LargeNumber,
@@ -302,8 +317,8 @@ class ConstraintCollection:
         :param velocity_goal:
         :param quadratic_weight:
         :param task_expression:
-        :param velocity_limit: Used for normalizing the expression, like
-            reference_velocity, must be positive
+        :param velocity_scale: the speed at which task_expression typically changes,
+            which scales quadratic_weight
         :param name:
         :param lower_slack_limit:
         :param upper_slack_limit:
@@ -314,7 +329,7 @@ class ConstraintCollection:
             expression=task_expression,
             bound=velocity_goal,
             quadratic_weight=quadratic_weight,
-            normalization_factor=velocity_limit,
+            velocity_scale=velocity_scale,
             lower_slack_limit=lower_slack_limit,
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,

@@ -1,6 +1,7 @@
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing_extensions import Any
 
 import pytest
@@ -30,7 +31,7 @@ from krrood.adapters.json_serializer import to_json
 from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -268,7 +269,7 @@ class TestClientWorldUpdates:
 
     def test_a_result_without_changes_is_not_waited_for(self):
         world_updates = ClientWorldUpdates(
-            world_synchronizer=PublishingSynchronizerMimic(), timeout=0.0
+            world_synchronizer=PublishingSynchronizerMimic(), timeout=timedelta(0)
         )
 
         world_updates.wait_for_the_changes_of_a_goal({})
@@ -276,7 +277,9 @@ class TestClientWorldUpdates:
     def test_the_changes_of_a_goal_are_waited_for(self):
         synchronizer = PublishingSynchronizerMimic(applied_sequence_number=9)
         world_updates = ClientWorldUpdates(
-            world_synchronizer=synchronizer, timeout=0.0, poll_interval=0.0
+            world_synchronizer=synchronizer,
+            timeout=timedelta(0),
+            poll_interval=timedelta(0),
         )
 
         world_updates.wait_for_the_changes_of_a_goal(
@@ -293,8 +296,8 @@ class TestClientWorldUpdates:
     def test_changes_that_never_arrive_are_reported(self):
         world_updates = ClientWorldUpdates(
             world_synchronizer=PublishingSynchronizerMimic(applied_sequence_number=8),
-            timeout=0.05,
-            poll_interval=0.01,
+            timeout=timedelta(seconds=0.05),
+            poll_interval=timedelta(seconds=0.01),
         )
 
         with pytest.raises(GiskardWorldUpdateNotReceivedError) as raised:

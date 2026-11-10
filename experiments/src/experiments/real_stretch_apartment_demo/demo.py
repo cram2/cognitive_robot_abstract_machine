@@ -66,8 +66,8 @@ from semantic_digital_twin.predefined_maps.apartment_environment import (
 )
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from cramph.composites import Sequence, StatementNode
 
@@ -118,7 +118,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
         )
 
     def is_scene_populated(self, world: World) -> bool:

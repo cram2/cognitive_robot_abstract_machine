@@ -8,7 +8,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 import numpy as np
 import pytest
 
-from semantic_digital_twin.spatial_types import Point2
+from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.datastructures import camera_model as camera_model_module
 from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortion,

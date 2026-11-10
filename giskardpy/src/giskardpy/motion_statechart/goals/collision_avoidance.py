@@ -12,7 +12,8 @@ from krrood.ormatic.utils import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValues
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
     UnexpectedWorldEntityCountError,
     CollisionViolatedError,
@@ -34,6 +35,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import (
     CollisionMatrix,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (
+    AllowCollisionForEndEffector,
     AvoidSelfCollisions,
 )
 from semantic_digital_twin.collision_checking.collision_variable_managers import (
@@ -44,8 +46,8 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     SelfCollisionVariableManager,
     ExternalCollisionVariableManager,
 )
-from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types import Vector3
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% shared by self and external collision avoidance
@@ -66,9 +68,10 @@ class _CollisionAvoidanceTask(ABC, Task):
     The robot whose collisions are avoided.
     """
 
-    max_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    The maximum velocity for the collision avoidance task.
+    Sets how fast a violated collision distance is restored, in m/s; not strictly
+    enforced.
     """
 
     collision_variable_manager: BaseCollisionVariableManager | None = field(
@@ -252,7 +255,8 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             root_V_contact_normal = manager.get_root_V_contact_normal_symbol(contact)
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
-                reference_velocity=self.max_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -297,9 +301,10 @@ class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
     robot of the world it runs in.
     """
 
-    max_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    The maximum velocity for the collision avoidance task.
+    Sets how fast a violated collision distance is restored, in m/s; not strictly
+    enforced.
     """
 
     cancel_if_collision_violated: bool = True
@@ -322,7 +327,9 @@ class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
         if self.robot is None:
             self.robot = _single_robot_of_world(self)
         task = _ExternalCollisionAvoidanceTask(
-            name=f"{self.name}/task", robot=self.robot, max_velocity=self.max_velocity
+            name=f"{self.name}/task",
+            robot=self.robot,
+            cruise_velocity=self.cruise_velocity,
         )
         self._add_child_to_statechart(task)
         if self.cancel_if_collision_violated:
@@ -395,6 +402,19 @@ class UpdateTemporaryCollisionRules(EndedByOwner, MotionStatechartNode):
     """
     The rules in force while this node runs.
     """
+
+    @classmethod
+    def for_end_effector(
+        cls, end_effector: EndEffector
+    ) -> UpdateTemporaryCollisionRules:
+        """
+        :param end_effector: The end effector that may touch its surroundings.
+        :return: A node that lets this end effector, together with whatever it holds,
+            collide with the environment.
+        """
+        return cls(
+            temporary_rules=[AllowCollisionForEndEffector(end_effector=end_effector)]
+        )
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         artifacts = MotionNodeArtifacts()
@@ -570,7 +590,8 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
             )
             artifacts.constraints.add_inequality_constraint(
                 name=f"{group_a.root.name}/{group_b.root.name}/{contact.rank}",
-                reference_velocity=self.max_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
@@ -615,9 +636,10 @@ class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
     robot of the world it runs in.
     """
 
-    max_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    The maximum velocity for the collision avoidance task.
+    Sets how fast a violated collision distance is restored, in m/s; not strictly
+    enforced.
     """
 
     cancel_if_collision_violated: bool = True
@@ -640,7 +662,9 @@ class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
         if self.robot is None:
             self.robot = _single_robot_of_world(self)
         task = _SelfCollisionAvoidanceTask(
-            name=f"{self.name}/task", robot=self.robot, max_velocity=self.max_velocity
+            name=f"{self.name}/task",
+            robot=self.robot,
+            cruise_velocity=self.cruise_velocity,
         )
         self._add_child_to_statechart(task)
         if self.cancel_if_collision_violated:

@@ -13,7 +13,7 @@ from semantic_digital_twin.datastructures.soft_trunk import (
     SoftTrunkSection,
 )
 from semantic_digital_twin.spatial_computations.ik_solver import InverseKinematicsSolver
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -27,7 +27,6 @@ from semantic_digital_twin.world_description.world_entity import Body, Connectio
 
 
 class TestSoftTrunk:
-
     def test_piecewise_constant_curvature_construction(self):
         """
         Tests if the PCC robot is built and its DOFs are accessible via properties.
@@ -257,6 +256,26 @@ class TestSoftConnectionRebuilding:
         )
         world.notify_state_change()
         return world
+
+    def test_a_re_parented_piecewise_constant_curvature_segment_keeps_its_name(self):
+        world = self.build_piecewise_constant_curvature_world()
+        segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
+
+        copied_segment = segment.copy_with_new_parent(
+            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        )
+
+        assert copied_segment.name == segment.name
+
+    def test_a_re_parented_cosserat_rod_segment_keeps_its_name(self):
+        world = self.build_cosserat_world()
+        segment = world.get_connections_by_type(CosseratRodConnection)[0]
+
+        copied_segment = segment.copy_with_new_parent(
+            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        )
+
+        assert copied_segment.name == segment.name
 
     def test_a_copied_piecewise_constant_curvature_world_bends_the_same_way(self):
         world = self.build_piecewise_constant_curvature_world()

@@ -52,7 +52,7 @@ from krrood.entity_query_language.verbalization.morphology import present_partic
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world import World
@@ -125,7 +125,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
         )
 
     def is_scene_populated(self, world: World) -> bool:

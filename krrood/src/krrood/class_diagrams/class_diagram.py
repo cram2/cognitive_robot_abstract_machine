@@ -42,6 +42,7 @@ from typing_extensions import Generic
 from krrood.class_diagrams.exceptions import (
     ClassIsUnMappedInClassDiagram,
     CouldNotResolveType,
+    FieldIsUnMappedInClassDiagram,
 )
 
 if TYPE_CHECKING:
@@ -348,6 +349,17 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
         """
         return self.clazz.__name__
 
+    def get_field(self, name: str) -> WrappedField:
+        """
+        :param name: The public name of one of the class's fields.
+        :return: That field.
+        :raises FieldIsUnMappedInClassDiagram: If the class has no field of that name.
+        """
+        for wrapped_field in self.fields:
+            if wrapped_field.name == name:
+                return wrapped_field
+        raise FieldIsUnMappedInClassDiagram(self.clazz, name)
+
     @cached_property
     def factory_methods(self) -> tuple[str, ...]:
         """
@@ -639,29 +651,32 @@ class ClassDiagram:
         Build parent map from inheritance edges: child_idx -> set(parent_idx)
         """
         parent_map: dict[int, set[int]] = {}
-        for u, v in self._dependency_graph.edge_list():
-            rel = self._dependency_graph.get_edge_data(u, v)
-            if isinstance(rel, Inheritance):
-                parent_map.setdefault(v, set()).add(u)
+        edges = self._dependency_graph.weighted_edge_list()
+        for parent_index, child_index, relation in edges:
+            if isinstance(relation, Inheritance):
+                parent_map.setdefault(child_index, set()).add(parent_index)
         return parent_map
 
-    def all_ancestors(self, node_idx: int) -> set[int]:
-        """DFS to compute all ancestors for each node index"""
+    def all_ancestors(self, node_index: int) -> set[int]:
+        """
+        :param node_index: The index of a class in the dependency graph.
+        :return: The indices of every class it inherits from, directly or indirectly.
+        """
         parent_map = self.parent_map
-        parents = parent_map.get(node_idx, set())
+        parents = parent_map.get(node_index, set())
         if not parents:
             return set()
         stack = list(parents)
         seen: set[int] = set(parents)
         while stack:
-            cur = stack.pop()
-            for p in parent_map.get(cur, set()):
-                if p not in seen:
-                    seen.add(p)
-                    stack.append(p)
+            current = stack.pop()
+            for parent in parent_map.get(current, set()):
+                if parent not in seen:
+                    seen.add(parent)
+                    stack.append(parent)
         return seen
 
-    def get_assoc_keys_by_source(
+    def get_association_keys_by_source(
         self, include_field_name: bool = False
     ) -> dict[int, set[tuple]]:
         """
@@ -677,14 +692,14 @@ class ClassDiagram:
         :return: A dictionary where the keys are source node identifiers (int), and the
             values are sets of tuples representing association keys.
         """
-        assoc_keys_by_source = {}
-        for u, v in self._dependency_graph.edge_list():
-            rel = self._dependency_graph.get_edge_data(u, v)
-            if isinstance(rel, Association):
-                assoc_keys_by_source.setdefault(u, set()).add(
-                    rel.get_key(include_field_name)
+        association_keys_by_source = {}
+        edges = self._dependency_graph.weighted_edge_list()
+        for source_index, _, relation in edges:
+            if isinstance(relation, Association):
+                association_keys_by_source.setdefault(source_index, set()).add(
+                    relation.get_key(include_field_name)
                 )
-        return assoc_keys_by_source
+        return association_keys_by_source
 
     @memoize
     def to_subdiagram_without_inherited_associations(
@@ -697,41 +712,34 @@ class ClassDiagram:
 
         Inheritance edges are preserved.
         """
-        # Rebuild a fresh diagram from the same classes to avoid mutating this instance
         result = copy(self)
-        # Convenience locals
-        g = result._dependency_graph
+        result._dependency_graph = self._dependency_graph.copy()
+        dependency_graph = result._dependency_graph
 
-        assoc_keys_by_source = result.get_assoc_keys_by_source(include_field_name)
+        association_keys_by_source = result.get_association_keys_by_source(
+            include_field_name
+        )
 
         # Mark redundant descendant association edges for removal
-        edges_to_remove: list[tuple[int, int]] = []
-        for u, v in g.edge_list():
-            rel = g.get_edge_data(u, v)
-            if not isinstance(rel, Association):
+        edges_to_remove: list[int] = []
+        edges = dependency_graph.edge_index_map().items()
+        for edge_index, (source_index, _, relation) in edges:
+            if not isinstance(relation, Association):
                 continue
 
-            key = rel.get_key(include_field_name)
-            # Collect all keys defined by any ancestor of u
+            key = relation.get_key(include_field_name)
+            # Collect all keys defined by any ancestor of the source
             inherited_keys: set[tuple] = set()
-            for anc in result.all_ancestors(u):
-                inherited_keys |= assoc_keys_by_source.get(anc, set())
+            for ancestor_index in result.all_ancestors(source_index):
+                inherited_keys |= association_keys_by_source.get(ancestor_index, set())
 
             if key in inherited_keys:
-                edges_to_remove.append((u, v))
+                edges_to_remove.append(edge_index)
 
-        # Remove redundant edges
-        result.remove_edges(edges_to_remove)
+        for edge_index in edges_to_remove:
+            dependency_graph.remove_edge_from_index(edge_index)
 
         return result
-
-    def remove_edges(self, edges):
-        """Remove edges from the dependency graph"""
-        for u, v in edges:
-            try:
-                self._dependency_graph.remove_edge(u, v)
-            except Exception:
-                pass
 
     @property
     def wrapped_classes(self):
@@ -1043,6 +1051,17 @@ class ClassDiagram:
         relation.index = self._dependency_graph.add_edge(
             relation.source.index, relation.target.index, relation
         )
+        clear_memoization_cache(self)
+
+    def remove_relation(self, relation: ClassRelation) -> None:
+        """
+        Removes a relation that :meth:`add_relation` added.
+
+        :param relation: The relation to remove.
+        """
+        self._dependency_graph.remove_edge_from_index(relation.index)
+        relation.index = None
+        clear_memoization_cache(self)
 
     def to_dot(
         self,

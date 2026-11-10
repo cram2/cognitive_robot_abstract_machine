@@ -20,7 +20,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import MissingConnectionAxisError
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
@@ -309,6 +309,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     ) -> Self:
         # Reuse the same degree of freedom so the joint state is kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -481,6 +482,7 @@ class ScrewConnection(ActiveConnection1DOF):
     ) -> Self:
         # Reuse the same degree of freedom so the joint state is kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -645,7 +647,7 @@ class Connection6DoF(Connection):
 
         :param transformation: The desired parent-to-child origin. Must carry a
             reference frame (:meth:`World.transform` raises
-            :class:`~semantic_digital_twin.exceptions.MissingReferenceFrameError`
+            :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
             otherwise); does not need to already be expressed in the parent frame. Other
             spatial types (e.g. ``Pose``) must be converted with their own
             ``homogeneous_matrix`` before being assigned here.
@@ -702,6 +704,7 @@ class Connection6DoF(Connection):
     ) -> Self:
         # Reuse the same degrees of freedom so the world state layout is kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -935,6 +938,7 @@ class OmniDrive(WheeledDrive):
     ) -> Self:
         # Reuse the same degrees of freedom so the odometry and the world state layout are kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -1124,6 +1128,7 @@ class DifferentialDrive(WheeledDrive):
     ) -> Self:
         # Reuse the same degrees of freedom so the odometry and the world state layout are kept.
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,

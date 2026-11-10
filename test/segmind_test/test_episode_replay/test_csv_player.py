@@ -9,7 +9,7 @@ from segmind.episode_segmenter import EpisodeSceneLoader, EpisodeSegmentation
 from segmind.players.csv_player import CSVEpisodePlayer
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 

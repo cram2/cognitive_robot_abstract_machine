@@ -71,6 +71,10 @@ from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.predefined_maps.apartment_environment import (
     ApartmentEnvironment,
 )
+from semantic_digital_twin.robots.robot_part_mixins import (
+    HasMobileBase,
+    TGenericMobileBase,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -102,16 +106,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Level,
     SemanticEnvironmentAnnotation,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Point3,
 )
-from semantic_digital_twin.utils import (
-    rclpy_installed,
-    tracy_installed,
-    daisy_installed,
-)
+from semantic_digital_twin.utils import rclpy_installed
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -508,7 +508,7 @@ def cylinder_bot_diff_world():
 
 
 def world_with_urdf_factory(
-    robot_semantic_annotation: type[AbstractRobot],
+    robot_semantic_annotation: type[HasMobileBase],
     robot_starting_pose: HomogeneousTransformationMatrix | None = None,
     urdf_path_resolver: PathResolver | None = None,
     robot_localization_pose: HomogeneousTransformationMatrix | None = None,
@@ -517,7 +517,9 @@ def world_with_urdf_factory(
     Builds this tree:
     map -> odom_combined -> "urdf tree"
     """
-    drive_connection_type = robot_semantic_annotation.get_drive_connection_type()
+    drive_connection_type = robot_semantic_annotation.get_type_of_generic_parameter(
+        TGenericMobileBase
+    ).get_drive_connection_type()
     urdf_parser = URDFParser.from_file(
         file_path=robot_semantic_annotation.get_ros_file_path(),
         path_resolver=urdf_path_resolver,
@@ -588,7 +590,7 @@ def _garmi_world_setup():
 
 @pytest.fixture(scope="session")
 def tracy_world():
-    if not tracy_installed():
+    if not Tracy.is_description_installed():
         pytest.skip("Tracy not installed")
     tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
     world_with_tracy = tracy_parser.create_world()
@@ -598,11 +600,10 @@ def tracy_world():
 
 @pytest.fixture(scope="session")
 def daisy_world():
-    if not daisy_installed():
+    if not DAiSy.is_description_installed():
         pytest.skip("DAiSy not installed")
-    daisy = "package://iai_daisy_description/robots/daisy.urdf.xacro"
     try:
-        daisy_parser = URDFParser.from_file(file_path=daisy)
+        daisy_parser = URDFParser.from_file(file_path=DAiSy.get_ros_file_path())
         world_with_daisy = daisy_parser.create_world()
         DAiSy.from_world(world_with_daisy)
     except Exception:

@@ -38,16 +38,18 @@ from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.adapters.ros.exceptions import (
+    WorldUpdateReferencesUnknownEntityError,
+)
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingPublishChangesAttribute,
     ApplyMissedMessagesWhileWorldIsBeingModifiedError,
     StateUpdateContainsUnknownDegreesOfFreedomError,
-    BrokenWorldModificationHistoryError,
+    PartiallyAppliedWorldModificationError,
     SynchronizerNotConnectedError,
     WorldHasMultipleSynchronizersError,
     WorldHasNoSynchronizerError,
-    WorldUpdateReferencesUnknownEntityError,
 )
 from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 from semantic_digital_twin.robots.pr2 import PR2
@@ -63,7 +65,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Fridge,
     Drawer,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -1243,7 +1245,7 @@ def test_nested_modify_world_publish_changes_true_false(rclpy_node):
 
     assert len(w1.kinematic_structure_entities) == len(w2.kinematic_structure_entities)
 
-    with pytest.raises(BrokenWorldModificationHistoryError):
+    with pytest.raises(PartiallyAppliedWorldModificationError):
         with w1.modify_world():
             handle = Handle.create_with_new_body_in_world("handle", w1)
 

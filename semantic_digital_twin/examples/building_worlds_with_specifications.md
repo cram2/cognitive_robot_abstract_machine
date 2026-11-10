@@ -117,7 +117,7 @@ parent frame. Because a specification is reusable, that placement and the name c
 *overridden* when you spawn, together with the `parent` the entity attaches to.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 # Bake a default pose straight into the specification.
 leg = BodySpecification.box(
@@ -187,7 +187,7 @@ corresponding `Body` constructors:
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 resources = Path(files("semantic_digital_twin")).parent.parent / "resources"
 
@@ -293,7 +293,7 @@ rotation to its translation.
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 
 world = World.create_with_root_body()
 
@@ -661,11 +661,27 @@ print("MJCF table world has", len(mjcf_world.bodies), "bodies")
 
 A world specification can also merge robots into the environment. Each one is described by a
 `RobotSpecification`, which bundles a robot's [semantic annotation class](adding-robots) with
-the poses that place it: `world_T_odom` sets the localization pose, and `odom_T_robot_start`
-the robot's start pose. The robot is parsed from its own description and inserted as
-`world.root -> odom -> connection -> robot`. The connection attaching the robot to its `odom`
-is the drive determined by the robot's mobile base, or a fixed connection when the robot has
-no mobile base.
+the poses that place it. The robot is parsed from its own description and inserted below the
+world root by its localization, at `localization_pose`:
+
+- A robot with a mobile base is inserted as `world.root -> odometry -> drive -> robot`. The
+  odometry body is named as its mobile base declares, and the drive is the one the mobile base
+  creates. `odometry_T_robot_start` sets the robot's start pose relative to its odometry body.
+- Any other robot is inserted as `world.root -> robot`, with the root of its description
+  attached directly. It has no odometry body, so it takes no start pose.
+
+A few more fields cover robots whose world has to line up with a running system:
+
+- `localization_connection_type` attaches the localized body to the world root. It is fixed by
+  default; a `Connection6DoF` lets the localization move, for example when it is read from tf.
+- `description_parser` reads the robot's description instead of the file the robot class
+  declares, for example a `URDFParser` of the XML on the `/robot_description` topic. The robot
+  keeps the names the parser gives it, so a parser with an empty `prefix` leaves them
+  unprefixed and matching the frames the robot publishes.
+
+`RobotSpecification.specify_real_robot` sets both for a robot as it runs on the real system:
+it keeps the names of the description, and it localizes a robot with a mobile base by a
+`Connection6DoF` and any other robot by a fixed connection.
 
 ```{code-cell} ipython3
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -676,8 +692,8 @@ world = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
-            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(y=2.0),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(y=2.0),
         )
     ],
 ).create_world()
@@ -685,9 +701,9 @@ world = WorldSpecification.from_urdf(
 
 Because `robots` is a list, a world can hold several of them, each with its own localization —
 including several instances of the same robot. Names are not unique in a world, so two PR2s
-contribute two joints called `pr2/torso_lift_joint`. Each robot is therefore annotated while it
-still owns the world it was parsed into, and its `odom` body carries its own identifier as a
-name prefix, so the localization frames stay distinguishable.
+contribute two joints called `pr2/torso_lift_joint` and two odometry bodies called
+`pr2/odom_combined`, told apart by their identifiers. Each robot is therefore annotated while it
+still owns the world it was parsed into.
 
 ```{code-cell} ipython3
 two_robot_world = WorldSpecification.from_urdf(
@@ -695,11 +711,11 @@ two_robot_world = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
         ),
         RobotSpecification(
             semantic_annotation_type=PR2,
-            world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
         ),
     ],
 ).create_world()

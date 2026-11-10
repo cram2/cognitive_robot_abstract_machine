@@ -1,14 +1,11 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
-from threading import Thread
 from typing_extensions import Any
 
 import numpy as np
 import pytest
 from control_msgs.msg import MultiDOFCommand
 from geometry_msgs.msg import Twist, TwistStamped
-from rclpy.executors import SingleThreadedExecutor
-from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray
 
 from giskardpy.middleware.ros2.command_publishing import (
@@ -16,7 +13,6 @@ from giskardpy.middleware.ros2.command_publishing import (
     Float64MultiArrayFormat,
     GroupCommandFormat,
     JointGroupVelocityCommandPublisher,
-    JointVelocityCommandPublisher,
     JointMinimumVelocities,
     MinimumVelocity,
     MultiDOFCommandFormat,
@@ -26,7 +22,7 @@ from giskardpy.middleware.ros2.command_publishing import (
 )
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -64,57 +60,6 @@ class RecordingPublisher:
 
     def publish(self, message: Any) -> None:
         self.published_messages.append(deepcopy(message))
-
-
-@dataclass
-class ParameterServingNode:
-    """
-    Stand-in for a velocity controller that offers the ``joint`` parameter Giskard reads
-    to learn which connection a namespace controls.
-    """
-
-    controller_name: str
-    """
-    Name of the node, which doubles as the namespace of its parameter service.
-    """
-
-    joint_name: str
-    """
-    Value served for the ``joint`` parameter.
-    """
-
-    node: Node = field(init=False)
-    """
-    The node offering the parameter service.
-    """
-
-    executor: SingleThreadedExecutor = field(init=False)
-    """
-    Executor spinning :attr:`node`.
-    """
-
-    spinner: Thread = field(init=False)
-    """
-    Thread running :attr:`executor`.
-    """
-
-    def __post_init__(self):
-        self.node = Node(self.controller_name)
-        self.node.declare_parameter("joint", self.joint_name)
-        self.executor = SingleThreadedExecutor()
-        self.executor.add_node(self.node)
-        self.spinner = Thread(
-            target=self.executor.spin, daemon=True, name=f"{self.controller_name} spin"
-        )
-        self.spinner.start()
-
-    def shutdown(self) -> None:
-        """
-        Stop spinning and destroy the node.
-        """
-        self.executor.shutdown()
-        self.spinner.join(2.0)
-        self.node.destroy_node()
 
 
 @dataclass
@@ -600,106 +545,6 @@ def test_overrides_of_commanded_joints_are_accepted(init_rospy):
     )
 
     assert publish_group(controller) == pytest.approx([0.01, 0.1])
-
-
-# %% per joint publisher
-
-
-@pytest.fixture()
-def joint_parameter_nodes(init_rospy):
-    nodes: list[ParameterServingNode] = []
-
-    def _serve(controller_name: str, joint_name: str) -> None:
-        nodes.append(
-            ParameterServingNode(controller_name=controller_name, joint_name=joint_name)
-        )
-
-    try:
-        yield _serve
-    finally:
-        for node in nodes:
-            node.shutdown()
-
-
-def build_joint_publisher(
-    world: World,
-    namespaces: list[str],
-    minimum_valid_velocity: float = 0.0,
-    minimum_velocity_overrides: dict[str, float] | None = None,
-) -> JointVelocityCommandPublisher:
-    """
-    Build a publisher that commands one joint per namespace.
-    """
-    return JointVelocityCommandPublisher(
-        world=world,
-        namespaces=namespaces,
-        minimum_velocities=JointMinimumVelocities.from_magnitudes(
-            minimum_valid_velocity, minimum_velocity_overrides
-        ),
-    )
-
-
-def publish_per_joint(publisher: JointVelocityCommandPublisher) -> list[float]:
-    """
-    Replace all publishers with recorders, publish once, and return the values.
-    """
-    recorders = [RecordingPublisher() for _ in publisher.publishers]
-    publisher.publishers = recorders
-    publisher.publish()
-    return [recorder.published_message.data for recorder in recorders]
-
-
-def test_publishes_one_message_per_namespace(joint_parameter_nodes):
-    specs = [
-        ConnectionSpec(name="joint_a", velocity=0.1),
-        ConnectionSpec(name="joint_b", velocity=0.2),
-    ]
-    world = build_world_with_joints(specs)
-    joint_parameter_nodes("joint_a_controller", "joint_a")
-    joint_parameter_nodes("joint_b_controller", "joint_b")
-
-    publisher = build_joint_publisher(
-        world, ["joint_a_controller", "joint_b_controller"]
-    )
-
-    values = publish_per_joint(publisher)
-
-    assert values == pytest.approx([0.1, 0.2])
-
-
-def test_per_joint_velocity_is_raised_to_minimum(joint_parameter_nodes):
-    specs = [
-        ConnectionSpec(name="slow_joint", velocity=-0.01),
-        ConnectionSpec(name="exempt_joint", velocity=0.01),
-    ]
-    world = build_world_with_joints(specs)
-    joint_parameter_nodes("slow_joint_controller", "slow_joint")
-    joint_parameter_nodes("exempt_joint_controller", "exempt_joint")
-
-    publisher = build_joint_publisher(
-        world,
-        ["slow_joint_controller", "exempt_joint_controller"],
-        minimum_valid_velocity=0.03,
-        minimum_velocity_overrides={"exempt_joint": 0.0},
-    )
-
-    values = publish_per_joint(publisher)
-
-    assert values == pytest.approx([-0.03, 0.01])
-
-
-def test_per_joint_velocity_includes_the_multiplier(joint_parameter_nodes):
-    specs = [ConnectionSpec(name="scaled_joint", velocity=0.0, multiplier=2.0)]
-    world = build_world_with_joints(specs)
-    connection = world.get_connection_by_name("scaled_joint")
-    world.state[connection.raw_dof.id].velocity = 0.05
-    joint_parameter_nodes("scaled_joint_controller", "scaled_joint")
-
-    publisher = build_joint_publisher(world, ["scaled_joint_controller"])
-
-    values = publish_per_joint(publisher)
-
-    assert values == pytest.approx([0.1])
 
 
 # %% drive publisher

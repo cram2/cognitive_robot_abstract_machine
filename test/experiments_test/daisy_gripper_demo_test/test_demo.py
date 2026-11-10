@@ -36,10 +36,11 @@ from semantic_digital_twin.robots.daisy import (
     DAiSyLeftGripper,
     DAiSyRightGripper,
 )
-from semantic_digital_twin.utils import daisy_installed
 from semantic_digital_twin.world import World
 
-pytestmark = pytest.mark.skipif(not daisy_installed(), reason="DAiSy not installed")
+pytestmark = pytest.mark.skipif(
+    not DAiSy.is_description_installed(), reason="DAiSy not installed"
+)
 
 # %% the demonstration
 

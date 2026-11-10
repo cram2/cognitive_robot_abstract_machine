@@ -200,8 +200,9 @@ class RelationalCircuitRegistry(ModelRegistry):
         ``RelationalCausalCircuit.from_grounded_circuit``): a class circuit fitted
         over many unrelated scalar and exchangeable variables otherwise makes
         ``verify_support_determinism`` compute over all of them, not just the ones
-        this query actually declared. Confounders are trimmed in alongside the cause
-        and effect, not just registered later, so a caller's own
+        this query actually declared. The variables adjusted for, marked ``confounder``
+        or chosen by a learned causal structure, are trimmed in alongside the cause and
+        effect, not just registered later, so a caller's own
         ``backdoor_adjustment(..., adjustment_variables=...)`` call still finds them
         on the returned circuit.
 
@@ -214,7 +215,7 @@ class RelationalCircuitRegistry(ModelRegistry):
             grounded,
             parameters.search_cause_variables,
             list(parameters.effect_variables_from_causes_effect),
-            adjustment_variables=parameters.search_confounder_variables,
+            adjustment_variables=parameters.adjustment_variables,
             trim_to_registered_variables=True,
         )
 

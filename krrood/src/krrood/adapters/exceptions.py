@@ -119,8 +119,16 @@ class UntrackedObjectError(JSONSerializationError):
     The key the document refers to the object with.
     """
 
+    name: Any = None
+    """
+    The name the reference to the object went by, which says which object was meant.
+    """
+
     def error_message(self) -> str:
-        return f"No object was deserialized with the key '{self.key}'."
+        return (
+            f"No object was deserialized with the key '{self.key}' "
+            f"(referred to as '{self.name}')."
+        )
 
     def suggest_correction(self) -> str:
         return (

@@ -27,7 +27,7 @@ from robokudo.io.ray_tracing_camera_interface import RayTracingCameraInterface
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.camera_rendering import RenderedRGBDFrame
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 
 # %% Rectangular rendered observation

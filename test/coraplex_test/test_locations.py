@@ -16,8 +16,8 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -58,7 +58,7 @@ _ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(0.5, 0.5, 0, yaw=np.pi / 2)
 
 
 def _world_with_a_robot_behind_a_displaced_odom(
-    world_T_odom: HomogeneousTransformationMatrix,
+    world_T_odometry: HomogeneousTransformationMatrix,
 ) -> World:
     """
     A world holding nothing but a PR2, reached through a displaced odom.
@@ -66,7 +66,9 @@ def _world_with_a_robot_behind_a_displaced_odom(
     specification = WorldSpecification(
         world_source=None,
         robots=[
-            RobotSpecification(semantic_annotation_type=PR2, world_T_odom=world_T_odom)
+            RobotSpecification(
+                semantic_annotation_type=PR2, localization_pose=world_T_odometry
+            )
         ],
     )
     try:

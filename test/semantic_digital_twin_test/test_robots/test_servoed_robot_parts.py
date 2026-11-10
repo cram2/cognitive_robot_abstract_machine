@@ -16,7 +16,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, ServoedRobotPart
 from semantic_digital_twin.robots.tiago import TiagoMujoco
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (

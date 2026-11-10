@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
+# %% Imports
+from dataclasses import dataclass, field
+from pathlib import Path
+from enum import Enum, StrEnum
+from typing_extensions import cast
+
+import trimesh
 
 import numpy as np
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Room, Floor
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Aperture,
     Table,
     Sofa,
     TrashCan,
@@ -34,11 +40,19 @@ from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+    RegionSpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
+    Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Vector3
+from semantic_digital_twin.utils import create_cache_dir
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -46,15 +60,14 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
-from semantic_digital_twin.world_description.geometry import Box, Scale, Color
+from semantic_digital_twin.world_description.geometry import Box, Scale, Color, Mesh
 from semantic_digital_twin.world_description.geometry import Cylinder
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.world_entity import Body, Region
 from semantic_digital_twin.world_source import WorldSource
 
-# %% speed limits
 
-
+# %% Articulation limits
 class MaximumSpeed(float, Enum):
     """
     The speed limits of the kitchen's movable parts.
@@ -77,14 +90,679 @@ class MaximumSpeed(float, Enum):
     """
 
 
-# %% kitchen
+# %% Wall parts
+class WindowWallPart(StrEnum):
+    """
+    Named bodies and window bays in the predefined kitchen wall.
+    """
+
+    WALL = "north_wall"
+    """
+    Main enclosing wall with window apertures.
+    """
+    CHANNEL = "north_wall_cable_channel"
+    """
+    Surface-mounted service channel near the floor.
+    """
+    LOWER_STRIP = "north_wall_lower_strip"
+    """
+    Exposed surface beneath the channel.
+    """
+    FIRST_WINDOW = "north_window_0"
+    """
+    Window bay beside the kitchen run.
+    """
+    SECOND_WINDOW = "north_window_1"
+    """
+    Middle window bay along the wall.
+    """
+    THIRD_WINDOW = "north_window_2"
+    """
+    Window bay toward the curved room corner.
+    """
 
 
+class WindowWallResource(StrEnum):
+    """
+    Cache categories for generated wall geometry.
+    """
+
+    GEOMETRY = "kitchen_window_wall"
+    """
+    Persistent generated meshes for the measured wall strips.
+    """
+
+
+# %% Surface measurements
+@dataclass
+class WallProfile:
+    """
+    A face coordinate varying linearly along the wall in root coordinates.
+    """
+
+    coordinate_at_reference: float
+    """
+    Face coordinate at the reference position in metres.
+    """
+    along_wall_slope: float = 0.0
+    """
+    Coordinate change per metre along root Y.
+    """
+    reference_y: float = -1.0
+    """
+    Along-wall reference position in metres.
+    """
+
+    def coordinate_at(self, along_wall_y: float) -> float:
+        """
+        Return the face coordinate at an along-wall position.
+        """
+        return self.coordinate_at_reference + self.along_wall_slope * (
+            along_wall_y - self.reference_y
+        )
+
+
+@dataclass
+class WallStrip:
+    """
+    A solid wall-mounted strip bounded by fitted front, top and bottom faces.
+    """
+
+    front: WallProfile
+    """
+    Root X coordinate of the exposed face.
+    """
+    top: WallProfile
+    """
+    Root Z coordinate of the top face.
+    """
+    bottom: WallProfile
+    """
+    Root Z coordinate of the bottom face.
+    """
+
+    def create_in_world(
+        self,
+        world: World,
+        name: WindowWallPart,
+        wall: KitchenWindowWall,
+    ) -> WallPanel:
+        """
+        Add a closed collision and visual solid backed by the wall plane.
+        """
+        vertices = [
+            (depth_x, along_wall_y, height_z)
+            for along_wall_y in (wall.start_y, wall.end_y)
+            for depth_x in (
+                self.front.coordinate_at(along_wall_y),
+                wall.interior_x,
+            )
+            for height_z in (
+                self.bottom.coordinate_at(along_wall_y),
+                self.top.coordinate_at(along_wall_y),
+            )
+        ]
+        mesh = Mesh.from_trimesh(
+            trimesh.points.PointCloud(vertices).convex_hull,
+            directory=wall.geometry_directory,
+        )
+        specification = SemanticAnnotationWithRootSpecification(
+            name=name,
+            semantic_annotation_type=WallPanel,
+            root_specification=BodySpecification(
+                name=None, shapes=ShapeCollection([mesh])
+            ),
+        )
+        return specification.spawn(world)
+
+
+# %% Window recesses
+@dataclass
+class WindowRecess:
+    """
+    An observed window bay with a sill and a closed recessed panel.
+    """
+
+    name: WindowWallPart
+    """
+    Stable name of the window bay.
+    """
+    start_y: float
+    """
+    First opening edge along root Y in metres.
+    """
+    end_y: float
+    """
+    Last opening edge along root Y in metres.
+    """
+    sill_top: float
+    """
+    Sill top above the registered floor in metres.
+    """
+    opening_top: float = 2.960
+    """
+    Upper recess boundary above the floor in metres.
+    """
+
+    def add_to_wall(self, world: World, wall: Wall, model: KitchenWindowWall) -> None:
+        """
+        Cut the window recess and add its sill and closed collision panel.
+        """
+        depth = model.panel_front_x + model.backing_thickness - model.interior_x
+        opening_height = self.opening_top - self.sill_top
+        center_y = (self.start_y + self.end_y) / 2
+        width = self.end_y - self.start_y
+        aperture = Aperture.create_with_new_region_in_world(
+            name=f"{self.name}_opening",
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=model.interior_x + depth / 2,
+                y=center_y,
+                z=(self.sill_top + self.opening_top) / 2,
+            ),
+            scale=Scale(depth * 2, width, opening_height),
+        )
+        wall.add(aperture)
+        window_panel = WallPanel.create_with_new_body_in_world(
+            name=f"{self.name}_panel",
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=model.panel_front_x + model.panel_thickness / 2,
+                y=center_y,
+                z=(self.sill_top + self.opening_top) / 2,
+            ),
+            scale=Scale(model.panel_thickness, width, opening_height),
+        )
+        for shape in window_panel.root.visual.shapes:
+            shape.color = Color(0.55, 0.75, 0.9, 0.3)
+        sill_depth = model.panel_front_x + model.panel_thickness - model.sill_front_x
+        WallPanel.create_with_new_body_in_world(
+            name=f"{self.name}_sill",
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=model.sill_front_x + sill_depth / 2,
+                y=center_y,
+                z=self.sill_top - model.sill_thickness / 2,
+            ),
+            scale=Scale(sill_depth, width, model.sill_thickness),
+        )
+
+
+# %% Window wall construction
+@dataclass
+class KitchenWindowWall:
+    """
+    The lab's window wall with recessed bays and projecting lower features.
+    """
+
+    interior_x: float = 4.986
+    """
+    Observed main room-facing wall plane in metres.
+    """
+    start_y: float = -2.510
+    """
+    Existing wall endpoint beside the kitchen run in metres.
+    """
+    end_y: float = 5.580
+    """
+    Wall endpoint overlapping the existing curved corner in metres.
+    """
+    height: float = 3.0
+    """
+    Retained nominal wall height in metres.
+    """
+    panel_front_x: float = 5.129
+    """
+    Observed window-assembly depth used for closed collision panels in metres.
+    """
+    backing_thickness: float = 0.05
+    """
+    Nominal wall material behind the window-assembly plane in metres.
+    """
+    panel_thickness: float = 0.01
+    """
+    Nominal closed window-panel thickness in metres.
+    """
+    sill_front_x: float = 4.945
+    """
+    Observed roomward sill edge in metres.
+    """
+    sill_thickness: float = 0.02
+    """
+    Approximate sill slab thickness in metres.
+    """
+    windows: tuple[WindowRecess, ...] = field(
+        default_factory=lambda: (
+            WindowRecess(WindowWallPart.FIRST_WINDOW, -2.370, -0.205, 0.619),
+            WindowRecess(WindowWallPart.SECOND_WINDOW, 0.374, 2.542, 0.615),
+            WindowRecess(WindowWallPart.THIRD_WINDOW, 3.124, 5.300, 0.611),
+        )
+    )
+    """
+    Observed window-bay boundaries and sill levels.
+    """
+    cable_channel: WallStrip = field(
+        default_factory=lambda: WallStrip(
+            front=WallProfile(4.92004270, -0.004738043),
+            top=WallProfile(0.24908890, -0.002023020),
+            bottom=WallProfile(0.08430169, -0.002697850),
+        )
+    )
+    """
+    Fitted channel faces extended along the wall.
+    """
+    lower_strip_front: WallProfile = field(
+        default_factory=lambda: WallProfile(4.94318739, -0.004332790)
+    )
+    """
+    Observed face of the exposed strip below the channel.
+    """
+    geometry_directory: Path = field(
+        default_factory=lambda: create_cache_dir(WindowWallResource.GEOMETRY)
+    )
+    """
+    Persistent directory for generated collision and visual meshes.
+    """
+
+    def create_in_world(self, world: World) -> Wall:
+        """
+        Add the windowed wall and its fixed surface-mounted features.
+        """
+        depth = self.panel_front_x + self.backing_thickness - self.interior_x
+        wall = Wall.create_with_new_body_in_world(
+            name=WindowWallPart.WALL,
+            world=world,
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=self.interior_x + depth / 2,
+                y=(self.start_y + self.end_y) / 2,
+            ),
+            scale=Scale(depth, self.end_y - self.start_y, self.height),
+        )
+        for window in self.windows:
+            window.add_to_wall(world, wall, self)
+        self.cable_channel.create_in_world(world, WindowWallPart.CHANNEL, self)
+        lower_strip = WallStrip(
+            front=self.lower_strip_front,
+            top=self.cable_channel.bottom,
+            bottom=WallProfile(0.0),
+        )
+        lower_strip.create_in_world(world, WindowWallPart.LOWER_STRIP, self)
+        return wall
+
+
+# %% Sofa surface measurements
+@dataclass
+class SofaProfilePoint:
+    """
+    A depth and floor-relative height on an upholstered side profile.
+    """
+
+    depth: float
+    """
+    Coordinate along the sofa's local depth axis.
+    """
+    height: float
+    """
+    Height above the room floor.
+    """
+
+
+@dataclass
+class SofaProfile:
+    """
+    A convex upholstery profile extruded across a specified width interval.
+    """
+
+    points: list[SofaProfilePoint]
+    """
+    Observed profile corners in depth and floor-relative height.
+    """
+
+    def create_mesh(
+        self, minimum_width: float, maximum_width: float, origin_height: float
+    ) -> trimesh.Trimesh:
+        """
+        Create a closed solid expressed relative to the sofa body origin.
+        """
+        vertices = [
+            (point.depth, width, point.height - origin_height)
+            for width in (minimum_width, maximum_width)
+            for point in self.points
+        ]
+        return trimesh.points.PointCloud(vertices).convex_hull
+
+
+class SofaResource(StrEnum):
+    """
+    Persistent geometry resource category for the kitchen sofa.
+    """
+
+    GEOMETRY = "kitchen_sofa"
+
+
+@dataclass
+class KitchenSofa:
+    """
+    A sofa with two seat cushions, two back cushions and solid armrests.
+    """
+
+    origin_height: float = 0.34
+    """
+    Retained sofa body origin height above the floor.
+    """
+    width: float = 1.68
+    """
+    Retained outer width across the armrests.
+    """
+    depth: float = 0.94
+    """
+    Retained base depth, excluding the observed front cushion overhang.
+    """
+    base_height: float = 0.29
+    """
+    Top of the conservative solid lower frame.
+    """
+    back_support_front: float = 0.20
+    """
+    Front of the conservative backing beneath the back cushions.
+    """
+    back_support_height: float = 0.40
+    """
+    Top of the conservative backing beneath the back cushions.
+    """
+    arm_width: float = 0.14
+    """
+    Width of each armrest.
+    """
+    cushion_gap: float = 0.012
+    """
+    Separation between the two seat and back cushions.
+    """
+    seat_surface_depth: float = 0.40
+    """
+    Depth of the semantic seating support patch.
+    """
+    seat_surface_width_margin: float = 0.05
+    """
+    Inset of the seating support patch from each inner arm face.
+    """
+    seat_surface_center_depth: float = -0.12
+    """
+    Centre of the seating support patch along the sofa depth axis.
+    """
+    seat_surface_height: float = 0.435
+    """
+    Floor-relative height of the seating support patch centre.
+    """
+    seat_surface_slope: float = 0.075
+    """
+    Seating support height decrease per metre toward the back.
+    """
+    seat_surface_thickness: float = 0.005
+    """
+    Thickness of the virtual seating support region.
+    """
+    geometry_directory: Path = field(
+        default_factory=lambda: create_cache_dir(SofaResource.GEOMETRY)
+    )
+    """
+    Persistent directory for the sofa's generated visual and collision mesh.
+    """
+    seat: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(-0.50, 0.28),
+                SofaProfilePoint(-0.50, 0.35),
+                SofaProfilePoint(-0.48, 0.41),
+                SofaProfilePoint(-0.44, 0.44),
+                SofaProfilePoint(-0.36, 0.453),
+                SofaProfilePoint(-0.25, 0.444),
+                SofaProfilePoint(-0.15, 0.435),
+                SofaProfilePoint(-0.05, 0.428),
+                SofaProfilePoint(0.05, 0.421),
+                SofaProfilePoint(0.18, 0.406),
+                SofaProfilePoint(0.20, 0.28),
+            ]
+        )
+    )
+    """
+    Rounded front and gently sloping upper surface of each seat cushion.
+    """
+    arm: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(-0.47, 0.10),
+                SofaProfilePoint(-0.47, 0.59),
+                SofaProfilePoint(-0.455, 0.64),
+                SofaProfilePoint(-0.42, 0.665),
+                SofaProfilePoint(-0.30, 0.670),
+                SofaProfilePoint(0.20, 0.675),
+                SofaProfilePoint(0.40, 0.660),
+                SofaProfilePoint(0.47, 0.62),
+                SofaProfilePoint(0.47, 0.06),
+                SofaProfilePoint(-0.43, 0.06),
+            ]
+        )
+    )
+    """
+    Armrest silhouette below the adjacent island worktop.
+    """
+    left_back: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(0.12, 0.40),
+                SofaProfilePoint(0.092, 0.50),
+                SofaProfilePoint(0.093, 0.55),
+                SofaProfilePoint(0.108, 0.60),
+                SofaProfilePoint(0.130, 0.65),
+                SofaProfilePoint(0.149, 0.70),
+                SofaProfilePoint(0.168, 0.75),
+                SofaProfilePoint(0.197, 0.80),
+                SofaProfilePoint(0.230, 0.83),
+                SofaProfilePoint(0.270, 0.842),
+                SofaProfilePoint(0.300, 0.838),
+                SofaProfilePoint(0.335, 0.82),
+                SofaProfilePoint(0.350, 0.78),
+                SofaProfilePoint(0.385, 0.65),
+                SofaProfilePoint(0.425, 0.28),
+            ]
+        )
+    )
+    """
+    Higher back cushion over the negative-width seating half.
+    """
+    right_back: SofaProfile = field(
+        default_factory=lambda: SofaProfile(
+            [
+                SofaProfilePoint(0.077, 0.40),
+                SofaProfilePoint(0.080, 0.50),
+                SofaProfilePoint(0.090, 0.55),
+                SofaProfilePoint(0.111, 0.60),
+                SofaProfilePoint(0.136, 0.65),
+                SofaProfilePoint(0.168, 0.70),
+                SofaProfilePoint(0.220, 0.75),
+                SofaProfilePoint(0.280, 0.79),
+                SofaProfilePoint(0.320, 0.806),
+                SofaProfilePoint(0.345, 0.80),
+                SofaProfilePoint(0.370, 0.76),
+                SofaProfilePoint(0.400, 0.65),
+                SofaProfilePoint(0.425, 0.28),
+            ]
+        )
+    )
+    """
+    Lower, more reclined back cushion over the positive-width seating half.
+    """
+
+    def create_in_world(
+        self, world: World, root_T_sofa: HomogeneousTransformationMatrix
+    ) -> Sofa:
+        """
+        Add a semantic sofa with a watertight upholstery envelope and seat support.
+        """
+        base = trimesh.creation.box(extents=(self.depth, self.width, self.base_height))
+        base.apply_translation((0, 0, self.base_height / 2 - self.origin_height))
+        meshes = [base]
+        inner_width = self.width / 2 - self.arm_width
+        backing = trimesh.creation.box(
+            extents=(
+                self.depth / 2 - self.back_support_front,
+                2 * inner_width,
+                self.back_support_height - self.base_height,
+            )
+        )
+        backing.apply_translation(
+            (
+                (self.depth / 2 + self.back_support_front) / 2,
+                0,
+                (self.back_support_height + self.base_height) / 2 - self.origin_height,
+            )
+        )
+        meshes.append(backing)
+        for minimum, maximum in (
+            (-self.width / 2, -inner_width),
+            (inner_width, self.width / 2),
+        ):
+            meshes.append(self.arm.create_mesh(minimum, maximum, self.origin_height))
+        for minimum, maximum, back in (
+            (-inner_width, -self.cushion_gap / 2, self.left_back),
+            (self.cushion_gap / 2, inner_width, self.right_back),
+        ):
+            meshes.append(self.seat.create_mesh(minimum, maximum, self.origin_height))
+            meshes.append(back.create_mesh(minimum, maximum, self.origin_height))
+        envelope = trimesh.boolean.union(meshes, engine="manifold")
+        shape = Mesh.from_trimesh(
+            envelope,
+            directory=self.geometry_directory,
+        )
+        shape.color = Color.BEIGE()
+        seat_surface = RegionSpecification.box(
+            name="sofa_seat_surface",
+            scale=Scale(
+                self.seat_surface_depth,
+                2 * (inner_width - self.seat_surface_width_margin),
+                self.seat_surface_thickness,
+            ),
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=self.seat_surface_center_depth,
+                z=self.seat_surface_height - self.origin_height,
+                pitch=np.arctan(self.seat_surface_slope),
+            ),
+        )
+        specification = SemanticAnnotationWithRootSpecification(
+            name="sofa",
+            semantic_annotation_type=Sofa,
+            root_specification=BodySpecification(
+                name=None,
+                shapes=ShapeCollection([shape]),
+                child_specifications=[seat_surface],
+            ),
+        )
+        sofa = specification.spawn(world, parent_T_self=root_T_sofa)
+        sofa.add_supporting_surface(
+            cast(
+                Region, world.get_kinematic_structure_entity_by_name(seat_surface.name)
+            )
+        )
+        return sofa
+
+
+# %% Measured kitchen geometry
+@dataclass
+class KitchenMeasurements:
+    """
+    Kitchen dimensions and placements in the registered model root frame.
+    """
+
+    wall_interior_y: float = -2.480
+    """
+    Observed interior plane behind the kitchen run in metres.
+    """
+    refrigerator_wall_interior_x: float = 0.0315
+    """
+    Observed interior plane beside the refrigerator in metres.
+    """
+    refrigerator_return_interior_y: float = -1.4812
+    """
+    Observed kitchen-facing plane of the short wall return in metres.
+    """
+    refrigerator_wall_thickness: float = 0.05
+    """
+    Nominal thickness of the refrigerator-side wall and return in metres.
+    """
+    refrigerator_return_left_x: float = -0.29
+    """
+    Nominal return endpoint toward the adjacent wall along root X in metres.
+    """
+    refrigerator_depth: float = 0.581
+    """
+    Refrigerator corpus depth under the flush-back constraint in metres.
+    """
+    counter_cabinet_depth: float = 0.586
+    """
+    Counter corpus depth under the flush-back constraint in metres.
+    """
+    counter_worktop_depth: float = 0.590
+    """
+    Worktop depth between the wall and observed front edge in metres.
+    """
+    oven_tower_depth: float = 0.599
+    """
+    Oven tower depth under the flush-back constraint in metres.
+    """
+    oven_left_drawer_outward_offset: float = 0.010
+    """
+    Left oven-side drawer mounting correction toward the room in metres.
+    """
+    oven_right_drawer_outward_offset: float = 0.012
+    """
+    Right oven-side drawer mounting correction toward the room in metres.
+    """
+    island_center_x: float = 3.52835439
+    """
+    Measured island corpus centre along root X in metres.
+    """
+    island_center_y: float = 0.46312429
+    """
+    Measured island corpus centre along root Y in metres.
+    """
+    island_yaw: float = np.pi / 2 + np.radians(0.3315143615)
+    """
+    Measured island orientation about the root vertical axis in radians.
+    """
+    sofa_center_x: float = 3.70718969
+    """
+    Fitted sofa centre along root X in metres.
+    """
+    sofa_center_y: float = 1.23349163
+    """
+    Fitted sofa centre along root Y under the island-clearance constraint in metres.
+    """
+    sofa_yaw: float = 4.719151098618833
+    """
+    Fitted sofa orientation about the root vertical axis in radians.
+    """
+    window_wall: KitchenWindowWall = field(default_factory=KitchenWindowWall)
+    """
+    Observed oven-side wall recesses and surface-mounted features.
+    """
+    sofa_shape: KitchenSofa = field(default_factory=KitchenSofa)
+    """
+    Observed seat, backrest and armrest surfaces of the sofa.
+    """
+
+
+# %% Environment construction
 @dataclass
 class KitchenEnvironment(WorldSource):
     """
     The kitchen together with its neighbouring rooms: their walls, the furniture and the
     rooms' floor areas.
+    """
+
+    measurements: KitchenMeasurements = field(default_factory=KitchenMeasurements)
+    """
+    Observed kitchen geometry with the existing flush-back construction constraint.
     """
 
     def create_world(self) -> World:
@@ -160,20 +838,45 @@ class KitchenEnvironment(WorldSource):
         )
 
         with world.modify_world():
+            refrigerator_wall_start_y = self.measurements.wall_interior_y - 0.025
+            refrigerator_wall_length = (
+                self.measurements.refrigerator_return_interior_y
+                - refrigerator_wall_start_y
+            )
             south_wall1 = Wall.create_with_new_body_in_world(
                 world=world,
                 name="south_wall1",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=-2.01),
-                scale=Scale(x=0.05, y=1.00, z=3.00),
+                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=self.measurements.refrigerator_wall_interior_x
+                    - self.measurements.refrigerator_wall_thickness / 2,
+                    y=refrigerator_wall_start_y + refrigerator_wall_length / 2,
+                ),
+                scale=Scale(
+                    x=self.measurements.refrigerator_wall_thickness,
+                    y=refrigerator_wall_length,
+                    z=3.00,
+                ),
             )
 
             south_wall2 = Wall.create_with_new_body_in_world(
                 world=world,
                 name="south_wall2",
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-0.145, y=-1.45, yaw=np.pi / 2
+                    x=(
+                        self.measurements.refrigerator_return_left_x
+                        + self.measurements.refrigerator_wall_interior_x
+                    )
+                    / 2,
+                    y=self.measurements.refrigerator_return_interior_y
+                    + self.measurements.refrigerator_wall_thickness / 2,
+                    yaw=np.pi / 2,
                 ),
-                scale=Scale(x=0.05, y=0.29, z=3.00),
+                scale=Scale(
+                    x=self.measurements.refrigerator_wall_thickness,
+                    y=self.measurements.refrigerator_wall_interior_x
+                    - self.measurements.refrigerator_return_left_x,
+                    z=3.00,
+                ),
             )
 
             south_wall3 = Wall.create_with_new_body_in_world(
@@ -225,9 +928,11 @@ class KitchenEnvironment(WorldSource):
                 world=world,
                 name="east_wall",
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=2.462, y=-2.535, yaw=np.pi / 2
+                    x=self.measurements.window_wall.interior_x / 2,
+                    y=self.measurements.wall_interior_y - 0.025,
+                    yaw=np.pi / 2,
                 ),
-                scale=Scale(0.05, 4.924, 3.00),
+                scale=Scale(0.05, self.measurements.window_wall.interior_x, 3.00),
             )
 
             middle_wall = Wall.create_with_new_body_in_world(
@@ -248,14 +953,7 @@ class KitchenEnvironment(WorldSource):
                 scale=Scale(0.05, 4.449, 3.00),
             )
 
-            north_wall = Wall.create_with_new_body_in_world(
-                world=world,
-                name="north_wall",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=4.949, y=1.51
-                ),
-                scale=Scale(0.05, 8.04, 3.00),
-            )
+            self.measurements.window_wall.create_in_world(world)
 
             world.add_connection(root_C_north_west_wall)
 
@@ -267,7 +965,7 @@ class KitchenEnvironment(WorldSource):
         standard_handle_width = 0.015
 
         with world.modify_world():
-            # --- TRASH CAN ---
+            # %% Trash can
             trash_can = TrashCan.get_annotation_specification(
                 "trash_can",
                 TrashCan.get_default_root_kinematic_structure_entity_specification(
@@ -282,8 +980,8 @@ class KitchenEnvironment(WorldSource):
             for shape in trash_can.root.visual.shapes:
                 shape.color = Color.GRAY()
 
-            # --- REFRIGERATOR ---
-            fridge_length, fridge_width = 0.60, 0.60
+            # %% Refrigerator
+            fridge_length, fridge_width = self.measurements.refrigerator_depth, 0.60
             fridge_front_width = 0.595
             fridge_drawer_floor_gap = 0.145
             fridge_drawer_height = 0.354
@@ -310,7 +1008,7 @@ class KitchenEnvironment(WorldSource):
             fridge_center_x = fridge_counter_boundary_x - fridge_width / 2
             fridge_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=fridge_center_x,
-                y=-2.181,
+                y=self.measurements.wall_interior_y + fridge_length / 2,
                 z=fridge_height / 2,
                 yaw=-np.pi / 2,
             )
@@ -456,7 +1154,7 @@ class KitchenEnvironment(WorldSource):
                 hinge_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-door_thickness / 2,
-                    y=fridge_front_width - 0.03,
+                    y=fridge_front_width - 0.041,
                 )
             )
             fridge_door_handle = Handle.get_annotation_specification(
@@ -469,7 +1167,10 @@ class KitchenEnvironment(WorldSource):
                     ),
                     thickness=standard_handle_width,
                 ),
-            ).spawn(world, parent_T_self=door_handle_world_pose)
+            ).spawn(
+                world,
+                parent_T_self=door_handle_world_pose,
+            )
             for shape in fridge_door_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
             fridge_door.add(fridge_door_handle)
@@ -478,7 +1179,7 @@ class KitchenEnvironment(WorldSource):
                 drawer_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-drawer_depth / 2,
-                    z=fridge_drawer_height / 2 - 0.03,
+                    z=fridge_drawer_height / 2 - 0.044,
                     roll=np.pi / 2,
                 )
             )
@@ -492,13 +1193,18 @@ class KitchenEnvironment(WorldSource):
                     ),
                     thickness=standard_handle_width,
                 ),
-            ).spawn(world, parent_T_self=drawer_handle_world_pose)
+            ).spawn(
+                world,
+                parent_T_self=drawer_handle_world_pose,
+            )
             for shape in fridge_drawer_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
             fridge_drawer.add(fridge_drawer_handle)
 
-            # --- KITCHEN COUNTER ---
-            counter_top_length, counter_top_depth = 2.044, 0.658
+            # %% Kitchen counter
+            counter_top_length = 2.044
+            counter_top_depth = self.measurements.counter_worktop_depth
+            counter_cabinet_depth = self.measurements.counter_cabinet_depth
             counter_top_surface_height = 0.85
             counter_top_thickness = 0.026
             counter_base_facing_height = 0.099
@@ -511,13 +1217,13 @@ class KitchenEnvironment(WorldSource):
             counter_top_center_x = fridge_counter_boundary_x + counter_top_length / 2
             root_T_counter_cabinets = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=counter_top_center_x,
-                y=-2.181,
+                y=self.measurements.wall_interior_y + counter_cabinet_depth / 2,
                 z=counter_base_facing_height + counter_cabinet_height / 2,
                 yaw=-np.pi / 2,
             )
             root_T_counter_top = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=counter_top_center_x,
-                y=-2.181,
+                y=self.measurements.wall_interior_y + counter_top_depth / 2,
                 z=counter_top_surface_height - counter_top_thickness / 2,
                 yaw=-np.pi / 2,
             )
@@ -540,7 +1246,7 @@ class KitchenEnvironment(WorldSource):
                 name="counter_base_facing",
                 world_root_T_self=root_T_counter_cabinets
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + counter_base_facing_setback,
+                    x=-counter_cabinet_depth / 2 + counter_base_facing_setback,
                     z=-counter_cabinet_height / 2 - counter_base_facing_height / 2,
                 ),
                 scale=Scale(
@@ -588,7 +1294,7 @@ class KitchenEnvironment(WorldSource):
                 module_1_door_height - counter_cabinet_height
             ) / 2
             module_1_handle_width = standard_handle_width
-            module_1_handle_top_inset = 0.04
+            module_1_handle_top_inset = 0.044
             module_2_door_gap = 0.005
             module_2_door_height = counter_cabinet_height - module_2_door_gap
 
@@ -603,7 +1309,7 @@ class KitchenEnvironment(WorldSource):
                 "module_1_cabinet",
                 Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
-                        x=counter_top_depth,
+                        x=counter_cabinet_depth,
                         y=module_1_width,
                         z=counter_cabinet_height,
                     ),
@@ -618,7 +1324,7 @@ class KitchenEnvironment(WorldSource):
                 name="module_1_face_plate",
                 world_root_T_self=module_1_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + module_1_door_thickness / 2,
+                    x=-counter_cabinet_depth / 2 + module_1_door_thickness / 2,
                     z=(counter_cabinet_height - module_1_face_plate_height) / 2,
                 ),
                 scale=Scale(
@@ -633,7 +1339,7 @@ class KitchenEnvironment(WorldSource):
             module_1_hinge_world_pose = (
                 module_1_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + module_1_door_thickness / 2,
+                    x=-counter_cabinet_depth / 2 + module_1_door_thickness / 2,
                     y=-module_1_front_width / 2,
                     z=module_1_door_center_height,
                 )
@@ -698,7 +1404,7 @@ class KitchenEnvironment(WorldSource):
                 "dishwasher",
                 Dishwasher.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
-                        x=counter_top_depth,
+                        x=counter_cabinet_depth,
                         y=module_2_width,
                         z=counter_cabinet_height,
                     ),
@@ -711,7 +1417,7 @@ class KitchenEnvironment(WorldSource):
             module_2_hinge_world_pose = (
                 module_2_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=-counter_top_depth / 2 + module_2_door_thickness / 2,
+                    x=-counter_cabinet_depth / 2 + module_2_door_thickness / 2,
                     z=-counter_cabinet_height / 2,
                 )
             )
@@ -769,7 +1475,7 @@ class KitchenEnvironment(WorldSource):
                 "module_3_cabinet",
                 Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
-                        x=counter_top_depth,
+                        x=counter_cabinet_depth,
                         y=module_3_width,
                         z=counter_cabinet_height,
                     ),
@@ -795,7 +1501,7 @@ class KitchenEnvironment(WorldSource):
                 drawer_pose = (
                     module_3_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                        x=-counter_top_depth / 2 + module_3_drawer_depth / 2,
+                        x=-counter_cabinet_depth / 2 + module_3_drawer_depth / 2,
                         z=drawer_center_height,
                     )
                 )
@@ -821,7 +1527,7 @@ class KitchenEnvironment(WorldSource):
                     drawer_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-module_3_drawer_depth / 2,
-                        z=face_height / 2 - 0.03,
+                        z=face_height / 2 - (0.049, 0.050, 0.054)[drawer_index],
                         roll=np.pi / 2,
                     )
                 )
@@ -841,8 +1547,8 @@ class KitchenEnvironment(WorldSource):
                 drawer.add(handle)
                 drawer_bottom_height += height
 
-            # --- OVEN TOWER ---
-            oven_width, oven_depth = 1.20, 0.658
+            # %% Oven tower
+            oven_width, oven_depth = 1.20, self.measurements.oven_tower_depth
             oven_base_facing_height = 0.145
             oven_side_drawer_height = 1.324
             oven_side_drawer_top_gap = 0.008
@@ -862,7 +1568,10 @@ class KitchenEnvironment(WorldSource):
                 + oven_width / 2
             )
             tower_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=tower_center_x, y=-2.181, z=oven_height / 2, yaw=-np.pi / 2
+                x=tower_center_x,
+                y=self.measurements.wall_interior_y + oven_depth / 2,
+                z=oven_height / 2,
+                yaw=-np.pi / 2,
             )
             tower = Cupboard.get_annotation_specification(
                 "oven_tower",
@@ -960,6 +1669,11 @@ class KitchenEnvironment(WorldSource):
                 side_drawer_pose = (
                     tower_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=-(
+                            self.measurements.oven_left_drawer_outward_offset
+                            if side == -1
+                            else self.measurements.oven_right_drawer_outward_offset
+                        ),
                         y=side * (center_width / 2 + side_width / 2),
                         z=(
                             -oven_height / 2
@@ -988,7 +1702,10 @@ class KitchenEnvironment(WorldSource):
 
                 handle_pose = (
                     side_drawer_pose
-                    @ HomogeneousTransformationMatrix.from_xyz_rpy(x=-oven_depth / 2)
+                    @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                        x=-oven_depth / 2,
+                        y=0.008,
+                    )
                 )
                 handle = Handle.get_annotation_specification(
                     f"oven_side_handle_{side_name}",
@@ -1056,7 +1773,7 @@ class KitchenEnvironment(WorldSource):
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-center_door_thickness / 2,
                     y=-center_front_width / 2,
-                    z=center_cabinet_door_height / 2 - 0.05,
+                    z=center_cabinet_door_height / 2 - 0.048,
                     roll=np.pi / 2,
                 ),
             )
@@ -1112,7 +1829,7 @@ class KitchenEnvironment(WorldSource):
                 parent_T_self=drawer_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-center_drawer_depth / 2,
-                    z=center_drawer_height / 2 - 0.05,
+                    z=center_drawer_height / 2 - 0.045,
                     roll=np.pi / 2,
                 ),
             )
@@ -1192,7 +1909,7 @@ class KitchenEnvironment(WorldSource):
                 shape.color = Color.GRAY()
             oven_door.add(oven_handle)
 
-            # --- SIDEBOARD / KITCHEN ISLAND ---
+            # %% Sideboard / kitchen island
             sideboard_length, sideboard_width, sideboard_height = 2.250, 0.597, 0.825
             sideboard_top_length, sideboard_top_width = 2.447, 0.796
             sideboard_top_thickness = 0.026
@@ -1265,10 +1982,10 @@ class KitchenEnvironment(WorldSource):
                 + sideboard_outer_column_width / 2,
             ]
             sideboard_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=3.545,
-                y=0.203 + sideboard_width / 2,
+                x=self.measurements.island_center_x,
+                y=self.measurements.island_center_y,
                 z=sideboard_height / 2,
-                yaw=np.pi / 2,
+                yaw=self.measurements.island_yaw,
             )
 
             kitchen_island = KitchenIsland.create_with_new_body_in_world(
@@ -1416,7 +2133,10 @@ class KitchenEnvironment(WorldSource):
                         drawer_pose
                         @ HomogeneousTransformationMatrix.from_xyz_rpy(
                             x=-sideboard_drawer_depth / 2,
-                            z=sideboard_drawer_height / 2 - 0.05,
+                            z=sideboard_drawer_height / 2
+                            - ((0.039, 0.038), (0.045, 0.039), (0.045, 0.041))[
+                                column_index
+                            ][row_index],
                             roll=np.pi / 2,
                         )
                     )
@@ -1435,22 +2155,21 @@ class KitchenEnvironment(WorldSource):
                         shape.color = Color.GRAY()
                     drawer.add(handle)
 
-            # --- SOFA ---
-            sofa = Sofa.create_with_new_body_in_world(
-                world=world,
-                name="sofa",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=3.60, y=1.601, z=0.34, yaw=4.7124
+            # %% Sofa
+            self.measurements.sofa_shape.create_in_world(
+                world,
+                HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=self.measurements.sofa_center_x,
+                    y=self.measurements.sofa_center_y,
+                    z=self.measurements.sofa_shape.origin_height,
+                    yaw=self.measurements.sofa_yaw,
                 ),
-                scale=Scale(x=0.94, y=1.68, z=0.68),
             )
-            for color in sofa.bodies[0].visual.shapes:
-                color.color = Color.BEIGE()
 
-            # --- COFFEE TABLE ---
+            # %% Coffee table
             self._build_coffee_table(world)
 
-            # --- CUPBOARD ---
+            # %% Cupboard
             cupboard_scale = Scale(0.43, 0.80, 2.02)
             cupboard_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=4.55, y=4.72, z=1.01
@@ -1529,7 +2248,7 @@ class KitchenEnvironment(WorldSource):
                     shape.color = Color.GRAY()
                 door.add(handle)
 
-            # --- DESK ---
+            # %% Desk
             desk_length, desk_width, desk_height = 0.60, 1.20, 0.75
             desk_color = Color.WHITE()
             desk_plate_thickness = 0.03
@@ -1565,7 +2284,7 @@ class KitchenEnvironment(WorldSource):
                     shape.color = desk_color
                 desk.add(leg)
 
-            # --- MODULAR COOKING TABLE ---
+            # %% Modular cooking table
             (
                 cooking_table_length,
                 cooking_table_depth,
@@ -1673,7 +2392,7 @@ class KitchenEnvironment(WorldSource):
                     shape.color = Color.GRAY()
                 drawer.add(handle)
 
-            # --- DINING TABLE ---
+            # %% Dining table
             (
                 dining_table_length,
                 dining_table_width,
@@ -1834,8 +2553,8 @@ class KitchenEnvironment(WorldSource):
 
             living_room_floor_polytope = [
                 Point3(0, 0, 0),
-                Point3(0, 2.971, 0),
-                Point3(5.214, 2.971, 0),
+                Point3(0, 2.801, 0),
+                Point3(5.214, 2.801, 0),
                 Point3(5.214, 0, 0),
             ]
 
@@ -1849,8 +2568,8 @@ class KitchenEnvironment(WorldSource):
             office_floor_polytope = [
                 Point3(0, 0, 0),
                 Point3(0, 2.67, 0),
-                Point3(2.71, 2.67, 0),
-                Point3(2.71, 0, 0),
+                Point3(2.705, 2.67, 0),
+                Point3(2.705, 0, 0),
             ]
 
             kitchen_floor = Floor.create_with_new_body_from_polytope_in_world(
@@ -1869,7 +2588,7 @@ class KitchenEnvironment(WorldSource):
                 world=world,
                 floor_polytope=living_room_floor_polytope,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=2.317, y=2.3095
+                    x=2.317, y=2.2245
                 ),
             )
             living_room = Room(
@@ -1893,7 +2612,7 @@ class KitchenEnvironment(WorldSource):
                 world=world,
                 floor_polytope=office_floor_polytope,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    x=3.56, y=4.96
+                    x=3.5625, y=4.96
                 ),
             )
             office = Room(floor=office_floor, name=PrefixedName("office"))

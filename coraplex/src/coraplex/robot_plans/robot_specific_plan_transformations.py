@@ -37,7 +37,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3
+from krrood_spatial_math.spatial_types import Pose, Vector3
 from semantic_digital_twin.world_description.connections import DifferentialDrive
 
 # %% keeping the torso upright while using a tool
@@ -168,14 +168,16 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
     def is_applicable(self, plan_node: CartesianPose) -> bool:
         if type(plan_node) is not CartesianPose:
             return False
-        owner = next(
-            (
-                node
-                for node in plan_node.path
-                if isinstance(node, Action)
-                or not isinstance(node, ControlStructureNode)
-            ),
-            None,
+        parent = plan_node.parent_node
+        owner = (
+            None
+            if parent is None
+            else parent.find_upwards(
+                lambda node: (
+                    isinstance(node, Action)
+                    or not isinstance(node, ControlStructureNode)
+                )
+            )
         )
         return (
             isinstance(owner, MovesToolCenterPoint)

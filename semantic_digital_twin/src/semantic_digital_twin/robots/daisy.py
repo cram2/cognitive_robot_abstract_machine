@@ -1,3 +1,8 @@
+"""
+The DAiSy dual-arm robot: its semantic parts, joint names, controllers and griplink
+grippers.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -9,7 +14,6 @@ from importlib.resources import files
 from pathlib import Path
 from typing_extensions import Self
 
-from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
 from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -28,6 +32,7 @@ from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.griplink_gripper import (
+    GriplinkCommand,
     GriplinkEndpoint,
     GriplinkGripper,
 )
@@ -42,7 +47,7 @@ from semantic_digital_twin.robots.robot_parts import (
     Finger,
     RobotCamera,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -194,16 +199,17 @@ class DAiSyLeftGripper(
         """
         return {
             GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/release", message_type=Release
+                action_topic="/left_gripper/release", command=GriplinkCommand.RELEASE
             ),
             GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/grip", message_type=Grip
+                action_topic="/left_gripper/grip", command=GriplinkCommand.GRIP
             ),
             GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/left_gripper/flexgrip", message_type=Flexgrip
+                action_topic="/left_gripper/flexgrip", command=GriplinkCommand.FLEXGRIP
             ),
             GripperState.FLEXOPEN: GriplinkEndpoint(
-                action_topic="/left_gripper/flexrelease", message_type=Flexrelease
+                action_topic="/left_gripper/flexrelease",
+                command=GriplinkCommand.FLEXRELEASE,
             ),
         }
 
@@ -268,16 +274,17 @@ class DAiSyRightGripper(
         """
         return {
             GripperState.OPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/release", message_type=Release
+                action_topic="/right_gripper/release", command=GriplinkCommand.RELEASE
             ),
             GripperState.CLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/grip", message_type=Grip
+                action_topic="/right_gripper/grip", command=GriplinkCommand.GRIP
             ),
             GripperState.FLEXCLOSE: GriplinkEndpoint(
-                action_topic="/right_gripper/flexgrip", message_type=Flexgrip
+                action_topic="/right_gripper/flexgrip", command=GriplinkCommand.FLEXGRIP
             ),
             GripperState.FLEXOPEN: GriplinkEndpoint(
-                action_topic="/right_gripper/flexrelease", message_type=Flexrelease
+                action_topic="/right_gripper/flexrelease",
+                command=GriplinkCommand.FLEXRELEASE,
             ),
         }
 

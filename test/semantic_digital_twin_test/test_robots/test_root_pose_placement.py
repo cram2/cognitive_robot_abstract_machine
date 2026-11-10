@@ -5,17 +5,17 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 
 
 def _pr2_behind_an_odom(
-    world_T_odom: HomogeneousTransformationMatrix,
+    world_T_odometry: HomogeneousTransformationMatrix,
 ) -> tuple[World, AbstractRobot]:
     """
     A world holding nothing but a PR2, reached through an odom frame at
-    ``world_T_odom``.
+    ``world_T_odometry``.
 
     The specification path is what puts the odom between the world root and the robot,
     so the placement is exercised against the same chain a specification builds.
@@ -23,7 +23,7 @@ def _pr2_behind_an_odom(
     world = World.create_with_root_body("root")
     try:
         robot = RobotSpecification(
-            semantic_annotation_type=PR2, world_T_odom=world_T_odom
+            semantic_annotation_type=PR2, localization_pose=world_T_odometry
         ).spawn(world)
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
