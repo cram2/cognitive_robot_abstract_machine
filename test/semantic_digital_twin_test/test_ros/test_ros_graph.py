@@ -2,6 +2,7 @@ from datetime import timedelta
 
 import pytest
 from rcl_interfaces.msg import FloatingPointRange
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from typing_extensions import Iterator
@@ -13,12 +14,7 @@ from semantic_digital_twin.adapters.ros.exceptions import (
     ServiceUnavailableError,
     TopicNotFoundError,
 )
-from semantic_digital_twin.adapters.ros.ros2_interface import (
-    call_service,
-    message_type_name,
-    search_for_unique_publisher_of_type,
-    wait_for_message,
-)
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph, message_type_name
 
 # %% message types
 
@@ -26,6 +22,13 @@ from semantic_digital_twin.adapters.ros.ros2_interface import (
 def test_a_message_type_is_named_the_way_ros_names_it() -> None:
     assert message_type_name(String) == "std_msgs/msg/String"
     assert message_type_name(Trigger) == "std_srvs/srv/Trigger"
+
+
+# %% the node
+
+
+def test_a_graph_looks_through_the_registered_node_by_default(init_rospy) -> None:
+    assert RosGraph().node is rospy.get_node()
 
 
 # %% finding topics
@@ -51,7 +54,7 @@ def test_looking_for_the_publisher_of_a_type_nobody_publishes_raises(
     init_rospy,
 ) -> None:
     with pytest.raises(TopicNotFoundError) as raised:
-        search_for_unique_publisher_of_type(rospy.get_node(), FloatingPointRange)
+        RosGraph().unique_publisher_of_type(FloatingPointRange)
 
     assert raised.value.message_type_name == "rcl_interfaces/msg/FloatingPointRange"
 
@@ -60,7 +63,7 @@ def test_looking_for_the_publisher_of_a_type_two_topics_carry_raises(
     two_topics_of_one_type: list[str],
 ) -> None:
     with pytest.raises(AmbiguousTopicError) as raised:
-        search_for_unique_publisher_of_type(rospy.get_node(), FloatingPointRange)
+        RosGraph().unique_publisher_of_type(FloatingPointRange)
 
     assert sorted(raised.value.topic_names) == two_topics_of_one_type
 
@@ -68,13 +71,26 @@ def test_looking_for_the_publisher_of_a_type_two_topics_carry_raises(
 # %% waiting for messages
 
 
+def test_a_latched_robot_description_is_received(init_rospy) -> None:
+    node = rospy.get_node()
+    topic = "/description_latched_by_the_test"
+    publisher = node.create_publisher(
+        String,
+        topic,
+        QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL),
+    )
+    publisher.publish(String(data="<robot/>"))
+
+    description = RosGraph().robot_description(topic)
+    node.destroy_publisher(publisher)
+
+    assert description == "<robot/>"
+
+
 def test_waiting_for_a_message_nobody_publishes_raises(init_rospy) -> None:
     with pytest.raises(NoMessageReceivedError) as raised:
-        wait_for_message(
-            rospy.get_node(),
-            String,
-            "/topic_nobody_publishes_on",
-            timeout=timedelta(seconds=0.1),
+        RosGraph().wait_for_message(
+            String, "/topic_nobody_publishes_on", timeout=timedelta(seconds=0.1)
         )
 
     assert raised.value.topic == "/topic_nobody_publishes_on"
@@ -83,18 +99,23 @@ def test_waiting_for_a_message_nobody_publishes_raises(init_rospy) -> None:
 # %% calling services
 
 
+def respond_called(
+    request: Trigger.Request, response: Trigger.Response
+) -> Trigger.Response:
+    """
+    Answers every trigger with the message ``called``.
+    """
+    response.message = "called"
+    return response
+
+
 def test_calling_a_service_returns_its_response(init_rospy) -> None:
     node = rospy.get_node()
-
-    def respond(
-        request: Trigger.Request, response: Trigger.Response
-    ) -> Trigger.Response:
-        response.message = "called"
-        return response
-
-    service = node.create_service(Trigger, "service_offered_by_the_test", respond)
-    response = call_service(
-        node, Trigger, "service_offered_by_the_test", Trigger.Request()
+    service = node.create_service(
+        Trigger, "service_offered_by_the_test", respond_called
+    )
+    response = RosGraph().call_service(
+        Trigger, "service_offered_by_the_test", Trigger.Request()
     )
     node.destroy_service(service)
 
@@ -103,8 +124,7 @@ def test_calling_a_service_returns_its_response(init_rospy) -> None:
 
 def test_calling_a_service_that_nobody_offers_raises(init_rospy) -> None:
     with pytest.raises(ServiceUnavailableError):
-        call_service(
-            rospy.get_node(),
+        RosGraph().call_service(
             Trigger,
             "service_that_nobody_offers",
             Trigger.Request(),

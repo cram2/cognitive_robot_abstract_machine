@@ -13,7 +13,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 from typing_extensions import Iterator
 
-from semantic_digital_twin.adapters.ros.ros2_interface import get_robot_description
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy import (
     daisy_standalone,
     daisy_velocity,
@@ -79,7 +79,7 @@ def published_robot_description(init_rospy) -> Iterator[str]:
         .parent.parent.joinpath("resources", "urdf", "simple_two_arm_robot.urdf")
         .read_text()
     )
-    topic = inspect.signature(get_robot_description).parameters["topic"].default
+    topic = inspect.signature(RosGraph.robot_description).parameters["topic"].default
     publisher = rospy.get_node().create_publisher(
         String,
         topic,

@@ -18,6 +18,7 @@ import pytest
 
 from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros.ros_graph import wait_for_future_to_complete
 from giskardpy.middleware.ros2.command_publishing import (
     JointGroupVelocityCommandPublisher,
 )
@@ -93,7 +94,7 @@ class MockRobotDriver:
         future = client.call_async(
             controller_manager_services.ListControllers.Request()
         )
-        rospy.wait_for_future_to_complete(future)
+        wait_for_future_to_complete(future)
         node.destroy_client(client)
         return any(
             controller.name == self.velocity_controller

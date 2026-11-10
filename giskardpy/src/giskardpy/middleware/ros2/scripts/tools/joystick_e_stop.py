@@ -13,7 +13,7 @@ from sensor_msgs.msg import Joy
 import numpy as np
 
 from semantic_digital_twin.adapters.ros import rospy
-from semantic_digital_twin.adapters.ros.ros2_interface import wait_for_message
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 
 
 class JoystickEStop:
@@ -68,7 +68,7 @@ def main(args=None):
     """
     rospy.init_node("giskard_e_stop")
 
-    joy_msg = wait_for_message(rospy.get_node(), Joy, "/joy")
+    joy_msg = RosGraph(rospy.get_node()).wait_for_message(Joy, "/joy")
     num_buttons = len(joy_msg.buttons)
 
     rospy.get_node().declare_parameter("button_ids", list(range(num_buttons)))

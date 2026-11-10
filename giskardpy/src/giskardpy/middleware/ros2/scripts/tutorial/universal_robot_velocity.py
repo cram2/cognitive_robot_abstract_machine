@@ -6,7 +6,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
 )
 from rclpy.node import Node
-from semantic_digital_twin.adapters.ros.ros2_interface import get_robot_description
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
@@ -36,7 +36,7 @@ def create_giskard(node: Node) -> Giskard:
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    MinimalRobot, urdf=get_robot_description(node)
+                    MinimalRobot, urdf=RosGraph(node).robot_description()
                 )
             ]
         ),

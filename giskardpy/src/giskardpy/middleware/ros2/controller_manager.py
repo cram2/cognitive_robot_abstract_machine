@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from controller_manager_msgs.srv import ListControllers
-from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from typing_extensions import TYPE_CHECKING
 
@@ -16,12 +15,7 @@ from giskardpy.middleware.ros2.exceptions import (
     ControllersNotActiveError,
     ControllersNotLoadedError,
 )
-from semantic_digital_twin.adapters.ros.ros2_interface import (
-    call_service,
-    get_parameters,
-    search_for_publisher_of_node_with_type,
-    search_for_subscriber_of_node_with_type,
-)
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 
 if TYPE_CHECKING:
     from controller_manager_msgs.msg import ControllerState as ControllerStateMessage
@@ -75,9 +69,9 @@ class ControllerManager:
     The name of the controller manager node, including the namespace it runs in.
     """
 
-    node: Node = field(kw_only=True)
+    ros_graph: RosGraph = field(default_factory=RosGraph, kw_only=True)
     """
-    The node that talks to the controller manager and its controllers.
+    The graph the controller manager and its controllers are looked up in.
     """
 
     @property
@@ -105,8 +99,7 @@ class ControllerManager:
         :raises ControllersNotActiveError: If the whitelist names a controller that is
             loaded but does not run.
         """
-        controllers = call_service(
-            self.node,
+        controllers = self.ros_graph.call_service(
             ListControllers,
             f"{self.name}/list_controllers",
             ListControllers.Request(),
@@ -145,8 +138,7 @@ class ControllerManager:
         :return: The joints the controller commands, in the order of its command layout.
         """
         return (
-            get_parameters(
-                self.node,
+            self.ros_graph.get_parameters(
                 node_name=f"{self.namespace.rstrip('/')}/{controller_name}",
                 parameter_names=[ControllerParameter.JOINTS],
             )
@@ -159,8 +151,7 @@ class ControllerManager:
         :param message_type: The message type the controller receives its commands in.
         :return: The topic the controller receives its commands on.
         """
-        return search_for_subscriber_of_node_with_type(
-            self.node,
+        return self.ros_graph.subscriber_of_node_with_type(
             node_name=controller_name,
             topic_type=message_type,
             namespace=self.namespace,
@@ -170,8 +161,7 @@ class ControllerManager:
         """
         :return: The topic a joint state broadcaster publishes on.
         """
-        return search_for_publisher_of_node_with_type(
-            self.node,
+        return self.ros_graph.publisher_of_node_with_type(
             node_name=controller_name,
             topic_type=JointState,
             namespace=self.namespace,

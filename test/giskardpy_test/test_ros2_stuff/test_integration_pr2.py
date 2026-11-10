@@ -12,7 +12,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from semantic_digital_twin.adapters.ros.rospy import wait_for_future_to_complete
+from semantic_digital_twin.adapters.ros.ros_graph import wait_for_future_to_complete
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from cramph.exceptions import EmptyStatechartError
 from giskardpy.motion_statechart.graph_node import EndMotion

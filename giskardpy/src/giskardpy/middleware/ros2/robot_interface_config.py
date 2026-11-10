@@ -31,10 +31,7 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
     TfFrameSynchronizer,
 )
 from giskardpy.middleware.ros2.motion_server import MotionServer
-from semantic_digital_twin.adapters.ros.ros2_interface import (
-    search_for_unique_publisher_of_type,
-    search_for_unique_subscriber_of_type,
-)
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from semantic_digital_twin.robots.robot_part_mixins import HasInputSource
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -177,8 +174,8 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         Tell Giskard to sync an odometry joint added during by the world config.
         """
         if odometry_topic is None:
-            odometry_topic = search_for_unique_publisher_of_type(
-                rospy.get_node(), Odometry
+            odometry_topic = RosGraph(rospy.get_node()).unique_publisher_of_type(
+                Odometry
             )
         assert isinstance(joint, (OmniDrive, DifferentialDrive))
         synchronizer = OdometrySynchronizer(
@@ -280,8 +277,8 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             [drive] = drives
         command_format = command_format or TwistFormat()
         if command_topic is None:
-            command_topic = search_for_unique_subscriber_of_type(
-                rospy.get_node(), command_format.message_type()
+            command_topic = RosGraph(rospy.get_node()).unique_subscriber_of_type(
+                command_format.message_type()
             )
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
@@ -348,7 +345,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param whitelist: The names of the controllers to consider, all if ``None``.
         """
         controller_manager = ControllerManager(
-            controller_manager_name, node=rospy.get_node()
+            controller_manager_name, ros_graph=RosGraph(rospy.get_node())
         )
         for controller in controller_manager.active_controllers(whitelist):
             match controller.type:

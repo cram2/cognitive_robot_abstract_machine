@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from giskardpy.middleware.ros2.giskard import Giskard
 from rclpy.node import Node
-from semantic_digital_twin.adapters.ros.ros2_interface import get_robot_description
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
     StretchVelocityInterface,
 )
@@ -24,7 +24,7 @@ def create_giskard(node: Node) -> Giskard:
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    Stretch, urdf=get_robot_description(node)
+                    Stretch, urdf=RosGraph(node).robot_description()
                 )
             ]
         ),
