@@ -767,7 +767,7 @@ def handle_opened_by(opening: Match) -> Handle:
     :return: The handle its first candidate opens the drawer by.
     """
     first_candidate = next(
-        iter(EntityQueryLanguageGenerativeBackend().evaluate(opening))
+        iter(EntityQueryLanguageGenerativeBackend().evaluate(expression=opening))
     )
     return first_candidate.open_container.grasp.graspable
 

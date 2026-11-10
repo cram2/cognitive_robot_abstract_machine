@@ -364,10 +364,10 @@ class CartesianPositionTrajectory(CartesianTask):
         self.remaining_distance = FloatVariable(
             str(PrefixedName("remaining_distance", str(self.name)))
         )
-        float_variable_data.register_expression(self.remaining_distance)
+        float_variable_data.register_expression(expression=self.remaining_distance)
         float_variable_data.set_value(
-            self.remaining_distance,
-            self._distance_left_from(0, self._goal_points_np[0]),
+            expression=self.remaining_distance,
+            value=self._distance_left_from(0, self._goal_points_np[0]),
         )
 
     def _distance_left_from(
@@ -416,10 +416,11 @@ class CartesianPositionTrajectory(CartesianTask):
             sparse=False,
         )
         self._compiled_goal_reference_frame_P_tip.bind_args_to_memory_view(
-            0, self.context.world.state.positions
+            arg_idx=0, numpy_array=self.context.world.state.positions
         )
         self.context.float_variable_data.bind_argument(
-            self._compiled_goal_reference_frame_P_tip, 1
+            compiled_function=self._compiled_goal_reference_frame_P_tip,
+            argument_index=1,
         )
 
     def _update_trajectory_index(self, goal_reference_frame_P_tip_np: np.ndarray):
@@ -486,11 +487,14 @@ class CartesianPositionTrajectory(CartesianTask):
         self._update_trajectory_index(goal_reference_frame_P_tip_np)
         target_point = self._compute_target_point(goal_reference_frame_P_tip_np)
         self.context.float_variable_data.set_value(
-            self.goal_reference_frame_P_current_target_point, target_point
+            expression=self.goal_reference_frame_P_current_target_point,
+            value=target_point,
         )
         self.context.float_variable_data.set_value(
-            self.remaining_distance,
-            self._distance_left_from(self.current_index, goal_reference_frame_P_tip_np),
+            expression=self.remaining_distance,
+            value=self._distance_left_from(
+                self.current_index, goal_reference_frame_P_tip_np
+            ),
         )
         return None
 
@@ -508,11 +512,11 @@ class CartesianPositionTrajectory(CartesianTask):
             self.goal_reference_frame
         )
         float_variable_data.register_expression(
-            self.goal_reference_frame_P_current_target_point
+            expression=self.goal_reference_frame_P_current_target_point
         )
         float_variable_data.set_value(
-            self.goal_reference_frame_P_current_target_point,
-            self.goal_points[self.current_index].to_np()[:-1],
+            expression=self.goal_reference_frame_P_current_target_point,
+            value=self.goal_points[self.current_index].to_np()[:-1],
         )
 
 
@@ -1020,7 +1024,7 @@ class CartesianPositionVelocityLimit(Task):
             root_P_tip
         )
         root_P_tip_dot = root_P_tip.total_derivative(
-            position_variables, velocity_variables
+            variables=position_variables, variables_dot=velocity_variables
         )
 
         artifacts.observation = root_P_tip_dot.norm() <= self.max_linear_velocity

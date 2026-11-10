@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class PropertyDescriptorRelation(PredicateClassRelation):
     """
     Edge data representing a relation between two wrapped instances that is represented
@@ -87,7 +87,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             (i.e., if the value was already set).
         """
         return self.wrapped_field.property_descriptor.update_value(
-            self.source.instance, self.target.instance
+            domain_value=self.source.instance, range_value=self.target.instance
         )
 
     def infer_super_relations(self):
@@ -96,7 +96,10 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for super_domain, super_field in self.super_relations:
             self.__class__(
-                super_domain, self.target, super_field, inferred=True
+                source=super_domain,
+                target=self.target,
+                wrapped_field=super_field,
+                inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
     def infer_inverse_relation(self):
@@ -106,7 +109,10 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         if self.inverse_of:
             inverse_domain, inverse_field = self.inverse_domain_and_field
             self.__class__(
-                inverse_domain, self.source, inverse_field, inferred=True
+                source=inverse_domain,
+                target=self.source,
+                wrapped_field=inverse_field,
+                inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
     @cached_property
@@ -125,12 +131,14 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             self.wrapped_field.property_descriptor.__class__
         )
         for association in property_descriptor_cls.get_superproperties_associations(
-            source_type
+            domain_type=source_type
         ):
             original_source_instance = association.get_original_source_instance_given_this_relation_source_instance(
-                self.source.instance
+                source_instance=self.source.instance
             )
-            source = SymbolGraph().get_wrapped_instance(original_source_instance)
+            source = SymbolGraph().get_wrapped_instance(
+                instance=original_source_instance
+            )
             yield source, association.wrapped_field
 
     @property
@@ -145,9 +153,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
                 f"cannot find a field for the inverse {self.inverse_of} defined for the relation {self}"
             )
         original_source_instance = self.inverse_association.get_original_source_instance_given_this_relation_source_instance(
-            self.target.instance
+            source_instance=self.target.instance
         )
-        source = SymbolGraph().get_wrapped_instance(original_source_instance)
+        source = SymbolGraph().get_wrapped_instance(instance=original_source_instance)
         return source, self.inverse_association.wrapped_field
 
     @cached_property
@@ -157,7 +165,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         Return the inverse field (if it exists) stored in the target of this relation.
         """
-        return self.inverse_of.get_association_of_source_type(self.target.instance_type)
+        return self.inverse_of.get_association_of_source_type(
+            domain_type=self.target.instance_type
+        )
 
     def infer_transitive_relations(self):
         """
@@ -174,9 +184,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for nxt_relation in self.target_outgoing_relations_with_same_descriptor_type:
             self.__class__(
-                self.source,
-                nxt_relation.target,
-                nxt_relation.wrapped_field,
+                source=self.source,
+                target=nxt_relation.target,
+                wrapped_field=nxt_relation.wrapped_field,
                 inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
@@ -186,9 +196,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for nxt_relation in self.source_incoming_relations_with_same_descriptor_type:
             self.__class__(
-                nxt_relation.source,
-                self.target,
-                nxt_relation.wrapped_field,
+                source=nxt_relation.source,
+                target=self.target,
+                wrapped_field=nxt_relation.wrapped_field,
                 inferred=True,
             ).update_source_and_add_to_graph_and_apply_implications()
 
@@ -204,7 +214,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             relation.property_descriptor_cls, self.property_descriptor_cls
         )
         yield from SymbolGraph().get_outgoing_relations_with_condition(
-            self.target, relation_condition
+            wrapped_instance=self.target, edge_condition=relation_condition
         )
 
     @property
@@ -219,7 +229,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             relation.property_descriptor_cls, self.property_descriptor_cls
         )
         yield from SymbolGraph().get_incoming_relations_with_condition(
-            self.source, relation_condition
+            wrapped_instance=self.source, edge_condition=relation_condition
         )
 
     @cached_property

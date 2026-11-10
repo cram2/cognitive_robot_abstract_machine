@@ -73,7 +73,7 @@ def _rule(construct, name, **kw):
     """
     A rule whose build just emits its own name.
     """
-    return _custom(construct, name, lambda node, context: WordFragment(name), **kw)
+    return _custom(construct, name, lambda node, context: WordFragment(text=name), **kw)
 
 
 # ── select: specificity ──────────────────────────────────────────────────────
@@ -132,10 +132,10 @@ def test_fold_child_re_enters_the_fold():
             Mid,
             "parent",
             lambda node, context: PhraseFragment(
-                [WordFragment("p"), context.child(child)]
+                parts=[WordFragment(text="p"), context.child(node=child)]
             ),
         ),
-        _custom(Other, "child", lambda node, context: WordFragment("c")),
+        _custom(Other, "child", lambda node, context: WordFragment(text="c")),
     ]
     assert (
         flatten_fragment_to_plain_text(fold(parent, MicroplanningServices(), rules))
@@ -147,7 +147,7 @@ def test_fold_binding_override_short_circuits_before_dispatch():
     # Only a real expression carries an _id_ the override map is keyed on.
     node = MinimalSymbolicExpression()
     context = MicroplanningServices()
-    context.binding.binding_overrides[node._id_] = WordFragment("OVERRIDE")
+    context.binding.binding_overrides[node._id_] = WordFragment(text="OVERRIDE")
     # No rules at all — the override must still win.
     assert flatten_fragment_to_plain_text(fold(node, context, [])) == "OVERRIDE"
 
@@ -177,7 +177,7 @@ def test_enters_query_scope_wraps_build_but_not_when():
 
         def build(self, node, context):
             observed["build_depth"] = context.configuration.query_depth
-            return WordFragment("scoped")
+            return WordFragment(text="scoped")
 
     context = MicroplanningServices()
     fold(Mid(), context, [ScopedRule()])

@@ -274,7 +274,9 @@ class MilkTransportDemonstration(RobotDemonstration):
         :return: The milk's grasp closest to the robot standing there, raised
             :attr:`grasp_height` above the milk's origin.
         """
-        [closest] = GraspsByCloseness(milk, standing_pose, number_of_grasps=1)()
+        [closest] = GraspsByCloseness(
+            graspable=milk, standing_position=standing_pose, number_of_grasps=1
+        )()
         milk_T_raised_grasp = (
             HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=self.grasp_height, reference_frame=milk.root

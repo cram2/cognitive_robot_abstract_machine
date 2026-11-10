@@ -7,7 +7,7 @@ from typing_extensions import Self
 from krrood.utils import get_full_class_name
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SerializationKeywordArgument:
     """
     An object that travels through nested ``to_json`` or ``from_json`` calls in their

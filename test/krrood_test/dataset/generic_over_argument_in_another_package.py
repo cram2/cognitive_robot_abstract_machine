@@ -20,7 +20,7 @@ The kind of interval a :class:`LabelledIntervals` is about.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LabelledIntervals(Generic[IntervalT], SubClassSafeGeneric):
     """
     A labelled collection over one kind of interval, without a field of that kind.
@@ -35,7 +35,7 @@ class LabelledIntervals(Generic[IntervalT], SubClassSafeGeneric):
 # %% a field naming the specialization
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HolderOfSpecializedGeneric:
     """
     Holds a collection specialized with the interval from the other package.

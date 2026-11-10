@@ -1052,7 +1052,7 @@ class World(HasSimulatorProperties):
             return
         introspector = DataclassOnlyIntrospector()
 
-        for field_ in introspector.discover(semantic_annotation.__class__):
+        for field_ in introspector.discover(owner_cls=semantic_annotation.__class__):
             value = getattr(semantic_annotation, field_.public_name)
 
             if isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value):

@@ -1,3 +1,7 @@
+"""
+Tests of generating ``AGENTS.md`` from rule sections, and of naming code in rules.
+"""
+
 from __future__ import annotations
 
 import sys
@@ -47,14 +51,18 @@ def shipped_sections() -> list[type[Section]]:
     """
     :return: The top-level sections krrood ships.
     """
-    return RuleModule(shipped_rules).sections
+    return RuleModule(module=shipped_rules).sections
 
 
 def test_the_file_lists_the_rules_of_its_sections_under_their_headings(
     repository_root: Path,
 ) -> None:
+    """
+    Each section is rendered as its heading followed by its rules.
+    """
     instructions = AgentsInstructions(
-        repository_root, [DesignPrinciplesRules, VerificationRules]
+        repository_root=repository_root,
+        sections=[DesignPrinciplesRules, VerificationRules],
     )
 
     assert instructions.text == DatasetFile.RULE_SECTIONS_TEXT.read_text().format(
@@ -97,7 +105,13 @@ def test_no_two_shipped_sibling_sections_share_a_title(
 def test_shipped_rules_name_no_cram_package(
     repository_root: Path, shipped_sections: list[type[Section]]
 ) -> None:
-    text = AgentsInstructions(repository_root, shipped_sections).text
+    """
+    The rules krrood ships stay usable by any repository, so none names a package of
+    this one.
+    """
+    text = AgentsInstructions(
+        repository_root=repository_root, sections=shipped_sections
+    ).text
 
     assert "cram" not in text.lower()
 
@@ -108,7 +122,10 @@ def test_shipped_rules_name_no_cram_package(
 def test_the_checkers_of_a_module_are_those_of_the_checked_rules_in_its_sections() -> (
     None
 ):
-    assert RuleModule(rule_sections).checkers == (
+    """
+    Only rules carrying a checker contribute one.
+    """
+    assert RuleModule(module=rule_sections).checkers == (
         AssertionsRules.KEEP_ASSERTIONS_SHORT.checker,
     )
 
@@ -127,7 +144,9 @@ def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
     """
     The checkers come in the order of the sections and rules declaring them.
     """
-    assert RuleModule(shipped_rules).checkers == (
+    assert RuleModule(module=shipped_rules).checkers == (
+        CodeStyleRules.KEYWORD_ONLY_DATACLASS_FIELDS.checker,
+        CodeStyleRules.KEYWORD_ONLY_METHOD_PARAMETERS.checker,
         CodeStyleRules.NO_HAND_WRITTEN_FIELD_ACCESSORS.checker,
         NamingRules.NO_LEADING_PREPOSITIONS.checker,
         DocumentationRules.DOCUMENT_EVERY_CONSTRUCT.checker,
@@ -138,9 +157,14 @@ def test_every_checker_krrood_ships_is_that_of_a_shipped_rule() -> None:
 def test_the_repository_instructions_have_the_checkers_of_all_their_rules(
     project_rules_repository: Path,
 ) -> None:
+    """
+    A repository's own rules add no checker when none of them carries one.
+    """
     assert (
-        AgentsInstructions.from_repository(project_rules_repository).checkers
-        == RuleModule(shipped_rules).checkers
+        AgentsInstructions.from_repository(
+            repository_root=project_rules_repository
+        ).checkers
+        == RuleModule(module=shipped_rules).checkers
     )
 
 
@@ -148,23 +172,38 @@ def test_the_repository_instructions_have_the_checkers_of_all_their_rules(
 
 
 def test_a_class_is_named_by_its_import_path() -> None:
-    assert CodeReference(DataclassException).path == (
+    """
+    A class is rendered as its module and qualified name.
+    """
+    assert CodeReference(target=DataclassException).path == (
         f"`{DataclassException.__module__}.{DataclassException.__qualname__}`"
     )
 
 
 def test_a_module_is_named_by_its_import_path() -> None:
-    assert CodeReference(path_enumeration).path == f"`{path_enumeration.__name__}`"
+    """
+    A module is rendered as its dotted name.
+    """
+    assert (
+        CodeReference(target=path_enumeration).path == f"`{path_enumeration.__name__}`"
+    )
 
 
 def test_an_object_is_named_by_the_module_it_is_imported_from() -> None:
-    assert CodeReference(pytest.raises, pytest).path == (
+    """
+    An object re-exported by a public module is rendered with that module, not the
+    defining one.
+    """
+    assert CodeReference(target=pytest.raises, public_module=pytest).path == (
         f"`{pytest.__name__}.{pytest.raises.__qualname__}`"
     )
 
 
 def test_a_method_is_named_by_its_own_name() -> None:
-    assert CodeReference(DataclassException.error_message).name == (
+    """
+    The short form of a reference is the object's own name.
+    """
+    assert CodeReference(target=DataclassException.error_message).name == (
         f"`{DataclassException.error_message.__name__}`"
     )
 
@@ -218,31 +257,42 @@ def project_rules_package_repository(
 def test_the_file_lists_the_project_sections_after_the_shipped_ones(
     project_rules_repository: Path, shipped_sections: list[type[Section]]
 ) -> None:
+    """
+    A repository's own sections follow the shipped sections.
+    """
     project_rules = RuleModule.import_from(
-        project_rules_repository, RepositoryInstructionsFile.PROJECT_RULES
+        directory=project_rules_repository,
+        module_name=RepositoryInstructionsFile.PROJECT_RULES,
     )
 
-    assert AgentsInstructions.from_repository(project_rules_repository).sections == (
-        shipped_sections + [project_rules.module.DeploymentRules]
-    )
+    assert AgentsInstructions.from_repository(
+        repository_root=project_rules_repository
+    ).sections == (shipped_sections + [project_rules.module.DeploymentRules])
 
 
 def test_the_file_lists_no_section_declared_outside_the_rule_modules(
     repository_root: Path,
 ) -> None:
+    """
+    A section defined elsewhere, though imported, is not listed.
+    """
     assert DesignPrinciplesRules not in (
-        AgentsInstructions.from_repository(repository_root).sections
+        AgentsInstructions.from_repository(repository_root=repository_root).sections
     )
 
 
 def test_a_package_lists_the_sections_its_modules_define_alphabetically(
     project_rules_package_repository: Path,
 ) -> None:
+    """
+    The sections of a rules package's modules are ordered by their headings.
+    """
     package = RuleModule.import_from(
-        project_rules_package_repository, RepositoryInstructionsFile.PROJECT_RULES
+        directory=project_rules_package_repository,
+        module_name=RepositoryInstructionsFile.PROJECT_RULES,
     ).module
 
-    assert RuleModule(package).sections == [
+    assert RuleModule(module=package).sections == [
         package.monitoring.AlertingRules,
         package.operations.DeploymentRules,
         package.operations.ReleasesRules,
@@ -265,7 +315,7 @@ def test_the_project_rules_can_import_the_modules_of_their_repository(
     )
 
     project_rules = RuleModule.import_from(
-        repository_root, RepositoryInstructionsFile.PROJECT_RULES
+        directory=repository_root, module_name=RepositoryInstructionsFile.PROJECT_RULES
     )
 
     assert project_rules.sections == [project_rules.module.ReviewRules]
@@ -274,12 +324,17 @@ def test_the_project_rules_can_import_the_modules_of_their_repository(
 def test_the_project_rules_module_is_imported_once(
     project_rules_repository: Path,
 ) -> None:
+    """
+    Importing a repository's rules twice yields the same module.
+    """
     assert (
         RuleModule.import_from(
-            project_rules_repository, RepositoryInstructionsFile.PROJECT_RULES
+            directory=project_rules_repository,
+            module_name=RepositoryInstructionsFile.PROJECT_RULES,
         ).module
         is RuleModule.import_from(
-            project_rules_repository, RepositoryInstructionsFile.PROJECT_RULES
+            directory=project_rules_repository,
+            module_name=RepositoryInstructionsFile.PROJECT_RULES,
         ).module
     )
 
@@ -287,9 +342,13 @@ def test_the_project_rules_module_is_imported_once(
 def test_a_repository_without_a_project_rules_module_has_none(
     repository_root: Path,
 ) -> None:
+    """
+    A repository declaring no rules of its own has no rules module.
+    """
     assert (
         RuleModule.import_from(
-            repository_root, RepositoryInstructionsFile.PROJECT_RULES
+            directory=repository_root,
+            module_name=RepositoryInstructionsFile.PROJECT_RULES,
         )
         is None
     )
@@ -299,42 +358,54 @@ def test_a_repository_without_a_project_rules_module_has_none(
 
 
 def test_agents_md_command_writes_a_new_file(repository_root: Path) -> None:
-    exit_status = CommandLine.main([Subcommand.AGENTS_MD])
+    """
+    ``krrood agents-md`` writes a missing file and exits with a failure, as pre-commit
+    expects of a hook that changed a file.
+    """
+    exit_status = CommandLine.main(command_line=[Subcommand.AGENTS_MD])
 
     assert exit_status == ExitStatus.FAILURE
     assert (repository_root / RepositoryInstructionsFile.AGENTS).read_text() == (
-        AgentsInstructions.from_repository(repository_root).text
+        AgentsInstructions.from_repository(repository_root=repository_root).text
     )
 
 
 def test_agents_md_command_replaces_a_hand_written_file(
     repository_root: Path,
 ) -> None:
+    """
+    A file written by hand is replaced by the generated one.
+    """
     path = repository_root / RepositoryInstructionsFile.AGENTS
     path.write_text(DatasetFile.HAND_WRITTEN_RULES.read_text())
 
-    CommandLine.main([Subcommand.AGENTS_MD])
+    CommandLine.main(command_line=[Subcommand.AGENTS_MD])
 
     assert path.read_text() == (
-        AgentsInstructions.from_repository(repository_root).text
+        AgentsInstructions.from_repository(repository_root=repository_root).text
     )
 
 
 def test_agents_md_command_succeeds_when_the_file_is_current(
     repository_root: Path,
 ) -> None:
-    CommandLine.main([Subcommand.AGENTS_MD])
-
-    assert CommandLine.main([Subcommand.AGENTS_MD]) == ExitStatus.SUCCESS
+    """
+    Regenerating a current file changes nothing and exits successfully.
+    """
+    CommandLine.main(command_line=[Subcommand.AGENTS_MD])
+    assert CommandLine.main(command_line=[Subcommand.AGENTS_MD]) == ExitStatus.SUCCESS
 
 
 def test_check_fails_on_an_edited_file_without_rewriting_it(
     repository_root: Path,
 ) -> None:
+    """
+    Verifying an edited file fails and leaves the edit in place.
+    """
     path = repository_root / RepositoryInstructionsFile.AGENTS
     path.write_text(DatasetFile.HAND_WRITTEN_RULES.read_text())
 
-    exit_status = CommandLine.main([Subcommand.AGENTS_MD, Option.CHECK])
+    exit_status = CommandLine.main(command_line=[Subcommand.AGENTS_MD, Option.CHECK])
 
     assert exit_status == ExitStatus.FAILURE
     assert path.read_text() == DatasetFile.HAND_WRITTEN_RULES.read_text()
@@ -343,13 +414,23 @@ def test_check_fails_on_an_edited_file_without_rewriting_it(
 def test_agents_md_command_adds_the_project_rules(
     project_rules_repository: Path,
 ) -> None:
-    CommandLine.main([Subcommand.AGENTS_MD])
+    """
+    The generated file lists the repository's own rules.
+    """
+    CommandLine.main(command_line=[Subcommand.AGENTS_MD])
 
     text = (project_rules_repository / RepositoryInstructionsFile.AGENTS).read_text()
     assert RuleModule.import_from(
-        project_rules_repository, RepositoryInstructionsFile.PROJECT_RULES
+        directory=project_rules_repository,
+        module_name=RepositoryInstructionsFile.PROJECT_RULES,
     ).module.DeploymentRules.heading in (text.splitlines())
 
 
 def test_check_fails_when_the_file_is_missing(repository_root: Path) -> None:
-    assert CommandLine.main([Subcommand.AGENTS_MD, Option.CHECK]) == ExitStatus.FAILURE
+    """
+    Verifying a missing file fails.
+    """
+    assert (
+        CommandLine.main(command_line=[Subcommand.AGENTS_MD, Option.CHECK])
+        == ExitStatus.FAILURE
+    )

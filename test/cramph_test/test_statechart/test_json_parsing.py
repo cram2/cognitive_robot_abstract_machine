@@ -74,7 +74,7 @@ def test_trinary_transition() -> None:
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
     condition_copy = TransitionCondition.from_json(
-        new_json_data,
+        data=new_json_data,
         **DeserializedNodeTracker.from_statechart(msc).create_kwargs(),
     )
     assert condition_copy == condition
@@ -99,7 +99,7 @@ def test_ending_condition_round_trip(transition_kind: TransitionKind) -> None:
     ]
 
     condition_copy = TransitionCondition.from_json(
-        json.loads(json.dumps(condition.to_json())),
+        data=json.loads(json.dumps(condition.to_json())),
         **DeserializedNodeTracker.from_statechart(msc).create_kwargs(),
     )
 
@@ -123,7 +123,7 @@ def test_nested_goals(tmp_path) -> None:
     new_json_data = json.loads(json_str)
 
     msc_copy = Statechart.from_json(
-        new_json_data, context=StatechartContext(world=World())
+        data=new_json_data, context=StatechartContext(world=World())
     )
     msc_copy.compiler.add_transitions()
     msc.draw(str(tmp_path / "statechart.pdf"))
@@ -147,7 +147,7 @@ def test_collapsed_goal_survives_json_round_trip() -> None:
     new_json_data = json.loads(json_str)
 
     msc_copy = Statechart.from_json(
-        new_json_data, context=StatechartContext(world=World())
+        data=new_json_data, context=StatechartContext(world=World())
     )
 
     assert msc_copy.get_node_by_index(goal.index).plot_specifications.collapse_children
@@ -254,7 +254,7 @@ def test_start_condition(statechart_executor: StatechartExecutor) -> None:
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
     kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
-    msc_copy = Statechart.from_json(new_json_data, context=kin_sim.context)
+    msc_copy = Statechart.from_json(data=new_json_data, context=kin_sim.context)
 
     statechart_executor.compile(statechart=msc)
     kin_sim.compile(statechart=msc_copy)
@@ -278,7 +278,7 @@ def test_cancel_statechart() -> None:
     kin_sim = StatechartExecutor(
         context=StatechartContext(world=World()),
     )
-    msc_copy = Statechart.from_json(new_json_data, context=kin_sim.context)
+    msc_copy = Statechart.from_json(data=new_json_data, context=kin_sim.context)
 
     kin_sim.compile(statechart=msc_copy)
 
@@ -325,7 +325,7 @@ def test_duplicate_condition() -> None:
     new_json_data = json.loads(json_str)
 
     msc_copy = Statechart.from_json(
-        new_json_data, context=StatechartContext(world=World())
+        data=new_json_data, context=StatechartContext(world=World())
     )
     msc_copy.compiler.add_transitions()
     assert len(msc_copy.unique_edges) == 3
@@ -343,7 +343,7 @@ def test_child_added_to_goal_is_its_child_once_after_json_round_trip() -> None:
     new_json_data = json.loads(json.dumps(msc.to_json()))
 
     msc_copy = Statechart.from_json(
-        new_json_data, context=StatechartContext(world=World())
+        data=new_json_data, context=StatechartContext(world=World())
     )
     sequence_copy = msc_copy.get_node_by_index(sequence.index)
     assert [node.name for node in sequence_copy.nodes] == [child.name]
@@ -366,7 +366,7 @@ def test_children_of_compiled_goal_are_its_children_once_after_json_round_trip(
     new_json_data = json.loads(json.dumps(msc.to_json()))
 
     msc_copy = Statechart.from_json(
-        new_json_data, context=StatechartContext(world=World())
+        data=new_json_data, context=StatechartContext(world=World())
     )
     sequence_copy = msc_copy.get_node_by_index(sequence.index)
     assert sequence_copy.nodes == [
@@ -382,7 +382,8 @@ def assert_children_keep_their_order_after_json_round_trip(
     order `sequence` holds them.
     """
     msc_copy = Statechart.from_json(
-        json.loads(json.dumps(msc.to_json())), context=StatechartContext(world=World())
+        data=json.loads(json.dumps(msc.to_json())),
+        context=StatechartContext(world=World()),
     )
     sequence_copy = msc_copy.get_node_by_index(sequence.index)
     assert sequence_copy.nodes == [
@@ -421,7 +422,7 @@ def test_node_referenced_by_another_node_is_one_instance_after_json_round_trip()
     new_json_data = json.loads(json.dumps(msc.to_json()))
 
     msc_copy = Statechart.from_json(
-        new_json_data, context=StatechartContext(world=World())
+        data=new_json_data, context=StatechartContext(world=World())
     )
     watching_copy = msc_copy.get_node_by_index(watching.index)
     assert watching_copy.watched_node is msc_copy.get_node_by_index(watched.index)
@@ -456,11 +457,11 @@ def test_a_statechart_refers_to_world_entities_by_reference(
 
     assert json_data[StatechartJSONKey.NODES][node.index][
         "world_entity"
-    ] == WorldEntityReferenceWriter().write_reference(world_entity)
+    ] == WorldEntityReferenceWriter().write_reference(obj=world_entity)
 
     tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
     msc_copy = Statechart.from_json(
-        json_data,
+        data=json_data,
         context=StatechartContext(world=mini_world),
         **tracker.create_kwargs(),
     )
@@ -476,7 +477,8 @@ def assert_conditions_survive_json_round_trip(msc: Statechart) -> None:
     that every node of both ends up with the same conditions.
     """
     msc_copy = Statechart.from_json(
-        json.loads(json.dumps(msc.to_json())), context=StatechartContext(world=World())
+        data=json.loads(json.dumps(msc.to_json())),
+        context=StatechartContext(world=World()),
     )
 
     msc.compiler.compile()
@@ -557,7 +559,7 @@ def test_condition_naming_an_unknown_variable_is_rejected() -> None:
 
     with pytest.raises(UnknownConditionVariableError):
         Statechart.from_json(
-            json.loads(document), context=StatechartContext(world=World())
+            data=json.loads(document), context=StatechartContext(world=World())
         )
 
 
@@ -597,7 +599,8 @@ def test_condition_using_unsupported_syntax_is_rejected(
 
     with pytest.raises(UnsupportedConditionSyntaxError):
         Statechart.from_json(
-            json.loads(json.dumps(document)), context=StatechartContext(world=World())
+            data=json.loads(json.dumps(document)),
+            context=StatechartContext(world=World()),
         )
 
 
@@ -626,7 +629,8 @@ def test_written_conditions_of_a_compiled_statechart_survive_json_round_trip(
     statechart_executor.compile(statechart=msc)
 
     msc_copy = Statechart.from_json(
-        json.loads(json.dumps(msc.to_json())), context=StatechartContext(world=World())
+        data=json.loads(json.dumps(msc.to_json())),
+        context=StatechartContext(world=World()),
     )
     StatechartExecutor(msc_copy.context).compile(statechart=msc_copy)
 
@@ -650,7 +654,7 @@ def test_state_of_an_executed_json_parsed_statechart_survives_json_round_trip(
     msc.add_node(EndStatechart.when_true(second))
     executor = StatechartExecutor(context=StatechartContext(world=World()))
     msc_copy = Statechart.from_json(
-        json.loads(json.dumps(msc.to_json())), context=executor.context
+        data=json.loads(json.dumps(msc.to_json())), context=executor.context
     )
     executor.compile(statechart=msc_copy)
     executor.tick_until_end()
@@ -661,7 +665,7 @@ def test_state_of_an_executed_json_parsed_statechart_survives_json_round_trip(
     ]
 
     state_copy = state_type.from_json(
-        json.loads(json.dumps(state.to_json())), statechart=msc_copy
+        data=json.loads(json.dumps(state.to_json())), statechart=msc_copy
     )
 
     assert state_copy == state

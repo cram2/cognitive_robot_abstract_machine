@@ -18,7 +18,9 @@ from krrood.entity_query_language.verbalization.vocabulary.english import Punctu
 
 
 def _text(fragment) -> str:
-    return flatten_fragment_to_plain_text(OrthographyProcessor().process(fragment))
+    return flatten_fragment_to_plain_text(
+        OrthographyProcessor().process(fragment=fragment)
+    )
 
 
 def test_comma_hugs_the_preceding_token():

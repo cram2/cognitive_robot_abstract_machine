@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from krrood.symbol_graph.symbol_graph import Symbol
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsolatedTypeAlpha(Symbol):
     """
     An isolated type used for forward reference testing.
@@ -22,7 +22,7 @@ class IsolatedTypeAlpha(Symbol):
     alpha_value: str = ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsolatedTypeBeta(Symbol):
     """
     Another isolated type used for forward reference testing.

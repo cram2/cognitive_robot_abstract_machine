@@ -63,7 +63,7 @@ class ExitStatus(IntEnum):
 # %% command line
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CommandLine:
     """
     The ``krrood`` command line: its subcommands, their arguments and running the one a
@@ -76,7 +76,7 @@ class CommandLine:
     """
 
     @classmethod
-    def main(cls, command_line: Sequence[str] | None = None) -> int:
+    def main(cls, *, command_line: Sequence[str] | None = None) -> int:
         """
         Run the subcommand the command line names.
 
@@ -87,7 +87,7 @@ class CommandLine:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
         interface = cls()
         arguments = interface.parser.parse_args(command_line)
-        return arguments.run(arguments)
+        return arguments.run(arguments=arguments)
 
     @cached_property
     def parser(self) -> argparse.ArgumentParser:
@@ -129,18 +129,20 @@ class CommandLine:
 
         return parser
 
-    def format_files(self, arguments: argparse.Namespace) -> ExitStatus:
+    def format_files(self, *, arguments: argparse.Namespace) -> ExitStatus:
         """
         Format the files named on the command line.
 
         :param arguments: The parsed command line.
         :return: :attr:`ExitStatus.FAILURE` if any file was modified.
         """
-        if DocstringFormatter().format_files(arguments.files):
+        if DocstringFormatter().format_files(paths=arguments.files):
             return ExitStatus.FAILURE
         return ExitStatus.SUCCESS
 
-    def generate_agents_instructions(self, arguments: argparse.Namespace) -> ExitStatus:
+    def generate_agents_instructions(
+        self, *, arguments: argparse.Namespace
+    ) -> ExitStatus:
         """
         Generate, or with :attr:`Option.CHECK` verify, the ``AGENTS.md`` of the current
         directory.
@@ -148,7 +150,7 @@ class CommandLine:
         :param arguments: The parsed command line.
         :return: :attr:`ExitStatus.FAILURE` if the file was rewritten or is stale.
         """
-        instructions = AgentsInstructions.from_repository(Path.cwd())
+        instructions = AgentsInstructions.from_repository(repository_root=Path.cwd())
         if arguments.check:
             if instructions.is_current():
                 return ExitStatus.SUCCESS
@@ -165,7 +167,7 @@ class CommandLine:
             return ExitStatus.FAILURE
         return ExitStatus.SUCCESS
 
-    def check_files(self, arguments: argparse.Namespace) -> ExitStatus:
+    def check_files(self, *, arguments: argparse.Namespace) -> ExitStatus:
         """
         Report the code in the files named on the command line that breaks a rule a
         checker enforces.
@@ -173,11 +175,11 @@ class CommandLine:
         :param arguments: The parsed command line.
         :return: :attr:`ExitStatus.FAILURE` if any code breaks a rule.
         """
-        instructions = AgentsInstructions.from_repository(Path.cwd())
-        staged = None if arguments.all_lines else StagedLines(Path.cwd())
-        violations = CodeRulesCheck(instructions.checkers, staged).violations(
-            arguments.files
-        )
+        instructions = AgentsInstructions.from_repository(repository_root=Path.cwd())
+        staged = None if arguments.all_lines else StagedLines(repository=Path.cwd())
+        violations = CodeRulesCheck(
+            checkers=instructions.checkers, staged=staged
+        ).violations(paths=arguments.files)
         for violation in violations:
             logger.error(violation.render())
         if violations:

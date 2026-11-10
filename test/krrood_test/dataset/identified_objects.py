@@ -13,7 +13,7 @@ from krrood.patterns.identifier_and_name import HasID, HasName
 # %% objects referred to by identifier
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Landmark(HasID, HasName[str]):
     """
     A named object that documents refer to instead of containing it.
@@ -30,7 +30,7 @@ class Landmark(HasID, HasName[str]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnnamedMarker(HasID):
     """
     An object that documents refer to by its identifier alone, having no name.
@@ -42,18 +42,20 @@ class UnnamedMarker(HasID):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LandmarkTracker(DeserializedObjectTracker[UUID, Landmark]):
     """
     The landmarks the reader of a document already has.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LandmarkReference(ObjectReference):
     """
     How a document points at a :class:`Landmark` or an :class:`UnnamedMarker`.
     """
 
-    def resolve(self, data: dict[str, Any], **kwargs) -> Landmark:
-        return LandmarkTracker.from_kwargs(kwargs).get(from_json(data[self.id_key]))
+    def resolve(self, *, data: dict[str, Any], **kwargs) -> Landmark:
+        return LandmarkTracker.from_kwargs(from_json_kwargs=kwargs).get(
+            key=from_json(data[self.id_key])
+        )

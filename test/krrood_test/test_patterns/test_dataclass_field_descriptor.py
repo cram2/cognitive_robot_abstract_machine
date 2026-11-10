@@ -35,9 +35,9 @@ def test_field_keeps_its_declared_default():
 
 
 def test_field_keeps_its_metadata():
-    assert JSONMetadata.of_field(HolderOfValueKeptInStorage, "value") == JSONMetadata(
-        serialize=False
-    )
+    assert JSONMetadata.of_field(
+        clazz=HolderOfValueKeptInStorage, field_name="value"
+    ) == JSONMetadata(serialize=False)
 
 
 def test_descriptor_is_read_on_the_class():

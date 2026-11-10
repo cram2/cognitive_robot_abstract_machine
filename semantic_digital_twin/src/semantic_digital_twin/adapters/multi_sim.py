@@ -1761,7 +1761,7 @@ class MujocoConnectionJoints(Generic[ConnectionType], SubClassSafeGeneric, ABC):
         for realisation in recursive_subclasses(cls) + [cls]:
             try:
                 realised_type = realisation.get_type_of_generic_parameter(
-                    ConnectionType
+                    parameter=ConnectionType
                 )
             except UnboundGenericParameter:
                 continue

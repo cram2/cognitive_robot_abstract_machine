@@ -15,7 +15,7 @@ from ..dataset.example_classes import (
 @pytest.fixture
 def diagram() -> ClassDiagram:
     return ClassDiagram(
-        [
+        classes=[
             KRROODPosition,
             KRROODPositions,
             KRROODPositionsSubclassWithAnotherKRROODPosition,
@@ -28,7 +28,7 @@ def diagram() -> ClassDiagram:
 
 
 def test_every_association_between_two_classes_is_keyed(diagram):
-    aggregator = diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
+    aggregator = diagram.get_wrapped_class(clazz=DoubleKRROODPositionAggregator)
 
     assert diagram.get_association_keys_by_source(include_field_name=True)[
         aggregator.index
@@ -51,12 +51,12 @@ def test_the_diagram_without_inherited_associations_leaves_the_diagram_unchanged
 
 def test_only_inherited_associations_are_left_out(diagram):
     subclass = diagram.get_wrapped_class(
-        KRROODPositionsSubclassWithAnotherKRROODPosition
+        clazz=KRROODPositionsSubclassWithAnotherKRROODPosition
     )
     inherited = {
         association.wrapped_field.name
         for association in diagram.associations
-        if association.source == diagram.get_wrapped_class(KRROODPositions)
+        if association.source == diagram.get_wrapped_class(clazz=KRROODPositions)
     }
 
     subdiagram = diagram.to_subdiagram_without_inherited_associations(
@@ -78,25 +78,27 @@ def test_only_inherited_associations_are_left_out(diagram):
 
 
 def test_an_added_relation_is_among_the_outgoing_relations(diagram):
-    position = diagram.get_wrapped_class(KRROODPosition)
-    diagram.get_out_edges(position)
+    position = diagram.get_wrapped_class(clazz=KRROODPosition)
+    diagram.get_out_edges(cls=position)
     relation = Inheritance(
-        position, diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
+        source=position,
+        target=diagram.get_wrapped_class(clazz=DoubleKRROODPositionAggregator),
     )
 
-    diagram.add_relation(relation)
+    diagram.add_relation(relation=relation)
 
-    assert relation in diagram.get_out_edges(position)
+    assert relation in diagram.get_out_edges(cls=position)
 
 
 def test_a_removed_relation_is_no_longer_among_the_outgoing_relations(diagram):
-    position = diagram.get_wrapped_class(KRROODPosition)
+    position = diagram.get_wrapped_class(clazz=KRROODPosition)
     relation = Inheritance(
-        position, diagram.get_wrapped_class(DoubleKRROODPositionAggregator)
+        source=position,
+        target=diagram.get_wrapped_class(clazz=DoubleKRROODPositionAggregator),
     )
-    diagram.add_relation(relation)
-    diagram.get_out_edges(position)
+    diagram.add_relation(relation=relation)
+    diagram.get_out_edges(cls=position)
 
-    diagram.remove_relation(relation)
+    diagram.remove_relation(relation=relation)
 
-    assert relation not in diagram.get_out_edges(position)
+    assert relation not in diagram.get_out_edges(cls=position)

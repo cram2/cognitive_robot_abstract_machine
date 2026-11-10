@@ -99,8 +99,8 @@ query = set_of(r.type, count(r), average(r.battery)) \
     .where(r.online) \
     .grouped_by(r.type) \
     .having(count(r) > 2) \
-    .ordered_by(average(r.battery), descending=True) \
-    .limit(5)
+    .ordered_by(variable=average(r.battery), descending=True) \
+    .limit(n=5)
 ```
 
 ```{warning}

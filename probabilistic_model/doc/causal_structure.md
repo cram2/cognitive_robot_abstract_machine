@@ -45,7 +45,7 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
 - `graph.CausalGraph` holds a graph whose edges may be directed or undirected. An
   undirected edge is one the data cannot orient, so the graph stands for every
   directed acyclic graph that orients those edges without adding a collider:
-  `member_graphs()` lists them.
+  `member_graphs()` lists them, up to `maximum_member_graphs` of them.
 - `identification.AdjustmentSelector` checks the adjustment criterion (Shpitser,
   VanderWeele and Robins, 2010; Perković et al., 2015) in every member graph. Its
   `identify` returns one of:
@@ -63,9 +63,13 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
   keeps a valid declared set and otherwise prefers the valid sets that drop the fewest
   of its nodes.
 - `learning.PeterClarkStructureLearner` runs the Peter-Clark algorithm through
-  causal-learn on the rows, discretized into a few levels per column, and
-  `learning.RelationalCausalStructureLearner` does the same on a relational circuit's
-  class table and part tables. A part attribute becomes one node for every
+  causal-learn on the rows, discretized into a few levels per column.
+  `learning.GreedyEquivalenceSearchStructureLearner` runs greedy equivalence search
+  with the Bayesian Dirichlet equivalent uniform score instead; it needs at least three
+  columns that vary, and the domain causal knowledge only orients the edges it leaves
+  undirected.
+  `learning.RelationalCausalStructureLearner` does the same with either learner on a
+  relational circuit's class table and part tables. A part attribute becomes one node for every
   part of its collection. The learned edges are kept as causal relations of the class
   in `krrood`'s class diagram.
 - `domain_causal_knowledge.DomainCausalKnowledge` carries what the data cannot settle:

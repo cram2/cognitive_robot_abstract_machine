@@ -702,7 +702,7 @@ class IsolatedBenchmarkSession(AbstractContextManager):
     def __enter__(self) -> IsolatedBenchmarkSession:
         SymbolGraph.clear()
         self._class_diagram = ClassDiagram(
-            recursive_subclasses(Symbol) + [World],
+            classes=recursive_subclasses(Symbol) + [World],
             introspector=DescriptorAwareIntrospector(),
         )
         SymbolGraph(_class_diagram=self._class_diagram)

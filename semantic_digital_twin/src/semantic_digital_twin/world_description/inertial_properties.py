@@ -24,7 +24,7 @@ class NPMatrix3x3(SubclassJSONSerializer):
         return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(data=np.array(data["data"]))
 
 
@@ -62,7 +62,7 @@ class NPVector3(SubclassJSONSerializer):
         return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any]) -> Self:
+    def _from_json(cls, *, data: dict[str, Any]) -> Self:
         return cls(data=np.array(data["data"]))
 
 

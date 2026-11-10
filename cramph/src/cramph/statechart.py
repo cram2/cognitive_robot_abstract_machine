@@ -971,7 +971,7 @@ class Statechart(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(
-        cls, data: dict[str, Any], *, context: StatechartContext, **kwargs: Any
+        cls, *, data: dict[str, Any], context: StatechartContext, **kwargs: Any
     ) -> Self:
         """
         Reconstructs a statechart from its JSON representation, as produced by
@@ -1016,12 +1016,12 @@ class Statechart(SubclassJSONSerializer):
         Registers the written nodes, then their transition conditions, then hands every
         goal holding one of them its children in the order it was written with.
         """
-        DeserializedNodeTracker.from_kwargs(kwargs)
+        DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         for json_data in data[StatechartJSONKey.NODES]:
             node = from_json(json_data, **kwargs)
             self._register_node(node)
         for json_data in data[StatechartJSONKey.CONDITIONS]:
-            transition = TransitionCondition.from_json(json_data, **kwargs)
+            transition = TransitionCondition.from_json(data=json_data, **kwargs)
             transition.owner._set_transition(transition)
         for parent_index, child_indices in data[StatechartJSONKey.CHILDREN].items():
             # JSON writes the integer keys as strings

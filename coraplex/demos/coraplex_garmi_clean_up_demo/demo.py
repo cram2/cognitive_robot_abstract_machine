@@ -565,7 +565,11 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             Pose, domain=[Pose(reference_frame=arm._robot.root)]
         )
         return flat_variable(
-            GraspsByCloseness(graspable, where_the_robot_stands, number_of_grasps=None)
+            GraspsByCloseness(
+                graspable=graspable,
+                standing_position=where_the_robot_stands,
+                number_of_grasps=None,
+            )
         )
 
     def _lay_the_milk_into_the_drawer(

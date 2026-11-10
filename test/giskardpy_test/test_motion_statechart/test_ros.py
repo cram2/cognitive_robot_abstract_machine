@@ -40,7 +40,7 @@ def to_and_from_json(
     tracker = WorldEntityWithIDKwargsTracker.from_world(target_executor.context.world)
     kwargs = tracker.create_kwargs()
     return Statechart.from_json(
-        new_json_data, context=target_executor.context, **kwargs
+        data=new_json_data, context=target_executor.context, **kwargs
     )
 
 

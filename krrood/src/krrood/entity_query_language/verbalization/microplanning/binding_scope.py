@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BindingScope:
     """
     The deferred-constraint frame stack and the field-reference override map used when
@@ -55,7 +55,7 @@ class BindingScope:
         """
         return self.constraint_frames.pop() if self.constraint_frames else []
 
-    def defer_constraint(self, expression: SymbolicExpression) -> None:
+    def defer_constraint(self, *, expression: SymbolicExpression) -> None:
         """
         Defer *expression* into the top constraint frame; a no-op when no frame is open.
 

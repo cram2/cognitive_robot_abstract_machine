@@ -18,7 +18,7 @@ from krrood.ormatic.utils import classproperty
 # %% code named by rules
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CodeReference:
     """
     A module, class or function a rule names, rendered as inline Markdown code, so the

@@ -160,7 +160,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         cache_key = (method_name, *identifier)
         if cache_key not in self._symbol_cache:
             symbol = creator_func()
-            self.float_variable_data.register_expression(symbol)
+            self.float_variable_data.register_expression(expression=symbol)
             self._symbol_cache[cache_key] = symbol
         return self._symbol_cache[cache_key]
 
