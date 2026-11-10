@@ -17,7 +17,7 @@ import dataclasses
 import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import Any, Dict, List, Optional, Set, Tuple, Type
+from typing_extensions import Any, Dict, List, Set, Tuple, Type
 from uuid import UUID
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
@@ -200,7 +200,7 @@ class CornerCaseStore:
     Default: :class:`AsdictCaseSerializer`.
     """
 
-    def record(self, node: SymbolicExpression, case: Any) -> None:
+    def record_corner_case(self, node: SymbolicExpression, case: Any) -> None:
         """
         Record ``case`` as the corner case for the rule whose condition is ``node``.
 
@@ -209,7 +209,7 @@ class CornerCaseStore:
         """
         self.cases[node._id_] = case
 
-    def get(self, node_id: Optional[UUID]) -> Optional[Any]:
+    def get_corner_case_for_node(self, node_id: UUID | None) -> Any | None:
         """
         Return the corner case recorded for ``node_id``, or ``None`` if absent.
 

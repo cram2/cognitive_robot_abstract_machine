@@ -106,30 +106,30 @@ def test_from_data_reconstructs_a_nested_dataclass_from_an_asdict_style_mapping(
     assert rebuilt == _rex()
 
 
-# %% CornerCaseStore.record / get
+# %% CornerCaseStore.record_corner_case / get_corner_case_for_node
 
 
-def test_get_returns_the_case_recorded_for_a_node():
+def test_get_corner_case_for_node_returns_the_case_recorded_for_a_node():
     animal = variable(Animal, domain=[])
     store = CornerCaseStore()
     case = _rex()
 
-    store.record(animal, case)
+    store.record_corner_case(animal, case)
 
-    assert store.get(animal._id_) is case
+    assert store.get_corner_case_for_node(animal._id_) is case
 
 
-def test_get_returns_none_for_a_node_with_no_recorded_case():
+def test_get_corner_case_for_node_returns_none_for_a_node_with_no_recorded_case():
     animal = variable(Animal, domain=[])
     store = CornerCaseStore()
 
-    assert store.get(animal._id_) is None
+    assert store.get_corner_case_for_node(animal._id_) is None
 
 
-def test_get_returns_none_for_a_none_node_id():
+def test_get_corner_case_for_node_returns_none_for_a_none_node_id():
     store = CornerCaseStore()
 
-    assert store.get(None) is None
+    assert store.get_corner_case_for_node(None) is None
 
 
 # %% CornerCaseStore.to_ordered_sources / from_ordered_cases
@@ -139,7 +139,7 @@ def test_to_ordered_sources_only_includes_nodes_with_a_recorded_case():
     with_case = variable(Animal, domain=[])
     without_case = variable(Animal, domain=[])
     store = CornerCaseStore()
-    store.record(with_case, _rex())
+    store.record_corner_case(with_case, _rex())
 
     sources = store.to_ordered_sources([with_case, without_case])
 
@@ -154,5 +154,5 @@ def test_from_ordered_cases_rebuilds_a_store_keyed_by_node_id():
 
     rebuilt = CornerCaseStore.from_ordered_cases([with_case, without_case], {0: case})
 
-    assert rebuilt.get(with_case._id_) == case
-    assert rebuilt.get(without_case._id_) is None
+    assert rebuilt.get_corner_case_for_node(with_case._id_) == case
+    assert rebuilt.get_corner_case_for_node(without_case._id_) is None

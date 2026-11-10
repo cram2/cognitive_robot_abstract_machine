@@ -2,7 +2,7 @@
 Self-contained tests for the underspecified-match adapter
 (:mod:`krrood.entity_query_language.rdr.underspecified`).
 
-Builds real ``Match`` objects directly via the public ``an(Type)(...).from_(domain)``
+Builds real ``Match`` objects directly via the public ``a(Type)(...).from_(domain)``
 factory rather than through :class:`EQLSingleClassRDR`, so this test module -- and the
 underspecified-inference slice it covers -- stays testable independently of the rest of
 the RDR engine.
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 import pytest
 from typing_extensions import List, Optional
 
-from krrood.entity_query_language.factories import an
+from krrood.entity_query_language.factories import a, an
 from krrood.entity_query_language.rdr.exceptions import (
     MultipleInferenceTargets,
     NoInferenceTarget,
@@ -122,7 +122,7 @@ def test_multiple_ellipsis_attributes_raise_multiple_inference_targets():
 
 
 def test_unbounded_iterable_ellipsis_attribute_raises_unsupported_inference_target():
-    match = an(TaggedAnimal)(tags=...).from_([TaggedAnimal("cat", tags=["fluffy"])])
+    match = a(TaggedAnimal)(tags=...).from_([TaggedAnimal("cat", tags=["fluffy"])])
     parser = RippleDownRulesMatchParser(match)
 
     with pytest.raises(UnsupportedInferenceTarget) as error:
@@ -132,7 +132,7 @@ def test_unbounded_iterable_ellipsis_attribute_raises_unsupported_inference_targ
 
 
 def test_a_target_on_a_case_type_that_is_not_a_dataclass_is_undeclared():
-    match = an(PlainAnimal)(species=...).from_([PlainAnimal("cat")])
+    match = a(PlainAnimal)(species=...).from_([PlainAnimal("cat")])
     parser = RippleDownRulesMatchParser(match)
 
     with pytest.raises(UndeclaredInferenceTarget) as error:
