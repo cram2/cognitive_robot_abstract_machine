@@ -57,7 +57,6 @@ from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     CalledMatchAfterResolution,
     CalledMatchMultipleTimes,
-    DomainExpressionAfterWhereCondition,
     MatchTypeCannotBeDetermined,
     PositionalArgumentsInMatchPattern,
     NoAttributeWithAccessPathName,
@@ -65,6 +64,7 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
+from krrood.entity_query_language.query.query import MatchedEntity
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
@@ -371,14 +371,12 @@ class Match(
         own namespace - its modifiers, ``build``, ``evaluate`` - can stand in for a
         matched class's field of the same name.
         """
-        from krrood.entity_query_language.factories import entity
-
         if self._expression is not None:
             return self._expression
 
         if not self._resolved_:
             self.resolve()
-        entity_ = entity(self._variable_)
+        entity_ = MatchedEntity(_selected_variables_=(self._variable_,))
         if self._conditions_:
             entity_ = entity_.where(*self._conditions_)
         entity_._quantify_(self._quantifier_type_)
@@ -402,8 +400,6 @@ class Match(
         """
         parent = parent or self
         self._update_fields_(variable, parent)
-        if variable is None and self._domain_holds_other_types_:
-            self._conditions_.append(HasType(self._variable_, self._type_))
         for attr_name, attr_assigned_value in self._kwargs_.items():
             if isinstance(attr_assigned_value, (list, tuple)) and any(
                 isinstance(element, AbstractMatchExpression)
@@ -416,17 +412,6 @@ class Match(
                 attribute_name=attr_name,
                 assigned_value=attr_assigned_value,
             )
-
-    @property
-    def _domain_holds_other_types_(self) -> bool:
-        """
-        :return: Whether this match's domain is an expression whose elements are not
-            all instances of the matched type, so the match keeps only those that are.
-        """
-        if not isinstance(self._domain_, HasSymbolicOperations):
-            return False
-        element_type = self._variable_._type_
-        return not (isclass(element_type) and issubclass(element_type, self._type_))
 
     def _create_attribute_match_and_resolve(
         self,
@@ -500,21 +485,11 @@ class Match(
         ``__call__`` eagerly created one), its domain is updated in place instead of
         replacing the variable outright: conditions built earlier against ``self._variable_``
         (for example from an already-recorded ``where``) reference that same object, so
-        replacing it would silently orphan them from the re-scoped domain. An expression
-        domain makes the subject the flattening of the expression, which replaces the
-        subject variable.
-
-        :raises DomainExpressionAfterWhereCondition: If the domain is an expression and a
-            ``where`` condition already refers to the subject variable.
+        replacing it would silently orphan them from the re-scoped domain.
         """
-        from krrood.entity_query_language.factories import variable, variable_from
-
-        if isinstance(self._domain_, HasSymbolicOperations):
-            if self._where_conditions_:
-                raise DomainExpressionAfterWhereCondition(self)
-            self._variable_ = variable_from(self._domain_)
-            return
         if self._variable_ is None:
+            from krrood.entity_query_language.factories import variable
+
             self._variable_ = variable(self._type_, domain=self._domain_)
             return
 
@@ -854,8 +829,6 @@ class Match(
 
         :param domain: The instances the match ranges over.
         :return: This match, for chaining.
-        :raises DomainExpressionAfterWhereCondition: If ``domain`` is an expression and a
-            ``where`` condition was already recorded on this match.
         """
         self._domain_ = domain
         self._create_or_update_variable_()

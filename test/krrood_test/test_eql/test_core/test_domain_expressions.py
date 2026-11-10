@@ -9,9 +9,6 @@ from dataclasses import dataclass
 
 import pytest
 
-from krrood.entity_query_language.exceptions import (
-    DomainExpressionAfterWhereCondition,
-)
 from krrood.entity_query_language.factories import (
     a,
     flat_variable,
@@ -19,7 +16,6 @@ from krrood.entity_query_language.factories import (
     variable,
     variable_from,
 )
-from krrood.entity_query_language.predicate import HasType
 
 from ...dataset.semantic_world_like_classes import (
     Body,
@@ -108,11 +104,21 @@ def test_match_keeps_only_the_elements_of_its_type(two_worlds):
 
 def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
     world = variable(World, two_worlds.worlds)
-    connection = variable_from(world.connections)
+    connection = a(FixedConnection).from_(world.connections)
 
-    result = (
-        set_of(world, connection).where(HasType(connection, FixedConnection)).tolist()
-    )
+    result = set_of(world, connection).tolist()
+
+    assert [(row[world], row[connection]) for row in result] == [
+        (two_worlds.first, two_worlds.first.connections[0]),
+        (two_worlds.second, two_worlds.second.connections[0]),
+    ]
+
+
+def test_match_selected_before_its_domain_binds_the_domain_expression(two_worlds):
+    world = variable(World, two_worlds.worlds)
+    connection = a(FixedConnection).from_(world.connections)
+
+    result = set_of(connection, world).tolist()
 
     assert [(row[world], row[connection]) for row in result] == [
         (two_worlds.first, two_worlds.first.connections[0]),
@@ -137,13 +143,16 @@ def test_match_with_a_pattern_ranges_over_its_domain_expression(two_worlds):
     assert result == [two_worlds.second.bodies[1]]
 
 
-def test_domain_expression_after_a_where_condition_is_rejected(two_worlds):
+def test_where_condition_before_a_domain_expression_constrains_the_match(
+    two_worlds,
+):
     world = variable(World, two_worlds.worlds)
     body = a(Body)
     body.where(body.name == "handle 2")
 
-    with pytest.raises(DomainExpressionAfterWhereCondition):
-        body.from_(world.bodies)
+    result = body.from_(world.bodies).tolist()
+
+    assert result == [two_worlds.second.bodies[1]]
 
 
 # %% untyped domains

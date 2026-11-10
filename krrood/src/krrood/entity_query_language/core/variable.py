@@ -10,6 +10,7 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
+from inspect import isclass
 
 from typing_extensions import (
     Any,
@@ -33,7 +34,10 @@ from krrood.entity_query_language.core.mapped_variable import (
 )
 from krrood.entity_query_language.evaluation_context import EvaluationContext
 from krrood.entity_query_language.ground_term import CallTerm, GroundTermExpression
-from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
+from krrood.entity_query_language.cache_data import (
+    InstanceFilteredDomain,
+    ReEnterableLazyIterable,
+)
 from krrood.entity_query_language.enums import DomainSource
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.entity_query_language.exceptions import (
@@ -138,12 +142,22 @@ class Variable(CanHaveDomainSource[T]):
     """
     An atomic expression of EQL that has a domain of possible values.
 
-    It can be evaluated to yield values from its domain.
+    It can be evaluated to yield values from its domain. A domain that is an expression
+    gives, for each binding of the expression, the elements of the value it evaluates to
+    that are instances of :attr:`_type_`.
     """
 
-    _domain_: Iterable[T] = field(default_factory=list)
+    _domain_: DomainType = field(default_factory=list)
     """
     The original domain value.
+    """
+
+    _domain_expression_: SymbolicExpression | None = field(
+        init=False, default=None, repr=False
+    )
+    """
+    The expression whose values hold this variable's values, or ``None`` when the domain
+    is a collection of the values themselves.
     """
 
     _re_enterable_domain_generator_: ReEnterableLazyIterable[T] = field(
@@ -165,12 +179,19 @@ class Variable(CanHaveDomainSource[T]):
 
         self._update_domain_(self._domain_)
 
-    def _update_domain_(self, domain):
+    def _update_domain_(self, domain: DomainType) -> None:
         """
-        Set the domain, keeping a :class:`ReEnterableLazyIterable` as it is and reading
-        any other value as the only values of the domain, so a domain that replaces
-        :class:`InstancesOfType` is not extended by the instances an evaluation adds.
+        Set the domain, keeping an expression as the child the values are read from, a
+        :class:`ReEnterableLazyIterable` as it is, and reading any other value as the
+        only values of the domain, so a domain that replaces :class:`InstancesOfType` is
+        not extended by the instances an evaluation adds.
         """
+        if self._domain_expression_ is not None:
+            self._domain_expression_._remove_parent_(self)
+            self._domain_expression_ = None
+        if isinstance(domain, HasSymbolicOperations):
+            self._domain_expression_ = self._update_children_(domain)[0]
+            return
         if isinstance(domain, ReEnterableLazyIterable):
             self._re_enterable_domain_generator_ = domain
             return
@@ -187,14 +208,39 @@ class Variable(CanHaveDomainSource[T]):
         """
         Fetch values from the domain values and yield an OperationResult for each.
         """
+        if self._domain_expression_ is not None:
+            yield from self._evaluate_elements_of_domain_expression_(sources)
+            return
         for v in self._re_enterable_domain_generator_:
             bindings = sources.bindings | {self._id_: v}
             yield self._build_operation_result_(bindings, sources)
 
+    def _evaluate_elements_of_domain_expression_(
+        self, sources: OperationResult
+    ) -> Iterator[OperationResult]:
+        """
+        :param sources: The current bindings.
+        :return: A result for every element of :attr:`_type_` in the value of each
+            binding of :attr:`_domain_expression_`, carrying that binding.
+        """
+        for domain_result in self._domain_expression_._evaluate_(sources):
+            value = domain_result.value
+            elements = value if is_iterable(value) else (value,)
+            if isclass(self._type_):
+                elements = InstanceFilteredDomain(self._type_, elements)
+            for element in elements:
+                bindings = domain_result.bindings | {self._id_: element}
+                yield self._build_operation_result_(bindings, domain_result)
+
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
-        raise NoChildToReplace(self, old_child, new_child)
+        if (
+            self._domain_expression_ is None
+            or self._domain_expression_._id_ != old_child._id_
+        ):
+            raise NoChildToReplace(self, old_child, new_child)
+        self._domain_expression_ = new_child
 
     @cached_property
     def _name_(self) -> str:

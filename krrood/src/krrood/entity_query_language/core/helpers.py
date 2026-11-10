@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from typing_extensions import Any, Iterable
+from typing_extensions import Any
 
 from krrood.entity_query_language.cache_data import InstanceFilteredDomain
-from krrood.entity_query_language.core.variable import InstancesOfType, Literal
+from krrood.entity_query_language.core.mapped_variable import HasSymbolicOperations
+from krrood.entity_query_language.core.variable import (
+    DomainType,
+    InstancesOfType,
+    Literal,
+)
 from krrood.entity_query_language.utils import T, is_iterable
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -16,7 +21,7 @@ def unwrap_if_literal(value: Any) -> Any:
     return value._value_ if isinstance(value, Literal) else value
 
 
-def _resolve_domain(type_: type[T], domain: Iterable[T] | None) -> Iterable[T] | None:
+def _resolve_domain(type_: type[T], domain: DomainType | None) -> DomainType | None:
     """
     Resolve a variable's domain: what :func:`variable` and
     :meth:`~krrood.entity_query_language.query.match.Match._create_or_update_variable_`
@@ -29,8 +34,10 @@ def _resolve_domain(type_: type[T], domain: Iterable[T] | None) -> Iterable[T] |
         Ormatic).
     :return: The given ``domain`` filtered to instances of ``type_``. For a Symbol type
         with no domain given, every instance of ``type_`` in the evaluation instead.
-        Otherwise ``domain`` unchanged.
+        Otherwise, an expression included, ``domain`` unchanged.
     """
+    if isinstance(domain, HasSymbolicOperations):
+        return domain
     if domain is not None and is_iterable(domain):
         return InstanceFilteredDomain(type_, domain)
     if domain is None and issubclass(type_, Symbol):

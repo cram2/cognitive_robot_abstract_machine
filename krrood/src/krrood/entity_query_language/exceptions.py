@@ -1109,28 +1109,6 @@ class CalledMatchMultipleTimes(DataclassException):
 
 
 @dataclass
-class DomainExpressionAfterWhereCondition(UsageError):
-    """
-    Raised when a match is given an expression as its domain after a ``where`` condition
-    was recorded on it.
-    """
-
-    match: Match
-    """
-    The match whose domain was set.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Match '{self.match}' was given an expression as its domain after a where "
-            f"condition, which refers to the match's previous subject variable."
-        )
-
-    def suggest_correction(self) -> str:
-        return "Call from_ before where."
-
-
-@dataclass
 class AmbiguousQuerySubject(UsageError):
     """
     Raised when a condition uses a query that selects several variables as a value,

@@ -76,6 +76,24 @@ specify a domain, and `an(Type)` for nested child attributes. Use `the(...)` ins
 when exactly one solution is expected.
 ```
 
+### A domain that depends on another variable
+
+The domain can also be an expression, such as an attribute of another variable. The match then
+ranges, for each value of that variable, over the instances of its type in the attribute's value:
+
+```python
+world = variable(ExampleWorld, worlds)
+connection = a(FixedConnection).from_(world.connections)
+
+# One row per world and each of its own fixed connections
+rows = set_of(world, connection).tolist()
+```
+
+A match is part of the query it is used in, not a query of its own: `world` takes one value
+per row, wherever it occurs. A query you write yourself with `entity(...)` or `set_of(...)`
+and nest in another one is a scope of its own, so its variables range independently of the
+outer query, as in [aggregation subqueries](aggregators.md).
+
 ## Nested Matching
 
 The real power of the match API comes from nesting. You can describe deeply nested object graphs in a single expression.
