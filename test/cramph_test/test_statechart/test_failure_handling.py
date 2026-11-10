@@ -24,6 +24,7 @@ from cramph.exceptions import (
 from cramph.executor import StatechartExecutor
 from cramph.failure_handling import (
     FailureHandlingNode,
+    FailureHandlingStrategy,
     HandledOnFailure,
     RetryFailedNode,
 )
@@ -88,7 +89,7 @@ class NodeFailingItsFirstRuns(
 
 
 @dataclass
-class StrategyGivingUp:
+class StrategyGivingUp(FailureHandlingStrategy):
     """
     A failure handling strategy that leaves the failed node as it is and records it.
     """
@@ -98,7 +99,7 @@ class StrategyGivingUp:
     The node this strategy was given on every call, in order.
     """
 
-    def __call__(self, failed_node: StatechartNode) -> None:
+    def handle_failure(self, failed_node: StatechartNode) -> None:
         self.failed_nodes.append(failed_node)
 
 
@@ -108,13 +109,13 @@ class StrategyRetrying(StrategyGivingUp):
     A failure handling strategy that records the failed node and runs it again.
     """
 
-    def __call__(self, failed_node: StatechartNode) -> None:
-        super().__call__(failed_node)
+    def handle_failure(self, failed_node: StatechartNode) -> None:
+        super().handle_failure(failed_node)
         failed_node.statechart.request_reset(failed_node)
 
 
 @dataclass
-class StrategyInsertingBeforeTheFailedStep:
+class StrategyInsertingBeforeTheFailedStep(FailureHandlingStrategy):
     """
     A failure handling strategy that runs a new step before the step holding the failed
     node, and then that step again.
@@ -125,7 +126,7 @@ class StrategyInsertingBeforeTheFailedStep:
     The step to insert.
     """
 
-    def __call__(self, failed_node: StatechartNode) -> None:
+    def handle_failure(self, failed_node: StatechartNode) -> None:
         step = ControlStructureNode.step_holding(failed_node)
         step.parent_node.insert_before(step, self.inserted_step)
         failed_node.statechart.request_reset(step)

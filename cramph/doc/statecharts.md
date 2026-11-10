@@ -666,9 +666,9 @@ the statechart keeps ticking and asks again on the next tick.
 ## Handling failures
 
 A `FailureHandlingNode` is attached to the node it observes: it starts once that node failed and
-calls its `failure_handling_strategy` with the failed node in `on_start`. A strategy is any
-callable taking the failed node, and it recovers by changing the plan. A strategy that leaves the
-node failed has given up. The handler succeeds on the next tick, which says the strategy ran and
+hands the failed node to the `handle_failure` of its `failure_handling_strategy` in `on_start`.
+A strategy is a `FailureHandlingStrategy` dataclass, and it recovers by changing the plan. A
+strategy that leaves the node failed has given up. The handler succeeds on the next tick, which says the strategy ran and
 not that it recovered, and is ready again once the observed node was reset.
 
 The handler has to be a sibling of the node it observes, and every control structure reacts to a
@@ -689,7 +689,7 @@ flowchart LR
         handler(["FailureHandlingNode"])
     end
     node -- "start: is_failed<br/>reset: is_not_started" --> handler
-    handler -. "on_start: failure_handling_strategy(handled node)" .-> plan(["the plan"])
+    handler -. "on_start: handle_failure(handled node)" .-> plan(["the plan"])
 ```
 
 `RetryFailedNode` is the strategy running the failed node again, up to `maximum_attempts` times.
@@ -697,8 +697,8 @@ It resets the node with `Statechart.request_reset`, which any strategy may call,
 holding the failed one. A strategy may also insert nodes into the compiled plan; coraplex's
 `RecoveryByInsertion` does that with a plan transformation and then runs the failed step again.
 
-A strategy is usually not serializable, so these nodes only work in a statechart that is ticked
-locally.
+A strategy is sent through JSON with the node holding it. A strategy that changes the structure
+of the plan, such as `RecoveryByInsertion`, only works in a statechart that is ticked locally.
 
 ## Choosing a child while running
 

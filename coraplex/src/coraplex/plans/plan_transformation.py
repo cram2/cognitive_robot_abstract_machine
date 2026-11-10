@@ -313,6 +313,9 @@ class RecoveryByInsertion(LimitedRecovery):
         :attr:`transformation` inserts into, since a compiled node cannot be put below a
         new one: :meth:`InsertionTransformation.apply` raises
         :class:`~cramph.exceptions.StatechartAlreadyCompiledError` otherwise.
+
+    .. warning:: It only works in a locally ticked statechart, since a remote executor
+        does not send the nodes it inserts back.
     """
 
     transformation: InsertionTransformation

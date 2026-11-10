@@ -3,8 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Callable
-
 from cramph.composites import CompositeNodeEndingItsChildren
 from cramph.node import (
     NodeArtifacts,
@@ -17,6 +15,29 @@ from krrood.symbolic_math.symbolic_math import (
     logic_and,
     trinary_if_cases,
 )
+
+# %% failure handling strategies
+
+
+@dataclass
+class FailureHandlingStrategy(ABC):
+    """
+    Changes a plan so that it recovers from the failure of one of its nodes.
+
+    .. note:: A strategy is sent through JSON together with the node holding it, so its
+        private fields start anew on the receiver.
+    """
+
+    @abstractmethod
+    def handle_failure(self, failed_node: StatechartNode) -> None:
+        """
+        Changes the plan so that it recovers from the failure of `failed_node`.
+
+        Leaving that node failed means giving up on it.
+
+        :param failed_node: The node that failed.
+        """
+
 
 # %% reacting to a failure
 
@@ -34,8 +55,8 @@ class FailureHandlingNode(SucceedsOnObservingTrue, StatechartNode):
     Its conditions may only read a sibling, and control structure nodes react to a failed
     child on their own, so inside a plan use :class:`HandledOnFailure` instead.
 
-    .. warning:: A strategy is usually not serializable, so such a node only works in a
-        locally ticked statechart.
+    .. warning:: A strategy that changes the structure of the plan, for example by
+        inserting nodes, only works in a locally ticked statechart.
     """
 
     observed_node: StatechartNode
@@ -43,12 +64,9 @@ class FailureHandlingNode(SucceedsOnObservingTrue, StatechartNode):
     The node whose failure starts this node.
     """
 
-    failure_handling_strategy: Callable[[StatechartNode], None]
+    failure_handling_strategy: FailureHandlingStrategy
     """
-    Called with :attr:`observed_node` when this node starts, to change the plan so that
-    it recovers.
-
-    Leaving that node failed means giving up on it.
+    Handles the failure of :attr:`observed_node` when this node starts.
     """
 
     def __post_init__(self) -> None:
@@ -61,7 +79,7 @@ class FailureHandlingNode(SucceedsOnObservingTrue, StatechartNode):
 
     def on_start(self) -> None:
         with self.statechart.modify(rewrites_compiled_nodes=True):
-            self.failure_handling_strategy(self.observed_node)
+            self.failure_handling_strategy.handle_failure(self.observed_node)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
@@ -75,8 +93,8 @@ class HandledOnFailure(CompositeNodeEndingItsChildren):
 
     A node that cannot fail on its own is rejected, since it would never be handled.
 
-    .. warning:: A strategy is usually not serializable, so such a node only works in a
-        locally ticked statechart.
+    .. warning:: A strategy that changes the structure of the plan, for example by
+        inserting nodes, only works in a locally ticked statechart.
     """
 
     handled_node: StatechartNode
@@ -84,7 +102,7 @@ class HandledOnFailure(CompositeNodeEndingItsChildren):
     The node to run and to recover when it fails.
     """
 
-    failure_handling_strategy: Callable[[StatechartNode], None]
+    failure_handling_strategy: FailureHandlingStrategy
     """
     See :attr:`FailureHandlingNode.failure_handling_strategy`.
     """
@@ -141,7 +159,7 @@ class HandledOnFailure(CompositeNodeEndingItsChildren):
 
 
 @dataclass
-class LimitedRecovery(ABC):
+class LimitedRecovery(FailureHandlingStrategy, ABC):
     """
     A failure handling strategy that tries to recover at most :attr:`maximum_attempts`
     times and gives up after that.
@@ -160,10 +178,7 @@ class LimitedRecovery(ABC):
     How often this strategy tried to recover so far.
     """
 
-    def __call__(self, failed_node: StatechartNode) -> None:
-        """
-        :param failed_node: The node that failed.
-        """
+    def handle_failure(self, failed_node: StatechartNode) -> None:
         if self._attempts_made >= self.maximum_attempts:
             return
         self._attempts_made += 1

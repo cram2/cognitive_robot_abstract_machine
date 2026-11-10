@@ -208,9 +208,9 @@ except RepetitionsExhausted as exhausted:
 
 ## Recovering from a failure
 
-`HandledOnFailure` runs a `failure_handling_strategy` when its child failed. Any callable taking
-the failed node is a strategy; `RetryFailedNode` runs the node again, up to `maximum_attempts`
-times. While the step is being recovered, the sequence holding it keeps running.
+`HandledOnFailure` runs a `failure_handling_strategy` when its child failed. A strategy is a
+`FailureHandlingStrategy` whose `handle_failure` gets the failed node; `RetryFailedNode` runs the
+node again, up to `maximum_attempts` times. While the step is being recovered, the sequence holding it keeps running.
 
 ```{code-cell} ipython3
 from cramph.failure_handling import HandledOnFailure, RetryFailedNode
