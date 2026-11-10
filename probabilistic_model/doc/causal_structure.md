@@ -65,8 +65,9 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
 - `learning.PeterClarkStructureLearner` runs the Peter-Clark algorithm through
   causal-learn on the rows, discretized into a few levels per column.
   `learning.GreedyEquivalenceSearchStructureLearner` runs greedy equivalence search
-  with the BDeu score instead; it needs at least three columns that vary, and the domain
-  causal knowledge only orients the edges it leaves undirected.
+  with the Bayesian Dirichlet equivalent uniform score instead; it needs at least three
+  columns that vary, and the domain causal knowledge only orients the edges it leaves
+  undirected.
   `learning.RelationalCausalStructureLearner` does the same with either learner on a
   relational circuit's class table and part tables. A part attribute becomes one node for every
   part of its collection. The learned edges are kept as causal relations of the class

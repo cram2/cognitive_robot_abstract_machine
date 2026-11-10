@@ -88,7 +88,7 @@ class GraphScore(StrEnum):
     the name causal-learn gives them.
     """
 
-    BAYESIAN_DIRICHLET = "local_score_BDeu"
+    BAYESIAN_DIRICHLET_EQUIVALENT_UNIFORM = "local_score_BDeu"
     """
     The Bayesian Dirichlet equivalent uniform score :cite:p:`heckerman1995learning`.
     """
@@ -289,7 +289,7 @@ class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
         :cite:p:`meek1995causal`.
     """
 
-    score: GraphScore = GraphScore.BAYESIAN_DIRICHLET
+    score: GraphScore = GraphScore.BAYESIAN_DIRICHLET_EQUIVALENT_UNIFORM
     """
     The score of a graph.
     """
