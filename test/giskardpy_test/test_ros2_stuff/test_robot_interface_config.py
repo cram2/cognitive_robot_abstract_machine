@@ -113,7 +113,7 @@ def set_up_standalone(world_source: WorldSource) -> Giskard:
 
 
 def test_standalone_controls_the_joints_tracy_declares(
-    init_rospy, tracy_world, tracy_world_specification
+    init_background_node, tracy_world, tracy_world_specification
 ) -> None:
     giskard = set_up_standalone(tracy_world_specification)
 
@@ -123,7 +123,7 @@ def test_standalone_controls_the_joints_tracy_declares(
 
 
 def test_standalone_controls_the_joints_daisy_declares(
-    init_rospy, daisy_world, daisy_world_specification
+    init_background_node, daisy_world, daisy_world_specification
 ) -> None:
     giskard = set_up_standalone(daisy_world_specification)
 
@@ -133,7 +133,7 @@ def test_standalone_controls_the_joints_daisy_declares(
 
 
 def test_standalone_controls_the_joints_the_pr2_declares(
-    init_rospy, pr2_world_copy, pr2_world_specification
+    init_background_node, pr2_world_copy, pr2_world_specification
 ) -> None:
     giskard = set_up_standalone(pr2_world_specification)
 
@@ -143,7 +143,7 @@ def test_standalone_controls_the_joints_the_pr2_declares(
 
 
 def test_standalone_controls_the_joints_the_hsr_declares(
-    init_rospy, _hsr_world_setup, hsr_world_specification
+    init_background_node, _hsr_world_setup, hsr_world_specification
 ) -> None:
     giskard = set_up_standalone(hsr_world_specification)
 
@@ -153,7 +153,7 @@ def test_standalone_controls_the_joints_the_hsr_declares(
 
 
 def test_standalone_controls_the_joints_stretch_declares(
-    init_rospy, stretch_world_copy, stretch_world_specification
+    init_background_node, stretch_world_copy, stretch_world_specification
 ) -> None:
     giskard = set_up_standalone(stretch_world_specification)
 
@@ -219,7 +219,7 @@ def closed_loop_pr2(
 
 
 def test_a_closed_loop_interface_that_commands_nothing_controls_no_joint(
-    init_rospy,
+    init_background_node,
     pr2_world_specification,
 ) -> None:
     giskard = closed_loop_pr2(
@@ -231,7 +231,7 @@ def test_a_closed_loop_interface_that_commands_nothing_controls_no_joint(
 
 
 def test_closed_loop_controls_exactly_the_commanded_joints(
-    init_rospy, pr2_world_specification
+    init_background_node, pr2_world_specification
 ) -> None:
     interface = GroupCommandingInterface(
         joint_names=[PR2Joint.HEAD_PAN, PR2Joint.HEAD_TILT]
@@ -244,7 +244,7 @@ def test_closed_loop_controls_exactly_the_commanded_joints(
 
 
 def test_closed_loop_does_not_control_a_drive_nothing_commands(
-    init_rospy, pr2_world_specification
+    init_background_node, pr2_world_specification
 ) -> None:
     giskard = closed_loop_pr2(
         GroupCommandingInterface(joint_names=[PR2Joint.HEAD_PAN]),
@@ -271,7 +271,7 @@ class DriveCommandingInterface(ClosedLoopRobotInterfaceConfig):
 
 
 def test_a_drive_command_without_a_drive_commands_the_only_drive_of_the_world(
-    init_rospy,
+    init_background_node,
     pr2_world_specification,
 ) -> None:
     giskard = closed_loop_pr2(DriveCommandingInterface(), pr2_world_specification)
@@ -284,7 +284,7 @@ def test_a_drive_command_without_a_drive_commands_the_only_drive_of_the_world(
 
 
 def test_a_drive_command_without_a_drive_in_a_world_without_a_drive_raises(
-    init_rospy,
+    init_background_node,
     tracy_world_specification,
 ) -> None:
     giskard = Giskard(
@@ -314,7 +314,7 @@ class PartReadingInterface(GroupCommandingInterface):
 
 
 @pytest.fixture()
-def pr2_reading_its_own_parts(init_rospy, pr2_world_specification) -> Giskard:
+def pr2_reading_its_own_parts(init_background_node, pr2_world_specification) -> Giskard:
     """
     A closed-loop Giskard whose PR2 is read from what the robot publishes.
     """
@@ -395,7 +395,7 @@ class BaseReadingInterface(GroupCommandingInterface):
 
 
 @pytest.fixture()
-def pr2_reading_only_its_base(init_rospy, pr2_world_specification) -> Giskard:
+def pr2_reading_only_its_base(init_background_node, pr2_world_specification) -> Giskard:
     """
     A closed-loop Giskard whose PR2 reads only its base from what the robot publishes.
     """
@@ -530,7 +530,7 @@ class JointStateTopicInterface(ClosedLoopRobotInterfaceConfig):
 
 
 def test_closed_loop_does_not_rewrite_a_joint_state_it_already_wrote(
-    init_rospy, mini_world: World
+    init_background_node, mini_world: World
 ):
     [connection] = mini_world.connections
     control_loop_inputs = WorldStateInputs(world=mini_world)

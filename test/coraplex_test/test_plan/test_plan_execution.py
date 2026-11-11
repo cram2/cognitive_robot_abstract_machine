@@ -42,7 +42,7 @@ from krrood.ormatic.data_access_objects.helper import to_dao
 from sqlalchemy import select
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )

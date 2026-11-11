@@ -1,7 +1,8 @@
 from datetime import timedelta
 
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.ros2_interface import get_robot_description
+from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
     DAiSyVelocityInterface,
 )
@@ -12,19 +13,18 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.daisy import DAiSy
 
 
-def create_giskard() -> Giskard:
+def create_giskard(node: Node) -> Giskard:
     """
     Build a Giskard that commands DAiSy, described by what the robot publishes on
     ``/robot_description``.
 
-    .. note:: The ros node has to be initialized first, because the robot description is
-        read from its topic.
+    :param node: The node Giskard runs on, which reads the robot description.
     """
     return Giskard(
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    DAiSy, urdf=get_robot_description()
+                    DAiSy, urdf=RosGraph(node).robot_description()
                 )
             ]
         ),

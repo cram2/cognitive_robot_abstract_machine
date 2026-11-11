@@ -46,9 +46,9 @@ from coraplex.robot_plans.actions.core.robot_body import (
 from coraplex.robot_plans.mixins import ReattachesBranches
 from cramph.composites import Sequence, StatementNode
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.goals.base_pose_goals import HolonomicBaseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from krrood.entity_query_language.core.mapped_variable import FlatVariable
 from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable

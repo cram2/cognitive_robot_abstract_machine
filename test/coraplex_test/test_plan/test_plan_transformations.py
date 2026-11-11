@@ -59,12 +59,12 @@ from cramph.composites import (
 )
 from cramph.context import ContextExtension
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.goals.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianPose,
     CartesianPositionStraight,
 )
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
 from krrood.entity_query_language.factories import a, variable

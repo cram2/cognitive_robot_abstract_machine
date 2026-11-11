@@ -11,10 +11,10 @@ import pytest
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from semantic_digital_twin.collision_checking.collision_rules import (

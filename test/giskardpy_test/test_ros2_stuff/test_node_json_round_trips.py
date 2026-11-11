@@ -30,11 +30,11 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkFlexActionServerTask,
     GriplinkPresetActionServerTask,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import (
+from giskardpy.motion_statechart.ros2_nodes.action_servers import (
     NavigateActionServerTask,
     RobotiqGripperActionServerTask,
 )
-from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
+from giskardpy.motion_statechart.ros2_nodes.topics import (
     PublishOnStart,
     TopicNode,
     TopicPublisherNode,

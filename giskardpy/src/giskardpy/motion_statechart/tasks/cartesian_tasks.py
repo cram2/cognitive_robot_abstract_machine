@@ -1,3 +1,8 @@
+"""
+Tasks moving or holding a tip link relative to a root link in Cartesian space, and the
+nodes limiting how fast it moves.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -46,6 +51,9 @@ from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+
+# %% reaching Cartesian goals
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -1144,3 +1152,48 @@ class CartesianVelocityLimit(Parallel):
         ]
         for position, limit in enumerate(limits):
             self._insert_at(position, limit)
+
+
+# %% reaching a Cartesian pose along a straight line
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class CartesianPoseStraight(CartesianPose):
+    """
+    Differs from
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPose` in moving
+    the tip link along a straight line towards the goal position.
+    """
+
+    weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
+    """
+    Task priority relative to other tasks.
+    """
+
+    def create_tasks(self) -> list[MotionStatechartNode]:
+        """
+        :return: New position and orientation tasks reaching :attr:`goal_pose`, the
+            position along a straight line.
+        """
+        return [
+            CartesianPositionStraight(
+                name=f"{self.name}/position",
+                root_link=self.root_link,
+                tip_link=self.tip_link,
+                goal_point=self.goal_pose.position,
+                cruise_velocity=self.cruise_linear_velocity,
+                threshold=self.translation_threshold,
+                weight=self.weight,
+                binding_policy=self.binding_policy,
+            ),
+            CartesianOrientation(
+                name=f"{self.name}/orientation",
+                root_link=self.root_link,
+                tip_link=self.tip_link,
+                goal_orientation=self.goal_pose.rotation_matrix,
+                cruise_velocity=self.cruise_angular_velocity,
+                threshold=self.orientation_threshold,
+                weight=self.weight,
+                binding_policy=self.binding_policy,
+            ),
+        ]
