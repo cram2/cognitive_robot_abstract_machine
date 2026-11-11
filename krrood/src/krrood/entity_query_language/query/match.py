@@ -61,6 +61,10 @@ from krrood.entity_query_language.exceptions import (
     NoAttributeWithAccessPathName,
     UnboundPatternVariable,
 )
+from krrood.entity_query_language.operators.core_logical_operators import (
+    AND,
+    chained_logic,
+)
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.query.query import MatchedEntity
@@ -357,6 +361,19 @@ class Match(
             matched class.
         """
         return name.startswith("_")
+
+    def _quantifier_operands_(
+        self, condition: ConditionType
+    ) -> tuple[Variable[T], ConditionType]:
+        """
+        Overrides :meth:`Operand._quantifier_operands_`: a quantifier over a match
+        ranges over the variable it describes, and states the pattern and the
+        :meth:`where` conditions of each value together with *condition*.
+        """
+        self.resolve()
+        return self._variable_, chained_logic(
+            AND, *self._conditions_, *self._where_conditions_, condition
+        )
 
     @property
     def _symbolic_expression_(self) -> Entity[T]:

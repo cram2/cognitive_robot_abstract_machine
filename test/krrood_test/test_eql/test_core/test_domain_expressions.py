@@ -12,7 +12,9 @@ import pytest
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import (
     a,
+    exists,
     flat_variable,
+    for_all,
     set_of,
     variable,
     variable_from,
@@ -297,3 +299,43 @@ def test_value_of_undeclared_type_is_read_as_its_runtime_kind(journeys):
     result = variable_from(journey.every_stop()).tolist()
 
     assert result == journeys.planned.every_stop()
+
+
+# %% quantifiers over a match
+
+
+def test_existential_quantifier_over_a_match_ranges_over_its_domain(journeys):
+    """
+    Some extra stop of a journey is the tower, for the journey whose stops are its own.
+    """
+    journey = a(Journey).from_(journeys.journeys)
+    stop = a(Stop).from_(journey.extra_stops)
+
+    result = journey.where(exists(stop, stop.name == journeys.tower.name)).tolist()
+
+    assert result == [journeys.planned]
+
+
+def test_universal_quantifier_over_a_match_ranges_over_its_domain(journeys):
+    """
+    Every extra stop of a journey is the harbour, vacuously so for a journey without
+    extra stops.
+    """
+    journey = a(Journey).from_(journeys.journeys)
+    stop = a(Stop).from_(journey.extra_stops)
+
+    result = journey.where(for_all(stop, stop.name == journeys.harbour.name)).tolist()
+
+    assert result == [journeys.unplanned]
+
+
+def test_quantifier_over_a_match_states_its_pattern(journeys):
+    """
+    A quantifier over a match with a pattern states the pattern of each value.
+    """
+    journey = a(Journey).from_(journeys.journeys)
+    tower = a(Stop)(name=journeys.tower.name).from_(journey.extra_stops)
+
+    result = journey.where(exists(tower, True)).tolist()
+
+    assert result == [journeys.planned]
