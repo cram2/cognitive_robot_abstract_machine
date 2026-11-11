@@ -6,11 +6,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.scripts.iai_robots.hsr.configs import (
-    WorldWithHSRConfig,
-)
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
@@ -23,6 +19,9 @@ from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.robots.hsrb import HSRB
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.specifications.robots import RobotSpecification
 
 
 @pytest.fixture()
@@ -43,9 +42,10 @@ class HSRTester(GiskardTester):
         self.map = self.api.world.root
 
     def setup_giskard(self) -> Giskard:
-        robot_desc = load_xacro("package://hsr_description/robots/hsrb4s.urdf.xacro")
         return Giskard(
-            world_config=WorldWithHSRConfig(urdf=robot_desc),
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(HSRB)]
+            ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),

@@ -14,7 +14,7 @@ from krrood.entity_query_language.query.query import Query
 # %% classified case
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Opening:
     """
     A case the rule tree classifies by its width.
@@ -26,7 +26,7 @@ class Opening:
     """
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class OpeningKind:
     """
     The kind the rule tree concludes for an :class:`Opening`.
@@ -38,14 +38,14 @@ class OpeningKind:
     """
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class NarrowOpeningKind(OpeningKind):
     """
     The kind concluded for an opening narrower than the rule tree's threshold.
     """
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class WideOpeningKind(OpeningKind):
     """
     The kind concluded for an opening wider than the rule tree's threshold.
@@ -55,7 +55,7 @@ class WideOpeningKind(OpeningKind):
 # %% domain evaluated on iteration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KindConcludedOnIteration:
     """
     A variable domain that evaluates a rule tree each time it is iterated, and yields

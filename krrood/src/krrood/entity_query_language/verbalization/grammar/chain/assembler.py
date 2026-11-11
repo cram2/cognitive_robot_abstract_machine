@@ -60,17 +60,19 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
 
     planner = ChainPlanner
 
-    def realize(self, node: MappedVariable, plan: ChainPlan) -> VerbalizationFragment:
+    def realize(
+        self, *, node: MappedVariable, plan: ChainPlan
+    ) -> VerbalizationFragment:
         """
         :param node: The chain to render.
         :param plan: The chain plan computed for *node*.
         :return: The possessive rendering — the unguarded default form.
         """
-        return self.possessive(plan)
+        return self.possessive(plan=plan)
 
     # %% surface forms
 
-    def possessive(self, plan: ChainPlan) -> VerbalizationFragment:
+    def possessive(self, *, plan: ChainPlan) -> VerbalizationFragment:
         """
         :param plan: The analysed chain.
         :return: The possessive path *"the attribute of the Root"*; for a variable root, deferred to
@@ -80,7 +82,7 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         >>> verbalize_expression(variable(Task, []).name)
         'the name of a Task'
         """
-        root_fragment = self._chain_root(plan.root)
+        root_fragment = self._chain_root(root=plan.root)
         if isinstance(plan.root, Variable):
             return PossessiveChain(
                 parts=plan.parts,
@@ -90,7 +92,7 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
             )
         return possessive_path(plan.parts, root_fragment)
 
-    def plural_attribute(self, plan: ChainPlan) -> VerbalizationFragment:
+    def plural_attribute(self, *, plan: ChainPlan) -> VerbalizationFragment:
         """
         :param plan: The analysed chain (a single attribute on a variable — see
             :attr:`ChainPlan.is_single_variable_attribute`).
@@ -103,18 +105,18 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         # The root's plural noun phrase ("Robots" / "Robot 2") is the variable rule's job; recurse
         # for it rather than rebuilding its number/definiteness/label here.
         root_noun_phrase = self.context.child(
-            plan.root, number=GrammaticalNumber.PLURAL
+            node=plan.root, number=GrammaticalNumber.PLURAL
         )
         return NounPhrase(
             head=RoleFragment.for_attribute(
-                attribute._owner_class_, attribute._attribute_name_
+                owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
             ),
             number=GrammaticalNumber.PLURAL,
             definiteness=Definiteness.INDEFINITE,
             modifiers=[Prepositions.OF.as_fragment(), root_noun_phrase],
         )
 
-    def _chain_root(self, root: SymbolicExpression) -> VerbalizationFragment:
+    def _chain_root(self, *, root: SymbolicExpression) -> VerbalizationFragment:
         """
         :param root: The chain root.
         :return: The noun phrase for the chain root. Recursed in ``inline`` position, so an entity
@@ -124,10 +126,10 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         >>> verbalize_expression(variable(Mission, []).assigned_to)
         'the Robot to which a Mission is assigned'
         """
-        return self.context.child(root, inline=True)
+        return self.context.child(node=root, inline=True)
 
     def boolean_predicative(
-        self, plan: ChainPlan, negated: bool = False
+        self, *, plan: ChainPlan, negated: bool = False
     ) -> VerbalizationFragment:
         """
         :param plan: The analysed chain (a boolean terminal — see
@@ -140,13 +142,13 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         >>> verbalize_expression(variable(Robot, []).operational)
         'a Robot is operational'
         """
-        navigation_fragment, terminal = self._boolean_navigation(plan)
+        navigation_fragment, terminal = self._boolean_navigation(plan=plan)
         predicate = resolve_boolean_predicate(terminal)
         return boolean_predicate_clause(
             navigation_fragment, predicate, terminal, negated=negated
         )
 
-    def boolean_alternative(self, plan: ChainPlan) -> VerbalizationFragment:
+    def boolean_alternative(self, *, plan: ChainPlan) -> VerbalizationFragment:
         """
         :param plan: The analysed boolean-terminal chain.
         :return: The unconstrained-boolean predicative *"<navigation> is either <attribute> or not"* —
@@ -156,11 +158,11 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         >>> verbalize_expression(variable(Task, []).completed == variable(bool, [True, False]))
         'a Task is either completed or not'
         """
-        navigation_fragment, terminal = self._boolean_navigation(plan)
+        navigation_fragment, terminal = self._boolean_navigation(plan=plan)
         predicate = resolve_boolean_predicate(terminal)
         return boolean_alternative_clause(navigation_fragment, predicate, terminal)
 
-    def _boolean_navigation(self, plan: ChainPlan) -> tuple:
+    def _boolean_navigation(self, *, plan: ChainPlan) -> tuple:
         """:return: ``(navigation_fragment, terminal)`` for a boolean-terminal chain — the navigation
         prefix and the terminal attribute node, shared by the predicative and the open-alternative
         forms.
@@ -175,5 +177,5 @@ class ChainAssembler(Assembler[MappedVariable, ChainPlan]):
         'the first task of a Worker is completed'
         """
         terminal = boolean_terminal_attribute(plan.chain)
-        navigation_fragment = self.context.child(terminal._child_, inline=True)
+        navigation_fragment = self.context.child(node=terminal._child_, inline=True)
         return navigation_fragment, terminal

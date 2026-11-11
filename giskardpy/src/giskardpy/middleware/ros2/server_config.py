@@ -1,3 +1,7 @@
+"""
+Configuration of the goal lifecycle of the Giskard motion server.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

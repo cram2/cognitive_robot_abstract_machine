@@ -15,7 +15,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RecognizedGroup(Symbol):
     name: str
 
@@ -26,15 +26,15 @@ class RecognizedGroup(Symbol):
         return hash(self.name)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Company(RecognizedGroup): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Country(RecognizedGroup): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Person(Symbol):
     name: str
     works_for: RecognizedGroup = None
@@ -44,77 +44,78 @@ class Person(Symbol):
         return hash(self.name)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CEOAsFirstRole(Role[Person], Symbol):
     head_of: RecognizedGroup = None
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RepresentativeAsSecondRole(Role[CEOAsFirstRole], Symbol):
     representative_of: RecognizedGroup = None
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class DelegateAsThirdRole(Role[RepresentativeAsSecondRole], Symbol):
     delegate_of: RecognizedGroup = field(kw_only=True, default=None)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Member(PropertyDescriptor, HasInverseProperty):
-
     @classmethod
     def get_inverse(cls) -> Type[MemberOf]:
         return MemberOf
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MemberOf(PropertyDescriptor, HasInverseProperty):
     @classmethod
     def get_inverse(cls) -> Type[Member]:
         return Member
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorksFor(MemberOf):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HeadOf(WorksFor):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RepresentativeOf(HeadOf):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DelegateOf(RepresentativeOf):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubOrganizationOf(PropertyDescriptor, TransitiveProperty): ...
 
 
 # Person fields' descriptors
-Person.works_for = WorksFor(Person, "works_for")
-Person.member_of = MemberOf(Person, "member_of")
+Person.works_for = WorksFor(domain=Person, field_name="works_for")
+Person.member_of = MemberOf(domain=Person, field_name="member_of")
 
 # CEO fields' descriptors
-CEOAsFirstRole.head_of = HeadOf(CEOAsFirstRole, "head_of")
+CEOAsFirstRole.head_of = HeadOf(domain=CEOAsFirstRole, field_name="head_of")
 
 # Representative fields' descriptors
 RepresentativeAsSecondRole.representative_of = RepresentativeOf(
-    RepresentativeAsSecondRole, "representative_of"
+    domain=RepresentativeAsSecondRole, field_name="representative_of"
 )
 
 # Delegate fields' descriptors
-DelegateAsThirdRole.delegate_of = DelegateOf(DelegateAsThirdRole, "delegate_of")
+DelegateAsThirdRole.delegate_of = DelegateOf(
+    domain=DelegateAsThirdRole, field_name="delegate_of"
+)
 
 # RecognizedGroup fields' descriptors
-RecognizedGroup.members = Member(RecognizedGroup, "members")
+RecognizedGroup.members = Member(domain=RecognizedGroup, field_name="members")
 RecognizedGroup.sub_organization_of = SubOrganizationOf(
-    RecognizedGroup, "sub_organization_of"
+    domain=RecognizedGroup, field_name="sub_organization_of"
 )

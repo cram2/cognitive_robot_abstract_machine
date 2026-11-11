@@ -11,7 +11,7 @@ import rustworkx as rx
 from typing_extensions import Any
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RWXNode:
     name: str
     graph: rx.PyDAG
@@ -35,7 +35,7 @@ class RWXNode:
         self.id: int = self.graph.add_node(self)
 
     # Non-primary connect: add edge without changing primary parent pointer
-    def add_parent(self, parent: RWXNode, edge_weight=None):
+    def add_parent(self, *, parent: RWXNode, edge_weight=None):
         # Avoid self-loops
         if parent is self:
             return
@@ -50,13 +50,13 @@ class RWXNode:
     def remove(self):
         self.graph.remove_node(self.id)
 
-    def remove_node(self, node: RWXNode):
+    def remove_node(self, *, node: RWXNode):
         self.graph.remove_node(node.id)
 
-    def remove_child(self, child: RWXNode):
-        child.remove_parent(self)
+    def remove_child(self, *, child: RWXNode):
+        child.remove_parent(parent=self)
 
-    def remove_parent(self, parent: RWXNode):
+    def remove_parent(self, *, parent: RWXNode):
         self.graph.remove_edge(parent.id, self.id)
 
     @property
@@ -83,7 +83,7 @@ class RWXNode:
             self._primary_parent_id = None
             return
         # Create edge and set as primary (no need to detach non-primary edges)
-        self.add_parent(value)
+        self.add_parent(parent=value)
         self._primary_parent_id = value.id
 
     @property
@@ -114,6 +114,7 @@ class RWXNode:
 
     def visualize(
         self,
+        *,
         figsize=(35, 30),
         node_size=7000,
         font_size=25,

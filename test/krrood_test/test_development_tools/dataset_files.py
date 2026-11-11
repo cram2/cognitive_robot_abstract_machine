@@ -8,11 +8,14 @@ from pathlib import Path
 
 from krrood.patterns.path_enumeration import PathEnumeration
 
+from .dataset.field_accessors import hand_written_accessors
+from .dataset.leading_prepositions import prepositional_names, verb_phrase_names
 from .dataset.missing_docstrings import (
     documented_module,
     no_module_docstring,
     undocumented_definitions,
 )
+from .dataset.positional_parameters import positional_definitions
 from .dataset.prose_length import (
     comment_blocks,
     fields_and_literal_blocks,
@@ -58,6 +61,19 @@ class DatasetFile(PathEnumeration):
     PROJECT_RULES_MODULE = Path(__file__).parent / "dataset" / "project_rules_module.py"
     """
     A module declaring a repository's own rules.
+    """
+
+    PROJECT_RULES_IMPORTING_REPOSITORY = (
+        Path(__file__).parent / "dataset" / "project_rules_importing_repository.py"
+    )
+    """
+    A module declaring a repository's own rules from the wording of another module of
+    that repository.
+    """
+
+    REPOSITORY_WORDING = Path(__file__).parent / "dataset" / "repository_wording.py"
+    """
+    The module of the repository that :attr:`PROJECT_RULES_IMPORTING_REPOSITORY` imports.
     """
 
     PROJECT_RULES_PACKAGE = Path(__file__).parent / "dataset" / "project_rules_package"
@@ -125,4 +141,54 @@ class DocstringSnippet(PathEnumeration):
     )
     """
     A module that raises when imported, whose method and function are undocumented.
+    """
+
+
+class PositionalParametersSnippet(PathEnumeration):
+    """
+    The Python sources the keyword-only checks read.
+    """
+
+    POSITIONAL_DEFINITIONS = Path(positional_definitions.__file__)
+    """
+    A module with positional and keyword-only dataclasses and methods, and the ones the
+    rules exempt.
+    """
+
+    UNIMPORTABLE_DEFINITIONS = Path(positional_definitions.__file__).with_name(
+        "unimportable_definitions.py"
+    )
+    """
+    A module that raises when imported, with a positional dataclass, a positional method
+    of a class without bases and one of a class with a base.
+    """
+
+
+class FieldAccessorSnippet(PathEnumeration):
+    """
+    The Python sources the hand written field accessor check reads.
+    """
+
+    HAND_WRITTEN_ACCESSORS = Path(hand_written_accessors.__file__)
+    """
+    A module with a hand written data descriptor and a dataclass property setter, next
+    to a plain class property setter and a descriptor built on the base, which pass.
+    """
+
+
+class MethodNameSnippet(PathEnumeration):
+    """
+    The Python sources the leading preposition check reads.
+    """
+
+    PREPOSITIONAL_NAMES = Path(prepositional_names.__file__)
+    """
+    A module whose classmethod, method, private method and function each begin their
+    name with a preposition.
+    """
+
+    VERB_PHRASE_NAMES = Path(verb_phrase_names.__file__)
+    """
+    A module whose method names are verb phrases, an alternative constructor and a
+    conversion.
     """

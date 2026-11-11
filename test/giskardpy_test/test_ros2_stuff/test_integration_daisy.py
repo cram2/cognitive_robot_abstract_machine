@@ -1,17 +1,14 @@
 from dataclasses import dataclass
 
+import numpy as np
 import pytest
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.scripts.iai_robots.daisy.configs import (
-    WorldWithDAiSyConfig,
-)
-from giskardpy.middleware.ros2.utils.utils import load_xacro
 from giskardpy.data_types.exceptions import MaxTrajectoryLengthException
-from giskardpy.middleware.ros2.utils.utils_for_tests import compare_poses, GiskardTester
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import CancelStatechart
@@ -21,6 +18,10 @@ from cramph.statechart import (
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.robots.daisy import DAiSy
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+
 
 # %% trajectory length limit
 
@@ -57,11 +58,10 @@ def default_joint_state(default_daisy_pose: dict[str, float]) -> dict[str, float
 @dataclass
 class DAiSyTester(GiskardTester):
     def setup_giskard(self) -> Giskard:
-        robot_desc = load_xacro(
-            "package://iai_daisy_description/robots/daisy.urdf.xacro"
-        )
         return Giskard(
-            world_config=WorldWithDAiSyConfig(urdf=robot_desc),
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(DAiSy)]
+            ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),
             qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
@@ -117,4 +117,4 @@ def test_joints1(giskard: DAiSyTester) -> None:
         quat_w=-0.0767,
         reference_frame=base,
     )
-    compare_poses(base_T_finger_current, base_T_finger_expected)
+    assert np.allclose(base_T_finger_current, base_T_finger_expected, atol=1e-2)

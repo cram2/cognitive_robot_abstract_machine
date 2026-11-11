@@ -147,16 +147,16 @@ class JointState(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         # A connection carries no identifier of its own, so it is referenced the way
         # Connection itself is serialized: through the entities it joins. Names would
         # not do, since two instances of the same robot description name their joints
         # identically.
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         child_names = data.get("child_names") or [None] * len(data["child_ids"])
         connections = [
             tracker.get(
-                from_json(child_id), name=from_json(child_name)
+                key=from_json(child_id), name=from_json(child_name)
             ).parent_connection
             for child_id, child_name in zip(data["child_ids"], child_names)
         ]

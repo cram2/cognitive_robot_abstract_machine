@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from collections.abc import Mapping
 from enum import IntEnum
 
 from griplink_interfaces.action import Flexgrip, Flexrelease, Grip, Release
@@ -15,7 +16,7 @@ from giskardpy.motion_statechart.exceptions import (
     NoGriplinkEndpoint,
     UnknownGriplinkActionError,
 )
-from giskardpy.motion_statechart.goals.gripper import (
+from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
 )
@@ -24,13 +25,14 @@ from semantic_digital_twin.datastructures.robots.gripper_configuration import (
     GripperConfiguration,
 )
 from semantic_digital_twin.robots.griplink_gripper import (
+    GriplinkCommand,
     GriplinkEndpoint,
     GriplinkFlexConfiguration,
     GriplinkGripperConfiguration,
     GriplinkGripPreset,
     GriplinkPresetConfiguration,
 )
-from giskardpy.motion_statechart.ros2_nodes.ros_tasks import ActionServerTask
+from giskardpy.motion_statechart.ros2_nodes.action_servers import ActionServerTask
 
 logger = logging.getLogger(__name__)
 
@@ -183,10 +185,22 @@ class GriplinkActionServerTask(
     """
 
     @classproperty
-    @abstractmethod
-    def commanded_actions(cls) -> frozenset[type]:
+    def action_types(cls) -> Mapping[GriplinkCommand, type]:
         """
-        The griplink actions this task builds goals for.
+        The ROS action each griplink command is executed as.
+        """
+        return {
+            GriplinkCommand.GRIP: Grip,
+            GriplinkCommand.RELEASE: Release,
+            GriplinkCommand.FLEXGRIP: Flexgrip,
+            GriplinkCommand.FLEXRELEASE: Flexrelease,
+        }
+
+    @classproperty
+    @abstractmethod
+    def commanded_actions(cls) -> frozenset[GriplinkCommand]:
+        """
+        The griplink commands this task builds goals for.
         """
 
     @classmethod
@@ -238,7 +252,7 @@ class GriplinkActionServerTask(
         """
         state_type = configuration.joint_state.state_type
         endpoint = configuration.end_effector.griplink_endpoint(state_type)
-        if endpoint is None or endpoint.message_type not in cls.commanded_actions:
+        if endpoint is None or endpoint.command not in cls.commanded_actions:
             raise NoGriplinkEndpoint(
                 end_effector=configuration.end_effector, state_type=state_type
             )
@@ -275,15 +289,15 @@ class GriplinkPresetActionServerTask(GriplinkActionServerTask):
     """
 
     @classproperty
-    def commanded_actions(cls) -> frozenset[type]:
-        return frozenset((Grip, Release))
+    def commanded_actions(cls) -> frozenset[GriplinkCommand]:
+        return frozenset((GriplinkCommand.GRIP, GriplinkCommand.RELEASE))
 
     @classmethod
     def from_configuration(cls, configuration: GriplinkPresetConfiguration) -> Self:
         endpoint = cls.endpoint_serving(configuration)
         return cls(
             action_topic=endpoint.action_topic,
-            message_type=endpoint.message_type,
+            message_type=cls.action_types[endpoint.command],
             grip_preset=configuration.grip_preset,
         )
 
@@ -343,15 +357,15 @@ class GriplinkFlexActionServerTask(GriplinkActionServerTask):
     """
 
     @classproperty
-    def commanded_actions(cls) -> frozenset[type]:
-        return frozenset((Flexgrip, Flexrelease))
+    def commanded_actions(cls) -> frozenset[GriplinkCommand]:
+        return frozenset((GriplinkCommand.FLEXGRIP, GriplinkCommand.FLEXRELEASE))
 
     @classmethod
     def from_configuration(cls, configuration: GriplinkFlexConfiguration) -> Self:
         endpoint = cls.endpoint_serving(configuration)
         return cls(
             action_topic=endpoint.action_topic,
-            message_type=endpoint.message_type,
+            message_type=cls.action_types[endpoint.command],
             grip_position=configuration.grip_position,
             grip_force=configuration.grip_force,
             grip_velocity=configuration.grip_velocity,

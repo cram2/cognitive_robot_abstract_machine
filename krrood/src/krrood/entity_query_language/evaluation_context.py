@@ -16,7 +16,14 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 from ordered_set import OrderedSet
-from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING
+from typing_extensions import Any, Callable, Iterator, TYPE_CHECKING, TypeVar
+
+from krrood.entity_query_language.ground_term import (
+    GroundTerm,
+    LiveTermReader,
+    TermReader,
+    TermValue,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.base_expressions import (
@@ -27,6 +34,8 @@ if TYPE_CHECKING:
 _evaluation_context_var: ContextVar[EvaluationContext | None] = ContextVar(
     "_evaluation_context", default=None
 )
+
+ResultType = TypeVar("ResultType")
 
 
 def get_evaluation_context() -> EvaluationContext | None:
@@ -55,33 +64,33 @@ class EvaluationObserver(ABC):
     """
 
     def on_evaluate_enter(
-        self, expression: SymbolicExpression, sources: OperationResult | None = None
+        self, *, expression: SymbolicExpression, sources: OperationResult | None = None
     ) -> None:
         """
         Called when entering an expression's _evaluate_ method.
         """
 
-    def on_evaluate_exit(self, expression: SymbolicExpression) -> None:
+    def on_evaluate_exit(self, *, expression: SymbolicExpression) -> None:
         """
         Called when exiting an expression's _evaluate_ method.
         """
 
     def on_result_yielded(
-        self, expression: SymbolicExpression, result: OperationResult
+        self, *, expression: SymbolicExpression, result: OperationResult
     ) -> None:
         """
         Called for each OperationResult yielded from _evaluate_.
         """
 
     def on_conclusions_processed(
-        self, expression: SymbolicExpression, result: OperationResult
+        self, *, expression: SymbolicExpression, result: OperationResult
     ) -> None:
         """
         Called after _evaluate_conclusions_and_update_bindings_ completes.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActiveConditionsRoot:
     """
     Tracks which node is the active conditions root for the current evaluation pass.
@@ -104,7 +113,7 @@ class ActiveConditionsRoot:
     """
 
     def set_active_root_if_not_set(
-        self, root: SymbolicExpression, has_condition: bool
+        self, *, root: SymbolicExpression, has_condition: bool
     ) -> None:
         """
         Set *root* as the active conditions root for this pass, unless one is already
@@ -120,12 +129,12 @@ class ActiveConditionsRoot:
             self._root_id = root._id_
             self.has_condition = has_condition
 
-    def is_active_root(self, node: SymbolicExpression) -> bool:
+    def is_active_root(self, *, node: SymbolicExpression) -> bool:
         """:return: ``True`` if *node* is the active conditions root for this pass."""
         return self._root_id == node._id_
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TruthValueOperatorChildren:
     """
     Tracks which nodes were evaluated as a direct child of a
@@ -147,7 +156,7 @@ class TruthValueOperatorChildren:
     far this pass.
     """
 
-    def record(self, expression_id: uuid.UUID) -> None:
+    def record(self, *, expression_id: uuid.UUID) -> None:
         """
         Record *expression_id* as evaluated as a direct child of a
         ``TruthValueOperator`` during the current pass.
@@ -158,7 +167,7 @@ class TruthValueOperatorChildren:
         return expression_id in self._ids
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvaluatedExpressionIds:
     """
     Tracks every expression id evaluated so far during the current evaluation pass.
@@ -180,13 +189,13 @@ class EvaluatedExpressionIds:
     while the set has a given length is reused instead of copying the whole set again.
     """
 
-    def record(self, expression_id: uuid.UUID) -> None:
+    def record(self, *, expression_id: uuid.UUID) -> None:
         """
         Record *expression_id* as evaluated during the current pass.
         """
         self._ids.add(expression_id)
 
-    def merge(self, other: OrderedSet) -> None:
+    def merge(self, *, other: OrderedSet) -> None:
         """
         Merge *other* into the recorded ids (for example, ids evaluated by an earlier
         stage of the same result chain).
@@ -205,7 +214,7 @@ class EvaluatedExpressionIds:
         return self._snapshot[1]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OutermostQuery:
     """
     Tracks which compiled query node is the outermost query for the current evaluation
@@ -223,7 +232,7 @@ class OutermostQuery:
     takes it.
     """
 
-    def is_nested(self, query: SymbolicExpression) -> bool:
+    def is_nested(self, *, query: SymbolicExpression) -> bool:
         """
         Record *query* as the outermost query if none is recorded yet, then report
         whether *query* is nested inside some other, already-recorded outermost query.
@@ -237,7 +246,7 @@ class OutermostQuery:
         return self.node._id_ != query._id_
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubqueryResultCache:
     """
     Caches an uncorrelated subquery's result stream per query node for one evaluation
@@ -252,7 +261,7 @@ class SubqueryResultCache:
     Cached result stream keyed by the compiled query node's identifier.
     """
 
-    def get_or_create(self, query_id: uuid.UUID, factory: Callable[[], Any]) -> Any:
+    def get_or_create(self, *, query_id: uuid.UUID, factory: Callable[[], Any]) -> Any:
         """
         Return the cached stream for *query_id*, creating it via *factory* if not
         already cached.
@@ -267,7 +276,7 @@ class SubqueryResultCache:
         return self._streams[query_id]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvaluationContext:
     """
     Carries observer state through the evaluation pipeline.
@@ -341,13 +350,34 @@ class EvaluationContext:
     Caches each nested subquery's result stream for the current evaluation pass.
     """
 
+    term_reader: TermReader = field(default_factory=LiveTermReader)
+    """
+    Reads the value of every attribute, index, call and symbolic function application
+    the evaluation reaches.
+    """
+
     has_running_evaluation: bool = field(default=False, init=False)
     """
     Whether an evaluation is running in this context, from its first result until it is
     exhausted or closed.
     """
 
-    def is_child_of_truth_value_operator(self, expression: SymbolicExpression) -> bool:
+    outer_visible_variables_cache: dict[
+        uuid.UUID, tuple[weakref.ref[SymbolicExpression], ...]
+    ] = field(default_factory=dict)
+    """
+    Memoizes, per quantifier id, the variables of that quantifier that also occur
+    elsewhere in the query being evaluated. They depend on the query around the
+    quantifier, so they are fixed during one evaluation but can differ once the query is
+    rebuilt.
+
+    ..warning:: Held through weak references, for the same reason as
+        :attr:`expression_index_cache`.
+    """
+
+    def is_child_of_truth_value_operator(
+        self, *, expression: SymbolicExpression
+    ) -> bool:
         """
         :param expression: The symbolic expression to test.
         :return: ``True`` if *expression* was evaluated as a direct child of a
@@ -367,9 +397,36 @@ class EvaluationContext:
         finally:
             _evaluation_context_var.reset(context_token)
 
+    @classmethod
+    def current_value_of_term(cls, *, term: GroundTerm) -> TermValue | None:
+        """
+        :param term: The ground term to read.
+        :return: The value of *term* as the current evaluation context's
+            :attr:`term_reader` reads it, or its live value outside an evaluation.
+        """
+        evaluation_context = get_evaluation_context()
+        if evaluation_context is None:
+            return term.live_term_value()
+        return evaluation_context.term_reader.value_of_term(term=term)
+
+    @classmethod
+    def iterate_reading_from(
+        cls, *, term_reader: TermReader | None, results: Iterator[ResultType]
+    ) -> Iterator[ResultType]:
+        """
+        :param term_reader: What the evaluation producing *results* reads ground terms
+            with, or ``None`` to read them as the current evaluation context does.
+        :param results: The results of an evaluation that has not started yet.
+        :return: The same results. The evaluation, and every evaluation it starts, reads
+            ground terms with *term_reader*.
+        """
+        if term_reader is None:
+            return results
+        return cls(term_reader=term_reader).iterate_as_current(results=results)
+
     def iterate_as_current(
-        self, results: Iterator[OperationResult]
-    ) -> Iterator[OperationResult]:
+        self, *, results: Iterator[ResultType]
+    ) -> Iterator[ResultType]:
         """
         Iterate the given results with this context as the current evaluation context
         while each of them is produced, and while they are closed.
@@ -409,7 +466,7 @@ class EvaluationContext:
             ``None``.
         """
         for observer in self.observers:
-            observer.on_evaluate_enter(expression, sources)
+            observer.on_evaluate_enter(expression=expression, sources=sources)
 
     def on_evaluate_exit(self, *, expression: SymbolicExpression) -> None:
         """
@@ -418,7 +475,7 @@ class EvaluationContext:
         :param expression: The expression that just finished evaluating.
         """
         for observer in self.observers:
-            observer.on_evaluate_exit(expression)
+            observer.on_evaluate_exit(expression=expression)
 
     def on_result_yielded(
         self,
@@ -433,7 +490,7 @@ class EvaluationContext:
         :param result: The :class:`OperationResult` that was yielded.
         """
         for observer in self.observers:
-            observer.on_result_yielded(expression, result)
+            observer.on_result_yielded(expression=expression, result=result)
 
     def on_conclusions_processed(
         self,
@@ -448,4 +505,4 @@ class EvaluationContext:
         :param result: The :class:`OperationResult` after conclusion processing.
         """
         for observer in self.observers:
-            observer.on_conclusions_processed(expression, result)
+            observer.on_conclusions_processed(expression=expression, result=result)

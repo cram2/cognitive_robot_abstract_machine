@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 228" role="img" aria-label="Two timelines. With the whole parallel waiting, the left hand's allowance from the previous parallel ends when the new parallel starts, and the new allowance only starts after grounding, leaving a gap. With the other branches starting with the parallel, the new allowance starts at once and the gap is gone.">
+<style>
+.background { fill: #ffffff; }
+.box { fill: #ffffff; stroke: #98a5ac; stroke-width: 1.2; }
+.choose { fill: #ffffff; stroke: #17212a; stroke-width: 1.6; }
+.start { fill: #d7eeef; stroke: #0e7882; stroke-width: 1.6; }
+.later { fill: #ffffff; stroke: #0e7882; stroke-width: 1.3; stroke-dasharray: 5 3; }
+.ok { fill: #dcf0e2; stroke: #2c8448; stroke-width: 1.4; }
+.fail { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; }
+.run { fill: #dde8f7; stroke: #2d69b8; stroke-width: 1.4; }
+.wait { fill: #f6ead3; stroke: #a86d12; stroke-width: 1.6; }
+.ghost { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.gap { fill: #f8e1dc; stroke: #bf3f2b; stroke-width: 1.4; stroke-dasharray: 5 3; }
+.trialbox { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1.4; }
+.zone { fill: #efebfa; stroke: #6b4fc0; stroke-width: 1; stroke-dasharray: 6 4; opacity: 0.9; }
+.template { fill: none; stroke: #98a5ac; stroke-width: 1.2; stroke-dasharray: 6 4; }
+.rootmark { fill: none; stroke: #0e7882; stroke-width: 1.4; stroke-dasharray: 6 4; }
+.root { fill: #d7eeef; stroke: #0e7882; stroke-width: 2.2; }
+.edge { stroke: #98a5ac; stroke-width: 1.2; fill: none; }
+.flow { stroke: #17212a; stroke-width: 1.4; fill: none; }
+.flow-bad { stroke: #bf3f2b; stroke-width: 1.4; fill: none; }
+.flow-accent { stroke: #0e7882; stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+.marker-line { stroke: #5b6971; stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.head { fill: #17212a; }
+.head-bad { fill: #bf3f2b; }
+text { fill: #17212a; }
+.h { font: 600 14px "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif; }
+.t { font: 500 12px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.tn { font: 500 11px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.s { font: 11px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #5b6971; }
+.lab { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #17212a; }
+.lab-bad { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #bf3f2b; }
+.lab-accent { font: 500 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #0e7882; }
+.lab-trial { font: 600 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; fill: #6b4fc0; }
+.num { font: 600 13px "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+.gridcell { fill: #ffffff; stroke: #98a5ac; stroke-width: 1; }
+</style>
+<defs><marker id="f1-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="head" d="M0 0 L10 5 L0 10 z"/></marker></defs>
+<rect class="background" x="0" y="0" width="1040" height="228"/>
+        <text class="h" x="20" y="24">The whole parallel waits</text>
+        <text class="s" x="136" y="50" text-anchor="end">left hand allowance</text>
+        <text class="s" x="136" y="76" text-anchor="end">place branch</text>
+        <rect class="run" x="150" y="38" width="150" height="20" rx="4"/>
+        <text class="tn" x="225" y="52" text-anchor="middle">previous parallel</text>
+        <rect class="gap" x="300" y="38" width="220" height="20" rx="4"/>
+        <text class="lab-bad" x="410" y="52" text-anchor="middle">no allowance: collision</text>
+        <rect class="run" x="520" y="38" width="400" height="20" rx="4"/>
+        <text class="tn" x="720" y="52" text-anchor="middle">allowance</text>
+        <rect class="wait" x="300" y="64" width="220" height="20" rx="4"/>
+        <text class="tn" x="410" y="78" text-anchor="middle">grounding</text>
+        <rect class="run" x="520" y="64" width="400" height="20" rx="4"/>
+        <text class="tn" x="720" y="78" text-anchor="middle">place, open</text>
+
+        <text class="h" x="20" y="120">The other branches start with the parallel</text>
+        <text class="s" x="136" y="146" text-anchor="end">left hand allowance</text>
+        <text class="s" x="136" y="172" text-anchor="end">place branch</text>
+        <rect class="run" x="150" y="134" width="150" height="20" rx="4"/>
+        <text class="tn" x="225" y="148" text-anchor="middle">previous parallel</text>
+        <rect class="run" x="300" y="134" width="620" height="20" rx="4"/>
+        <text class="tn" x="610" y="148" text-anchor="middle">allowance</text>
+        <rect class="wait" x="300" y="160" width="220" height="20" rx="4"/>
+        <text class="tn" x="410" y="174" text-anchor="middle">grounding</text>
+        <rect class="run" x="520" y="160" width="400" height="20" rx="4"/>
+        <text class="tn" x="720" y="174" text-anchor="middle">place</text>
+
+        <line class="marker-line" x1="300" y1="30" x2="300" y2="194"/>
+        <text class="s" x="300" y="210" text-anchor="middle">parallel starts</text>
+        <line class="marker-line" x1="520" y1="30" x2="520" y2="194"/>
+        <text class="s" x="520" y="210" text-anchor="middle">statements grounded</text>
+        <line class="flow" x1="150" y1="198" x2="1000" y2="198" marker-end="url(#f1-arrow)"/>
+        <text class="s" x="1000" y="214" text-anchor="end">time</text>
+      </svg>

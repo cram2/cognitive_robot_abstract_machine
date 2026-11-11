@@ -42,7 +42,7 @@ class TestMotionGoalPayload:
             motion_statechart, client=create_client()
         )
 
-        restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
+        restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
 
         assert restored.motion_statechart_json_data == motion_statechart.to_json()
 
@@ -56,7 +56,7 @@ class TestMotionGoalPayload:
             create_motion_statechart(), client=client
         )
 
-        restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
+        restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
 
         assert restored.client == client
 
@@ -68,7 +68,7 @@ class TestMotionGoalPayload:
             required_position=position,
         )
 
-        restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
+        restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
 
         assert restored.required_position == position
 
@@ -77,7 +77,7 @@ class TestMotionGoalPayload:
             create_motion_statechart(), client=create_client()
         )
 
-        restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
+        restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
 
         assert restored.required_position is None
 
@@ -91,7 +91,7 @@ class TestMotionGoalPayload:
             publishes_debug_expressions=publishes_debug_expressions,
         )
 
-        restored = MotionGoal.from_json(json.loads(json.dumps(goal.to_json())))
+        restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
 
         assert restored.publishes_debug_expressions is publishes_debug_expressions
 

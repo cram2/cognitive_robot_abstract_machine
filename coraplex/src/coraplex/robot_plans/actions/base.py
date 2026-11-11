@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 
-from typing_extensions import Any
+from typing_extensions import TYPE_CHECKING, Any, Self
 
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.plan_transformation import PlanRewriting
@@ -29,6 +29,9 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +83,28 @@ class Action(CompositeNode, ABC):
         statechart_fields = {action_field.name for action_field in fields(Action)}
         return {
             discovered.public_name: getattr(self, discovered.field.name)
-            for discovered in DataclassOnlyIntrospector().discover(type(self))
+            for discovered in DataclassOnlyIntrospector().discover(owner_cls=type(self))
             if discovered.field.init and discovered.field.name not in statechart_fields
         }
+
+    def rebound_to(self, world: World) -> Self:
+        """
+        :param world: The world the new action refers to, such as a copy of the one this
+            action refers to.
+        :return: A new action with the parameters of this one, referring to `world`. The
+            actions among those parameters are built anew the same way, since each of
+            them becomes a node of the statechart the new action runs in.
+        """
+        return type(self)(
+            **{
+                name: (
+                    value.rebound_to(world)
+                    if isinstance(value, Action)
+                    else world.rebind_world_entities(value)
+                )
+                for name, value in self.designator_parameter.items()
+            }
+        )
 
     @property
     def robot(self) -> AbstractRobot:

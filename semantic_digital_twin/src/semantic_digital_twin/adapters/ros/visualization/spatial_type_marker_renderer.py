@@ -326,13 +326,19 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     @classmethod
     def rendered_expression(cls, spatial_type: SpatialType) -> SymbolicVector:
         if isinstance(spatial_type, Quaternion):
-            return SymbolicVector(Matrix.vstack([np.zeros(3), spatial_type]))
+            return SymbolicVector(
+                Matrix.vstack(list_of_matrices=[np.zeros(3), spatial_type])
+            )
         if isinstance(spatial_type, RotationMatrix):
-            return SymbolicVector(Matrix.vstack([np.zeros(3), spatial_type.quaternion]))
+            return SymbolicVector(
+                Matrix.vstack(list_of_matrices=[np.zeros(3), spatial_type.quaternion])
+            )
         if isinstance(spatial_type, Pose2D):
             spatial_type = spatial_type.pose
         return SymbolicVector(
-            Matrix.vstack([spatial_type.position[:3], spatial_type.quaternion])
+            Matrix.vstack(
+                list_of_matrices=[spatial_type.position[:3], spatial_type.quaternion]
+            )
         )
 
     @classmethod

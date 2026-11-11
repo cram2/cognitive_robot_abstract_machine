@@ -132,8 +132,8 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
                 self.qp_data.equality_matrix_degrees_of_freedom,
                 self.qp_data.equality_matrix_slack,
                 Matrix.zeros(
-                    self.qp_data.equality_matrix_slack.shape[0],
-                    self.qp_data.number_inequality_slack_variables,
+                    rows=self.qp_data.equality_matrix_slack.shape[0],
+                    columns=self.qp_data.number_inequality_slack_variables,
                 ),
             ]
         )
@@ -141,8 +141,8 @@ class QPDataExplicitFactory(QPDataFactory[QPDataExplicit]):
             [
                 self.qp_data.inequality_matrix_degrees_of_freedom,
                 Matrix.zeros(
-                    self.qp_data.inequality_matrix_slack.shape[0],
-                    self.qp_data.number_equality_slack_variables,
+                    rows=self.qp_data.inequality_matrix_slack.shape[0],
+                    columns=self.qp_data.number_equality_slack_variables,
                 ),
                 self.qp_data.inequality_matrix_slack,
             ]
@@ -249,8 +249,8 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
                     self.qp_data.equality_matrix_degrees_of_freedom,
                     self.qp_data.equality_matrix_slack,
                     Matrix.zeros(
-                        self.qp_data.equality_matrix_degrees_of_freedom.shape[0],
-                        self.qp_data.inequality_matrix_slack.shape[1],
+                        rows=self.qp_data.equality_matrix_degrees_of_freedom.shape[0],
+                        columns=self.qp_data.inequality_matrix_slack.shape[1],
                     ),
                 ]
             )
@@ -258,8 +258,8 @@ class QPDataTwoSidedInequalityFactory(QPDataFactory[QPDataTwoSidedInequality]):
                 [
                     self.qp_data.inequality_matrix_degrees_of_freedom,
                     Matrix.zeros(
-                        self.qp_data.inequality_matrix_degrees_of_freedom.shape[0],
-                        self.qp_data.equality_matrix_slack.shape[1],
+                        rows=self.qp_data.inequality_matrix_degrees_of_freedom.shape[0],
+                        columns=self.qp_data.equality_matrix_slack.shape[1],
                     ),
                     self.qp_data.inequality_matrix_slack,
                 ]

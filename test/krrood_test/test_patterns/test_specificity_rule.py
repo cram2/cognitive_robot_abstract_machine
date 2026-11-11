@@ -20,7 +20,7 @@ class NegativeNumberRule(NumberRule):
     """
 
     @classmethod
-    def applies(cls, number: int) -> bool:
+    def applies(cls, *, number: int) -> bool:
         return number < 0
 
 
@@ -30,7 +30,7 @@ class NonNegativeNumberRule(NumberRule):
     """
 
     @classmethod
-    def applies(cls, number: int) -> bool:
+    def applies(cls, *, number: int) -> bool:
         return number >= 0
 
 
@@ -40,7 +40,7 @@ class ZeroRule(NonNegativeNumberRule):
     """
 
     @classmethod
-    def applies(cls, number: int) -> bool:
+    def applies(cls, *, number: int) -> bool:
         return number == 0
 
 
@@ -59,7 +59,7 @@ class EvenNumberRule(ParityRule):
     """
 
     @classmethod
-    def applies(cls, number: int) -> bool:
+    def applies(cls, *, number: int) -> bool:
         return number % 2 == 0
 
 
@@ -78,7 +78,7 @@ class FirstOverlappingRule(OverlappingRule):
     """
 
     @classmethod
-    def applies(cls, subject: object) -> bool:
+    def applies(cls, *, subject: object) -> bool:
         return True
 
 
@@ -88,7 +88,7 @@ class SecondOverlappingRule(OverlappingRule):
     """
 
     @classmethod
-    def applies(cls, subject: object) -> bool:
+    def applies(cls, *, subject: object) -> bool:
         return True
 
 
@@ -108,16 +108,16 @@ def test_alternatives_are_the_concrete_rules_of_the_family():
     [(-3, NegativeNumberRule), (5, NonNegativeNumberRule), (0, ZeroRule)],
 )
 def test_most_specific_applying_rule_is_chosen(number, rule):
-    assert NumberRule.most_applicable(number) is rule
+    assert NumberRule.most_applicable(number=number) is rule
 
 
 def test_no_applying_rule_gives_none():
-    assert ParityRule.most_applicable(3) is None
+    assert ParityRule.most_applicable(number=3) is None
 
 
 def test_equally_specific_applying_rules_are_rejected():
     with pytest.raises(AmbiguousRuleError) as collision:
-        OverlappingRule.most_applicable("anything")
+        OverlappingRule.most_applicable(subject="anything")
 
     assert set(collision.value.candidates) == {
         FirstOverlappingRule,

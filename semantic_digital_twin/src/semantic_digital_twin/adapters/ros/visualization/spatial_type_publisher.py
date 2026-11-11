@@ -202,7 +202,9 @@ class CompiledSpatialTypeVisualizations:
             ).rendered_expression(visualization.spatial_type)
             for visualization in self.visualizations
         ]
-        self._variables = Matrix.vstack(rendered_expressions).free_variables()
+        self._variables = Matrix.vstack(
+            list_of_matrices=rendered_expressions
+        ).free_variables()
         self._compiled_rendered_values = CompiledFunctionWithViews(
             expressions=rendered_expressions,
             parameters=VariableParameters.from_lists(self._variables),

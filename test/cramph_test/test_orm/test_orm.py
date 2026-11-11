@@ -1,3 +1,7 @@
+"""
+Statecharts and their nodes survive being stored through cramph's ORM interface.
+"""
+
 import pytest
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
@@ -7,7 +11,13 @@ from sqlalchemy.orm import Session
 from cramph.composites import Sequence
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
-from cramph.node import EndStatechart
+from cramph.node import CancelStatechart, EndStatechart
+from cramph.nodes_for_testing import (
+    ConstFalseNode,
+    ConstTrueNode,
+    NodeAssertionError,
+    NodeAssertionErrorNamingANode,
+)
 from cramph.orm.ormatic_interface import Base, CountTicksDAO
 from cramph.statechart import Statechart
 
@@ -48,16 +58,50 @@ def statechart_run_to_its_end(statechart_executor: StatechartExecutor) -> Statec
     return statechart
 
 
+def store_and_read_back(session: Session, statechart: Statechart) -> Statechart:
+    """
+    :param session: The session to store `statechart` through.
+    :param statechart: The statechart to store.
+    :return: `statechart` as read back from the database.
+    """
+    stored = to_dao(statechart)
+    session.add(stored)
+    session.commit()
+    session.expunge_all()
+    return session.scalars(select(type(stored))).one().from_dao()
+
+
 @pytest.fixture
 def statechart_read_back(session, statechart_run_to_its_end: Statechart) -> Statechart:
     """
     :return: :func:`statechart_run_to_its_end` as read back from the database.
     """
-    stored = to_dao(statechart_run_to_its_end)
-    session.add(stored)
-    session.commit()
-    session.expunge_all()
-    return session.scalars(select(type(stored))).one().from_dao()
+    return store_and_read_back(session, statechart_run_to_its_end)
+
+
+@pytest.fixture
+def cancelled_statechart(statechart_executor: StatechartExecutor) -> Statechart:
+    """
+    :return: A statechart with a node still running, ticked until a cancel node ended
+        it with an error naming that node.
+    """
+    running = ConstFalseNode()
+    trigger = ConstTrueNode()
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_nodes(
+        [
+            running,
+            trigger,
+            CancelStatechart.when_true(
+                trigger,
+                NodeAssertionErrorNamingANode(reason="cancelled", node=running),
+            ),
+        ]
+    )
+    statechart_executor.compile(statechart)
+    with pytest.raises(NodeAssertionError):
+        statechart_executor.tick_until_end(timeout=100)
+    return statechart
 
 
 # %% statechart node persistence
@@ -140,4 +184,31 @@ class TestStatechartSurvivesRoundTrip:
         assert (
             statechart_read_back.observation_state
             == statechart_run_to_its_end.observation_state
+        )
+
+    def test_cancelling_node_is_read_back(
+        self, session, cancelled_statechart: Statechart
+    ) -> None:
+        read_back = store_and_read_back(session, cancelled_statechart)
+
+        assert [
+            None if item.cancelled_by is None else item.cancelled_by.index
+            for item in read_back.state_history.items
+        ] == [
+            None if item.cancelled_by is None else item.cancelled_by.index
+            for item in cancelled_statechart.state_history.items
+        ]
+
+    def test_cancellation_error_is_read_back_with_a_copy_of_the_node_it_names(
+        self, session, cancelled_statechart: Statechart
+    ) -> None:
+        read_back = store_and_read_back(session, cancelled_statechart)
+
+        original = cancelled_statechart.state_history.latest_item.cancellation_error
+        error = read_back.state_history.latest_item.cancellation_error
+        assert (type(error), error.reason, type(error.node), error.node.name) == (
+            type(original),
+            original.reason,
+            type(original.node),
+            original.node.name,
         )
