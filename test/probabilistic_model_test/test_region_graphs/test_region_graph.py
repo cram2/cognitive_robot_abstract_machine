@@ -8,12 +8,21 @@ import optax
 import pytest
 from random_events.product_algebra import SimpleEvent
 from random_events.set import Set
-from random_events.variable import Continuous, Symbolic
+from random_events.variable import Continuous, Integer, Symbolic
 from scipy.special import logsumexp
 from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.region_graph.exceptions import (
+    MultipleRootsError,
+    UnequalFactorSizesError,
+    UnsupportedRegionVariableError,
+)
+from probabilistic_model.learning.region_graph.region_graph import (
+    Partition,
+    Region,
+    RegionGraph,
+)
 from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import (
     ClassificationCircuit,
     DifferentiableLayeredCircuit,
@@ -84,6 +93,46 @@ def test_region_graphs_with_different_seeds_have_different_partitions():
     assert partitions_of(first) != partitions_of(second)
 
 
+def test_a_region_graph_with_two_roots_raises():
+    variables = continuous_variables(2)
+    region_graph = RegionGraph(variables)
+    for variable in variables:
+        region_graph.add_node(Region(SortedSet([variable])))
+    with pytest.raises(MultipleRootsError):
+        region_graph.root
+
+
+def test_a_leaf_region_over_an_integer_variable_raises():
+    region_graph = RegionGraph(
+        SortedSet([Integer("count")]), depth=0, repetitions=1
+    ).create_random_region_graph()
+    with pytest.raises(UnsupportedRegionVariableError):
+        region_graph.as_probabilistic_circuit()
+
+
+def test_a_partition_of_regions_with_layers_of_different_sizes_raises():
+    """
+    The root partition multiplies a leaf with three input units and a region whose sum
+    layer has five units.
+    """
+    first, second = continuous_variables(2)
+    region_graph = RegionGraph(SortedSet([first, second]))
+    root, root_partition = Region(SortedSet([first, second])), Partition()
+    leaf, inner_region = Region(SortedSet([first])), Region(SortedSet([second]))
+    inner_partition, inner_leaf = Partition(), Region(SortedSet([second]))
+    region_graph.add_edges_from(
+        [
+            (root, root_partition),
+            (root_partition, leaf),
+            (root_partition, inner_region),
+            (inner_region, inner_partition),
+            (inner_partition, inner_leaf),
+        ]
+    )
+    with pytest.raises(UnequalFactorSizesError):
+        region_graph.as_probabilistic_circuit(input_units=3, sum_units=5)
+
+
 def test_region_graph_has_a_region_per_split():
     region_graph = RegionGraph(
         continuous_variables(4), partitions=2, depth=1, repetitions=2
@@ -107,7 +156,7 @@ def test_every_partition_of_a_deep_region_graph_over_few_variables_has_children(
         continuous_variables(4), partitions=2, depth=2, repetitions=2
     ).create_random_region_graph()
     assert all(
-        region_graph.out_degree(partition) > 0
+        len(region_graph.successors(partition)) > 0
         for partition in region_graph.partition_nodes()
     )
 

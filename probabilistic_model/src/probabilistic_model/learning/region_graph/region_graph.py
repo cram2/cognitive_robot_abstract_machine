@@ -1,14 +1,24 @@
+"""
+Region graphs, the random partitions of variables that randomized and tensorized sum-
+product networks (RAT-SPNs) are built from.
+"""
+
+from __future__ import annotations
+
 from collections import deque
 from dataclasses import dataclass, field
 
-import networkx as nx
+import jax.numpy as jnp
+import jax.random
+import rustworkx as rx
 import numpy as np
 from jax.experimental.sparse import BCOO
 from random_events.variable import Continuous, Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import Self, Type, Iterable
+from typing_extensions import Iterable, Self
 
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
+    DifferentiableLayer,
     DifferentiableProductLayer,
     DifferentiableDenseSumLayer,
 )
@@ -22,11 +32,18 @@ from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import 
     DifferentiableLayeredCircuit,
     ClassificationCircuit,
 )
-import jax.numpy as jnp
-import jax.random
+from probabilistic_model.graph import DirectedAcyclicGraph
+from probabilistic_model.learning.region_graph.exceptions import (
+    MultipleRootsError,
+    UnequalFactorSizesError,
+    UnsupportedRegionVariableError,
+)
 
 
-@dataclass
+# %% nodes
+
+
+@dataclass(eq=False)
 class Region:
     """
     A region in a region graph.
@@ -41,8 +58,11 @@ class Region:
     The variables in the region.
     """
 
-    def __hash__(self) -> int:
-        return id(self)
+    layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
+    """
+    The layer that models this region in the circuit of the region graph, once
+    :meth:`RegionGraph.as_probabilistic_circuit` built it.
+    """
 
     def random_partition(
         self, random_number_generator: np.random.Generator, number_of_parts: int = 2
@@ -60,20 +80,30 @@ class Region:
         ]
 
     def __repr__(self) -> str:
+        """
+        :return: The names of the variables of this region as a set.
+        """
         return "{" + ", ".join([v.name for v in self.variables]) + "}"
 
 
-@dataclass
+@dataclass(eq=False)
 class Partition:
     """
     A partition in a region graph.
     """
 
-    def __hash__(self) -> int:
-        return id(self)
+    layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
+    """
+    The product layer that multiplies the regions of this partition, once
+    :meth:`RegionGraph.as_probabilistic_circuit` built it.
+    """
 
 
-class RegionGraph(nx.DiGraph):
+# %% region graph
+
+
+@dataclass(eq=False)
+class RegionGraph(DirectedAcyclicGraph[Region | Partition]):
     """
     A region graph is a directed acyclic bipartite graph that represents a (potentially
     repeated) partition of variables.
@@ -86,58 +116,51 @@ class RegionGraph(nx.DiGraph):
     The variables of the region graph.
     """
 
-    classes: int
-    """
-    The number of classes.
-
-    If classes > 1, the circuit is a classifier, if 1 it is a generative model.
-    """
-
-    partitions: int
+    partitions: int = 2
     """
     The number of partitions to create in each region.
     """
 
-    depth: int
+    depth: int = 2
     """
     The depth of each repetition of the region graph.
     """
 
-    repetitions: int
+    repetitions: int = 2
     """
     The number of repetitions to create in the region graph.
 
     A repetition is another partitioning on the set of variables.
     """
 
-    random_number_generator: np.random.Generator
+    classes: int = 1
     """
-    The generator that draws the random partitions, so that a seed fixes the graph.
+    The number of classes.
+
+    If classes > 1, the circuit is a classifier, if 1 it is a generative model.
     """
 
-    def __init__(
-        self,
-        variables: SortedSet,
-        partitions: int = 2,
-        depth: int = 2,
-        repetitions: int = 2,
-        classes: int = 1,
-        seed: int = 69,
-    ):
-        """
-        :param seed: The seed of :attr:`random_number_generator`.
-        """
-        super().__init__()
-        self.random_number_generator = np.random.default_rng(seed)
-        self.classes = classes
-        self.variables = variables
-        self.partitions = partitions
-        self.depth = depth
-        self.repetitions = repetitions
+    seed: int = 69
+    """
+    The seed of :attr:`random_number_generator`, which fixes the graph.
+    """
 
-    def create_random_region_graph(self):
+    random_number_generator: np.random.Generator = field(init=False, repr=False)
+    """
+    The generator that draws the random partitions.
+    """
+
+    def __post_init__(self):
+        """
+        Seed :attr:`random_number_generator` with :attr:`seed`.
+        """
+        self.random_number_generator = np.random.default_rng(self.seed)
+
+    def create_random_region_graph(self) -> Self:
         """
         Create a random region graph according to the classes parameters in-place.
+
+        :return: This region graph.
         """
         root = Region(self.variables)
         self.add_node(root)
@@ -149,7 +172,7 @@ class RegionGraph(nx.DiGraph):
         """
         :return: An iterator over all regions.
         """
-        for node in self.nodes:
+        for node in self.nodes():
             if isinstance(node, Region):
                 yield node
 
@@ -157,11 +180,11 @@ class RegionGraph(nx.DiGraph):
         """
         :return: An iterator over all partitions.
         """
-        for node in self.nodes:
+        for node in self.nodes():
             if isinstance(node, Partition):
                 yield node
 
-    def recursive_split(self, node: Region):
+    def recursive_split(self, node: Region) -> None:
         """
         Recursively split a region into partitions.
 
@@ -195,13 +218,14 @@ class RegionGraph(nx.DiGraph):
         """
         possible_roots = [node for node in self.nodes() if self.in_degree(node) == 0]
         if len(possible_roots) > 1:
-            raise ValueError(
-                f"More than one root found. Possible roots are {possible_roots}"
-            )
+            raise MultipleRootsError(possible_roots)
         return possible_roots[0]
 
     def as_probabilistic_circuit(
-        self, input_units: int = 5, sum_units: int = 5, key=jax.random.PRNGKey(69)
+        self,
+        input_units: int = 5,
+        sum_units: int = 5,
+        key: jax.Array = jax.random.PRNGKey(69),
     ) -> DifferentiableLayeredCircuit | ClassificationCircuit:
         """
         Convert the region graph to a jax probabilistic circuit.
@@ -214,8 +238,8 @@ class RegionGraph(nx.DiGraph):
         root = self.root
 
         # create nodes for each region
-        for layer in reversed(list(nx.bfs_layers(self, root))):
-            for node in layer:
+        for layer in reversed(rx.bfs_layers(self.graph, [self.index_of(root)])):
+            for node in map(self.graph.__getitem__, layer):
                 children = list(self.successors(node))
                 parents = list(self.predecessors(node))
                 if isinstance(node, Region):
@@ -251,7 +275,7 @@ class RegionGraph(nx.DiGraph):
                                 variable_index, log_probabilities=log_probabilities
                             )
                         else:
-                            raise ValueError(f"Variable {variable} is not supported.")
+                            raise UnsupportedRegionVariableError(variable)
 
                     # if the region is root or in the middle
                     else:
@@ -278,9 +302,7 @@ class RegionGraph(nx.DiGraph):
                 elif isinstance(node, Partition):
                     node_lengths = [child.layer.number_of_nodes for child in children]
                     if not len(set(node_lengths)) == 1:
-                        raise ValueError(
-                            f"Node lengths must be all equal. Got {node_lengths}"
-                        )
+                        raise UnequalFactorSizesError(node_lengths)
 
                     edges = (
                         jnp.arange(node_lengths[0])
