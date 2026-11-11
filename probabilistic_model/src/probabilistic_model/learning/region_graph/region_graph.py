@@ -158,10 +158,7 @@ class RegionGraph(nx.DiGraph):
         while remaining_regions:
             region, depth, partition = remaining_regions.popleft()
 
-            if len(region.variables) == 1:
-                continue
-
-            if depth == 0:
+            if depth == 0 or len(region.variables) == 1:
                 for variable in region.variables:
                     self.add_edge(partition, Region(SortedSet([variable])))
                 continue

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -8,9 +10,13 @@ import optax
 import pytest
 from jax.experimental.sparse import BCOO
 from jax.tree_util import tree_flatten
+from random_events.variable import Continuous
+from sortedcontainers import SortedSet
+from typing_extensions import Any
 
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
+from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
     DifferentiableSparseSumLayer,
 )
@@ -166,3 +172,89 @@ def test_gradient_descent_learns_the_mixture_weights():
     weights /= jnp.sum(weights)
     assert weights[0] == pytest.approx(1 / 3, abs=0.01)
     assert weights[1] == pytest.approx(2 / 3, abs=0.01)
+
+
+# %% compiled training steps
+
+
+@dataclass
+class UpdateCounter:
+    """
+    Counts how often the Python code of an optimizer's update runs.
+
+    Inside a compiled training step it runs once, while the step is traced.
+    """
+
+    evaluations: int = 0
+    """
+    The number of times the update ran.
+    """
+
+    def wrap(
+        self, optimizer: optax.GradientTransformation
+    ) -> optax.GradientTransformation:
+        """
+        :return: The optimizer, with every run of its update counted.
+        """
+
+        def update(
+            *arguments: Any, **keyword_arguments: Any
+        ) -> tuple[optax.Updates, optax.OptState]:
+            self.evaluations += 1
+            return optimizer.update(*arguments, **keyword_arguments)
+
+        return optax.GradientTransformation(optimizer.init, update)
+
+
+@pytest.fixture
+def region_graph() -> RegionGraph:
+    """
+    A random region graph over four continuous variables.
+    """
+    return RegionGraph(
+        SortedSet(Continuous(f"x{index}") for index in range(4)),
+        partitions=2,
+        depth=1,
+        repetitions=2,
+    )
+
+
+def test_fitting_compiles_the_whole_training_step(region_graph):
+    model = region_graph.create_random_region_graph().as_probabilistic_circuit()
+    counter = UpdateCounter()
+    model.fit(
+        jnp.array(np.random.normal(size=(50, 4))),
+        epochs=5,
+        optimizer=counter.wrap(optax.adam(0.01)),
+    )
+    assert counter.evaluations == 1
+
+
+def test_fitting_a_classifier_compiles_the_whole_training_step(region_graph):
+    region_graph.classes = 2
+    model = region_graph.create_random_region_graph().as_probabilistic_circuit()
+    counter = UpdateCounter()
+    model.fit(
+        jnp.array(np.random.normal(size=(50, 4))),
+        labels=jnp.array(np.random.randint(2, size=50)),
+        epochs=5,
+        optimizer=counter.wrap(optax.adam(0.01)),
+    )
+    assert counter.evaluations == 1
+
+
+def test_fitting_two_classifiers_of_the_same_shape_trains_both():
+    variables = SortedSet(Continuous(f"x{index}") for index in range(4))
+    data = jnp.array(np.random.normal(size=(50, 4)))
+    labels = jnp.array(np.random.randint(2, size=50))
+    for _ in range(2):
+        model = (
+            RegionGraph(variables, partitions=2, depth=1, repetitions=2, classes=2)
+            .create_random_region_graph()
+            .as_probabilistic_circuit()
+        )
+        initial_log_likelihoods = model.root.log_likelihood_of_nodes(data)
+        model.fit(data, labels=labels, epochs=2)
+        assert not jnp.allclose(
+            model.root.log_likelihood_of_nodes(data), initial_log_likelihoods
+        )
