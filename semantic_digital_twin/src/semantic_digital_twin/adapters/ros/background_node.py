@@ -1,6 +1,11 @@
 """
 A process-local ROS node with its own executor and spin thread, shared by every library
 in the process.
+
+This module owns the node's lifecycle, for applications that do not run a node of their
+own: it creates, registers, spins and shuts it down. Finding topics, waiting for messages
+and calling services through a node belongs to
+:class:`~semantic_digital_twin.adapters.ros.ros_graph.RosGraph`.
 """
 
 from __future__ import annotations
@@ -11,7 +16,6 @@ from threading import RLock, Thread
 from time import sleep
 
 import rclpy
-from rclpy import Future
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
@@ -74,11 +78,6 @@ def spinner_thread_target(node: Node) -> None:
         node.get_logger().info(f"{node.get_name()} died.")
     except Exception:
         pass
-
-
-def wait_for_future_to_complete(future: Future) -> None:
-    while rclpy.ok() and not future.done():
-        sleep(0.01)
 
 
 def init_node(node_name: str) -> None:

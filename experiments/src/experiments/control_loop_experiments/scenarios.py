@@ -19,12 +19,11 @@ from experiments.control_loop_experiments.control_loop_profiler import (
     ControlLoopProfiler,
 )
 from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
 from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
@@ -51,7 +50,7 @@ from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from krrood_spatial_math.spatial_types import Pose
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
 )
@@ -62,6 +61,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+
 
 # %% how much the measurement records
 
@@ -284,7 +284,7 @@ class BenchmarkRobot(GiskardTester):
             environment.
         :param pose: Where the environment is placed in the world.
         """
-        self.add_urdf_to_world(name=name, urdf=load_xacro(package_path), pose=pose)
+        self.add_urdf_to_world(name=name, file_path=package_path, pose=pose)
 
 
 # %% scenarios
@@ -706,11 +706,11 @@ class IsolatedBenchmarkSession(AbstractContextManager):
             introspector=DescriptorAwareIntrospector(),
         )
         SymbolGraph(_class_diagram=self._class_diagram)
-        rospy.init_node(self.node_name)
+        background_node.init_node(self.node_name)
         return self
 
     def __exit__(self, exception_type, exception, traceback) -> None:
-        rospy.shutdown()
+        background_node.shutdown()
         SymbolGraph.clear()
         self._class_diagram.clear()
 

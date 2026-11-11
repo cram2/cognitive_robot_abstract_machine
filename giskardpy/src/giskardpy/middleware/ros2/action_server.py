@@ -13,7 +13,7 @@ from giskardpy.data_types.exceptions import (
     MissingActionResultError,
     MissingGoalOutcomeError,
 )
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 
 
 class GoalOutcome(Enum):
@@ -149,7 +149,7 @@ class ActionServerHandler:
 
     def __post_init__(self):
         self._action_server = ActionServer(
-            node=rospy.get_node(),
+            node=background_node.get_node(),
             action_type=self.action_type,
             action_name=self.action_name,
             execute_callback=self.execute_callback,
@@ -176,7 +176,7 @@ class ActionServerHandler:
         """
         if goal_id is None:
             goal_id = self.goal_id
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             f"{self.action_name}(Goal #{goal_id}): {message}"
         )
 
