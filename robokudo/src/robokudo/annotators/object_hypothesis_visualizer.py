@@ -80,6 +80,7 @@ class ObjectHypothesisVisualizerDescriptor(
 # %% ObjectHypothesisVisualizer annotator
 
 
+@dataclass(eq=False)
 class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescriptor]):
     """Annotator for visualizing object hypotheses in the CAS.
 
@@ -90,24 +91,23 @@ class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescrip
     * Optionally filtering objects based on query type
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ObjectHypothesisVisualizerDescriptor = field(
+        default_factory=ObjectHypothesisVisualizerDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    _mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """Reusable visualization meshes indexed by geometry properties."""
+
     @classproperty
     def Descriptor(cls) -> type[ObjectHypothesisVisualizerDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ObjectHypothesisVisualizerDescriptor
-
-    def __init__(
-        self,
-        name: str = "ObjectHypothesisVisualizer",
-        descriptor: ObjectHypothesisVisualizerDescriptor | None = None,
-    ) -> None:
-        """Initialize the object hypothesis visualizer.
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self._mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = {}
 
     def _iter_mesh_visuals(self, body: Body) -> list[Mesh]:
         """Return mesh-based visual shapes for a body."""

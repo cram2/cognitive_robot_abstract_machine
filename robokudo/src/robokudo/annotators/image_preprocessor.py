@@ -64,6 +64,7 @@ class ImagePreprocessorDescriptor(AnnotatorDescriptor[ImagePreprocessorParameter
 # %% ImagePreprocessor annotator
 
 
+@dataclass(eq=False)
 class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
     """
     RGB-D image preprocessor and point cloud generator.
@@ -79,6 +80,23 @@ class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
        Requires properly configured camera intrinsics and color-to-depth ratio.
     """
 
+    name: str = "ImagePreprocessor"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ImagePreprocessorDescriptor = field(
+        default_factory=ImagePreprocessorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    color: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Optional color image currently being worked with"""
+
+    depth: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Optional depth image currently being worked with"""
+
+    display_mode: ImagePreprocessorAnnotator.ViewMode = field(init=False, repr=False)
+    """The display mode to use (color or depth)"""
+
     class ViewMode(StrEnum):
         """
         Visualization mode enumeration.
@@ -92,34 +110,12 @@ class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ImagePreprocessorDescriptor
 
-    def __init__(
-        self,
-        name: str = "ImagePreprocessor",
-        descriptor: ImagePreprocessorDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the image preprocessor.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.color: npt.NDArray | None = None
-        """
-        Optional color image currently being worked with
-        """
-
-        self.depth: npt.NDArray | None = None
-        """
-        Optional depth image currently being worked with
-        """
-
         self.display_mode: ImagePreprocessorAnnotator.ViewMode = self.ViewMode.COLOR
-        """
-        The display mode to use (color or depth)
-        """
 
     def update(self) -> Status:
         """

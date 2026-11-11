@@ -12,7 +12,12 @@ The annotators follow these principles:
    For RUNNING status checks, use CASCondition from cas_condition.py instead.
 """
 
+from __future__ import annotations
+
 import functools
+
+# %% Imports
+from dataclasses import dataclass, field
 
 from py_trees.common import Status
 from typing_extensions import Callable
@@ -23,6 +28,7 @@ from robokudo.exceptions import CASCheckConfigurationError, CASCheckFailed
 from robokudo.types.scene import ObjectHypothesis
 
 
+@dataclass(eq=False)
 class CASCheckFunc(BaseAnnotator):
     """
     Function-based CAS condition checker.
@@ -36,26 +42,29 @@ class CASCheckFunc(BaseAnnotator):
        Will raise an exception if initialized without a function.
     """
 
-    def __init__(
-        self,
-        name: str = "CASCheckFunc",
-        function: Callable[[CAS], bool] | None = None,
-        raise_with_str: str = "",
-    ) -> None:
-        """
-        Initialize the CAS condition checker.
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
-        :param name: Name of this node in the behavior tree
-        :param function: Function that evaluates CAS conditions, must return bool
-        :param raise_with_str: Error message to raise on failure, empty string disables
-            raising
-        :raises CASCheckConfigurationError: If function is None
+    function: Callable[[CAS], bool] | None = None
+    """
+    Condition evaluated against the current CAS.
+    """
+
+    raise_with_str: str = ""
+    """
+    Failure message; an empty value returns a failure status instead.
+    """
+
+    def __post_init__(self) -> None:
         """
-        super(CASCheckFunc, self).__init__(name=name)
-        if function is None:
-            raise CASCheckConfigurationError(component_name=name)
-        self.function = function
-        self.raise_with_str = raise_with_str
+        Initialize annotator resources after
+        :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
+        """
+        super().__post_init__()
+        if self.function is None:
+            raise CASCheckConfigurationError(component_name=self.name)
 
     def update(self) -> Status:
         """
@@ -86,6 +95,7 @@ def any_of_type_present(annotation_type: type, cas: CAS) -> bool:
     return len(annotations) > 0
 
 
+@dataclass(init=False, eq=False)
 class CASCheckAnnotationTypeExists(CASCheckFunc):
     """
     Check for existence of specific annotation types.
@@ -97,9 +107,29 @@ class CASCheckAnnotationTypeExists(CASCheckFunc):
     * Returns FAILURE if no annotations exist
     """
 
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    annotation_type: type | None = None
+    """
+    Annotation type whose presence satisfies the condition.
+    """
+
+    raise_with_str: str = ""
+    """
+    Failure message; an empty value returns a failure status instead.
+    """
+
+    function: Callable[[CAS], bool] | None = field(init=False, repr=False)
+    """
+    Condition specialized to the requested annotation type.
+    """
+
     def __init__(
         self,
-        name: str = "CASCheckAnnotationTypeExists",
+        name: str = __qualname__,
         annotation_type: type | None = None,
         raise_with_str: str = "",
     ) -> None:
@@ -112,12 +142,14 @@ class CASCheckAnnotationTypeExists(CASCheckFunc):
             raising. This is useful in scenarios where you want to raise an error which
             will be sent via the Query Interface to the caller.
         """
+        self.annotation_type = annotation_type
         function = functools.partial(any_of_type_present, annotation_type)
         super(CASCheckAnnotationTypeExists, self).__init__(
             name=name, function=function, raise_with_str=raise_with_str
         )
 
 
+@dataclass(init=False, eq=False)
 class CASCheckOHExists(CASCheckAnnotationTypeExists):
     """
     Check for existence of ObjectHypothesis annotations.
@@ -129,9 +161,27 @@ class CASCheckOHExists(CASCheckAnnotationTypeExists):
     * Returns FAILURE if no ObjectHypothesis exists
     """
 
-    def __init__(
-        self, name: str = "CASCheckOHExists", raise_with_str: str = ""
-    ) -> None:
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    raise_with_str: str = ""
+    """
+    Failure message; an empty value returns a failure status instead.
+    """
+
+    function: Callable[[CAS], bool] | None = field(init=False, repr=False)
+    """
+    Condition specialized to the requested annotation type.
+    """
+
+    annotation_type: type = field(default=ObjectHypothesis, init=False)
+    """
+    Object-hypothesis annotation required by this checker.
+    """
+
+    def __init__(self, name: str = __qualname__, raise_with_str: str = "") -> None:
         """
         Initialize ObjectHypothesis checker.
 

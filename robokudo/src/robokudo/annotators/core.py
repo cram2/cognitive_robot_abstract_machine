@@ -24,7 +24,7 @@ import threading
 import time
 from collections import defaultdict
 from concurrent.futures import Future
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -79,6 +79,17 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     context.
     """
 
+    name: str = field(init=False)
+    """Name of this node in the behaviour tree."""
+
+    descriptor: DescriptorType = field(
+        default_factory=BaseAnnotatorDescriptor, init=False, repr=False
+    )
+    """Configuration supplied to this annotator instance."""
+
+    rk_logger: logging.Logger = field(init=False, repr=False)
+    """Logger for annotator processing and lifecycle messages."""
+
     @classproperty
     def Descriptor(cls) -> type[AnnotatorDescriptor]:
         """Configuration constructor for annotators with common parameters only."""
@@ -108,8 +119,12 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         # self.rk_logger.debug("%s" % (get_line_context(self)))
-        self.descriptor: DescriptorType = descriptor
+        self.descriptor = descriptor
         """Concrete configuration supplied to this annotator instance."""
+
+    def __post_init__(self) -> None:
+        """Initialize behaviour-tree identity and the annotator logger."""
+        BaseAnnotator.__init__(self, name=self.name, descriptor=self.descriptor)
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -461,9 +476,20 @@ class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     their results.
     """
 
+    compute_worker: Worker | None = field(default=None, init=False, repr=False)
+    """Computation scheduled for the current processing iteration."""
+
+    compute_worker_started: bool = field(default=False, init=False, repr=False)
+    """Whether the current computation has been started."""
+
+    compute_worker_thread: threading.Thread | None = field(
+        default=None, init=False, repr=False
+    )
+    """Thread running the current computation."""
+
     def __init__(
         self,
-        name: str = "ThreadedAnnotator",
+        name: str = __qualname__,
         descriptor: DescriptorType | None = None,
     ) -> None:
         """
@@ -477,6 +503,10 @@ class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
         self.compute_worker: Worker | None = None
         self.compute_worker_started: bool = False
         self.compute_worker_thread: threading.Thread | None = None
+
+    def __post_init__(self) -> None:
+        """Initialize worker state in addition to :meth:`BaseAnnotator.__post_init__`."""
+        ThreadedAnnotator.__init__(self, name=self.name, descriptor=self.descriptor)
 
     def initialise(self) -> None:
         """

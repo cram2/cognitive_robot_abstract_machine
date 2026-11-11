@@ -19,7 +19,12 @@ The module uses:
    Requires at least 10 points per object hypothesis.
 """
 
+from __future__ import annotations
+
 import copy
+
+# %% Imports
+from dataclasses import dataclass
 from timeit import default_timer
 
 import numpy as np
@@ -32,11 +37,12 @@ from robokudo.cas import CASViews
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.transform import (
-    get_transform_matrix,
     get_quaternion_from_rotation_matrix,
+    get_transform_matrix,
 )
 
 
+@dataclass(eq=False)
 class ClusterPosePCAAnnotator(BaseAnnotator):
     """
     3D pose estimation using principal component analysis.
@@ -53,14 +59,10 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
        Requires minimum 10 points per object hypothesis.
     """
 
-    def __init__(self, name: str = "ClusterPosePCAAnnotator") -> None:
-        """
-        Initialize the PCA pose estimator.
-
-        :param name: Name of this annotator instance
-        """
-        super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     def update(self) -> Status:
         """

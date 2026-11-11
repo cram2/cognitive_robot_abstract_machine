@@ -1,10 +1,15 @@
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass, field
+
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
-    ColorHistogram,
     Classification,
+    ColorHistogram,
     PoseAnnotation,
 )
 from robokudo.types.cv import ImageROI
@@ -12,17 +17,37 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 
 
+@dataclass(eq=False)
 class ObjectAssociator(BaseAnnotator):
     """
     An annotator that associates the objects of the current iteration with the objects
     of the last iteration.
     """
 
-    def __init__(self, name: str = "ObjectAssociator") -> None:
-        super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
-        self.tracked_objects: list[ObjectHypothesis] = []
+    tracked_objects: list[ObjectHypothesis] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    Object state retained between processing iterations.
+    """
+
+    obj_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
+    """
+    Compares current hypotheses with tracked objects.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Initialize annotator resources after
+        :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
+        """
+        super().__post_init__()
+        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.obj_comparator = (
             ObjectHypothesisComparator(self.get_cas)

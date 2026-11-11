@@ -8,6 +8,11 @@ of perception pipelines based on the current query state.
 Original implementation by Malte Huerkamp.
 """
 
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass
+
 from py_trees.composites import Composite, Sequence
 from robokudo_msgs.action import Query
 from typing_extensions import Any, Callable
@@ -18,6 +23,7 @@ from robokudo.tree_components.task_scheduler import TaskSchedulerBase
 from robokudo.utils.tree import add_child_to_parent, setup_with_descendants_on_behavior
 
 
+@dataclass(eq=False)
 class QueryBasedScheduler(
     TaskSchedulerBase,
     BaseAnnotator,
@@ -35,30 +41,29 @@ class QueryBasedScheduler(
     :type filter_function: Callable[[QueryGoal], str]
     """
 
-    def __init__(
-        self,
-        name: str = "QueryBasedScheduler",
-        tasks: dict[str, Composite] | None = None,
-        filter_function: Callable[[Query.Goal], str] | None = None,
-    ) -> None:
-        """
-        Initialize the query-based scheduler.
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
-        Tasks should be a dict with key='task-identifier' and value a
-        py_trees.Behaviour)
+    tasks: dict[str, Composite] | None = None
+    """
+    Available task trees indexed by the query-selected task identifier.
+    """
 
-        :param name: Name of the scheduler node
-        :param tasks: Dictionary mapping task IDs to behavior trees
-        :param: filter_function a callable/function which returns a string with the
-            identifier of the subtree to include. This function will receive the
-            CASViews.QUERY and can then decide which subtree identifier is the desired
-            one.
+    filter_function: Callable[[Query.Goal], str] | None = None
+    """
+    Selects the task identifier for the current query.
+    """
+
+    def __post_init__(self) -> None:
         """
-        super().__init__(name)
-        if tasks is None:
-            tasks = dict()
-        self.tasks: dict[str, Composite] = tasks
-        self.filter_function: Callable[[Query.Goal], str] | None = filter_function
+        Initialize annotator resources after
+        :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
+        """
+        super().__init__(self.name)
+        if self.tasks is None:
+            self.tasks = dict()
 
     def setup(self, **kwargs: Any) -> bool:
         """

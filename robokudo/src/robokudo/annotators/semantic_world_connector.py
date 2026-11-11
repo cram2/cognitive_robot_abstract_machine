@@ -61,6 +61,7 @@ class SemanticDigitalTwinConnectorDescriptor(
 # %% SemanticDigitalTwinConnector annotator
 
 
+@dataclass(eq=False)
 class SemanticDigitalTwinConnector(
     ThreadedAnnotator[SemanticDigitalTwinConnectorDescriptor]
 ):
@@ -68,22 +69,25 @@ class SemanticDigitalTwinConnector(
     An annotator that synchronizes the current state of the world with the semdt.
     """
 
+    name: str = "SemanticDigitalTwinSynchronization"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: SemanticDigitalTwinConnectorDescriptor = field(
+        default_factory=SemanticDigitalTwinConnectorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    object_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
+    """Compares perception hypotheses with semantic-world objects."""
+
     @classproperty
     def Descriptor(cls) -> type[SemanticDigitalTwinConnectorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return SemanticDigitalTwinConnectorDescriptor
 
-    def __init__(
-        self,
-        name: str = "SemanticDigitalTwinSynchronization",
-        descriptor: SemanticDigitalTwinConnectorDescriptor | None = None,
-    ) -> None:
-        """
-        Default construction.
-
-        Minimal one-time init!
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.object_comparator = (

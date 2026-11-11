@@ -18,12 +18,18 @@ The module is used for:
 * Output buffer management
 """
 
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass
+
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
 
 
+@dataclass(eq=False)
 class Redraw(BaseAnnotator):
     """
     Annotator for triggering visualization updates.
@@ -32,13 +38,10 @@ class Redraw(BaseAnnotator):
     latest visualization output.
     """
 
-    def __init__(self, name: str = "Redraw") -> None:
-        """
-        Initialize the redraw annotator.
-
-        :param name: Annotator name
-        """
-        super().__init__(name=name)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     def update(self) -> Status:
         """

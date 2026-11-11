@@ -55,6 +55,7 @@ class ROIAdjusterDescriptor(AnnotatorDescriptor[ROIAdjusterParameters]):
 # %% ROIAdjuster annotator
 
 
+@dataclass(eq=False)
 class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
     """Annotator for adjusting ROI sizes of object hypotheses.
 
@@ -63,22 +64,16 @@ class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
     and their associated masks, ensuring proper adjustment of both.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ROIAdjusterDescriptor = field(default_factory=ROIAdjusterDescriptor)
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[ROIAdjusterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ROIAdjusterDescriptor
-
-    def __init__(
-        self,
-        name: str = "ROIAdjusterAnnotator",
-        descriptor: ROIAdjusterDescriptor | None = None,
-    ) -> None:
-        """Initialize the ROI adjuster.
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

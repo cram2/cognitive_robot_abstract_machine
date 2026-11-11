@@ -25,6 +25,7 @@ from robokudo.types.annotation import Classification
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from transformers import PreTrainedTokenizerBase
 
 
 # %% CLIP parameters
@@ -65,48 +66,52 @@ class CLIPDescriptor(AnnotatorDescriptor[CLIPParameters]):
 # %% CLIP annotator
 
 
+@dataclass(eq=False)
 class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
     """
     Zero-shot classification by the similarity of CLIP's image embedding to the CLIP
     text embedding of each vocabulary entry.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: CLIPDescriptor = field(default_factory=CLIPDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    clip_model: CLIPModel = field(init=False, repr=False)
+    """CLIP model used for feature extraction."""
+
+    clip_preprocess: CLIPProcessor = field(init=False, repr=False)
+    """CLIP preprocessor used for input preprocessing."""
+
+    clip_tokenizer: PreTrainedTokenizerBase = field(init=False, repr=False)
+    """CLIP tokenizer used for text preprocessing."""
+
+    vocabulary_index: faiss.IndexFlatIP = field(init=False, repr=False)
+    """A faiss index for text features used in similarity search."""
+
     @classproperty
     def Descriptor(cls) -> type[CLIPDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return CLIPDescriptor
 
-    def __init__(
-        self,
-        name: str = "CLIPAnnotator",
-        descriptor: CLIPDescriptor | None = None,
-    ) -> None:
-        super().__init__(name=name, descriptor=descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.rk_logger.debug(f"Starting to init {self.__class__.__name__}")
 
         self.clip_model = CLIPModel.from_pretrained(
             self.descriptor.parameters.model_name
         ).to(self.descriptor.parameters.device)
-        """
-        CLIP model used for feature extraction.
-        """
         self.clip_preprocess = CLIPProcessor.from_pretrained(
             self.descriptor.parameters.model_name
         )
-        """
-        CLIP preprocessor used for input preprocessing.
-        """
         self.clip_tokenizer = self.clip_preprocess.tokenizer
-        """
-        CLIP tokenizer used for text preprocessing.
-        """
         self.vocabulary_index: faiss.IndexFlatIP = faiss.IndexFlatIP(
             self.clip_model.config.projection_dim
         )
-        """
-        A faiss index for text features used in similarity search.
-        """
         with torch.no_grad():
             templated_texts = [
                 self.descriptor.parameters.vocabulary_template.format(name)

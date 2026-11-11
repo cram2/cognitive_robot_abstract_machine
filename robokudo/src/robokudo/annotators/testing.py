@@ -35,12 +35,16 @@ from py_trees.composites import Sequence
 
 from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CAS, CASViews
-from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_descriptor import (
+    AnnotatorDescriptor,
+    BaseAnnotatorDescriptor,
+)
 from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 
+@dataclass(eq=False)
 class SlowAnnotator(ThreadedAnnotator):
     """A slow annotator that demonstrates long-running processing using ThreadedAnnotator.
 
@@ -53,17 +57,11 @@ class SlowAnnotator(ThreadedAnnotator):
     * Visual feedback testing
     """
 
-    def __init__(self, name: str = "SlowAnnotator", sleep_in_s: float = 1.0) -> None:
-        """
-        Initialize the slow annotator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        :param name: Name of the annotator instance
-        :param sleep_in_s: Sleep duration in seconds
-        """
-        super().__init__(name)
-
-        self.sleep_in_s = sleep_in_s
-        """Sleep duration in seconds"""
+    sleep_in_s: float = 1.0
+    """Delay applied while simulating annotator work."""
 
     def compute(self) -> Status:
         """
@@ -107,6 +105,7 @@ class SlowAnnotator(ThreadedAnnotator):
         return Status.SUCCESS
 
 
+@dataclass(eq=False)
 class EmptyAnnotator(BaseAnnotator):
     """
     Basic annotator that generates empty visual output.
@@ -115,13 +114,11 @@ class EmptyAnnotator(BaseAnnotator):
     Used for testing visualization and output handling.
     """
 
-    def __init__(self, name: str = "EmptyAnnotator", sleep_in_s: float = 1) -> None:
-        """Initialize the empty annotator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        :param name: Annotator name
-        :param sleep_in_s: Sleep duration in seconds
-        """
-        super().__init__(name)
+    sleep_in_s: float = 1
+    """This setting does not introduce a delay or affect the generated output."""
 
     def update(self) -> Status:
         """
@@ -137,6 +134,7 @@ class EmptyAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
 
+@dataclass(eq=False)
 class FailingAnnotator(ThreadedAnnotator):
     """
     Annotator that simulates failures for testing with a long-running annotator using the ThreadedAnnotator class.
@@ -145,15 +143,11 @@ class FailingAnnotator(ThreadedAnnotator):
     with configurable delays. Used for testing error handling.
     """
 
-    def __init__(self, name: str = "FailingAnnotator") -> None:
-        """Initialize the failing annotator.
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
-        :param name: Annotator name
-        """
-        super().__init__(name)
-
-        self.counter = 0
-        """Counter for alternating between success and failure states"""
+    counter: int = field(default=0, init=False, repr=False)
+    """Counter for alternating between success and failure states"""
 
     def initialise(self) -> None:
         """Initialize the annotator state.
@@ -189,6 +183,7 @@ class FailingAnnotator(ThreadedAnnotator):
         )
 
 
+@dataclass(eq=False)
 class FakeCollectionReaderAnnotator(BaseAnnotator):
     """
     A simulated collection reader for testing pipeline behavior.
@@ -208,17 +203,18 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
     * CAS creation testing
     """
 
-    def __init__(self, name: str = "FakeCollectionReader") -> None:
-        """
-        Initialize the fake collection reader.
+    name: str = "FakeCollectionReader"
+    """Name of this node in the behaviour tree."""
 
-        :param name: Name of the annotator instance
-        """
-        super().__init__(name)
+    collection_readers: list[BaseAnnotatorDescriptor] = field(init=False, repr=False)
+    """List of collection reader descriptors"""
+
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % (self.__class__.__name__))
 
         self.collection_readers = [self.descriptor]
-        """List of collection reader descriptors"""
         # self.rk_logger.debug("%s" % (get_line_context(self)))
 
     def setup(self, timeout: float) -> bool:
@@ -316,6 +312,7 @@ class ScopedDescriptor(AnnotatorDescriptor[ScopedParameters]):
 # %% Scoped annotator
 
 
+@dataclass(eq=False)
 class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
     """
     Demonstrates the usage of analysis scopes in annotators.
@@ -336,23 +333,16 @@ class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
         This is primarily a demonstration annotator for educational purposes.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ScopedDescriptor = field(default_factory=ScopedDescriptor)
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[ScopedDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ScopedDescriptor
-
-    def __init__(
-        self,
-        name: str = "ScopedAnnotator",
-        descriptor: ScopedDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the scoped annotator.
-
-        :param name: Name of the annotator instance
-        :param descriptor: Descriptor instance with parameters
-        """
-        super().__init__(name, descriptor)
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

@@ -61,6 +61,7 @@ class FilterDescriptor(AnnotatorDescriptor[FilterParameters]):
 # %% Filter annotator
 
 
+@dataclass(eq=False)
 class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     """
     Annotator for applying filter conditions to annotations.
@@ -69,23 +70,16 @@ class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     annotations, modifying the annotation list in-place based on the filter results.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: FilterDescriptor = field(default_factory=FilterDescriptor)
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[FilterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return FilterDescriptor
-
-    def __init__(
-        self,
-        name: str = "FilterAnnotator",
-        descriptor: FilterDescriptor | None = None,
-    ) -> None:
-        """Initialize the filter annotator.
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """

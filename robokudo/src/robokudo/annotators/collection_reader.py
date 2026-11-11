@@ -6,7 +6,7 @@ structures.
 from __future__ import annotations
 
 # %% Imports
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from timeit import default_timer
 
 from krrood.ormatic.utils import classproperty
@@ -49,11 +49,42 @@ class CollectionReaderDescriptor(AnnotatorDescriptor[CollectionReaderParameters]
 
 
 # %% Collection reader annotator
+@dataclass(init=False, eq=False)
 class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     """
     Acquire sensor data and share it with other annotators.
 
     It is typically the first annotator in the pipeline.
+    """
+
+    descriptor: CollectionReaderDescriptor
+    """
+    Configuration supplied to this annotator instance.
+    """
+
+    name: str = "CollectionReader"
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    camera_interface: CameraInterface | None = field(default=None, kw_only=True)
+    """
+    Acquisition interface owned by this reader.
+    """
+
+    start_timer: float | None = field(init=False, repr=False)
+    """
+    Start of the current wait for camera data.
+    """
+
+    iterations_since_last_data: int = field(init=False, repr=False)
+    """
+    Number of consecutive ticks waiting for camera data.
+    """
+
+    iterations_since_last_data_warn_threshold: int = field(init=False, repr=False)
+    """
+    Number of waiting ticks between camera availability warnings.
     """
 
     @classproperty

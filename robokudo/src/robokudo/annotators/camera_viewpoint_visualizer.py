@@ -5,6 +5,11 @@ This module provides an annotator for visualizing camera viewpoints and referenc
 in 3D space using Open3D.
 """
 
+from __future__ import annotations
+
+# %% Imports
+from dataclasses import dataclass
+
 import open3d as o3d
 from py_trees.common import Status
 
@@ -13,6 +18,7 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 
 
+@dataclass(eq=False)
 class CameraViewpointVisualizer(BaseAnnotator):
     """
     Annotator for visualizing camera viewpoints and reference frames.
@@ -25,14 +31,10 @@ class CameraViewpointVisualizer(BaseAnnotator):
     CAS.
     """
 
-    def __init__(self, name: str = "CameraViewpointVisualizer") -> None:
-        """
-        Initialize the camera viewpoint visualizer.
-
-        :param name: Name of the annotator instance
-        """
-        super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
 
     def update(self) -> Status:
         """

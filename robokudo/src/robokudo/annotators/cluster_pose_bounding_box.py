@@ -85,6 +85,7 @@ class ClusterPoseBoundingBoxDescriptor(
 # %% ClusterPoseBoundingBox annotator
 
 
+@dataclass(eq=False)
 class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescriptor]):
     """3D pose estimation using oriented bounding boxes.
 
@@ -100,23 +101,18 @@ class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescri
        Default behavior aligns z-axis with world frame up direction.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ClusterPoseBoundingBoxDescriptor = field(
+        default_factory=ClusterPoseBoundingBoxDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[ClusterPoseBoundingBoxDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ClusterPoseBoundingBoxDescriptor
-
-    def __init__(
-        self,
-        name: str = "ClusterPoseBoundingBoxAnnotator",
-        descriptor: ClusterPoseBoundingBoxDescriptor | None = None,
-    ) -> None:
-        """Initialize the pose estimator.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def adjust_bb_orientation_by_bb_size(
         self, pose_orientation: npt.NDArray, bounding_box_extents: list

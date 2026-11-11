@@ -30,6 +30,7 @@ from py_trees.common import Status
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
@@ -38,6 +39,10 @@ from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+
+if TYPE_CHECKING:
+    from rclpy.node import Node
+
 
 """
 This module implements a statistical outlierremoval based on the standard deviation and
@@ -98,6 +103,7 @@ class OutlierRemovalOnObjectHypothesisDescriptor(
 # %% OutlierRemovalOnObjectHypothesis annotator
 
 
+@dataclass(eq=False)
 class OutlierRemovalOnObjectHypothesisAnnotator(
     BaseAnnotator[OutlierRemovalOnObjectHypothesisDescriptor]
 ):
@@ -114,22 +120,25 @@ class OutlierRemovalOnObjectHypothesisAnnotator(
     The processing can be selectively disabled for specific object classes.
     """
 
+    name: str = "OutlierRemovalOnObjectHypothesis"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: OutlierRemovalOnObjectHypothesisDescriptor = field(
+        default_factory=OutlierRemovalOnObjectHypothesisDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    node: Node = field(init=False, repr=False)
+    """ROS node owning the annotator parameter declarations."""
+
     @classproperty
     def Descriptor(cls) -> type[OutlierRemovalOnObjectHypothesisDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return OutlierRemovalOnObjectHypothesisDescriptor
 
-    def __init__(
-        self,
-        name: str = "OutlierRemovalOnObjectHypothesis",
-        descriptor: OutlierRemovalOnObjectHypothesisDescriptor | None = None,
-    ):
-        """Initialize the outlier removal annotator.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.node = ROSNodeRegistry().get()

@@ -77,6 +77,7 @@ class ICPPoseRefinementDescriptor(AnnotatorDescriptor[ICPPoseRefinementParameter
 # %% ICPPoseRefinement annotator
 
 
+@dataclass(eq=False)
 class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor]):
     """Pose refinement using iterative closest point (ICP).
 
@@ -96,22 +97,30 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor])
        Currently limited to refining against a single pre-loaded model.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ICPPoseRefinementDescriptor = field(
+        default_factory=ICPPoseRefinementDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    class_name_to_ply_model: dict[str, o3d.geometry.PointCloud] = field(
+        init=False, repr=False
+    )
+    """Reference point cloud loaded for each configured object class."""
+
+    annotator_deactivated: bool = field(init=False, repr=False)
+    """Whether unavailable model data prevents pose refinement."""
+
     @classproperty
     def Descriptor(cls) -> type[ICPPoseRefinementDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ICPPoseRefinementDescriptor
 
-    def __init__(
-        self,
-        name: str = "ICPPoseRefinementAnnotator",
-        descriptor: ICPPoseRefinementDescriptor | None = None,
-    ) -> None:
-        """Initialize the ICP pose refiner.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # Data structure for available classes -> PLY files

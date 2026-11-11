@@ -53,22 +53,24 @@ class StaticCameraTransformDescriptor(
 # %% StaticCameraTransform annotator
 
 
+@dataclass(eq=False)
 class StaticCameraTransformAnnotator(BaseAnnotator[StaticCameraTransformDescriptor]):
     """
     Write a fixed camera-to-world transform to the current CAS.
     """
 
+    name: str = "StaticCameraTransform"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: StaticCameraTransformDescriptor = field(
+        default_factory=StaticCameraTransformDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[StaticCameraTransformDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return StaticCameraTransformDescriptor
-
-    def __init__(
-        self,
-        name: str = "StaticCameraTransform",
-        descriptor: StaticCameraTransformDescriptor | None = None,
-    ) -> None:
-        super().__init__(name=name, descriptor=descriptor)
 
     def update(self) -> Status:
         """

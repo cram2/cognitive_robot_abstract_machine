@@ -100,6 +100,7 @@ class TSDFDescriptor(AnnotatorDescriptor[TSDFParameters]):
 # %% TSDF annotator
 
 
+@dataclass(eq=False)
 class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
     """
     Annotator for per-object TSDF volume integration.
@@ -109,29 +110,32 @@ class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
         To segment objects out of the image a mask is required too. Higher quality masks yield better results.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: TSDFDescriptor = field(default_factory=TSDFDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    translation_comparator: TranslationComparator = field(init=False, repr=False)
+    """Translation comparator for comparing world positions between pipeline iterations."""
+
+    tracked_objects: list[dict[str, Any]] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """A list of tracked object data, including the bounding box and the TSDF volume."""
+
     @classproperty
     def Descriptor(cls) -> type[TSDFDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return TSDFDescriptor
 
-    def __init__(
-        self,
-        name: str = "TSDFAnnotator",
-        descriptor: TSDFDescriptor | None = None,
-    ) -> None:
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.translation_comparator = TranslationComparator(
             weight=1.0, max_distance=0.4
         )
-        """
-        Translation comparator for comparing world positions between pipeline iterations.
-        """
-
-        self.tracked_objects: list[dict[str, Any]] = []
-        """
-        A list of tracked object data, including the bounding box and the TSDF volume.
-        """
 
     def find_tracked_object(
         self, pose: PoseAnnotation, threshold: float = 0.75

@@ -29,6 +29,7 @@ from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from robokudo_msgs.action import Query
 
 
 # %% Color range bounds
@@ -183,6 +184,7 @@ class ImageClusterExtractorDescriptor(
 # %% ImageClusterExtractor annotator
 
 
+@dataclass(eq=False)
 class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
     """
     Extract object clusters from images using color segmentation.
@@ -198,6 +200,31 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
 
     The hue, saturation, and value thresholds can be adjusted dynamically based on color queries.
     """
+
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ImageClusterExtractorDescriptor = field(
+        default_factory=ImageClusterExtractorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    color: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Color image retained for the current computation."""
+
+    depth: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Depth image retained for the current computation."""
+
+    query: Query.Goal | None = field(default=None, init=False, repr=False)
+    """Query restricting the colors selected for extraction."""
+
+    camera_intrinsics: open3d.camera.PinholeCameraIntrinsic | None = field(
+        default=None, init=False, repr=False
+    )
+    """Projection model used to create point clouds from depth images."""
+
+    display_mode: ImageClusterExtractor.ViewMode = field(init=False, repr=False)
+    """Image representation selected for visualization."""
 
     class ViewMode:
         """
@@ -219,17 +246,10 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ImageClusterExtractorDescriptor
 
-    def __init__(
-        self,
-        name: str = "ImageClusterExtractor",
-        descriptor: ImageClusterExtractorDescriptor | None = None,
-    ) -> None:
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.color: npt.NDArray | None = None
-        self.depth: npt.NDArray | None = None
-        self.query = None
-        self.camera_intrinsics = None
 
         self.display_mode = self.ViewMode.masked_object
 

@@ -63,6 +63,7 @@ class LambdaFunctionDescriptor(AnnotatorDescriptor[LambdaFunctionParameters]):
 # %% LambdaFunction annotator
 
 
+@dataclass(eq=False)
 class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     """
     Annotator for executing arbitrary functions.
@@ -71,24 +72,18 @@ class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     for dynamic behavior definition without creating new annotator classes.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: LambdaFunctionDescriptor = field(
+        default_factory=LambdaFunctionDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[LambdaFunctionDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return LambdaFunctionDescriptor
-
-    def __init__(
-        self,
-        name: str = "LambdaFunctionAnnotator",
-        descriptor: LambdaFunctionDescriptor | None = None,
-    ):
-        """
-        Initialize the lambda function annotator.
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """

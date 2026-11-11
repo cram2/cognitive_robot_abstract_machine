@@ -117,6 +117,7 @@ class ClusterColorDescriptor(AnnotatorDescriptor[ClusterColorParameters]):
 # %% ClusterColor annotator
 
 
+@dataclass(eq=False)
 class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     """
     Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB
@@ -136,39 +137,46 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     * Value thresholds for black/white/grey
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ClusterColorDescriptor = field(default_factory=ClusterColorDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    color_hue_positions: dict[Color, float] = field(init=False, repr=False)
+    """Representative hue of each named color."""
+
+    cluster_color_info: list[list[tuple[Color, int, float]]] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """Color proportions calculated for the current object hypotheses."""
+
+    cluster_rois: list[Rect] = field(default_factory=list, init=False, repr=False)
+    """Image regions used for the current color calculation."""
+
     @classproperty
     def Descriptor(cls) -> type[ClusterColorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ClusterColorDescriptor
 
-    # To easily define this, we use RGB here and then flip it. OpenCV in python uses BGR per default.
-    # Please note, that this color will not be used for the segmentation!
-    # The segmentation is mainly done with self.color_hue_positions
-    color_name_to_bgr_values: dict[Color, tuple[int, ...]] = {
-        Color.RED: tuple(reversed((255, 0, 0))),
-        Color.YELLOW: tuple(reversed((255, 255, 0))),
-        Color.GREEN: tuple(reversed((0, 255, 0))),
-        Color.CYAN: tuple(reversed((0, 255, 255))),
-        Color.BLUE: tuple(reversed((0, 0, 255))),
-        Color.MAGENTA: tuple(reversed((255, 0, 255))),
-        Color.WHITE: tuple(reversed((255, 255, 255))),
-        Color.BLACK: tuple(reversed((0, 0, 0))),
-        Color.GREY: tuple(reversed((127, 127, 127))),
-    }
+    @classproperty
+    def color_name_to_bgr_values(cls) -> dict[Color, tuple[int, ...]]:
+        """Display colors in OpenCV channel order, independent of segmentation thresholds."""
+        return {
+            Color.RED: tuple(reversed((255, 0, 0))),
+            Color.YELLOW: tuple(reversed((255, 255, 0))),
+            Color.GREEN: tuple(reversed((0, 255, 0))),
+            Color.CYAN: tuple(reversed((0, 255, 255))),
+            Color.BLUE: tuple(reversed((0, 0, 255))),
+            Color.MAGENTA: tuple(reversed((255, 0, 255))),
+            Color.WHITE: tuple(reversed((255, 255, 255))),
+            Color.BLACK: tuple(reversed((0, 0, 0))),
+            Color.GREY: tuple(reversed((127, 127, 127))),
+        }
 
-    def __init__(
-        self,
-        name: str = "ClusterColorAnnotator",
-        descriptor: ClusterColorDescriptor | None = None,
-    ) -> None:
-        """
-        Default construction.
-
-        Minimal one-time init!
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # This list defines the range of a certain color.
@@ -187,9 +195,6 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
             Color.BLUE: hue_intervals[4],
             Color.MAGENTA: hue_intervals[5],
         }
-
-        self.cluster_color_info: list[list[tuple[Color, int, float]]] = []
-        self.cluster_rois: list[Rect] = []
 
         # Trigger JIT by calling method first time with empty data
         if self.descriptor.parameters.just_in_time_compile_on_init:

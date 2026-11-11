@@ -101,6 +101,7 @@ class WorldDescriptorBootstrapDescriptor(
 # %% WorldDescriptorBootstrap annotator
 
 
+@dataclass(eq=False)
 class WorldDescriptorBootstrapAnnotator(
     BaseAnnotator[WorldDescriptorBootstrapDescriptor]
 ):
@@ -108,21 +109,30 @@ class WorldDescriptorBootstrapAnnotator(
     Augment the current shared world with descriptor-defined entities.
     """
 
+    name: str = "WorldDescriptorBootstrap"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: WorldDescriptorBootstrapDescriptor = field(
+        default_factory=WorldDescriptorBootstrapDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    _last_augmented_world_id: int | None = field(default=None, init=False, repr=False)
+    """Identity of the world most recently augmented with descriptor entities."""
+
+    _merged_descriptor_entities: _MergedDescriptorEntities = field(
+        init=False, repr=False
+    )
+    """Descriptor entities retained for replacing a previous augmentation."""
+
     @classproperty
     def Descriptor(cls) -> type[WorldDescriptorBootstrapDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return WorldDescriptorBootstrapDescriptor
 
-    def __init__(
-        self,
-        name: str = "WorldDescriptorBootstrap",
-        descriptor: WorldDescriptorBootstrapDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the world descriptor bootstrap annotator.
-        """
-        super().__init__(name=name, descriptor=descriptor)
-        self._last_augmented_world_id: int | None = None
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self._merged_descriptor_entities = _MergedDescriptorEntities()
 
     def _update_tracker_if_active(self) -> None:

@@ -126,6 +126,7 @@ class StaticObjectDetectorDescriptor(
 # %% StaticObjectDetector annotator
 
 
+@dataclass(eq=False)
 class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor]):
     """
     Find a cluster based on a preconfigured Bounding Box, Pose and Class name.
@@ -142,30 +143,42 @@ class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor
        Parameters can be dynamically reconfigured through ROS dynamic reconfigure.
     """
 
+    name: str = "StaticObjectDetector"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: StaticObjectDetectorDescriptor = field(
+        default_factory=StaticObjectDetectorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    color: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Color image retained for the current computation."""
+
+    depth: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """Depth image retained for the current computation."""
+
+    cloud: open3d.geometry.PointCloud | None = field(
+        default=None, init=False, repr=False
+    )
+    """Point cloud retained for the current computation."""
+
+    camera_model: PinholeCameraModel | None = field(
+        default=None, init=False, repr=False
+    )
+    """Projection model for the current depth image."""
+
+    object_body: Body | None = field(default=None, init=False, repr=False)
+    """Semantic-world body associated with the current hypothesis."""
+
+    object_bodies_by_name: dict[str, Body] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """Semantic-world bodies retained by configured object name."""
+
     @classproperty
     def Descriptor(cls) -> type[StaticObjectDetectorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return StaticObjectDetectorDescriptor
-
-    def __init__(
-        self,
-        name: str = "StaticObjectDetector",
-        descriptor: StaticObjectDetectorDescriptor | None = None,
-    ) -> None:
-        """
-        Default construction. Minimal one-time init!
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.color: npt.NDArray | None = None
-        self.depth: npt.NDArray | None = None
-        self.cloud: open3d.geometry.PointCloud | None = None
-        self.camera_model: PinholeCameraModel | None = None
-        self.object_body: Body | None = None
-        self.object_bodies_by_name: dict[str, Body] = {}
 
     def detect_from_bb_descriptor(self, color_rgb: npt.NDArray) -> ObjectHypothesis:
         """

@@ -188,6 +188,7 @@ class PointCloudClusterExtractorDescriptor(
 # %% PointCloudClusterExtractor annotator
 
 
+@dataclass(eq=False)
 class PointCloudClusterExtractor(
     ThreadedAnnotator[PointCloudClusterExtractorDescriptor]
 ):
@@ -203,23 +204,18 @@ class PointCloudClusterExtractor(
        Requires a Plane annotation in the CAS to function.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: PointCloudClusterExtractorDescriptor = field(
+        default_factory=PointCloudClusterExtractorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[PointCloudClusterExtractorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return PointCloudClusterExtractorDescriptor
-
-    def __init__(
-        self,
-        name: str = "PointCloudClusterExtractor",
-        descriptor: PointCloudClusterExtractorDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the cluster extractor.
-
-        :param name: The name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
 
     def points_and_indices_from_plane(
         self,
@@ -525,6 +521,7 @@ class NaivePointCloudClusterExtractorDescriptor(
 # %% NaivePointCloudClusterExtractor annotator
 
 
+@dataclass(eq=False)
 class NaivePointCloudClusterExtractor(
     ThreadedAnnotator[NaivePointCloudClusterExtractorDescriptor]
 ):
@@ -535,23 +532,18 @@ class NaivePointCloudClusterExtractor(
        Unlike PointCloudClusterExtractor, this does not require a plane model.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: NaivePointCloudClusterExtractorDescriptor = field(
+        default_factory=NaivePointCloudClusterExtractorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[NaivePointCloudClusterExtractorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return NaivePointCloudClusterExtractorDescriptor
-
-    def __init__(
-        self,
-        name: str = "NaivePointCloudClusterExtractor",
-        descriptor: NaivePointCloudClusterExtractorDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the naive cluster extractor.
-
-        :param name: The name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:

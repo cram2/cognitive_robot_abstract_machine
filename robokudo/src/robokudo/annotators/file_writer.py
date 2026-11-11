@@ -67,6 +67,7 @@ class FileWriterDescriptor(AnnotatorDescriptor[FileWriterParameters]):
 # %% FileWriter annotator
 
 
+@dataclass(eq=False)
 class FileWriter(BaseAnnotator[FileWriterDescriptor]):
     """
     Sensor data storage to filesystem.
@@ -79,24 +80,26 @@ class FileWriter(BaseAnnotator[FileWriterDescriptor]):
        Target directory must exist and be writable.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: FileWriterDescriptor = field(default_factory=FileWriterDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    initialized: bool = field(default=False, init=False, repr=False)
+    """Whether the configured output directory is available."""
+
+    target_directory_path: Path = field(init=False, repr=False)
+    """Resolved directory receiving the generated files."""
+
     @classproperty
     def Descriptor(cls) -> type[FileWriterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return FileWriterDescriptor
 
-    def __init__(
-        self,
-        name: str = "FileWriter",
-        descriptor: FileWriterDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the file writer.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.initialized = False
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.rk_logger.debug(

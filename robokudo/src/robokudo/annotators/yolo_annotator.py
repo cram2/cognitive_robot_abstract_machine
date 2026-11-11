@@ -189,10 +189,37 @@ class YoloDescriptor(AnnotatorDescriptor[YoloParameters]):
 # %% Yolo annotator
 
 
+@dataclass(eq=False)
 class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
     """
     Detects objects with a YOLO model and annotates them as classified hypotheses.
     """
+
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: YoloDescriptor = field(default_factory=YoloDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    model_location: str = field(init=False, repr=False)
+    """Where the YOLO model is loaded from."""
+
+    model: YOLO | None = field(default=None, init=False, repr=False)
+    """The YOLO detection model, loaded during setup."""
+
+    class_names: dict[int, str] = field(default_factory=dict, init=False, repr=False)
+    """Name of each class the model detects, by class id, loaded during setup."""
+
+    segmentation_model: SAM | None = field(default=None, init=False, repr=False)
+    """The SAM model refining the hypothesis masks in precision mode, loaded during setup."""
+
+    camera_model: PinholeCameraModel | None = field(
+        default=None, init=False, repr=False
+    )
+    """Projection model at the depth image resolution."""
+
+    roi_comparator: RoiComparator = field(init=False, repr=False)
+    """Comparator measuring how much a detection overlaps an existing hypothesis."""
 
     @classproperty
     def Descriptor(cls) -> type[YoloDescriptor]:
@@ -206,38 +233,12 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """
         return 255
 
-    def __init__(
-        self,
-        name: str = "YoloAnnotator",
-        descriptor: YoloDescriptor | None = None,
-    ) -> None:
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.model_location: str = self.descriptor.parameters.model_location(self.name)
-        """
-        Where the YOLO model is loaded from.
-        """
-        self.model: YOLO | None = None
-        """
-        The YOLO detection model, loaded during setup.
-        """
-        self.class_names: dict[int, str] = {}
-        """
-        Name of each class the model detects, by class id, loaded during setup.
-        """
-        self.segmentation_model: SAM | None = None
-        """
-        The SAM model refining the hypothesis masks in precision mode, loaded during
-        setup.
-        """
-        self.camera_model: PinholeCameraModel | None = None
-        """
-        Projection model at the depth image resolution.
-        """
         self.roi_comparator = RoiComparator(weight=1.0)
-        """
-        Comparator measuring how much a detection overlaps an existing hypothesis.
-        """
 
     def setup(self, **kwargs: Any) -> bool:
         """

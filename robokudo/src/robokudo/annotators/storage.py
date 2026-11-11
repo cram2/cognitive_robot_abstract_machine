@@ -67,6 +67,7 @@ class StorageWriterDescriptor(AnnotatorDescriptor[StorageWriterParameters]):
 # %% StorageWriter annotator
 
 
+@dataclass(eq=False)
 class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     """
     Annotator for storing sensor data in MongoDB.
@@ -75,29 +76,28 @@ class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     allowing for data recording and offline processing without using ROS bag files.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: StorageWriterDescriptor = field(default_factory=StorageWriterDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    storage: Storage = field(init=False, repr=False)
+    """Storage connection used to persist pipeline data."""
+
+    storage_preparation_completed: bool = field(default=False, init=False, repr=False)
+    """Whether storage setup has already run for this writer."""
+
     @classproperty
     def Descriptor(cls) -> type[StorageWriterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return StorageWriterDescriptor
 
-    def __init__(
-        self,
-        name: str = "StorageWriter",
-        descriptor: StorageWriterDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the storage writer. Minimal one-time init!
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
+        super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.storage = Storage(self.descriptor.parameters.database_name)
-        self.storage_preparation_completed: bool = False
-        """
-        Whether storage setup has already run for this writer.
-        """
 
     def setup(self, **kwargs: Any) -> bool:
         """

@@ -78,6 +78,7 @@ class ClusterColorHistogramDescriptor(
 # %% ClusterColorHistogram annotator
 
 
+@dataclass(eq=False)
 class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescriptor]):
     """Hue and saturation histogram analysis for object hypotheses with RGB ROI and Mask.
 
@@ -92,23 +93,18 @@ class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescript
        Histogram plotting can significantly impact performance (200-500ms).
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ClusterColorHistogramDescriptor = field(
+        default_factory=ClusterColorHistogramDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[ClusterColorHistogramDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ClusterColorHistogramDescriptor
-
-    def __init__(
-        self,
-        name: str = "ClusterColorHistogramAnnotator",
-        descriptor: ClusterColorHistogramDescriptor | None = None,
-    ) -> None:
-        """Initialize the color histogram analyzer. Minimal one-time init!
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """Process object hypotheses and calculate color histograms.

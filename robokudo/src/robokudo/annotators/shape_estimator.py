@@ -202,6 +202,7 @@ class ShapeEstimatorDescriptor(AnnotatorDescriptor[ShapeEstimatorParameters]):
 # %% ShapeEstimator annotator
 
 
+@dataclass(eq=False)
 class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
     """Estimate one primitive shape per object hypothesis point cloud.
 
@@ -237,18 +238,18 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
     objects.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ShapeEstimatorDescriptor = field(
+        default_factory=ShapeEstimatorDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[ShapeEstimatorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ShapeEstimatorDescriptor
-
-    def __init__(
-        self,
-        name: str = "ShapeEstimatorAnnotator",
-        descriptor: ShapeEstimatorDescriptor | None = None,
-    ) -> None:
-        """Initialize the shape estimator annotator."""
-        super().__init__(name=name, descriptor=descriptor)
 
     def compute(self) -> Status:
         """Estimate shapes and publish annotations and 3D visualizations."""

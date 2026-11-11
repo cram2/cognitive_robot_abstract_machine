@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-# %% Imports
 import copy
+
+# %% Imports
+from dataclasses import dataclass, field
 
 import numpy as np
 import supervision as sv
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
+@dataclass(eq=False)
 class ByteTrackAnnotator(BaseAnnotator):
     """
     A ByteTrack annotator that tracks detected objects across pipeline ticks.
@@ -30,43 +33,63 @@ class ByteTrackAnnotator(BaseAnnotator):
     * ObjectHypothesis ROI + Mask + Classification annotation
     """
 
-    def __init__(self, name: str = "ByteTrackAnnotator") -> None:
-        super().__init__(name)
+    name: str = __qualname__
+    """
+    Name of this node in the behaviour tree.
+    """
+
+    tracker: ByteTrackTracker = field(init=False, repr=False)
+    """
+    Main ByteTrack instance for object instance tracking.
+    """
+
+    last_timestamp_nanoseconds: int = field(default=0, init=False, repr=False)
+    """
+    Acquisition time of the previous observation, used to detect backward time jumps.
+    """
+
+    label_annotator: sv.RichLabelAnnotator = field(init=False, repr=False)
+    """
+    A special label annotator, that cannot simply be used like the annotators in
+    `self.vis_annotators`.
+    """
+
+    vis_annotators: list[sv.BoxAnnotator | sv.MaskAnnotator | sv.TraceAnnotator] = (
+        field(init=False, repr=False)
+    )
+    """
+    A list of simple supervision annotators to use for visualization.
+
+    They will be applied in order.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Initialize annotator resources after
+        :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
+        """
+        super().__post_init__()
 
         self.tracker: ByteTrackTracker = ByteTrackTracker()
-        """
-        Main ByteTrack instance for object instance tracking.
-        """
-
-        self.last_ts: float = 0.0
-        """
-        Timestamp of the last data received, used for tracker reset detection.
-        """
 
         self.label_annotator = sv.RichLabelAnnotator(color_lookup=sv.ColorLookup.TRACK)
-        """
-        A special label annotator, that cannot simply be used like the annotators in `self.vis_annotators`.
-        """
 
         self.vis_annotators = [
             sv.BoxAnnotator(color_lookup=sv.ColorLookup.TRACK),
             sv.MaskAnnotator(color_lookup=sv.ColorLookup.INDEX),
             sv.TraceAnnotator(color_lookup=sv.ColorLookup.TRACK),
         ]
-        """
-        A list of simple supervision annotators to use for visualization. They will be applied in order.
-        """
 
     def update(self) -> Status:
         cas = self.get_cas()
         observation = cas.require_camera_observation()
 
-        data_ts = observation.timestamp_nanoseconds
-        if data_ts < self.last_ts:
+        timestamp_nanoseconds = observation.timestamp_nanoseconds
+        if timestamp_nanoseconds < self.last_timestamp_nanoseconds:
             # This is expected when looping data
             self.rk_logger.debug("Time moved backward, resetting tracker.")
             self.tracker.reset()
-        self.last_ts = data_ts
+        self.last_timestamp_nanoseconds = timestamp_nanoseconds
 
         object_hypotheses: list[ObjectHypothesis] = cas.filter_annotations_by_type(
             ObjectHypothesis
@@ -150,7 +173,8 @@ class ByteTrackAnnotator(BaseAnnotator):
 
     def visualize(self, tracked_detections: sv.Detections) -> None:
         """
-        Visualize the tracked detections and set the resulting image in the annotator output struct.
+        Visualize the tracked detections and set the resulting image in the annotator
+        output struct.
 
         :param tracked_detections: The tracked detections to visualize.
         """

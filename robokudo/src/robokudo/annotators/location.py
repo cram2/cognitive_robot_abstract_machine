@@ -78,6 +78,7 @@ class LocationDescriptor(AnnotatorDescriptor[LocationParameters]):
 # %% Location annotator
 
 
+@dataclass(eq=False)
 class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
     """Determine object locations within semantic regions.
 
@@ -94,22 +95,16 @@ class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
     * Handles coordinate frame transformations
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: LocationDescriptor = field(default_factory=LocationDescriptor)
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[LocationDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return LocationDescriptor
-
-    def __init__(
-        self,
-        name: str = "LocationAnnotator",
-        descriptor: LocationDescriptor | None = None,
-    ) -> None:
-        """Initialize the location annotator.
-
-        :param name: Annotator name
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name=name, descriptor=descriptor)
 
     def add_location_in_object_hypotheses(
         self,

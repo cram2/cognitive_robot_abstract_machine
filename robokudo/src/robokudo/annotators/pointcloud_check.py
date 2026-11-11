@@ -71,6 +71,7 @@ class PointcloudCheckDescriptor(AnnotatorDescriptor[PointcloudCheckParameters]):
 # %% PointcloudCheck annotator
 
 
+@dataclass(eq=False)
 class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
     """Check if the CASViews.Cloud contains more than X points.
 
@@ -78,22 +79,18 @@ class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
        Will raise exception if point cloud not found in CAS.
     """
 
+    name: str = "PointcloudcloudCheckAnnotator"
+    """Name of this node in the behaviour tree."""
+
+    descriptor: PointcloudCheckDescriptor = field(
+        default_factory=PointcloudCheckDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[PointcloudCheckDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return PointcloudCheckDescriptor
-
-    def __init__(
-        self,
-        name: str = "PointcloudcloudCheckAnnotator",
-        descriptor: PointcloudCheckDescriptor | None = None,
-    ) -> None:
-        """Initialize the point cloud checker.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

@@ -64,6 +64,7 @@ class RegionFilterDescriptor(AnnotatorDescriptor[RegionFilterParameters]):
 # %% RegionFilter annotator
 
 
+@dataclass(eq=False)
 class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     """Point cloud filtering using world regions.
 
@@ -71,28 +72,30 @@ class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     that provides semantic_digital_twin Regions via a shared World.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: RegionFilterDescriptor = field(default_factory=RegionFilterDescriptor)
+    """Configuration supplied to this annotator instance."""
+
+    world_frame_name: str = field(init=False, repr=False)
+    """Name of the world coordinate frame read from parameters"""
+
+    active_region: str = field(init=False, repr=False)
+    """Name of the active region to filter read from parameters"""
+
     @classproperty
     def Descriptor(cls) -> type[RegionFilterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return RegionFilterDescriptor
 
-    def __init__(
-        self,
-        name: str = "RegionFilter",
-        descriptor: RegionFilterDescriptor | None = None,
-    ) -> None:
-        """Initialize the region filter.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name=name, descriptor=descriptor)
+    def __post_init__(self) -> None:
+        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
+        super().__post_init__()
 
         self.world_frame_name: str = self.descriptor.parameters.world_frame_name
-        """Name of the world coordinate frame read from parameters"""
 
         self.active_region = self.descriptor.parameters.active_region
-        """Name of the active region to filter read from parameters"""
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:

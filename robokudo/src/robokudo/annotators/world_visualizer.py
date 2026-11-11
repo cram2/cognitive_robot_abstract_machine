@@ -57,22 +57,24 @@ class WorldVisualizerDescriptor(AnnotatorDescriptor[WorldVisualizerParameters]):
 # %% WorldVisualizer annotator
 
 
+@dataclass(eq=False)
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     """
     Visualize predefined objects and regions from the shared world.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: WorldVisualizerDescriptor = field(
+        default_factory=WorldVisualizerDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[WorldVisualizerDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return WorldVisualizerDescriptor
-
-    def __init__(
-        self,
-        name: str = "WorldVisualizer",
-        descriptor: WorldVisualizerDescriptor | None = None,
-    ) -> None:
-        super().__init__(name=name, descriptor=descriptor)
 
     @staticmethod
     def _body_size(body: Body) -> np.ndarray | None:

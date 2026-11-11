@@ -84,6 +84,7 @@ class PointcloudCropDescriptor(AnnotatorDescriptor[PointcloudCropParameters]):
 # %% PointcloudCrop annotator
 
 
+@dataclass(eq=False)
 class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
     """
     Point cloud cropping using axis-aligned bounding boxes.
@@ -95,29 +96,21 @@ class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
        When using world coordinates, requires valid camera-to-world transform in CAS.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: PointcloudCropDescriptor = field(
+        default_factory=PointcloudCropDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    color: npt.NDArray | None = field(default=None, init=False, repr=False)
+    """A copy of the color image currently being worked with."""
+
     @classproperty
     def Descriptor(cls) -> type[PointcloudCropDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return PointcloudCropDescriptor
-
-    def __init__(
-        self,
-        name: str = "PointcloudCropAnnotator",
-        descriptor: PointcloudCropDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the point cloud cropper.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-
-        self.color: npt.NDArray | None = None
-        """
-        A copy of the color image currently being worked with.
-        """
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

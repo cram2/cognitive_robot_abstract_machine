@@ -60,6 +60,7 @@ class BlurDescriptor(AnnotatorDescriptor[BlurParameters]):
 # %% Blur annotator
 
 
+@dataclass(eq=False)
 class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
     """Annotator for calculating and visualizing image blur metrics.
 
@@ -74,23 +75,16 @@ class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
        advancement when the blur threshold is exceeded.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: BlurDescriptor = field(default_factory=BlurDescriptor)
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[BlurDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return BlurDescriptor
-
-    def __init__(
-        self,
-        name: str = "BlurAnnotator",
-        descriptor: BlurDescriptor | None = None,
-    ) -> None:
-        """Initialize the blur annotator. Minimal one-time init!
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def compute_bluriness(self, img: npt.NDArray) -> float:
         """Compute the blur metric for an image.

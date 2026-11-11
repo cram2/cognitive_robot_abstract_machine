@@ -98,6 +98,7 @@ class PlaneDescriptor(AnnotatorDescriptor[PlaneParameters]):
 # %% Plane annotator
 
 
+@dataclass(eq=False)
 class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
     """
     Plane detector and visualizer for point clouds.
@@ -113,23 +114,16 @@ class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
        Uses Open3D's plane segmentation with configurable parameters.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: PlaneDescriptor = field(default_factory=PlaneDescriptor)
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[PlaneDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return PlaneDescriptor
-
-    def __init__(
-        self,
-        name: str = "PlaneAnnotator",
-        descriptor: PlaneDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the plane detector.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
 
     def compute(self) -> Status:
         """

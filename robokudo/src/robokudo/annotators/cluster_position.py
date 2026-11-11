@@ -67,6 +67,7 @@ class ClusterPositionDescriptor(AnnotatorDescriptor[ClusterPositionParameters]):
 # %% ClusterPosition annotator
 
 
+@dataclass(eq=False)
 class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
     """
     3D position estimation for object hypotheses.
@@ -83,24 +84,18 @@ class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
        Can process either ObjectHypothesis or CloudAnnotation data.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: ClusterPositionDescriptor = field(
+        default_factory=ClusterPositionDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
     @classproperty
     def Descriptor(cls) -> type[ClusterPositionDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ClusterPositionDescriptor
-
-    def __init__(
-        self,
-        name: str = "ClusterPositionAnnotator",
-        descriptor: ClusterPositionDescriptor | None = None,
-    ) -> None:
-        """
-        Initialize the position estimator.
-
-        :param name: Name of this annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """

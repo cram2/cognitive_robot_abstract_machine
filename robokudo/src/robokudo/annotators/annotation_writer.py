@@ -55,6 +55,7 @@ class AnnotationStorageWriterDescriptor(
 # %% AnnotationStorageWriter annotator
 
 
+@dataclass(eq=False)
 class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     """Annotator for writing annotations to storage in JSON format.
 
@@ -62,26 +63,21 @@ class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     directory, using JSON serialization.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: AnnotationStorageWriterDescriptor = field(
+        default_factory=AnnotationStorageWriterDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    counter: int = field(default=-1, init=False, repr=False)
+    """Counter for generating sequential filenames"""
+
     @classproperty
     def Descriptor(cls) -> type[AnnotationStorageWriterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return AnnotationStorageWriterDescriptor
-
-    def __init__(
-        self,
-        name: str = "AnnotationStorageWriter",
-        descriptor: AnnotationStorageWriterDescriptor | None = None,
-    ) -> None:
-        """Initialize the annotation storage writer. Minimal one-time init!
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-
-        self.counter: int = -1
-        """Counter for generating sequential filenames"""
 
     def update(self) -> Status:
         """Write current CAS annotations to storage.
@@ -146,6 +142,7 @@ class AnnotationPublisherWriterDescriptor(
 # %% AnnotationPublisherWriter annotator
 
 
+@dataclass(eq=False)
 class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescriptor]):
     """Annotator for publishing annotations via ROS topics.
 
@@ -153,26 +150,21 @@ class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescripto
     strings over a ROS topic.
     """
 
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
+
+    descriptor: AnnotationPublisherWriterDescriptor = field(
+        default_factory=AnnotationPublisherWriterDescriptor
+    )
+    """Configuration supplied to this annotator instance."""
+
+    pub: Publisher | None = field(default=None, init=False, repr=False)
+    """ROS publisher for annotations"""
+
     @classproperty
     def Descriptor(cls) -> type[AnnotationPublisherWriterDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return AnnotationPublisherWriterDescriptor
-
-    def __init__(
-        self,
-        name: str = "AnnotationPublisherWriter",
-        descriptor: AnnotationPublisherWriterDescriptor | None = None,
-    ) -> None:
-        """Initialize the annotation publisher. Minimal one-time init!
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-
-        self.pub: Publisher | None = None
-        """ROS publisher for annotations"""
 
     def setup(self, timeout: float) -> None:
         """Set up the ROS2 publisher for annotation messages.
