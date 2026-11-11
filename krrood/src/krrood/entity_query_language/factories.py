@@ -18,6 +18,7 @@ from typing_extensions import (
     Type,
     TYPE_CHECKING,
     TypeVar,
+    deprecated,
     overload,
 )
 
@@ -32,7 +33,6 @@ from krrood.entity_query_language.operators.causal import (
 )
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
-    FlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
     Attribute,
@@ -244,17 +244,18 @@ def deduced_variable(
 
 def variable_from(
     domain: DomainType | T,
-) -> T | Variable[T] | FlatVariable[T]:
+) -> T | Variable[T]:
     """
-    Create a variable from a given domain.
+    Create a variable that ranges over the values of a domain.
 
-    :param domain: An iterable to use as the variable's domain, or an expression whose
-        value, for each of its bindings, is flattened into the domain as
-        :func:`flat_variable` flattens it.
+    Each call creates a variable of its own, so two variables from one domain range over
+    it independently and a condition can relate one value to another.
+
+    :param domain: The values, or an expression whose value, for each of its bindings,
+        holds them; a value declared as a collection, or a collection of undeclared
+        kind, holds its elements, ``None`` holds none, and any other value itself.
     :return: A variable that can be queried for.
     """
-    if isinstance(domain, HasSymbolicOperations):
-        return FlatVariable(domain._symbolic_expression_)
     return Variable(_domain_=domain)
 
 
@@ -302,23 +303,17 @@ def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
     return Comparator(container, item, operator.contains)
 
 
+@deprecated("Use variable_from, which ranges over the elements of a collection.")
 def flat_variable(
     var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
-) -> Union[FlatVariable[T], T]:
+) -> Union[Variable[T], T]:
     """
-    Flatten a nested iterable domain into individual items while preserving the parent
-    bindings.
+    Create a variable that ranges over the elements of a collection.
 
-    This returns a DomainMapping that, when evaluated, yields one solution per inner
-    element (similar to SQL UNNEST), keeping existing variable bindings intact.
-
-    Each call yields a variable of its own, so two flattenings of the same collection
-    range over its elements independently and a condition can relate one element to
-    another.
+    .. deprecated::
+        Use :func:`variable_from`, which this is now the same as.
     """
-    # Constructed directly rather than through `_get_mapped_variable_`, whose cache
-    # would give every flattening of one collection the same identity.
-    return FlatVariable(var)
+    return variable_from(var)
 
 
 # %% Logical Operators

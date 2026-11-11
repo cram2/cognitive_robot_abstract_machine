@@ -23,6 +23,7 @@ from typing_extensions import (
 )
 
 from krrood.class_diagrams.call_arguments import CallArguments
+from krrood.class_diagrams.collection_kind import CollectionKind, DeclaredValueKind
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
@@ -172,10 +173,11 @@ class ExpressionDomain(VariableDomain[T]):
     The domain of the elements, for each binding of an expression, of the value it
     evaluates to, that are instances of a type.
 
-    A value that is not a collection is its only element.
+    A value declared as one value, or of undeclared kind and not a collection, is its
+    only element. A value that is ``None`` has no elements.
     """
 
-    expression: SymbolicExpression
+    expression: CanBehaveLikeAVariable
     """
     The expression whose values hold the domain's values.
     """
@@ -187,10 +189,33 @@ class ExpressionDomain(VariableDomain[T]):
 
     def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
         for result in self.expression._evaluate_(sources):
-            elements = result.value if is_iterable(result.value) else (result.value,)
+            elements = self._elements_in_value_(result.value)
             if isclass(self.element_type):
                 elements = InstanceFilteredDomain(self.element_type, elements)
             yield from (DomainValue(element, result) for element in elements)
+
+    def _elements_in_value_(self, value: Any) -> Iterable[T]:
+        """
+        :param value: A value the expression evaluated to.
+        :return: The elements of the value: the value's own when the expression is
+            declared to hold a collection, or is of undeclared kind and the value is a
+            collection, else the value alone.
+        """
+        if value is None:
+            return ()
+        declared_value_kind = self.expression._declared_value_kind_
+        if declared_value_kind is DeclaredValueKind.COLLECTION:
+            return value
+        if declared_value_kind is DeclaredValueKind.UNDECLARED and is_iterable(value):
+            return value
+        return (value,)
+
+    @property
+    def declared_element_type(self) -> Any:
+        """
+        The type the expression is declared to hold its elements as.
+        """
+        return CollectionKind.declared_element_type(self.expression._type_)
 
     @property
     def listed_values(self) -> Iterable[T]:
@@ -227,7 +252,8 @@ class Variable(CanHaveDomainSource[T]):
     An atomic expression of EQL that has a domain of possible values.
 
     It can be evaluated to yield values from its domain. A domain that is an expression
-    is read as an :class:`ExpressionDomain` of the variable's :attr:`_type_`.
+    is read as an :class:`ExpressionDomain` of the variable's :attr:`_type_`, and a
+    variable given no type takes the type the expression declares its elements as.
     """
 
     _domain_: DomainType | VariableDomain[T] = field(default_factory=list)
@@ -274,6 +300,8 @@ class Variable(CanHaveDomainSource[T]):
             self._values_domain_ = ExpressionDomain(
                 self._update_children_(domain)[0], self._type_
             )
+            if self._type_ is None:
+                self._type_ = self._values_domain_.declared_element_type
         else:
             self._values_domain_ = self._listed_values_type_()
             self._values_domain_.set_iterable(
@@ -291,11 +319,23 @@ class Variable(CanHaveDomainSource[T]):
             bindings = domain_value.sources.bindings | {self._id_: domain_value.value}
             yield self._build_operation_result_(bindings, domain_value.sources)
 
+    @property
+    def _expression_read_from_(self) -> CanBehaveLikeAVariable | None:
+        """
+        Overrides :attr:`CanBehaveLikeAVariable._expression_read_from_`: the expression
+        a domain that is one reads the variable's values from.
+        """
+        if isinstance(self._values_domain_, ExpressionDomain):
+            return self._values_domain_.expression
+        return None
+
     def _replace_child_field_(
         self, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         self._domain_ = new_child
-        self._values_domain_ = ExpressionDomain(new_child, self._type_)
+        self._values_domain_ = ExpressionDomain(
+            new_child, self._values_domain_.element_type
+        )
 
     @cached_property
     def _name_(self) -> str:

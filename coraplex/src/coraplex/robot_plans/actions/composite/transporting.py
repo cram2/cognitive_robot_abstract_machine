@@ -1,10 +1,15 @@
+"""
+The composite actions that move an object from one place to another, picking it up and
+placing it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from typing_extensions import Self
 
-from krrood.entity_query_language.factories import a, flat_variable, variable
+from krrood.entity_query_language.factories import a, variable_from, variable
 from coraplex.datastructures.enums import ReachFraction
 from coraplex.locations.locations import ReachabilityLocation
 from cramph.context import StatechartContext
@@ -280,7 +285,7 @@ class MoveAndPickUpAction(SequentialAction):
                 look_at=a(LookAtAction)(target=object_pose),
             ),
             pick_up=a(PickUpAction)(
-                grasp=flat_variable(
+                grasp=variable_from(
                     GraspsByCloseness(graspable, standing_position, number_of_grasps)
                 ),
                 arm=arm,
@@ -374,7 +379,7 @@ class MoveAndOpenAction(SequentialAction):
                 look_at=a(LookAtAction)(target=handle_pose),
             ),
             open_container=a(OpenAction)(
-                grasp=flat_variable(
+                grasp=variable_from(
                     GraspsByCloseness(handle, standing_position, number_of_grasps)
                 ),
                 arm=arm,

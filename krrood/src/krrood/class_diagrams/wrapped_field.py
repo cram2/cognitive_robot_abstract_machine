@@ -1,3 +1,7 @@
+"""
+The fields of the classes in a class diagram, with what their annotations declare.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -34,7 +38,7 @@ from krrood.class_diagrams.utils import (
     get_type_hints_of_object,
     is_union_annotation,
 )
-from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood.class_diagrams.collection_kind import CollectionKind, DeclaredValueKind
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -196,15 +200,39 @@ class WrappedField:
         :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union
         such as ``Optional``, whether any member of the union is.
         """
-        annotations = (
-            get_args(self.resolved_type)
-            if is_union_annotation(self.resolved_type)
-            else (self.resolved_type,)
-        )
         return any(
             get_origin(annotation) in CollectionKind.all_classes()
-            for annotation in annotations
+            for annotation in self._union_members_
         )
+
+    @cached_property
+    def declared_value_kind(self) -> DeclaredValueKind:
+        """
+        Whether the field's annotation declares a collection, one value, or neither.
+
+        Of a union's members other than ``None``, one that declares nothing makes the
+        union declare nothing, and otherwise one collection makes it a collection.
+        """
+        kinds = {
+            DeclaredValueKind.from_annotation(annotation)
+            for annotation in self._union_members_
+            if annotation is not NoneType
+        }
+        if not kinds or DeclaredValueKind.UNDECLARED in kinds:
+            return DeclaredValueKind.UNDECLARED
+        if DeclaredValueKind.COLLECTION in kinds:
+            return DeclaredValueKind.COLLECTION
+        return DeclaredValueKind.SINGLE_VALUE
+
+    @cached_property
+    def _union_members_(self) -> tuple[Any, ...]:
+        """
+        The members of the field's annotation when it is a union, else the annotation
+        alone.
+        """
+        if is_union_annotation(self.resolved_type):
+            return get_args(self.resolved_type)
+        return (self.resolved_type,)
 
     @cached_property
     def container_type(self) -> type | None:

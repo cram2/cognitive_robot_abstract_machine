@@ -48,7 +48,6 @@ from krrood.entity_query_language.operators.causal import (
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
-    FlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
 )
@@ -863,7 +862,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
     The value to assign to the attribute, which can be a Match instance or a Literal.
     """
 
-    _variable_: Attribute | FlatVariable = field(default=None, kw_only=True)
+    _variable_: Attribute = field(default=None, kw_only=True)
     """
     The symbolic variable representing the attribute.
     """
