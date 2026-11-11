@@ -178,6 +178,30 @@ class PropertyDescriptor(Symbol, DataclassFieldDescriptor):
     A set of all range types for this descriptor class.
     """
 
+    @classmethod
+    def declared_by(cls, *, domain_type: SymbolType) -> PropertyDescriptor | None:
+        """
+        :param domain_type: A class.
+        :return: The descriptor of exactly this descriptor class managing a field of the class, declared on the class
+            or else on the nearest class it inherits the field from; None if no such class declares one.
+        """
+        for declaring_type in domain_type.__mro__:
+            for attribute in vars(declaring_type).values():
+                if type(attribute) is cls:
+                    return attribute
+        return None
+
+    @classmethod
+    def super_properties(cls) -> list[type[PropertyDescriptor]]:
+        """
+        :return: The descriptor classes this descriptor class directly inherits from, its superproperties.
+        """
+        return [
+            base
+            for base in cls.__bases__
+            if base is not PropertyDescriptor and issubclass(base, PropertyDescriptor)
+        ]
+
     def __post_init__(self):
         self._validate_non_redundant_domain()
         self._update_wrapped_field()
