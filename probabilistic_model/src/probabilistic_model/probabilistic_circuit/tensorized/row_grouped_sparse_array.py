@@ -195,8 +195,6 @@ class RowGroupedSparseArray:
         :param operation: An associative and commutative binary ufunc with an identity.
         :return: The values with shape ``(..., #rows)``.
         """
-        # accumulated from the highest rank down, so every rank only extends the rows
-        # that have an entry of that rank
         result = np.full(values.shape[:-1] + (0,), operation.identity, dtype=float)
         for positions in reversed(self.entry_positions_by_rank):
             entries = values[..., positions]
