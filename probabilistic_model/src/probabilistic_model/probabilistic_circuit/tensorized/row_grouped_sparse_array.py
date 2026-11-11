@@ -61,19 +61,6 @@ class SparseEntries:
         )
 
 
-@dataclass
-class EntrySlot:
-    """
-    The ``k``-th stored entry of every row that has more than ``k`` stored entries.
-    """
-
-    positions: npt.NDArray[np.int64]
-    """
-    The position of that entry among the stored entries, one per such row, the rows in
-    the order of :attr:`RowGroupedSparseArray.rows_by_entry_count`.
-    """
-
-
 @dataclass(eq=False)
 class RowGroupedSparseArray:
     """
@@ -212,43 +199,50 @@ class RowGroupedSparseArray:
         return np.argsort(self.rows_by_entry_count)
 
     @functools.cached_property
-    def entry_slots(self) -> list[EntrySlot]:
+    def entry_positions_by_rank(self) -> list[npt.NDArray[np.int64]]:
         """
-        One slot per position of an entry within its row, up to the fullest row.
+        Element ``k`` holds, for every row with more than ``k`` stored entries, the
+        position of that row's ``k``-th entry among the stored entries. The rows follow
+        :attr:`rows_by_entry_count`, so the rows of each element are a prefix of the rows
+        of the element before it. For stored entries in rows ``[2, 0, 2, 1, 2, 0]``::
 
-        The rows of every slot are a prefix of the rows of the slot before it.
+            rows_by_entry_count     = [2, 0, 1, 3]
+            entry_positions_by_rank = [[0, 1, 3], [2, 5], [4]]
         """
         gather = self.gather[self.rows_by_entry_count]
-        rows_per_slot = (gather < self.number_of_stored_entries).sum(axis=0)
+        rows_per_rank = (gather < self.number_of_stored_entries).sum(axis=0)
         return [
-            EntrySlot(gather[:number_of_rows, slot])
-            for slot, number_of_rows in enumerate(rows_per_slot)
+            gather[:number_of_rows, rank]
+            for rank, number_of_rows in enumerate(rows_per_rank)
             if number_of_rows > 0
         ]
 
-    def logsumexp_by_row(self, values: npt.NDArray) -> npt.NDArray:
+    def reduce_by_row(self, values: npt.NDArray, operation: np.ufunc) -> npt.NDArray:
         """
-        Numerically stable ``log(sum(exp(values)))`` over the entries of every row,
-        ``-inf`` for a row whose entries are all ``-inf`` or that has none.
+        Combine the entries of every row with ``operation``, giving its identity for a
+        row without entries, without padding any row to the fullest one.
 
         :param values: Per-entry values with the entries in the last axis.
+        :param operation: An associative and commutative binary ufunc with an identity.
         :return: The values with shape ``(..., #rows)``.
         """
-        # accumulated from the last slot backwards, so every slot only extends the
-        # rows it holds and no row is ever padded
-        result = np.full(values.shape[:-1] + (0,), -np.inf)
-        for slot in reversed(self.entry_slots):
-            entries = values[..., slot.positions]
+        # accumulated from the highest rank down, so every rank only extends the rows
+        # that have an entry of that rank
+        result = np.full(values.shape[:-1] + (0,), operation.identity, dtype=float)
+        for positions in reversed(self.entry_positions_by_rank):
+            entries = values[..., positions]
             number_of_reduced_rows = result.shape[-1]
             result = np.concatenate(
                 [
-                    np.logaddexp(entries[..., :number_of_reduced_rows], result),
+                    operation(entries[..., :number_of_reduced_rows], result),
                     entries[..., number_of_reduced_rows:],
                 ],
                 axis=-1,
             )
         rows_without_entries = np.full(
-            values.shape[:-1] + (self.shape[0] - result.shape[-1],), -np.inf
+            values.shape[:-1] + (self.shape[0] - result.shape[-1],),
+            operation.identity,
+            dtype=float,
         )
         result = np.concatenate([result, rows_without_entries], axis=-1)
         return result[..., self.entry_count_ranks]

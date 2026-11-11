@@ -313,7 +313,7 @@ class SumLayer(InnerLayer):
         """
         :return: ``log(sum(exp(w)))`` over the weights of each node, shape (#nodes,).
         """
-        return self.log_weights.logsumexp_by_row(self.log_weights.data)
+        return self.log_weights.reduce_by_row(self.log_weights.data, np.logaddexp)
 
     @property
     def normalized_edge_log_weights(self) -> EdgeValues:
@@ -351,7 +351,7 @@ class SumLayer(InnerLayer):
         :return: The result for the nodes of this layer, shape (..., #nodes).
         """
         values = self.values_of_edges(child_results) * self.normalized_edge_weights
-        return self.log_weights.group_by_row(values, padding=0.0).sum(axis=-1)
+        return self.log_weights.reduce_by_row(values, np.add)
 
     def _weighted_forward_over_nodes(
         self, child_results: list[NodeVariableValues]
@@ -365,7 +365,7 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges([result.T for result in child_results])
         values = values * self.normalized_edge_weights
-        return self.log_weights.group_by_row(values, padding=0.0).sum(axis=-1).T
+        return self.log_weights.reduce_by_row(values, np.add).T
 
     def log_weighted_sum(
         self, child_results: list[SampleNodeValues]
@@ -379,7 +379,8 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges(child_results) + self.log_weights.data
         return (
-            self.log_weights.logsumexp_by_row(values) - self.log_normalization_constants
+            self.log_weights.reduce_by_row(values, np.logaddexp)
+            - self.log_normalization_constants
         )
 
     @memoized

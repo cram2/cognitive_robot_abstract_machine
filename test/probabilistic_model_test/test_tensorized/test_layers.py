@@ -99,9 +99,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
     LayerWithLogProbabilities,
     LogProbabilitiesOfLayers,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.utils import (
-    embedded_logsumexp,
-)
 from probabilistic_model.utils import MissingDict
 
 from ..circuit_building import (
@@ -127,28 +124,7 @@ def event_bounds(request) -> tuple[Bound, Bound]:
     return request.param
 
 
-# %% log-sum-exp
-
-
-def test_embedded_logsumexp():
-    np.testing.assert_allclose(
-        embedded_logsumexp(
-            np.array([[np.log(0.2), np.log(0.3)], [np.log(0.5), -np.inf]]), axis=1
-        ),
-        np.array([np.log(0.5), np.log(0.5)]),
-    )
-
-
-def test_logsumexp_of_only_minus_infinity_is_minus_infinity():
-    # the padding of the edge gather is -inf, so a node without edges reduces to a
-    # whole row of -inf and does not turn into a nan
-    np.testing.assert_array_equal(
-        embedded_logsumexp(np.array([[-np.inf, -np.inf]]), axis=1),
-        np.array([-np.inf]),
-    )
-
-
-# %% log-sum-exp by row of a sparse array
+# %% reduction of the entries of every row of a sparse array
 
 
 @pytest.fixture
@@ -161,7 +137,18 @@ def uneven_rows() -> RowGroupedSparseArray:
     )
 
 
-def test_logsumexp_by_row_reduces_the_entries_of_every_row(uneven_rows):
+def test_entry_positions_by_rank_list_the_kth_entry_of_every_row(uneven_rows):
+    np.testing.assert_array_equal(uneven_rows.rows_by_entry_count, [2, 0, 1, 3])
+    assert [
+        positions.tolist() for positions in uneven_rows.entry_positions_by_rank
+    ] == [
+        [0, 1, 3],
+        [2, 5],
+        [4],
+    ]
+
+
+def test_reduce_by_row_with_logaddexp_is_the_logsumexp_of_every_row(uneven_rows):
     values = np.random.normal(size=(2, 5, uneven_rows.number_of_stored_entries))
     values[0, 0, [1, 5]] = -np.inf
     expected = np.stack(
@@ -171,21 +158,39 @@ def test_logsumexp_by_row_reduces_the_entries_of_every_row(uneven_rows):
         ],
         axis=-1,
     )
-    np.testing.assert_allclose(uneven_rows.logsumexp_by_row(values), expected)
+    np.testing.assert_allclose(
+        uneven_rows.reduce_by_row(values, np.logaddexp), expected
+    )
 
 
-def test_logsumexp_by_row_of_only_minus_infinity_is_minus_infinity(uneven_rows):
+def test_reduce_by_row_with_add_is_the_sum_of_every_row(uneven_rows):
+    values = np.random.normal(size=(2, 5, uneven_rows.number_of_stored_entries))
+    expected = np.stack(
+        [
+            values[..., uneven_rows.rows == row].sum(axis=-1)
+            for row in range(uneven_rows.shape[0])
+        ],
+        axis=-1,
+    )
+    np.testing.assert_allclose(uneven_rows.reduce_by_row(values, np.add), expected)
+
+
+def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
+    uneven_rows,
+):
     values = np.full((3, uneven_rows.number_of_stored_entries), -np.inf)
     with np.errstate(all="raise"):
-        result = uneven_rows.logsumexp_by_row(values)
+        result = uneven_rows.reduce_by_row(values, np.logaddexp)
     np.testing.assert_array_equal(result, np.full((3, uneven_rows.shape[0]), -np.inf))
 
 
-def test_logsumexp_by_row_of_a_row_without_entries_is_minus_infinity(uneven_rows):
+@pytest.mark.parametrize("operation", [np.add, np.logaddexp])
+def test_reduce_by_row_gives_a_row_without_entries_the_identity(uneven_rows, operation):
     values = np.random.normal(size=(3, uneven_rows.number_of_stored_entries))
     row_without_entries = 3
     np.testing.assert_array_equal(
-        uneven_rows.logsumexp_by_row(values)[:, row_without_entries], -np.inf
+        uneven_rows.reduce_by_row(values, operation)[:, row_without_entries],
+        operation.identity,
     )
 
 
