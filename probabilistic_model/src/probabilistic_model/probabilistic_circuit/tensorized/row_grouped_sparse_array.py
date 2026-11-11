@@ -64,11 +64,7 @@ class SparseEntries:
 @dataclass(eq=False)
 class RowGroupedSparseArray:
     """
-    A two dimensional sparse array whose stored entries can be grouped by row.
-
-    Grouping lays the entries of every row out in one row of a rectangular array, padded
-    where a row has fewer entries than the fullest one, so that a reduction over the
-    entries of every row becomes one reduction over the last axis of that array.
+    A two dimensional sparse array whose stored entries can be reduced row by row.
     """
 
     array: coo_array
@@ -143,19 +139,6 @@ class RowGroupedSparseArray:
         gather[rows[order], offsets] = order
         return gather
 
-    @functools.cached_property
-    def is_contiguous(self) -> bool:
-        """
-        :return: Whether the entries are stored row by row with the same number of
-            entries per row, in which case grouping them is a reshape rather than a
-            gather.
-        """
-        gather = self.gather
-        return bool(
-            self.number_of_stored_entries == gather.size
-            and np.array_equal(gather, np.arange(gather.size).reshape(gather.shape))
-        )
-
     def pad(self, values: npt.NDArray, padding: float) -> npt.NDArray:
         """
         Append the slot that :attr:`gather` pads with.
@@ -168,20 +151,6 @@ class RowGroupedSparseArray:
         return np.concatenate(
             [values, np.full(values.shape[:-1] + (1,), padding)], axis=-1
         )
-
-    def group_by_row(
-        self, values: npt.NDArray, padding: float = -np.inf
-    ) -> npt.NDArray:
-        """
-        Rearrange per-entry values into one row per row of this array.
-
-        :param values: Per-entry values with the entries in the last axis.
-        :param padding: The value for rows with fewer entries than the fullest one.
-        :return: The values with shape ``(..., #rows, entries per row)``.
-        """
-        if self.is_contiguous:
-            return values.reshape(values.shape[:-1] + self.gather.shape)
-        return self.pad(values, padding)[..., self.gather]
 
     @functools.cached_property
     def rows_by_entry_count(self) -> npt.NDArray[np.int64]:
