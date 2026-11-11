@@ -5,6 +5,7 @@ product networks (RAT-SPNs) are built from.
 
 from __future__ import annotations
 
+from abc import ABC
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -44,7 +45,21 @@ from probabilistic_model.learning.region_graph.exceptions import (
 
 
 @dataclass(eq=False)
-class Region:
+class RegionGraphNode(ABC):
+    """
+    A node of a region graph, compared by identity.
+    """
+
+    layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
+    """
+    The layer that models this node in the circuit of the region graph, once
+    :meth:`RegionGraph.to_probabilistic_circuit` built it: an input or sum layer for a
+    region, a product layer for a partition.
+    """
+
+
+@dataclass(eq=False)
+class Region(RegionGraphNode):
     """
     A region in a region graph.
 
@@ -56,12 +71,6 @@ class Region:
     variables: SortedSet
     """
     The variables in the region.
-    """
-
-    layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
-    """
-    The layer that models this region in the circuit of the region graph, once
-    :meth:`RegionGraph.to_probabilistic_circuit` built it.
     """
 
     def random_partition(
@@ -87,15 +96,9 @@ class Region:
 
 
 @dataclass(eq=False)
-class Partition:
+class Partition(RegionGraphNode):
     """
     A partition in a region graph.
-    """
-
-    layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
-    """
-    The product layer that multiplies the regions of this partition, once
-    :meth:`RegionGraph.to_probabilistic_circuit` built it.
     """
 
 
@@ -103,7 +106,7 @@ class Partition:
 
 
 @dataclass(eq=False)
-class RegionGraph(DirectedAcyclicGraph[Region | Partition]):
+class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
     """
     A region graph is a directed acyclic bipartite graph that represents a (potentially
     repeated) partition of variables.
