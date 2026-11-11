@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import scipy.special
 from random_events.interval import (
     Bound,
     SimpleInterval,
@@ -144,6 +145,47 @@ def test_logsumexp_of_only_minus_infinity_is_minus_infinity():
     np.testing.assert_array_equal(
         embedded_logsumexp(np.array([[-np.inf, -np.inf]]), axis=1),
         np.array([-np.inf]),
+    )
+
+
+# %% log-sum-exp by row of a sparse array
+
+
+@pytest.fixture
+def uneven_rows() -> RowGroupedSparseArray:
+    """
+    Four rows holding two, one, three and no stored entries, stored out of row order.
+    """
+    return RowGroupedSparseArray.from_entries(
+        SparseEntries(np.zeros(6), [2, 0, 2, 1, 2, 0], [0, 1, 2, 3, 4, 5]), (4, 6)
+    )
+
+
+def test_logsumexp_by_row_reduces_the_entries_of_every_row(uneven_rows):
+    values = np.random.normal(size=(2, 5, uneven_rows.number_of_stored_entries))
+    values[0, 0, [1, 5]] = -np.inf
+    expected = np.stack(
+        [
+            scipy.special.logsumexp(values[..., uneven_rows.rows == row], axis=-1)
+            for row in range(uneven_rows.shape[0])
+        ],
+        axis=-1,
+    )
+    np.testing.assert_allclose(uneven_rows.logsumexp_by_row(values), expected)
+
+
+def test_logsumexp_by_row_of_only_minus_infinity_is_minus_infinity(uneven_rows):
+    values = np.full((3, uneven_rows.number_of_stored_entries), -np.inf)
+    with np.errstate(all="raise"):
+        result = uneven_rows.logsumexp_by_row(values)
+    np.testing.assert_array_equal(result, np.full((3, uneven_rows.shape[0]), -np.inf))
+
+
+def test_logsumexp_by_row_of_a_row_without_entries_is_minus_infinity(uneven_rows):
+    values = np.random.normal(size=(3, uneven_rows.number_of_stored_entries))
+    row_without_entries = 3
+    np.testing.assert_array_equal(
+        uneven_rows.logsumexp_by_row(values)[:, row_without_entries], -np.inf
     )
 
 
