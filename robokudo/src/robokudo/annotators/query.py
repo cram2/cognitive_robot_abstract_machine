@@ -177,12 +177,12 @@ class QueryFeedback(BaseAnnotator):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    feedback_str: str = ""
+    feedback_text: str = ""
     """Feedback text sent to the active query client."""
 
     def update(self) -> Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
-        QueryHandler.send_feedback_str(self.feedback_str)
+        QueryHandler.send_feedback_str(self.feedback_text)
 
         return Status.SUCCESS
 
@@ -204,15 +204,15 @@ class QueryFeedbackAndCount(BaseAnnotator):
     return_code: Status = Status.RUNNING
     """Status returned while the feedback counter is still running."""
 
-    i: int = field(default=0, init=False, repr=False)
+    current_count: int = field(default=0, init=False, repr=False)
     """The current count."""
 
     def update(self) -> Status:
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
-        QueryHandler.send_feedback_str(f"Count: {self.i}")
-        self.i = self.i + 1
-        if self.i > self.count_until:
-            self.i = 0
+        QueryHandler.send_feedback_str(f"Count: {self.current_count}")
+        self.current_count = self.current_count + 1
+        if self.current_count > self.count_until:
+            self.current_count = 0
             return Status.SUCCESS
         else:
             return self.return_code
@@ -348,7 +348,7 @@ class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
     location_converter: Location2ODConverter = field(init=False, repr=False)
     """Converts locations into query result properties."""
 
-    bb_size_converter: BoundingBox3DForShapeSizeConverter = field(
+    bounding_box_size_converter: BoundingBox3DForShapeSizeConverter = field(
         init=False, repr=False
     )
     """Converts bounding-box dimensions into query result properties."""
@@ -379,7 +379,7 @@ class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
         self.cylinder_converter = Cylinder2ODConverter()
         self.sphere_converter = Sphere2ODConverter()
         self.location_converter = Location2ODConverter()
-        self.bb_size_converter = BoundingBox3DForShapeSizeConverter()
+        self.bounding_box_size_converter = BoundingBox3DForShapeSizeConverter()
 
         self.type_converter = {
             SemanticColor: self.color_converter,
@@ -393,8 +393,8 @@ class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
             Cylinder: self.cylinder_converter,
             Sphere: self.sphere_converter,
             LocationAnnotation: self.location_converter,
-            BoundingBox3D: self.bb_size_converter,
-            BoundingBox3DAnnotation: self.bb_size_converter,
+            BoundingBox3D: self.bounding_box_size_converter,
+            BoundingBox3DAnnotation: self.bounding_box_size_converter,
         }
         self.query_matcher = ObjectHypothesisQueryMatcher()
 

@@ -158,7 +158,7 @@ class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescripto
     )
     """Configuration supplied to this annotator instance."""
 
-    pub: Publisher | None = field(default=None, init=False, repr=False)
+    publisher: Publisher | None = field(default=None, init=False, repr=False)
     """ROS publisher for annotations"""
 
     @classproperty
@@ -174,7 +174,7 @@ class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescripto
         self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
 
         node = ROSNodeRegistry().get()
-        self.pub = node.create_publisher(
+        self.publisher = node.create_publisher(
             String, self.descriptor.parameters.topic_name, 10
         )
 
@@ -192,10 +192,10 @@ class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescripto
         json_data_string = json.dumps(serialize_annotations(self.get_cas().annotations))
 
         # publish encoded data
-        if self.pub is None:
+        if self.publisher is None:
             raise RuntimeError("Publisher is not initialized. Call setup() first.")
         msg = String(data=json_data_string)
-        self.pub.publish(msg)
+        self.publisher.publish(msg)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

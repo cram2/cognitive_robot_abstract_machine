@@ -75,7 +75,7 @@ class ClusterColorParameters(AnnotatorParameters):
     )
     """Hue interval assigned to each chromatic category."""
 
-    just_in_time_compile_on_init: bool = False
+    just_in_time_compile_on_initialization: bool = False
     """Whether to compile the pixel-counting kernel during construction."""
 
     minimum_value_color: int = 60
@@ -146,12 +146,14 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     color_hue_positions: dict[Color, float] = field(init=False, repr=False)
     """Representative hue of each named color."""
 
-    cluster_color_info: list[list[tuple[Color, int, float]]] = field(
+    cluster_color_statistics: list[list[tuple[Color, int, float]]] = field(
         default_factory=list, init=False, repr=False
     )
     """Color proportions calculated for the current object hypotheses."""
 
-    cluster_rois: list[Rect] = field(default_factory=list, init=False, repr=False)
+    cluster_image_regions: list[Rect] = field(
+        default_factory=list, init=False, repr=False
+    )
     """Image regions used for the current color calculation."""
 
     @classproperty
@@ -197,7 +199,7 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         }
 
         # Trigger JIT by calling method first time with empty data
-        if self.descriptor.parameters.just_in_time_compile_on_init:
+        if self.descriptor.parameters.just_in_time_compile_on_initialization:
             start_timer_jit = default_timer()
             hsv_image = np.array([[[0, 0, 0]]])
             mask = np.array([[0]])
@@ -417,8 +419,8 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         color = self.get_cas().get(CASViews.COLOR_IMAGE)
 
         # List for visualization purposes
-        self.cluster_color_info = []
-        self.cluster_rois = []
+        self.cluster_color_statistics = []
+        self.cluster_image_regions = []
 
         self.create_color_annotations(color)
 
@@ -523,8 +525,8 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
                     break
 
             # Prepare visualization
-            self.cluster_color_info.append(color_count_result_sorted_by_count)
-            self.cluster_rois.append(roi)
+            self.cluster_color_statistics.append(color_count_result_sorted_by_count)
+            self.cluster_image_regions.append(roi)
 
     def draw_visualization(self, visualization_img: npt.NDArray) -> npt.NDArray:
         """
@@ -539,8 +541,8 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         :param visualization_img: Image to draw visualization on
         :return: Image with visualization overlays
         """
-        for i, roi in enumerate(self.cluster_rois):
-            cci = self.cluster_color_info[i]
+        for i, roi in enumerate(self.cluster_image_regions):
+            cci = self.cluster_color_statistics[i]
             dominant_color = cci[0][0]
             assert isinstance(dominant_color, Color)
             dominant_color_value = self.color_name_to_bgr_values[dominant_color]

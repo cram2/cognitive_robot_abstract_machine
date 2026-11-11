@@ -60,7 +60,7 @@ class SlowAnnotator(ThreadedAnnotator):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    sleep_in_s: float = 1.0
+    sleep_duration_seconds: float = 1.0
     """Delay applied while simulating annotator work."""
 
     def compute(self) -> Status:
@@ -95,7 +95,7 @@ class SlowAnnotator(ThreadedAnnotator):
         vis = cv2.rectangle(vis, (400, 400), (650, 650), (0, 0, 255), 2)
         self.get_annotator_output_struct().set_image(vis)
 
-        time.sleep(self.sleep_in_s)  # in s
+        time.sleep(self.sleep_duration_seconds)  # in s
 
         self.rk_logger.debug(
             "%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__
@@ -117,7 +117,7 @@ class EmptyAnnotator(BaseAnnotator):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    sleep_in_s: float = 1
+    sleep_duration_seconds: float = 1
     """This setting does not introduce a delay or affect the generated output."""
 
     def update(self) -> Status:

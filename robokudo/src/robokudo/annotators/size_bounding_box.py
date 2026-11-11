@@ -24,7 +24,7 @@ from robokudo.utils.transform import get_transform_matrix
 """
 Robokudo Size Annotator on Bounding Boxes 3D
 
-:class:`SizeBBAnnotator` performs an analysis of the 3D point cloud from any object hypothesis to 
+:class:`SizeBoundingBoxAnnotator` performs an analysis of the 3D point cloud from any object hypothesis to 
 derive the size of the objects from 3D oriented bounding boxes and annotates
 the information found for later processing steps.
 
@@ -42,7 +42,7 @@ Processing steps:
 
 
 @dataclass(eq=False)
-class SizeBBAnnotator(BaseAnnotator):
+class SizeBoundingBoxAnnotator(BaseAnnotator):
     """
     A class to analyze 3D point clouds and compute oriented bounding box sizes.
 

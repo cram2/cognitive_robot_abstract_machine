@@ -29,7 +29,7 @@ from robokudo.types.scene import ObjectHypothesis
 
 
 @dataclass(eq=False)
-class CASCheckFunc(BaseAnnotator):
+class CASCheckFunction(BaseAnnotator):
     """
     Function-based CAS condition checker.
 
@@ -96,11 +96,11 @@ def any_of_type_present(annotation_type: type, cas: CAS) -> bool:
 
 
 @dataclass(init=False, eq=False)
-class CASCheckAnnotationTypeExists(CASCheckFunc):
+class CASCheckAnnotationTypeExists(CASCheckFunction):
     """
     Check for existence of specific annotation types.
 
-    Specialized CASCheckFunc that:
+    Specialized CASCheckFunction that:
 
     * Checks for presence of specific annotation types
     * Returns SUCCESS if at least one annotation exists
@@ -150,7 +150,7 @@ class CASCheckAnnotationTypeExists(CASCheckFunc):
 
 
 @dataclass(init=False, eq=False)
-class CASCheckOHExists(CASCheckAnnotationTypeExists):
+class CASCheckObjectHypothesisExists(CASCheckAnnotationTypeExists):
     """
     Check for existence of ObjectHypothesis annotations.
 
@@ -189,6 +189,6 @@ class CASCheckOHExists(CASCheckAnnotationTypeExists):
         :param raise_with_str: Error message to raise on failure, empty string disables
             raising
         """
-        super(CASCheckOHExists, self).__init__(
+        super(CASCheckObjectHypothesisExists, self).__init__(
             name=name, annotation_type=ObjectHypothesis, raise_with_str=raise_with_str
         )

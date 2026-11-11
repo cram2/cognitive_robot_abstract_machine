@@ -218,7 +218,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
     )
     """Projection model at the depth image resolution."""
 
-    roi_comparator: RoiComparator = field(init=False, repr=False)
+    image_region_comparator: RoiComparator = field(init=False, repr=False)
     """Comparator measuring how much a detection overlaps an existing hypothesis."""
 
     @classproperty
@@ -238,7 +238,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         super().__post_init__()
 
         self.model_location: str = self.descriptor.parameters.model_location(self.name)
-        self.roi_comparator = RoiComparator(weight=1.0)
+        self.image_region_comparator = RoiComparator(weight=1.0)
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -404,11 +404,11 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
             return None
         most_overlapped = max(
             hypotheses,
-            key=lambda hypothesis: self.roi_comparator.compute_similarity(
+            key=lambda hypothesis: self.image_region_comparator.compute_similarity(
                 hypothesis.roi.roi, region
             ),
         )
-        overlap = self.roi_comparator.compute_similarity(
+        overlap = self.image_region_comparator.compute_similarity(
             most_overlapped.roi.roi, region
         )
         if overlap <= self.descriptor.parameters.minimum_hypothesis_overlap:

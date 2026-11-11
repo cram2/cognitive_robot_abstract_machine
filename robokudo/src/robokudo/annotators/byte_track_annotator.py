@@ -51,12 +51,12 @@ class ByteTrackAnnotator(BaseAnnotator):
     label_annotator: sv.RichLabelAnnotator = field(init=False, repr=False)
     """
     A special label annotator, that cannot simply be used like the annotators in
-    `self.vis_annotators`.
+    `self.visualization_annotators`.
     """
 
-    vis_annotators: list[sv.BoxAnnotator | sv.MaskAnnotator | sv.TraceAnnotator] = (
-        field(init=False, repr=False)
-    )
+    visualization_annotators: list[
+        sv.BoxAnnotator | sv.MaskAnnotator | sv.TraceAnnotator
+    ] = field(init=False, repr=False)
     """
     A list of simple supervision annotators to use for visualization.
 
@@ -74,7 +74,7 @@ class ByteTrackAnnotator(BaseAnnotator):
 
         self.label_annotator = sv.RichLabelAnnotator(color_lookup=sv.ColorLookup.TRACK)
 
-        self.vis_annotators = [
+        self.visualization_annotators = [
             sv.BoxAnnotator(color_lookup=sv.ColorLookup.TRACK),
             sv.MaskAnnotator(color_lookup=sv.ColorLookup.INDEX),
             sv.TraceAnnotator(color_lookup=sv.ColorLookup.TRACK),
@@ -186,7 +186,7 @@ class ByteTrackAnnotator(BaseAnnotator):
             tracked_detections.tracker_id is not None
             and len(tracked_detections.tracker_id) > 0
         ):
-            for annotator in self.vis_annotators:
+            for annotator in self.visualization_annotators:
                 vis_image = annotator.annotate(vis_image, tracked_detections)
 
             labels = []

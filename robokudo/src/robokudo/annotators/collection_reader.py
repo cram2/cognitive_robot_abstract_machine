@@ -82,7 +82,7 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     Number of consecutive ticks waiting for camera data.
     """
 
-    iterations_since_last_data_warn_threshold: int = field(init=False, repr=False)
+    iterations_since_last_data_warning_threshold: int = field(init=False, repr=False)
     """
     Number of waiting ticks between camera availability warnings.
     """
@@ -123,7 +123,7 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
         """
         Number of consecutive ticks waiting for camera data.
         """
-        self.iterations_since_last_data_warn_threshold: int = 40
+        self.iterations_since_last_data_warning_threshold: int = 40
         """
         Number of waiting ticks between camera availability warnings.
         """
@@ -155,7 +155,7 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
             self.feedback_message = "Waiting for incoming sensor data ..."
             if (
                 self.iterations_since_last_data
-                >= self.iterations_since_last_data_warn_threshold
+                >= self.iterations_since_last_data_warning_threshold
             ):
                 self.rk_logger.warning(
                     "Didn't receive sensor data since %s iterations.",

@@ -429,16 +429,16 @@ class Worker(object):
     execute a callback when the function completes.
     """
 
-    def __init__(self, fn: Callable, args: tuple = ()) -> None:
+    def __init__(self, function: Callable, arguments: tuple = ()) -> None:
         """
         Initialize the worker.
 
-        :param fn: The function to execute
-        :param args: Arguments to pass to the function
+        :param function: The function to execute
+        :param arguments: Arguments to pass to the function
         """
         self.future: Future = Future()
-        self._fn: Callable = fn
-        self._args: tuple = args
+        self._function: Callable = function
+        self._arguments: tuple = arguments
 
     def start(self, callback: Callable | None = None) -> threading.Thread:
         """
@@ -457,7 +457,7 @@ class Worker(object):
         Execute the function and store its result in the future object.
         """
         try:
-            self.future.set_result(self._fn(*self._args))
+            self.future.set_result(self._function(*self._arguments))
         except BaseException as e:
             self.future.set_exception(e)
 

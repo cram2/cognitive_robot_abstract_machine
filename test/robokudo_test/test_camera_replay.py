@@ -7,23 +7,20 @@ from __future__ import annotations
 # %% Imports
 import json
 from dataclasses import dataclass, replace
-from typing_extensions import Any
 from unittest.mock import Mock
 
 import numpy as np
 import pytest
-
-from robokudo import world as rk_world
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_mongodb_playback import MongoReplayMode
-from robokudo.exceptions import InvalidCameraObservation, CameraObservationMissing
+from robokudo.exceptions import CameraObservationMissing, InvalidCameraObservation
 from robokudo.io.cas_view_codecs import CameraObservationCodec, ViewPayload
+from robokudo.io.exceptions import RecordedViewMissing
 from robokudo.io.sensor_world import RecordedCameraWorld
 from robokudo.io.storage import Storage, StorageDocumentField
-from robokudo.io.exceptions import RecordedViewMissing
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types import Point2
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -38,10 +35,12 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
+from typing_extensions import Any
+
+from robokudo import world as rk_world
 
 # %% Recorded scene
 
@@ -394,7 +393,7 @@ def test_sensor_replay_skips_recorded_nonsensor_views() -> None:
     collection.find_one.return_value = Storage.encode_view_document(
         CASViews.COLOR_IMAGE, 7
     )
-    storage.db = {Storage.VIEW_COLLECTION_NAME: collection}
+    storage.database = {Storage.VIEW_COLLECTION_NAME: collection}
     frame = {
         StorageDocumentField.VIEW_IDS: {
             CASViews.COLOR_IMAGE: 1,
@@ -545,7 +544,7 @@ def test_storage_reports_missing_view_document() -> None:
     storage = Storage.__new__(Storage)
     collection = Mock()
     collection.find_one.return_value = None
-    storage.db = {Storage.VIEW_COLLECTION_NAME: collection}
+    storage.database = {Storage.VIEW_COLLECTION_NAME: collection}
     with pytest.raises(RecordedViewMissing):
         storage.load_view_document(
             {StorageDocumentField.VIEW_IDS: {CASViews.COLOR_IMAGE: 42}},

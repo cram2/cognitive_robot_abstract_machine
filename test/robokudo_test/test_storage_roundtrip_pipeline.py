@@ -1,34 +1,33 @@
 from __future__ import annotations
 
+import json
+
 # %% Imports
 import os
-from pathlib import Path
-import json
 import uuid
-import pytest
+from pathlib import Path
 
 import numpy as np
 import py_trees
-from rclpy.node import Node
-
-from robokudo.types.cv import ColorToDepthRatio
+import pytest
 import robokudo.defs
-from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
+import robokudo.utils.tree_execution
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from rclpy.node import Node
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.storage import StorageWriter
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.cas import CASViews
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.io.storage import Storage, StorageDocumentField
-import robokudo.utils.tree_execution
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-
-from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
-from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
+from robokudo.types.cv import ColorToDepthRatio
+
+from robokudo import world as rk_world
 
 pytestmark = pytest.mark.skipif(
     os.getenv("CI") == "true",
@@ -107,8 +106,8 @@ class TestStorageRoundtripPipeline:
                 writer_pipeline, writer_node
             )
             assert writer_status is py_trees.common.Status.SUCCESS
-            assert storage.db.cas.count_documents({}) == 1
-            stored_record = storage.db.cas.find_one({})
+            assert storage.database.cas.count_documents({}) == 1
+            stored_record = storage.database.cas.find_one({})
             assert stored_record is not None
             assert "world" in stored_record
 
@@ -121,13 +120,13 @@ class TestStorageRoundtripPipeline:
                 CASViews.QUERY, {"recorded": True}
             )
             query_id = (
-                storage.db[Storage.VIEW_COLLECTION_NAME]
+                storage.database[Storage.VIEW_COLLECTION_NAME]
                 .insert_one(query_document)
                 .inserted_id
             )
             view_ids = dict(stored_record[StorageDocumentField.VIEW_IDS])
             view_ids[CASViews.QUERY] = query_id
-            storage.db.cas.update_one(
+            storage.database.cas.update_one(
                 {"_id": stored_record["_id"]},
                 {"$set": {StorageDocumentField.VIEW_IDS: view_ids}},
             )

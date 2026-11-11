@@ -36,7 +36,7 @@ class ObjectAssociator(BaseAnnotator):
     Object state retained between processing iterations.
     """
 
-    obj_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
+    object_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
     """
     Compares current hypotheses with tracked objects.
     """
@@ -49,7 +49,7 @@ class ObjectAssociator(BaseAnnotator):
         super().__post_init__()
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
-        self.obj_comparator = (
+        self.object_comparator = (
             ObjectHypothesisComparator(self.get_cas)
             .with_comparator_for(PoseAnnotation, 0.3, max_distance=0.5)
             .with_comparator_for(Classification, 0.3)
@@ -75,7 +75,7 @@ class ObjectAssociator(BaseAnnotator):
             best_similarity = 0.0
 
             for oh_id, prev_oh in enumerate(self.tracked_objects):
-                similarity = self.obj_comparator.compute_similarity(prev_oh, new_oh)
+                similarity = self.object_comparator.compute_similarity(prev_oh, new_oh)
                 if similarity > 0.5 and similarity > best_similarity:
                     best_match_id = oh_id
                     best_similarity = similarity

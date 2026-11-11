@@ -123,7 +123,7 @@ def test_collection_reader_reports_wait_threshold(
     Reaching the wait threshold emits a warning and resets the counter.
     """
     reader_pipeline.camera_interface.has_new_data.return_value = False
-    reader_pipeline.reader.iterations_since_last_data_warn_threshold = 1
+    reader_pipeline.reader.iterations_since_last_data_warning_threshold = 1
     with caplog.at_level(logging.WARNING):
         assert reader_pipeline.reader.update() == Status.RUNNING
     assert reader_pipeline.reader.iterations_since_last_data == 0

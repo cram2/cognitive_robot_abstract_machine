@@ -1,3 +1,4 @@
+from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
@@ -18,7 +19,6 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 from robokudo.world import world_instance
-from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -64,7 +64,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
                 ClusterPoseBoundingBoxAnnotator(),
-                # SlowAnnotator("SlowAnnotator",sleep_in_s=0),
+                # SlowAnnotator("SlowAnnotator",sleep_duration_seconds=0),
             ]
         )
         return seq
