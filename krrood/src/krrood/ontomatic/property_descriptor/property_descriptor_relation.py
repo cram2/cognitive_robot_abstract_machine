@@ -65,7 +65,7 @@ class InferredThrough(Enum):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RelationExplanation:
     """
     How an inferred relation was derived.
@@ -85,7 +85,7 @@ class RelationExplanation:
 # %% declarations and paths
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Declaration:
     """
     An object of an individual whose class declares a property, with the descriptor of the declaration.
@@ -102,7 +102,7 @@ class Declaration:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RelationPath:
     """
     A path of relations in the symbol graph, from its first node to its last.
@@ -127,7 +127,7 @@ class RelationPath:
 # %% relations
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class PropertyDescriptorRelation(PredicateClassRelation):
     """
     Edge data representing a relation between two wrapped instances that is represented structurally by a property
@@ -147,7 +147,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
     # %% the objects of an individual
 
     @staticmethod
-    def root_role_taker(instance: Symbol) -> Symbol:
+    def root_role_taker(*, instance: Symbol) -> Symbol:
         """
         :return: The object at the end of the role-taker chain of the instance, or the instance if it is no role.
         """
@@ -156,18 +156,19 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         )
 
     @classmethod
-    def objects_of_individual(cls, instance: Symbol) -> list[Symbol]:
+    def objects_of_individual(cls, *, instance: Symbol) -> list[Symbol]:
         """
         :param instance: An object of the individual.
         :return: The objects representing the individual of the instance: its root role taker followed by the roles
             of the root in the order they were created.
         """
-        root = cls.root_role_taker(instance)
-        return [root, *Role.roles_for(root)]
+        root = cls.root_role_taker(instance=instance)
+        return [root, *Role.roles_for(role_taker=root)]
 
     @classmethod
     def declaring_object(
         cls,
+        *,
         instance: Symbol,
         property_descriptor_class: type[PropertyDescriptor],
         value: Symbol,
@@ -179,13 +180,15 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
         :return: The declaration, or None if no object of the individual declares the property.
         """
-        value_objects = cls.objects_of_individual(value)
+        value_objects = cls.objects_of_individual(instance=value)
         first_declaration = None
-        for individual_object in cls.objects_of_individual(instance):
-            descriptor = property_descriptor_class.declared_by(type(individual_object))
+        for individual_object in cls.objects_of_individual(instance=instance):
+            descriptor = property_descriptor_class.declared_by(
+                domain_type=type(individual_object)
+            )
             if descriptor is None:
                 continue
-            declaration = Declaration(individual_object, descriptor)
+            declaration = Declaration(holder=individual_object, descriptor=descriptor)
             if any(
                 isinstance(value_object, descriptor.range)
                 for value_object in value_objects
@@ -226,21 +229,23 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         :raises NoObjectOfIndividualDeclaresProperty: If no object of the individual declares the property.
         """
         declaration = self.declaring_object(
-            self.source.instance,
-            self.property_descriptor_class,
-            self.target.instance,
+            instance=self.source.instance,
+            property_descriptor_class=self.property_descriptor_class,
+            value=self.target.instance,
         )
         if declaration is None:
             raise NoObjectOfIndividualDeclaresProperty(
-                self.source.instance, self.property_descriptor_class
+                individual_object=self.source.instance,
+                property_descriptor_class=self.property_descriptor_class,
             )
         return declaration.descriptor.update_value(
-            declaration.holder, self.target.instance
+            domain_value=declaration.holder, range_value=self.target.instance
         )
 
     @classmethod
     def add_inferred_relation(
         cls,
+        *,
         source_instance: Symbol,
         property_descriptor_class: type[PropertyDescriptor],
         target: WrappedInstance,
@@ -252,14 +257,16 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         no object of the individual declares the property.
         """
         declaration = cls.declaring_object(
-            source_instance, property_descriptor_class, target.instance
+            instance=source_instance,
+            property_descriptor_class=property_descriptor_class,
+            value=target.instance,
         )
         if declaration is None:
             return
         cls(
-            SymbolGraph().ensure_wrapped_instance(declaration.holder),
-            target,
-            declaration.descriptor.wrapped_field,
+            source=SymbolGraph().ensure_wrapped_instance(instance=declaration.holder),
+            target=target,
+            wrapped_field=declaration.descriptor.wrapped_field,
             inferred=True,
             explanation=explanation,
         ).update_source_and_add_to_graph_and_apply_implications()
@@ -289,10 +296,12 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             equivalent_descriptor
         ) in self.property_descriptor_class.get_equivalent_properties():
             self.add_inferred_relation(
-                self.source.instance,
-                equivalent_descriptor,
-                self.target,
-                RelationExplanation(InferredThrough.EQUIVALENT, (self,)),
+                source_instance=self.source.instance,
+                property_descriptor_class=equivalent_descriptor,
+                target=self.target,
+                explanation=RelationExplanation(
+                    rule=InferredThrough.EQUIVALENT, premises=(self,)
+                ),
             )
 
     def infer_super_relations(self):
@@ -301,10 +310,12 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for super_descriptor_type in self.property_descriptor_class.super_properties():
             self.add_inferred_relation(
-                self.source.instance,
-                super_descriptor_type,
-                self.target,
-                RelationExplanation(InferredThrough.SUPER, (self,)),
+                source_instance=self.source.instance,
+                property_descriptor_class=super_descriptor_type,
+                target=self.target,
+                explanation=RelationExplanation(
+                    rule=InferredThrough.SUPER, premises=(self,)
+                ),
             )
 
     def infer_inverse_relation(self):
@@ -313,10 +324,12 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         if self.inverse_of and self.rule is not InferredThrough.INVERSE:
             self.add_inferred_relation(
-                self.target.instance,
-                self.inverse_of,
-                self.source,
-                RelationExplanation(InferredThrough.INVERSE, (self,)),
+                source_instance=self.target.instance,
+                property_descriptor_class=self.inverse_of,
+                target=self.source,
+                explanation=RelationExplanation(
+                    rule=InferredThrough.INVERSE, premises=(self,)
+                ),
             )
 
     def infer_symmetric_relation(self):
@@ -327,10 +340,12 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             return
         if issubclass(self.property_descriptor_class, SymmetricProperty):
             self.add_inferred_relation(
-                self.target.instance,
-                self.property_descriptor_class,
-                self.source,
-                RelationExplanation(InferredThrough.SYMMETRY, (self,)),
+                source_instance=self.target.instance,
+                property_descriptor_class=self.property_descriptor_class,
+                target=self.source,
+                explanation=RelationExplanation(
+                    rule=InferredThrough.SYMMETRY, premises=(self,)
+                ),
             )
 
     def infer_transitive_relations(self):
@@ -342,25 +357,29 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             return
         for relation in list(
             self.outgoing_relations_of_descriptor(
-                self.target, self.property_descriptor_class
+                node=self.target, descriptor_class=self.property_descriptor_class
             )
         ):
             self.add_inferred_relation(
-                self.source.instance,
-                self.property_descriptor_class,
-                relation.target,
-                RelationExplanation(InferredThrough.TRANSITIVE, (self, relation)),
+                source_instance=self.source.instance,
+                property_descriptor_class=self.property_descriptor_class,
+                target=relation.target,
+                explanation=RelationExplanation(
+                    rule=InferredThrough.TRANSITIVE, premises=(self, relation)
+                ),
             )
         for relation in list(
             self.incoming_relations_of_descriptor(
-                self.source, self.property_descriptor_class
+                node=self.source, descriptor_class=self.property_descriptor_class
             )
         ):
             self.add_inferred_relation(
-                relation.source.instance,
-                self.property_descriptor_class,
-                self.target,
-                RelationExplanation(InferredThrough.TRANSITIVE, (relation, self)),
+                source_instance=relation.source.instance,
+                property_descriptor_class=self.property_descriptor_class,
+                target=self.target,
+                explanation=RelationExplanation(
+                    rule=InferredThrough.TRANSITIVE, premises=(relation, self)
+                ),
             )
 
     def infer_chained_relations(self):
@@ -370,24 +389,30 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         for chain_position in self.property_descriptor_class.chain_positions():
             for path_before in self.paths_to(
-                self.source, chain_position.descriptors_before
+                end=self.source, descriptor_classes=chain_position.descriptors_before
             ):
                 for path_after in self.paths_from(
-                    self.target, chain_position.descriptors_after
+                    start=self.target,
+                    descriptor_classes=chain_position.descriptors_after,
                 ):
                     self.add_inferred_relation(
-                        path_before.first.instance,
-                        chain_position.implied_descriptor,
-                        path_after.last,
-                        RelationExplanation(
-                            InferredThrough.CHAIN,
-                            (*path_before.relations, self, *path_after.relations),
+                        source_instance=path_before.first.instance,
+                        property_descriptor_class=chain_position.implied_descriptor,
+                        target=path_after.last,
+                        explanation=RelationExplanation(
+                            rule=InferredThrough.CHAIN,
+                            premises=(
+                                *path_before.relations,
+                                self,
+                                *path_after.relations,
+                            ),
                         ),
                     )
 
     @classmethod
     def paths_to(
         cls,
+        *,
         end: WrappedInstance,
         descriptor_classes: tuple[type[PropertyDescriptor], ...],
     ) -> Iterator[RelationPath]:
@@ -397,16 +422,23 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         :return: Every path of relations of the descriptor classes ending in the node.
         """
         if not descriptor_classes:
-            yield RelationPath(end, end)
+            yield RelationPath(first=end, last=end)
             return
         *before, last = descriptor_classes
-        for relation in list(cls.incoming_relations_of_descriptor(end, last)):
-            for path in cls.paths_to(relation.source, tuple(before)):
-                yield RelationPath(path.first, end, (*path.relations, relation))
+        for relation in list(
+            cls.incoming_relations_of_descriptor(node=end, descriptor_class=last)
+        ):
+            for path in cls.paths_to(
+                end=relation.source, descriptor_classes=tuple(before)
+            ):
+                yield RelationPath(
+                    first=path.first, last=end, relations=(*path.relations, relation)
+                )
 
     @classmethod
     def paths_from(
         cls,
+        *,
         start: WrappedInstance,
         descriptor_classes: tuple[type[PropertyDescriptor], ...],
     ) -> Iterator[RelationPath]:
@@ -416,25 +448,31 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         :return: Every path of relations of the descriptor classes starting from the node.
         """
         if not descriptor_classes:
-            yield RelationPath(start, start)
+            yield RelationPath(first=start, last=start)
             return
         first, *after = descriptor_classes
-        for relation in list(cls.outgoing_relations_of_descriptor(start, first)):
-            for path in cls.paths_from(relation.target, tuple(after)):
-                yield RelationPath(start, path.last, (relation, *path.relations))
+        for relation in list(
+            cls.outgoing_relations_of_descriptor(node=start, descriptor_class=first)
+        ):
+            for path in cls.paths_from(
+                start=relation.target, descriptor_classes=tuple(after)
+            ):
+                yield RelationPath(
+                    first=start, last=path.last, relations=(relation, *path.relations)
+                )
 
     # %% relations in the graph
 
     @staticmethod
     def incoming_relations_of_descriptor(
-        node: WrappedInstance, descriptor_class: type[PropertyDescriptor]
+        *, node: WrappedInstance, descriptor_class: type[PropertyDescriptor]
     ) -> Iterator[PropertyDescriptorRelation]:
         """
         :return: The relations of the descriptor class, or of a subclass of it, that end in the node.
         """
         yield from SymbolGraph().get_incoming_relations_with_condition(
-            node,
-            lambda relation: (
+            wrapped_instance=node,
+            edge_condition=lambda relation: (
                 isinstance(relation, PropertyDescriptorRelation)
                 and issubclass(relation.property_descriptor_class, descriptor_class)
             ),
@@ -442,14 +480,14 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
     @staticmethod
     def outgoing_relations_of_descriptor(
-        node: WrappedInstance, descriptor_class: type[PropertyDescriptor]
+        *, node: WrappedInstance, descriptor_class: type[PropertyDescriptor]
     ) -> Iterator[PropertyDescriptorRelation]:
         """
         :return: The relations of the descriptor class, or of a subclass of it, that start from the node.
         """
         yield from SymbolGraph().get_outgoing_relations_with_condition(
-            node,
-            lambda relation: (
+            wrapped_instance=node,
+            edge_condition=lambda relation: (
                 isinstance(relation, PropertyDescriptorRelation)
                 and issubclass(relation.property_descriptor_class, descriptor_class)
             ),
@@ -496,15 +534,15 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         """
         return f"{self.source.name} {self.wrapped_field.name} {self.target.name}"
 
-    def explain(self, depth: int = 3) -> str:
+    def explain(self, *, depth: int = 3) -> str:
         """
         :param depth: How many levels of premises to show.
         :return: The fact of this relation and the rule it was inferred through, with the explanations of its
             premises indented below it, one line per fact.
         """
-        return "\n".join(self.explanation_lines(depth))
+        return "\n".join(self.explanation_lines(depth=depth))
 
-    def explanation_lines(self, depth: int, indentation: str = "") -> Iterator[str]:
+    def explanation_lines(self, *, depth: int, indentation: str = "") -> Iterator[str]:
         """
         :param depth: How many levels of premises to show.
         :param indentation: The indentation of the line of this relation.
@@ -515,11 +553,14 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         if self.explanation is None or depth == 0:
             return
         for premise in self.explanation.premises:
-            yield from premise.explanation_lines(depth - 1, f"{indentation}  ")
+            yield from premise.explanation_lines(
+                depth=depth - 1, indentation=f"{indentation}  "
+            )
 
     @classmethod
     def find(
         cls,
+        *,
         source_instance: Symbol,
         property_descriptor_class: type[PropertyDescriptor],
         target_instance: Symbol,
@@ -530,14 +571,14 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         :param target_instance: The value.
         :return: The relation in the symbol graph for the fact; None if there is none.
         """
-        source = SymbolGraph().get_wrapped_instance(source_instance)
+        source = SymbolGraph().get_wrapped_instance(instance=source_instance)
         if source is None:
             return None
         return next(
             (
                 relation
                 for relation in cls.outgoing_relations_of_descriptor(
-                    source, property_descriptor_class
+                    node=source, descriptor_class=property_descriptor_class
                 )
                 if relation.property_descriptor_class is property_descriptor_class
                 and relation.target.instance is target_instance

@@ -118,13 +118,13 @@ def generate_sqlalchemy_interface():
     logging.getLogger("krrood").setLevel(logging.DEBUG)
 
     class_diagram = ClassDiagram(
-        list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
+        classes=list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
     )
 
     instance = ORMatic(
         class_dependency_graph=class_diagram,
         interface_information=OrmaticInterfaceInformation(
-            type_mappings=TypeDict({KRROODPhysicalObject: ConceptType}),
+            type_mappings=TypeDict(_dict={KRROODPhysicalObject: ConceptType}),
             alternative_mappings=recursive_subclasses(AlternativeMapping),
         ),
     )
@@ -144,7 +144,7 @@ def generate_sqlalchemy_interface():
     with tempfile.NamedTemporaryFile(
         "w", dir=directory, prefix="ormatic_interface.", suffix=".py.tmp", delete=False
     ) as temporary_file:
-        instance.to_sqlalchemy_file(temporary_file)
+        instance.to_sqlalchemy_file(file=temporary_file)
         temporary_path = temporary_file.name
     os.replace(temporary_path, file_path)
 

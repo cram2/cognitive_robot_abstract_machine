@@ -37,7 +37,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
         """
         :return: The type this selects its nodes by.
         """
-        return type(self).get_type_of_generic_parameter(MatchedType)
+        return type(self).get_type_of_generic_parameter(parameter=MatchedType)
 
     def matches_node(self, plan_node: StatechartNode) -> bool:
         """

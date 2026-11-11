@@ -97,7 +97,7 @@ class Sage10kDatasetLoader:
 
         raw_json = json_file.read_text()
         json_dict = json.loads(raw_json)
-        result = Sage10kScene._from_json(json_dict)
+        result = Sage10kScene._from_json(data=json_dict)
         result.directory = extracted_dir
 
         return result

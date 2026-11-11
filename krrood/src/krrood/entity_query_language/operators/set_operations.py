@@ -25,7 +25,7 @@ from krrood.entity_query_language.utils import (
 )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class EvaluatesChildrenInSequence(MultiArityExpression, ABC):
     """
     An expression that yields the results of each of its children in turn.
@@ -38,18 +38,21 @@ class EvaluatesChildrenInSequence(MultiArityExpression, ABC):
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         yield from (
             self._build_operation_result_with_truth_(
-                child_result.is_true, child_result.bindings, child_result
+                truth=child_result.is_true,
+                bindings=child_result.bindings,
+                child_result=child_result,
             )
             for child_result in itertools.chain(
-                *(var._evaluate_(sources) for var in self._operation_children_)
+                *(var._evaluate_(sources=sources) for var in self._operation_children_)
             )
         )
 
-    def add_child(self, child: SymbolicExpression) -> None:
+    def add_child(self, *, child: SymbolicExpression) -> None:
         """
         Adds a child operand to this expression.
 
@@ -59,7 +62,7 @@ class EvaluatesChildrenInSequence(MultiArityExpression, ABC):
         child._parent_ = self
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Union(TruthValuedExpression, EvaluatesChildrenInSequence):
     """
     A symbolic union operation that can be used to evaluate multiple symbolic
@@ -70,7 +73,7 @@ class Union(TruthValuedExpression, EvaluatesChildrenInSequence):
     """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class PerformsCartesianProduct(SymbolicExpression, ABC):
     """
     A symbolic operation that evaluates its children in nested sequence, passing
@@ -89,7 +92,7 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         ...
 
     def _evaluate_product_(
-        self, sources: OperationResult | None
+        self, *, sources: OperationResult | None
     ) -> Iterator[OperationResult]:
         """
         Evaluate the symbolic expressions by generating combinations of values from
@@ -98,13 +101,13 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         :param sources: The current OperationResult carrying bindings, or None.
         :return: An Iterable of Bindings for each combination of values.
         """
-        ordered_operands = self._optimize_operands_order_(sources)
+        ordered_operands = self._optimize_operands_order_(sources=sources)
         return cartesian_product_while_passing_the_bindings_around(
             ordered_operands, sources
         )
 
     def _optimize_operands_order_(
-        self, sources: OperationResult | None
+        self, *, sources: OperationResult | None
     ) -> tuple[SymbolicExpression, ...]:
         """
         Should be overridden by derived classes if they can optimize the operands order.
@@ -112,7 +115,7 @@ class PerformsCartesianProduct(SymbolicExpression, ABC):
         return self._product_operands_
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class MultiArityExpressionThatPerformsACartesianProduct(
     MultiArityExpression, PerformsCartesianProduct, ABC
 ):

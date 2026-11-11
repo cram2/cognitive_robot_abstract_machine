@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnMonitoredContainerTypeForDescriptor(Exception):
     """
     Raised when a descriptor is used on a field with a container type that is not
@@ -34,7 +34,7 @@ class UnMonitoredContainerTypeForDescriptor(Exception):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoObjectOfIndividualDeclaresProperty(DataclassException):
     """
     Raised when a fact is stored for an individual none of whose objects, its root role

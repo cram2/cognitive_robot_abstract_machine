@@ -20,12 +20,12 @@ def test_module_generation():
     )
 
     description = ModuleRenderer.from_dataclasses(
-        [in_memory_class, in_memory_child_class]
+        classes=[in_memory_class, in_memory_child_class]
     )
 
     # generate a file in the dataset containing the parsing result
     path = Path(__file__).parent.parent / "dataset" / "generated_module.py"
-    description.write_to_file(path)
+    description.write_to_file(path=path)
 
     from ..dataset.generated_module import InMemoryClass, InMemoryChildClass
 

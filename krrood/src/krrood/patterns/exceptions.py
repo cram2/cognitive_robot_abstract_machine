@@ -8,7 +8,7 @@ from typing_extensions import Any, Callable
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DelegatedFactoryMethodError(DataclassException):
     """
     Raised when a role-taker factory method is invoked through a role.
@@ -48,7 +48,7 @@ class DelegatedFactoryMethodError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoleAttributeNotDeclaredError(DataclassException):
     """
     Raised when assigning a name that the role does not declare as one of its own
@@ -81,7 +81,7 @@ class RoleAttributeNotDeclaredError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnmemoizableOwnerError(DataclassException):
     """
     Raised when a memoized call's owner cannot hold a cache.
@@ -113,7 +113,7 @@ class UnmemoizableOwnerError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeywordNamesNoFactoryParameter(DataclassException, TypeError):
     """
     Raised when a keyword argument given for construction names no parameter of the
@@ -144,7 +144,7 @@ class KeywordNamesNoFactoryParameter(DataclassException, TypeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousRuleError(DataclassException):
     """
     Two or more rules of a family are equally specific for the same subject, a collision
@@ -174,7 +174,7 @@ class AmbiguousRuleError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InterfaceInstantiationError(DataclassException, TypeError):
     """
     Raised when an interface itself is instantiated instead of a class implementing it.

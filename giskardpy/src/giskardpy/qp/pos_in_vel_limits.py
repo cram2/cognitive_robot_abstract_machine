@@ -176,7 +176,7 @@ class BrakingProfile:
         # A distance shorter than the last braking step would leave only rest, so the degree
         # of freedom could never close it; the first step covers it instead.
         shortest_braking_distance, _ = velocity_if_cases[0]
-        remaining_distance_profile = sm.Vector.zeros(velocity_profile.shape[0])
+        remaining_distance_profile = sm.Vector.zeros(size=velocity_profile.shape[0])
         remaining_distance_profile[0] = distance / time_step
         velocity_if_cases[0] = (shortest_braking_distance, remaining_distance_profile)
         velocity_if_cases.append(

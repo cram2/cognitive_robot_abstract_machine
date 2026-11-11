@@ -29,7 +29,7 @@ def individual() -> PersonWithTwoRoles:
     """
     :return: A person with a basketball lover role and a sports lover role.
     """
-    return PersonWithTwoRoles.named("Bass")
+    return PersonWithTwoRoles.named(name="Bass")
 
 
 # %% declarations of a property
@@ -40,9 +40,15 @@ def test_a_class_declares_a_property_through_the_nearest_class_declaring_it():
     A class declares a property through its own field managed by exactly that property,
     or else through the nearest class it inherits such a field from.
     """
-    assert Loves.declared_by(BasketBallLover) is BasketBallLover.__dict__["loves"]
-    assert Likes.declared_by(BasketBallLover) is PeopleWithHobby.__dict__["likes"]
-    assert Loves.declared_by(PersonWithHobbies) is None
+    assert (
+        Loves.declared_by(domain_type=BasketBallLover)
+        is BasketBallLover.__dict__["loves"]
+    )
+    assert (
+        Likes.declared_by(domain_type=BasketBallLover)
+        is PeopleWithHobby.__dict__["likes"]
+    )
+    assert Loves.declared_by(domain_type=PersonWithHobbies) is None
 
 
 # %% the objects of an individual
@@ -58,7 +64,9 @@ def test_objects_of_individual_lists_the_root_first_and_tells_roles_apart(
     Roles compare equal to their taker, so the objects are compared by identity.
     """
     for individual_object in individual.objects:
-        objects = PropertyDescriptorRelation.objects_of_individual(individual_object)
+        objects = PropertyDescriptorRelation.objects_of_individual(
+            instance=individual_object
+        )
         assert list(map(id, objects)) == list(map(id, individual.objects))
 
 
@@ -75,12 +83,14 @@ def test_declaring_object_chooses_the_first_declaration_whose_range_admits_the_v
     basketball = BasketBall(name="BasketBall")
     for individual_object in individual.objects:
         declaration = PropertyDescriptorRelation.declaring_object(
-            individual_object, Loves, football
+            instance=individual_object, property_descriptor_class=Loves, value=football
         )
         assert declaration.holder is individual.sports_lover
         assert declaration.descriptor.domain is SportsLover
         declaration = PropertyDescriptorRelation.declaring_object(
-            individual_object, Loves, basketball
+            instance=individual_object,
+            property_descriptor_class=Loves,
+            value=basketball,
         )
         assert declaration.holder is individual.basketball_lover
         assert declaration.descriptor.domain is BasketBallLover
@@ -95,7 +105,7 @@ def test_declaring_object_falls_back_to_the_first_declaration(
     """
     game = VideoGames(name="Tetris")
     declaration = PropertyDescriptorRelation.declaring_object(
-        individual.person, Loves, game
+        instance=individual.person, property_descriptor_class=Loves, value=game
     )
     assert declaration.holder is individual.basketball_lover
     assert declaration.descriptor.domain is BasketBallLover
@@ -108,7 +118,9 @@ def test_declaring_object_is_none_without_a_declaration():
     person = PersonWithHobbies(name="Bass")
     assert (
         PropertyDescriptorRelation.declaring_object(
-            person, Loves, Sports(name="Football")
+            instance=person,
+            property_descriptor_class=Loves,
+            value=Sports(name="Football"),
         )
         is None
     )

@@ -40,7 +40,7 @@ class Evaluable(ABC):
         ...
 
     def evaluate(
-        self, backend: QueryBackend | None = None, state: TermReader | None = None
+        self, *, backend: QueryBackend | None = None, state: TermReader | None = None
     ) -> Iterator:
         """
         Evaluate using the given backend, returning an iterator over the results.
@@ -58,11 +58,13 @@ class Evaluable(ABC):
 
             backend = EntityQueryLanguageBackend()
         if state is not None and not backend.reads_state:
-            raise BackendCannotReadState(type(backend))
-        return EvaluationContext.iterate_reading_from(state, backend.evaluate(self))
+            raise BackendCannotReadState(backend_type=type(backend))
+        return EvaluationContext.iterate_reading_from(
+            term_reader=state, results=backend.evaluate(expression=self)
+        )
 
     def tolist(
-        self, backend: QueryBackend | None = None, state: TermReader | None = None
+        self, *, backend: QueryBackend | None = None, state: TermReader | None = None
     ) -> list:
         """
         Evaluate and return the results as a list.
@@ -74,7 +76,7 @@ class Evaluable(ABC):
         return make_list(self.evaluate(backend=backend, state=state))
 
     def first(
-        self, backend: QueryBackend | None = None, state: TermReader | None = None
+        self, *, backend: QueryBackend | None = None, state: TermReader | None = None
     ):
         """
         Evaluate and return the first result.

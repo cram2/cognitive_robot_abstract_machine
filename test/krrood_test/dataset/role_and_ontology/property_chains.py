@@ -18,7 +18,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersonWithAncestors(Symbol):
     """
     A person related to its children and to its descendants.
@@ -38,14 +38,14 @@ class PersonWithAncestors(Symbol):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParentOf(PropertyDescriptor):
     """
     Relates a person to its children.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AncestorOf(PropertyDescriptor, HasChainAxioms):
     """
     Relates a person to its descendants, implied by every chain of children.
@@ -54,14 +54,14 @@ class AncestorOf(PropertyDescriptor, HasChainAxioms):
     @classmethod
     def get_chain_axioms(cls) -> list[PropertyChain]:
         return [
-            PropertyChain((ParentOf, ParentOf)),
-            PropertyChain((ParentOf, AncestorOf)),
+            PropertyChain(properties=(ParentOf, ParentOf)),
+            PropertyChain(properties=(ParentOf, AncestorOf)),
         ]
 
 
 PersonWithAncestors.parent_of = ParentOf.from_eql_attribute(
-    a(PersonWithAncestors).parent_of
+    attribute=a(PersonWithAncestors).parent_of
 )
 PersonWithAncestors.ancestor_of = AncestorOf.from_eql_attribute(
-    a(PersonWithAncestors).ancestor_of
+    attribute=a(PersonWithAncestors).ancestor_of
 )

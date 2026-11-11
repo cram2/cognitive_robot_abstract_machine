@@ -13,7 +13,7 @@ from typing_extensions import Annotated
 # %% annotated fields
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnnotatedFieldMember:
     """
     An object another object refers to through an annotated field.
@@ -25,7 +25,7 @@ class AnnotatedFieldMember:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnnotatedFieldOwner:
     """
     An object with an annotated column and an annotated relationship.

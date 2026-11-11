@@ -100,7 +100,7 @@ class ClientAnsweringFromTheControlLoop(InputSynchronizer):
         feedback = feedback_data(self.action_server.feedback_messages[-1])
         for message in self.client.answer(feedback):
             sent = ChildChoiceMessage.from_json(
-                json.loads(json.dumps(message.to_json()))
+                data=json.loads(json.dumps(message.to_json()))
             )
             self.sent_messages.append(sent)
             self.server_chooser.receive(sent)

@@ -218,10 +218,10 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         return {**super().to_json(), "assignments": self.assignments_to_json()}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         variables = [from_json(variable) for variable in data["variables"]]
         assignments = [
-            AbstractCompositeSet.from_json(assignment)
+            AbstractCompositeSet.from_json(data=assignment)
             for assignment in data["assignments"]
         ]
         return cls.from_data(
@@ -236,7 +236,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         cls, data: dict[str, Any], variables: list[Variable]
     ) -> Self:
         assignments = [
-            AbstractCompositeSet.from_json(assignment)
+            AbstractCompositeSet.from_json(data=assignment)
             for assignment in data["assignments"]
         ]
         return cls.from_data(

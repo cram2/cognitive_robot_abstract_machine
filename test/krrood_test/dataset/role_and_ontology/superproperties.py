@@ -16,7 +16,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersonWithFeelings(Symbol):
     """
     A person related to the people it knows, likes and loves.
@@ -40,27 +40,33 @@ class PersonWithFeelings(Symbol):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Knows(PropertyDescriptor):
     """
     Relates a person to the people it knows.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Likes(Knows):
     """
     Relates a person to the people it likes, whom it also knows.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Loves(Likes):
     """
     Relates a person to the people it loves, whom it also likes.
     """
 
 
-PersonWithFeelings.knows = Knows.from_eql_attribute(a(PersonWithFeelings).knows)
-PersonWithFeelings.likes = Likes.from_eql_attribute(a(PersonWithFeelings).likes)
-PersonWithFeelings.loves = Loves.from_eql_attribute(a(PersonWithFeelings).loves)
+PersonWithFeelings.knows = Knows.from_eql_attribute(
+    attribute=a(PersonWithFeelings).knows
+)
+PersonWithFeelings.likes = Likes.from_eql_attribute(
+    attribute=a(PersonWithFeelings).likes
+)
+PersonWithFeelings.loves = Loves.from_eql_attribute(
+    attribute=a(PersonWithFeelings).loves
+)

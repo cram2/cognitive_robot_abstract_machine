@@ -64,7 +64,7 @@ class StatechartSentThroughJSON:
         sent_text = json.dumps(sent.to_json())
         tracker = WorldEntityWithIDKwargsTracker.from_world(context.world)
         received = Statechart.from_json(
-            json.loads(sent_text),
+            data=json.loads(sent_text),
             context=context,
             world=context.world,
             **tracker.create_kwargs(),

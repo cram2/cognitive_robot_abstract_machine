@@ -54,7 +54,7 @@ from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
     NoProgressError,
 )
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )

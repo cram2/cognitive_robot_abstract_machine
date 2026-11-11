@@ -16,7 +16,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
 from krrood.patterns.role import Role
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersonWithHobbies(Symbol):
     """
     A person, the role taker of its hobbies.
@@ -28,7 +28,7 @@ class PersonWithHobbies(Symbol):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Interest(Symbol):
     """
     Something a person can like.
@@ -40,28 +40,28 @@ class Interest(Symbol):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Sports(Interest):
     """
     A sport.
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class BasketBall(Sports):
     """
     Basketball.
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class VideoGames(Interest):
     """
     Video games.
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PeopleWithHobby(Role[PersonWithHobbies], Symbol):
     """
     A person in the role of someone with a hobby.
@@ -73,7 +73,7 @@ class PeopleWithHobby(Role[PersonWithHobbies], Symbol):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SportsLover(PeopleWithHobby):
     """
     A person in the role of a lover of sports.
@@ -85,7 +85,7 @@ class SportsLover(PeopleWithHobby):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class BasketBallLover(SportsLover):
     """
     A person in the role of a lover of basketball.
@@ -97,26 +97,26 @@ class BasketBallLover(SportsLover):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Likes(PropertyDescriptor):
     """
     Relates a person to what it likes.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Loves(Likes):
     """
     Relates a person to what it loves.
     """
 
 
-PeopleWithHobby.likes = Likes(PeopleWithHobby, "likes")
-SportsLover.loves = Loves(SportsLover, "loves")
-BasketBallLover.loves = Loves(BasketBallLover, "loves")
+PeopleWithHobby.likes = Likes(domain=PeopleWithHobby, field_name="likes")
+SportsLover.loves = Loves(domain=SportsLover, field_name="loves")
+BasketBallLover.loves = Loves(domain=BasketBallLover, field_name="loves")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PersonWithTwoRoles:
     """
     A person with a basketball lover role and a sports lover role, created in that order.
@@ -136,16 +136,16 @@ class PersonWithTwoRoles:
     """
 
     @classmethod
-    def named(cls, name: str) -> PersonWithTwoRoles:
+    def named(cls, *, name: str) -> PersonWithTwoRoles:
         """
         :param name: The name of the person.
         :return: A new person with both roles.
         """
         person = PersonWithHobbies(name=name)
         return cls(
-            person,
-            BasketBallLover(role_taker=person),
-            SportsLover(role_taker=person),
+            person=person,
+            basketball_lover=BasketBallLover(role_taker=person),
+            sports_lover=SportsLover(role_taker=person),
         )
 
     @property

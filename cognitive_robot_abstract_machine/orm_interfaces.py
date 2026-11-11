@@ -294,7 +294,7 @@ class GenerationOutput:
         if started is not None:
             self.start(started.package_name)
             return
-        report = ClassDiagramProgress.from_line(line)
+        report = ClassDiagramProgress.from_line(line=line)
         if report is None:
             self.written.append(line)
             return

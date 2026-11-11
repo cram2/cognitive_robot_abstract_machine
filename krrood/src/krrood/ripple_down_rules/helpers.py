@@ -21,6 +21,7 @@ from krrood.ripple_down_rules.utils import (
     make_set,
     update_case_in_case_query,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 if TYPE_CHECKING:
     from .rdr import RippleDownRules
@@ -33,12 +34,15 @@ def general_rdr_classify(
     case_query: CaseQuery | None = None,
 ) -> dict[str, Any]:
     """
-    Classify a case by going through all classifiers and adding the categories that are classified,
-     and then restarting the classification until no more categories can be added.
+    Classify a case by going through all classifiers and adding the categories that are
+    classified, and then restarting the classification until no more categories can be
+    added.
 
-    :param classifiers_dict: A dictionary mapping conclusion types to the classifiers that produce them.
+    :param classifiers_dict: A dictionary mapping conclusion types to the classifiers
+        that produce them.
     :param case: The case to classify.
-    :param modify_original_case: Whether to modify the original case or create a copy and modify it.
+    :param modify_original_case: Whether to modify the original case or create a copy
+        and modify it.
     :param case_query: The case query to extract metadata from if needed.
     :return: The categories that the case belongs to.
     """
@@ -48,7 +52,7 @@ def general_rdr_classify(
     while True:
         new_conclusions = {}
         for attribute_name, rdr in classifiers_dict.items():
-            pred_atts = rdr.classify(case_cp, case_query=case_query)
+            pred_atts = rdr.classify(case=case_cp, case_query=case_query)
             if pred_atts is None and type(None) not in rdr.conclusion_type:
                 continue
             if rdr.mutually_exclusive:
@@ -69,7 +73,10 @@ def general_rdr_classify(
                     conclusions[attribute_name].update(pred_atts)
             if attribute_name in new_conclusions:
                 temp_case_query = CaseQuery(
-                    case_cp, attribute_name, rdr.conclusion_type, rdr.mutually_exclusive
+                    original_case=case_cp,
+                    attribute_name=attribute_name,
+                    _attribute_types=rdr.conclusion_type,
+                    mutually_exclusive=rdr.mutually_exclusive,
                 )
                 update_case_in_case_query(temp_case_query, new_conclusions)
         if (
@@ -112,7 +119,8 @@ def load_or_create_func_rdr_model(
     :param func: The function to load the model for.
     :param model_dir: The directory where the model is stored.
     :param rdr_type: The type of the RDR model to load.
-    :param rdr_kwargs: Additional arguments to pass to the RDR constructor in the case of a new model.
+    :param rdr_kwargs: Additional arguments to pass to the RDR constructor in the case
+        of a new model.
     """
     model_name = get_func_rdr_model_name(func)
     model_path = os.path.join(model_dir, model_name, f"{model_name}.py")
@@ -168,7 +176,10 @@ def update_case_with_conclusion_output(
     if len(new_conclusions) == 0:
         return new_conclusions
     temp_case_query = CaseQuery(
-        case, attribute_name, conclusion_type, mutually_exclusive=mutually_exclusive
+        original_case=case,
+        attribute_name=attribute_name,
+        _attribute_types=conclusion_type,
+        mutually_exclusive=mutually_exclusive,
     )
     if not isinstance(output, Dict):
         output = {attribute_name: output}
@@ -193,7 +204,10 @@ def get_an_updated_case_copy(
     """
     case_cp = copy_case(case)
     temp_case_query = CaseQuery(
-        case_cp, attribute_name, conclusion_type, mutually_exclusive=mutually_exclusive
+        original_case=case_cp,
+        attribute_name=attribute_name,
+        _attribute_types=conclusion_type,
+        mutually_exclusive=mutually_exclusive,
     )
     output = conclusion(case_cp)
     if not isinstance(output, Dict):
@@ -209,7 +223,8 @@ def create_case_from_method(
     Create a Case from the function and its arguments.
 
     :param func: The function to create a case from.
-    :param func_output: A dictionary containing the output of the function, where the key is the output name.
+    :param func_output: A dictionary containing the output of the function, where the
+        key is the output name.
     :param args: The positional arguments of the function.
     :param kwargs: The keyword arguments of the function.
     :return: A Case object representing the case.
@@ -224,6 +239,7 @@ class MockRDRDecorator:
     def __init__(self, models_dir: str):
         self.models_dir = models_dir
 
+    @called_positionally
     def decorator(self, func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any | None:
@@ -255,7 +271,8 @@ def create_case_query_from_method(
     Create a CaseQuery from the function and its arguments.
 
     :param func: The function to create a case from.
-    :param func_output: The output of the function as a dictionary, where the key is the output name.
+    :param func_output: The output of the function as a dictionary, where the key is the
+        output name.
     :param output_type: The type of the output as a sequence of types.
     :param mutual_exclusive: If True, the output types are mutually exclusive.
     :param func_args: The positional arguments of the function.
@@ -294,10 +311,10 @@ def create_case_query_from_method(
     output_name = list(func_output.keys())[0]
     func_args_type_hints.update({output_name: Union[tuple(output_type)]})
     return CaseQuery(
-        case,
-        output_name,
-        tuple(output_type),
-        mutual_exclusive,
+        original_case=case,
+        attribute_name=output_name,
+        _attribute_types=tuple(output_type),
+        mutually_exclusive=mutual_exclusive,
         scope=scope,
         is_function=True,
         function_args_type_hints=func_args_type_hints,

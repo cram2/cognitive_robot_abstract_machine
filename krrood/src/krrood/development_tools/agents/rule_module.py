@@ -17,7 +17,7 @@ from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RuleModule:
     """
     A module, or a package with all of its modules, declaring sections of ``AGENTS.md``.
@@ -29,9 +29,12 @@ class RuleModule:
     """
 
     @classmethod
-    def import_from(cls, directory: Path, module_name: str) -> RuleModule | None:
+    def import_from(cls, *, directory: Path, module_name: str) -> RuleModule | None:
         """
         Import a module or package from a directory, once per process.
+
+        The directory joins the import path, so the module can import the rest of its
+        repository without the repository being installed.
 
         :param directory: The directory holding the module or package.
         :param module_name: The name of the module or package.
@@ -43,11 +46,13 @@ class RuleModule:
         if specification is None:
             return None
         if module_name in sys.modules:
-            return cls(sys.modules[module_name])
+            return cls(module=sys.modules[module_name])
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
         module = importlib.util.module_from_spec(specification)
         sys.modules[module_name] = module
         specification.loader.exec_module(module)
-        return cls(module)
+        return cls(module=module)
 
     @property
     def modules(self) -> list[ModuleType]:

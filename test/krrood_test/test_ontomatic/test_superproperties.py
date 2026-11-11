@@ -22,8 +22,8 @@ def test_a_statement_of_a_property_is_a_statement_of_every_superproperty_above_i
     Loving someone implies liking them, and liking them implies knowing them, although
     knows is no direct superproperty of loves.
     """
-    romeo = PersonWithFeelings("romeo")
-    juliet = PersonWithFeelings("juliet")
+    romeo = PersonWithFeelings(name="romeo")
+    juliet = PersonWithFeelings(name="juliet")
 
     romeo.loves.add(juliet)
 
@@ -36,13 +36,23 @@ def test_a_statement_of_a_superproperty_is_explained_one_step_up_the_hierarchy()
     Each implied statement is explained by the statement of the property directly below
     its own, so the explanation follows the hierarchy.
     """
-    romeo = PersonWithFeelings("romeo")
-    juliet = PersonWithFeelings("juliet")
+    romeo = PersonWithFeelings(name="romeo")
+    juliet = PersonWithFeelings(name="juliet")
 
     romeo.loves.add(juliet)
 
-    loves = PropertyDescriptorRelation.find(romeo, Loves, juliet)
-    likes = PropertyDescriptorRelation.find(romeo, Likes, juliet)
-    knows = PropertyDescriptorRelation.find(romeo, Knows, juliet)
-    assert likes.explanation == RelationExplanation(InferredThrough.SUPER, (loves,))
-    assert knows.explanation == RelationExplanation(InferredThrough.SUPER, (likes,))
+    loves = PropertyDescriptorRelation.find(
+        source_instance=romeo, property_descriptor_class=Loves, target_instance=juliet
+    )
+    likes = PropertyDescriptorRelation.find(
+        source_instance=romeo, property_descriptor_class=Likes, target_instance=juliet
+    )
+    knows = PropertyDescriptorRelation.find(
+        source_instance=romeo, property_descriptor_class=Knows, target_instance=juliet
+    )
+    assert likes.explanation == RelationExplanation(
+        rule=InferredThrough.SUPER, premises=(loves,)
+    )
+    assert knows.explanation == RelationExplanation(
+        rule=InferredThrough.SUPER, premises=(likes,)
+    )

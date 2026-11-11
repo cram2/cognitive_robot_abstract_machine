@@ -805,7 +805,7 @@ class Statechart(SubclassJSONSerializer):
         Ends the statechart if a :class:`CancelStatechart` node started in the current
         tick: every other node still running or paused is interrupted, which is recorded
         as the last snapshot of :attr:`state_history`, naming the first such cancel
-        node, and then that node's exception is raised.
+        node and its exception, and then that exception is raised.
         """
         cancelling_node = next(
             (node for node in self._cancel_nodes if node.has_pending_exception), None
@@ -821,6 +821,7 @@ class Statechart(SubclassJSONSerializer):
                     life_cycle_state=self.life_cycle_state,
                     observation_state=self.observation_state,
                     cancelled_by=cancelling_node,
+                    cancellation_error=cancelling_node.pending_exception,
                 )
             )
         finally:
@@ -970,7 +971,7 @@ class Statechart(SubclassJSONSerializer):
 
     @classmethod
     def _from_json(
-        cls, data: dict[str, Any], *, context: StatechartContext, **kwargs: Any
+        cls, *, data: dict[str, Any], context: StatechartContext, **kwargs: Any
     ) -> Self:
         """
         Reconstructs a statechart from its JSON representation, as produced by
@@ -1015,12 +1016,12 @@ class Statechart(SubclassJSONSerializer):
         Registers the written nodes, then their transition conditions, then hands every
         goal holding one of them its children in the order it was written with.
         """
-        DeserializedNodeTracker.from_kwargs(kwargs)
+        DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         for json_data in data[StatechartJSONKey.NODES]:
             node = from_json(json_data, **kwargs)
             self._register_node(node)
         for json_data in data[StatechartJSONKey.CONDITIONS]:
-            transition = TransitionCondition.from_json(json_data, **kwargs)
+            transition = TransitionCondition.from_json(data=json_data, **kwargs)
             transition.owner._set_transition(transition)
         for parent_index, child_indices in data[StatechartJSONKey.CHILDREN].items():
             # JSON writes the integer keys as strings

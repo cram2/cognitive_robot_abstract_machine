@@ -4,10 +4,12 @@ from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.ros2_interface import get_robot_description
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     TracyVelocityInterface,
-    WorldWithTracyConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.robots.tracy import Tracy
 
 
 def create_giskard() -> Giskard:
@@ -19,7 +21,13 @@ def create_giskard() -> Giskard:
         read from its topic.
     """
     return Giskard(
-        world_config=WorldWithTracyConfig(urdf=get_robot_description()),
+        world_source=WorldSpecification(
+            robots=[
+                RobotSpecification.specify_real_robot(
+                    Tracy, urdf=get_robot_description()
+                )
+            ]
+        ),
         robot_interface_config=TracyVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(

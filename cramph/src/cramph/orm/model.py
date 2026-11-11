@@ -56,6 +56,12 @@ class NodeStatesAtTick:
     None if they did not end it.
     """
 
+    cancellation_error: Exception | None = None
+    """
+    The exception the cancellation ended the statechart with, None if the values did not
+    end it.
+    """
+
     @classmethod
     def from_item(cls, item: StateHistoryItem) -> Self:
         """
@@ -69,6 +75,7 @@ class NodeStatesAtTick:
             cancelling_node_index=(
                 None if item.cancelled_by is None else item.cancelled_by.index
             ),
+            cancellation_error=item.cancellation_error,
         )
 
     def item_of(self, statechart: Statechart) -> StateHistoryItem:
@@ -91,6 +98,7 @@ class NodeStatesAtTick:
                 if self.cancelling_node_index is None
                 else statechart.get_node_by_index(self.cancelling_node_index)
             ),
+            cancellation_error=self.cancellation_error,
         )
 
 
@@ -132,7 +140,7 @@ class StatechartMapping(AlternativeMapping[Statechart]):
     """
 
     @classmethod
-    def from_domain_object(cls, obj: Statechart) -> Self:
+    def from_domain_object(cls, *, obj: Statechart) -> Self:
         return cls(
             context=obj.context,
             pass_limit=obj.pass_limit,
@@ -146,7 +154,7 @@ class StatechartMapping(AlternativeMapping[Statechart]):
     def to_domain_object(self) -> Statechart:
         world = self.context.world
         statechart = Statechart.from_json(
-            json.loads(self.structure),
+            data=json.loads(self.structure),
             context=self.context,
             world=world,
             **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),

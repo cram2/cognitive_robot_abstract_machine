@@ -20,7 +20,7 @@ from krrood.ontomatic.property_descriptor.property_descriptor import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersonWithFriends(Symbol):
     """
     A person related to its friends and to the people it knows.
@@ -44,14 +44,14 @@ class PersonWithFriends(Symbol):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FriendOf(PropertyDescriptor, SymmetricProperty):
     """
     Relates a person to its friends, who are friends of the person in turn.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Knows(PropertyDescriptor, HasEquivalentProperties):
     """
     Relates a person to the people it knows, the people it is acquainted with.
@@ -62,7 +62,7 @@ class Knows(PropertyDescriptor, HasEquivalentProperties):
         return [IsAcquaintedWith]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsAcquaintedWith(PropertyDescriptor, HasEquivalentProperties):
     """
     Relates a person to the people it is acquainted with, the people it knows.
@@ -73,14 +73,14 @@ class IsAcquaintedWith(PropertyDescriptor, HasEquivalentProperties):
         return [Knows]
 
 
-PersonWithFriends.friend_of = FriendOf(PersonWithFriends, "friend_of")
-PersonWithFriends.knows = Knows(PersonWithFriends, "knows")
+PersonWithFriends.friend_of = FriendOf(domain=PersonWithFriends, field_name="friend_of")
+PersonWithFriends.knows = Knows(domain=PersonWithFriends, field_name="knows")
 PersonWithFriends.is_acquainted_with = IsAcquaintedWith(
-    PersonWithFriends, "is_acquainted_with"
+    domain=PersonWithFriends, field_name="is_acquainted_with"
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Area(Symbol):
     """
     An area that is part of larger areas.
@@ -100,7 +100,7 @@ class Area(Symbol):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsPartOf(PropertyDescriptor, TransitiveProperty, HasEquivalentProperties):
     """
     Relates an area to the areas it is part of, and to the areas those are part of.
@@ -111,7 +111,7 @@ class IsPartOf(PropertyDescriptor, TransitiveProperty, HasEquivalentProperties):
         return [LiesWithin]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LiesWithin(PropertyDescriptor, HasEquivalentProperties):
     """
     Relates an area to the areas it lies within, the areas it is part of.
@@ -122,11 +122,11 @@ class LiesWithin(PropertyDescriptor, HasEquivalentProperties):
         return [IsPartOf]
 
 
-Area.is_part_of = IsPartOf(Area, "is_part_of")
-Area.lies_within = LiesWithin(Area, "lies_within")
+Area.is_part_of = IsPartOf(domain=Area, field_name="is_part_of")
+Area.lies_within = LiesWithin(domain=Area, field_name="lies_within")
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Building(Symbol):
     """
     A building standing in an area.
@@ -142,4 +142,4 @@ class Building(Symbol):
     """
 
 
-Building.stands_in = IsPartOf(Building, "stands_in")
+Building.stands_in = IsPartOf(domain=Building, field_name="stands_in")

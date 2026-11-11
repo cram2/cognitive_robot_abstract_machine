@@ -46,6 +46,9 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
     RotationMatrix,
 )
+from semantic_digital_twin.world_description.connection_properties import (
+    DriveVelocityLimits,
+)
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     OmniDrive,
@@ -665,6 +668,14 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
     @classproperty
     def forward_axis(cls) -> Vector3:
         return Vector3.X()
+
+    @classproperty
+    def drive_velocity_limits(cls) -> DriveVelocityLimits:
+        """
+        GARMI's drive is limited to 0.1 m/s and 0.1 rad/s instead of the limits of
+        :meth:`MobileBase.drive_velocity_limits`.
+        """
+        return DriveVelocityLimits(translation=0.1, rotation=0.1)
 
     def setup_hardware_interfaces(self) -> None:
         """

@@ -25,8 +25,8 @@ def test_a_symmetric_property_relates_the_object_back_to_the_subject():
     """
     A symmetric property relates the object back to the subject.
     """
-    alice = PersonWithFriends("alice")
-    bob = PersonWithFriends("bob")
+    alice = PersonWithFriends(name="alice")
+    bob = PersonWithFriends(name="bob")
 
     alice.friend_of.add(bob)
 
@@ -38,16 +38,20 @@ def test_the_statement_back_is_explained_by_the_statement_it_reverses():
     The statement back from the object is inferred through symmetry from the statement
     made, which is asserted and has no explanation.
     """
-    alice = PersonWithFriends("alice")
-    bob = PersonWithFriends("bob")
+    alice = PersonWithFriends(name="alice")
+    bob = PersonWithFriends(name="bob")
 
     alice.friend_of.add(bob)
 
-    asserted = PropertyDescriptorRelation.find(alice, FriendOf, bob)
+    asserted = PropertyDescriptorRelation.find(
+        source_instance=alice, property_descriptor_class=FriendOf, target_instance=bob
+    )
     assert asserted.explanation is None
     assert PropertyDescriptorRelation.find(
-        bob, FriendOf, alice
-    ).explanation == RelationExplanation(InferredThrough.SYMMETRY, (asserted,))
+        source_instance=bob, property_descriptor_class=FriendOf, target_instance=alice
+    ).explanation == RelationExplanation(
+        rule=InferredThrough.SYMMETRY, premises=(asserted,)
+    )
 
 
 # %% equivalent properties
@@ -57,8 +61,8 @@ def test_a_statement_of_a_property_is_a_statement_of_its_equivalent_property():
     """
     A statement of a property is a statement of its equivalent property.
     """
-    alice = PersonWithFriends("alice")
-    bob = PersonWithFriends("bob")
+    alice = PersonWithFriends(name="alice")
+    bob = PersonWithFriends(name="bob")
 
     alice.knows.add(bob)
 
@@ -69,8 +73,8 @@ def test_equivalence_holds_in_both_directions():
     """
     Equivalence holds in both directions.
     """
-    alice = PersonWithFriends("alice")
-    bob = PersonWithFriends("bob")
+    alice = PersonWithFriends(name="alice")
+    bob = PersonWithFriends(name="bob")
 
     alice.is_acquainted_with.add(bob)
 
@@ -85,9 +89,9 @@ def test_a_statement_through_an_equivalent_property_is_composed_with_the_stateme
     A statement of a transitive property implied by its equivalent property is composed
     with the statements of the transitive property already made about its object.
     """
-    kitchen = Area("kitchen")
-    flat = Area("flat")
-    city = Area("city")
+    kitchen = Area(name="kitchen")
+    flat = Area(name="flat")
+    city = Area(name="city")
     flat.is_part_of.add(city)
 
     kitchen.lies_within.add(flat)
@@ -104,18 +108,30 @@ def test_a_composed_statement_is_held_by_the_field_of_its_subject():
     subject of the earlier statement, also when the two subjects hold the property in
     fields of different classes.
     """
-    house = Building("house")
-    city = Area("city")
-    country = Area("country")
+    house = Building(name="house")
+    city = Area(name="city")
+    country = Area(name="country")
     house.stands_in.add(city)
 
     city.is_part_of.add(country)
 
-    composed = PropertyDescriptorRelation.find(house, IsPartOf, country)
+    composed = PropertyDescriptorRelation.find(
+        source_instance=house,
+        property_descriptor_class=IsPartOf,
+        target_instance=country,
+    )
     assert composed.explanation == RelationExplanation(
-        InferredThrough.TRANSITIVE,
-        (
-            PropertyDescriptorRelation.find(house, IsPartOf, city),
-            PropertyDescriptorRelation.find(city, IsPartOf, country),
+        rule=InferredThrough.TRANSITIVE,
+        premises=(
+            PropertyDescriptorRelation.find(
+                source_instance=house,
+                property_descriptor_class=IsPartOf,
+                target_instance=city,
+            ),
+            PropertyDescriptorRelation.find(
+                source_instance=city,
+                property_descriptor_class=IsPartOf,
+                target_instance=country,
+            ),
         ),
     )

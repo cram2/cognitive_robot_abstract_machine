@@ -67,7 +67,7 @@ def generate_orm():
     logging.getLogger("krrood").setLevel(logging.DEBUG)
 
     ormatic = ORMatic.from_package(
-        [semantic_digital_twin],
+        packages=[semantic_digital_twin],
         ormatic_interface_dependencies=[],
         ignored_classes=ignore_classes,
         type_mappings={
@@ -84,7 +84,7 @@ def generate_orm():
     )
 
     with open(ormatic_interface_path, "w") as f:
-        ormatic.to_sqlalchemy_file(f)
+        ormatic.to_sqlalchemy_file(file=f)
 
 
 if __name__ == "__main__":

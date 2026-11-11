@@ -1017,7 +1017,7 @@ def test_perception_task_survives_a_chart_round_trip(
     chart.add_node(EndMotion.when_true(task))
 
     restored_chart = Statechart.from_json(
-        json.loads(json.dumps(chart.to_json())),
+        data=json.loads(json.dumps(chart.to_json())),
         context=StatechartContext(world=receiving_world),
         **receiving_world_kwargs(receiving_world),
     )

@@ -45,7 +45,7 @@ def translate(condition) -> Event:
     :param condition: The where condition to translate.
     :return: The random event that corresponds to the condition.
     """
-    return WhereExpressionToRandomEventTranslator(condition).translate()
+    return WhereExpressionToRandomEventTranslator(conditions_root=condition).translate()
 
 
 def translate_where_conditions(query) -> Event:
@@ -244,7 +244,7 @@ def test_query_rooted_condition_translates_like_the_variable_rooted_one():
 
 def test_quantified_where_condition():
     pose = underspecified_pose()
-    position_variable = variable(KRROODPosition, [KRROODPosition(1.0, 2.0, 3.0)])
+    position_variable = variable(KRROODPosition, [KRROODPosition(x=1.0, y=2.0, z=3.0)])
     query = pose.where(
         for_all(position_variable, position_variable.x > 0.0),
     )

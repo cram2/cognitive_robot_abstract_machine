@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing_extensions import List, Set
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class FrozenInner:
     """
     A flat frozen value object (hashable, so it can live in a ``Set``).
@@ -30,7 +30,7 @@ class FrozenInner:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class FrozenOuter:
     """
     A frozen object with a nested frozen relationship, a list, and a set collection.
