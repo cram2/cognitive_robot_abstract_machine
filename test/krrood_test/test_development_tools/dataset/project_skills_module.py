@@ -4,6 +4,8 @@ A repository's own skills module, standing in for the one a repository declares.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from krrood.development_tools.agents.rule import Section
 from krrood.development_tools.agents.skill import AgentTool, Skill
 from krrood.ormatic.utils import classproperty
@@ -48,6 +50,10 @@ class DeployingTheServiceSkill(Skill):
     """
 
     @classproperty
+    def path(cls) -> Path:
+        return Path(".claude/skills/deploying-the-service/SKILL.md")
+
+    @classproperty
     def description(cls) -> str:
         return "Deploy the service. Use when the developer asks to deploy."
 
@@ -68,6 +74,10 @@ class AuditingSkill(Skill):
     """
     A second skill, listed before the first.
     """
+
+    @classproperty
+    def path(cls) -> Path:
+        return Path(".claude/skills/auditing/SKILL.md")
 
     @classproperty
     def description(cls) -> str:

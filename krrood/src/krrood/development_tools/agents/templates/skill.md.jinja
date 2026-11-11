@@ -1,4 +1,5 @@
----
+{% extends "sections.md.jinja" %}
+{% block preamble %}---
 name: {{ skill.name }}
 description: {{ skill.description }}
 allowed-tools: {{ skill.allowed_tools | join(", ") }}
@@ -8,6 +9,5 @@ allowed-tools: {{ skill.allowed_tools | join(", ") }}
 # {{ skill.title }}
 
 {{ skill.introduction }}
-{% set heading_prefix = "#" %}
-{% set sections = skill.sections %}
-{% include "sections.md.jinja" %}
+{% endblock %}
+{% block heading_prefix %}#{% endblock %}

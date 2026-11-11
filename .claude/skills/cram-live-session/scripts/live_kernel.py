@@ -112,7 +112,7 @@ class LogMarker(StrEnum):
     """
 
 
-class RunEnd(IntEnum):
+class RunEndExitStatus(IntEnum):
     """
     How following a run ended, as the exit status of this script; a run that finished
     ends it with its own exit status instead.
@@ -386,19 +386,19 @@ class LiveKernel:
                 process_id = self.process_id
                 if process_id is None:
                     logger.warning("The kernel no longer runs.")
-                    return RunEnd.KERNEL_GONE
+                    return RunEndExitStatus.KERNEL_GONE
                 if self.is_sleeping(process_id=process_id):
                     logger.warning(
                         "The kernel sleeps without output for %s: probably deadlocked; "
                         "'interrupt' shows where.",
                         silent,
                     )
-                    return RunEnd.DEADLOCKED
+                    return RunEndExitStatus.DEADLOCKED
                 silent = timedelta()
             time.sleep(self.poll_period.total_seconds())
             waited += self.poll_period
         logger.warning("Still running after %s; continue with 'wait %s'.", waited, name)
-        return RunEnd.STILL_RUNNING
+        return RunEndExitStatus.STILL_RUNNING
 
     def is_sleeping(self, *, process_id: int) -> bool:
         """

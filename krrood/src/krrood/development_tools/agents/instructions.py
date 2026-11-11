@@ -29,14 +29,15 @@ class TemplateFile(PathEnumeration):
     The templates the generated files are rendered from.
     """
 
-    AGENTS = Path(__file__).parent / "templates" / "agents.md.jinja"
+    SECTIONS = Path(__file__).parent / "templates" / "sections.md.jinja"
     """
     The content of ``AGENTS.md``: rules under the headings of their sections.
     """
 
     SKILL = Path(__file__).parent / "templates" / "skill.md.jinja"
     """
-    The content of a ``SKILL.md``: the skill's front matter, introduction and sections.
+    The content of a ``SKILL.md``: :attr:`SECTIONS` with the skill's front matter and
+    introduction in place of the ``AGENTS.md`` notice, and every heading one level lower.
     """
 
 
@@ -132,8 +133,10 @@ class AgentsInstructions(GeneratedInstructions):
 
     @property
     def text(self) -> str:
-        return CodeGenerator(template_directory=str(TemplateFile.AGENTS.parent)).render(
-            template_name=TemplateFile.AGENTS.name,
+        return CodeGenerator(
+            template_directory=str(TemplateFile.SECTIONS.parent)
+        ).render(
+            template_name=TemplateFile.SECTIONS.name,
             sections=self.sections,
             check_command=Subcommand.CHECK.invocation,
         )
@@ -150,7 +153,7 @@ class SkillInstructions(GeneratedInstructions):
 
     repository_root: Path
     """
-    The directory holding the repository's skills directory.
+    The directory the skill's :attr:`Skill.path` is relative to.
     """
 
     skill: type[Skill]
@@ -160,18 +163,14 @@ class SkillInstructions(GeneratedInstructions):
 
     @property
     def path(self) -> Path:
-        return (
-            self.repository_root
-            / RepositoryInstructionsFile.SKILLS
-            / self.skill.name
-            / RepositoryInstructionsFile.SKILL
-        )
+        return self.repository_root / self.skill.path
 
     @property
     def text(self) -> str:
         return CodeGenerator(template_directory=str(TemplateFile.SKILL.parent)).render(
             template_name=TemplateFile.SKILL.name,
             skill=self.skill,
+            sections=self.skill.sections,
             generate_command=Subcommand.SKILLS.invocation,
             check_command=Subcommand.CHECK.invocation,
         )
@@ -186,7 +185,7 @@ class RepositorySkills:
 
     repository_root: Path
     """
-    The directory holding the module and the skills directory.
+    The directory holding the module, which the skills' paths are relative to.
     """
 
     @property

@@ -9,7 +9,7 @@ allowed-tools: Bash, Read, Write, Edit
 
 The developer says what the robot does next. You write each step as a *cell*, show its code, perform it in a kernel that stays alive between steps, and report what happened. The kernel keeps the world, the robot, the simulation and every moment before a cell, so a step can be undone, retried or replayed in seconds instead of rebuilding the scene.
 
-The data structures live in CRAM (`experiments.live_session`, and the snapshot of a stepped MuJoCo simulation in `semantic_digital_twin.adapters.multi_sim`); the scripts next to this file drive the kernel. Code you write in cells follows `@AGENTS.md` only loosely: cells are throwaway, but anything that proves itself moves into the codebase under the full rules.
+The data structures live in CRAM (`experiments.live_session`, and the snapshot of a stepped MuJoCo simulation in `semantic_digital_twin.adapters.multi_sim`); read them, and the actions and helpers a step needs, in the codebase. The scripts next to this file drive the kernel. Code you write in cells follows `@AGENTS.md` only loosely: cells are throwaway, but anything that proves itself moves into the codebase under the full rules.
 
 ## Working loop
 <!-- from WorkingLoopRules in agent_skills.py -->
@@ -32,29 +32,3 @@ The data structures live in CRAM (`experiments.live_session`, and the snapshot o
 - Write the cell to a file in your scratchpad, starting with `# %% cell <title>` and ending with `session.report(label="...", outcome=outcome)`
 - Perform it with `live_kernel.py perform FILE`, several cells of a file with `--cells 2:4`. The output streams back as the kernel prints it. A run still going after `LIVE_WAIT_SECONDS` keeps running; follow it with `live_kernel.py wait NAME`
 - Use `live_kernel.py raw FILE` for measuring and for set up code: a raw run is not kept in the history, so replays do not repeat it
-
-## Data structures
-<!-- from DataStructuresRules in agent_skills.py -->
-- `experiments.live_session.session.LiveSession(simulation=..., tool_frame=..., robot_base=...)` is `session` in the kernel:
-  - `report(label=..., outcome=None) -> StepReport` prints one aligned line (label, status, and where the tool and the base are now) and keeps the label and outcome with the running cell
-  - `perform(cell=..., namespace=...)` takes a snapshot, then runs the cell in the kernel's `globals()`; `perform_cells.py` calls it
-  - `history: list[PerformedCell]` holds every performed cell with its `cell`, `snapshot_before`, `reports` and `finished` (false if it raised)
-  - `revert_last_cell() -> Cell` goes back to the moment before the last cell, which is dropped
-  - `replay(first_cell=..., namespace=...)` goes back to the moment before history entry `first_cell`, then performs it and every later cell again
-  - `take_snapshot(name=...)` and `restore_snapshot(name=...)` keep and restore named checkpoints in `snapshots`
-- `StepReport.status` is `StepStatus.SUCCEEDED` (`ok`), `StepStatus.NO_PLAN` (empty), or the failure's class name
-- `experiments.live_session.cells` holds `Cell(title=..., source=...)`, `CellScript.from_file(path=...)` and `CellMarker.START` (`# %% cell `)
-- `semantic_digital_twin.adapters.multi_sim.MujocoSim.take_snapshot()` and `restore_snapshot(snapshot=...)` restore the physics exactly (positions, velocities, controls, time), the world state and the servo set points; the physics then continues as it did after the snapshot. A snapshot does not survive a change to the world's model (`SnapshotDoesNotFitSimulationError`)
-
-## Useful pieces for cells
-<!-- from UsefulPiecesForCellsRules in agent_skills.py -->
-- World frame box of a body: `body.collision.as_bounding_box_collection_in_frame(world.root).bounding_box().to_array_bounds()` (`.lower`, `.upper`); pass the robot's root as the frame for a footprint
-- A MuJoCo joint's anchor and axis: `mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, name)`, then `data.xanchor[j]`, `data.xaxis[j]`, `data.qpos[m.jnt_qposadr[j]]`, `m.jnt_range[j]` (`m, data = simulation.simulator._mj_model, simulation.simulator._mj_data`)
-- Motions: `NavigateAction(target_location=pose)`, `MoveTorsoAction(torso_state=TorsoState.LOW)`, `ParkArmsAction(arms=robot.all_arms)`, `PickUpAction(grasp=..., arm=arm)`; perform them with the template's `run(...)`, which returns the `PlanOutcome` to report
-- Joint limits and what is near each arm link are the first things to measure when a motion stops with `MotionMadeNoProgress`
-
-## When something goes wrong
-<!-- from WhenSomethingGoesWrongRules in agent_skills.py -->
-- **No output and the run does not end**: `live_kernel.py` warns when the kernel sleeps without output, most likely a deadlock. `live_kernel.py interrupt` raises `KeyboardInterrupt` in the kernel and the traceback shows where it waited; report it to the developer
-- **`docker exec` hangs** on some servers after the command finished: the script always runs detached and reads a log instead. Do the same for anything you run by hand
-- **A restore is refused** with `SnapshotDoesNotFitSimulationError`: the world's model changed (an object was spawned or removed); take new snapshots after such a change

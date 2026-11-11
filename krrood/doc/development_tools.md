@@ -128,14 +128,17 @@ class DeploymentRules(Section):
 
 A skill is code as well: a class subclassing `Skill`, named for the skill followed by
 `Skill`, in an `agent_skills.py` module at the repository root or in the modules of an
-`agent_skills` package there. `krrood skills` writes each skill defined in it to
-`.claude/skills/<name>/SKILL.md`, where the name is the class name's words in kebab
-case (`CramLiveSessionSkill` becomes `cram-live-session`). The skill's classproperties
+`agent_skills` package there. `krrood skills` writes each skill defined in it to the
+path its `path` classproperty gives, relative to the repository root, usually
+`.claude/skills/<name>/SKILL.md`. The name is the class name's words in kebab case
+(`CRAMLiveSessionSkill` becomes `cram-live-session`). The skill's other classproperties
 give the front matter (`description`, `allowed_tools`), the paragraphs below its title
 (`introduction`) and its sections, which are `Section`s like the rules and are written
 in the order `sections` lists them, one heading level below the title:
 
 ```python
+from pathlib import Path
+
 from krrood.development_tools.agents.rule import Section
 from krrood.development_tools.agents.skill import AgentTool, Skill
 
@@ -145,6 +148,10 @@ class LoopRules(Section):
 
 
 class LiveSessionSkill(Skill):
+    @classproperty
+    def path(cls) -> Path:
+        return Path(".claude/skills/live-session/SKILL.md")
+
     @classproperty
     def description(cls) -> str:
         return "Drive a simulated robot step by step. Use when ..."

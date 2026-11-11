@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from enum import StrEnum
+from pathlib import Path
 
 from krrood.development_tools.agents.rule import ClassNamedDeclaration, Section
 from krrood.ormatic.utils import classproperty
@@ -70,6 +71,13 @@ class Skill(ClassNamedDeclaration):
         joined by hyphens.
         """
         return "-".join(word.lower() for word in cls.topic_words)
+
+    @classproperty
+    @abstractmethod
+    def path(cls) -> Path:
+        """
+        Where the skill's ``SKILL.md`` lies, relative to the repository root.
+        """
 
     @classproperty
     @abstractmethod

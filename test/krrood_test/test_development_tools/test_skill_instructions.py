@@ -57,19 +57,14 @@ def test_a_module_lists_no_skill_it_only_imports() -> None:
 # %% the generated file
 
 
-def test_the_file_of_a_skill_lies_in_a_directory_named_after_it(
+def test_the_file_of_a_skill_lies_where_the_skill_says(
     repository_root: Path,
 ) -> None:
     instructions = SkillInstructions(
         repository_root=repository_root, skill=DeployingTheServiceSkill
     )
 
-    assert instructions.path == (
-        repository_root
-        / RepositoryInstructionsFile.SKILLS
-        / DeployingTheServiceSkill.name
-        / RepositoryInstructionsFile.SKILL
-    )
+    assert instructions.path == repository_root / DeployingTheServiceSkill.path
 
 
 def test_the_file_lists_the_introduction_then_the_sections_in_the_order_given(
