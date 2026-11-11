@@ -15,29 +15,25 @@ from experiments.live_session.exceptions import (
     NoPerformedCellError,
     UnknownSnapshotError,
 )
-from experiments.live_session.session import StepStatus
+from experiments.live_session.session import StepReport, StepStatus
 
 from .conftest import PendulumSession
 
 # %% reports
 
 
-def test_a_report_shows_where_the_tool_and_the_base_are(
+def test_a_report_shows_its_label_and_status(
     pendulum_session: PendulumSession, capsys: pytest.CaptureFixture[str]
 ):
-    """
-    The positions are read from the world when the report is shown, not kept with it.
-    """
-    session = pendulum_session.session
-    tool_position = session.tool_frame.global_pose.position.to_np()[:3]
-    base_position = session.robot_base.global_pose.position.to_np()[:3]
+    report = pendulum_session.session.report(label="looked")
 
-    report = session.report(label="looked")
+    assert capsys.readouterr().out == f"{report.to_line()}\n"
 
-    assert capsys.readouterr().out == (
-        f"{report.to_line()} tool {tool_position.round(3)} "
-        f"base {base_position.round(3)}\n"
-    )
+
+def test_a_report_line_aligns_the_status_after_the_label():
+    report = StepReport(label="looked", outcome=None)
+
+    assert report.to_line() == f"{'looked':<34} {StepStatus.NO_PLAN}"
 
 
 @pytest.mark.parametrize(

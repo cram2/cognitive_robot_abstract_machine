@@ -62,10 +62,6 @@ def run(*actions: StatechartNode) -> PlanOutcome:
 
 
 # %% cell the live session
-session = LiveSession(
-    simulation=simulation,
-    tool_frame=arm.end_effector.tool_frame,
-    robot_base=robot.root,
-)
+session = LiveSession(simulation=simulation)
 session.take_snapshot(name="composed")
 session.report(label="session started")

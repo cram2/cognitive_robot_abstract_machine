@@ -15,7 +15,7 @@ The data structures live in CRAM (`experiments.live_session`, and the snapshot o
 <!-- from WorkingLoopRules in agent_skills.py -->
 - **One step per instruction.** Do what the developer asked, then stop and wait. Never chain further robot steps on your own, even when the next one seems obvious. An instruction with several parts ("open the gripper, put a finger left of the lever, push right") is one step; perform its parts in one cell
 - **Show the code before you perform it.** Every motion cell goes into the chat as a code block first, then gets performed. Measuring code may be summarised in a sentence
-- **Report from the reports.** Every cell ends with `session.report(label=..., outcome=...)`; quote the status, tool and base positions, and say in a sentence what that means for the instruction (reached, stopped short by how much, what failed)
+- **Report from the reports.** Every cell ends with `session.report(label=..., outcome=...)`; quote the status, measure where the robot got to when the step is about reaching somewhere, and say in a sentence what that means for the instruction (reached, stopped short by how much, what failed)
 - **When a step fails, diagnose before retrying.** Measure with a raw run (what is near, which joint is at its limit, which body blocks) and offer the developer concrete options with a recommendation. Do not loop through blind retries
 - **Undo instead of rebuilding.** To retry a step, `session.revert_last_cell()`; to show steps again, `session.replay(first_cell=i, namespace=globals())`. Name a checkpoint the developer will want to come back to with `session.take_snapshot(name=...)`
 - **Keep the developer's words.** Cell titles say what the developer asked for, in their words; they are what the history shows

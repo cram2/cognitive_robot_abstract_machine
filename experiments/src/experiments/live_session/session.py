@@ -17,9 +17,6 @@ from experiments.live_session.exceptions import (
     UnknownSnapshotError,
 )
 from semantic_digital_twin.adapters.multi_sim import MujocoSim, MujocoSimulationSnapshot
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 
 # %% reports
 
@@ -70,10 +67,10 @@ class StepReport:
 
     def to_line(self) -> str:
         """
-        :return: The label and the status as one line of text, their columns aligned
-            with every other report's.
+        :return: The label and the status as one line of text, the statuses aligned with
+            every other report's.
         """
-        return "%-34s %-34s" % (self.label, self.status)
+        return f"{self.label:<34} {self.status}"
 
 
 # %% performed cells
@@ -121,16 +118,6 @@ class LiveSession:
     The stepped simulation the robot acts in.
     """
 
-    tool_frame: KinematicStructureEntity
-    """
-    The frame of the tool the steps move, reported after every step.
-    """
-
-    robot_base: KinematicStructureEntity
-    """
-    The robot's base, reported after every step.
-    """
-
     snapshots: dict[str, MujocoSimulationSnapshot] = field(default_factory=dict)
     """
     The moments the developer named, to go back to.
@@ -143,8 +130,8 @@ class LiveSession:
 
     def report(self, *, label: str, outcome: PlanOutcome | None = None) -> StepReport:
         """
-        Tell the developer how a step ended and where the tool and the base are now, and
-        keep how it ended with the cell being performed.
+        Tell the developer how a step ended, and keep how it ended with the cell being
+        performed.
 
         :param label: What the step did.
         :param outcome: How the plan the step ran ended, if it ran one.
@@ -153,12 +140,7 @@ class LiveSession:
         report = StepReport(label=label, outcome=outcome)
         if self.history and not self.history[-1].finished:
             self.history[-1].reports.append(report)
-        tool_position = self.tool_frame.global_pose.position.to_np()[:3]
-        base_position = self.robot_base.global_pose.position.to_np()[:3]
-        print(
-            f"{report.to_line()} tool {tool_position.round(3)} "
-            f"base {base_position.round(3)}"
-        )
+        print(report.to_line())
         return report
 
     def take_snapshot(self, *, name: str) -> MujocoSimulationSnapshot:

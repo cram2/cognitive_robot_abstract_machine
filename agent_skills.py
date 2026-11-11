@@ -35,8 +35,9 @@ class WorkingLoopRules(Section):
 
     REPORT_FROM_THE_REPORTS = (
         "**Report from the reports.** Every cell ends with "
-        "`session.report(label=..., outcome=...)`; quote the status, tool and base "
-        "positions, and say in a sentence what that means for the instruction "
+        "`session.report(label=..., outcome=...)`; quote the status, measure where "
+        "the robot got to when the step is about reaching somewhere, and say in a "
+        "sentence what that means for the instruction "
         "(reached, stopped short by how much, what failed)"
     )
 

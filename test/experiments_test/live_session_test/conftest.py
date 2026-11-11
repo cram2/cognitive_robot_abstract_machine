@@ -89,7 +89,7 @@ class PendulumSession:
 @pytest.fixture
 def pendulum_session() -> Iterator[PendulumSession]:
     """
-    A session over a stepped simulation of a servoed pendulum, its arm as the tool.
+    A session over a stepped simulation of a servoed pendulum.
     """
     if not runs_in_continuous_integration():
         pytest.skip("MuJoCo tests only run in CI")
@@ -97,11 +97,7 @@ def pendulum_session() -> Iterator[PendulumSession]:
     world = pendulum.world
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
-    session = LiveSession(
-        simulation=simulation,
-        tool_frame=pendulum.hinge.child,
-        robot_base=pendulum.hinge.parent,
-    )
+    session = LiveSession(simulation=simulation)
     namespace = {
         "session": session,
         "simulation": simulation,
