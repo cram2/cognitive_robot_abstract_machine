@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -172,6 +173,7 @@ class ProductLayer(InnerLayer):
             (len(self.child_layers), self.number_of_nodes)
         )
         self.reset_variables()
+        self.__dict__.pop(ProductLayer.inner_layer_edges.attrname, None)
         self.factors = self.factors_of_edges()
 
     @property
@@ -239,7 +241,7 @@ class ProductLayer(InnerLayer):
 
     # %% queries
 
-    @property
+    @functools.cached_property
     def inner_layer_edges(self) -> InnerLayerEdges:
         return InnerLayerEdges(
             self.edges.col.astype(np.int64),
