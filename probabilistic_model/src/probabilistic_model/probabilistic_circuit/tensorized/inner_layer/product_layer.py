@@ -173,11 +173,7 @@ class ProductLayer(InnerLayer):
             (len(self.child_layers), self.number_of_nodes)
         )
         self.reset_variables()
-        for cached in (
-            ProductLayer.inner_layer_edges,
-            ProductLayer.edges_per_child_layer,
-        ):
-            self.__dict__.pop(cached.attrname, None)
+        self.__dict__.pop(ProductLayer.inner_layer_edges.attrname, None)
         self.factors = self.factors_of_edges()
 
     @property
@@ -252,16 +248,6 @@ class ProductLayer(InnerLayer):
             self.edges.row.astype(np.int64),
             self.edges.data.astype(np.int64),
         )
-
-    @functools.cached_property
-    def edges_per_child_layer(self) -> list[InnerLayerEdges]:
-        """
-        :return: The edges into every child layer, one entry per child layer.
-        """
-        return [
-            self.inner_layer_edges.into_child_layer(child_layer_index)
-            for child_layer_index in range(len(self.child_layers))
-        ]
 
     def combine_factors(
         self, child_results: list[SampleNodeValues], operation: np.ufunc

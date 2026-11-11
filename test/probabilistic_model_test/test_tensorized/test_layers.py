@@ -52,10 +52,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignm
     ForwardSampleAssignment,
     SampleRowsOfNode,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
-    InnerLayerEdge,
-    InnerLayerEdges,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer import (
     ProductLayer,
 )
@@ -845,30 +841,6 @@ def test_mixture_of_rejects_a_wrong_number_of_weights(leaf_x):
 
 
 # %% datastructures of the queries
-
-
-def test_edges_into_one_child_layer():
-    edges = InnerLayerEdges(
-        np.array([0, 0, 1, 1]), np.array([0, 1, 0, 0]), np.array([2, 0, 1, 3])
-    )
-    into_first = edges.into_child_layer(0)
-    assert list(into_first) == [
-        InnerLayerEdge(0, 0, 2),
-        InnerLayerEdge(1, 0, 1),
-        InnerLayerEdge(1, 0, 3),
-    ]
-    assert not into_first.every_node_at_most_once
-    assert edges.into_child_layer(1).every_node_at_most_once
-
-
-def test_product_layer_edges_per_child_layer():
-    layer = ProductLayer.product_of(
-        [uniform_layer_of(0, [(0, 1)]), uniform_layer_of(1, [(0, 1)])]
-    )
-    assert [list(edges) for edges in layer.edges_per_child_layer] == [
-        [InnerLayerEdge(0, 0, 0)],
-        [InnerLayerEdge(0, 1, 0)],
-    ]
 
 
 def test_sparse_entries_concatenate_into_one_array():
