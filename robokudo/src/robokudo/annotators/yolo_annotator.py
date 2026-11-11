@@ -243,7 +243,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """
         Load the models, so that building a pipeline does not download them.
         """
-        parameters: YoloParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         parameters.models_directory.mkdir(parents=True, exist_ok=True)
         self.model = YOLO(self.model_location)
         self.class_names = self._load_class_names()
@@ -257,7 +257,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """
         :return: Name of each class the model detects, by class id.
         """
-        parameters: YoloParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if parameters.pretrained_model is not None:
             return dict(self.model.names)
         class_names_file = parameters.file_in_ros_package(parameters.class_names_path)
@@ -269,7 +269,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """
         Detect objects and annotate them as classified object hypotheses.
         """
-        parameters: YoloParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if parameters.global_with_depth:
             cas = self.get_cas()
             color_to_depth_ratio = cas.color_to_depth_ratio
@@ -449,7 +449,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """
         :return: The mask of the detected object on the detection image.
         """
-        parameters: YoloParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if not parameters.precision_mode:
             x1, y1, x2, y2 = detection.bounding_box.get_corner_points()
             mask = np.zeros(detection_image.shape[:2], dtype=np.uint8)
@@ -493,7 +493,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         Draw the annotated hypotheses into the color image, together with their masks in
         precision mode, and output the point clouds of the new hypotheses.
         """
-        parameters: YoloParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         visualization_image = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
         for index, annotated in enumerate(annotated_detections):
             if parameters.precision_mode and annotated.is_new:

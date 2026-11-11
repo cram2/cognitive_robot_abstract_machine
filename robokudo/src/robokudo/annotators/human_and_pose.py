@@ -273,7 +273,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
         :attr:`Descriptor.Parameters.models_directory`, creating that directory if it
         does not exist, and, if configured, warming the model up.
         """
-        parameters: HumanAndPoseParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         parameters.models_directory.mkdir(parents=True, exist_ok=True)
         self.model = YOLO(
             str(parameters.models_directory / parameters.pretrained_model)
@@ -291,7 +291,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
         :return: The humans the model detects in the image, with their bounding boxes,
             confidences and keypoints.
         """
-        parameters: HumanAndPoseParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         return self.model.predict(
             image,
             conf=parameters.confidence_threshold,
@@ -310,7 +310,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
         :raises NotAPoseModelException: If the model reports no keypoints for a
             detection.
         """
-        parameters: HumanAndPoseParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         depth_frame = self._depth_frame() if parameters.global_with_depth else None
         result = self._predict(self.get_cas().get(CASViews.COLOR_IMAGE))
 
@@ -361,7 +361,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
         :return: The human hypothesis of the detection.
         :raises NotAPoseModelException: If the model reports no keypoints.
         """
-        parameters: HumanAndPoseParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         if result.keypoints is None:
             raise NotAPoseModelException(
                 annotator_name=self.name, model=parameters.pretrained_model
@@ -450,7 +450,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
         :return: The cloud around each keypoint, empty for keypoints below
             :attr:`Descriptor.Parameters.keypoint_confidence_threshold_for_clouds`.
         """
-        parameters: HumanAndPoseParameters = self.descriptor.parameters
+        parameters = self.descriptor.parameters
         return [
             BodyKeypointCloud(
                 keypoint=keypoint,
