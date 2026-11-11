@@ -44,14 +44,20 @@ class Region:
     def __hash__(self) -> int:
         return id(self)
 
-    def random_partition(self, k=2) -> list[Self]:
-        indices = np.arange(len(self.variables))
-        np.random.shuffle(indices)
-        partitions = [
+    def random_partition(
+        self, random_number_generator: np.random.Generator, number_of_parts: int = 2
+    ) -> list[Self]:
+        """
+        :param random_number_generator: The generator that shuffles the variables.
+        :param number_of_parts: The number of regions to split this region into.
+        :return: Regions of nearly equal size whose variables partition the variables of
+            this region at random.
+        """
+        indices = random_number_generator.permutation(len(self.variables))
+        return [
             Region(SortedSet([self.variables[index] for index in split]))
-            for split in np.array_split(indices, k)
+            for split in np.array_split(indices, number_of_parts)
         ]
-        return partitions
 
     def __repr__(self) -> str:
         return "{" + ", ".join([v.name for v in self.variables]) + "}"
@@ -104,6 +110,11 @@ class RegionGraph(nx.DiGraph):
     A repetition is another partitioning on the set of variables.
     """
 
+    random_number_generator: np.random.Generator
+    """
+    The generator that draws the random partitions, so that a seed fixes the graph.
+    """
+
     def __init__(
         self,
         variables: SortedSet,
@@ -111,8 +122,13 @@ class RegionGraph(nx.DiGraph):
         depth: int = 2,
         repetitions: int = 2,
         classes: int = 1,
+        seed: int = 69,
     ):
+        """
+        :param seed: The seed of :attr:`random_number_generator`.
+        """
         super().__init__()
+        self.random_number_generator = np.random.default_rng(seed)
         self.classes = classes
         self.variables = variables
         self.partitions = partitions
@@ -163,7 +179,9 @@ class RegionGraph(nx.DiGraph):
                     self.add_edge(partition, Region(SortedSet([variable])))
                 continue
 
-            new_regions = region.random_partition(self.partitions)
+            new_regions = region.random_partition(
+                self.random_number_generator, self.partitions
+            )
             for new_region in new_regions:
                 self.add_edge(partition, new_region)
                 new_partition = Partition()

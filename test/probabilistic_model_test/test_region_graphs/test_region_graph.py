@@ -53,6 +53,37 @@ def continuous_variables(number_of_variables: int, prefix: str = "") -> SortedSe
 # %% structure
 
 
+def partitions_of(region_graph: RegionGraph) -> list[list[str]]:
+    """
+    :param region_graph: A region graph.
+    :return: The names of the variables of every region, in the order they were created.
+    """
+    return [
+        [variable.name for variable in region.variables]
+        for region in region_graph.regions()
+    ]
+
+
+def test_region_graphs_with_the_same_seed_have_the_same_partitions():
+    first, second = (
+        RegionGraph(
+            continuous_variables(8), depth=2, repetitions=2, seed=3
+        ).create_random_region_graph()
+        for _ in range(2)
+    )
+    assert partitions_of(first) == partitions_of(second)
+
+
+def test_region_graphs_with_different_seeds_have_different_partitions():
+    first, second = (
+        RegionGraph(
+            continuous_variables(8), depth=2, repetitions=2, seed=seed
+        ).create_random_region_graph()
+        for seed in (3, 4)
+    )
+    assert partitions_of(first) != partitions_of(second)
+
+
 def test_region_graph_has_a_region_per_split():
     region_graph = RegionGraph(
         continuous_variables(4), partitions=2, depth=1, repetitions=2
