@@ -226,7 +226,9 @@ def test_custom_weights_and_class_names_are_read_from_ros_package(
         FileLoader,
         "get_path_to_file_in_ros_package",
         staticmethod(
-            lambda ros_pkg_name, relative_path: tmp_path / ros_pkg_name / relative_path
+            lambda ros_package_name, relative_path: (
+                tmp_path / ros_package_name / relative_path
+            )
         ),
     )
     descriptor = scene.descriptor()

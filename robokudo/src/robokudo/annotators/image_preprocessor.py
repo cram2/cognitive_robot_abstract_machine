@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 class ImagePreprocessorParameters(AnnotatorParameters):
     """Parameters for configuring preprocessing."""
 
-    depth_trunc: float = 9.0
+    depth_truncation: float = 9.0
     """Maximum depth distance in meters, points beyond are discarded from cloud creation"""
 
 
@@ -173,7 +173,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
             open3d_color_image,
             open3d_depth_image,
             convert_rgb_to_intensity=False,
-            depth_trunc=self.descriptor.parameters.depth_trunc,
+            depth_trunc=self.descriptor.parameters.depth_truncation,
         )
 
         cloud = open3d.geometry.PointCloud.create_from_rgbd_image(

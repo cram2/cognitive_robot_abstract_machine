@@ -73,19 +73,19 @@ class FileReaderInterface(CameraInterface):
     Position of the next frame to read.
     """
 
-    def __init__(self, camera_config: Any) -> None:
+    def __init__(self, camera_configuration: Any) -> None:
         """
         Initialize the file reader interface.
 
         Sets up the directory structure and loads all matching data files. Raises
         exceptions for invalid configurations or missing files.
 
-        :param camera_config: Camera configuration object
+        :param camera_configuration: Camera configuration object
         :raises Exception: If target directory or ROS package is invalid
         """
-        super().__init__(camera_config)
+        super().__init__(camera_configuration)
 
-        if camera_config.lookup_viewpoint:
+        if camera_configuration.lookup_viewpoint:
             warnings.warn(
                 "FileReaderInterface does not support live TF transform lookup. "
                 "lookup_viewpoint=True will be ignored; configure "
@@ -99,37 +99,39 @@ class FileReaderInterface(CameraInterface):
         Whether the interface was successfully initialized.
         """
         # Compute the targeted directory by considering the target_ros_package variable
-        if camera_config.target_ros_package:
+        if camera_configuration.target_ros_package:
             # rospack = rospkg.RosPack()
             package_path = Path(
                 ament_index_python.packages.get_package_share_directory(
-                    camera_config.target_ros_package
+                    camera_configuration.target_ros_package
                 )
             )
-            target_dir_path = package_path.joinpath(camera_config.target_dir)
-            if not target_dir_path.exists() or not target_dir_path.is_dir():
+            target_directory_path = package_path.joinpath(
+                camera_configuration.target_directory
+            )
+            if not target_directory_path.exists() or not target_directory_path.is_dir():
                 raise InvalidFileSource(
-                    reason=f"{str(target_dir_path)} is not existing or not a directory."
+                    reason=f"{str(target_directory_path)} is not existing or not a directory."
                 )
-            self.target_dir: str = str(target_dir_path)
+            self.target_directory: str = str(target_directory_path)
             """
             Target directory path as string.
             """
-            self.target_dir_path: Path = target_dir_path
+            self.target_directory_path: Path = target_directory_path
             """
             Target directory as Path object.
             """
         else:
-            if not camera_config.target_dir:
+            if not camera_configuration.target_directory:
                 raise InvalidFileSource(
-                    reason="FileReaderInterface: target_ros_package AND target_dir not properly set. Check CameraConfig"
+                    reason="FileReaderInterface: target_ros_package AND target_directory not properly set. Check CameraConfig"
                 )
 
-            self.target_dir: str = camera_config.target_dir
-            self.target_dir_path: Path = Path(self.target_dir)
+            self.target_directory: str = camera_configuration.target_directory
+            self.target_directory_path: Path = Path(self.target_directory)
 
-        if hasattr(camera_config, "filename_prefix"):
-            self.filename_prefix = camera_config.filename_prefix
+        if hasattr(camera_configuration, "filename_prefix"):
+            self.filename_prefix = camera_configuration.filename_prefix
         else:
             self.filename_prefix = "rk_"
             """
@@ -147,7 +149,8 @@ class FileReaderInterface(CameraInterface):
         """
         # Matching all files with the set prefix and the timestamp
         file_paths_found = [
-            x for x in sorted(self.target_dir_path.glob(f"{self.filename_prefix}*"))
+            x
+            for x in sorted(self.target_directory_path.glob(f"{self.filename_prefix}*"))
         ]
 
         # Insert files into self.loaded_data and self.loaded_paths, hashed by the timestamp in the filename
@@ -206,7 +209,7 @@ class FileReaderInterface(CameraInterface):
     def has_new_data(self) -> bool:
         if not self.initialized:
             return False
-        if self.camera_config.loop and self.next_frame_index == len(
+        if self.camera_configuration.loop and self.next_frame_index == len(
             self.frame_timestamps
         ):
             self.next_frame_index = 0
@@ -258,7 +261,10 @@ class RGBDFileReaderInterface(FileReaderInterface):
         cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
 
         recorded_observation = data[CASViews.CAMERA_OBSERVATION]
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
+        cas.set(
+            CASViews.COLOR_TO_DEPTH_RATIO,
+            self.camera_configuration.color_to_depth_ratio,
+        )
         camera_frame = recorded_observation["camera_frame"]
         world_T_camera = self.static_world_T_camera_if_configured(camera_frame)
         self.store_camera_observation(

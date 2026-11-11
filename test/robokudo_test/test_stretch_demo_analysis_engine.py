@@ -43,12 +43,12 @@ def test_pointcloud_crop_is_narrowed_to_the_target_shelf_layer(monkeypatch):
     parameters = crop_annotator.descriptor.parameters
 
     assert parameters.relative_to_world is True
-    assert parameters.min_x == TARGET_SHELF_MIN_WORLD_X
-    assert parameters.max_x == TARGET_SHELF_MAX_WORLD_X
-    assert parameters.min_y == TARGET_SHELF_MIN_WORLD_Y
-    assert parameters.max_y == TARGET_SHELF_MAX_WORLD_Y
-    assert parameters.min_z == TARGET_SHELF_LAYER_MIN_WORLD_Z
-    assert parameters.max_z == TARGET_SHELF_LAYER_MAX_WORLD_Z
+    assert parameters.minimum_x == TARGET_SHELF_MIN_WORLD_X
+    assert parameters.maximum_x == TARGET_SHELF_MAX_WORLD_X
+    assert parameters.minimum_y == TARGET_SHELF_MIN_WORLD_Y
+    assert parameters.maximum_y == TARGET_SHELF_MAX_WORLD_Y
+    assert parameters.minimum_z == TARGET_SHELF_LAYER_MIN_WORLD_Z
+    assert parameters.maximum_z == TARGET_SHELF_LAYER_MAX_WORLD_Z
 
 
 def test_pipeline_extracts_objects_by_color_not_depth_clustering(monkeypatch):

@@ -375,7 +375,7 @@ def test_storage_reader_keeps_camera_identity_in_cas() -> None:
         }
 
     reader.storage = Mock(load_views_from_mongo_in_cas=Mock(side_effect=load_views))
-    reader.camera_config = Mock(
+    reader.camera_configuration = Mock(
         restore_annotations=False, replay_mode=MongoReplayMode.SENSOR_CONTEXT
     )
     cas = CAS()
@@ -421,7 +421,7 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.rk_logger = Mock()
     reader._recorded_camera_id = None
-    reader.camera_config = Mock(
+    reader.camera_configuration = Mock(
         restore_annotations=False, replay_mode=MongoReplayMode.FULL_WORLD
     )
     frame = {

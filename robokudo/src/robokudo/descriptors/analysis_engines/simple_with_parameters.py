@@ -66,7 +66,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         Pipeline configuration:
 
         * Kinect camera interface setup
-        * Image preprocessor with depth_trunc = 4.5m
+        * Image preprocessor with depth_truncation = 4.5m
         * Slow annotator for processing simulation
 
         :return: The configured pipeline with custom parameters
@@ -74,7 +74,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
         image_preprocessor_config = ImagePreprocessorAnnotator.Descriptor()
-        image_preprocessor_config.parameters.depth_trunc = 4.5
+        image_preprocessor_config.parameters.depth_truncation = 4.5
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

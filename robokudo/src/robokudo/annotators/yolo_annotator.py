@@ -141,7 +141,7 @@ class YoloParameters(AnnotatorParameters):
     precision_mode_erosion_kernel_size: int = 2
     """Edge length in pixels of the square kernel the SAM masks are eroded with."""
 
-    depth_truncate: float = 3.5
+    depth_truncation: float = 3.5
     """Distance in meters beyond which depth measurements are left out of the hypothesis point clouds."""
 
     classify_existing_hypotheses: bool = False
@@ -171,7 +171,7 @@ class YoloParameters(AnnotatorParameters):
         :return: The absolute path of the file.
         """
         return FileLoader.get_path_to_file_in_ros_package(
-            ros_pkg_name=self.ros_package_name, relative_path=relative_path
+            ros_package_name=self.ros_package_name, relative_path=relative_path
         )
 
 
@@ -484,7 +484,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
             depth_image=self.get_cas().get(CASViews.DEPTH_IMAGE),
             mask=detection_mask,
             camera_model=self.camera_model,
-            depth_truncate=self.descriptor.parameters.depth_truncate,
+            depth_truncation=self.descriptor.parameters.depth_truncation,
             mask_true_value=self.mask_foreground,
         )
 

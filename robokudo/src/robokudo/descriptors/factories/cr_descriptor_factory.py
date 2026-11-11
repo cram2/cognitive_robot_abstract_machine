@@ -88,10 +88,10 @@ class CollectionReaderDescriptorFactory:
         :raises TypeError: If the keyword arguments are invalid for the camera config
             class.
         """
-        camera_config = CameraConfigRegistry.create_config(camera, **kwargs)
+        camera_configuration = CameraConfigRegistry.create_config(camera, **kwargs)
         return CollectionReaderDescriptor(
             parameters=CollectionReaderParameters.from_defaults(
-                camera_config=camera_config,
+                camera_configuration=camera_configuration,
                 camera_interface_type=cls._camera_interface_types[camera],
             ),
         )

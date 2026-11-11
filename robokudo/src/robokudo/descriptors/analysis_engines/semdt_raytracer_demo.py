@@ -11,7 +11,9 @@ from __future__ import annotations
 # %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
@@ -52,7 +54,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
-                ClusterPoseBBAnnotator(),
+                ClusterPoseBoundingBoxAnnotator(),
             ]
         )
         return seq

@@ -44,7 +44,7 @@ from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 class FileWriterParameters(AnnotatorParameters):
     """Parameters for configuring file storage."""
 
-    target_dir: str = "/tmp/"
+    target_directory: str = "/tmp/"
     """Directory to store files in"""
 
     filename_prefix: str = "rk_"
@@ -100,15 +100,17 @@ class FileWriter(BaseAnnotator[FileWriterDescriptor]):
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         self.rk_logger.debug(
-            f"Writing files to {self.descriptor.parameters.target_dir}"
+            f"Writing files to {self.descriptor.parameters.target_directory}"
         )
-        self.target_dir_path: Path = Path(self.descriptor.parameters.target_dir)
+        self.target_directory_path: Path = Path(
+            self.descriptor.parameters.target_directory
+        )
 
-        if self.target_dir_path.exists() and self.target_dir_path.is_dir():
+        if self.target_directory_path.exists() and self.target_directory_path.is_dir():
             self.initialized = True
         else:
             self.rk_logger.error(
-                f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
+                f"{self.descriptor.parameters.target_directory} is not existing or not a directory"
             )
 
     def generate_full_file_path_(self, data_type: CASViews, file_extension: str) -> str:
@@ -129,7 +131,7 @@ class FileWriter(BaseAnnotator[FileWriterDescriptor]):
         fn_prefix = self.descriptor.parameters.filename_prefix
         timestamp = self.get_cas().timestamp
         return str(
-            self.target_dir_path.joinpath(
+            self.target_directory_path.joinpath(
                 f"{fn_prefix}{str(timestamp)}_{data_type}.{file_extension}"
             )
         )

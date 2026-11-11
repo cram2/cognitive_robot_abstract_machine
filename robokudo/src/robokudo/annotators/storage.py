@@ -44,7 +44,7 @@ from robokudo.io.storage import Storage, StorageDocumentField
 class StorageWriterParameters(AnnotatorParameters):
     """Parameter container for storage configuration."""
 
-    db_name: str = "rk_scenes"
+    database_name: str = "rk_scenes"
     """Database name"""
 
     drop_database_on_storage: bool = True
@@ -93,7 +93,7 @@ class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
         """
         super().__init__(name, descriptor)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.storage = Storage(self.descriptor.parameters.db_name)
+        self.storage = Storage(self.descriptor.parameters.database_name)
         self.storage_preparation_completed: bool = False
         """
         Whether storage setup has already run for this writer.

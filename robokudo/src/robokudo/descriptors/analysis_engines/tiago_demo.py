@@ -101,7 +101,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
-                # ClusterPoseBBAnnotator(),
+                # ClusterPoseBoundingBoxAnnotator(),
                 ClusterPosePCAAnnotator(),
                 GenerateQueryResult(),
             ]

@@ -324,7 +324,7 @@ def get_cloud_from_rgb_depth_and_mask(
     depth_image: npt.NDArray,
     mask: npt.NDArray,
     camera_model: PinholeCameraModel,
-    depth_truncate: float = 9.0,
+    depth_truncation: float = 9.0,
     mask_true_value: int = 255,
 ) -> open3d.geometry.PointCloud:
     """
@@ -336,7 +336,7 @@ def get_cloud_from_rgb_depth_and_mask(
     :param depth_image: Depth image in millimeters.
     :param mask: Mask on the depth image.
     :param camera_model: Projection model at the depth image resolution.
-    :param depth_truncate: Distance in meters beyond which measurements are left out.
+    :param depth_truncation: Distance in meters beyond which measurements are left out.
     :param mask_true_value: Value of the mask pixels whose depth measurements the cloud
         is built from.
     :return: The colored point cloud of the masked depth measurements.
@@ -348,7 +348,7 @@ def get_cloud_from_rgb_depth_and_mask(
         open3d_color_image,
         open3d_depth_image,
         convert_rgb_to_intensity=False,
-        depth_trunc=depth_truncate,
+        depth_trunc=depth_truncation,
     )
 
     return open3d.geometry.PointCloud.create_from_rgbd_image(

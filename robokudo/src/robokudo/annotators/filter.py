@@ -37,13 +37,13 @@ from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 class FilterParameters(AnnotatorParameters):
     """Parameter container for filter configuration."""
 
-    func: Callable | None = None
+    function: Callable | None = None
     """Filter function to apply"""
 
-    func_args: tuple | None = None
+    function_arguments: tuple | None = None
     """Positional arguments for filter function"""
 
-    func_kwargs: dict | None = None
+    function_keyword_arguments: dict | None = None
     """Keyword arguments for filter function"""
 
 
@@ -96,17 +96,21 @@ class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
 
         :return: SUCCESS status
         """
-        func = self.descriptor.parameters.func
+        function = self.descriptor.parameters.function
 
-        if func:
-            func_args = self.descriptor.parameters.func_args or []
-            func_kwargs = self.descriptor.parameters.func_kwargs or {}
+        if function:
+            function_arguments = self.descriptor.parameters.function_arguments or []
+            function_keyword_arguments = (
+                self.descriptor.parameters.function_keyword_arguments or {}
+            )
 
             temporary_annotations = self.get_cas().annotations
             temporary_annotations = [
                 annotation
                 for annotation in temporary_annotations
-                if func(annotation, *func_args, **func_kwargs)
+                if function(
+                    annotation, *function_arguments, **function_keyword_arguments
+                )
             ]
             self.get_cas().annotations = temporary_annotations
 

@@ -50,7 +50,7 @@ if TYPE_CHECKING:
 class ClusterColorHistogramParameters(AnnotatorParameters):
     """Parameters for configuring histogram calculation."""
 
-    histogram_cols: int = 16
+    histogram_columns: int = 16
     """Number of histogram columns (hue bins)"""
 
     histogram_rows: int = 16
@@ -199,7 +199,7 @@ class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescript
 
             # Generate the actual histogram
             hist_size = [
-                self.descriptor.parameters.histogram_cols,
+                self.descriptor.parameters.histogram_columns,
                 self.descriptor.parameters.histogram_rows,
             ]
             histogram_2d = cv2.calcHist(

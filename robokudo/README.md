@@ -75,68 +75,6 @@ pip install "robokudo[dev]"
   `ros2_ws`, the checkbox next to `cognitive_robot_abstract_machine` is ticked. Also check the other way (`ros2_ws` in
   `cognitive_robot_abstract_machine` is ticked).
 
-### Annotator configuration
-
-Descriptors and parameters are module-level dataclasses. The annotator still exposes
-its descriptor constructor for IDE discovery:
-
-```python
-from robokudo.annotators.yolo_annotator import YoloAnnotator
-
-descriptor = YoloAnnotator.Descriptor()
-descriptor.parameters.threshold = 0.8
-descriptor.parameters.global_with_depth = False
-annotator = YoloAnnotator(descriptor=descriptor)
-```
-
-The same classes can be imported directly as `YoloDescriptor` and `YoloParameters`.
-`YoloAnnotator.Descriptor.Parameters` also returns the module-level parameter class.
-Use the directly imported names in type annotations.
-
-Configure shared defaults once, before constructing descriptors:
-
-```python
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
-
-defaults = AnnotatorPredefinedParameters()
-defaults.global_with_visualization = False
-```
-
-The defaults object is shared across the application, including multiple and nested
-pipelines. Assign settings on this **instance**, rather than on the class. Each new
-descriptor snapshots the defaults into its own parameter dataclass. Annotator-specific
-defaults, such as HumanAndPose's disabled depth processing, take precedence. Local
-assignments on `descriptor.parameters` affect only that descriptor. Existing
-descriptors do not change when the application's defaults change, and camera readers
-do not update defaults during acquisition.
-
-Constructing a parameter dataclass directly supplies its complete configuration.
-Use `YoloParameters.from_defaults(threshold=0.8)` to start from the application's
-configured defaults, or `YoloParameters(threshold=0.8)` to use the declared dataclass
-defaults. An explicitly supplied `YoloDescriptor(parameters=parameters)` retains that
-object without reapplying defaults.
-
-Descriptors round-trip through `krrood.adapters.json_serializer.to_json` and
-`from_json`. Saved descriptors contain effective global values, so loading them
-reproduces those settings independently of the current application defaults.
-Serializable class definitions must remain importable at their module-level paths.
-Callable parameter values must themselves be serializable; a module-level callable
-dataclass is suitable, while arbitrary lambdas and closures are not supported by the
-dataclass serializer.
-
-Collection-reader descriptors store a camera configuration and a camera-interface
-**type**. The reader constructs the runtime interface when instantiated. Access the
-live interface through `reader.camera_interface`, rather than through its descriptor.
-For controlled acquisition, such as tests, pass an existing interface using
-`CollectionReaderAnnotator(descriptor, camera_interface=interface)`.
-
-For a new annotator, define its parameter dataclass as a subclass of
-`AnnotatorParameters`, its descriptor as a subclass of
-`AnnotatorDescriptor[YourParameters]`, and initialize the descriptor's `parameters`
-field with `field(default_factory=YourParameters.from_defaults)`. Bind the annotator
-base to its descriptor type and expose the descriptor using krrood's `classproperty`.
-Global parameter fields are inherited; they need no per-annotator declarations.
-
 ### Tutorials
 
 https://robokudo.ai.uni-bremen.de/

@@ -37,13 +37,13 @@ from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 class LambdaFunctionParameters(AnnotatorParameters):
     """Parameter container for function configuration."""
 
-    func: Callable | None = None
+    function: Callable | None = None
     """Configured callable, or None to perform no operation."""
 
-    func_args: tuple | None = None
+    function_arguments: tuple | None = None
     """Positional arguments passed to the configured callable."""
 
-    func_kwargs: dict | None = None
+    function_keyword_arguments: dict | None = None
     """Keyword arguments passed to the configured callable."""
 
 
@@ -99,12 +99,14 @@ class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
 
         :return: SUCCESS status
         """
-        func = self.descriptor.parameters.func
+        function = self.descriptor.parameters.function
 
-        if func:
-            func_args = self.descriptor.parameters.func_args or []
-            func_kwargs = self.descriptor.parameters.func_kwargs or {}
+        if function:
+            function_arguments = self.descriptor.parameters.function_arguments or []
+            function_keyword_arguments = (
+                self.descriptor.parameters.function_keyword_arguments or {}
+            )
 
-            func(self, *func_args, **func_kwargs)
+            function(self, *function_arguments, **function_keyword_arguments)
 
         return Status.SUCCESS

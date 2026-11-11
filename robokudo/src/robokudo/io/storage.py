@@ -114,15 +114,15 @@ class Storage:
         better compatibility across pymongo versions and simpler cursor management.
         """
 
-        def __init__(self, db_name: str) -> None:
+        def __init__(self, database_name: str) -> None:
             """
             Initialize the list reader.
 
-            :param db_name: Name of the MongoDB database
+            :param database_name: Name of the MongoDB database
             """
             client = Storage.instantiate_mongo_client()
 
-            self.db_reader = client[db_name]
+            self.db_reader = client[database_name]
             """
             MongoDB database instance.
             """
@@ -167,13 +167,13 @@ class Storage:
             self.index += 1
             return data
 
-    def __init__(self, db_name: str) -> None:
+    def __init__(self, database_name: str) -> None:
         """
         Initialize the storage interface.
 
-        :param db_name: Name of the MongoDB database
+        :param database_name: Name of the MongoDB database
         """
-        self.db_name = db_name
+        self.database_name = database_name
         """
         Name of the MongoDB database.
         """
@@ -181,7 +181,7 @@ class Storage:
         """
         MongoDB client connection.
         """
-        self.db: Database = self.client[db_name]
+        self.db: Database = self.client[database_name]
         """
         MongoDB database instance.
         """
@@ -190,7 +190,7 @@ class Storage:
         """
         Drop the entire database.
         """
-        self.client.drop_database(self.db_name)
+        self.client.drop_database(self.database_name)
 
     @staticmethod
     def encode_view_document(view_name: str, view_value: Any) -> dict[str, Any]:

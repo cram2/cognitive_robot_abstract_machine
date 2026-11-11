@@ -94,17 +94,17 @@ class CameraInterface(object):
         """
         return "robokudo_camera_mount_"
 
-    def __init__(self, camera_config: Any) -> None:
+    def __init__(self, camera_configuration: Any) -> None:
         """
         Initialize the camera interface.
 
-        :param camera_config: Configuration for the camera
+        :param camera_configuration: Configuration for the camera
         """
         self._has_new_data: bool = False
         """
         Whether new data is available.
         """
-        self.camera_config: Any = camera_config
+        self.camera_configuration: Any = camera_configuration
         """
         Camera configuration object.
         """
@@ -216,13 +216,13 @@ class CameraInterface(object):
         :param camera_frame: Optical frame identifying the camera in the runtime world.
         :return: Camera pose in the configured world frame, or ``None`` if disabled.
         """
-        if not self.camera_config.static_camera_transform_enabled:
+        if not self.camera_configuration.static_camera_transform_enabled:
             return None
 
         return self.bind_world_T_camera(
-            world_frame=self.camera_config.static_world_frame,
+            world_frame=self.camera_configuration.static_world_frame,
             camera_frame=camera_frame,
-            world_T_camera=self.camera_config.static_world_T_camera,
+            world_T_camera=self.camera_configuration.static_world_T_camera,
         )
 
     def store_camera_observation(
@@ -362,34 +362,34 @@ class ROSCameraInterface(CameraInterface):
     transform lookups and camera intrinsics handling.
     """
 
-    def __init__(self, camera_config: Any, node: Node | None = None) -> None:
+    def __init__(self, camera_configuration: Any, node: Node | None = None) -> None:
         """
         Initialize the ROS camera interface.
 
-        :param camera_config: Configuration for the ROS camera
+        :param camera_configuration: Configuration for the ROS camera
         :param node: A ROS node for transform lookups
         """
-        super().__init__(camera_config)
+        super().__init__(camera_configuration)
 
         self.node = node if node is not None else ROSNodeRegistry().get()
         """
         ROS node for communication with ROS.
         """
-        if hasattr(self.camera_config, "lookup_viewpoint"):
-            self.lookup_viewpoint: bool = self.camera_config.lookup_viewpoint
+        if hasattr(self.camera_configuration, "lookup_viewpoint"):
+            self.lookup_viewpoint: bool = self.camera_configuration.lookup_viewpoint
 
             self.tf_from: str = (
-                normalize_ros_frame_id(camera_config.tf_from)
+                normalize_ros_frame_id(camera_configuration.tf_from)
                 if self.lookup_viewpoint
-                else camera_config.tf_from
+                else camera_configuration.tf_from
             )
             """
             Transform source frame.
             """
             self.tf_to: str = (
-                normalize_ros_frame_id(camera_config.tf_to)
+                normalize_ros_frame_id(camera_configuration.tf_to)
                 if self.lookup_viewpoint
-                else camera_config.tf_to
+                else camera_configuration.tf_to
             )
             """
             Transform target frame.
@@ -427,7 +427,9 @@ class ROSCameraInterface(CameraInterface):
         ):
             return False
         world_T_camera = self.tf_buffer.lookup_transform(
-            target_frame=self.tf_to, source_frame=self.tf_from, time=timestamp
+            target_frame=self.tf_to,
+            source_frame=self.tf_from,
+            time=timestamp,
         )
         translation = world_T_camera.transform.translation
         rotation = world_T_camera.transform.rotation
@@ -539,21 +541,21 @@ class KinectCameraInterface(ROSCameraInterface):
     depth images through ROS topics. It supports both raw and compressed image formats.
     """
 
-    def __init__(self, camera_config: Any) -> None:
+    def __init__(self, camera_configuration: Any) -> None:
         """
         Initialize the Kinect camera interface.
 
         Sets up ROS subscribers and synchronization for color, depth, and camera info
         topics.
 
-        :param camera_config: Configuration for the Kinect camera
+        :param camera_configuration: Configuration for the Kinect camera
         """
-        super().__init__(camera_config)
+        super().__init__(camera_configuration)
 
         self.color_subscriber: message_filters.Subscriber = Subscriber(
             self.node,
             CompressedImage if self.compressed_color_configured() else Image,
-            camera_config.topic_color,
+            camera_configuration.topic_color,
         )
         """
         Color image subscriber.
@@ -561,13 +563,13 @@ class KinectCameraInterface(ROSCameraInterface):
         self.depth_subscriber: message_filters.Subscriber = Subscriber(
             self.node,
             CompressedImage if self.compressed_depth_configured() else Image,
-            camera_config.topic_depth,
+            camera_configuration.topic_depth,
         )
         """
         Depth image subscriber.
         """
         self.camera_info_subscriber: message_filters.Subscriber = Subscriber(
-            self.node, CameraInfo, camera_config.topic_camera_info
+            self.node, CameraInfo, camera_configuration.topic_camera_info
         )
         """
         Camera info subscriber.
@@ -580,9 +582,9 @@ class KinectCameraInterface(ROSCameraInterface):
         ts.registerCallback(self.callback)
 
         self.rk_logger.info("Subscribed to: ")
-        self.rk_logger.info(f"  {camera_config.topic_color}")
-        self.rk_logger.info(f"  {camera_config.topic_depth}")
-        self.rk_logger.info(f"  {camera_config.topic_camera_info}")
+        self.rk_logger.info(f"  {camera_configuration.topic_color}")
+        self.rk_logger.info(f"  {camera_configuration.topic_depth}")
+        self.rk_logger.info(f"  {camera_configuration.topic_camera_info}")
 
         self.color: npt.NDArray | None = None
         """
@@ -620,8 +622,8 @@ class KinectCameraInterface(ROSCameraInterface):
         :return: True if compressed depth is configured, False otherwise
         """
         return (
-            hasattr(self.camera_config, "depth_hints")
-            and self.camera_config.depth_hints == "compressedDepth"
+            hasattr(self.camera_configuration, "depth_hints")
+            and self.camera_configuration.depth_hints == "compressedDepth"
         )
 
     def compressed_color_configured(self) -> bool:
@@ -631,8 +633,8 @@ class KinectCameraInterface(ROSCameraInterface):
         :return: True if compressed color is configured, False otherwise
         """
         return (
-            hasattr(self.camera_config, "color_hints")
-            and self.camera_config.color_hints == "compressed"
+            hasattr(self.camera_configuration, "color_hints")
+            and self.camera_configuration.color_hints == "compressed"
         )
 
     def get_node(self) -> rclpy.node.Node:
@@ -734,23 +736,25 @@ class KinectCameraInterface(ROSCameraInterface):
             return
 
         self.lock.acquire()
-        if self.camera_config.hi_res_mode:
+        if self.camera_configuration.high_resolution_mode:
             self.color = self.color[0:960, 0:1280]
 
         width = self.camera_info.width
         height = self.camera_info.height
-        if self.camera_config.hi_res_mode:
+        if self.camera_configuration.high_resolution_mode:
             height = 960
         self.camera_info.width = width
         self.camera_info.height = height
 
-        self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
+        self.color_to_depth_ratio = self.camera_configuration.color_to_depth_ratio
 
         cas.set(CASViews.COLOR_IMAGE, self.color)
         cas.set(CASViews.DEPTH_IMAGE, self.depth)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
 
-        camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
+        camera_frame = (
+            self.camera_info.header.frame_id or self.camera_configuration.tf_from
+        )
         self.validate_camera_frame_for_tf(camera_frame)
         world_T_camera = self.world_T_camera_from_tf(self.timestamp)
         self.store_camera_observation(

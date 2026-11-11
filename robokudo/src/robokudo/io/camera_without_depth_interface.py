@@ -61,7 +61,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
     * Static camera calibration
     """
 
-    def __init__(self, camera_config: Any) -> None:
+    def __init__(self, camera_configuration: Any) -> None:
         """
         Initialize the OpenCV camera interface.
 
@@ -70,13 +70,13 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         :raises IOError: If video stream/file cannot be opened
         """
-        super().__init__(camera_config)
+        super().__init__(camera_configuration)
 
         # open video stream
-        device = camera_config.device
+        device = camera_configuration.device
 
         self.video_capture: cv2.VideoCapture = cv2.VideoCapture(
-            device, camera_config.api_preference
+            device, camera_configuration.capture_backend
         )
         """
         OpenCV video capture object.
@@ -84,7 +84,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         if self.video_capture is None or not self.video_capture.isOpened():
             raise IOError("Could not open video stream/file:<{}>.".format(device))
 
-        self.device_driver_flag: int = camera_config.device_driver_flag
+        self.device_driver_flag: int = camera_configuration.device_driver_flag
         """
         OpenCV-specific driver flags.
         """
@@ -99,7 +99,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         Type of input (video/camera/image)
         """
         self._loop_counter: int = (
-            self.stream_type != TYPE_CAMERA and camera_config.loop_mode
+            self.stream_type != TYPE_CAMERA and camera_configuration.loop_mode
         )
         """
         Number of remaining playback loops.
@@ -194,13 +194,13 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
                 self._loop_counter = self._loop_counter - 1
 
         # stabilise contrast/brightness
-        if self.camera_config.normalize_rgb:
+        if self.camera_configuration.normalize_color_image:
             cv2.normalize(color, color, 0, 255, cv2.NORM_MINMAX)
 
         # update additional (fake) data
-        depth = self.camera_config.depth
-        camera_info = self.camera_config.camera_info
-        color_to_depth_ratio = self.camera_config.color_to_depth_ratio
+        depth = self.camera_configuration.depth
+        camera_info = self.camera_configuration.camera_info
+        color_to_depth_ratio = self.camera_configuration.color_to_depth_ratio
         if camera_info is None:
             raise CameraDataMissing(
                 data_name="Camera calibration",
@@ -219,7 +219,9 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         cas.set(CASViews.COLOR_IMAGE, color)
         cas.set(CASViews.DEPTH_IMAGE, depth)
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, color_to_depth_ratio)
-        camera_frame = camera_info.header.frame_id or self.camera_config.camera_frame
+        camera_frame = (
+            camera_info.header.frame_id or self.camera_configuration.camera_frame
+        )
         modalities = (
             (CameraModality.COLOR, CameraModality.DEPTH)
             if depth is not None

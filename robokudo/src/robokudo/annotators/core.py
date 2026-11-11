@@ -88,7 +88,7 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
         self,
         name: str = "Annotator",
         descriptor: DescriptorType | None = None,
-        ros_pkg_name: str = PACKAGE_NAME,
+        ros_package_name: str = PACKAGE_NAME,
     ) -> None:
         """
         Initialize the BaseAnnotator.
@@ -97,14 +97,14 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
 
         :param name: Name of the annotator instance
         :param descriptor: Configuration descriptor
-        :param ros_pkg_name: Name of the ROS package
+        :param ros_package_name: Name of the ROS package
         """
         super().__init__(name)
         if descriptor is None:
             descriptor = self.Descriptor()
 
-        # self.rk_logger = get_logger(ros_pkg_name)
-        self.rk_logger = logging.getLogger(ros_pkg_name)
+        # self.rk_logger = get_logger(ros_package_name)
+        self.rk_logger = logging.getLogger(ros_package_name)
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
         # self.rk_logger.debug("%s" % (get_line_context(self)))

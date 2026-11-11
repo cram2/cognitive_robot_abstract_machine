@@ -524,7 +524,7 @@ class TestUtilsO3DHelper(object):
         mask[100:200, 100:200] = 255
 
         pc = get_cloud_from_rgb_depth_and_mask(
-            rgb_image, depth_image, mask, camera_model, depth_truncate=0.2
+            rgb_image, depth_image, mask, camera_model, depth_truncation=0.2
         )  # truncate from 200 mm
 
         assert len(pc.points) == 0

@@ -53,37 +53,39 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-# %% ClusterPoseBB parameters
+# %% ClusterPoseBoundingBox parameters
 
 
 @dataclass(kw_only=True)
-class ClusterPoseBBParameters(AnnotatorParameters):
+class ClusterPoseBoundingBoxParameters(AnnotatorParameters):
     """Parameters for configuring pose estimation."""
 
-    align_x_axis_by_max_bbox_extent: bool = False
+    align_x_axis_by_maximum_bounding_box_extent: bool = False
     """Whether to align x-axis with longest box side. The default behaviour of this Annotator orients the z-axis such that it always points up w.r.t the world frame. By setting this parameter to True, this behaviour will be overwritten. In that case, x will always point in the direction of the largest side (extent) of the bounding box"""
 
     bounding_box_visualization_color: tuple[int, int, int] = (0, 0, 0)
     """RGB color for box visualization"""
 
 
-# %% ClusterPoseBB descriptor
+# %% ClusterPoseBoundingBox descriptor
 
 
 @dataclass(kw_only=True)
-class ClusterPoseBBDescriptor(AnnotatorDescriptor[ClusterPoseBBParameters]):
-    """Declarative configuration of :class:`ClusterPoseBBAnnotator`."""
+class ClusterPoseBoundingBoxDescriptor(
+    AnnotatorDescriptor[ClusterPoseBoundingBoxParameters]
+):
+    """Declarative configuration of :class:`ClusterPoseBoundingBoxAnnotator`."""
 
-    parameters: ClusterPoseBBParameters = field(
-        default_factory=ClusterPoseBBParameters.from_defaults
+    parameters: ClusterPoseBoundingBoxParameters = field(
+        default_factory=ClusterPoseBoundingBoxParameters.from_defaults
     )
     """Effective settings initialized from application and annotator defaults."""
 
 
-# %% ClusterPoseBB annotator
+# %% ClusterPoseBoundingBox annotator
 
 
-class ClusterPoseBBAnnotator(BaseAnnotator[ClusterPoseBBDescriptor]):
+class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescriptor]):
     """3D pose estimation using oriented bounding boxes.
 
     This annotator:
@@ -99,14 +101,14 @@ class ClusterPoseBBAnnotator(BaseAnnotator[ClusterPoseBBDescriptor]):
     """
 
     @classproperty
-    def Descriptor(cls) -> type[ClusterPoseBBDescriptor]:
+    def Descriptor(cls) -> type[ClusterPoseBoundingBoxDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ClusterPoseBBDescriptor
+        return ClusterPoseBoundingBoxDescriptor
 
     def __init__(
         self,
-        name: str = "ClusterPoseBBAnnotator",
-        descriptor: ClusterPoseBBDescriptor | None = None,
+        name: str = "ClusterPoseBoundingBoxAnnotator",
+        descriptor: ClusterPoseBoundingBoxDescriptor | None = None,
     ) -> None:
         """Initialize the pose estimator.
 
@@ -250,7 +252,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator[ClusterPoseBBDescriptor]):
 
             # We've finished calculating the transformation and size of the bounding box.
             # If the pose shall be aligned w.r.t the bbox extents, call the corresponding method
-            if self.descriptor.parameters.align_x_axis_by_max_bbox_extent:
+            if self.descriptor.parameters.align_x_axis_by_maximum_bounding_box_extent:
                 aligned_orientation, aligned_extents = (
                     self.adjust_bb_orientation_by_bb_size(
                         pose_orientation=cluster_rotation_in_camera,

@@ -118,12 +118,14 @@ class DepthFrame:
         """
         return 255
 
-    def box_cloud(self, box: Rect, depth_truncate: float) -> open3d.geometry.PointCloud:
+    def box_cloud(
+        self, box: Rect, depth_truncation: float
+    ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a box.
 
         :param box: The box in color image pixels.
-        :param depth_truncate: Distance in meters beyond which measurements are left
+        :param depth_truncation: Distance in meters beyond which measurements are left
             out.
         :return: The colored point cloud of the depth measurements inside the box.
         """
@@ -132,7 +134,7 @@ class DepthFrame:
         ).get_corner_points()
         mask = np.zeros_like(self.depth_image, dtype=np.uint8)
         mask[top:bottom, left:right] = self.mask_foreground
-        return self._masked_cloud(mask, depth_truncate=depth_truncate)
+        return self._masked_cloud(mask, depth_truncation=depth_truncation)
 
     def disc_cloud(self, x: float, y: float, radius: int) -> open3d.geometry.PointCloud:
         """
@@ -224,7 +226,7 @@ class HumanAndPoseParameters(AnnotatorParameters):
     warmup_image_shape: tuple[int, int, int] = (512, 512, 3)
     """Shape (height, width, channels) of the blank image the model is warmed up on."""
 
-    depth_truncate: float = 3.5
+    depth_truncation: float = 3.5
     """Distance in meters beyond which depth measurements are left out of the box clouds, removing background from the human detection."""
 
 
@@ -397,13 +399,15 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
             return hypothesis
 
         hypothesis.points = depth_frame.box_cloud(
-            hypothesis.roi.roi, parameters.depth_truncate
+            hypothesis.roi.roi, parameters.depth_truncation
         )
         if parameters.shrink_bounding_box is not None and keeps_full_box:
             hypothesis.annotations.append(
                 CloudAnnotation(
                     source=self.name,
-                    points=depth_frame.box_cloud(shrunk_box, parameters.depth_truncate),
+                    points=depth_frame.box_cloud(
+                        shrunk_box, parameters.depth_truncation
+                    ),
                 )
             )
         if parameters.generate_clouds_for_keypoints:

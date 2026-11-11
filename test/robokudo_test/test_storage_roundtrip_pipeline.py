@@ -36,16 +36,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
+def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pipeline:
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
-        target_dir=recording_directory,
+        target_directory=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
-    camera_config = file_reader_descriptor.parameters.camera_config
-    camera_config.static_camera_transform_enabled = True
-    camera_config.static_world_T_camera = (
+    camera_configuration = file_reader_descriptor.parameters.camera_configuration
+    camera_configuration.static_camera_transform_enabled = True
+    camera_configuration.static_world_T_camera = (
         HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
@@ -58,7 +58,7 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
     )
 
     writer_descriptor = StorageWriter.Descriptor()
-    writer_descriptor.parameters.db_name = db_name
+    writer_descriptor.parameters.database_name = database_name
     writer_descriptor.parameters.drop_database_on_storage = True
 
     pipeline = Pipeline("WriterPipeline")
@@ -72,9 +72,9 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
     return pipeline
 
 
-def _build_reader_pipeline(db_name: str) -> Pipeline:
+def _build_reader_pipeline(database_name: str) -> Pipeline:
     mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-        "mongo", loop=False, db_name=db_name
+        "mongo", loop=False, database_name=database_name
     )
     pipeline = Pipeline("ReaderPipeline")
     pipeline.add_children(
@@ -91,8 +91,8 @@ class TestStorageRoundtripPipeline:
         self, cup_on_counter_directory: Path
     ) -> None:
         rk_world.init_world_with_entity_tracker()
-        db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
-        storage = Storage(db_name)
+        database_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
+        storage = Storage(database_name)
         writer_node = Node(
             f"{robokudo.defs.TEST_ROS_NODE_NAME}_writer_{uuid.uuid4().hex}"
         )
@@ -100,7 +100,9 @@ class TestStorageRoundtripPipeline:
             f"{robokudo.defs.TEST_ROS_NODE_NAME}_reader_{uuid.uuid4().hex}"
         )
         try:
-            writer_pipeline = _build_writer_pipeline(db_name, cup_on_counter_directory)
+            writer_pipeline = _build_writer_pipeline(
+                database_name, cup_on_counter_directory
+            )
             writer_status = robokudo.utils.tree_execution.run_tree_once(
                 writer_pipeline, writer_node
             )
@@ -133,7 +135,7 @@ class TestStorageRoundtripPipeline:
             rk_world.init_world_with_entity_tracker()
             assert rk_world.world_instance().is_empty()
 
-            reader_pipeline = _build_reader_pipeline(db_name)
+            reader_pipeline = _build_reader_pipeline(database_name)
             reader_status = robokudo.utils.tree_execution.run_tree_once(
                 reader_pipeline, reader_node
             )

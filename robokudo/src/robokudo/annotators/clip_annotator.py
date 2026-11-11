@@ -14,10 +14,10 @@ from transformers import CLIPModel, CLIPProcessor
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.zero_shot_classification_annotator import (
-    ClassificationDescriptor,
     ZeroShotClassificationAnnotator,
     ZeroShotClassificationParameters,
 )
+from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
 from robokudo.datastructures.torch_device import (
     TorchDeviceJSONSerializer as TorchDeviceJSONSerializer,
 )
@@ -55,7 +55,7 @@ class CLIPParameters(ZeroShotClassificationParameters):
 
 
 @dataclass(kw_only=True)
-class CLIPDescriptor(ClassificationDescriptor[CLIPParameters]):
+class CLIPDescriptor(AnnotatorDescriptor[CLIPParameters]):
     """Declarative configuration of :class:`CLIPAnnotator`."""
 
     parameters: CLIPParameters = field(default_factory=CLIPParameters.from_defaults)
@@ -150,14 +150,16 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
         vocabulary_size = len(self.descriptor.parameters.vocabulary)
         if self.descriptor.parameters.use_softmax:
             return vocabulary_size
-        return min(self.descriptor.parameters.save_top_k, vocabulary_size)
+        return min(
+            self.descriptor.parameters.maximum_saved_classifications, vocabulary_size
+        )
 
     def _search_index(
         self,
         features: npt.NDArray[np.float32],
         k: int,
         use_softmax: bool,
-        save_top_k: int,
+        maximum_saved_classifications: int,
     ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.int64]]:
         """
         Search the faiss index using the given features.
@@ -165,7 +167,7 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
         :param features: The features to search the index with.
         :param k: The number of candidates to retrieve from the index for each feature.
         :param use_softmax: Whether to apply a softmax to the results of each feature.
-        :param save_top_k: How many results to keep after applying softmax.
+        :param maximum_saved_classifications: How many results to keep after applying softmax.
         :return: A tuple of (similarities, class indices)
         """
         class_similarities, class_indices = self.vocabulary_index.search(features, k=k)
@@ -176,8 +178,8 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
 
             class_similarities = torch.softmax(torch.tensor(logits), dim=1).numpy()
 
-            class_similarities = class_similarities[:, :save_top_k]
-            class_indices = class_indices[:, :save_top_k]
+            class_similarities = class_similarities[:, :maximum_saved_classifications]
+            class_indices = class_indices[:, :maximum_saved_classifications]
         else:
             # Move [-1.0, 1.0] to [0.0, 1.0]
             class_similarities += 1.0
@@ -190,7 +192,7 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
             features=self._get_image_features(images),
             k=self._candidate_count(),
             use_softmax=self.descriptor.parameters.use_softmax,
-            save_top_k=self.descriptor.parameters.save_top_k,
+            maximum_saved_classifications=self.descriptor.parameters.maximum_saved_classifications,
         )
         return [
             [

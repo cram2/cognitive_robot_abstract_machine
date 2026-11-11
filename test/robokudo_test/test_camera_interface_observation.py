@@ -16,7 +16,7 @@ from geometry_msgs.msg import TransformStamped
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 from rclpy.time import Time as ROSClockTime
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
+from robokudo.datastructures.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.static_camera_transform import StaticCameraTransformAnnotator
 from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
@@ -63,7 +63,7 @@ class SynchronizedImageConfiguration:
     Camera optical frame used when the message does not declare one.
     """
 
-    hi_res_mode: bool = False
+    high_resolution_mode: bool = False
     """
     Whether the legacy high-resolution crop is active.
     """
@@ -107,7 +107,7 @@ class OpenCVCameraTestConfig:
     Fallback optical frame when the calibration declares no frame.
     """
 
-    normalize_rgb: bool = False
+    normalize_color_image: bool = False
     """
     Whether to normalize the captured color values.
     """
@@ -534,7 +534,7 @@ def test_live_reader_rejects_tf_source_for_a_different_optical_frame(
     Reject a configured TF source that is not the image optical frame.
     """
     interface = object.__new__(KinectCameraInterface)
-    interface.camera_config = SynchronizedImageConfiguration()
+    interface.camera_configuration = SynchronizedImageConfiguration()
     interface._has_new_data = True
     interface.lookup_viewpoint = True
     interface.tf_from = "another_optical_frame"
@@ -563,7 +563,7 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     camera_info.header.frame_id = "/color_optical_frame"
     original_parent = camera_body.parent_connection
     interface = object.__new__(KinectCameraInterface)
-    interface.camera_config = SynchronizedImageConfiguration()
+    interface.camera_configuration = SynchronizedImageConfiguration()
     interface._has_new_data = True
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
@@ -598,7 +598,7 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     An isolated live camera gets a world reference and sampled mount.
     """
     interface = object.__new__(KinectCameraInterface)
-    interface.camera_config = SynchronizedImageConfiguration()
+    interface.camera_configuration = SynchronizedImageConfiguration()
     interface._has_new_data = True
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
@@ -636,7 +636,7 @@ def test_rgbd_reader_stores_camera_observation(
     The live RGB-D reader publishes semantic metadata with each CAS frame.
     """
     interface = object.__new__(KinectCameraInterface)
-    interface.camera_config = SynchronizedImageConfiguration()
+    interface.camera_configuration = SynchronizedImageConfiguration()
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.color = np.zeros(
@@ -672,7 +672,7 @@ def test_rgb_only_reader_stores_camera_observation(
     The live RGB-only reader publishes the same semantic metadata contract.
     """
     interface = object.__new__(ROSCameraWithoutDepthInterface)
-    interface.camera_config = LiveColorCameraConfig()
+    interface.camera_configuration = LiveColorCameraConfig()
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.color = np.zeros(
@@ -711,7 +711,7 @@ def test_rgb_only_rotation_updates_effective_calibration(
     original_tangential_x = camera_info.d[2]
     original_tangential_y = camera_info.d[3]
     interface = object.__new__(ROSCameraWithoutDepthInterface)
-    interface.camera_config = LiveColorCameraConfig(
+    interface.camera_configuration = LiveColorCameraConfig(
         rotate_image=ImageRotation.COUNTERCLOCKWISE_90
     )
     interface._has_new_data = True
@@ -774,7 +774,9 @@ def test_rgbd_high_resolution_crop_updates_effective_resolution(
     camera_info.height = 1024
     camera_info.k = [900.0, 0.0, 640.0, 0.0, 910.0, 512.0, 0.0, 0.0, 1.0]
     interface = object.__new__(KinectCameraInterface)
-    interface.camera_config = SynchronizedImageConfiguration(hi_res_mode=True)
+    interface.camera_configuration = SynchronizedImageConfiguration(
+        high_resolution_mode=True
+    )
     interface._has_new_data = True
     interface.lookup_viewpoint = False
     interface.color = np.zeros((1024, 1280, 3), dtype=np.uint8)
@@ -808,7 +810,7 @@ def opencv_camera_interface(
 ) -> OpenCVCameraWithoutDepthInterface:
     """Provide one captured frame without opening a camera or video file."""
     interface = object.__new__(OpenCVCameraWithoutDepthInterface)
-    interface.camera_config = OpenCVCameraTestConfig(camera_info=camera_info)
+    interface.camera_configuration = OpenCVCameraTestConfig(camera_info=camera_info)
     interface.video_capture = SeekableImageSequence()
     interface.device_driver_flag = 0
     interface.stream_type = 1

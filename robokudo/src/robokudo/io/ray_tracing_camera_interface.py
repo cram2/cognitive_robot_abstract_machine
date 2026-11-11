@@ -30,14 +30,14 @@ class RayTracingCameraInterface(CameraInterface):
     coherent semantic camera observation into the CAS.
     """
 
-    def __init__(self, camera_config: RayTracingCameraConfiguration) -> None:
+    def __init__(self, camera_configuration: RayTracingCameraConfiguration) -> None:
         """
         Initialize the camera interface.
 
-        :param camera_config: Ray-tracer camera configuration descriptor.
+        :param camera_configuration: Ray-tracer camera configuration descriptor.
         """
-        super().__init__(camera_config)
-        self.context_resolver = RayTracingContextResolver(camera_config)
+        super().__init__(camera_configuration)
+        self.context_resolver = RayTracingContextResolver(camera_configuration)
         """
         Resolver for the configured world and semantic camera.
         """
@@ -58,7 +58,7 @@ class RayTracingCameraInterface(CameraInterface):
         """
         context = self.context_resolver.resolve()
         frame = context.world.ray_tracer.render(
-            context.camera, rgb_mode=self.camera_config.rgb_mode
+            context.camera, rgb_mode=self.camera_configuration.color_rendering_mode
         )
         camera_model = frame.camera_model
 
@@ -94,7 +94,10 @@ class RayTracingCameraInterface(CameraInterface):
 
         cas.set(CASViews.COLOR_IMAGE, frame.color_bgr.swapaxes(0, 1).copy())
         cas.set(CASViews.DEPTH_IMAGE, frame.depth_in_millimeters.swapaxes(0, 1).copy())
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
+        cas.set(
+            CASViews.COLOR_TO_DEPTH_RATIO,
+            self.camera_configuration.color_to_depth_ratio,
+        )
         cas.set(CASViews.OBJECT_IMAGE, frame.segmentation.swapaxes(0, 1).copy())
         cas.set(CASViews.BODY_COLORS, frame.body_colors)
         cas.set_ref(CASViews.GROUND_TRUTH_WORLD_REFERENCE, world)

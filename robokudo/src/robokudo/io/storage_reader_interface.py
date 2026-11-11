@@ -101,21 +101,23 @@ class StorageReaderInterface(CameraInterface):
             }
         )
 
-    def __init__(self, camera_config: MongoCameraConfig) -> None:
+    def __init__(self, camera_configuration: MongoCameraConfig) -> None:
         """
         Initialize the storage reader interface.
 
         Sets up MongoDB connection and creates a list reader for the specified database.
 
-        :param camera_config: Configuration containing database settings
+        :param camera_configuration: Configuration containing database settings
         """
-        super().__init__(camera_config)
+        super().__init__(camera_configuration)
 
-        self.storage: Storage = Storage(camera_config.db_name)
+        self.storage: Storage = Storage(camera_configuration.database_name)
         """
         MongoDB storage interface.
         """
-        self.reader: Storage.ListReader = self.storage.ListReader(camera_config.db_name)
+        self.reader: Storage.ListReader = self.storage.ListReader(
+            camera_configuration.database_name
+        )
         """
         List-based reader for MongoDB data.
         """
@@ -248,20 +250,14 @@ class StorageReaderInterface(CameraInterface):
         :return: True if more data is available, False otherwise
         """
         # Check if we have to reinitialize the cursor after we hit the end of the recorded data
-        if self.camera_config.loop and not self.reader.cursor_has_frames():
+        if self.camera_configuration.loop and not self.reader.cursor_has_frames():
             self.reader.reset_cursor()
 
         return self.reader.cursor_has_frames()
 
     def set_data(self, cas: CAS) -> None:
         """
-        Update the Common Analysis Structure with data from storage.
-
-        This method:
-        * Retrieves the next frame from storage
-        * Restores views and annotations
-        * Updates camera intrinsics
-        * Sets depth availability flag
+        Restore the next stored frame, its camera context and optional annotations.
 
         :param cas: Common Analysis Structure to update
         """
@@ -270,16 +266,16 @@ class StorageReaderInterface(CameraInterface):
             self.rk_logger.debug(f"Reader has no next frame cas_frame:={cas_frame}")
             return
 
-        if self.camera_config.replay_mode == MongoReplayMode.SENSOR_CONTEXT:
+        if self.camera_configuration.replay_mode == MongoReplayMode.SENSOR_CONTEXT:
             if self._recorded_camera_id is None:
                 self._restore_sensor_world(cas_frame)
             included_views = set(self.SENSOR_VIEW_NAMES)
-        elif self.camera_config.replay_mode == MongoReplayMode.FULL_WORLD:
+        elif self.camera_configuration.replay_mode == MongoReplayMode.FULL_WORLD:
             self._restore_full_world(cas_frame)
             included_views = None
         else:
             raise UnknownMode(
-                mode=self.camera_config.replay_mode, context="Mongo replay"
+                mode=self.camera_configuration.replay_mode, context="Mongo replay"
             )
         cas_frame[StorageDocumentField.VIEWS] = {}
         self.storage.load_views_from_mongo_in_cas(
@@ -293,7 +289,7 @@ class StorageReaderInterface(CameraInterface):
             else:
                 cas.set(view_name, view_content)
         observation = cas.require_camera_observation()
-        if self.camera_config.replay_mode == MongoReplayMode.SENSOR_CONTEXT:
+        if self.camera_configuration.replay_mode == MongoReplayMode.SENSOR_CONTEXT:
             if observation.camera.id != self._recorded_camera_id:
                 raise InvalidCameraObservation(
                     reason="recorded camera identity changed during playback"
@@ -301,5 +297,5 @@ class StorageReaderInterface(CameraInterface):
             RecordedCameraWorld.apply_pose(rk_world.world_instance(), observation)
 
         # Restore annotations
-        if self.camera_config.restore_annotations:
+        if self.camera_configuration.restore_annotations:
             self.storage.load_annotations_from_mongo_in_cas(cas_frame, cas)

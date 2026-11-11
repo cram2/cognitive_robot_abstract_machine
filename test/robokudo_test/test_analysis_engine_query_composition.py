@@ -95,7 +95,7 @@ class FakeCameraInterface:
     Camera interface for composition tests that only inspect pipeline nodes.
     """
 
-    camera_config: FakeCameraConfig
+    camera_configuration: FakeCameraConfig
     """Configuration retained while constructing a pipeline without acquisition."""
 
     interface_type: str = "FakeCameraInterface"
@@ -121,7 +121,7 @@ def create_fake_collection_reader_descriptor(
     """
     return CollectionReaderAnnotator.Descriptor(
         parameters=CollectionReaderParameters.from_defaults(
-            camera_config=FakeCameraConfig(),
+            camera_configuration=FakeCameraConfig(),
             camera_interface_type=FakeCameraInterface,
         ),
     )

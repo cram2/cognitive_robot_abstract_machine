@@ -54,7 +54,7 @@ class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
     Flag to enable looping over database entries.
     """
 
-    db_name: str = "rk_scenes"
+    database_name: str = "rk_scenes"
     """
     Name of the MongoDB database to read from.
     """

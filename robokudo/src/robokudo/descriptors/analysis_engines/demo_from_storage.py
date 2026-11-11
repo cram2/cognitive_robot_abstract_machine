@@ -1,7 +1,9 @@
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outlier_removal_objecthypothesis import (
@@ -61,7 +63,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
-                ClusterPoseBBAnnotator(),
+                ClusterPoseBoundingBoxAnnotator(),
                 # SlowAnnotator("SlowAnnotator",sleep_in_s=0),
             ]
         )

@@ -124,7 +124,7 @@ class ImageClusterExtractorParameters(AnnotatorParameters):
     erosion_iterations: int = 2
     """Number of erosion passes applied to the segmented image mask."""
 
-    contour_min_size: int = 1000
+    contour_minimum_size: int = 1000
     """Minimum contour area in pixels retained for object extraction."""
 
     color_ranges: dict[ColorName, ColorRange] = field(
@@ -135,16 +135,16 @@ class ImageClusterExtractorParameters(AnnotatorParameters):
     outlier_removal: bool = True
     """Whether statistical outliers are removed from extracted point clouds."""
 
-    outlier_removal_nb_neighbors: int = 20
+    outlier_removal_neighbor_count: int = 20
     """Neighbors considered by statistical point-cloud outlier removal."""
 
-    outlier_removal_std_ratio: float = 2.0
+    outlier_removal_standard_deviation_ratio: float = 2.0
     """Standard-deviation multiplier used to reject point-cloud outliers."""
 
-    num_of_objects: int = 2
+    number_of_objects: int = 2
     """Maximum number of largest image contours extracted as objects."""
 
-    min_points_threshold: int = 62
+    minimum_points_threshold: int = 62
     """Minimum point count required to retain an extracted object cloud."""
 
     def __post_init__(self) -> None:
@@ -379,10 +379,10 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
         filtered_contour_areas = [
             area
             for area in contour_areas
-            if area > self.descriptor.parameters.contour_min_size
+            if area > self.descriptor.parameters.contour_minimum_size
         ]
         sorted_areas = sorted(filtered_contour_areas, reverse=True)
-        largest_elements = sorted_areas[: self.descriptor.parameters.num_of_objects]
+        largest_elements = sorted_areas[: self.descriptor.parameters.number_of_objects]
         filtered_contours = [
             contours[contour_index]
             for contour_index, area in enumerate(contour_areas)
@@ -423,8 +423,8 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
 
         if self.descriptor.parameters.outlier_removal:
             cloud, _ = cloud.remove_statistical_outlier(
-                nb_neighbors=self.descriptor.parameters.outlier_removal_nb_neighbors,
-                std_ratio=self.descriptor.parameters.outlier_removal_std_ratio,
+                nb_neighbors=self.descriptor.parameters.outlier_removal_neighbor_count,
+                std_ratio=self.descriptor.parameters.outlier_removal_standard_deviation_ratio,
             )
         return cloud
 
@@ -464,7 +464,7 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
             cloud = self._create_point_cloud(resized_color, contour_mask)
             clusters.point_clouds.append(cloud)
 
-            if len(cloud.points) < self.descriptor.parameters.min_points_threshold:
+            if len(cloud.points) < self.descriptor.parameters.minimum_points_threshold:
                 continue
 
             object_hypothesis = ObjectHypothesis()

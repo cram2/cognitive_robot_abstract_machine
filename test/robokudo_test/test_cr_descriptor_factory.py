@@ -16,7 +16,7 @@ class TestCrDescriptorFactory(object):
         """
         descriptor = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
-        assert type(descriptor.parameters.camera_config) == MongoCameraConfig
+        assert type(descriptor.parameters.camera_configuration) == MongoCameraConfig
         assert descriptor.parameters.camera_interface_type is StorageReaderInterface
 
     def test_cr_descriptor_factory_invalid_interface_name(self) -> None:
@@ -34,19 +34,19 @@ class TestCrDescriptorFactory(object):
         descriptor factory.
         """
         loop = False
-        db_name = "other_db_name"
+        database_name = "other_db_name"
 
         descriptor = CollectionReaderDescriptorFactory.create_descriptor(
             "mongo",
             loop=loop,
-            db_name=db_name,
+            database_name=database_name,
         )
 
-        assert type(descriptor.parameters.camera_config) == MongoCameraConfig
+        assert type(descriptor.parameters.camera_configuration) == MongoCameraConfig
         assert descriptor.parameters.camera_interface_type is StorageReaderInterface
 
-        assert descriptor.parameters.camera_config.loop == loop
-        assert descriptor.parameters.camera_config.db_name == db_name
+        assert descriptor.parameters.camera_configuration.loop == loop
+        assert descriptor.parameters.camera_configuration.database_name == database_name
 
     def test_cr_descriptor_factory_invalid_additional_config(self) -> None:
         """

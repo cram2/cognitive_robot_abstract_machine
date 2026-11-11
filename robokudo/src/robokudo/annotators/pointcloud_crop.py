@@ -46,22 +46,22 @@ if TYPE_CHECKING:
 class PointcloudCropParameters(AnnotatorParameters):
     """Parameters for configuring point cloud cropping."""
 
-    min_x: float = -2.0
+    minimum_x: float = -2.0
     """Minimum X coordinate"""
 
-    min_y: float = -2.0
+    minimum_y: float = -2.0
     """Minimum Y coordinate"""
 
-    min_z: float = -9.0
+    minimum_z: float = -9.0
     """Minimum Z coordinate"""
 
-    max_x: float = 2.0
+    maximum_x: float = 2.0
     """Maximum X coordinate"""
 
-    max_y: float = 2.0
+    maximum_y: float = 2.0
     """Maximum Y coordinate"""
 
-    max_z: float = 3.0
+    maximum_z: float = 3.0
     """Maximum Z coordinate"""
 
     relative_to_world: bool = False
@@ -139,14 +139,14 @@ class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
 
         bounding_box = open3d.geometry.AxisAlignedBoundingBox(
             [
-                self.descriptor.parameters.min_x,
-                self.descriptor.parameters.min_y,
-                self.descriptor.parameters.min_z,
+                self.descriptor.parameters.minimum_x,
+                self.descriptor.parameters.minimum_y,
+                self.descriptor.parameters.minimum_z,
             ],
             [
-                self.descriptor.parameters.max_x,
-                self.descriptor.parameters.max_y,
-                self.descriptor.parameters.max_z,
+                self.descriptor.parameters.maximum_x,
+                self.descriptor.parameters.maximum_y,
+                self.descriptor.parameters.maximum_z,
             ],
         )
 

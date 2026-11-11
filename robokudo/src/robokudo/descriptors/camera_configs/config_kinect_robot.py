@@ -60,7 +60,7 @@ class KinectCameraConfig(
     Overwrite RGBDComponent.
     """
 
-    hi_res_mode: bool = True
+    high_resolution_mode: bool = True
     """
     Overwrite RGBDComponent.
     """

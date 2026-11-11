@@ -64,16 +64,16 @@ _PYTYPE_TO_ROS_FIELD: dict[type, str] = {
 class OutlierRemovalOnObjectHypothesisParameters(AnnotatorParameters):
     """Parameter container for outlier removal configuration."""
 
-    dbscan_neighbors: int = 90
+    clustering_minimum_point_count: int = 90
     """Minimum points to form a cluster (DBSCAN min_samples)"""
 
-    dbscan_epsilon: float = 0.02
+    clustering_epsilon: float = 0.02
     """DBSCAN neighborhood size"""
 
-    stat_neighbors: int = 200
+    statistical_neighbor_count: int = 200
     """Number of neighbors for statistical analysis"""
 
-    stat_std: float = 0.5
+    statistical_standard_deviation_ratio: float = 0.5
     """Standard deviation threshold for outlier removal"""
 
     skip_removal_on_classes: list[str] = field(default_factory=list)
@@ -202,8 +202,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(
 
             pcd = annotation.points
             cl, ind = pcd.remove_statistical_outlier(
-                nb_neighbors=self.descriptor.parameters.stat_neighbors,
-                std_ratio=self.descriptor.parameters.stat_std,
+                nb_neighbors=self.descriptor.parameters.statistical_neighbor_count,
+                std_ratio=self.descriptor.parameters.statistical_standard_deviation_ratio,
             )
 
             pcd = pcd.select_by_index(ind)
@@ -213,8 +213,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(
             ) as cm:
                 labels = np.array(
                     pcd.cluster_dbscan(
-                        eps=self.descriptor.parameters.dbscan_epsilon,
-                        min_points=self.descriptor.parameters.dbscan_neighbors,
+                        eps=self.descriptor.parameters.clustering_epsilon,
+                        min_points=self.descriptor.parameters.clustering_minimum_point_count,
                         print_progress=True,
                     )
                 )

@@ -54,7 +54,7 @@ class OpenCVCameraConfig(BaseCameraConfig):
                   Note: First image needs number between 0 and 4 and the following numbers cannot contain any gaps.
               URL of video/camera stream or image
     """
-    api_preference: int = cv2.CAP_ANY
+    capture_backend: int = cv2.CAP_ANY
     """
     Preferred OpenCV capture API backend.
     """
@@ -62,7 +62,7 @@ class OpenCVCameraConfig(BaseCameraConfig):
     """
     Flag argument to use when retrieving/reading the frames.
     """
-    normalize_rgb: bool = True
+    normalize_color_image: bool = True
     """
     Normalize/stabilise rgb image contrast/brightness.
     """

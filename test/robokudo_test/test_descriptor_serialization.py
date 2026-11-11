@@ -12,7 +12,7 @@ import pytest
 import torch
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.utils import get_full_class_name, resolve_class_from_full_name
-from robokudo.annotator_parameters import AnnotatorPredefinedParameters
+from robokudo.datastructures.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.annotation_writer import (
     AnnotationPublisherWriterDescriptor,
     AnnotationStorageWriterDescriptor,
@@ -21,7 +21,9 @@ from robokudo.annotators.blur import BlurAnnotator, BlurDescriptor, BlurParamete
 from robokudo.annotators.clip_annotator import CLIPDescriptor
 from robokudo.annotators.cluster_color import ClusterColorDescriptor
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramDescriptor
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBDescriptor
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxDescriptor,
+)
 from robokudo.annotators.cluster_position import ClusterPositionDescriptor
 from robokudo.annotators.collection_reader import (
     CollectionReaderAnnotator,
@@ -240,7 +242,9 @@ def test_collection_reader_descriptor_round_trip() -> None:
     """
     original = CollectionReaderDescriptor(
         parameters=CollectionReaderParameters.from_defaults(
-            camera_config=BaseCameraConfig(interface_type=CameraInterface.__name__),
+            camera_configuration=BaseCameraConfig(
+                interface_type=CameraInterface.__name__
+            ),
             camera_interface_type=CameraInterface,
         )
     )
@@ -255,14 +259,19 @@ def test_restored_collection_reader_constructs_its_runtime_interface() -> None:
     """
     descriptor = CollectionReaderDescriptor(
         parameters=CollectionReaderParameters.from_defaults(
-            camera_config=BaseCameraConfig(interface_type=CameraInterface.__name__),
+            camera_configuration=BaseCameraConfig(
+                interface_type=CameraInterface.__name__
+            ),
             camera_interface_type=CameraInterface,
         )
     )
     restored = from_json(json.loads(json.dumps(to_json(descriptor))))
     reader = CollectionReaderAnnotator(restored)
     assert type(reader.camera_interface) is restored.parameters.camera_interface_type
-    assert reader.camera_interface.camera_config is restored.parameters.camera_config
+    assert (
+        reader.camera_interface.camera_configuration
+        is restored.parameters.camera_configuration
+    )
 
 
 def test_callable_dataclass_parameter_round_trip() -> None:
@@ -271,13 +280,14 @@ def test_callable_dataclass_parameter_round_trip() -> None:
     """
     predicate = ClassificationFilter(classname=Classification.__name__)
     original = FilterDescriptor()
-    original.parameters.func = predicate
+    original.parameters.function = predicate
     restored = from_json(json.loads(json.dumps(to_json(original))))
-    assert restored.parameters.func == predicate
+    assert restored.parameters.function == predicate
     assert (
-        restored.parameters.func(Classification(classname=predicate.classname)) is True
+        restored.parameters.function(Classification(classname=predicate.classname))
+        is True
     )
-    assert restored.parameters.func(Classification()) is False
+    assert restored.parameters.function(Classification()) is False
 
 
 def test_annotator_specific_global_default_is_preserved(
@@ -315,7 +325,7 @@ def test_clip_device_selection_round_trips_without_device_access(
         CLIPDescriptor,
         ClusterColorDescriptor,
         ClusterColorHistogramDescriptor,
-        ClusterPoseBBDescriptor,
+        ClusterPoseBoundingBoxDescriptor,
         ClusterPositionDescriptor,
         FileWriterDescriptor,
         FilterDescriptor,

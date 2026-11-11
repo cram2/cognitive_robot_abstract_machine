@@ -81,8 +81,6 @@ class AnalysisEngine(AnalysisEngineInterface):
             loop_mode=1,
         )
 
-        cv_config.parameters.global_with_depth = False
-
         seq = Pipeline("RWPipeline")
         seq.add_children(
             [

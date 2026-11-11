@@ -48,15 +48,17 @@ class ZeroShotClassificationParameters(AnnotatorParameters):
     analysis_scope: CASViews | type[ObjectHypothesis] = CASViews.COLOR_IMAGE
     """Select the whole color image or individual object hypotheses for classification."""
 
-    filter_fn: Callable[[ObjectHypothesis], bool] | None = None
+    filter_function: Callable[[ObjectHypothesis], bool] | None = None
     """An optional filter function used to filter object hypotheses before analyzing them."""
 
-    save_top_k: int = field(init=False, metadata=JSONMetadata(serialize=True).as_dict())
+    maximum_saved_classifications: int = field(
+        init=False, metadata=JSONMetadata(serialize=True).as_dict()
+    )
     """How many annotations to create per analyzed image or hypothesis."""
 
     def __post_init__(self) -> None:
         """Initialize values derived from the configured processing settings."""
-        self.save_top_k: int = min(5, len(self.vocabulary))
+        self.maximum_saved_classifications: int = min(5, len(self.vocabulary))
 
 
 # %% ZeroShotClassification descriptor
@@ -68,16 +70,8 @@ ClassificationParametersType = TypeVar(
 
 
 @dataclass(kw_only=True)
-class ClassificationDescriptor(
-    AnnotatorDescriptor[ClassificationParametersType],
-    Generic[ClassificationParametersType],
-):
-    """Configuration shared by classifiers with vocabulary-based parameters."""
-
-
-@dataclass(kw_only=True)
 class ZeroShotClassificationDescriptor(
-    ClassificationDescriptor[ZeroShotClassificationParameters]
+    AnnotatorDescriptor[ZeroShotClassificationParameters]
 ):
     """Declarative configuration of :class:`ZeroShotClassificationAnnotator`."""
 
@@ -91,7 +85,7 @@ class ZeroShotClassificationDescriptor(
 
 
 class ZeroShotClassificationAnnotator(
-    ThreadedAnnotator[ClassificationDescriptor[ClassificationParametersType]],
+    ThreadedAnnotator[AnnotatorDescriptor[ClassificationParametersType]],
     Generic[ClassificationParametersType],
     ABC,
 ):
@@ -101,7 +95,7 @@ class ZeroShotClassificationAnnotator(
     """
 
     @classproperty
-    def Descriptor(cls) -> type[ClassificationDescriptor]:
+    def Descriptor(cls) -> type[AnnotatorDescriptor]:
         """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
         return ZeroShotClassificationDescriptor
 
@@ -118,7 +112,7 @@ class ZeroShotClassificationAnnotator(
         Classify each image against the vocabulary.
 
         :param images: The images to classify, in RGB channel order.
-        :return: For each image, at most ``save_top_k`` classifications, the most
+        :return: For each image, at most ``maximum_saved_classifications`` classifications, the most
             confident first.
         """
 
@@ -179,8 +173,8 @@ class ZeroShotClassificationAnnotator(
             self.rk_logger.info("Found 0 object hypotheses to analyze")
             return Status.SUCCESS
 
-        if self.descriptor.parameters.filter_fn is not None:
-            ohs = list(filter(self.descriptor.parameters.filter_fn, ohs))
+        if self.descriptor.parameters.filter_function is not None:
+            ohs = list(filter(self.descriptor.parameters.filter_function, ohs))
 
             if len(ohs) == 0:
                 self.rk_logger.info("All object hypotheses were filtered out")

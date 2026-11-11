@@ -220,7 +220,7 @@ def _color_descriptor() -> CLIPDescriptor:
     descriptor = CLIPAnnotator.Descriptor()
     descriptor.parameters.device = torch.device("cpu")
     descriptor.parameters.vocabulary = COLOR_VOCABULARY
-    descriptor.parameters.save_top_k = len(COLOR_VOCABULARY)
+    descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY)
     return descriptor
 
 
@@ -298,12 +298,12 @@ def test_each_image_of_a_batch_is_classified_by_its_own_color(color_embedding_cl
 
 def test_classification_keeps_save_top_k_classifications(color_embedding_clip):
     descriptor = _color_descriptor()
-    descriptor.parameters.save_top_k = 2
+    descriptor.parameters.maximum_saved_classifications = 2
     annotator = CLIPAnnotator(descriptor=descriptor)
 
     classifications = _classify_solid_image(annotator, COLOR_BY_WORD["red"])
 
-    assert len(classifications) == descriptor.parameters.save_top_k
+    assert len(classifications) == descriptor.parameters.maximum_saved_classifications
 
 
 def test_classifications_name_the_annotator_as_source(color_embedding_clip):
@@ -359,7 +359,7 @@ def test_save_top_k_beyond_vocabulary_without_softmax_reports_each_word_once(
 ):
     descriptor = _color_descriptor()
     descriptor.parameters.use_softmax = False
-    descriptor.parameters.save_top_k = len(COLOR_VOCABULARY) + 2
+    descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY) + 2
     annotator = CLIPAnnotator(descriptor=descriptor)
 
     classifications = _classify_solid_image(annotator, COLOR_BY_WORD["blue"])

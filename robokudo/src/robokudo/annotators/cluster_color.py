@@ -67,7 +67,7 @@ class Color(Enum):
 class ClusterColorParameters(AnnotatorParameters):
     """Parameters for color analysis configuration."""
 
-    num_of_colors: int = 6
+    number_of_colors: int = 6
     """Number of chromatic categories dividing the hue interval."""
 
     color_range: float = field(
@@ -75,19 +75,19 @@ class ClusterColorParameters(AnnotatorParameters):
     )
     """Hue interval assigned to each chromatic category."""
 
-    jit_compile_on_init: bool = False
+    just_in_time_compile_on_init: bool = False
     """Whether to compile the pixel-counting kernel during construction."""
 
-    min_value_color: int = 60
+    minimum_value_color: int = 60
     """Value threshold a pixel must exceed to be classified as chromatic."""
 
-    min_saturation_color: int = 60
+    minimum_saturation_color: int = 60
     """Saturation threshold a pixel must exceed to be classified as chromatic."""
 
-    max_value_black: int = 60
+    maximum_value_black: int = 60
     """Largest pixel value classified as black."""
 
-    min_value_white: int = 120
+    minimum_value_white: int = 120
     """Value threshold an achromatic pixel must exceed to be classified as white."""
 
     ratio_annotation_threshold: float = 0.2
@@ -98,7 +98,7 @@ class ClusterColorParameters(AnnotatorParameters):
 
     def __post_init__(self) -> None:
         """Initialize values derived from the configured processing settings."""
-        self.color_range: float = 256 / self.num_of_colors
+        self.color_range: float = 256 / self.number_of_colors
 
 
 # %% ClusterColor descriptor
@@ -176,7 +176,7 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
             i * self.descriptor.parameters.color_range
             + self.descriptor.parameters.color_range / 2
             + 0.5
-            for i in range(0, self.descriptor.parameters.num_of_colors)
+            for i in range(0, self.descriptor.parameters.number_of_colors)
         ]
 
         self.color_hue_positions = {
@@ -192,7 +192,7 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         self.cluster_rois: list[Rect] = []
 
         # Trigger JIT by calling method first time with empty data
-        if self.descriptor.parameters.jit_compile_on_init:
+        if self.descriptor.parameters.just_in_time_compile_on_init:
             start_timer_jit = default_timer()
             hsv_image = np.array([[[0, 0, 0]]])
             mask = np.array([[0]])
@@ -220,11 +220,11 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
             hsv_image,
             mask,
             len(Color),
-            self.descriptor.parameters.min_saturation_color,
-            self.descriptor.parameters.min_value_color,
-            self.descriptor.parameters.max_value_black,
-            self.descriptor.parameters.min_value_white,
-            self.descriptor.parameters.num_of_colors,
+            self.descriptor.parameters.minimum_saturation_color,
+            self.descriptor.parameters.minimum_value_color,
+            self.descriptor.parameters.maximum_value_black,
+            self.descriptor.parameters.minimum_value_white,
+            self.descriptor.parameters.number_of_colors,
             self.descriptor.parameters.color_range,
         )
 
@@ -240,10 +240,10 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         hsv_image: npt.NDArray,
         mask: npt.NDArray,
         total_amount_of_colors: int,
-        min_saturation_color: int,
-        min_value_color: int,
-        max_value_black: int,
-        min_value_white: int,
+        minimum_saturation_color: int,
+        minimum_value_color: int,
+        maximum_value_black: int,
+        minimum_value_white: int,
         number_of_colors: int,
         color_range: float,
     ) -> tuple[int, npt.NDArray]:
@@ -255,10 +255,10 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         :param hsv_image: Image in HSV color space.
         :param mask: Binary mask indicating pixels to analyze.
         :param total_amount_of_colors: Total number of color categories.
-        :param min_saturation_color: Minimum saturation for chromatic colors.
-        :param min_value_color: Minimum value for chromatic colors.
-        :param max_value_black: Maximum value for black classification.
-        :param min_value_white: Minimum value for white classification.
+        :param minimum_saturation_color: Minimum saturation for chromatic colors.
+        :param minimum_value_color: Minimum value for chromatic colors.
+        :param maximum_value_black: Maximum value for black classification.
+        :param minimum_value_white: Minimum value for white classification.
         :param number_of_colors: Number of hue divisions.
         :param color_range: Size of each hue division.
         :return: A tuple with the number of analyzed pixels (given by the mask) as well
@@ -282,7 +282,7 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
                 counted_pixel_sum += 1
                 hue, sat, val = hsv_image[i, j]
                 # Assume check is done in the right order to not mix up indices
-                if sat > min_saturation_color and val > min_value_color:
+                if sat > minimum_saturation_color and val > minimum_value_color:
                     if hue < hue_intervals[Color.RED.value[0]]:
                         color_count[Color.RED.value[0]] += 1
                     elif hue < hue_intervals[Color.YELLOW.value[0]]:
@@ -297,9 +297,9 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
                         color_count[Color.MAGENTA.value[0]] += 1
                     else:
                         color_count[Color.RED.value[0]] += 1
-                elif val <= max_value_black:
+                elif val <= maximum_value_black:
                     color_count[Color.BLACK.value[0]] += 1
-                elif val > min_value_white:
+                elif val > minimum_value_white:
                     color_count[Color.WHITE.value[0]] += 1
                 else:
                     color_count[Color.GREY.value[0]] += 1
@@ -342,17 +342,18 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         pl_color, pl_bw_range = split(
             im,
             np.logical_and(
-                im[:, 1] > self.descriptor.parameters.min_saturation_color,
-                im[:, 2] > self.descriptor.parameters.min_value_color,
+                im[:, 1] > self.descriptor.parameters.minimum_saturation_color,
+                im[:, 2] > self.descriptor.parameters.minimum_value_color,
             ),
         )
 
         pl_black, pl_grey_white = split(
-            pl_bw_range, pl_bw_range[:, 2] <= self.descriptor.parameters.max_value_black
+            pl_bw_range,
+            pl_bw_range[:, 2] <= self.descriptor.parameters.maximum_value_black,
         )
         pl_white, pl_grey = split(
             pl_grey_white,
-            pl_grey_white[:, 2] > self.descriptor.parameters.min_value_white,
+            pl_grey_white[:, 2] > self.descriptor.parameters.minimum_value_white,
         )
 
         # Check on the HUE channel the color and reduce the list of pixels piece-by-piece

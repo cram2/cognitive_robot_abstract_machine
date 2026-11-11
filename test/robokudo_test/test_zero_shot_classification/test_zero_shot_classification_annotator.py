@@ -62,7 +62,9 @@ class ChannelMeanClassificationAnnotator(
         classifications.sort(
             key=lambda classification: classification.confidence, reverse=True
         )
-        return classifications[: self.descriptor.parameters.save_top_k]
+        return classifications[
+            : self.descriptor.parameters.maximum_saved_classifications
+        ]
 
 
 def _color_descriptor() -> ZeroShotClassificationDescriptor:
@@ -71,7 +73,7 @@ def _color_descriptor() -> ZeroShotClassificationDescriptor:
     """
     descriptor = ZeroShotClassificationAnnotator.Descriptor()
     descriptor.parameters.vocabulary = COLOR_VOCABULARY
-    descriptor.parameters.save_top_k = len(COLOR_VOCABULARY)
+    descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY)
     return descriptor
 
 
@@ -156,7 +158,7 @@ def test_object_hypothesis_scope_classifies_each_hypothesis_by_its_region():
 def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
     descriptor = _object_hypothesis_descriptor()
     rejected_object = object_hypothesis(x=0, y=0, width=10, height=10)
-    descriptor.parameters.filter_fn = lambda hypothesis: (
+    descriptor.parameters.filter_function = lambda hypothesis: (
         hypothesis is not rejected_object
     )
     annotator = _annotator_in_pipeline(descriptor, two_color_scene())
@@ -167,7 +169,7 @@ def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
 
     assert hypothesis_classifications(rejected_object) == []
     assert len(hypothesis_classifications(accepted_object)) == (
-        descriptor.parameters.save_top_k
+        descriptor.parameters.maximum_saved_classifications
     )
 
 

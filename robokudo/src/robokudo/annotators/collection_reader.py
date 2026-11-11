@@ -29,7 +29,7 @@ class CollectionReaderParameters(AnnotatorParameters):
     Camera configuration independent of subscriptions and acquisition resources.
     """
 
-    camera_config: BaseCameraConfig
+    camera_configuration: BaseCameraConfig
     """
     Calibration, input source, and acquisition settings for the camera.
     """
@@ -76,7 +76,7 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
         super().__init__(name, descriptor)
         self.camera_interface = (
             descriptor.parameters.camera_interface_type(
-                descriptor.parameters.camera_config
+                descriptor.parameters.camera_configuration
             )
             if camera_interface is None
             else camera_interface

@@ -41,8 +41,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def storage_instance():
-    db_name = "ONLY_UNITTESTS_test_db"
-    storage = Storage(db_name)
+    database_name = "ONLY_UNITTESTS_test_db"
+    storage = Storage(database_name)
     yield storage
     # Cleanup after tests
     storage.drop_database()
@@ -103,7 +103,7 @@ def create_camera_model() -> PinholeCameraModel:
 
 class TestStorage:
     def test_drop_database(self, storage_instance):
-        db_name = storage_instance.db_name
+        database_name = storage_instance.database_name
         storage_instance.drop_database()
 
         # Verify the database no longer exists
@@ -114,7 +114,7 @@ class TestStorage:
         mongo_host = os.getenv("RK_MONGO_HOST", "localhost")
         mongo_port = int(os.getenv("RK_MONGO_PORT", 27017))
         client = pymongo.MongoClient(host=mongo_host, port=mongo_port)
-        assert db_name not in client.list_database_names()
+        assert database_name not in client.list_database_names()
 
     def test_store_and_retrieve_cas(self, storage_instance, cas_data):
         result = store_cas_in_storage(storage_instance, cas_data)

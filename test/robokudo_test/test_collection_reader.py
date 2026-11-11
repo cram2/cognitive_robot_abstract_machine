@@ -52,7 +52,7 @@ def reader_pipeline() -> ReaderPipeline:
     camera_interface = Mock(spec=CameraInterface)
     descriptor = CollectionReaderAnnotator.Descriptor(
         parameters=CollectionReaderParameters.from_defaults(
-            camera_config=BaseCameraConfig(interface_type="test"),
+            camera_configuration=BaseCameraConfig(interface_type="test"),
             camera_interface_type=CameraInterface,
         ),
     )

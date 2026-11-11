@@ -54,8 +54,8 @@ from robokudo.utils.transform import (
 class ICPPoseRefinementParameters(AnnotatorParameters):
     """Parameters for configuring model loading."""
 
-    ros_pkg_path: str | None = None
-    """If set, use use data_path as a relative path to self.ros_pkg_path"""
+    ros_package_name: str | None = None
+    """If set, use use data_path as a relative path to self.ros_package_name"""
 
     data_path: str | None = None
     """Relative Path to the folder containing the models"""
@@ -139,12 +139,12 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor])
         :param class_name: Name of object class to load model for
         :return: Path to PLY file or None if not found
         """
-        if self.descriptor.parameters.ros_pkg_path is not None:
-            # if using ros_pkg_path, data_path has to be set as well!
+        if self.descriptor.parameters.ros_package_name is not None:
+            # if using ros_package_name, data_path has to be set as well!
             assert self.descriptor.parameters.data_path is not None
 
             data_folder_path = FileLoader.get_path_to_file_in_ros_package(
-                ros_pkg_name=self.descriptor.parameters.ros_pkg_path,
+                ros_package_name=self.descriptor.parameters.ros_package_name,
                 relative_path=self.descriptor.parameters.data_path,
             )
         elif self.descriptor.parameters.data_path is not None:

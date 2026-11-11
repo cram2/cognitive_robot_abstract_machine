@@ -39,22 +39,22 @@ class CASCheckFunc(BaseAnnotator):
     def __init__(
         self,
         name: str = "CASCheckFunc",
-        func: Callable[[CAS], bool] | None = None,
+        function: Callable[[CAS], bool] | None = None,
         raise_with_str: str = "",
     ) -> None:
         """
         Initialize the CAS condition checker.
 
         :param name: Name of this node in the behavior tree
-        :param func: Function that evaluates CAS conditions, must return bool
+        :param function: Function that evaluates CAS conditions, must return bool
         :param raise_with_str: Error message to raise on failure, empty string disables
             raising
-        :raises CASCheckConfigurationError: If func is None
+        :raises CASCheckConfigurationError: If function is None
         """
         super(CASCheckFunc, self).__init__(name=name)
-        if func is None:
+        if function is None:
             raise CASCheckConfigurationError(component_name=name)
-        self.func = func
+        self.function = function
         self.raise_with_str = raise_with_str
 
     def update(self) -> Status:
@@ -65,7 +65,7 @@ class CASCheckFunc(BaseAnnotator):
         :raises CASCheckFailed: If raise_with_str is set and condition is False
         """
         cas = self.get_cas()
-        if self.func(cas):
+        if self.function(cas):
             return Status.SUCCESS
         else:
             if self.raise_with_str != "":
@@ -112,9 +112,9 @@ class CASCheckAnnotationTypeExists(CASCheckFunc):
             raising. This is useful in scenarios where you want to raise an error which
             will be sent via the Query Interface to the caller.
         """
-        func = functools.partial(any_of_type_present, annotation_type)
+        function = functools.partial(any_of_type_present, annotation_type)
         super(CASCheckAnnotationTypeExists, self).__init__(
-            name=name, func=func, raise_with_str=raise_with_str
+            name=name, function=function, raise_with_str=raise_with_str
         )
 
 

@@ -83,16 +83,16 @@ class ShapeEstimatorParameters(AnnotatorParameters):
     fit_sphere: bool = False
     """Whether sphere fitting is enabled."""
 
-    max_sphere_radius_meters: float = 0.4
+    maximum_sphere_radius_meters: float = 0.4
     """Maximum allowed sphere radius."""
 
-    max_sphere_radius_to_bbox_diagonal_ratio: float = 1.0
+    maximum_sphere_radius_to_bounding_box_diagonal_ratio: float = 1.0
     """Maximum allowed ratio between sphere radius and point cloud diagonal."""
 
-    max_sphere_radius_to_observed_extent_ratio: float = 0.8
+    maximum_sphere_radius_to_observed_extent_ratio: float = 0.8
     """Maximum allowed ratio between sphere radius and observed cloud extent."""
 
-    max_sphere_center_distance_to_bbox_diagonal_ratio: float = 0.9
+    maximum_sphere_center_distance_to_bounding_box_diagonal_ratio: float = 0.9
     """Maximum allowed ratio between center offset and point cloud diagonal."""
 
     fit_cylinder: bool = True
@@ -101,22 +101,22 @@ class ShapeEstimatorParameters(AnnotatorParameters):
     cylinder_minimum_inlier_ratio: float = 0.87
     """Minimum inlier ratio required for cylinder candidates."""
 
-    max_cylinder_radius_meters: float = 0.4
+    maximum_cylinder_radius_meters: float = 0.4
     """Maximum allowed cylinder radius."""
 
-    max_cylinder_height_meters: float = 1.0
+    maximum_cylinder_height_meters: float = 1.0
     """Maximum allowed cylinder height."""
 
-    max_cylinder_radius_to_bbox_diagonal_ratio: float = 1.0
+    maximum_cylinder_radius_to_bounding_box_diagonal_ratio: float = 1.0
     """Maximum allowed ratio between cylinder radius and cloud diagonal."""
 
-    max_cylinder_radius_to_cross_section_extent_ratio: float = 0.95
+    maximum_cylinder_radius_to_cross_section_extent_ratio: float = 0.95
     """Maximum allowed ratio between cylinder radius and observed cross-section extent."""
 
-    max_cylinder_center_distance_to_bbox_diagonal_ratio: float = 0.8
+    maximum_cylinder_center_distance_to_bounding_box_diagonal_ratio: float = 0.8
     """Maximum allowed ratio between axis center offset and cloud diagonal."""
 
-    cylinder_max_initializations: int = 12
+    cylinder_maximum_initializations: int = 12
     """Maximum number of cylinder initialization hypotheses for multi-start optimization."""
 
     cylinder_consensus_trials: int = 30
@@ -131,7 +131,7 @@ class ShapeEstimatorParameters(AnnotatorParameters):
     cylinder_axis_stabilization_trigger_degrees: float = 8.0
     """Minimum axis deviation angle required to trigger cylinder stabilization."""
 
-    cylinder_axis_stabilization_max_score_drop: float = 0.08
+    cylinder_axis_stabilization_maximum_score_drop: float = 0.08
     """Maximum tolerated score drop for accepting stabilized cylinder."""
 
     prefer_upright_cylinder_axis: bool = True
@@ -146,7 +146,7 @@ class ShapeEstimatorParameters(AnnotatorParameters):
     fit_cuboid: bool = True
     """Whether cuboid fitting is enabled."""
 
-    max_cuboid_extent_meters: float = 0.6
+    maximum_cuboid_extent_meters: float = 0.6
     """Maximum allowed cuboid edge length for any axis."""
 
     cuboid_distance_threshold: float = 0.015
@@ -366,17 +366,17 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
                     SphereFitParameters(
                         distance_threshold=parameters.distance_threshold,
                         robust_loss=parameters.robust_loss,
-                        max_radius=parameters.max_sphere_radius_meters,
-                        max_radius_to_bbox_diagonal_ratio=(
-                            parameters.max_sphere_radius_to_bbox_diagonal_ratio
+                        maximum_radius=parameters.maximum_sphere_radius_meters,
+                        maximum_radius_to_bounding_box_diagonal_ratio=(
+                            parameters.maximum_sphere_radius_to_bounding_box_diagonal_ratio
                         ),
-                        max_radius_to_observed_extent_ratio=(
-                            parameters.max_sphere_radius_to_observed_extent_ratio
+                        maximum_radius_to_observed_extent_ratio=(
+                            parameters.maximum_sphere_radius_to_observed_extent_ratio
                         ),
-                        max_center_distance_to_bbox_diagonal_ratio=(
-                            parameters.max_sphere_center_distance_to_bbox_diagonal_ratio
+                        maximum_center_distance_to_bounding_box_diagonal_ratio=(
+                            parameters.maximum_sphere_center_distance_to_bounding_box_diagonal_ratio
                         ),
-                        min_inlier_ratio=parameters.minimum_inlier_ratio,
+                        minimum_inlier_ratio=parameters.minimum_inlier_ratio,
                     ),
                 )
             )
@@ -388,19 +388,19 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
                     CylinderFitParameters(
                         distance_threshold=parameters.distance_threshold,
                         robust_loss=parameters.robust_loss,
-                        max_radius=parameters.max_cylinder_radius_meters,
-                        max_height=parameters.max_cylinder_height_meters,
-                        max_radius_to_bbox_diagonal_ratio=(
-                            parameters.max_cylinder_radius_to_bbox_diagonal_ratio
+                        maximum_radius=parameters.maximum_cylinder_radius_meters,
+                        maximum_height=parameters.maximum_cylinder_height_meters,
+                        maximum_radius_to_bounding_box_diagonal_ratio=(
+                            parameters.maximum_cylinder_radius_to_bounding_box_diagonal_ratio
                         ),
-                        max_radius_to_cross_section_extent_ratio=(
-                            parameters.max_cylinder_radius_to_cross_section_extent_ratio
+                        maximum_radius_to_cross_section_extent_ratio=(
+                            parameters.maximum_cylinder_radius_to_cross_section_extent_ratio
                         ),
-                        max_axis_center_distance_to_bbox_diagonal_ratio=(
-                            parameters.max_cylinder_center_distance_to_bbox_diagonal_ratio
+                        maximum_axis_center_distance_to_bounding_box_diagonal_ratio=(
+                            parameters.maximum_cylinder_center_distance_to_bounding_box_diagonal_ratio
                         ),
-                        min_inlier_ratio=parameters.cylinder_minimum_inlier_ratio,
-                        max_initializations=parameters.cylinder_max_initializations,
+                        minimum_inlier_ratio=parameters.cylinder_minimum_inlier_ratio,
+                        maximum_initializations=parameters.cylinder_maximum_initializations,
                         consensus_trials=parameters.cylinder_consensus_trials,
                         inlier_polishing_iterations=(
                             parameters.cylinder_inlier_polishing_iterations
@@ -415,8 +415,8 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
                     CUBOID_FIT_ADAPTER,
                     CuboidFitParameters(
                         distance_threshold=parameters.cuboid_distance_threshold,
-                        max_extent=parameters.max_cuboid_extent_meters,
-                        min_inlier_ratio=parameters.cuboid_minimum_inlier_ratio,
+                        maximum_extent=parameters.maximum_cuboid_extent_meters,
+                        minimum_inlier_ratio=parameters.cuboid_minimum_inlier_ratio,
                     ),
                 )
             )
@@ -462,16 +462,16 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
         return CylinderFitConstraints(
             distance_threshold=self.descriptor.parameters.distance_threshold,
             robust_loss=self.descriptor.parameters.robust_loss,
-            max_radius=self.descriptor.parameters.max_cylinder_radius_meters,
-            max_height=self.descriptor.parameters.max_cylinder_height_meters,
+            max_radius=self.descriptor.parameters.maximum_cylinder_radius_meters,
+            max_height=self.descriptor.parameters.maximum_cylinder_height_meters,
             max_radius_to_bbox_diagonal_ratio=(
-                self.descriptor.parameters.max_cylinder_radius_to_bbox_diagonal_ratio
+                self.descriptor.parameters.maximum_cylinder_radius_to_bounding_box_diagonal_ratio
             ),
             max_radius_to_cross_section_extent_ratio=(
-                self.descriptor.parameters.max_cylinder_radius_to_cross_section_extent_ratio
+                self.descriptor.parameters.maximum_cylinder_radius_to_cross_section_extent_ratio
             ),
             max_axis_center_distance_to_bbox_diagonal_ratio=(
-                self.descriptor.parameters.max_cylinder_center_distance_to_bbox_diagonal_ratio
+                self.descriptor.parameters.maximum_cylinder_center_distance_to_bounding_box_diagonal_ratio
             ),
         )
 
@@ -619,7 +619,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
 
         minimum_accepted_score = (
             original_fit.score
-            - self.descriptor.parameters.cylinder_axis_stabilization_max_score_drop
+            - self.descriptor.parameters.cylinder_axis_stabilization_maximum_score_drop
         )
         if selected_candidate.fit.score < minimum_accepted_score:
             return False
@@ -921,7 +921,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
                 cuboid_fit.inlier_indices, dtype=np.int64
             ),
             distance_threshold=self.descriptor.parameters.cuboid_distance_threshold,
-            max_extent=self.descriptor.parameters.max_cuboid_extent_meters,
+            max_extent=self.descriptor.parameters.maximum_cuboid_extent_meters,
             min_inlier_ratio=self.descriptor.parameters.cuboid_minimum_inlier_ratio,
         )
         if stabilized_fit is None:
