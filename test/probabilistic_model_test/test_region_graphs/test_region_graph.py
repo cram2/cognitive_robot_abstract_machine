@@ -107,7 +107,7 @@ def test_a_leaf_region_over_an_integer_variable_raises():
         SortedSet([Integer("count")]), depth=0, repetitions=1
     ).create_random_region_graph()
     with pytest.raises(UnsupportedRegionVariableError):
-        region_graph.as_probabilistic_circuit()
+        region_graph.to_probabilistic_circuit()
 
 
 def test_a_partition_of_regions_with_layers_of_different_sizes_raises():
@@ -130,7 +130,7 @@ def test_a_partition_of_regions_with_layers_of_different_sizes_raises():
         ]
     )
     with pytest.raises(UnequalFactorSizesError):
-        region_graph.as_probabilistic_circuit(input_units=3, sum_units=5)
+        region_graph.to_probabilistic_circuit(input_units=3, sum_units=5)
 
 
 def test_region_graph_has_a_region_per_split():
@@ -145,7 +145,7 @@ def test_circuit_of_a_region_graph_has_a_sum_unit_per_sum_node():
         continuous_variables(4), partitions=2, depth=1, repetitions=2
     ).create_random_region_graph()
     circuit = CircuitRepresentations().convert(
-        region_graph.as_probabilistic_circuit(input_units=10, sum_units=5),
+        region_graph.to_probabilistic_circuit(input_units=10, sum_units=5),
         ProbabilisticCircuit,
     )
     assert len([node for node in circuit.nodes() if isinstance(node, SumUnit)]) == 21
@@ -165,7 +165,7 @@ def test_deep_region_graph_over_few_variables_becomes_a_circuit():
     region_graph = RegionGraph(
         continuous_variables(5), partitions=2, depth=2, repetitions=2
     ).create_random_region_graph()
-    model = region_graph.as_probabilistic_circuit(input_units=3, sum_units=5)
+    model = region_graph.to_probabilistic_circuit(input_units=3, sum_units=5)
     data = jnp.array(np.random.normal(size=(20, 5)))
     assert jnp.all(jnp.isfinite(model.log_likelihood(data)))
 
@@ -178,7 +178,7 @@ def test_learned_circuit_has_normalized_parameters(target):
     region_graph = RegionGraph(
         variables, partitions=2, depth=2, repetitions=2
     ).create_random_region_graph()
-    model = region_graph.as_probabilistic_circuit(input_units=5, sum_units=5)
+    model = region_graph.to_probabilistic_circuit(input_units=5, sum_units=5)
     data = jnp.array(np.random.uniform(0, 1, (100, len(variables))))
     model.fit(data, epochs=10, optimizer=optax.adamw(0.01))
 
@@ -197,7 +197,7 @@ def test_classification_circuit_predicts_a_distribution_over_the_target(target):
     region_graph = RegionGraph(
         features, partitions=2, depth=1, repetitions=6, classes=2
     ).create_random_region_graph()
-    model = region_graph.as_probabilistic_circuit(input_units=5, sum_units=5)
+    model = region_graph.to_probabilistic_circuit(input_units=5, sum_units=5)
     assert isinstance(model, ClassificationCircuit)
     assert model.root.number_of_nodes == 2
 
@@ -225,7 +225,7 @@ def test_classification_circuit_learns_to_separate_its_classes():
     region_graph = RegionGraph(
         features, partitions=2, depth=1, repetitions=2, classes=2
     ).create_random_region_graph()
-    model = region_graph.as_probabilistic_circuit(input_units=5, sum_units=5)
+    model = region_graph.to_probabilistic_circuit(input_units=5, sum_units=5)
     labels = jnp.array(np.repeat([Target.A, Target.B], 50))
     data = jnp.array(np.random.normal(size=(100, 4))) + 5.0 * (2 * labels[:, None] - 1)
     model.fit(data, labels=labels, epochs=200, optimizer=optax.adam(0.05))

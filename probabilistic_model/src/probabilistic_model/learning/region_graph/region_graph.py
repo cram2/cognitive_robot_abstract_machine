@@ -61,7 +61,7 @@ class Region:
     layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
     """
     The layer that models this region in the circuit of the region graph, once
-    :meth:`RegionGraph.as_probabilistic_circuit` built it.
+    :meth:`RegionGraph.to_probabilistic_circuit` built it.
     """
 
     def random_partition(
@@ -95,7 +95,7 @@ class Partition:
     layer: DifferentiableLayer | None = field(default=None, init=False, repr=False)
     """
     The product layer that multiplies the regions of this partition, once
-    :meth:`RegionGraph.as_probabilistic_circuit` built it.
+    :meth:`RegionGraph.to_probabilistic_circuit` built it.
     """
 
 
@@ -221,7 +221,7 @@ class RegionGraph(DirectedAcyclicGraph[Region | Partition]):
             raise MultipleRootsError(possible_roots)
         return possible_roots[0]
 
-    def as_probabilistic_circuit(
+    def to_probabilistic_circuit(
         self,
         input_units: int = 5,
         sum_units: int = 5,

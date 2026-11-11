@@ -220,7 +220,7 @@ def region_graph() -> RegionGraph:
 
 
 def test_fitting_compiles_the_whole_training_step(region_graph):
-    model = region_graph.create_random_region_graph().as_probabilistic_circuit()
+    model = region_graph.create_random_region_graph().to_probabilistic_circuit()
     counter = UpdateCounter()
     model.fit(
         jnp.array(np.random.normal(size=(50, 4))),
@@ -232,7 +232,7 @@ def test_fitting_compiles_the_whole_training_step(region_graph):
 
 def test_fitting_a_classifier_compiles_the_whole_training_step(region_graph):
     region_graph.classes = 2
-    model = region_graph.create_random_region_graph().as_probabilistic_circuit()
+    model = region_graph.create_random_region_graph().to_probabilistic_circuit()
     counter = UpdateCounter()
     model.fit(
         jnp.array(np.random.normal(size=(50, 4))),
@@ -251,7 +251,7 @@ def test_fitting_two_classifiers_of_the_same_shape_trains_both():
         model = (
             RegionGraph(variables, partitions=2, depth=1, repetitions=2, classes=2)
             .create_random_region_graph()
-            .as_probabilistic_circuit()
+            .to_probabilistic_circuit()
         )
         initial_log_likelihoods = model.root.log_likelihood_of_nodes(data)
         model.fit(data, labels=labels, epochs=2)
