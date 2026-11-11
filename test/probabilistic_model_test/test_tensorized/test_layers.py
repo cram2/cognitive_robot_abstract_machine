@@ -93,6 +93,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparseArray,
+    RowGroupedSparsity,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -128,13 +129,13 @@ def event_bounds(request) -> tuple[Bound, Bound]:
 
 
 @pytest.fixture
-def uneven_rows() -> RowGroupedSparseArray:
+def uneven_rows() -> RowGroupedSparsity:
     """
     Four rows holding two, one, three and no stored entries, stored out of row order.
     """
     return RowGroupedSparseArray.from_entries(
         SparseEntries(np.zeros(6), [2, 0, 2, 1, 2, 0], [0, 1, 2, 3, 4, 5]), (4, 6)
-    )
+    ).sparsity
 
 
 def test_entry_positions_by_rank_list_the_kth_entry_of_every_row(uneven_rows):
@@ -210,6 +211,62 @@ def test_decomposability_is_decided_per_node():
         layer.is_decomposable_of_nodes(), np.array([True, False])
     )
     assert not layer.is_decomposable()
+
+
+# %% structure fixed at construction
+
+
+def test_sparsity_stores_every_column_once_in_order_only_for_identity_columns():
+    identity = RowGroupedSparsity(np.array([0, 0, 1]), np.array([0, 1, 2]), (2, 3))
+    permuted = RowGroupedSparsity(np.array([0, 0, 1]), np.array([1, 0, 2]), (2, 3))
+    assert identity.stores_every_column_once_in_order
+    assert not permuted.stores_every_column_once_in_order
+
+
+def test_new_values_of_a_sparse_array_keep_its_sparsity():
+    log_weights = RowGroupedSparseArray.from_entries(
+        SparseEntries(np.zeros(2), [0, 1], [1, 0]), (2, 2)
+    )
+    assert log_weights.with_data(np.ones(2)).sparsity is log_weights.sparsity
+
+
+@pytest.fixture
+def product_with_two_factors_in_one_child_layer() -> ProductLayer:
+    """
+    A product layer whose single node multiplies both nodes of one uniform layer.
+    """
+    leaf = uniform_layer_of(0, [(0, 2), (0, 4)])
+    edges = coo_array((np.array([0, 1]), ([0, 0], [0, 0])), shape=(1, 1))
+    return ProductLayer([leaf], edges)
+
+
+def test_product_layer_stores_each_factor_of_a_node(
+    product_with_two_factors_in_one_child_layer,
+):
+    factors = product_with_two_factors_in_one_child_layer.factors
+    assert (factors.rows.tolist(), factors.columns.tolist()) == ([0, 0], [0, 1])
+
+
+def test_product_layer_adds_the_log_likelihoods_of_factors_in_one_child_layer(
+    product_with_two_factors_in_one_child_layer,
+):
+    events = np.array([[1.0]])
+    [leaf] = product_with_two_factors_in_one_child_layer.child_layers
+    np.testing.assert_array_equal(
+        product_with_two_factors_in_one_child_layer.log_likelihood_of_nodes(events),
+        leaf.log_likelihood_of_nodes(events).sum(axis=1, keepdims=True),
+    )
+
+
+def test_attaching_a_child_layer_stores_its_factors(
+    product_with_two_factors_in_one_child_layer,
+):
+    other_leaf = uniform_layer_of(1, [(0, 1)])
+    product_with_two_factors_in_one_child_layer.attach_child_layer(
+        other_leaf, np.array([0]), np.array([0])
+    )
+    factors = product_with_two_factors_in_one_child_layer.factors
+    assert (factors.rows.tolist(), factors.columns.tolist()) == ([0, 0, 0], [0, 1, 2])
 
 
 # %% truncation of input layers in a circuit

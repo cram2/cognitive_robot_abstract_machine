@@ -102,7 +102,7 @@ def dense_log_weights(layer: SumLayer) -> np.ndarray:
         where the layer has no edge.
     """
     result = np.full((layer.number_of_nodes, layer.column_offsets[-1]), -np.inf)
-    result[layer.log_weights.rows, layer.log_weights.columns] = (
+    result[layer.log_weights.sparsity.rows, layer.log_weights.sparsity.columns] = (
         layer.normalized_edge_log_weights
     )
     return result

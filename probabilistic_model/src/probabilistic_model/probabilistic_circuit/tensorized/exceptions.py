@@ -117,3 +117,24 @@ class CopiesNotAlignedError(ProbabilisticModelException, ValueError):
             "Only stack copies that a structural pass made from the same layer graph "
             "without pruning it."
         )
+
+
+@dataclass
+class UnsupportedArrayBackendError(ProbabilisticModelException, TypeError):
+    """
+    Exception raised when a numeric query needs special functions of an array backend
+    that none of them computes.
+    """
+
+    namespace_name: str
+    """
+    The name of the Array API namespace of the backend.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No special functions are available for arrays of {self.namespace_name}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Use numpy or jax arrays."
