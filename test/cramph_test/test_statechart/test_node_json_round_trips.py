@@ -14,6 +14,7 @@ from cramph.composites import (
     CompositeNodeChoosingItsChild,
     Parallel,
     PausedUntilTrue,
+    StartedWhenTrue,
     PausedWhileTrue,
     RepeatUntil,
     Sequence,
@@ -175,6 +176,12 @@ def _cases() -> list[NodeRoundTripCase]:
             PausedUntilTrue,
             lambda world: [
                 PausedUntilTrue(monitor=ConstTrueNode(), monitored_node=ConstTrueNode())
+            ],
+        ),
+        NodeRoundTripCase(
+            StartedWhenTrue,
+            lambda world: [
+                StartedWhenTrue(monitor=ConstTrueNode(), monitored_node=ConstTrueNode())
             ],
         ),
         NodeRoundTripCase(

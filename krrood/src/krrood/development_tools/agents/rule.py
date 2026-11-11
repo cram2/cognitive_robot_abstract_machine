@@ -18,7 +18,7 @@ from krrood.ormatic.utils import classproperty
 # %% code named by rules
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CodeReference:
     """
     A module, class or function a rule names, rendered as inline Markdown code, so the
@@ -82,10 +82,59 @@ class AgentRule:
     """
 
 
+# %% instructions declared as classes
+
+
+class ClassNamedDeclaration:
+    """
+    Agent instructions declared as a class whose name is its topic followed by
+    :attr:`name_suffix`.
+    """
+
+    @classproperty
+    def name_suffix(cls) -> str:
+        """
+        The word every such class name ends in, which is not part of the topic.
+        """
+        return ""
+
+    @classproperty
+    def topic_words(cls) -> list[str]:
+        """
+        The words of the topic as the class name spells them, an acronym such as ``CI``
+        counting as one word.
+        """
+        return re.findall(
+            r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*",
+            cls.__name__.removesuffix(cls.name_suffix),
+        )
+
+    @classproperty
+    def title(cls) -> str:
+        """
+        The words of the topic in sentence case, keeping acronyms in capitals.
+        """
+        first_word, *other_words = cls.topic_words
+        return " ".join(
+            [
+                first_word,
+                *(word if word.isupper() else word.lower() for word in other_words),
+            ]
+        )
+
+    @classproperty
+    def source_path(cls) -> Path:
+        """
+        The path of the module declaring the class, relative to the directory its top-
+        level package or module lies in.
+        """
+        return Path(*cls.__module__.split(".")).with_suffix(".py")
+
+
 # %% sections
 
 
-class Section(AgentRule, Enum):
+class Section(AgentRule, ClassNamedDeclaration, Enum):
     """
     A section of ``AGENTS.md`` on one topic, whose members are the rules it lists.
 
@@ -94,27 +143,15 @@ class Section(AgentRule, Enum):
     """
 
     @classproperty
+    def name_suffix(cls) -> str:
+        return "Rules"
+
+    @classproperty
     def parent(cls) -> type[Section] | None:
         """
         The section this one is nested under; none for a top-level section.
         """
         return None
-
-    @classproperty
-    def title(cls) -> str:
-        """
-        The text of the section's heading: the words of the topic in sentence case,
-        keeping acronyms such as ``CI`` in capitals.
-        """
-        first_word, *other_words = re.findall(
-            r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*", cls.__name__.removesuffix("Rules")
-        )
-        return " ".join(
-            [
-                first_word,
-                *(word if word.isupper() else word.lower() for word in other_words),
-            ]
-        )
 
     @classproperty
     def subsections(cls) -> list[type[Section]]:
@@ -164,11 +201,3 @@ class Section(AgentRule, Enum):
         The section's heading as a line of Markdown.
         """
         return f"{'#' * cls.depth} {cls.title}"
-
-    @classproperty
-    def source_path(cls) -> Path:
-        """
-        The path of the module declaring the section, relative to the directory its top-
-        level package or module lies in.
-        """
-        return Path(*cls.__module__.split(".")).with_suffix(".py")

@@ -144,7 +144,7 @@ def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
     """
     palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
     box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
-    assert InContactWith(box, palm)()
+    assert InContactWith(body1=box, body2=palm)()
     gripper_bodies = {
         body
         for end_effector in pr2_world_copy.get_semantic_annotations_by_type(EndEffector)

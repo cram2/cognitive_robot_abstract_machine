@@ -64,11 +64,7 @@ class SparseEntries:
 @dataclass(eq=False)
 class RowGroupedSparseArray:
     """
-    A two dimensional sparse array whose stored entries can be grouped by row.
-
-    Grouping lays the entries of every row out in one row of a rectangular array, padded
-    where a row has fewer entries than the fullest one, so that a reduction over the
-    entries of every row becomes one reduction over the last axis of that array.
+    A two dimensional sparse array whose stored entries can be reduced row by row.
     """
 
     array: coo_array
@@ -143,19 +139,6 @@ class RowGroupedSparseArray:
         gather[rows[order], offsets] = order
         return gather
 
-    @functools.cached_property
-    def is_contiguous(self) -> bool:
-        """
-        :return: Whether the entries are stored row by row with the same number of
-            entries per row, in which case grouping them is a reshape rather than a
-            gather.
-        """
-        gather = self.gather
-        return bool(
-            self.number_of_stored_entries == gather.size
-            and np.array_equal(gather, np.arange(gather.size).reshape(gather.shape))
-        )
-
     def pad(self, values: npt.NDArray, padding: float) -> npt.NDArray:
         """
         Append the slot that :attr:`gather` pads with.
@@ -169,19 +152,67 @@ class RowGroupedSparseArray:
             [values, np.full(values.shape[:-1] + (1,), padding)], axis=-1
         )
 
-    def group_by_row(
-        self, values: npt.NDArray, padding: float = -np.inf
-    ) -> npt.NDArray:
+    @functools.cached_property
+    def rows_by_entry_count(self) -> npt.NDArray[np.int64]:
         """
-        Rearrange per-entry values into one row per row of this array.
+        The rows ordered by their number of stored entries, the fullest first.
+        """
+        counts = np.bincount(self.rows, minlength=self.shape[0])
+        return np.argsort(-counts, kind="stable")
+
+    @functools.cached_property
+    def entry_count_ranks(self) -> npt.NDArray[np.int64]:
+        """
+        The position of every row in :attr:`rows_by_entry_count`.
+        """
+        return np.argsort(self.rows_by_entry_count)
+
+    @functools.cached_property
+    def entry_positions_by_rank(self) -> list[npt.NDArray[np.int64]]:
+        """
+        Element ``k`` holds, for every row with more than ``k`` stored entries, the
+        position of that row's ``k``-th entry among the stored entries. The rows follow
+        :attr:`rows_by_entry_count`, so the rows of each element are a prefix of the rows
+        of the element before it. For stored entries in rows ``[2, 0, 2, 1, 2, 0]``::
+
+            rows_by_entry_count     = [2, 0, 1, 3]
+            entry_positions_by_rank = [[0, 1, 3], [2, 5], [4]]
+        """
+        gather = self.gather[self.rows_by_entry_count]
+        rows_per_rank = (gather < self.number_of_stored_entries).sum(axis=0)
+        return [
+            gather[:number_of_rows, rank]
+            for rank, number_of_rows in enumerate(rows_per_rank)
+            if number_of_rows > 0
+        ]
+
+    def reduce_by_row(self, values: npt.NDArray, operation: np.ufunc) -> npt.NDArray:
+        """
+        Combine the entries of every row with ``operation``, giving its identity for a
+        row without entries, without padding any row to the fullest one.
 
         :param values: Per-entry values with the entries in the last axis.
-        :param padding: The value for rows with fewer entries than the fullest one.
-        :return: The values with shape ``(..., #rows, entries per row)``.
+        :param operation: An associative and commutative binary ufunc with an identity.
+        :return: The values with shape ``(..., #rows)``.
         """
-        if self.is_contiguous:
-            return values.reshape(values.shape[:-1] + self.gather.shape)
-        return self.pad(values, padding)[..., self.gather]
+        result = np.full(values.shape[:-1] + (0,), operation.identity, dtype=float)
+        for positions in reversed(self.entry_positions_by_rank):
+            entries = values[..., positions]
+            number_of_reduced_rows = result.shape[-1]
+            result = np.concatenate(
+                [
+                    operation(entries[..., :number_of_reduced_rows], result),
+                    entries[..., number_of_reduced_rows:],
+                ],
+                axis=-1,
+            )
+        rows_without_entries = np.full(
+            values.shape[:-1] + (self.shape[0] - result.shape[-1],),
+            operation.identity,
+            dtype=float,
+        )
+        result = np.concatenate([result, rows_without_entries], axis=-1)
+        return result[..., self.entry_count_ranks]
 
     def with_data(self, data: npt.NDArray) -> Self:
         """

@@ -182,7 +182,7 @@ def test_a_statement_yields_no_more_candidates_than_the_default_limit() -> None:
 
 
 def test_the_limit_of_a_statement_outranks_the_default_limit() -> None:
-    statement = _statement_of_names(["first", "second"]).limit(2)
+    statement = _statement_of_names(["first", "second"]).limit(n=2)
     node = StatementNode(statement=statement)
 
     node.next_candidate(
@@ -199,6 +199,15 @@ def test_a_statement_that_ran_out_of_candidates_did_not_reach_its_limit() -> Non
     node.next_candidate(backend, default_candidate_limit=2)
 
     assert node.next_candidate(backend, default_candidate_limit=2) is None
+    assert not node.reached_candidate_limit
+
+
+def test_a_statement_that_never_grounded_did_not_reach_its_limit() -> None:
+    """
+    A statement handed its candidate rather than grounding one has pulled none.
+    """
+    node = StatementNode(statement=_statement_of_names(["only"]))
+
     assert not node.reached_candidate_limit
 
 

@@ -28,6 +28,7 @@ from .graphs import (
     confounded,
     mediated,
     undirected_chain,
+    undirected_parent,
     without_member_graphs,
 )
 
@@ -70,8 +71,20 @@ def test_unshielded_colliders_name_both_parents_in_name_order():
     }
 
 
-def test_too_many_undirected_edges_raises():
-    graph = undirected_chain(CausalGraph.maximum_undirected_edges + 1)
+def test_a_long_undirected_chain_has_one_member_graph_per_source():
+    graph = undirected_chain(20)
+
+    assert sorted(
+        node.name
+        for member in graph.member_graphs()
+        for node in member.nodes()
+        if member.in_degree(node) == 0
+    ) == sorted(graph.node_names)
+
+
+def test_more_member_graphs_than_listed_raises():
+    graph = undirected_chain(3)
+    graph.maximum_member_graphs = len(graph.nodes()) - 1
 
     with pytest.raises(EquivalenceClassTooLarge):
         graph.member_graphs()
@@ -109,6 +122,12 @@ def test_nodes_without_an_edge_are_not_adjacent():
     graph = mediated()
 
     assert not graph.adjacent(graph.node("X"), graph.node("Y"))
+
+
+def test_a_node_an_undirected_edge_may_point_into_is_a_possible_ancestor():
+    graph = undirected_parent()
+
+    assert graph.possible_ancestors(graph.node("X")) == {graph.node("A")}
 
 
 # %% storing a graph

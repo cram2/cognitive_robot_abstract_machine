@@ -42,7 +42,7 @@ class AnnotatorDescriptor(Generic[ParametersType], SubClassSafeGeneric):
     @classproperty
     def Parameters(cls) -> type[ParametersType]:
         """Parameter constructor exposed through the descriptor discovery interface."""
-        return cls.get_type_of_generic_parameter(ParametersType)
+        return cls.get_type_of_generic_parameter(parameter=ParametersType)
 
     @classproperty
     def Capabilities(cls) -> type[AnnotatorCapabilities]:

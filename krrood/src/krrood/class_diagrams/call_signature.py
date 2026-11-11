@@ -18,13 +18,13 @@ from krrood.utils import is_hashable
 # %% call signature
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CallSignature:
     """
     The parameters a call to one callee passes its arguments to, as its caller writes
     them: a class is called without ``self``, a method read from its class with it.
 
-    >>> CallSignature.of(divmod).accepts_keyword("x")
+    >>> CallSignature.from_callable(callee=divmod).accepts_keyword(keyword="x")
     False
     """
 
@@ -34,24 +34,24 @@ class CallSignature:
     """
 
     @classmethod
-    def of(cls, callee: Callable[..., Any]) -> CallSignature:
+    def from_callable(cls, *, callee: Callable[..., Any]) -> CallSignature:
         """
         :param callee: The function, method or class that is called.
         :return: The signature of *callee*, read once for each callee that can be
             hashed.
         """
         if not is_hashable(callee):
-            return cls(inspect.signature(callee))
-        return cls._of_hashable_callee_(callee)
+            return cls(parameters=inspect.signature(callee))
+        return cls._from_hashable_callable_(callee=callee)
 
     @classmethod
     @memoize
-    def _of_hashable_callee_(cls, callee: Callable[..., Any]) -> CallSignature:
+    def _from_hashable_callable_(cls, *, callee: Callable[..., Any]) -> CallSignature:
         """
         :param callee: A callee that can be hashed.
         :return: The signature of *callee*.
         """
-        return cls(inspect.signature(callee))
+        return cls(parameters=inspect.signature(callee))
 
     @classproperty
     def kinds_passed_by_name(cls) -> frozenset[inspect._ParameterKind]:
@@ -62,22 +62,24 @@ class CallSignature:
             {inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY}
         )
 
-    def bind(self, /, *positional: Any, **keyword: Any) -> CallArguments:
+    def bind(self, *, arguments: CallArguments) -> CallArguments:
         """
-        :param positional: The arguments passed by position.
-        :param keyword: The arguments passed by name.
+        :param arguments: The arguments a caller passes to the callee.
         :return: The arguments the callee receives, the same however they were passed
             and including the defaults that were left out.
         :raises TypeError: If the arguments do not fit the parameters.
         """
-        bound_arguments = self.parameters.bind(*positional, **keyword)
+        bound_arguments = self.parameters.bind(
+            *arguments.positional, **arguments.keyword
+        )
         bound_arguments.apply_defaults()
-        return CallArguments(bound_arguments.args, bound_arguments.kwargs)
+        return CallArguments(
+            positional=bound_arguments.args, keyword=bound_arguments.kwargs
+        )
 
-    def keyword_arguments(self, /, *positional: Any, **keyword: Any) -> dict[str, Any]:
+    def bind_by_name(self, *, arguments: CallArguments) -> dict[str, Any]:
         """
-        :param positional: The arguments passed by position.
-        :param keyword: The arguments passed by name.
+        :param arguments: The arguments a caller passes to the callee.
         :return: Each argument that was passed, by the name it is passed by, so calling
             the callee with these alone makes the same call. Defaults that were left out
             are not included.
@@ -85,7 +87,9 @@ class CallSignature:
             takes it only by position.
         :raises TypeError: If the arguments do not fit the parameters.
         """
-        passed = self.parameters.bind(*positional, **keyword).arguments
+        passed = self.parameters.bind(
+            *arguments.positional, **arguments.keyword
+        ).arguments
         kinds = {name: self.parameters.parameters[name].kind for name in passed.keys()}
         passed_only_by_position = tuple(
             name
@@ -95,7 +99,7 @@ class CallSignature:
         )
         if passed_only_by_position:
             raise ArgumentsPassableOnlyByPosition(
-                self.parameters, passed_only_by_position
+                parameters=self.parameters, parameter_names=passed_only_by_position
             )
         keyword_arguments = {}
         for name, value in passed.items():
@@ -105,7 +109,7 @@ class CallSignature:
                 keyword_arguments[name] = value
         return keyword_arguments
 
-    def accepts_keyword(self, keyword: str) -> bool:
+    def accepts_keyword(self, *, keyword: str) -> bool:
         """
         :param keyword: The name of a keyword argument.
         :return: Whether the callee takes *keyword*, as a parameter of that name or

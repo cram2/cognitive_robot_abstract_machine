@@ -71,6 +71,25 @@ def test_circuit_of_a_region_graph_has_a_sum_unit_per_sum_node():
     assert len([node for node in circuit.nodes() if isinstance(node, SumUnit)]) == 21
 
 
+def test_every_partition_of_a_deep_region_graph_over_few_variables_has_children():
+    region_graph = RegionGraph(
+        continuous_variables(4), partitions=2, depth=2, repetitions=2
+    ).create_random_region_graph()
+    assert all(
+        region_graph.out_degree(partition) > 0
+        for partition in region_graph.partition_nodes()
+    )
+
+
+def test_deep_region_graph_over_few_variables_becomes_a_circuit():
+    region_graph = RegionGraph(
+        continuous_variables(5), partitions=2, depth=2, repetitions=2
+    ).create_random_region_graph()
+    model = region_graph.as_probabilistic_circuit(input_units=3, sum_units=5)
+    data = jnp.array(np.random.normal(size=(20, 5)))
+    assert jnp.all(jnp.isfinite(model.log_likelihood(data)))
+
+
 # %% learning
 
 
@@ -119,3 +138,16 @@ def test_classification_circuit_predicts_a_distribution_over_the_target(target):
         for element in target.domain
     )
     assert total == pytest.approx(1.0)
+
+
+def test_classification_circuit_learns_to_separate_its_classes():
+    features = continuous_variables(4, prefix="x")
+    region_graph = RegionGraph(
+        features, partitions=2, depth=1, repetitions=2, classes=2
+    ).create_random_region_graph()
+    model = region_graph.as_probabilistic_circuit(input_units=5, sum_units=5)
+    labels = jnp.array(np.repeat([Target.A, Target.B], 50))
+    data = jnp.array(np.random.normal(size=(100, 4))) + 5.0 * (2 * labels[:, None] - 1)
+    model.fit(data, labels=labels, epochs=200, optimizer=optax.adam(0.05))
+    predictions = jnp.argmax(model.root.log_likelihood_of_nodes(data), axis=1)
+    assert jnp.all(predictions == labels)

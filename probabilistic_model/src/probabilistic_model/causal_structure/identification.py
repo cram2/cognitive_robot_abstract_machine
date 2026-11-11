@@ -8,12 +8,14 @@ acyclic graph the causal graph stands for.
 from __future__ import annotations
 
 import itertools
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import cached_property
 
 import pandas as pd
+
+from krrood.patterns.interface import Interface
 
 from probabilistic_model.causal_structure.discretization import Discretizer
 from probabilistic_model.causal_structure.exceptions import (
@@ -156,6 +158,29 @@ class Identification(ABC):
     What a causal graph says about the effect of a cause on an effect.
     """
 
+    @property
+    @abstractmethod
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        """
+        :return: Every set the effect may be identified by adjusting for; none if the
+            effect is not identified.
+        """
+
+    @property
+    def is_identified(self) -> bool:
+        """
+        :return: Whether a single set identifies the effect.
+        """
+        return False
+
+    @property
+    def includes_no_effect(self) -> bool:
+        """
+        :return: Whether, in some graph the causal graph stands for, the cause has no
+            effect on the effect at all.
+        """
+        return False
+
 
 @dataclass
 class IdentifiedEffect(Identification):
@@ -168,6 +193,14 @@ class IdentifiedEffect(Identification):
     The nodes to adjust for.
     """
 
+    @property
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        return [self.adjustment]
+
+    @property
+    def is_identified(self) -> bool:
+        return True
+
 
 @dataclass
 class PartiallyIdentifiedEffect(Identification):
@@ -176,7 +209,7 @@ class PartiallyIdentifiedEffect(Identification):
     effect is one of several, one per parent set (Maathuis, Kalisch and Bühlmann, 2009).
     """
 
-    candidate_adjustments: list[AdjustmentSet]
+    parent_sets: list[AdjustmentSet]
     """
     Each distinct parent set of the cause that does not hold the effect, the smallest
     first.
@@ -187,6 +220,14 @@ class PartiallyIdentifiedEffect(Identification):
     Whether the effect is a parent of the cause in some member graph, where the cause
     has no effect on it at all.
     """
+
+    @property
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        return self.parent_sets
+
+    @property
+    def includes_no_effect(self) -> bool:
+        return self.includes_member_without_causal_path
 
 
 class UnidentifiedReason(StrEnum):
@@ -223,6 +264,10 @@ class UnidentifiedEffect(Identification):
     """
     Why.
     """
+
+    @property
+    def candidate_adjustments(self) -> list[AdjustmentSet]:
+        return []
 
 
 # %% choosing an adjustment set
@@ -384,8 +429,124 @@ class AdjustmentSelector:
         if not all(candidate.nodes <= eligible for candidate in candidates):
             return UnidentifiedEffect(UnidentifiedReason.PARENT_SET_NOT_ELIGIBLE)
         return PartiallyIdentifiedEffect(
-            candidate_adjustments=candidates,
+            parent_sets=candidates,
             includes_member_without_causal_path=any(
                 effect in parents for parents in parent_sets
             ),
         )
+
+
+# %% what to do with a declared adjustment set
+
+
+class DeclaredAdjustmentPolicy(Interface):
+    """
+    What a causal graph's identification of an effect does with a set of nodes declared
+    to adjust for.
+    """
+
+    @abstractmethod
+    def identify(
+        self,
+        selector: AdjustmentSelector,
+        cause: GraphNode,
+        effect: GraphNode,
+        declared: AdjustmentSet,
+        eligible: set[GraphNode],
+        training_rows: pd.DataFrame | None = None,
+    ) -> Identification:
+        """
+        :param selector: Chooses and checks adjustment sets in the causal graph.
+        :param cause: The cause.
+        :param effect: The effect.
+        :param declared: The nodes declared to adjust for.
+        :param eligible: The nodes the model can adjust for.
+        :param training_rows: The rows the model was fitted on, whose support ranks the
+            valid adjustment sets.
+        :return: What the graph says about the effect, given the declared set.
+        """
+
+
+@dataclass
+class InvalidDeclaredAdjustmentRefusal(DeclaredAdjustmentPolicy):
+    """
+    Keeps a declared set that meets the adjustment criterion in every member graph and
+    refuses any other.
+    """
+
+    def identify(
+        self,
+        selector: AdjustmentSelector,
+        cause: GraphNode,
+        effect: GraphNode,
+        declared: AdjustmentSet,
+        eligible: set[GraphNode],
+        training_rows: pd.DataFrame | None = None,
+    ) -> Identification:
+        """
+        :raises InvalidAdjustmentSet: If the declared set fails in a member graph.
+        """
+        return selector.check_declared(cause, effect, declared)
+
+
+@dataclass
+class InvalidDeclaredAdjustmentRepair(DeclaredAdjustmentPolicy):
+    """
+    Keeps a declared set that meets the adjustment criterion in every member graph, and
+    repairs any other: of the valid sets, those that drop the fewest declared nodes win,
+    ranked among themselves as :meth:`AdjustmentSelector.identify` ranks its sets.
+    """
+
+    def identify(
+        self,
+        selector: AdjustmentSelector,
+        cause: GraphNode,
+        effect: GraphNode,
+        declared: AdjustmentSet,
+        eligible: set[GraphNode],
+        training_rows: pd.DataFrame | None = None,
+    ) -> Identification:
+        if not selector.graph.has_member_graphs:
+            return UnidentifiedEffect(UnidentifiedReason.NO_MEMBER_GRAPH)
+        checks = selector.checks_for(cause, effect)
+        if all(check.failure_reason(declared) is None for check in checks):
+            return IdentifiedEffect(declared)
+        forbidden = set().union(*(check.forbidden_nodes for check in checks))
+        keepable = sorted(declared.nodes - {cause, effect} - forbidden)
+        added = selector.candidate_adjustments(
+            sorted(eligible - declared.nodes - {cause, effect} - forbidden)
+        )
+        valid = [
+            adjustment
+            for adjustment in self.sets_keeping(keepable, added)
+            if all(check.failure_reason(adjustment) is None for check in checks)
+        ]
+        if not valid:
+            return selector.identify(cause, effect, eligible, training_rows)
+        return IdentifiedEffect(
+            min(
+                valid,
+                key=lambda adjustment: (
+                    len(declared.nodes - adjustment.nodes),
+                    selector.under_supported_cells(cause, adjustment, training_rows),
+                    adjustment,
+                ),
+            )
+        )
+
+    @staticmethod
+    def sets_keeping(
+        keepable: list[GraphNode], added: list[AdjustmentSet]
+    ) -> list[AdjustmentSet]:
+        """
+        :param keepable: The declared nodes a set may keep.
+        :param added: The sets of other nodes a set may add.
+        :return: Every combination of some of the keepable nodes with one of the added
+            sets.
+        """
+        return [
+            AdjustmentSet(frozenset(kept) | addition.nodes)
+            for addition in added
+            for size in range(len(keepable), -1, -1)
+            for kept in itertools.combinations(keepable, size)
+        ]

@@ -10,11 +10,12 @@ from typing_extensions import Callable, Self
 
 import rclpy
 from json_msgs.action import JsonAction
+from rclpy.node import Node
 from std_msgs.msg import String
 from sqlalchemy.orm import sessionmaker
 
 from giskardpy.data_types.exceptions import NoControlledJointsError
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceMessage,
@@ -43,7 +44,6 @@ from giskardpy.middleware.ros2.world_updates import (
     IncomingWorldUpdates,
     OutgoingWorldUpdates,
 )
-from giskardpy.model.world_config import WorldConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.ormatic.utils import create_engine
 from krrood.patterns.caching import clear_memoization_cache
@@ -60,7 +60,9 @@ from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ActiveConnection
+from semantic_digital_twin.world_source import WorldSource
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from cramph.composites import ChildChooserAccess
@@ -78,9 +80,9 @@ class Giskard:
     Instantiate it with the configs of the setup and call :meth:`live`.
     """
 
-    world_config: WorldConfig
+    world_source: WorldSource
     """
-    Which robot description is loaded and how the robot is attached to the world.
+    Describes the world Giskard controls, including the robot in it.
     """
 
     server_config: GiskardServerConfig
@@ -97,6 +99,11 @@ class Giskard:
     qp_controller_config: QPControllerConfig = field(default_factory=QPControllerConfig)
     """
     The control frequency and the tuning of the controller.
+    """
+
+    world: World = field(init=False)
+    """
+    The world Giskard controls, created from :attr:`world_source` during :meth:`setup`.
     """
 
     executor: StatechartExecutor = field(init=False)
@@ -146,18 +153,18 @@ class Giskard:
 
     @classmethod
     def standalone(
-        cls, world_config: WorldConfig, qp_controller_config: QPControllerConfig
+        cls, world_source: WorldSource, qp_controller_config: QPControllerConfig
     ) -> Self:
         """
-        :param world_config: Which robot description is loaded and how the robot is
-            attached to the world.
+        :param world_source: Describes the world Giskard controls, including the robot
+            in it.
         :param qp_controller_config: The control frequency and the tuning of the
             controller.
         :return: A Giskard that simulates the robot instead of commanding it, with
             debug output enabled.
         """
         return cls(
-            world_config=world_config,
+            world_source=world_source,
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(debug_mode=True),
             qp_controller_config=qp_controller_config,
@@ -165,17 +172,17 @@ class Giskard:
 
     @classmethod
     def launch(
-        cls, create_giskard: Callable[[], Giskard], node_name: str = "giskard"
+        cls, create_giskard: Callable[[Node], Giskard], node_name: str = "giskard"
     ) -> None:
         """
         Run a Giskard as a ros node until ROS shuts down.
 
-        :param create_giskard: Builds the Giskard to run. It is called once the ros node
-            exists, so it can read from topics.
+        :param create_giskard: Builds the Giskard to run from the ros node it runs on.
+            The node already spins, so the builder can read from its topics.
         :param node_name: The name of the ros node.
         """
-        rospy.init_node(node_name)
-        create_giskard().live()
+        background_node.init_node(node_name)
+        create_giskard(background_node.get_node()).live()
 
     def setup(self):
         """
@@ -183,16 +190,16 @@ class Giskard:
 
         You usually don't need to call this.
         """
-        node_logger = rospy.get_node().get_logger()
+        node_logger = background_node.get_node().get_logger()
         node_logger.info("Building the world.")
-        with self.world_config.world.modify_world():
-            self.world_config.setup_world()
-            clear_memoization_cache(self.world_config.world)
+        self.world = self.world_source.create_world()
+        with self.world.modify_world():
+            clear_memoization_cache(self.world)
             self.executor = StatechartExecutor(
-                context=StatechartContext(world=self.world_config.world),
+                context=StatechartContext(world=self.world),
                 pacer=self.robot_interface_config.create_pacer(),
                 extensions=[
-                    RosNodeAccess(rospy.get_node()),
+                    RosNodeAccess(background_node.get_node()),
                     MotionControl(qp_controller_config=self.qp_controller_config),
                 ],
             )
@@ -208,12 +215,13 @@ class Giskard:
         """
         Build the goal lifecycle around the executor.
         """
-        world = self.world_config.world
+        world = self.world
         action_server = ActionServerHandler(
-            action_name=f"{rospy.get_node().get_name()}/command", action_type=JsonAction
+            action_name=f"{background_node.get_node().get_name()}/command",
+            action_type=JsonAction,
         )
         client_watchdog = ClientWatchdog(
-            presence=HeartbeatPresence(node=rospy.get_node()),
+            presence=HeartbeatPresence(node=background_node.get_node()),
         )
         outgoing_world_updates = OutgoingWorldUpdates(
             world_synchronizer=self.world_synchronizer
@@ -263,12 +271,12 @@ class Giskard:
             world_updates=world_updates, action_server=action_server
         )
         self.executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
-        node = rospy.get_node()
+        node = background_node.get_node()
         node.create_subscription(
             String,
             child_choices_topic(node.get_name()),
             lambda message: chooser.receive(
-                ChildChoiceMessage.from_json(json.loads(message.data))
+                ChildChoiceMessage.from_json(data=json.loads(message.data))
             ),
             10,
         )
@@ -304,8 +312,8 @@ class Giskard:
             session = sessionmaker(bind=engine)()
 
             self.model_reload_synchronizer = ModelReloadSynchronizer(
-                node=rospy.get_node(),
-                _world=self.world_config.world,
+                node=background_node.get_node(),
+                _world=self.world,
                 session=session,
                 defer_incoming_reloads=True,
             )
@@ -318,27 +326,27 @@ class Giskard:
         # Deferring only the incoming direction: the control loop decides when a foreign
         # update may touch the world it is controlling, while this world's own changes
         # keep being published through the normal callbacks.
-        rospy.get_node().get_logger().info("Publishing the world.")
+        background_node.get_node().get_logger().info("Publishing the world.")
         self.world_synchronizer = WorldSynchronizer(
-            _world=self.world_config.world,
-            node=rospy.get_node(),
+            _world=self.world,
+            node=background_node.get_node(),
             defer_incoming_updates=True,
         )
         self.world_fetcher = FetchWorldServer(
-            node=rospy.get_node(), world=self.world_config.world
+            node=background_node.get_node(), world=self.world
         )
-        rospy.get_node().get_logger().info(
+        background_node.get_node().get_logger().info(
             "Listening for frames that are already published on tf."
         )
         self.tf_publisher = TFPublisher.create_with_ignore_existing_tf(
-            node=rospy.get_node(), world=self.world_config.world
+            node=background_node.get_node(), world=self.world
         )
-        rospy.get_node().get_logger().info("Starting the visualization.")
+        background_node.get_node().get_logger().info("Starting the visualization.")
         self.viz_marker_publisher = VizMarkerPublisher(
-            node=rospy.get_node(), _world=self.world_config.world
+            node=background_node.get_node(), _world=self.world
         )
         self.collision_marker_publisher = CollisionVisualizationMarkerPublisher(
-            node=rospy.get_node(), throttle=5, world=self.world_config.world
+            node=background_node.get_node(), throttle=5, world=self.world
         )
 
     def close_world_model_ros_interface(self):
@@ -361,6 +369,7 @@ class Giskard:
             self.world_fetcher.close()
         if self.motion_server is not None:
             self.motion_server.client_watchdog.presence.stop()
+            self.motion_server.action_server.close()
         if self.tf_publisher is not None:
             self.tf_publisher.stop()
         if self.viz_marker_publisher is not None:
@@ -375,17 +384,17 @@ class Giskard:
 
     @property
     def robots(self) -> list[AbstractRobot]:
-        return self.world_config.world.get_semantic_annotations_by_type(AbstractRobot)
+        return self.world.get_semantic_annotations_by_type(AbstractRobot)
 
     def _controlled_joints_sanity_check(self):
-        world = self.world_config.world
+        world = self.world
         movable_joints = world.get_connections_by_type(ActiveConnection)
         controlled_joints = [joint for joint in movable_joints if joint.is_controlled]
         non_controlled_joints = set(movable_joints).difference(set(controlled_joints))
         if len(controlled_joints) == 0 and len(world.connections) > 0:
             raise NoControlledJointsError()
         if len(non_controlled_joints) > 0:
-            rospy.get_node().get_logger().info(
+            background_node.get_node().get_logger().info(
                 f"The following joints are non-fixed according to the urdf, "
                 f"but not flagged as controlled: {[c.name for c in non_controlled_joints]}."
             )
@@ -401,9 +410,9 @@ class Giskard:
             try:
                 self.setup()
                 self.motion_server.live()
-                rospy.spinner_thread.join()
+                background_node.spinner_thread.join()
             except KeyboardInterrupt:
-                rospy.get_node().get_logger().info(
+                background_node.get_node().get_logger().info(
                     "Giskard was interrupted, shutting down."
                 )
             finally:

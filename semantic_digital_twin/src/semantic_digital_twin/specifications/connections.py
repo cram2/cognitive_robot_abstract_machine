@@ -98,7 +98,9 @@ class ConnectionSpecification(
         shared_field_names = {
             shared_field.name for shared_field in fields(ConnectionSpecification)
         }
-        discovered_attributes = DataclassOnlyIntrospector().discover(type(self))
+        discovered_attributes = DataclassOnlyIntrospector().discover(
+            owner_cls=type(self)
+        )
         instance_values = vars(self)
         result = {}
         for attribute in discovered_attributes:
@@ -164,7 +166,6 @@ class ConnectionSpecification(
                     ).evaluate()
                 ),
             )
-            placed_connection.name = connection.name
             world.remove_connection(connection)
             world.add_connection(placed_connection)
         return placed_connection

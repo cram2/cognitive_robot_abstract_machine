@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassIsUnMappedInClassDiagram(DataclassException):
     """
     Raised when a class is not mapped in the class diagram.
@@ -23,7 +23,7 @@ class ClassIsUnMappedInClassDiagram(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingContainedTypeOfContainer(DataclassException):
     """
     Raised when a container type is missing its contained type.
@@ -35,6 +35,7 @@ class MissingContainedTypeOfContainer(DataclassException):
     """
     The class that is missing the contained type.
     """
+
     field_name: str
     """
     The name of the field that is missing the contained type.
@@ -55,7 +56,7 @@ class MissingContainedTypeOfContainer(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CouldNotResolveType(DataclassException):
     """
     Raised when a type cannot be resolved.
@@ -65,6 +66,7 @@ class CouldNotResolveType(DataclassException):
     """
     The name of the type that could not be resolved.
     """
+
     error: Exception | None = None
     """
     The exception that was raised when resolving the type.
@@ -82,7 +84,7 @@ class CouldNotResolveType(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockedClassInstantiationError(DataclassException):
     """
     Raised when an attempt is made to instantiate a MockedClass.
@@ -95,7 +97,7 @@ class MockedClassInstantiationError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FactoryMethodDecoratorError(DataclassException):
     """
     Raised when ``@factory_method`` does not wrap a ``classmethod``.
@@ -118,7 +120,7 @@ class FactoryMethodDecoratorError(DataclassException):
         return "Apply @factory_method as the outermost decorator, directly above @classmethod."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArgumentsPassableOnlyByPosition(DataclassException):
     """
     Raised when a call has to be written with keyword arguments alone, but some of its
@@ -149,7 +151,7 @@ class ArgumentsPassableOnlyByPosition(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldIsUnMappedInClassDiagram(DataclassException):
     """
     Raised when a class in the class diagram has no field of a given name.

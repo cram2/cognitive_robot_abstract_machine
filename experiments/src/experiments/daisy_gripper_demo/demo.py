@@ -125,7 +125,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
         )
 
     def is_scene_populated(self, world: World) -> bool:

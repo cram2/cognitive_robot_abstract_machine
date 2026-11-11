@@ -440,7 +440,9 @@ class StatechartExecutor(Executor, RecompileCallback):
         Registers the variable counting the ticks in the context.
         """
         self.context.tick_variable = FloatVariable("tick_count")
-        self.context.float_variable_data.register_expression(self.context.tick_variable)
+        self.context.float_variable_data.register_expression(
+            expression=self.context.tick_variable
+        )
 
     @property
     def time(self) -> float:
@@ -458,7 +460,9 @@ class StatechartExecutor(Executor, RecompileCallback):
 
     @tick_count.setter
     def tick_count(self, value: int) -> None:
-        self.context.float_variable_data.set_value(self.context.tick_variable, value)
+        self.context.float_variable_data.set_value(
+            expression=self.context.tick_variable, value=value
+        )
 
     def compile(self, statechart: Statechart) -> None:
         """

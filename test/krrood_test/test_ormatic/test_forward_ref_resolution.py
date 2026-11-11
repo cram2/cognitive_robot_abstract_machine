@@ -65,7 +65,7 @@ class TestForwardReferenceResolution:
 
         # This should not raise a NameError - the fix should handle multiple
         # forward references iteratively
-        class_diagram = ClassDiagram(classes)
+        class_diagram = ClassDiagram(classes=classes)
 
         # Verify that the class diagram was created successfully
         assert class_diagram is not None

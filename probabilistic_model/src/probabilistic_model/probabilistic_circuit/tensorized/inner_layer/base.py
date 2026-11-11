@@ -640,7 +640,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             **{
                 field_.name: json_serializer.from_json(data[field_.name], **kwargs)

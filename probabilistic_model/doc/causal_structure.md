@@ -45,7 +45,7 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
 - `graph.CausalGraph` holds a graph whose edges may be directed or undirected. An
   undirected edge is one the data cannot orient, so the graph stands for every
   directed acyclic graph that orients those edges without adding a collider:
-  `member_graphs()` lists them.
+  `member_graphs()` lists them, up to `maximum_member_graphs` of them.
 - `identification.AdjustmentSelector` checks the adjustment criterion (Shpitser,
   VanderWeele and Robins, 2010; Perković et al., 2015) in every member graph. Its
   `identify` returns one of:
@@ -58,11 +58,18 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
   - `UnidentifiedEffect`: no set of the eligible variables works.
 
   `check_declared` raises `InvalidAdjustmentSet` for a declared set that fails in some
-  member graph.
+  member graph. What a query does with such a set is a `DeclaredAdjustmentPolicy`:
+  `InvalidDeclaredAdjustmentRefusal` raises, and `InvalidDeclaredAdjustmentRepair`
+  keeps a valid declared set and otherwise prefers the valid sets that drop the fewest
+  of its nodes.
 - `learning.PeterClarkStructureLearner` runs the Peter-Clark algorithm through
-  causal-learn on the rows, discretized into a few levels per column, and
-  `learning.RelationalCausalStructureLearner` does the same on a relational circuit's
-  class table and part tables. A part attribute becomes one node for every
+  causal-learn on the rows, discretized into a few levels per column.
+  `learning.GreedyEquivalenceSearchStructureLearner` runs greedy equivalence search
+  with the Bayesian Dirichlet equivalent uniform score instead; it needs at least three
+  columns that vary, and the domain causal knowledge only orients the edges it leaves
+  undirected.
+  `learning.RelationalCausalStructureLearner` does the same with either learner on a
+  relational circuit's class table and part tables. A part attribute becomes one node for every
   part of its collection. The learned edges are kept as causal relations of the class
   in `krrood`'s class diagram.
 - `domain_causal_knowledge.DomainCausalKnowledge` carries what the data cannot settle:
@@ -70,15 +77,26 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
   - required and forbidden edges;
   - deterministic copies, which the tests skip and the graph restores as children of
     their source.
+- `relational_checks.ExampleToPartCheck.dependences(tables)` tests the independence a relational circuit
+  assumes: an instance's attributes reach its parts' attributes only through the
+  aggregation statistics. Given to `RelationalCausalStructureLearner` as its
+  `example_to_part_check`, every pair that stays dependent given the statistics and any
+  one other attribute the dependence could run through becomes an edge of the learned
+  graph, from the instance attribute to the part attribute unless the tiers place the
+  part attribute first.
 
 ## Using it from a query
 
 `krrood`'s `ProbabilisticBackend` takes the learned structure of each class in
 `causal_structures`. For such a class, a query that marks `cause` and `causes_effect`
 but no `confounder` has its adjustment set chosen
-from the learned graph, a marked `confounder` set is checked, and an effect the graph
-does not identify raises `EffectNotIdentified`. See the EQL causality guide for
-examples.
+from the learned graph, a marked `confounder` set is settled by the backend's
+`declared_adjustment_policy`, and an effect the graph does not identify raises
+`EffectNotIdentified`.
+`ProbabilisticBackend.interventional_range` answers a partially identified effect with
+the lowest and highest probability across the candidate sets. A query with
+`causes_effect` and no `cause` lets `rank_causes` rank every variable that may be an
+ancestor of the effect. See the EQL causality guide for examples.
 
 ## What the data has to supply
 
@@ -96,7 +114,8 @@ Learning the structure from observational data has limits:
   recorded.
 - **The relational assumption.** A relational circuit lets an instance's attributes
   affect its parts only through the aggregation statistics, and the relational learner
-  follows it.
+  follows it unless it is given an `ExampleToPartCheck`, which adds the edges where the
+  data disagrees.
 - **Interventions on counts.** Setting an aggregation statistic is ambiguous once it
   has parents among the part attributes, since many configurations of the parts give
   the same count (Spirtes and Scheines, 2004).

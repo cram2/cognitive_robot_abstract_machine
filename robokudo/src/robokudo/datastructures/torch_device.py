@@ -31,32 +31,32 @@ class TorchDeviceConfiguration:
 
 
 # %% Device serialization
-@dataclass
+@dataclass(kw_only=True)
 class TorchDeviceJSONSerializer(ExternalClassJSONSerializer[torch.device]):
     """
     Adapt PyTorch devices through a declarative dataclass representation.
     """
 
     @classmethod
-    def to_json(cls, instance: torch.device, **kwargs: Any) -> dict[str, Any]:
+    def to_json(cls, *, instance: torch.device, **kwargs: Any) -> dict[str, Any]:
         """
         Preserve device identifiers in :meth:`ExternalClassJSONSerializer.to_json`.
         """
         result = DataclassJSONSerializer.to_json(
-            TorchDeviceConfiguration(device_identifier=str(instance)), **kwargs
+            instance=TorchDeviceConfiguration(device_identifier=str(instance)), **kwargs
         )
         result[JSONField.TYPE] = get_full_class_name(type(instance))
         return result
 
     @classmethod
     def from_json(
-        cls, data: dict[str, Any], clazz: type[torch.device], **kwargs: Any
+        cls, *, data: dict[str, Any], clazz: type[torch.device], **kwargs: Any
     ) -> torch.device:
         """
         Restore a selection without hardware access; see
         :meth:`ExternalClassJSONSerializer.from_json`.
         """
         configuration = DataclassJSONSerializer.from_json(
-            data, clazz=TorchDeviceConfiguration, **kwargs
+            data=data, clazz=TorchDeviceConfiguration, **kwargs
         )
         return clazz(configuration.device_identifier)

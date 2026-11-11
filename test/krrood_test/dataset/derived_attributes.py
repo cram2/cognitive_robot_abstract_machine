@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Rectangle:
     """
     A rectangle constructed from its sides, exposing its area as a derived attribute.
@@ -30,14 +30,14 @@ class Rectangle:
     """
 
     @classmethod
-    def from_sides(cls, first_side: float, second_side: float) -> Rectangle:
+    def from_sides(cls, *, first_side: float, second_side: float) -> Rectangle:
         """
         :param first_side: The length of the horizontal sides.
         :param second_side: The length of the vertical sides.
         :return: The rectangle with those sides, which keeps neither under the name of
             its parameter.
         """
-        return cls(first_side, second_side)
+        return cls(width=first_side, height=second_side)
 
     @property
     def area(self) -> float:

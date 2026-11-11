@@ -54,7 +54,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
     StructuralQuery,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.utils import (
-    embedded_logsumexp,
     remap_indices,
 )
 
@@ -314,9 +313,7 @@ class SumLayer(InnerLayer):
         """
         :return: ``log(sum(exp(w)))`` over the weights of each node, shape (#nodes,).
         """
-        return embedded_logsumexp(
-            self.log_weights.group_by_row(self.log_weights.data), axis=-1
-        )
+        return self.log_weights.reduce_by_row(self.log_weights.data, np.logaddexp)
 
     @property
     def normalized_edge_log_weights(self) -> EdgeValues:
@@ -354,7 +351,7 @@ class SumLayer(InnerLayer):
         :return: The result for the nodes of this layer, shape (..., #nodes).
         """
         values = self.values_of_edges(child_results) * self.normalized_edge_weights
-        return self.log_weights.group_by_row(values, padding=0.0).sum(axis=-1)
+        return self.log_weights.reduce_by_row(values, np.add)
 
     def _weighted_forward_over_nodes(
         self, child_results: list[NodeVariableValues]
@@ -368,7 +365,7 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges([result.T for result in child_results])
         values = values * self.normalized_edge_weights
-        return self.log_weights.group_by_row(values, padding=0.0).sum(axis=-1).T
+        return self.log_weights.reduce_by_row(values, np.add).T
 
     def log_weighted_sum(
         self, child_results: list[SampleNodeValues]
@@ -381,8 +378,10 @@ class SumLayer(InnerLayer):
         :return: The log-result of the nodes of this layer with shape (..., #nodes).
         """
         values = self.values_of_edges(child_results) + self.log_weights.data
-        grouped = self.log_weights.group_by_row(values)
-        return embedded_logsumexp(grouped, axis=-1) - self.log_normalization_constants
+        return (
+            self.log_weights.reduce_by_row(values, np.logaddexp)
+            - self.log_normalization_constants
+        )
 
     @memoized
     def log_likelihood_of_nodes(

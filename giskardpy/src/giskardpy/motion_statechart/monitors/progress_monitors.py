@@ -1,7 +1,13 @@
+"""
+Monitors that detect when the tasks of a motion stop approaching their goals, and cancel
+the motion then.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
+
 
 import numpy as np
 from numpy.typing import NDArray
@@ -20,7 +26,12 @@ from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues, ObservationStateValues
 from giskardpy.motion_statechart.exceptions import NoProgressError
-from cramph.node import CancelStatechart, CompositeNode, NodeArtifacts
+from cramph.node import (
+    CancelStatechart,
+    CompositeNode,
+    NodeArtifacts,
+    StatechartNode,
+)
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionStatechartNode
 from cramph.monitors import CountSimulationTimeSeconds
 
@@ -247,7 +258,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
             ]
         )
         if self.monitored_tasks:
-            self.context.float_variable_data.register_expression(variables)
+            self.context.float_variable_data.register_expression(expression=variables)
         return variables
 
     def _compile_errors(self) -> None:
@@ -265,9 +276,11 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
             sparse=False,
         )
         self._compiled_errors.bind_args_to_memory_view(
-            0, self.context.world.state.positions
+            arg_idx=0, numpy_array=self.context.world.state.positions
         )
-        self.context.float_variable_data.bind_argument(self._compiled_errors, 1)
+        self.context.float_variable_data.bind_argument(
+            compiled_function=self._compiled_errors, argument_index=1
+        )
 
     def _running(self) -> NDArray[np.bool_]:
         """
@@ -340,11 +353,12 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         if self.monitored_tasks:
             self.context.float_variable_data.set_value(
-                self._errors_at_last_progress_variables, self._errors_at_last_progress
+                expression=self._errors_at_last_progress_variables,
+                value=self._errors_at_last_progress,
             )
             self.context.float_variable_data.set_value(
-                self._seconds_since_last_progress_variables,
-                self._seconds_since_last_progress,
+                expression=self._seconds_since_last_progress_variables,
+                value=self._seconds_since_last_progress,
             )
 
 
@@ -406,7 +420,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
     the negation of its observation to a node's fail condition to give up on that node.
     """
 
-    monitored_node: MotionStatechartNode
+    monitored_node: StatechartNode
     """
     The task or goal whose progress is watched.
     """
@@ -423,7 +437,13 @@ class StillProgressing(EndedByOwner, CompositeNode):
     """
 
     @property
-    def prerequisite_nodes(self) -> list[MotionStatechartNode]:
+    def prerequisite_nodes(self) -> list[StatechartNode]:
+        """
+        See :meth:`~cramph.node.StatechartNode.prerequisite_nodes`.
+
+        :return: :attr:`monitored_node`, whose converging tasks this node only finds
+            once it expanded.
+        """
         return [self.monitored_node]
 
     @property
@@ -535,9 +555,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         """
         return NodeArtifacts(observation=sm.logic_not(self._timer.observes_true))
 
-    def _find_converging_tasks(
-        self, node: MotionStatechartNode
-    ) -> list[ConvergingTask]:
+    def _find_converging_tasks(self, node: StatechartNode) -> list[ConvergingTask]:
         """
         Collect every converging task at or below ``node``.
 
@@ -592,4 +610,11 @@ class _CancelBecauseNoProgress(CancelStatechart):
     """
 
     def create_exception(self) -> NoProgressError:
-        return NoProgressError(progress_monitor=self.progress_monitor)
+        """
+        :return: An error naming the tasks that are stalled when this node starts, see
+            :meth:`~cramph.node.CancelStatechart.create_exception`.
+        """
+        return NoProgressError(
+            progress_monitor=self.progress_monitor,
+            stalled_tasks=self.progress_monitor.stalled_tasks,
+        )

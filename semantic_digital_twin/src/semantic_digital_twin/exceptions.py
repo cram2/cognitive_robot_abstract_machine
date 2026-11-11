@@ -17,7 +17,6 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.adapters.ros.messages import MetaData
     from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
@@ -1434,49 +1433,6 @@ class SynchronizerNotConnectedError(UsageError):
 
 
 @dataclass
-class WorldUpdateReferencesUnknownEntityError(UsageError):
-    """
-    Raised when an update refers to an entity this world never received, which leaves
-    everything the missing update carried out of reach.
-    """
-
-    publisher: MetaData
-    """
-    The synchronizer whose update could not be applied.
-    """
-
-    entity_id: UUID
-    """
-    The entity the update refers to.
-
-    Only its id is known, because the update that created it never arrived.
-    """
-
-    entity_name: PrefixedName | None
-    """
-    The name the update calls that entity, or ``None`` where it carries none.
-    """
-
-    def error_message(self) -> str:
-        named_entity = (
-            f"'{self.entity_name}' ({self.entity_id})"
-            if self.entity_name is not None
-            else f"'{self.entity_id}'"
-        )
-        return (
-            f"The update of '{self.publisher.node_name}' refers to the entity "
-            f"{named_entity}, which this world never received."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Create the synchronizer of a world before modifying that world: changes made "
-            "before it exists reach nobody, and every later change that builds on them "
-            "cannot be applied."
-        )
-
-
-@dataclass
 class WorldHasMultipleSynchronizersError(UsageError):
     """
     Raised when the synchronizer of a world is asked for, but several of them publish
@@ -2394,36 +2350,6 @@ class ExerciseVerificationFailed(UsageError):
 
 
 @dataclass
-class DriveVelocityLimitsOnUndrivenRobot(UsageError):
-    """
-    Raised when drive velocity limits are given for a robot that is attached to its
-    localization frame rigidly rather than by a drive.
-    """
-
-    robot_type_name: str
-    """
-    The name of the robot type the limits were given for.
-    """
-
-    connection_type_name: str
-    """
-    The name of the connection type that robot attaches to its localization frame with.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"'{self.robot_type_name}' attaches to its localization frame with a "
-            f"'{self.connection_type_name}', which carries no velocity limits."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "leave the drive velocity limits unset, or give the robot a mobile base "
-            "whose drive can carry them."
-        )
-
-
-@dataclass
 class NothingHeld(UsageError):
     """
     Raised when the grasp of a gripper that holds nothing is asked for.
@@ -2642,6 +2568,31 @@ class SimulationAlreadyRunningError(UsageError):
 
     def suggest_correction(self) -> str:
         return "Stop the simulation before starting it again."
+
+
+@dataclass(kw_only=True)
+class SnapshotDoesNotFitSimulationError(UsageError):
+    """
+    Raised when a simulation is restored from a snapshot of a simulation that was built
+    from a different world.
+    """
+
+    world_name: str
+    """
+    Name of the root of the world whose simulation the snapshot was restored into.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The snapshot was not taken of the simulation of the world rooted at "
+            f"{self.world_name}: its physics or world state has a different size."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Restore only snapshots taken of this simulation, after the last change to "
+            "its world's model."
+        )
 
 
 @dataclass

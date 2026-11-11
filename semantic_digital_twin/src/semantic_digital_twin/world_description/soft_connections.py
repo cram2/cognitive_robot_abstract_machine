@@ -50,11 +50,11 @@ class PiecewiseConstantCurvatureConnection(Connection):
 
     @classmethod
     def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
             name=from_json(data["name"]),
-            parent=tracker.get(from_json(data["parent_id"])),
-            child=tracker.get(from_json(data["child_id"])),
+            parent=tracker.get(key=from_json(data["parent_id"])),
+            child=tracker.get(key=from_json(data["child_id"])),
             parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
@@ -90,6 +90,7 @@ class PiecewiseConstantCurvatureConnection(Connection):
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -255,11 +256,11 @@ class CosseratRodConnection(Connection):
 
     @classmethod
     def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
             name=from_json(data["name"]),
-            parent=tracker.get(from_json(data["parent_id"])),
-            child=tracker.get(from_json(data["child_id"])),
+            parent=tracker.get(key=from_json(data["parent_id"])),
+            child=tracker.get(key=from_json(data["child_id"])),
             parent_T_connection_expression=from_json(
                 data["parent_T_connection_expression"], **kwargs
             ),
@@ -299,6 +300,7 @@ class CosseratRodConnection(Connection):
         parent_T_connection_expression: HomogeneousTransformationMatrix,
     ) -> Self:
         return self.__class__(
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
             parent=new_parent,
             child=self.child,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -412,7 +414,7 @@ class CosseratRodConnection(Connection):
             )
 
         # RK4 Integration along the length
-        accumulated_transform = sm.Matrix.eye(4)
+        accumulated_transform = sm.Matrix.eye(size=4)
         num_steps = 10
         step_length = self.segment_length / num_steps
 

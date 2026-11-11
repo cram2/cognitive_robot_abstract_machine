@@ -52,6 +52,59 @@ class UnimportableDefinitionsLine(IntEnum):
     """
 
 
+class PositionalDefinitionsLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.PositionalParametersSnippet.POSITIONAL_DEFINITIONS`.
+    """
+
+    POSITIONAL_DATACLASS = 22
+    """
+    The decorator of the dataclass declared without ``kw_only``.
+    """
+
+    POSITIONAL_FROZEN_DATACLASS = 34
+    """
+    The decorator of the frozen dataclass declared through the module without
+    ``kw_only``.
+    """
+
+    POSITIONAL_METHOD = 87
+    """
+    The method taking a parameter positionally.
+    """
+
+    POSITIONAL_STATIC_METHOD = 94
+    """
+    The static method taking a parameter positionally.
+    """
+
+    POSITIONAL_OVERRIDE = 138
+    """
+    The positional override of a method the repository defines.
+    """
+
+    POSITIONAL_METHOD_OF_LIBRARY_SUBCLASS = 155
+    """
+    The positional method that no base class of the standard library subclass defines.
+    """
+
+
+class UnimportablePositionalDefinitionsLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.PositionalParametersSnippet.UNIMPORTABLE_DEFINITIONS`.
+    """
+
+    POSITIONAL_DATACLASS = 13
+    """
+    The decorator of the dataclass declared without ``kw_only``.
+    """
+
+    POSITIONAL_METHOD_WITHOUT_BASES = 30
+    """
+    The positional method of the class without bases.
+    """
+
+
 class OverlongAttributeDocstringLine(IntEnum):
     """
     Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.ProseSnippet.OVERLONG_ATTRIBUTE_DOCSTRING`.
@@ -71,6 +124,48 @@ class CommentBlocksLine(IntEnum):
     LONG_BLOCK = 10
     """
     The first line of the four-line comment block.
+    """
+
+
+class HandWrittenAccessorsLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.FieldAccessorSnippet.HAND_WRITTEN_ACCESSORS`.
+    """
+
+    DATA_DESCRIPTOR_SETTER = 25
+    """
+    The ``__set__`` of the hand written data descriptor.
+    """
+
+    DATACLASS_PROPERTY_SETTER = 50
+    """
+    The property setter of the dataclass.
+    """
+
+
+class PrepositionalNamesLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.MethodNameSnippet.PREPOSITIONAL_NAMES`.
+    """
+
+    CLASSMETHOD = 14
+    """
+    The factory classmethod beginning with ``for``.
+    """
+
+    METHOD = 20
+    """
+    The method beginning with ``as``.
+    """
+
+    PRIVATE_METHOD = 26
+    """
+    The private method beginning with ``with`` after its underscore.
+    """
+
+    FUNCTION = 33
+    """
+    The function beginning with ``of``.
     """
 
 

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.variable import Variable
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class GuardCondition:
     """
     A condition that must be satisfied for a rule to be applied.
@@ -44,6 +44,7 @@ class GuardCondition:
 
     def holds_for(
         self,
+        *,
         shared_variable: Variable,
         case: Any,
     ) -> bool:
@@ -55,9 +56,9 @@ class GuardCondition:
 
         :param shared_variable: The EQL variable the conditions range over.
         :param case: The concrete case object to evaluate against.
-        :return: ``True`` if the guard is satisfied.
+        :return:``True`` if the guard is satisfied.
         """
-        shared_variable._update_domain_([case])
+        shared_variable._update_domain_(domain=[case])
         # A leaf predicate yields its own bound boolean per case; a Not() has no
         # id-keyed payload of its own, so it yields the full binding row when it holds
         # and nothing when it does not. Both read correctly through bool().

@@ -1758,6 +1758,18 @@ def test_missing_world_modification_context(world_setup):
         world.add_semantic_annotation(Handle(root=l1))
 
 
+def test_attribute_change_without_world_modification_context_leaves_entity_unchanged():
+    world = World()
+    body = Body(name=PrefixedName("body"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(body)
+
+    with pytest.raises(MissingWorldModificationContextError):
+        body.update_name(PrefixedName("renamed"))
+
+    assert body.name == PrefixedName("body")
+
+
 def test_dof_removal_simple():
     world = World()
     body1 = Body(name=PrefixedName("body1"))
@@ -2209,6 +2221,16 @@ def test_move_branch_preserves_active_connection(world_setup):
     assert isinstance(r2.parent_connection, RevoluteConnection)
     assert r2.parent_connection.dof.id == old_dof_id
     assert np.allclose(r2.global_transform, old_pose)
+
+
+def test_move_branch_keeps_connection_findable_by_name(world_setup):
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection_name = r2.parent_connection.name
+
+    with world.modify_world():
+        world.move_branch(r2, bf)
+
+    assert world.get_connection_by_name(connection_name) is r2.parent_connection
 
 
 # %% re-parenting a free-floating branch

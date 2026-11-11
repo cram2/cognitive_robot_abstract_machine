@@ -26,7 +26,7 @@ InstanceDict = Dict[int, Any]  # Dictionary that maps object ids to objects
 WorkItemT = TypeVar("WorkItemT", bound="DataAccessObjectWorkItem")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataAccessObjectWorkItem(abc.ABC):
     """
     Abstract base class for conversion work items.
@@ -35,7 +35,7 @@ class DataAccessObjectWorkItem(abc.ABC):
     dao_instance: DataAccessObject
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataAccessObjectState(Generic[WorkItemT], abc.ABC):
     """
     Abstract base class for conversion states.
@@ -61,7 +61,7 @@ class DataAccessObjectState(Generic[WorkItemT], abc.ABC):
         """
         pass
 
-    def has(self, source: Any) -> bool:
+    def has(self, *, source: Any) -> bool:
         """
         Check if the given source object has already been converted.
 
@@ -70,7 +70,7 @@ class DataAccessObjectState(Generic[WorkItemT], abc.ABC):
         """
         return id(source) in self.memo
 
-    def get(self, source: Any) -> Any | None:
+    def get(self, *, source: Any) -> Any | None:
         """
         Get the converted object for the given source object.
 
@@ -79,7 +79,7 @@ class DataAccessObjectState(Generic[WorkItemT], abc.ABC):
         """
         return self.memo.get(id(source))
 
-    def register(self, source: Any, target: Any) -> None:
+    def register(self, *, source: Any, target: Any) -> None:
         """
         Register a conversion result in the memoization store.
 
@@ -88,7 +88,7 @@ class DataAccessObjectState(Generic[WorkItemT], abc.ABC):
         """
         self.memo[id(source)] = target
 
-    def pop(self, source: Any) -> Any | None:
+    def pop(self, *, source: Any) -> Any | None:
         """
         Remove and return the conversion result for the given source object.
 
@@ -117,7 +117,7 @@ class HasGeneric(Generic[T]):
         """
         tp = cls._dao_like_argument()
         if tp is None:
-            raise NoGenericError(cls)
+            raise NoGenericError(clazz=cls)
         return tp
 
     @classmethod

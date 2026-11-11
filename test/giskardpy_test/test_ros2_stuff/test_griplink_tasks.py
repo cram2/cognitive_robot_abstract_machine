@@ -24,7 +24,7 @@ from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import NoGriplinkEndpoint
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkActionServerTask,
@@ -39,6 +39,7 @@ from semantic_digital_twin.datastructures.robots.gripper_configuration import (
 )
 from semantic_digital_twin.robots.daisy import DAiSy, DAiSyLeftGripper
 from semantic_digital_twin.robots.griplink_gripper import (
+    GriplinkCommand,
     GriplinkFlexConfiguration,
     GriplinkGripPreset,
     GriplinkPresetConfiguration,
@@ -127,6 +128,16 @@ def left_gripper_of(world: World) -> DAiSyLeftGripper:
     return world.get_semantic_annotations_by_type(DAiSy)[0].left_arm.end_effector
 
 
+# %% the ROS action of each griplink command
+
+
+def test_every_griplink_command_is_executed_as_the_ros_action_of_its_name() -> None:
+    assert {
+        command: action_type.__name__
+        for command, action_type in GriplinkActionServerTask.action_types.items()
+    } == {command: command.value for command in GriplinkCommand}
+
+
 # %% reaching a griplink configuration
 
 
@@ -144,7 +155,7 @@ def test_a_preset_configuration_is_reached_through_the_endpoint_of_its_state(
     assert type(task) is GriplinkPresetActionServerTask
     assert (task.action_topic, task.message_type, task.grip_preset) == (
         endpoint.action_topic,
-        endpoint.message_type,
+        GriplinkActionServerTask.action_types[endpoint.command],
         configuration.grip_preset,
     )
 
@@ -175,7 +186,7 @@ def test_a_flex_configuration_is_reached_with_its_hardware_parameters(
         task.grip_acceleration,
     ) == (
         endpoint.action_topic,
-        endpoint.message_type,
+        GriplinkActionServerTask.action_types[endpoint.command],
         configuration.grip_position,
         configuration.grip_force,
         configuration.grip_velocity,

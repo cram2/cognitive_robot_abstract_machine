@@ -37,7 +37,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
         """
         :return: The type this selects its nodes by.
         """
-        return type(self).get_type_of_generic_parameter(MatchedType)
+        return type(self).get_type_of_generic_parameter(parameter=MatchedType)
 
     def matches_node(self, plan_node: StatechartNode) -> bool:
         """
@@ -257,6 +257,15 @@ class PlanRewriting(ContextExtension):
             while rewritten.parent_node is not former_parent:
                 rewritten = rewritten.parent_node
         return rewritten
+
+    def treat_as_offered(self, node: StatechartNode) -> None:
+        """
+        Keep the transformations from rewriting `node`, although the nodes below it are
+        still offered to them.
+
+        :param node: A node of the plan.
+        """
+        self._offered.add(node)
 
     def _next_node_to_offer(self, root: StatechartNode) -> StatechartNode | None:
         """
