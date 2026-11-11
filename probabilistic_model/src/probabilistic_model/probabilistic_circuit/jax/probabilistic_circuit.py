@@ -100,31 +100,45 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         :param loss: The scalar loss of the root layer and the arguments.
         :param arguments: The arrays the loss takes after the root layer.
         :param epochs: The number of epochs.
-        :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
-            learning rate of 1e-3 is used.
+        :param optimizer: The optimizer to use, which receives the trainable arrays of
+            the root layer as a flat list. If `None`, the Adam optimizer with a learning
+            rate of 1e-3 is used.
         """
         if optimizer is None:
             optimizer = optax.adam(1e-3)
 
-        @eqx.filter_jit
+        # Static fields of the layers hold arrays, which pytree comparisons inside the
+        # optimizer cannot handle, so the step works on the flat list of trainable arrays.
+        parameters, structure = eqx.partition(self.root, eqx.is_inexact_array)
+        leaves, definition = jax.tree_util.tree_flatten(parameters)
+
+        def rebuilt_root(leaves: list[jax.Array]) -> DifferentiableLayer:
+            return eqx.combine(
+                jax.tree_util.tree_unflatten(definition, leaves), structure
+            )
+
+        @jax.jit
         def step(
-            root: DifferentiableLayer,
+            leaves: list[jax.Array],
             optimizer_state: optax.OptState,
             *arguments: jax.Array,
-        ) -> tuple[DifferentiableLayer, optax.OptState, jax.Array]:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(root, *arguments)
+        ) -> tuple[list[jax.Array], optax.OptState, jax.Array]:
+            loss_value, gradients = jax.value_and_grad(
+                lambda leaves: loss(rebuilt_root(leaves), *arguments)
+            )(leaves)
             updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(root, eqx.is_inexact_array)
+                gradients, optimizer_state, leaves
             )
-            return eqx.apply_updates(root, updates), optimizer_state, loss_value
+            return optax.apply_updates(leaves, updates), optimizer_state, loss_value
 
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
+        optimizer_state = optimizer.init(leaves)
         progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
         for _ in progress_bar:
-            self.root, optimizer_state, loss_value = step(
-                self.root, optimizer_state, *arguments
+            leaves, optimizer_state, loss_value = step(
+                leaves, optimizer_state, *arguments
             )
             progress_bar.set_postfix_str(f"Loss: {loss_value}")
+        self.root = rebuilt_root(leaves)
 
 
 @dataclass
@@ -225,6 +239,6 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
         """
 
         def loss(root: DifferentiableLayer, x: jax.Array, y: jax.Array) -> jax.Array:
-            return -jnp.mean(root.log_likelihood_of_nodes(x)[y])
+            return -jnp.mean(root.log_likelihood_of_nodes(x)[jnp.arange(len(y)), y])
 
         self.minimize(loss, (data, labels), epochs, optimizer)

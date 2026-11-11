@@ -241,3 +241,20 @@ def test_fitting_a_classifier_compiles_the_whole_training_step(region_graph):
         optimizer=counter.wrap(optax.adam(0.01)),
     )
     assert counter.evaluations == 1
+
+
+def test_fitting_two_classifiers_of_the_same_shape_trains_both():
+    variables = SortedSet(Continuous(f"x{index}") for index in range(4))
+    data = jnp.array(np.random.normal(size=(50, 4)))
+    labels = jnp.array(np.random.randint(2, size=50))
+    for _ in range(2):
+        model = (
+            RegionGraph(variables, partitions=2, depth=1, repetitions=2, classes=2)
+            .create_random_region_graph()
+            .as_probabilistic_circuit()
+        )
+        initial_log_likelihoods = model.root.log_likelihood_of_nodes(data)
+        model.fit(data, labels=labels, epochs=2)
+        assert not jnp.allclose(
+            model.root.log_likelihood_of_nodes(data), initial_log_likelihoods
+        )
