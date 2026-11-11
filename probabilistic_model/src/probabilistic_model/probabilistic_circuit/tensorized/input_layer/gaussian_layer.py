@@ -32,8 +32,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous
     ContinuousLayerWithDensity,
     ContinuousLayerWithConstrainedSupport,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.special_functions import (
-    SpecialFunctions,
+from probabilistic_model.probabilistic_circuit.tensorized.normal_distribution_functions import (
+    NormalDistributionFunctions,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
     LayerWithLogProbabilities,
@@ -76,9 +76,9 @@ class HasLocationAndScale:
             (#events, #nodes).
         """
         column = np.asarray(values, dtype=float).reshape(-1, 1)
-        return SpecialFunctions.from_arrays(
+        return NormalDistributionFunctions.from_arrays(
             self.location, self.scale
-        ).normal_log_density(column, self.location, self.scale)
+        ).log_density(column, self.location, self.scale)
 
     def normal_cumulative_distribution(self, values: NodeValues) -> NodeValues:
         """
@@ -87,9 +87,9 @@ class HasLocationAndScale:
         :return: The cumulative distribution function of the Gaussian of every node at
             the values.
         """
-        return SpecialFunctions.from_arrays(
+        return NormalDistributionFunctions.from_arrays(
             self.location, self.scale
-        ).normal_cumulative_distribution(values, self.location, self.scale)
+        ).cumulative_distribution(values, self.location, self.scale)
 
     def has_equal_parameters(self, other: Self) -> bool:
         """

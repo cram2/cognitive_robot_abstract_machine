@@ -1,6 +1,6 @@
 """
-The special functions that the numeric queries of the layers need and the Python Array
-API standard does not define, for every supported array backend.
+The functions of the normal distribution that the numeric queries of the layers need and
+the Python Array API standard does not define, for every supported array backend.
 """
 
 from __future__ import annotations
@@ -20,13 +20,14 @@ from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     UnsupportedArrayBackendError,
 )
 
-# %% special functions of one array backend
+# %% normal distribution functions of one array backend
 
 
 @dataclass
-class SpecialFunctions(ABC):
+class NormalDistributionFunctions(ABC):
     """
-    The special functions of the normal distribution, computed by one array backend.
+    The cumulative distribution function and the log-density of normal distributions,
+    computed by one array backend.
 
     Every function takes and returns arrays of that backend and broadcasts its
     arguments.
@@ -38,10 +39,10 @@ class SpecialFunctions(ABC):
     """
 
     @classmethod
-    def from_arrays(cls, *arrays: Any) -> SpecialFunctions:
+    def from_arrays(cls, *arrays: Any) -> NormalDistributionFunctions:
         """
         :param arrays: Arrays of one backend.
-        :return: The special functions of that backend.
+        :return: The normal distribution functions of that backend.
         :raises UnsupportedArrayBackendError: If no subclass computes them for that
             backend.
         """
@@ -56,12 +57,12 @@ class SpecialFunctions(ABC):
     def supports(cls, namespace: ModuleType) -> bool:
         """
         :param namespace: An Array API namespace.
-        :return: Whether this class computes the special functions of its backend.
+        :return: Whether this class computes the functions for that backend.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def standard_normal_cumulative_distribution(self, values: Any) -> Any:
+    def standard_cumulative_distribution(self, values: Any) -> Any:
         """
         :param values: Any array.
         :return: The cumulative distribution function of the standard normal
@@ -70,7 +71,7 @@ class SpecialFunctions(ABC):
         raise NotImplementedError
 
     @classproperty
-    def log_normalization_of_normal_density(cls) -> float:
+    def log_normalization_constant(cls) -> float:
         """
         The logarithm of the normalization constant of the standard normal density,
         ``log(sqrt(2 pi))``.
@@ -78,9 +79,7 @@ class SpecialFunctions(ABC):
         # spelled as scipy.stats.norm spells it, so that the densities agree bit for bit
         return float(np.log(np.sqrt(2 * np.pi)))
 
-    def normal_cumulative_distribution(
-        self, values: Any, location: Any, scale: Any
-    ) -> Any:
+    def cumulative_distribution(self, values: Any, location: Any, scale: Any) -> Any:
         """
         :param values: The values.
         :param location: The mean of the normal distribution.
@@ -88,9 +87,9 @@ class SpecialFunctions(ABC):
         :return: The cumulative distribution function of the normal distribution at
             every value.
         """
-        return self.standard_normal_cumulative_distribution((values - location) / scale)
+        return self.standard_cumulative_distribution((values - location) / scale)
 
-    def normal_log_density(self, values: Any, location: Any, scale: Any) -> Any:
+    def log_density(self, values: Any, location: Any, scale: Any) -> Any:
         """
         :param values: The values.
         :param location: The mean of the normal distribution.
@@ -100,7 +99,7 @@ class SpecialFunctions(ABC):
         """
         standardized = (values - location) / scale
         return (
-            -(standardized**2) / 2.0 - self.log_normalization_of_normal_density
+            -(standardized**2) / 2.0 - self.log_normalization_constant
         ) - self.namespace.log(scale)
 
 
@@ -108,28 +107,28 @@ class SpecialFunctions(ABC):
 
 
 @dataclass
-class ScipySpecialFunctions(SpecialFunctions):
+class ScipyNormalDistributionFunctions(NormalDistributionFunctions):
     """
-    The special functions of numpy arrays, computed by scipy.
+    The normal distribution functions of numpy arrays, computed by scipy.
     """
 
     @classmethod
     def supports(cls, namespace: ModuleType) -> bool:
         return is_numpy_namespace(namespace)
 
-    def standard_normal_cumulative_distribution(self, values: Any) -> Any:
+    def standard_cumulative_distribution(self, values: Any) -> Any:
         return scipy.special.ndtr(values)
 
 
 @dataclass
-class JaxSpecialFunctions(SpecialFunctions):
+class JaxNormalDistributionFunctions(NormalDistributionFunctions):
     """
-    The special functions of jax arrays, computed by :mod:`jax.scipy`.
+    The normal distribution functions of jax arrays, computed by :mod:`jax.scipy`.
     """
 
     @classmethod
     def supports(cls, namespace: ModuleType) -> bool:
         return is_jax_namespace(namespace)
 
-    def standard_normal_cumulative_distribution(self, values: Any) -> Any:
+    def standard_cumulative_distribution(self, values: Any) -> Any:
         return jax.scipy.special.ndtr(values)

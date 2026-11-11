@@ -106,13 +106,15 @@ class RowGroupedSparsity:
 
     entry_positions_by_rank: list[npt.NDArray[np.int64]] = field(init=False)
     """
-    Element ``k`` holds, for every row with more than ``k`` stored entries, the
-    position of that row's ``k``-th entry among the stored entries. The rows follow
-    :attr:`rows_by_entry_count`, so the rows of each element are a prefix of the rows
-    of the element before it. For stored entries in rows ``[2, 0, 2, 1, 2, 0]``::
+    The stored entries grouped by their rank within their row: element ``k`` lists the
+    position of the ``k``-th entry of every row with more than ``k`` entries, the rows
+    ordered as :attr:`rows_by_entry_count`. Stored entries in rows ``[2, 0, 2, 1, 2, 0]``
+    put positions 0, 2 and 4 in row 2, positions 1 and 5 in row 0 and position 3 in row 1::
 
         rows_by_entry_count     = [2, 0, 1, 3]
-        entry_positions_by_rank = [[0, 1, 3], [2, 5], [4]]
+        entry_positions_by_rank = [[0, 1, 3],  # the first entry of rows 2, 0 and 1
+                                   [2, 5],     # the second entry of rows 2 and 0
+                                   [4]]        # the third entry of row 2
     """
 
     stores_every_column_once_in_order: bool = field(init=False)

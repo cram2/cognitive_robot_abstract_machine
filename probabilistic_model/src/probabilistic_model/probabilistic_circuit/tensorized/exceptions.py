@@ -122,8 +122,8 @@ class CopiesNotAlignedError(ProbabilisticModelException, ValueError):
 @dataclass
 class UnsupportedArrayBackendError(ProbabilisticModelException, TypeError):
     """
-    Exception raised when a numeric query needs special functions of an array backend
-    that none of them computes.
+    Exception raised when a numeric query needs the normal distribution functions of an
+    array backend for which none are available.
     """
 
     namespace_name: str
@@ -133,7 +133,8 @@ class UnsupportedArrayBackendError(ProbabilisticModelException, TypeError):
 
     def error_message(self) -> str:
         return (
-            f"No special functions are available for arrays of {self.namespace_name}."
+            f"No normal distribution functions are available for arrays of "
+            f"{self.namespace_name}."
         )
 
     def suggest_correction(self) -> str:
