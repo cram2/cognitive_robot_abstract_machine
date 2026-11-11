@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Set
 
+from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ontomatic.property_descriptor.property_descriptor import (
     PropertyDescriptor,
@@ -111,9 +112,9 @@ class Loves(Likes):
     """
 
 
-PeopleWithHobby.likes = Likes(domain=PeopleWithHobby, field_name="likes")
-SportsLover.loves = Loves(domain=SportsLover, field_name="loves")
-BasketBallLover.loves = Loves(domain=BasketBallLover, field_name="loves")
+PeopleWithHobby.likes = Likes.from_eql_attribute(attribute=a(PeopleWithHobby).likes)
+SportsLover.loves = Loves.from_eql_attribute(attribute=a(SportsLover).loves)
+BasketBallLover.loves = Loves.from_eql_attribute(attribute=a(BasketBallLover).loves)
 
 
 @dataclass(kw_only=True)

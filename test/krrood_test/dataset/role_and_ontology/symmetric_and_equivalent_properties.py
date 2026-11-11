@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Set
 
+from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.predicate import Symbol
 from krrood.ontomatic.property_descriptor.mixins import (
     HasEquivalentProperties,
@@ -73,10 +74,12 @@ class IsAcquaintedWith(PropertyDescriptor, HasEquivalentProperties):
         return [Knows]
 
 
-PersonWithFriends.friend_of = FriendOf(domain=PersonWithFriends, field_name="friend_of")
-PersonWithFriends.knows = Knows(domain=PersonWithFriends, field_name="knows")
-PersonWithFriends.is_acquainted_with = IsAcquaintedWith(
-    domain=PersonWithFriends, field_name="is_acquainted_with"
+PersonWithFriends.friend_of = FriendOf.from_eql_attribute(
+    attribute=a(PersonWithFriends).friend_of
+)
+PersonWithFriends.knows = Knows.from_eql_attribute(attribute=a(PersonWithFriends).knows)
+PersonWithFriends.is_acquainted_with = IsAcquaintedWith.from_eql_attribute(
+    attribute=a(PersonWithFriends).is_acquainted_with
 )
 
 
@@ -122,8 +125,8 @@ class LiesWithin(PropertyDescriptor, HasEquivalentProperties):
         return [IsPartOf]
 
 
-Area.is_part_of = IsPartOf(domain=Area, field_name="is_part_of")
-Area.lies_within = LiesWithin(domain=Area, field_name="lies_within")
+Area.is_part_of = IsPartOf.from_eql_attribute(attribute=a(Area).is_part_of)
+Area.lies_within = LiesWithin.from_eql_attribute(attribute=a(Area).lies_within)
 
 
 @dataclass(kw_only=True, eq=False)
@@ -142,4 +145,4 @@ class Building(Symbol):
     """
 
 
-Building.stands_in = IsPartOf(domain=Building, field_name="stands_in")
+Building.stands_in = IsPartOf.from_eql_attribute(attribute=a(Building).stands_in)

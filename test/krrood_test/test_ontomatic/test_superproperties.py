@@ -41,13 +41,13 @@ def test_a_statement_of_a_superproperty_is_explained_one_step_up_the_hierarchy()
 
     romeo.loves.add(juliet)
 
-    loves = PropertyDescriptorRelation.find(
+    loves = PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=romeo, property_descriptor_class=Loves, target_instance=juliet
     )
-    likes = PropertyDescriptorRelation.find(
+    likes = PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=romeo, property_descriptor_class=Likes, target_instance=juliet
     )
-    knows = PropertyDescriptorRelation.find(
+    knows = PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=romeo, property_descriptor_class=Knows, target_instance=juliet
     )
     assert likes.explanation == RelationExplanation(

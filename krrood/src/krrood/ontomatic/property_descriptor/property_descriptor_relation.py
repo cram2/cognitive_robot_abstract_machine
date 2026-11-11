@@ -146,15 +146,6 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
     # %% the objects of an individual
 
-    @staticmethod
-    def root_role_taker(*, instance: Symbol) -> Symbol:
-        """
-        :return: The object at the end of the role-taker chain of the instance, or the instance if it is no role.
-        """
-        return (
-            instance.root_persistent_entity if isinstance(instance, Role) else instance
-        )
-
     @classmethod
     def objects_of_individual(cls, *, instance: Symbol) -> list[Symbol]:
         """
@@ -162,7 +153,9 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         :return: The objects representing the individual of the instance: its root role taker followed by the roles
             of the root in the order they were created.
         """
-        root = cls.root_role_taker(instance=instance)
+        root = (
+            instance.root_persistent_entity if isinstance(instance, Role) else instance
+        )
         return [root, *Role.roles_for(role_taker=root)]
 
     @classmethod
@@ -180,22 +173,27 @@ class PropertyDescriptorRelation(PredicateClassRelation):
 
         :return: The declaration, or None if no object of the individual declares the property.
         """
-        value_objects = cls.objects_of_individual(instance=value)
-        first_declaration = None
-        for individual_object in cls.objects_of_individual(instance=instance):
-            descriptor = property_descriptor_class.declared_by(
-                domain_type=type(individual_object)
+        declarations = [
+            Declaration(holder=individual_object, descriptor=descriptor)
+            for individual_object in cls.objects_of_individual(instance=instance)
+            if (
+                descriptor := property_descriptor_class.declared_by(
+                    domain_type=type(individual_object)
+                )
             )
-            if descriptor is None:
-                continue
-            declaration = Declaration(holder=individual_object, descriptor=descriptor)
-            if any(
-                isinstance(value_object, descriptor.range)
-                for value_object in value_objects
-            ):
-                return declaration
-            first_declaration = first_declaration or declaration
-        return first_declaration
+        ]
+        value_objects = cls.objects_of_individual(instance=value)
+        return next(
+            (
+                declaration
+                for declaration in declarations
+                if any(
+                    isinstance(value_object, declaration.descriptor.range)
+                    for value_object in value_objects
+                )
+            ),
+            next(iter(declarations), None),
+        )
 
     # %% adding relations
 
@@ -353,7 +351,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         Infer the relations composing this relation with the relations of its property before and after it, if the
         property is transitive.
         """
-        if not self.transitive:
+        if not self.is_transitive:
             return
         for relation in list(
             self.outgoing_relations_of_descriptor(
@@ -503,7 +501,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
         return type(self.wrapped_field.property_descriptor)
 
     @cached_property
-    def transitive(self) -> bool:
+    def is_transitive(self) -> bool:
         """
         Whether the property of the relation is transitive.
         """
@@ -558,7 +556,7 @@ class PropertyDescriptorRelation(PredicateClassRelation):
             )
 
     @classmethod
-    def find(
+    def find_relation_for_triple(
         cls,
         *,
         source_instance: Symbol,

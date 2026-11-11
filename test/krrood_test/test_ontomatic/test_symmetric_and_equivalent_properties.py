@@ -43,11 +43,11 @@ def test_the_statement_back_is_explained_by_the_statement_it_reverses():
 
     alice.friend_of.add(bob)
 
-    asserted = PropertyDescriptorRelation.find(
+    asserted = PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=alice, property_descriptor_class=FriendOf, target_instance=bob
     )
     assert asserted.explanation is None
-    assert PropertyDescriptorRelation.find(
+    assert PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=bob, property_descriptor_class=FriendOf, target_instance=alice
     ).explanation == RelationExplanation(
         rule=InferredThrough.SYMMETRY, premises=(asserted,)
@@ -115,7 +115,7 @@ def test_a_composed_statement_is_held_by_the_field_of_its_subject():
 
     city.is_part_of.add(country)
 
-    composed = PropertyDescriptorRelation.find(
+    composed = PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=house,
         property_descriptor_class=IsPartOf,
         target_instance=country,
@@ -123,12 +123,12 @@ def test_a_composed_statement_is_held_by_the_field_of_its_subject():
     assert composed.explanation == RelationExplanation(
         rule=InferredThrough.TRANSITIVE,
         premises=(
-            PropertyDescriptorRelation.find(
+            PropertyDescriptorRelation.find_relation_for_triple(
                 source_instance=house,
                 property_descriptor_class=IsPartOf,
                 target_instance=city,
             ),
-            PropertyDescriptorRelation.find(
+            PropertyDescriptorRelation.find_relation_for_triple(
                 source_instance=city,
                 property_descriptor_class=IsPartOf,
                 target_instance=country,

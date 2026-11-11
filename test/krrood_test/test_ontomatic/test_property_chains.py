@@ -128,19 +128,19 @@ def test_an_implied_statement_is_explained_by_the_statements_of_its_chain():
     grandparent.parent_of.add(parent)
     parent.parent_of.add(child)
 
-    assert PropertyDescriptorRelation.find(
+    assert PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=grandparent,
         property_descriptor_class=AncestorOf,
         target_instance=child,
     ).explanation == RelationExplanation(
         rule=InferredThrough.CHAIN,
         premises=(
-            PropertyDescriptorRelation.find(
+            PropertyDescriptorRelation.find_relation_for_triple(
                 source_instance=grandparent,
                 property_descriptor_class=ParentOf,
                 target_instance=parent,
             ),
-            PropertyDescriptorRelation.find(
+            PropertyDescriptorRelation.find_relation_for_triple(
                 source_instance=parent,
                 property_descriptor_class=ParentOf,
                 target_instance=child,
@@ -165,7 +165,7 @@ def test_an_explanation_shows_a_fact_above_the_facts_it_was_inferred_from():
         person.name: SymbolGraph().get_wrapped_instance(instance=person).name
         for person in (grandparent, parent, child)
     }
-    assert PropertyDescriptorRelation.find(
+    assert PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=grandparent,
         property_descriptor_class=AncestorOf,
         target_instance=child,
@@ -187,7 +187,7 @@ def test_an_explanation_shows_premises_only_down_to_its_depth():
     grandparent.parent_of.add(parent)
     parent.parent_of.add(child)
 
-    explanation = PropertyDescriptorRelation.find(
+    explanation = PropertyDescriptorRelation.find_relation_for_triple(
         source_instance=grandparent,
         property_descriptor_class=AncestorOf,
         target_instance=child,
