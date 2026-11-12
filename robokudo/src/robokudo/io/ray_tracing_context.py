@@ -7,7 +7,6 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-import robokudo.world
 from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RuntimeRobotWorldSource,
     RayTracingCameraConfiguration,
@@ -70,14 +69,16 @@ class RayTracingContextResolver:
     Cached world-camera pair after successful source resolution.
     """
 
-    def resolve(self) -> RayTracingContext:
+    def resolve(self, *, perception_world: World) -> RayTracingContext:
         """
         Resolve and cache a complete world-camera pair.
 
-        Failed runtime resolution remains uncached so a later synchronization attempt
-        can make the robot and its camera available.
+        A descriptor source renders a scene world of its own; a runtime robot source
+        renders ``perception_world``. Failed runtime resolution remains uncached so a
+        later synchronization attempt can make the robot and its camera available.
 
-        :return: Runtime world and camera used for rendered frames.
+        :param perception_world: The world perception perceives into.
+        :return: World and camera used for rendered frames.
         """
         if self._context is not None:
             return self._context
@@ -88,12 +89,9 @@ class RayTracingContextResolver:
             camera = self._select_descriptor_camera(world, source)
             if source.camera_pose is not None:
                 self._apply_camera_pose(world, camera, source.camera_pose)
-            robokudo.world.set_world(world)
         else:
-            world = robokudo.world.world_instance()
+            world = perception_world
             camera = self._select_runtime_robot_camera(world, source)
-
-        robokudo.world.init_world_entity_tracker_from_world(world)
         self._context = RayTracingContext(world=world, camera=camera)
         return self._context
 
@@ -106,7 +104,7 @@ class RayTracingContextResolver:
         """
         Apply the configured initial camera pose.
 
-        :param world: Runtime world that owns the camera connection.
+        :param world: Scene world that owns the camera connection.
         :param camera: Selected semantic camera.
         :param camera_pose: Initial camera-root pose.
         :raises CameraPoseOverrideUnavailable: If the camera attachment is immutable.

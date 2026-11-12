@@ -25,6 +25,8 @@ from semantic_digital_twin.datastructures.camera_rendering import (
     RenderedRGBDFrame,
     BodyColorRenderingMode,
 )
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color
 
 # %% Interface integration
@@ -42,15 +44,45 @@ def test_interface_publishes_aligned_body_color_rgbd_frame() -> None:
         )
     )
     cas = CAS()
+    world = World()
 
-    interface.set_data(cas)
+    interface.set_data(cas=cas, world=world)
 
     assert cas.color_image.shape[:2] == cas.depth_image.shape
     assert cas.get(CASViews.OBJECT_IMAGE).shape == cas.depth_image.shape
     assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
-    context = interface.context_resolver.resolve()
-    assert cas.camera_observation.camera is context.camera
+    context = interface.context_resolver.resolve(perception_world=world)
     assert cas.ground_truth_world_ref is context.world
+
+
+def test_rendering_camera_is_placed_in_the_world_perception_perceives_into() -> None:
+    """
+    The camera rendering a scene world of its own is placed in the perception world at
+    its pose in the scene.
+    """
+    interface = RayTracingCameraInterface(
+        RayTracingCameraConfiguration(
+            source=WorldDescriptorSource(
+                descriptor_name="world_semdt_raytracer_cylinders"
+            )
+        )
+    )
+    cas = CAS()
+    world = World()
+
+    interface.set_data(cas=cas, world=world)
+
+    scene_camera = interface.context_resolver.resolve(perception_world=world).camera
+    camera_body = world.get_body_by_name(scene_camera.root.name.name)
+    assert world.get_semantic_annotations_by_type(Camera) == [
+        cas.camera_observation.camera
+    ]
+    assert cas.camera_observation.camera.root is camera_body
+    np.testing.assert_allclose(
+        camera_body.global_transform.to_np(),
+        scene_camera.root.global_transform.to_np(),
+        atol=1e-12,
+    )
 
 
 def test_interface_publishes_effective_model_for_field_of_view_camera():
@@ -64,7 +96,8 @@ def test_interface_publishes_effective_model_for_field_of_view_camera():
             )
         )
     )
-    context = interface.context_resolver.resolve()
+    world = World()
+    context = interface.context_resolver.resolve(perception_world=world)
     native_field_of_view = context.camera.field_of_view
     resolution = CameraResolution(width=32, height=24)
     context.camera.camera_model = FieldOfViewCameraModel(
@@ -73,9 +106,8 @@ def test_interface_publishes_effective_model_for_field_of_view_camera():
     )
     cas = CAS()
 
-    interface.set_data(cas)
+    interface.set_data(cas=cas, world=world)
 
-    assert cas.camera_observation.camera is context.camera
     assert cas.camera_observation.effective_camera_model.resolution is resolution
     assert np.isclose(
         cas.camera_observation.field_of_view.horizontal_angle,
@@ -102,7 +134,8 @@ def test_interface_publishes_shared_rendered_frame(monkeypatch: MonkeyPatch) -> 
             )
         )
     )
-    context = interface.context_resolver.resolve()
+    world = World()
+    context = interface.context_resolver.resolve(perception_world=world)
     frame = RenderedRGBDFrame(
         color_bgr=np.zeros((2, 3, 3), dtype=np.uint8),
         depth_in_millimeters=np.full((2, 3), 1000, dtype=np.uint16),
@@ -116,7 +149,7 @@ def test_interface_publishes_shared_rendered_frame(monkeypatch: MonkeyPatch) -> 
     monkeypatch.setattr(context.world.ray_tracer, "render", render)
     cas = CAS()
 
-    interface.set_data(cas)
+    interface.set_data(cas=cas, world=world)
 
     render.assert_called_once_with(
         context.camera, rgb_mode=interface.camera_config.rgb_mode
