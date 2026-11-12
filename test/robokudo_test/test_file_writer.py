@@ -106,7 +106,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
         )
     )
     replayed_cas = CAS()
-    reader.set_data(replayed_cas)
+    reader.set_data(cas=replayed_cas, world=World())
 
     replayed_observation = replayed_cas.require_camera_observation()
     assert replayed_observation.camera.root.name.name == camera_frame.name.name

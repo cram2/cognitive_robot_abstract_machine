@@ -132,7 +132,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         return self._has_new_data
 
-    def set_data(self, cas: CAS, world: World) -> None:
+    def set_data(self, *, cas: CAS, world: World) -> None:
         """
         Update the Common Analysis Structure with latest frame data.
 
@@ -143,8 +143,8 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         * Updates the CAS with frame and camera data
 
         :param cas: Common Analysis Structure to update
-        :param world: The world perception perceives into; the camera is not placed in
-            it, since its pose is unknown
+        :param world: The world perception perceives into; the camera is registered
+            there without a pose, since its pose is unknown
         """
         if not self.has_new_data():
             # no new frame available
@@ -234,6 +234,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         )
         self.store_camera_observation(
             cas=cas,
+            world=world,
             camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
             camera_frame=camera_frame,
             timestamp_nanoseconds=timestamp_nanoseconds,

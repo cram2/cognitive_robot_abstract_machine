@@ -84,7 +84,7 @@ class TestFailedCameraPlacement:
     ) -> None:
         receive_a_frame(camera_interface)
         with pytest.raises(UnknownWorldFrameError):
-            camera_interface.set_data(CAS(), world_without_the_world_frame())
+            camera_interface.set_data(cas=CAS(), world=world_without_the_world_frame())
 
         receiving = Thread(
             target=receive_a_frame, args=(camera_interface,), daemon=True

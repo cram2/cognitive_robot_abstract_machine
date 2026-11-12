@@ -13,8 +13,14 @@ from enum import StrEnum
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.datastructures.camera_model import (
+    CameraModality,
+    PinholeCameraModel,
+)
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -23,7 +29,8 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.cas import CAS
-from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
+from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
+from robokudo.io.camera_interface import CameraInterface
 
 # %% frames
 
@@ -88,35 +95,66 @@ def camera_pose(x: float = 0.0) -> HomogeneousTransformationMatrix:
 def cas_seen_from(
     world: World,
     world_T_camera: HomogeneousTransformationMatrix,
+    world_frame: str = FrameName.WORLD,
 ) -> CAS:
     """
     A CAS whose camera is placed at ``world_T_camera`` in ``world``.
 
     :param world: The world the camera is placed in.
-    :param world_T_camera: Pose of the camera in the world frame.
+    :param world_T_camera: Pose of the camera in ``world_frame``.
+    :param world_frame: The frame the camera pose is measured against.
     :return: The CAS.
     """
     cas = CAS()
-    place_camera_of(cas, world, world_T_camera)
+    place_camera_of(cas, world, world_T_camera, world_frame=world_frame)
     return cas
+
+
+def camera_interface(*, located_through_tf: bool = False) -> CameraInterface:
+    """
+    :param located_through_tf: Whether the camera pose is looked up through TF.
+    :return: A camera interface that places its camera against the test frames.
+    """
+    interface = CameraInterface(BaseCameraConfig(interface_type="test"))
+    interface.lookup_viewpoint = located_through_tf
+    return interface
 
 
 def place_camera_of(
     cas: CAS,
     world: World,
     world_T_camera: HomogeneousTransformationMatrix,
+    interface: CameraInterface | None = None,
+    world_frame: str = FrameName.WORLD,
 ) -> None:
     """
-    Place the camera of ``cas`` at ``world_T_camera`` in ``world``.
+    Place the camera of ``cas`` at ``world_T_camera`` in ``world`` and store its
+    observation in ``cas``.
 
     :param cas: The CAS whose camera is placed.
     :param world: The world the camera is placed in.
-    :param world_T_camera: Pose of the camera in the world frame.
+    :param world_T_camera: Pose of the camera in ``world_frame``.
+    :param interface: The camera interface placing the camera; a live camera located
+        through TF if omitted.
+    :param world_frame: The frame the camera pose is measured against.
     """
-    CameraPlacement(world).place(
-        cas,
-        MeasuredCameraPose(
-            world_frame=FrameName.WORLD,
+    interface = (
+        interface
+        if interface is not None
+        else camera_interface(located_through_tf=True)
+    )
+    interface.store_camera_observation(
+        cas=cas,
+        world=world,
+        camera_model=PinholeCameraModel.from_field_of_view(
+            resolution=CameraResolution(), field_of_view=FieldOfView()
+        ),
+        camera_frame=FrameName.CAMERA,
+        timestamp_nanoseconds=0,
+        modalities=(CameraModality.COLOR, CameraModality.DEPTH),
+        world_T_camera=interface.bind_world_T_camera(
+            world=world,
+            world_frame=world_frame,
             camera_frame=FrameName.CAMERA,
             world_T_camera=world_T_camera,
         ),

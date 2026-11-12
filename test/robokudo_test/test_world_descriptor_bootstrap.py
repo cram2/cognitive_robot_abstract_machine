@@ -3,13 +3,13 @@ from py_trees.common import Status
 from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
-from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
-from robokudo.cas import CAS
 from robokudo.pipeline import Pipeline
 from robokudo.world_descriptor import PredefinedObject
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Region
+
+from ._perception_world import camera_interface
 
 
 def in_pipeline_of(
@@ -27,13 +27,11 @@ def in_pipeline_of(
 class TestWorldDescriptorBootstrapAnnotator:
     def test_augment_world_keeps_existing_frame_references(self):
         runtime_world = World()
-        CameraPlacement(runtime_world).place(
-            CAS(),
-            MeasuredCameraPose(
-                world_frame="map",
-                camera_frame="camera",
-                world_T_camera=HomogeneousTransformationMatrix(),
-            ),
+        camera_interface().bind_world_T_camera(
+            world=runtime_world,
+            world_frame="map",
+            camera_frame="camera",
+            world_T_camera=HomogeneousTransformationMatrix(),
         )
 
         camera_body = runtime_world.get_body_by_name("camera")
