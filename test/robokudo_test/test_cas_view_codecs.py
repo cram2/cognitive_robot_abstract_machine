@@ -1,13 +1,7 @@
 # %% Imports
 import numpy as np
 import pytest
-from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    WorldEntityWithIDKwargsTracker,
-)
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from std_msgs.msg import String
 
 from robokudo.types.camera import CameraObservation
@@ -87,8 +81,8 @@ def test_stamped_transform_codec_roundtrip():
 
 @pytest.mark.parametrize("has_world_pose", [True, False])
 def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
-    monkeypatch, has_world_pose
-):
+    has_world_pose: bool,
+) -> None:
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
@@ -109,10 +103,6 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     with world.modify_world():
         world.add_semantic_annotation(camera)
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    monkeypatch.setattr(
-        "robokudo.io.cas_view_codecs.world.get_world_entity_tracker",
-        lambda: tracker,
-    )
     observation = CameraObservation(
         camera=camera,
         effective_camera_model=camera_model,
@@ -122,7 +112,9 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     registry = CASViewCodecRegistry()
 
     encoded = registry.encode_view("camera_observation", observation)
-    decoded_name, decoded_observation = registry.decode_view(encoded)
+    decoded_name, decoded_observation = registry.decode_view(
+        encoded, **tracker.create_kwargs()
+    )
 
     assert decoded_name == "camera_observation"
     assert decoded_observation.camera is camera

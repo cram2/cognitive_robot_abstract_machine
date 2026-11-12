@@ -1,34 +1,38 @@
+"""
+Replay of stored recordings into the world perception perceives into.
+"""
+
 from __future__ import annotations
 
-from robokudo.cas import CAS, CASViews
-from robokudo.io.camera_placement import CameraPlacement, MeasuredCameraPose
-from robokudo.io.storage import Storage
+# %% Imports
+from unittest.mock import Mock
+
+import pytest
+
+from robokudo.cas import CAS
+from robokudo.io.exceptions import ReplayWorldShared
 from robokudo.io.storage_reader_interface import StorageReaderInterface
 
-from ._perception_world import FrameName, SharedWorld, camera_pose
+from ._perception_world import SharedWorld
 
-# %% recorded camera pose
+# %% replay world
 
 
-class TestRecordedCameraPose:
-    def test_camera_recorded_in_a_shared_world_is_replayed_under_its_frame(
-        self, shared_world: SharedWorld
+class TestReplayWorld:
+    """
+    The world a recording is replayed into.
+    """
+
+    def test_replaying_into_a_shared_world_raises_before_reading_a_frame(
+        self, *, shared_world: SharedWorld
     ) -> None:
-        cas = CAS()
-        measured_pose = MeasuredCameraPose(
-            world_frame=FrameName.WORLD,
-            camera_frame=FrameName.CAMERA,
-            world_T_camera=camera_pose(x=1.0),
-        )
-        CameraPlacement(shared_world.world).place(cas, measured_pose)
-        view_document = Storage.encode_view_document(
-            view_name=CASViews.CAMERA_TO_WORLD_TRANSFORM,
-            view_value=cas.camera_to_world_transform,
-        )
+        """
+        A recording is never replayed into a world other processes share.
+        """
         reader = StorageReaderInterface.__new__(StorageReaderInterface)
+        reader.reader = Mock()
 
-        recorded_pose = reader._decode_recorded_camera_pose(
-            view_document, Storage.generate_dict_from_real_cas(cas)
-        )
+        with pytest.raises(ReplayWorldShared):
+            reader.set_data(cas=CAS(), world=shared_world.world)
 
-        assert recorded_pose.camera_frame == measured_pose.camera_frame
+        reader.reader.get_next_frame.assert_not_called()
