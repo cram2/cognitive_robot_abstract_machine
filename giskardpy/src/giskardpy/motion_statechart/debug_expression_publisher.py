@@ -180,8 +180,8 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     """
     Publishes the spatial debug expressions of every running node as RViz markers.
 
-    They are evaluated on the control loop at :attr:`publish_frequency` and rendered and
-    published on a thread of its own.
+    They are compiled with the statechart, evaluated on the control loop at
+    :attr:`publish_frequency` and rendered and published on a thread of its own.
 
     .. warning:: Switch on :attr:`publishes_markers` only while debugging, because the
         evaluation slows down the control loop.
@@ -200,7 +200,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     publishes_markers: bool = True
     """
     Whether the statecharts compiled from now on publish their debug expressions; while
-    off, none are collected, evaluated or published.
+    off, none are collected, compiled, evaluated or published.
     """
 
     _marker_publisher: BackgroundMarkerPublisher = field(init=False)
@@ -218,17 +218,12 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     frees an expression.
     """
 
-    _shown_nodes: list[MotionStatechartNode] = field(init=False, default_factory=list)
-    """
-    The nodes whose debug expressions :attr:`_compiled_visualizations` evaluates.
-    """
-
     _compiled_visualizations: CompiledSpatialTypeVisualizations | None = field(
         init=False, default=None
     )
     """
-    Evaluates the visualizations of :attr:`_shown_nodes`, None when they have to be
-    compiled before the next publish.
+    Evaluates the visualizations of every node in :attr:`_visualizations_per_node`, in
+    its order; None while the current statechart publishes no markers.
     """
 
     _last_published_tick: int | None = field(init=False, default=None)
@@ -244,8 +239,8 @@ class DebugExpressionPublishing(TickingExecutorExtension):
 
     def after_compile(self, executor: StatechartExecutor) -> None:
         """
-        Collect the spatial debug expressions of every node of the compiled statechart,
-        replacing those of the previous one.
+        Collect and compile the spatial debug expressions of every node of the compiled
+        statechart, replacing those of the previous one.
         """
         self._release_visualizations()
         if not self.publishes_markers:
@@ -261,13 +256,22 @@ class DebugExpressionPublishing(TickingExecutorExtension):
             ]
             if visualizations:
                 self._visualizations_per_node[node] = visualizations
+        if not self._visualizations_per_node:
+            return
+        self._compiled_visualizations = CompiledSpatialTypeVisualizations(
+            visualizations=[
+                visualization
+                for visualizations in self._visualizations_per_node.values()
+                for visualization in visualizations
+            ]
+        )
 
     def after_tick(self, executor: StatechartExecutor) -> None:
         """
         Publish the debug expressions of the running nodes, if a publish period passed
         since the last publish.
         """
-        if not self.publishes_markers:
+        if self._compiled_visualizations is None:
             return
         ticks_between_publishes = max(
             1,
@@ -282,23 +286,22 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         ):
             return
         self._last_published_tick = executor.tick_count
-        running_nodes = [
+        owning_nodes = [
             node
-            for node in self._visualizations_per_node
-            if node.life_cycle_state == LifeCycleValues.RUNNING
+            for node, visualizations in self._visualizations_per_node.items()
+            for _ in visualizations
         ]
-        if self._compiled_visualizations is None or running_nodes != self._shown_nodes:
-            self._shown_nodes = running_nodes
-            self._compiled_visualizations = CompiledSpatialTypeVisualizations(
-                visualizations=[
-                    visualization
-                    for node in running_nodes
-                    for visualization in self._visualizations_per_node[node]
-                ]
-            )
         self._marker_publisher.submit(
             submission=MarkerSubmission(
-                evaluated_visualizations=self._compiled_visualizations.evaluate(),
+                evaluated_visualizations=[
+                    evaluated_visualization
+                    for evaluated_visualization, node in zip(
+                        self._compiled_visualizations.evaluate(),
+                        owning_nodes,
+                        strict=True,
+                    )
+                    if node.life_cycle_state == LifeCycleValues.RUNNING
+                ],
                 root_frame_name=str(executor.context.world.root.name),
             )
         )
@@ -328,7 +331,6 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         """
         self._marker_publisher.wait_until_published()
         self._visualizations_per_node = {}
-        self._shown_nodes = []
         self._compiled_visualizations = None
         self._last_published_tick = None
 

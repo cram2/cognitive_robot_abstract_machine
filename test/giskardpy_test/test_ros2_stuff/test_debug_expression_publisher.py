@@ -24,6 +24,7 @@ from cramph.monitors import CountTicks
 from cramph.node import EndedByOwner
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
+from giskardpy.motion_statechart import debug_expression_publisher
 from giskardpy.motion_statechart.debug_expression_publisher import (
     BackgroundMarkerPublisher,
     DebugExpressionPublishing,
@@ -407,24 +408,32 @@ def test_running_nodes_whose_debug_expressions_share_a_name_publish_apart(
     assert len(published_namespaces(publishing)) == 2
 
 
-def test_the_shown_debug_expressions_are_compiled_again_only_when_they_change(
-    publishing, cylinder_bot_world
+def test_ticking_compiles_no_debug_expressions(
+    publishing, cylinder_bot_world, monkeypatch
 ):
     """
-    The function evaluating the shown debug expressions is reused while the same nodes
-    run.
+    The debug expressions are compiled with the statechart, so no tick compiles, not
+    even one at which other nodes start running.
     """
     executor = create_executor(cylinder_bot_world, publishing)
     nodes = NodesStartingInTurn.build(executor.context)
     executor.compile(nodes.statechart)
-    executor.tick()
-    compiled_with_first_running = publishing._compiled_visualizations
 
-    executor.tick()
-    assert publishing._compiled_visualizations is compiled_with_first_running
+    def fail_compiling(**kwargs) -> None:
+        """
+        Fail the test instead of compiling during a tick.
+        """
+        pytest.fail("a tick compiled debug expressions")
+
+    monkeypatch.setattr(
+        debug_expression_publisher, "CompiledSpatialTypeVisualizations", fail_compiling
+    )
 
     tick_until_running(executor, nodes.second)
-    assert publishing._compiled_visualizations is not compiled_with_first_running
+
+    assert published_namespaces(publishing) == collected_namespaces(
+        publishing, nodes.first, nodes.second
+    )
 
 
 def test_markers_are_published_at_the_publish_frequency(
