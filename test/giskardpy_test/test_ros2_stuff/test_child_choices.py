@@ -48,7 +48,7 @@ from .test_motion_server import (
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserAnsweringInTurn(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Gives the prepared children one after another, then says no child is left.
@@ -60,7 +60,7 @@ class ChooserAnsweringInTurn(ChildChooser[CompositeNodeChoosingItsChild]):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         if not self.children:
             return None
@@ -142,11 +142,13 @@ class ChoosingGoal:
         :return: A goal running one choosing node until `end_node_factory` ends it.
         """
         context = StatechartContext(world=World())
-        context.add_extension(ChildChooserAccess(choosers=[ChooserAnsweringInTurn([])]))
+        context.add_extension(
+            extension=ChildChooserAccess(choosers=[ChooserAnsweringInTurn(children=[])])
+        )
         statechart = Statechart(context=context)
         choosing_node = CompositeNodeChoosingItsChild(name="choosing")
-        statechart.add_node(choosing_node)
-        statechart.add_node(end_node_factory(choosing_node))
+        statechart.add_node(node=choosing_node)
+        statechart.add_node(node=end_node_factory(node=choosing_node))
         return cls(statechart=statechart, choosing_node=choosing_node)
 
     def goal_json(self) -> str:
@@ -163,7 +165,7 @@ def _server_chooser(motion_server: MotionServerFixture) -> ChildSentByClient:
     :return: The chooser of the server's statechart context.
     """
     [chooser] = motion_server.executor.context.require_extension(
-        ChildChooserAccess
+        extension_type=ChildChooserAccess
     ).choosers
     return chooser
 
@@ -181,7 +183,7 @@ def _client_answering(
         client=ChildChoiceClient(
             statechart=goal.statechart,
             child_chooser_access=ChildChooserAccess(
-                choosers=[ChooserAnsweringInTurn(children)]
+                choosers=[ChooserAnsweringInTurn(children=children)]
             ),
             world_updates=client_world_updates(),
         ),
@@ -209,7 +211,9 @@ def _cancel_after(motion_server: MotionServerFixture, ticks: int) -> None:
 def _server_choosing_node(
     motion_server: MotionServerFixture, goal: ChoosingGoal
 ) -> CompositeNodeChoosingItsChild:
-    return motion_server.executor.statechart.get_node_by_index(goal.choosing_node.index)
+    return motion_server.executor.statechart.get_node_by_index(
+        index=goal.choosing_node.index
+    )
 
 
 @pytest.fixture()
@@ -218,7 +222,7 @@ def choosing_motion_server(motion_server: MotionServerFixture) -> MotionServerFi
     :return: A motion server whose nodes choose the children a client sends.
     """
     motion_server.executor.context.add_extension(
-        ChildChooserAccess(
+        extension=ChildChooserAccess(
             choosers=[
                 ChildSentByClient(
                     world_updates=motion_server.world_updates,
@@ -338,7 +342,11 @@ def test_the_client_answers_a_waiting_node_once_per_child_it_holds() -> None:
     client = ChildChoiceClient(
         statechart=goal.statechart,
         child_chooser_access=ChildChooserAccess(
-            choosers=[ChooserAnsweringInTurn([CountSimulationTimeSeconds(seconds=0.1)])]
+            choosers=[
+                ChooserAnsweringInTurn(
+                    children=[CountSimulationTimeSeconds(seconds=0.1)]
+                )
+            ]
         ),
         world_updates=client_world_updates(),
     )

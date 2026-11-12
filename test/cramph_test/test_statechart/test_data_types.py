@@ -117,7 +117,7 @@ def test_transition_kind_can_trigger_from(transition_kind, life_cycle_state) -> 
     The triggerability check matches membership in the transition kind's source states.
     """
     expected = life_cycle_state in transition_kind.source_states
-    assert transition_kind.can_trigger_from(life_cycle_state) is expected
+    assert transition_kind.can_trigger_from(life_cycle=life_cycle_state) is expected
 
 
 # %% the outcome an ending transition yields
@@ -162,8 +162,8 @@ def test_a_life_cycle_predicate_expression_matches_its_truth_table(
 ) -> None:
     life_cycle = FloatVariable(name="life_cycle")
 
-    expression = predicate.expression(life_cycle).substitute(
+    expression = predicate.expression(life_cycle=life_cycle).substitute(
         old_variables=[life_cycle], new_variables=[Scalar(life_cycle_state)]
     )
 
-    assert float(expression) == predicate.truth_value(life_cycle_state)
+    assert float(expression) == predicate.truth_value(life_cycle_value=life_cycle_state)

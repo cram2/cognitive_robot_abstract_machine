@@ -85,7 +85,7 @@ def observation_for(
     # A template may hand back a node's observation variable unwrapped, which cannot be
     # copied and therefore not substituted into.
     substituted = DerivedConditionVariable.substitute_in(
-        Scalar(artifacts.observation)
+        expression=Scalar(artifacts.observation)
     ).substitute(
         old_variables=[
             goal.monitored_node.observation_variable,
@@ -228,9 +228,9 @@ def compile_chart(nodes: list[StatechartNode]) -> StatechartExecutor:
     :param nodes: The top level nodes of a fresh statechart.
     :return: The executor, after compiling the statechart.
     """
-    executor = StatechartExecutor(StatechartContext(world=World()))
+    executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
-    statechart.add_nodes(nodes)
+    statechart.add_nodes(nodes=nodes)
     executor.compile(statechart=statechart)
     return executor
 

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # %% bar data
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateSpan:
     """
     A stretch of ticks over which a node kept one state.
@@ -48,7 +48,7 @@ class StateSpan:
 # %% plotter
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HistoryGanttChartPlotter:
     """
     Plot a hierarchy of a Statechart as a Gantt chart.
@@ -115,25 +115,25 @@ class HistoryGanttChartPlotter:
         """
         return len(self.statechart.nodes)
 
-    def life_cycle_spans(self, node: StatechartNode) -> list[StateSpan]:
+    def life_cycle_spans(self, *, node: StatechartNode) -> list[StateSpan]:
         """
         :param node: The node to look up.
         :return: The life cycle states `node` went through since it joined the
             statechart, in order; empty if no snapshot records it.
         """
-        snapshots = self.statechart.state_history.items_recording(node)
+        snapshots = self.statechart.state_history.items_recording(node=node)
         return self._merge_into_spans(
             ticks=[snapshot.tick_count for snapshot in snapshots],
             states=[snapshot.life_cycle_state[node] for snapshot in snapshots],
         )
 
-    def observation_spans(self, node: StatechartNode) -> list[StateSpan]:
+    def observation_spans(self, *, node: StatechartNode) -> list[StateSpan]:
         """
         :param node: The node to look up.
         :return: The observation states `node` went through since it joined the
             statechart, in order; empty if no snapshot records it.
         """
-        snapshots = self.statechart.state_history.items_recording(node)
+        snapshots = self.statechart.state_history.items_recording(node=node)
         return self._merge_into_spans(
             ticks=[snapshot.tick_count for snapshot in snapshots],
             states=[snapshot.observation_state[node] for snapshot in snapshots],
@@ -141,6 +141,7 @@ class HistoryGanttChartPlotter:
 
     def _merge_into_spans(
         self,
+        *,
         ticks: list[int],
         states: list[LifeCycleValues] | list[ObservationStateValues],
     ) -> list[StateSpan]:
@@ -183,7 +184,7 @@ class HistoryGanttChartPlotter:
             self.total_ticks * self.x_width_per_tick if self.x_width_per_tick else None
         )
 
-    def plot_gantt_chart(self, file_name: str) -> None:
+    def plot_gantt_chart(self, *, file_name: str) -> None:
         """
         Render the Gantt chart and save it.
 
@@ -208,19 +209,19 @@ class HistoryGanttChartPlotter:
 
         ordered_nodes = self._sort_nodes_by_parents()
 
-        ax_main, ax_final = self._build_subplots(ordered_nodes)
+        ax_main, ax_final = self._build_subplots(ordered_nodes=ordered_nodes)
 
         for node_idx, node in enumerate(ordered_nodes):
             self._plot_spans(
                 axis=ax_main,
                 node_idx=node_idx,
-                spans=self.life_cycle_spans(node),
+                spans=self.life_cycle_spans(node=node),
                 top=True,
             )
             self._plot_spans(
                 axis=ax_main,
                 node_idx=node_idx,
-                spans=self.observation_spans(node),
+                spans=self.observation_spans(node=node),
                 top=False,
             )
             self._plot_final_state_column(axis=ax_final, node=node, node_idx=node_idx)
@@ -231,7 +232,7 @@ class HistoryGanttChartPlotter:
         self._save_figure(file_name=file_name)
 
     def _build_subplots(
-        self, ordered_nodes: list[StatechartNode]
+        self, *, ordered_nodes: list[StatechartNode]
     ) -> tuple[plt.Axes, plt.Axes]:
         """
         Builds a subplot layout with a main axis and a fixed-width final-state axis for
@@ -246,7 +247,7 @@ class HistoryGanttChartPlotter:
         node_names: list[str] = []
         for idx, n in enumerate(ordered_nodes):
             prev_depth = 0 if idx == 0 else ordered_nodes[idx - 1].depth
-            node_names.append(self._make_label(n, prev_depth))
+            node_names.append(self._make_label(node=n, prev_depth=prev_depth))
 
         # Build figure so that axes widths are fixed in physical units (inches)
         # Main axis width = length_in_units * second_width_in_cm; Final axis width = fixed value independent of second_width_in_cm
@@ -264,7 +265,7 @@ class HistoryGanttChartPlotter:
         top_margin_inches = 0.2
 
         # Measure required width for right-side y tick labels and set right margin adaptively
-        labels_w_inches = self._measure_labels_width_in(node_names)
+        labels_w_inches = self._measure_labels_width_in(labels=node_names)
         label_pad_inches = 0.2
         right_margin_inches = max(0.8, labels_w_inches + label_pad_inches)
 
@@ -323,6 +324,7 @@ class HistoryGanttChartPlotter:
 
     def _plot_final_state_column(
         self,
+        *,
         axis: plt.Axes,
         node: StatechartNode,
         node_idx: int,
@@ -338,7 +340,7 @@ class HistoryGanttChartPlotter:
         :param column_padding: The space left free on each side of the column, as a
             fraction of its width.
         """
-        snapshots = self.statechart.state_history.items_recording(node)
+        snapshots = self.statechart.state_history.items_recording(node=node)
         if not snapshots:
             return
         final_states = [
@@ -357,6 +359,7 @@ class HistoryGanttChartPlotter:
 
     def _plot_spans(
         self,
+        *,
         axis: plt.Axes,
         node_idx: int,
         spans: list[StateSpan],
@@ -382,6 +385,7 @@ class HistoryGanttChartPlotter:
 
     def _draw_block(
         self,
+        *,
         axis: plt.Axes,
         node_idx,
         block_start,
@@ -418,6 +422,7 @@ class HistoryGanttChartPlotter:
 
     def _format_axes(
         self,
+        *,
         main_axis: plt.Axes,
         final_state_axis: plt.Axes,
         ordered_nodes: list[StatechartNode],
@@ -463,7 +468,7 @@ class HistoryGanttChartPlotter:
         node_names = []
         for idx, n in enumerate(ordered_nodes):
             prev_depth = 0 if idx == 0 else ordered_nodes[idx - 1].depth
-            node_names.append(self._make_label(n, prev_depth))
+            node_names.append(self._make_label(node=n, prev_depth=prev_depth))
         node_idx = list(range(len(node_names)))
 
         # Hide y ticks on main axis but keep the shared tick locations intact
@@ -479,7 +484,7 @@ class HistoryGanttChartPlotter:
             axis="y", right=True, labelright=True, left=False, labelleft=False
         )
 
-    def _make_label(self, node: StatechartNode, prev_depth: int) -> str:
+    def _make_label(self, *, node: StatechartNode, prev_depth: int) -> str:
         """
         Generates a formatted label for a given node in a statechart by incorporating
         its depth and using ASCII art for hierarchical representation.
@@ -503,7 +508,7 @@ class HistoryGanttChartPlotter:
         else:
             return "│  " * (depth - 1) + "├─ " + node.unique_name
 
-    def _measure_labels_width_in(self, labels: list[str]) -> float:
+    def _measure_labels_width_in(self, *, labels: list[str]) -> float:
         """
         Measures the maximum width of a list of text labels when rendered in a temporary
         figure. This is useful to determine the required space for labels in a plot.
@@ -532,7 +537,7 @@ class HistoryGanttChartPlotter:
         finally:
             plt.close(fig)
 
-    def _save_figure(self, file_name: str) -> None:
+    def _save_figure(self, *, file_name: str) -> None:
         """
         Saves the current figure to the specified file.
 

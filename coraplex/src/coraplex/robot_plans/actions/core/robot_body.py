@@ -265,5 +265,5 @@ class MoveManipulatorAction(MovesToolCenterPoint, GoalAction):
             binding_policy=GoalBindingPolicy.Bind_on_start,
         )
         for node in self.keep_base_still():
-            goal.add_node(node)
+            goal.add_node(node=node)
         return goal

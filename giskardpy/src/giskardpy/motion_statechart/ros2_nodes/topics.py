@@ -47,7 +47,9 @@ class TopicNode(EndedByOwner, MotionStatechartNode, Generic[MsgType]):
 
     def set_up(self) -> None:
         super().set_up()
-        ros_context_extension = self.context.require_extension(RosContextExtension)
+        ros_context_extension = self.context.require_extension(
+            extension_type=RosContextExtension
+        )
         self.ros2_node = ros_context_extension.ros_node
 
 

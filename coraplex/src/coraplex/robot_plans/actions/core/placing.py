@@ -151,7 +151,7 @@ class PlaceAction(
                     self.object_designator, end_effector.held_body_T_grasp
                 )
         for previous_pick in self.statechart.get_preceding_nodes_by_type(
-            self, PickUpAction
+            node=self, node_type=PickUpAction
         ):
             if previous_pick.grasp.graspable.root is object_body:
                 return previous_pick.arm, previous_pick.grasp
@@ -179,5 +179,7 @@ class PlaceAction(
                 arm.end_effector,
                 threshold=threshold,
             )
-            for arm in context.require_extension(RobotAccess).robot.all_arms
+            for arm in context.require_extension(
+                extension_type=RobotAccess
+            ).robot.all_arms
         ]

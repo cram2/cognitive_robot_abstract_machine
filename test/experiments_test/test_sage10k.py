@@ -95,7 +95,7 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     run_plan(
         Sage10kOpenDoor(door=door),
         [
-            RobotAccess(robot),
+            RobotAccess(robot=robot),
             StatementGrounding(query_backend=ProbabilisticBackend()),
         ],
     )

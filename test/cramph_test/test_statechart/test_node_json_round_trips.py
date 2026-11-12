@@ -78,7 +78,7 @@ def _context(world: World) -> StatechartContext:
     """
     context = StatechartContext(world=world)
     context.add_extension(
-        ChildChooserAccess(choosers=[ChooserAnsweringInTurn(children=[])])
+        extension=ChildChooserAccess(choosers=[ChooserAnsweringInTurn(children=[])])
     )
     return context
 
@@ -107,7 +107,7 @@ def _cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 never_true := ConstFalseNode(),
                 CancelStatechart.when_true(
-                    never_true, exception=NodeNotFoundError(name="node")
+                    node=never_true, exception=NodeNotFoundError(name="node")
                 ),
             ],
         ),
@@ -242,7 +242,9 @@ def sending_context(
 def receiving_executor(
     case: NodeRoundTripCase, request: pytest.FixtureRequest
 ) -> StatechartExecutor:
-    return StatechartExecutor(_context(request.getfixturevalue(case.world_fixture)))
+    return StatechartExecutor(
+        context=_context(request.getfixturevalue(case.world_fixture))
+    )
 
 
 # %% round trips

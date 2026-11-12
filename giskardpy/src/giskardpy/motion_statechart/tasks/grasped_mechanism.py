@@ -97,7 +97,7 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode):
                 )
             )
         self._add_children_to_statechart(
-            [
+            nodes=[
                 *allowances,
                 JointPositionList(
                     name="hinge goal",

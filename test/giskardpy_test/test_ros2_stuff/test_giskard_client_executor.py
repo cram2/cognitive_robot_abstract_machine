@@ -22,7 +22,7 @@ from .test_action_client import ServerAnsweringOneGoal, giskard_command_server
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionCountingCompilesAndRuns(ExecutorExtension):
     """
     An executor extension that counts how often it was told that a statechart compiled
@@ -39,10 +39,10 @@ class ExtensionCountingCompilesAndRuns(ExecutorExtension):
     How often the extension was told that a run stopped.
     """
 
-    def after_compile(self, executor: Executor) -> None:
+    def after_compile(self, *, executor: Executor) -> None:
         self.compile_count += 1
 
-    def after_run(self, executor: Executor) -> None:
+    def after_run(self, *, executor: Executor) -> None:
         self.run_count += 1
 
 
@@ -71,8 +71,8 @@ def executor_with_a_statechart(
         node_handle=background_node.get_node(), world=world, extensions=[extension]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(CountTicks(ticks=1))
-    executor.compile(statechart)
+    statechart.add_node(node=CountTicks(ticks=1))
+    executor.compile(statechart=statechart)
     yield executor
     executor.close()
 

@@ -34,8 +34,8 @@ def _two_node_statechart() -> Statechart:
     :return: A statechart in which `second` starts once `first` succeeded.
     """
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(first := _node_arriving_at_once("first"))
-    statechart.add_node(second := _node_arriving_at_once("second"))
+    statechart.add_node(node=(first := _node_arriving_at_once("first")))
+    statechart.add_node(node=(second := _node_arriving_at_once("second")))
     second.start_condition = first.is_succeeded
     return statechart
 
@@ -82,16 +82,18 @@ def test_sent_nodes_join_a_running_statechart_and_read_its_nodes(
     receiver = Statechart.from_json(
         data=_sent_through_json(sender.to_json()), context=statechart_executor.context
     )
-    statechart_executor.compile(receiver)
+    statechart_executor.compile(statechart=receiver)
     for _ in range(4):
         statechart_executor.tick()
     received_second = receiver.nodes[1]
     assert received_second.life_cycle_state == LifeCycleValues.SUCCEEDED
     third: StatechartNode = _node_arriving_at_once("third")
-    sender.add_node(third)
+    sender.add_node(node=third)
     third.start_condition = sender.nodes[1].is_succeeded
 
-    receiver.add_nodes_from_json(_sent_through_json(sender.nodes_from_to_json(2)))
+    receiver.add_nodes_from_json(
+        data=_sent_through_json(sender.nodes_from_to_json(first_node_index=2))
+    )
     statechart_executor.tick()
     statechart_executor.tick()
 

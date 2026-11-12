@@ -261,7 +261,9 @@ class LifeCyclePredicateDefinition:
     The states in which the predicate is true; every other state makes it false.
     """
 
-    def truth_value(self, life_cycle_value: LifeCycleValues) -> ObservationStateValues:
+    def truth_value(
+        self, *, life_cycle_value: LifeCycleValues
+    ) -> ObservationStateValues:
         """
         :param life_cycle_value: The state to evaluate the predicate in.
         :return: True if the predicate holds in that state, false otherwise.
@@ -270,7 +272,7 @@ class LifeCyclePredicateDefinition:
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
 
-    def expression(self, life_cycle: Scalar) -> Scalar:
+    def expression(self, *, life_cycle: Scalar) -> Scalar:
         """
         The same truth table as :meth:`truth_value`, but read off an expression rather
         than a value.
@@ -345,7 +347,7 @@ class ObservationPredicateDefinition:
     """
 
     def truth_value(
-        self, observation: ObservationStateValues
+        self, *, observation: ObservationStateValues
     ) -> ObservationStateValues:
         """
         :param observation: The observation to evaluate the test on.
@@ -355,7 +357,7 @@ class ObservationPredicateDefinition:
             return ObservationStateValues.TRUE
         return ObservationStateValues.FALSE
 
-    def expression(self, observation: Scalar) -> Scalar:
+    def expression(self, *, observation: Scalar) -> Scalar:
         """
         The same test as :meth:`truth_value`, read off an expression rather than a value.
 
@@ -482,7 +484,7 @@ class TransitionKind(Enum):
                 return LifeCycleValues.INTERRUPTED
         raise TransitionHasNoOutcomeError(transition_kind=self)
 
-    def can_trigger_from(self, life_cycle: LifeCycleValues) -> bool:
+    def can_trigger_from(self, *, life_cycle: LifeCycleValues) -> bool:
         """
         :param life_cycle: The lifecycle state to check.
         :return: Whether this transition can trigger from the given lifecycle state.

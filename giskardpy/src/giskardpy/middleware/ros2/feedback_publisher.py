@@ -129,7 +129,7 @@ class ActionFeedbackPublisher:
         return [
             node
             for node in self.executor.statechart.get_nodes_by_type(
-                CompositeNodeChoosingItsChild
+                node_type=CompositeNodeChoosingItsChild
             )
             if node.is_waiting_for_a_child
         ]

@@ -63,7 +63,7 @@ def _executed(plan: StatechartNode, extensions: list[ContextExtension]) -> None:
     Execute `plan` in simulation.
     """
     executor = simulated_executor(extensions)
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
 

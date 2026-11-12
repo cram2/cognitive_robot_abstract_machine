@@ -229,7 +229,7 @@ def tool_center_point_goal(
     :return: The goal moving that tool center point there.
     """
     return CartesianPose(
-        root_link=RobotAccess(robot).controlled_root,
+        root_link=RobotAccess(robot=robot).controlled_root,
         tip_link=(
             left_or_only_arm(robot) if arm is None else arm
         ).end_effector.tool_frame,
@@ -301,7 +301,9 @@ def physically_simulated_executor(
         counts its steps while the controller moves the world.
     """
     return PhysicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions),
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        ),
         simulation=SimulationThatCountsItsSteps(),
         **options,
     )
