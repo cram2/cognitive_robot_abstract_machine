@@ -14,9 +14,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     PerceivedObject,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description import geometry
 from semantic_digital_twin.world_description.connections import (
@@ -346,9 +344,9 @@ class TestNewObjects:
         )
 
         [shape] = world.get_kinematic_structure_entity_by_id(body_id).visual.shapes
-        blue_in_bgr = ClusterColorAnnotator.color_name_to_bgr_values[Color.BLUE]
-        assert shape.color == geometry.Color.from_rgb(
-            [value / 255 for value in reversed(blue_in_bgr)]
+        blue, green, red = ClusterColorAnnotator.color_name_to_bgr_values[Color.BLUE]
+        assert shape.color == geometry.Color.from_rgba(
+            red=red / 255, green=green / 255, blue=blue / 255
         )
 
     def test_reports_the_bodies_of_the_objects_in_the_order_they_were_found(
@@ -414,7 +412,7 @@ class TestNewObjects:
         world_body = Body(name=PrefixedName(FrameName.WORLD, prefix="robot"))
         with world.modify_world():
             world.add_body(world_body)
-        cas = cas_seen_from(world, camera_pose())
+        cas = cas_seen_from(world, camera_pose(), world_frame=str(world_body.name))
 
         [body_id] = perceived_objects.apply(cas_holding(cas, make_object_hypothesis()))
 

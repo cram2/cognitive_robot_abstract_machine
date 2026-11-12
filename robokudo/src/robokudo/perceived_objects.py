@@ -13,6 +13,8 @@ from dataclasses import dataclass, field, replace
 from uuid import UUID
 
 import numpy as np
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from rclpy.time import Time
 from scipy.optimize import linear_sum_assignment
 from semantic_digital_twin.reasoning.queries import annotation_class_by_label
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -22,10 +24,6 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     PerceivedObject,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description import geometry
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -33,7 +31,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 from robokudo.annotators.cluster_color import ClusterColorAnnotator, Color
-from robokudo.cas import CAS, CASViews
+from robokudo.cas import CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
@@ -331,27 +329,29 @@ class PerceivedObjects:
         :param hypotheses: The hypotheses to annotate.
         :param cas: The CAS whose camera pose locates the hypotheses.
         """
-        camera_to_world_transform = cas.camera_to_world_transform
-        if camera_to_world_transform is None:
+        observation = cas.camera_observation
+        if observation is None or observation.world_T_camera is None:
             return
+        world_T_camera = observation.world_T_camera
 
         for hypothesis in hypotheses:
             pose = hypothesis.latest_annotation_of_type(PoseAnnotation)
             if pose is None:
                 continue
-            world_pose = camera_to_world_transform @ Pose.from_xyz_quaternion(
+            world_pose = world_T_camera @ Pose.from_xyz_quaternion(
                 *pose.translation, *pose.rotation
             )
-            stamped_pose = StampedPoseAnnotation(
-                source=type(self).__name__,
-                translation=world_pose.position.to_np()[:3].tolist(),
-                rotation=world_pose.orientation.to_np().tolist(),
+            hypothesis.annotations.append(
+                StampedPoseAnnotation(
+                    source=type(self).__name__,
+                    translation=world_pose.position.to_np()[:3].tolist(),
+                    rotation=world_pose.orientation.to_np().tolist(),
+                    frame=str(world_T_camera.reference_frame.name),
+                    timestamp=Time(
+                        nanoseconds=observation.timestamp_nanoseconds
+                    ).to_msg(),
+                )
             )
-            if cas.world_frame is not None:
-                stamped_pose.frame = cas.world_frame
-            if cas.contains(CASViews.CAMERA_INFO):
-                stamped_pose.timestamp = cas.get(CASViews.CAMERA_INFO).header.stamp
-            hypothesis.annotations.append(stamped_pose)
 
     def _locate(self, hypothesis: ObjectHypothesis, cas: CAS) -> Detection | None:
         """
@@ -362,10 +362,15 @@ class PerceivedObjects:
             :attr:`world`, or ``hypothesis`` has no 3D bounding box.
         """
         bounding_box = hypothesis.latest_annotation_of_type(BoundingBox3DAnnotation)
-        camera_to_world_transform = cas.camera_to_world_transform
-        if camera_to_world_transform is None or bounding_box is None:
+        observation = cas.camera_observation
+        if (
+            observation is None
+            or observation.world_T_camera is None
+            or bounding_box is None
+        ):
             return None
-        world_body = camera_to_world_transform.reference_frame
+        world_T_camera = observation.world_T_camera
+        world_body = world_T_camera.reference_frame
         if world_body not in self.world.kinematic_structure_entities:
             return None
 
@@ -379,7 +384,7 @@ class PerceivedObjects:
         )
         return Detection(
             hypothesis=hypothesis,
-            pose=camera_to_world_transform @ camera_T_bounding_box,
+            pose=world_T_camera @ camera_T_bounding_box,
             scale=scale,
             shape=self._shape_of(hypothesis, camera_T_bounding_box, scale),
             semantic_class=(
@@ -432,11 +437,11 @@ class PerceivedObjects:
         if not semantic_colors:
             return None
         dominant_color = max(semantic_colors, key=lambda color: color.ratio)
-        blue_green_red = ClusterColorAnnotator.color_name_to_bgr_values[
+        blue, green, red = ClusterColorAnnotator.color_name_to_bgr_values[
             Color[dominant_color.color.upper()]
         ]
-        return geometry.Color.from_rgb(
-            [value / 255 for value in reversed(blue_green_red)]
+        return geometry.Color.from_rgba(
+            red=red / 255, green=green / 255, blue=blue / 255
         )
 
     # %% objects of the world
