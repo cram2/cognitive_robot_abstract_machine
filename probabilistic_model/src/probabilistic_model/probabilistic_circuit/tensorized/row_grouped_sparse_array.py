@@ -106,10 +106,11 @@ class RowGroupedSparsity:
 
     entry_positions_by_rank: list[npt.NDArray[np.int64]] = field(init=False)
     """
-    The stored entries grouped by their rank within their row: element ``k`` lists the
-    position of the ``k``-th entry of every row with more than ``k`` entries, the rows
-    ordered as :attr:`rows_by_entry_count`. Stored entries in rows ``[2, 0, 2, 1, 2, 0]``
-    put positions 0, 2 and 4 in row 2, positions 1 and 5 in row 0 and position 3 in row 1::
+    Element ``k`` lists the position of the ``k``-th entry of every row with more than
+    ``k`` entries, the rows ordered as :attr:`rows_by_entry_count`. For entries stored
+    in rows ``[2, 0, 2, 1, 2, 0]``:
+
+    .. code-block:: python
 
         rows_by_entry_count     = [2, 0, 1, 3]
         entry_positions_by_rank = [[0, 1, 3],  # the first entry of rows 2, 0 and 1
@@ -201,7 +202,8 @@ class RowGroupedSparsity:
         row without entries, without padding any row to the fullest one.
 
         :param values: Per-entry values with the entries in the last axis.
-        :param operation: An associative and commutative binary ufunc with an identity.
+        :param operation: An associative and commutative numpy universal function of two
+            arrays, applied element by element, that has an identity.
         :return: The values with shape ``(..., #rows)``.
         """
         result = np.full(values.shape[:-1] + (0,), operation.identity, dtype=float)

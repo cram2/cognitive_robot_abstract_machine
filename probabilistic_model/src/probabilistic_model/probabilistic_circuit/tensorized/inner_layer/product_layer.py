@@ -256,8 +256,9 @@ class ProductLayer(InnerLayer):
         Combine, per node, the results of the child nodes it multiplies.
 
         :param child_results: The result per child layer with the child nodes last.
-        :param operation: An associative and commutative binary ufunc with an identity,
-            which a node without factors gets.
+        :param operation: An associative and commutative numpy universal function of two
+            arrays, applied element by element, whose identity a node without factors
+            gets.
         :return: The combined result with the nodes of this layer last.
         """
         values = self.factors.values_of_entries(np.concatenate(child_results, axis=-1))

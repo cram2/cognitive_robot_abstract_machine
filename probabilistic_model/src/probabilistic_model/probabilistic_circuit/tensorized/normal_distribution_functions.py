@@ -14,17 +14,23 @@ import numpy as np
 import scipy.special
 from array_api_compat import array_namespace, is_jax_namespace, is_numpy_namespace
 from krrood.ormatic.utils import classproperty
-from typing_extensions import Any
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic, TypeVar
 
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     UnsupportedArrayBackendError,
 )
 
+ArrayType = TypeVar("ArrayType")
+"""
+The array type of the backend that computes the functions.
+"""
+
 # %% normal distribution functions of one array backend
 
 
 @dataclass
-class NormalDistributionFunctions(ABC):
+class NormalDistributionFunctions(Generic[ArrayType], SubClassSafeGeneric, ABC):
     """
     The cumulative distribution function and the log-density of normal distributions,
     computed by one array backend.
@@ -39,7 +45,7 @@ class NormalDistributionFunctions(ABC):
     """
 
     @classmethod
-    def from_arrays(cls, *arrays: Any) -> NormalDistributionFunctions:
+    def from_arrays(cls, *arrays: ArrayType) -> NormalDistributionFunctions[ArrayType]:
         """
         :param arrays: Arrays of one backend.
         :return: The normal distribution functions of that backend.
@@ -62,9 +68,9 @@ class NormalDistributionFunctions(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def standard_cumulative_distribution(self, values: Any) -> Any:
+    def standard_cumulative_distribution(self, values: ArrayType) -> ArrayType:
         """
-        :param values: Any array.
+        :param values: The values.
         :return: The cumulative distribution function of the standard normal
             distribution at every value.
         """
@@ -79,7 +85,9 @@ class NormalDistributionFunctions(ABC):
         # spelled as scipy.stats.norm spells it, so that the densities agree bit for bit
         return float(np.log(np.sqrt(2 * np.pi)))
 
-    def cumulative_distribution(self, values: Any, location: Any, scale: Any) -> Any:
+    def cumulative_distribution(
+        self, values: ArrayType, location: ArrayType, scale: ArrayType
+    ) -> ArrayType:
         """
         :param values: The values.
         :param location: The mean of the normal distribution.
@@ -89,7 +97,9 @@ class NormalDistributionFunctions(ABC):
         """
         return self.standard_cumulative_distribution((values - location) / scale)
 
-    def log_density(self, values: Any, location: Any, scale: Any) -> Any:
+    def log_density(
+        self, values: ArrayType, location: ArrayType, scale: ArrayType
+    ) -> ArrayType:
         """
         :param values: The values.
         :param location: The mean of the normal distribution.
@@ -107,7 +117,7 @@ class NormalDistributionFunctions(ABC):
 
 
 @dataclass
-class ScipyNormalDistributionFunctions(NormalDistributionFunctions):
+class ScipyNormalDistributionFunctions(NormalDistributionFunctions[np.ndarray]):
     """
     The normal distribution functions of numpy arrays, computed by scipy.
     """
@@ -116,12 +126,12 @@ class ScipyNormalDistributionFunctions(NormalDistributionFunctions):
     def supports(cls, namespace: ModuleType) -> bool:
         return is_numpy_namespace(namespace)
 
-    def standard_cumulative_distribution(self, values: Any) -> Any:
+    def standard_cumulative_distribution(self, values: np.ndarray) -> np.ndarray:
         return scipy.special.ndtr(values)
 
 
 @dataclass
-class JaxNormalDistributionFunctions(NormalDistributionFunctions):
+class JaxNormalDistributionFunctions(NormalDistributionFunctions[jax.Array]):
     """
     The normal distribution functions of jax arrays, computed by :mod:`jax.scipy`.
     """
@@ -130,5 +140,5 @@ class JaxNormalDistributionFunctions(NormalDistributionFunctions):
     def supports(cls, namespace: ModuleType) -> bool:
         return is_jax_namespace(namespace)
 
-    def standard_cumulative_distribution(self, values: Any) -> Any:
+    def standard_cumulative_distribution(self, values: jax.Array) -> jax.Array:
         return jax.scipy.special.ndtr(values)
