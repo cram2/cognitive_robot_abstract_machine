@@ -308,7 +308,9 @@ class DegreeOfFreedomLimitProfiler:
         """
         sign = direction.sign
         time_step = self.time_step.total_seconds()
-        velocity_bound = braking_profile.shifted_by(sign * position_error) * sign
+        velocity_bound = (
+            braking_profile.shifted_by(distance=sign * position_error) * sign
+        )
         one_step_change = jerk_limit * time_step**2
         one_step_change_bound = sm.limit(
             position_error / time_step,

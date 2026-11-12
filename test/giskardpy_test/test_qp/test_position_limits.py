@@ -192,9 +192,9 @@ def test_multiple_joints_outside_limits_recover(pr2_world_state_reset):
         lower = conn.dof.limits.lower.position
         upper = conn.dof.limits.upper.position
         assert np.isclose(conn.position, goal, atol=0.01), f"{conn.name} not at goal"
-        assert (
-            lower - 0.01 <= conn.position <= upper + 0.01
-        ), f"{conn.name} outside limits"
+        assert lower - 0.01 <= conn.position <= upper + 0.01, (
+            f"{conn.name} outside limits"
+        )
 
 
 def _default_config() -> QPControllerConfig:
@@ -232,12 +232,12 @@ def test_dof_limits_joint_near_upper_limit(prismatic_bot):
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        upper_vel[0] < 0.9
-    ), "Upper velocity at t=0 must be reduced near the upper position limit"
-    assert np.isclose(
-        lower_vel[0], -VELOCITY_LIMIT, atol=1e-3
-    ), "Lower velocity is unconstrained going away from the limit"
+    assert upper_vel[0] < 0.9, (
+        "Upper velocity at t=0 must be reduced near the upper position limit"
+    )
+    assert np.isclose(lower_vel[0], -VELOCITY_LIMIT, atol=1e-3), (
+        "Lower velocity is unconstrained going away from the limit"
+    )
 
 
 def test_dof_limits_joint_near_lower_limit(prismatic_bot):
@@ -247,12 +247,12 @@ def test_dof_limits_joint_near_lower_limit(prismatic_bot):
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        lower_vel[0] > -0.9
-    ), "Lower velocity at t=0 must be reduced (less negative) near the lower position limit"
-    assert np.isclose(
-        upper_vel[0], VELOCITY_LIMIT, atol=1e-3
-    ), "Upper velocity is unconstrained going away from the limit"
+    assert lower_vel[0] > -0.9, (
+        "Lower velocity at t=0 must be reduced (less negative) near the lower position limit"
+    )
+    assert np.isclose(upper_vel[0], VELOCITY_LIMIT, atol=1e-3), (
+        "Upper velocity is unconstrained going away from the limit"
+    )
 
 
 def test_dof_limits_joint_above_upper_limit(prismatic_bot):
@@ -261,9 +261,9 @@ def test_dof_limits_joint_above_upper_limit(prismatic_bot):
     limits = _compute_limits(prismatic_bot)
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        upper_vel[0] <= 0.0
-    ), "Upper velocity must be non-positive when joint is above the upper limit"
+    assert upper_vel[0] <= 0.0, (
+        "Upper velocity must be non-positive when joint is above the upper limit"
+    )
 
 
 def test_dof_limits_joint_below_lower_limit(prismatic_bot):
@@ -272,9 +272,9 @@ def test_dof_limits_joint_below_lower_limit(prismatic_bot):
     limits = _compute_limits(prismatic_bot)
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        lower_vel[0] >= 0.0
-    ), "Lower velocity must be non-negative when joint is below the lower limit"
+    assert lower_vel[0] >= 0.0, (
+        "Lower velocity must be non-negative when joint is below the lower limit"
+    )
 
 
 def test_dof_limits_integrating_upper_velocity_bounds_stays_within_position_limit(
@@ -289,9 +289,9 @@ def test_dof_limits_integrating_upper_velocity_bounds_stays_within_position_limi
     upper_vel_bounds = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
     final_position = initial_position + DT * np.sum(upper_vel_bounds)
-    assert (
-        final_position <= POSITION_UPPER_LIMIT + 1e-3
-    ), "Integrating the upper velocity bounds must not overshoot the upper position limit"
+    assert final_position <= POSITION_UPPER_LIMIT + 1e-3, (
+        "Integrating the upper velocity bounds must not overshoot the upper position limit"
+    )
 
 
 def test_dof_limits_jerk_is_relaxed_when_braking_is_insufficient(prismatic_bot):
@@ -302,9 +302,9 @@ def test_dof_limits_jerk_is_relaxed_when_braking_is_insufficient(prismatic_bot):
     limits = _compute_limits(prismatic_bot)
     jerk_upper_at_t0 = limits.upper_bounds.evaluate()[NUMBER_OF_VELOCITY_STEPS]
 
-    assert (
-        jerk_upper_at_t0 > EXPECTED_JERK_LIMIT
-    ), "Jerk limit at t=0 must be relaxed when normal braking cannot prevent a position limit violation"
+    assert jerk_upper_at_t0 > EXPECTED_JERK_LIMIT, (
+        "Jerk limit at t=0 must be relaxed when normal braking cannot prevent a position limit violation"
+    )
 
 
 def test_dof_limits_no_position_limits(prismatic_world_no_position_limits):
@@ -312,17 +312,23 @@ def test_dof_limits_no_position_limits(prismatic_world_no_position_limits):
     upper_vel = limits.upper_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
     lower_vel = limits.lower_bounds.evaluate()[:NUMBER_OF_VELOCITY_STEPS]
 
-    assert np.allclose(
-        upper_vel, VELOCITY_LIMIT, atol=1e-3
-    ), "Without position limits, upper velocity bounds must be flat"
-    assert np.allclose(
-        lower_vel, -VELOCITY_LIMIT, atol=1e-3
-    ), "Without position limits, lower velocity bounds must be flat"
+    assert np.allclose(upper_vel, VELOCITY_LIMIT, atol=1e-3), (
+        "Without position limits, upper velocity bounds must be flat"
+    )
+    assert np.allclose(lower_vel, -VELOCITY_LIMIT, atol=1e-3), (
+        "Without position limits, lower velocity bounds must be flat"
+    )
 
 
 # %% reaching a position limit
 
 LIMIT_REACHING_TOLERANCE = 1e-3
+
+STOPPED_SPEED = VELOCITY_LIMIT / 20
+"""
+Speed below which a joint driven to a position limit counts as stopped: far below its
+velocity limit, yet above the speed at which a joint that stopped short creeps on.
+"""
 
 
 def test_joint_goal_at_upper_limit_is_reached(prismatic_bot):
@@ -351,3 +357,35 @@ def test_joint_goal_at_upper_limit_is_reached(prismatic_bot):
     executor.tick_until_end()
 
     assert np.isclose(connection.position, upper, atol=LIMIT_REACHING_TOLERANCE)
+
+
+def test_joint_driven_to_upper_limit_comes_to_rest_only_on_it(prismatic_bot):
+    """
+    A joint driven at full speed to a position limit brakes onto the limit, instead of
+    coming to rest short of it and creeping the rest of the way.
+    """
+    connection = _connection(prismatic_bot)
+    upper = connection.dof.limits.upper.position
+    config = QPControllerConfig(target_frequency=TARGET_FREQUENCY)
+
+    executor = StatechartExecutor(
+        context=StatechartContext(world=prismatic_bot),
+        extensions=[MotionControl(qp_controller_config=config)],
+    )
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(
+        JointPositionList(goal_state=JointState.from_mapping({connection: upper}))
+    )
+    executor.compile(statechart=statechart)
+
+    positions_once_stopped = []
+    has_moved = False
+    for _ in range(round(2 * TARGET_FREQUENCY)):
+        executor.tick()
+        speed = abs(prismatic_bot.state[connection.dof.id].velocity)
+        has_moved = has_moved or speed > STOPPED_SPEED
+        if has_moved and speed < STOPPED_SPEED:
+            positions_once_stopped.append(connection.position)
+
+    assert positions_once_stopped
+    assert np.allclose(positions_once_stopped, upper, atol=LIMIT_REACHING_TOLERANCE)

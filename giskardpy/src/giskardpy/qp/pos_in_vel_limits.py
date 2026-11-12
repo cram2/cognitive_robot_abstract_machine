@@ -149,36 +149,40 @@ class BrakingProfile:
             column_offset += prediction_horizon
         return link_model
 
-    def shifted_by(self, distance: Scalar) -> Vector:
+    def shifted_by(self, *, distance: Scalar) -> Vector:
         """
-        Returns the part of this profile that remains when only ``distance`` is left to
-        cover, padded with rest.
+        Returns the velocity profile that brakes to rest after covering exactly
+        ``distance``, padded with rest, for any distance up to the one this whole
+        profile covers. A longer distance gets this whole profile and, further away, its
+        first velocity at every step.
 
-        Selects how far into the braking the motion already is by comparing the remaining
-        ``distance`` against the distance covered by progressively truncated tails of the
-        profile.
-
-        :param distance: Remaining distance that determines how much of the profile is
-            shifted out.
-        :return: Velocity at each step of the prediction horizon for the remaining
-            ``distance``.
+        :param distance: Remaining distance to cover before coming to rest.
+        :return: Velocity at each step of the prediction horizon.
         """
         time_step = self.time_step.total_seconds()
         velocity_profile = self.zero_negligible_velocities(self.velocity)
         velocity_if_cases = []
-        for x in range(len(velocity_profile) - 1, -1, -1):
-            condition = time_step * sum(velocity_profile[x:])
-            velocity_result = np.concatenate(
-                [velocity_profile[x + 1 :], np.zeros(x + 1)]
+        shorter_tail = np.zeros(velocity_profile.shape[0])
+        shorter_tail_distance = 0.0
+        for first_step in reversed(range(velocity_profile.shape[0])):
+            longer_tail = np.concatenate(
+                [velocity_profile[first_step:], np.zeros(first_step)]
             )
-            if condition > 0:
-                velocity_if_cases.append((condition, sm.Vector(velocity_result)))
-        # A distance shorter than the last braking step would leave only rest, so the degree
-        # of freedom could never close it; the first step covers it instead.
-        shortest_braking_distance, _ = velocity_if_cases[0]
-        remaining_distance_profile = sm.Vector.zeros(size=velocity_profile.shape[0])
-        remaining_distance_profile[0] = distance / time_step
-        velocity_if_cases[0] = (shortest_braking_distance, remaining_distance_profile)
+            longer_tail_distance = time_step * sum(velocity_profile[first_step:])
+            if longer_tail_distance <= shorter_tail_distance:
+                continue
+            # Between two neighbouring tails, a blend of both covers exactly the distance.
+            blend = (distance - shorter_tail_distance) / (
+                longer_tail_distance - shorter_tail_distance
+            )
+            velocity_if_cases.append(
+                (
+                    longer_tail_distance,
+                    sm.Vector(shorter_tail)
+                    + sm.Vector(longer_tail - shorter_tail) * blend,
+                )
+            )
+            shorter_tail, shorter_tail_distance = longer_tail, longer_tail_distance
         velocity_if_cases.append(
             (
                 2 * velocity_if_cases[-1][0] - velocity_if_cases[-2][0],
