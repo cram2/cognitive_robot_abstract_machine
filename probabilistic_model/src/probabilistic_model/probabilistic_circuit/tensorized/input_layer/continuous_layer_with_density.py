@@ -205,7 +205,6 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         :param values: The values with shape (#events,).
         :return: A boolean array of shape (#events, #nodes).
         """
-        xp = self.namespace
         column = self.float_column(values=values)
 
         # these arrays hold one entry per event per node, so the homogeneous cases get
@@ -217,8 +216,10 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         elif not left_closed.any():
             left = self.lower < column
         else:
-            left = xp.where(
-                xp.asarray(left_closed), self.lower <= column, self.lower < column
+            left = self.namespace.where(
+                self.namespace.asarray(left_closed),
+                self.lower <= column,
+                self.lower < column,
             )
 
         right_closed = self.right_closed
@@ -227,8 +228,10 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         elif not right_closed.any():
             right = column < self.upper
         else:
-            right = xp.where(
-                xp.asarray(right_closed), column <= self.upper, column < self.upper
+            right = self.namespace.where(
+                self.namespace.asarray(right_closed),
+                column <= self.upper,
+                column < self.upper,
             )
 
         return left & right

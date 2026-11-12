@@ -87,8 +87,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         :return: The values as floats in an array of the backend of the parameters,
             shape (#events, 1).
         """
-        xp = self.namespace
-        return xp.reshape(xp.asarray(values, dtype=xp.float64), (-1, 1))
+        return self.namespace.reshape(
+            self.namespace.asarray(values, dtype=self.namespace.float64), (-1, 1)
+        )
 
     # %% per node view
 
@@ -170,20 +171,20 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeVariableValues:
-        xp = self.namespace
         if not query.requested[self.variable]:
-            return xp.zeros(
-                (self.number_of_nodes, query.number_of_variables), dtype=xp.float64
+            return self.namespace.zeros(
+                (self.number_of_nodes, query.number_of_variables),
+                dtype=self.namespace.float64,
             )
         own_moments = self.moment_of_nodes_own(
             int(query.order[self.variable]),
             float(query.center[self.variable]),
             variables[self.variable],
         )
-        is_own_variable = xp.asarray(
+        is_own_variable = self.namespace.asarray(
             np.arange(query.number_of_variables) == self.variable
         )
-        return xp.where(is_own_variable, own_moments[:, None], 0.0)
+        return self.namespace.where(is_own_variable, own_moments[:, None], 0.0)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -414,13 +415,15 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
-        xp = self.namespace
         interval: Interval = event[variables[self.variable]]
-        result = xp.zeros(self.number_of_nodes, dtype=xp.float64)
+        result = self.namespace.zeros(
+            self.number_of_nodes, dtype=self.namespace.float64
+        )
         for simple_interval in interval.simple_sets:
             values = self.cumulative_distribution_of_nodes_from_column(
-                xp.asarray(
-                    [simple_interval.lower, simple_interval.upper], dtype=xp.float64
+                self.namespace.asarray(
+                    [simple_interval.lower, simple_interval.upper],
+                    dtype=self.namespace.float64,
                 )
             )
             result = result + (values[1] - values[0])

@@ -319,26 +319,28 @@ class TruncatedGaussianLayer(
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        xp = self.namespace
         with np.errstate(divide="ignore"):
             density = self.normal_log_density(
                 column=self.float_column(values=values)
-            ) - xp.log(self.normalizing_constant)
-        return xp.where(self.included_condition(values), density, -np.inf)
+            ) - self.namespace.log(self.normalizing_constant)
+        return self.namespace.where(self.included_condition(values), density, -np.inf)
 
     def cumulative_distribution_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        xp = self.namespace
         column = self.float_column(values=values)
-        left_included = xp.where(
-            xp.asarray(self.left_closed), self.lower <= column, self.lower < column
+        left_included = self.namespace.where(
+            self.namespace.asarray(self.left_closed),
+            self.lower <= column,
+            self.lower < column,
         )
         untruncated = self.normal_cumulative_distribution(column)
         result = (
             untruncated - self.cumulative_distribution_to_lower
         ) / self.normalizing_constant
-        return xp.minimum(1.0, xp.where(left_included, result, 0.0))
+        return self.namespace.minimum(
+            1.0, self.namespace.where(left_included, result, 0.0)
+        )
 
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         location, scale = self.location[nodes], self.scale[nodes]

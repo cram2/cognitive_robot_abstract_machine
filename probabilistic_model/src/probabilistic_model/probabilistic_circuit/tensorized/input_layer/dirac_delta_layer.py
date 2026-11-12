@@ -114,17 +114,20 @@ class DiracDeltaLayer(AbstractContinuousLayer):
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        xp = self.namespace
-        hit = xp.abs(self.float_column(values=values) - self.location) < self.tolerance
+        hit = (
+            self.namespace.abs(self.float_column(values=values) - self.location)
+            < self.tolerance
+        )
         with np.errstate(divide="ignore"):
-            return xp.where(hit, xp.log(self.density_cap), -np.inf)
+            return self.namespace.where(
+                hit, self.namespace.log(self.density_cap), -np.inf
+            )
 
     def cumulative_distribution_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        xp = self.namespace
         reached = self.float_column(values=values) >= self.location - self.tolerance
-        return xp.astype(reached, xp.float64)
+        return self.namespace.astype(reached, self.namespace.float64)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -134,12 +137,11 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         se.UnivariateInputLayer.moment_of_nodes_own`, in closed form: all the mass of a
         node lies at its location.
         """
-        xp = self.namespace
         if order == 0:
-            return xp.ones_like(self.location)
+            return self.namespace.ones_like(self.location)
         if order == 1:
             return self.location - center
-        return xp.zeros_like(self.location)
+        return self.namespace.zeros_like(self.location)
 
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         return self.location[nodes].astype(float)
@@ -157,8 +159,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         """
         lower_of_window = self.location - self.tolerance
         upper_of_window = self.location + self.tolerance
-        xp = self.namespace
-        inside = xp.zeros(self.number_of_nodes, dtype=xp.bool)
+        inside = self.namespace.zeros(self.number_of_nodes, dtype=self.namespace.bool)
         for simple_interval in assignment.simple_sets:
             left = (
                 simple_interval.lower <= upper_of_window
@@ -199,8 +200,9 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         node has probability one if the event reaches its location up to
         :attr:`tolerance` and zero otherwise.
         """
-        xp = self.namespace
-        return xp.astype(self.contains(event[variables[self.variable]]), xp.float64)
+        return self.namespace.astype(
+            self.contains(event[variables[self.variable]]), self.namespace.float64
+        )
 
     def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]

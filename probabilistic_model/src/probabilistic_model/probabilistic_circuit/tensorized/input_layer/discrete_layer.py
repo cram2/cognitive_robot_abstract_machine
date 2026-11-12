@@ -126,14 +126,14 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             symbolic variable, see :class:`SymbolicEncoding`.
         :return: The index of every value, or ``-1`` for values that are not a state.
         """
-        xp = self.namespace
         values = self.float_column(values=values)[:, 0]
         states = self.float_states
-        positions = xp.minimum(
-            xp.searchsorted(states, values), max(self.number_of_states - 1, 0)
+        positions = self.namespace.minimum(
+            self.namespace.searchsorted(states, values),
+            max(self.number_of_states - 1, 0),
         )
-        found = xp.take(states, positions) == values
-        return xp.where(found, positions, -1)
+        found = self.namespace.take(states, positions) == values
+        return self.namespace.where(found, positions, -1)
 
     @memoized
     def log_likelihood_of_nodes(
@@ -422,9 +422,10 @@ class IntegerLayer(DiscreteLayer):
         Unlike :meth:`DiscreteLayer.cumulative_distribution_of_nodes`, integers are
         ordered: the result is the probability of the states up to every value.
         """
-        xp = self.namespace
         reached = self.float_column(values=self.column_of(events)) >= self.float_states
-        return self.table.dot(xp.astype(reached, xp.float64).T).T
+        return self.table.dot(
+            self.namespace.astype(reached, self.namespace.float64).T
+        ).T
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable

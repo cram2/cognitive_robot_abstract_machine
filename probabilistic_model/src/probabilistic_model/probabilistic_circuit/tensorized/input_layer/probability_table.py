@@ -312,12 +312,11 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return int(self.log_probabilities.size)
 
     def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
-        xp = self.namespace
         # an unknown state reads the appended column of probability zero
-        padded = xp.concat(
+        padded = self.namespace.concat(
             [
                 self.log_probabilities,
-                xp.full(
+                self.namespace.full(
                     (self.number_of_nodes, 1),
                     -np.inf,
                     dtype=self.log_probabilities.dtype,
@@ -325,17 +324,22 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
             ],
             axis=1,
         )
-        columns = xp.where(indices >= 0, indices, self.number_of_states)
-        return xp.take(padded, columns, axis=1).T
+        columns = self.namespace.where(indices >= 0, indices, self.number_of_states)
+        return self.namespace.take(padded, columns, axis=1).T
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
-        xp = self.namespace
-        columns = xp.asarray(np.flatnonzero(selected))
-        return xp.sum(xp.exp(xp.take(self.log_probabilities, columns, axis=1)), axis=1)
+        columns = self.namespace.asarray(np.flatnonzero(selected))
+        return self.namespace.sum(
+            self.namespace.exp(
+                self.namespace.take(self.log_probabilities, columns, axis=1)
+            ),
+            axis=1,
+        )
 
     def dot(self, values: StateValues) -> NodeValues:
-        xp = self.namespace
-        return xp.matmul(xp.exp(self.log_probabilities), xp.asarray(values))
+        return self.namespace.matmul(
+            self.namespace.exp(self.log_probabilities), self.namespace.asarray(values)
+        )
 
     def probabilities_of_node(self, node: int) -> tuple[StateIndices, TableEntryValues]:
         [states] = np.nonzero(np.isfinite(self.log_probabilities[node]))
