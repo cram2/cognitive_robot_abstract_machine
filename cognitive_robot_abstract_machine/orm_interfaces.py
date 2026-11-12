@@ -178,8 +178,8 @@ class OrmInterface:
     @cached_property
     def dependencies(self) -> tuple[str, ...]:
         """
-        Names of the packages whose generated interface this interface's generator
-        imports with a module-level ``import`` statement, and so builds on.
+        :return: The names of the packages whose generated interface this interface's
+            generator imports with a module-level ``import`` statement, and so builds on.
         """
         tree = ast.parse(self.generator.read_text(encoding="utf-8"))
         imported_modules = [
@@ -365,9 +365,8 @@ class WorkspaceOrmInterfaces:
     @cached_property
     def interfaces_in_build_order(self) -> tuple[OrmInterface, ...]:
         """
-        The interfaces, each after every interface it builds on, and otherwise in the
-        order of :attr:`interfaces`.
-
+        :return: The interfaces, each after every interface it builds on, and otherwise
+            in the order of :attr:`interfaces`.
         :raises UnorderableOrmInterfacesError: If no such order exists.
         """
         ordered: list[OrmInterface] = []

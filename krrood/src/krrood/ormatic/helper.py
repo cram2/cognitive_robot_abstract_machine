@@ -65,8 +65,8 @@ class OrmaticInterfaceChain:
     @cached_property
     def module_names(self) -> set[str]:
         """
-        The names of the modules of the interfaces and of every interface they build
-        on, directly or through other interfaces.
+        :return: The names of the modules of the interfaces and of every interface they
+            build on, directly or through other interfaces.
         """
         mapped_classes_by_module: dict[str, list[type]] = {}
         for mapper in Base.registry.mappers:
@@ -93,7 +93,7 @@ class OrmaticInterfaceChain:
     @cached_property
     def data_access_objects(self) -> list[type[DataAccessObject]]:
         """
-        The data access objects of the interfaces in the chain.
+        :return: The data access objects of the interfaces in the chain.
         """
         return [
             mapper.class_
@@ -105,7 +105,7 @@ class OrmaticInterfaceChain:
     @cached_property
     def alternative_mappings(self) -> list[type[AlternativeMapping]]:
         """
-        The alternative mappings the interfaces in the chain map.
+        :return: The alternative mappings the interfaces in the chain map.
         """
         return [
             data_access_object.original_class()
