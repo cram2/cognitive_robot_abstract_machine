@@ -28,6 +28,7 @@ from cognitive_robot_abstract_machine.orm_interfaces import (
     WorkspaceOrmInterfaces,
 )
 
+from . import dataset
 from .dataset import failing_generate_orm, generate_orm, mapped_module
 
 # %% a checkout of packages that generate an interface
@@ -276,19 +277,43 @@ class BranchingPackage(StrEnum):
 
 
 @pytest.fixture
-def branching_workspace(tmp_path: Path) -> WorkspaceOrmInterfaces:
+def branching_workspace() -> WorkspaceOrmInterfaces:
     """
     The interfaces of :class:`BranchingPackage`, in an order that follows their
-    dependencies.
+    dependencies, whose generators are in the test dataset.
     """
+    workspace_root = Path(dataset.__file__).parent / "branching_workspace"
     return WorkspaceOrmInterfaces(
-        (
-            OrmInterface(BranchingPackage.BASE, tmp_path),
-            OrmInterface(BranchingPackage.MIDDLE, tmp_path, (BranchingPackage.BASE,)),
-            OrmInterface(BranchingPackage.SIDE, tmp_path, (BranchingPackage.BASE,)),
-            OrmInterface(BranchingPackage.TOP, tmp_path, (BranchingPackage.MIDDLE,)),
+        tuple(
+            OrmInterface(package_name, workspace_root)
+            for package_name in (
+                BranchingPackage.BASE,
+                BranchingPackage.MIDDLE,
+                BranchingPackage.SIDE,
+                BranchingPackage.TOP,
+            )
         )
     )
+
+
+def test_an_interface_builds_on_the_interfaces_its_generator_imports(
+    branching_workspace: WorkspaceOrmInterfaces,
+):
+    """
+    The packages an interface builds on are those whose generated interface its
+    generator imports.
+    """
+    dependencies_by_package = {
+        interface.package_name: interface.dependencies
+        for interface in branching_workspace.interfaces
+    }
+
+    assert dependencies_by_package == {
+        BranchingPackage.BASE: (),
+        BranchingPackage.MIDDLE: (BranchingPackage.BASE,),
+        BranchingPackage.SIDE: (BranchingPackage.BASE,),
+        BranchingPackage.TOP: (BranchingPackage.MIDDLE,),
+    }
 
 
 def package_names_of_workspace(workspace: WorkspaceOrmInterfaces) -> list[str]:
