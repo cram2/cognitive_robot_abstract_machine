@@ -5,6 +5,7 @@ array backend and agree with numpy there.
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 from dataclasses import dataclass
 from types import ModuleType
@@ -417,4 +418,26 @@ def test_cumulative_distribution_of_nodes_compiles_with_jax(ordered_input_layer_
         np.asarray(result),
         case.build(np).cumulative_distribution_of_nodes(case.events(namespace=np)),
         rtol=1e-12,
+    )
+
+
+# %% copies of layers that answered a query
+
+
+def test_a_layer_that_answered_a_query_can_be_deep_copied(
+    input_layer_case, array_backend
+):
+    """
+    A deep copy of a layer whose backend a query has looked up answers that query on the
+    same backend, like the original.
+    """
+    case = input_layer_case
+    layer = case.build(array_backend)
+    expected = layer.log_likelihood_of_nodes(case.events(namespace=array_backend))
+    assert_result_of_backend_equals(
+        copy.deepcopy(layer).log_likelihood_of_nodes(
+            case.events(namespace=array_backend)
+        ),
+        np.asarray(expected),
+        array_backend,
     )
