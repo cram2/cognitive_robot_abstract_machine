@@ -304,11 +304,12 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return int(self.log_probabilities.size)
 
     def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
-        result = np.full((len(indices), self.number_of_nodes), -np.inf)
-        known = indices >= 0
-        if known.any():
-            result[known] = self.log_probabilities[:, indices[known]].T
-        return result
+        # an unknown state reads the appended column of probability zero
+        padded = np.concatenate(
+            [self.log_probabilities, np.full((self.number_of_nodes, 1), -np.inf)],
+            axis=1,
+        )
+        return padded[:, np.where(indices >= 0, indices, self.number_of_states)].T
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
         return np.exp(self.log_probabilities[:, selected]).sum(axis=1)

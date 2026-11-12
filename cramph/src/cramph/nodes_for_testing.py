@@ -1,3 +1,7 @@
+"""
+Nodes and exceptions with fixed, simple behaviour that tests build statecharts from.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -37,6 +41,19 @@ class NodeAssertionError(StatechartError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class NodeAssertionErrorNamingANode(NodeAssertionError):
+    """
+    Raised by test statechart nodes when a behaviour they assert on is violated by one
+    particular node.
+    """
+
+    node: StatechartNode
+    """
+    The node that violated the assertion.
+    """
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -820,14 +837,14 @@ class NodeWritingAVariableOnStart(EndedByOwner, StatechartNode):
 
     def set_up(self) -> None:
         self.variable = FloatVariable(f"{self.name}/written_on_start")
-        self.context.float_variable_data.register_expression(self.variable)
+        self.context.float_variable_data.register_expression(expression=self.variable)
 
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_trinary_unknown())
 
     def on_start(self) -> None:
         self.context.float_variable_data.set_value(
-            self.variable, float(ObservationStateValues.TRUE)
+            expression=self.variable, value=float(ObservationStateValues.TRUE)
         )
 
 

@@ -182,7 +182,7 @@ predicate. It unwraps any role to its root entity before comparing, so a role an
 the same entity:
 
 ```{code-cell} ipython3
-print("IsSameSemanticEntity(alice, ceo):", bool(IsSameSemanticEntity(alice, ceo)))
+print("IsSameSemanticEntity(alice, ceo):", bool(IsSameSemanticEntity(first_entity=alice, second_entity=ceo)))
 ```
 
 ## Attribute Access
@@ -276,8 +276,8 @@ cs_101 = Course(name="CS 101")
 professor = Professor(role_taker=alice, teaches=[cs_101])
 
 print("ceo == professor:", ceo == professor)
-print("IsSameSemanticEntity(ceo, professor):", bool(IsSameSemanticEntity(ceo, professor)))
-print("IsSameSemanticEntity(professor, alice):", bool(IsSameSemanticEntity(professor, alice)))
+print("IsSameSemanticEntity(ceo, professor):", bool(IsSameSemanticEntity(first_entity=ceo, second_entity=professor)))
+print("IsSameSemanticEntity(professor, alice):", bool(IsSameSemanticEntity(first_entity=professor, second_entity=alice)))
 print("set size:", len({alice, ceo, professor}))
 
 # Each role preserves its own context-specific data
@@ -304,7 +304,7 @@ print("companies headed:", sorted(role.head_of.name for role in same_type_roles)
 
 # They are distinct objects, yet the same underlying entity
 print("ceo is ceo_of_globex:", ceo is ceo_of_globex)
-print("IsSameSemanticEntity(ceo, ceo_of_globex):", bool(IsSameSemanticEntity(ceo, ceo_of_globex)))
+print("IsSameSemanticEntity(ceo, ceo_of_globex):", bool(IsSameSemanticEntity(first_entity=ceo, second_entity=ceo_of_globex)))
 ```
 
 ## Role Chaining
@@ -323,8 +323,8 @@ class Representative(Role[CEO]):
 rep = Representative(role_taker=ceo, represents=acme)
 
 print("rep == ceo:", rep == ceo)
-print("IsSameSemanticEntity(rep, ceo):", bool(IsSameSemanticEntity(rep, ceo)))
-print("IsSameSemanticEntity(rep, alice):", bool(IsSameSemanticEntity(rep, alice)))
+print("IsSameSemanticEntity(rep, ceo):", bool(IsSameSemanticEntity(first_entity=rep, second_entity=ceo)))
+print("IsSameSemanticEntity(rep, alice):", bool(IsSameSemanticEntity(first_entity=rep, second_entity=alice)))
 print("set size:", len({alice, ceo, professor, rep}))
 ```
 
@@ -355,7 +355,7 @@ print("root type:", Representative.get_root_role_taker_type())
 | Retrieve all roles | `Role.roles_for(taker)` |
 | Access the immediate role taker | `role.role_taker` |
 | Access the root non-role entity | `role.root_persistent_entity` |
-| Check two objects are the same entity | `Role.is_same_semantic_entity(a, b)`, or `IsSameSemanticEntity(a, b)` in a query (both see through role chains) |
+| Check two objects are the same entity | `Role.is_same_semantic_entity(first_entity=a, second_entity=b)`, or `IsSameSemanticEntity(first_entity=a, second_entity=b)` in a query (both see through role chains) |
 | Find the root role-taker type | `MyRole.get_root_role_taker_type()` |
 | Read taker attributes via role | Use the role instance directly — read delegation is automatic |
 | Change a taker attribute | Assign through `role.role_taker` |

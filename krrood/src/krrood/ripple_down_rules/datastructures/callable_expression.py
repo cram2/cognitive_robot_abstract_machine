@@ -16,6 +16,9 @@ from typing_extensions import Any, get_origin
 
 from krrood.source_analysis.source_extraction import extract_function_source
 from krrood.ripple_down_rules.datastructures.case import create_case, Case
+from krrood.ripple_down_rules.exceptions import (
+    NoUserInputOrConclusionForCallableExpression,
+)
 from krrood.ripple_down_rules.utils import (
     is_iterable,
     build_user_input_from_conclusion,
@@ -33,7 +36,6 @@ class VariableVisitor(ast.NodeVisitor):
     represented as an AST tree.
     """
 
-    compares: list[tuple[ast.Name | ast.Call, ast.cmpop, ast.Name | ast.Call]]
     variables: set[str]
     all: list[ast.BoolOp]
 
@@ -42,7 +44,6 @@ class VariableVisitor(ast.NodeVisitor):
         self.attributes: dict[ast.Name, ast.Attribute] = {}
         self.types = set()
         self.callables = set()
-        self.compares = list()
         self.binary_ops = list()
         self.all = list()
 
@@ -72,7 +73,6 @@ class VariableVisitor(ast.NodeVisitor):
 
     def visit_Compare(self, node):
         self.all.append(node)
-        self.compares.append([node.left, node.ops[0], node.comparators[0]])
         self.generic_visit(node)
 
     def visit_Name(self, node):
@@ -134,7 +134,7 @@ class CallableExpression:
             callable expression can return multiple conclusions.
         """
         if user_input is None and conclusion is None:
-            raise ValueError("Either user_input or conclusion must be provided.")
+            raise NoUserInputOrConclusionForCallableExpression()
         if user_input is None:
             user_input = build_user_input_from_conclusion(conclusion)
         self.conclusion: Any | None = conclusion
@@ -173,7 +173,7 @@ class CallableExpression:
         self.mutually_exclusive: bool = mutually_exclusive
 
     @classmethod
-    def get_encapsulating_function(cls, postfix: str = "") -> str:
+    def get_encapsulating_function(cls, *, postfix: str = "") -> str:
         """
         Get the encapsulating function that is used to wrap the user input.
         """
@@ -213,7 +213,7 @@ class CallableExpression:
                 f"Error during evaluation: {e}, user_input: {self.user_input}"
             )
 
-    def combine_with(self, other: CallableExpression) -> CallableExpression:
+    def combine_with(self, *, other: CallableExpression) -> CallableExpression:
         """
         Combine this callable expression with another callable expression using the
         'and' operator.
@@ -235,7 +235,7 @@ class CallableExpression:
             mutually_exclusive=self.mutually_exclusive,
         )
 
-    def update_user_input_from_file(self, file_path: str, function_name: str):
+    def update_user_input_from_file(self, *, file_path: str, function_name: str):
         """
         Update the user input from a file.
         """
@@ -250,7 +250,7 @@ class CallableExpression:
             return
         self.user_input = self.get_encapsulating_function() + "\n" + new_function_body
 
-    def write_to_python_file(self, file_path: str, append: bool = False):
+    def write_to_python_file(self, *, file_path: str, append: bool = False):
         """
         Write the callable expression to a python file.
 

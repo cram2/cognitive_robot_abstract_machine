@@ -75,7 +75,7 @@ class RecordedDebugExpression:
         self.debug_expression = debug_expression
         self._free_variables = debug_expression.expression.free_variables()
         self._compiled_function = debug_expression.expression.compile(
-            VariableParameters.from_lists(self._free_variables)
+            parameters=VariableParameters.from_lists(self._free_variables)
         )
         self._is_followed = True
 

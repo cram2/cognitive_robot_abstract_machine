@@ -35,7 +35,7 @@ class PythonSourceFile(StrEnum):
 # %% imports run when a module is loaded
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModuleLevelImportFinder(ast.NodeVisitor):
     """
     Collects the imports a module runs when it is loaded: those outside every function
@@ -84,7 +84,7 @@ class ModuleLevelImportFinder(ast.NodeVisitor):
         self.imports.append(node)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ModuleImport:
     """
     One module that an import statement loads, together with the statement.
@@ -105,7 +105,7 @@ class ModuleImport:
 # %% the distribution's modules
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ModuleGraph:
     """
     The modules of a distribution and the modules each one loads when it is loaded.
@@ -117,7 +117,7 @@ class ModuleGraph:
     """
 
     @classmethod
-    def from_packages(cls, package_directories: list[Path]) -> ModuleGraph:
+    def from_packages(cls, *, package_directories: list[Path]) -> ModuleGraph:
         """
         :param package_directories: The directories of the distribution's top-level
             packages.
@@ -130,9 +130,9 @@ class ModuleGraph:
                 if path.name == PythonSourceFile.PACKAGE_INITIALIZER:
                     parts = parts[:-1]
                 paths[".".join(parts)] = path
-        return cls(paths)
+        return cls(paths=paths)
 
-    def module_name(self, path: Path) -> str | None:
+    def module_name(self, *, path: Path) -> str | None:
         """
         :param path: A Python source file.
         :return: The dotted name of the module it holds, or none if it is not one of the
@@ -144,7 +144,7 @@ class ModuleGraph:
         )
 
     @functools.cache
-    def imports(self, module: str) -> tuple[ModuleImport, ...]:
+    def imports(self, *, module: str) -> tuple[ModuleImport, ...]:
         """
         :param module: The dotted name of one of the distribution's modules.
         :return: Every module that loading it loads directly, parent packages included.
@@ -158,13 +158,13 @@ class ModuleGraph:
             else module.rpartition(".")[0]
         )
         return tuple(
-            ModuleImport(statement, loaded)
+            ModuleImport(statement=statement, module=loaded)
             for statement in finder.imports
-            for loaded in self.loaded_modules(statement, package)
+            for loaded in self.loaded_modules(statement=statement, package=package)
         )
 
     def loaded_modules(
-        self, statement: ast.Import | ast.ImportFrom, package: str
+        self, *, statement: ast.Import | ast.ImportFrom, package: str
     ) -> list[str]:
         """
         :param statement: An import statement.

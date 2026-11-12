@@ -59,7 +59,7 @@ class TestRotationMatrix:
         )
         rotation_json = rotation.to_json()
 
-        assert RotationMatrix.from_json(rotation_json).to_json() == rotation_json
+        assert RotationMatrix.from_json(data=rotation_json).to_json() == rotation_json
 
     @pytest.mark.parametrize("q1", quaternions)
     @pytest.mark.parametrize("q2", quaternions)
@@ -164,9 +164,13 @@ class TestRotationMatrix:
             AxisAngle(Vector3.unit_vector(0.2, -0.9, 0.3), variable)
         )
 
-        derivative = rotation.axis_angle.angle.jacobian([variable])
+        derivative = rotation.axis_angle.angle.jacobian(variables=[variable])
 
-        assert np.isfinite(derivative.substitute([variable], [angle]).to_np()).all()
+        assert np.isfinite(
+            derivative.substitute(
+                old_variables=[variable], new_variables=[angle]
+            ).to_np()
+        ).all()
 
     def test_reference_frames(self):
         reference_frame = Body(name=PrefixedName("muh"))
@@ -1168,7 +1172,9 @@ class TestVector3:
         nominator_expr = Vector3.from_iterable(nominator)
         denominator_expr = sm.Scalar(data=denominator)
         if_nan_expr = Vector3.from_iterable(if_nan)
-        result = nominator_expr.safe_division(denominator_expr, if_nan_expr)
+        result = nominator_expr.safe_division(
+            other=denominator_expr, if_nan=if_nan_expr
+        )
         if denominator == 0:
             assert np.allclose(result[:3], if_nan)
         else:
@@ -1441,7 +1447,7 @@ class TestTransformationMatrix:
         """
         t = HomogeneousTransformationMatrix()
         t_json = t.to_json()
-        t_copy = HomogeneousTransformationMatrix.from_json(t_json)
+        t_copy = HomogeneousTransformationMatrix.from_json(data=t_json)
         assert np.allclose(t.to_np(), t_copy.to_np())
 
     def test_reference_frames(self):
@@ -1630,7 +1636,7 @@ class TestTransformationMatrix:
         x = sm.FloatVariable(name="x")
         m1 = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
         m2 = HomogeneousTransformationMatrix.from_xyz_rpy(x=x)
-        actual = m1.dot(m2).substitute([x], [0.5])
+        actual = m1.dot(m2).substitute(old_variables=[x], new_variables=[0.5])
         expected = (
             m1.to_np() @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5).to_np()
         )
@@ -2386,18 +2392,20 @@ class TestConstantEntriesAreNormalised:
         np.testing.assert_array_equal(matrix.to_np()[:3, 3], [5.0, 5.0, 5.0])
 
     def test_pose_repairs_its_bottom_row(self):
-        pose = Pose.from_casadi_sx(sm.to_sx(self._matrix_with_wrong_constant_entries()))
+        pose = Pose.from_casadi_sx(
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
+        )
         np.testing.assert_array_equal(pose.to_np()[3, :], [0.0, 0.0, 0.0, 1.0])
 
     def test_rotation_matrix_repairs_its_bottom_row(self):
         rotation = RotationMatrix.from_casadi_sx(
-            sm.to_sx(self._matrix_with_wrong_constant_entries())
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
         )
         np.testing.assert_array_equal(rotation.to_np()[3, :], [0.0, 0.0, 0.0, 1.0])
 
     def test_rotation_matrix_drops_any_translation(self):
         rotation = RotationMatrix.from_casadi_sx(
-            sm.to_sx(self._matrix_with_wrong_constant_entries())
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
         )
         np.testing.assert_array_equal(rotation.to_np()[:3, 3], [0.0, 0.0, 0.0])
 

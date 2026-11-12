@@ -18,22 +18,22 @@ from ...factories.world.handles_and_containers import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Handle1(HandleConf):
     name: str = "Handle1"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Handle2(HandleConf):
     name: str = "Handle2"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Container1(ContainerConf):
     name: str = "Container1"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Container2(ContainerConf):
     name: str = "Container2"
 
@@ -42,7 +42,7 @@ def bodies():
     return [Handle1(), Handle2(), Container1(), Container2()]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HandlesAndContainersWorld(WorldConf):
     bodies: list[BodyConf] = field(default_factory=bodies, init=False)
     connections: list[Connection] = field(

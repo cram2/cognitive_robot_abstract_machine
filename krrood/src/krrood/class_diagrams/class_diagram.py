@@ -52,70 +52,87 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassRelation(ABC):
     """
-    Abstract base class representing a relationship between two classes in a UML class diagram.
+    Abstract base class representing a relationship between two classes in a UML class
+    diagram.
     """
 
     source: WrappedClass
-    """The source class in the relation."""
+    """
+    The source class in the relation.
+    """
 
     target: WrappedClass
-    """The target class in the relation."""
+    """
+    The target class in the relation.
+    """
 
     index: int | None = field(init=False, default=None)
     """
-    The index of the relation in the dependency graph. This is used to uniquely identify the relation.
+    The index of the relation in the dependency graph.
+
+    This is used to uniquely identify the relation.
     """
 
     inferred: bool = field(default=False, init=False)
     """
-    Whether this relation was inferred (e.g. associations from role takers) or explicitly defined.
+    Whether this relation was inferred (e.g. associations from role takers) or
+    explicitly defined.
     """
 
     def __str__(self):
-        """Return the relation name for display purposes."""
+        """
+        Return the relation name for display purposes.
+        """
         return f"{self.__class__.__name__}"
 
     @property
     def color(self) -> str:
-        """Default edge color used when visualizing the relation."""
+        """
+        Default edge color used when visualizing the relation.
+        """
         if self.inferred:
             return "red"
         return "black"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Inheritance(ClassRelation):
     """
     Represents an inheritance (generalization) relationship in UML.
 
-    This is an "is-a" relationship where the source class inherits from the target class.
-    In UML notation, this is represented by a solid line with a hollow triangle pointing to the parent class.
+    This is an "is-a" relationship where the source class inherits from the target
+    class. In UML notation, this is represented by a solid line with a hollow triangle
+    pointing to the parent class.
     """
 
     def __str__(self):
         return f"isSuperClassOf"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Association(ClassRelation):
     """
     Represents a general association relationship between two classes.
 
-    This is the most general form of relationship, indicating that instances of one class
-    are connected to instances of another class. In UML notation, this is shown as a solid line.
+    This is the most general form of relationship, indicating that instances of one
+    class are connected to instances of another class. In UML notation, this is shown as
+    a solid line.
     """
 
     wrapped_field: WrappedField
-    """The field in the source class that creates this association with the target class."""
+    """
+    The field in the source class that creates this association with the target class.
+    """
 
     def get_original_source_instance_given_this_relation_source_instance(
-        self, source_instance: Any
+        self, *, source_instance: Any
     ):
         """
-        Given a source instance, returns the original source instance that has the wrapped field of this association.
+        Given a source instance, returns the original source instance that has the
+        wrapped field of this association.
         """
         if not isinstance(source_instance, self.source.clazz):
             raise ValueError(
@@ -125,13 +142,15 @@ class Association(ClassRelation):
 
     @cached_property
     def many_to_many(self) -> bool:
-        """Whether the association is one-to-many (True) or many-to-one (False)."""
+        """
+        Whether the association is one-to-many (True) or many-to-one (False).
+        """
         return (
             self.wrapped_field.is_many_to_many_relationship
             and not self.wrapped_field.is_type_type
         )
 
-    def get_key(self, include_field_name: bool = False) -> tuple:
+    def get_key(self, *, include_field_name: bool = False) -> tuple:
         """
         A tuple representing the key of the association.
         """
@@ -149,36 +168,42 @@ class Association(ClassRelation):
         return hash(self) == hash(other)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HasRoleTaker(Association):
     """
-    This is an association between a role and a role taker where the role class contains a role taker field.
+    This is an association between a role and a role taker where the role class contains
+    a role taker field.
     """
 
     def __str__(self):
         return f"role-taker({self.wrapped_field.public_name})"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AssociationThroughRoleTaker(Association):
     """
-    This is an association between a role and a role taker where the role taker class contains an association. This
-    applies transitively to the role taker's role takers and so on. The path is a list of fields that are traversed to
-    get to the target class.
+    This is an association between a role and a role taker where the role taker class
+    contains an association.
+
+    This applies transitively to the role taker's role takers and so on. The path is a
+    list of fields that are traversed to get to the target class.
     """
 
     wrapped_field: WrappedField = field(init=False)
     """
     The last field in the path that is the association to the target class.
     """
+
     association_path: list[Association]
     """
     The path of associations that are traversed to get to the target class.
     """
+
     field_path: list[WrappedField] = field(init=False)
     """
     The path of fields that are traversed to get to the target class.
     """
+
     inferred: bool = field(init=False, default=True)
     """
     Redefined inferred to be always true, and never initialized through the init method.
@@ -197,20 +222,23 @@ class AssociationThroughRoleTaker(Association):
 
     @memoize
     def get_original_source_instance_given_this_relation_source_instance(
-        self, source_instance: Any
+        self, *, source_instance: Any
     ):
         """
-        Resolve the instance that actually owns the target, following the role-taker path.
+        Resolve the instance that actually owns the target, following the role-taker
+        path.
 
-        Walks every field in the path except the last (the association to the target), so the
-        returned instance is the role taker on which the target association is declared.
+        Walks every field in the path except the last (the association to the target),
+        so the returned instance is the role taker on which the target association is
+        declared.
 
         :param source_instance: The role instance this association starts from.
-        :return: The instance along the role-taker path that owns the target association.
+        :return: The instance along the role-taker path that owns the target
+            association.
         """
         source_instance = (
             super().get_original_source_instance_given_this_relation_source_instance(
-                source_instance
+                source_instance=source_instance
             )
         )
         for wrapped_field in self.field_path[:-1]:
@@ -233,30 +261,36 @@ class AssociationThroughRoleTaker(Association):
 
 class ParseError(TypeError):
     """
-    Error that will be raised when the parser encounters something that can/should not be parsed.
+    Error that will be raised when the parser encounters something that can/should not
+    be parsed.
 
     For instance, Union types
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedClass(Generic[T], SubClassSafeGeneric):
-    """A node wrapper around a Python class used in the class diagram graph."""
+    """
+    A node wrapper around a Python class used in the class diagram graph.
+    """
 
     index: int | None = field(init=False, default=None)
     """
     The class unique index in the graph.
     """
+
     clazz: type[T]
     """
     The class to be wrapped.
     """
+
     _class_diagram: ClassDiagram | None = field(
         init=False, hash=False, default=None, repr=False
     )
     """
     The class diagram where this class is part of.
     """
+
     _wrapped_field_name_map_: dict[str, WrappedField] = field(
         init=False, hash=False, default_factory=dict, repr=False
     )
@@ -265,7 +299,7 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
     """
 
     def fields_with_metadata(
-        self, metadata_type: type[FieldMetadata]
+        self, *, metadata_type: type[FieldMetadata]
     ) -> list[WrappedField]:
         """
         :return: the fields of this class carrying metadata of *metadata_type*, in
@@ -274,7 +308,7 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
         return [
             wrapped_field
             for wrapped_field in self.fields
-            if metadata_type.of_wrapped_field(wrapped_field) is not None
+            if metadata_type.of_wrapped_field(wrapped_field=wrapped_field) is not None
         ]
 
     def _get_introspector(self) -> AttributeIntrospector:
@@ -297,8 +331,10 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
     @cached_property
     def roles(self) -> tuple[WrappedClass, ...]:
         """
-        A tuple of roles that this class plays, represented by the HasRoleTaker instances.
-         There are HasRoleTaker edges connecting the roles to this class.
+        A tuple of roles that this class plays, represented by the HasRoleTaker
+        instances.
+
+        There are HasRoleTaker edges connecting the roles to this class.
         """
         return tuple(
             [
@@ -319,19 +355,19 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
 
     @cached_property
     def fields(self) -> list[WrappedField]:
-        """Return wrapped fields discovered by the diagram’s attribute introspector.
+        """
+        Return wrapped fields discovered by the diagram’s attribute introspector.
 
         Public names from the introspector are used to index `_wrapped_field_name_map_`.
         """
-
         wrapped_fields: list[WrappedField] = []
         introspector = self._get_introspector()
         try:
-            discovered = introspector.discover(self.class_to_introspect)
+            discovered = introspector.discover(owner_cls=self.class_to_introspect)
             for item in discovered:
                 wf = WrappedField(
-                    self,
-                    item.field,
+                    clazz=self,
+                    field=item.field,
                     public_name=item.public_name,
                     property_descriptor=item.property_descriptor,
                 )
@@ -349,7 +385,7 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
         """
         return self.clazz.__name__
 
-    def get_field(self, name: str) -> WrappedField:
+    def get_field(self, *, name: str) -> WrappedField:
         """
         :param name: The public name of one of the class's fields.
         :return: That field.
@@ -358,7 +394,7 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
         for wrapped_field in self.fields:
             if wrapped_field.name == name:
                 return wrapped_field
-        raise FieldIsUnMappedInClassDiagram(self.clazz, name)
+        raise FieldIsUnMappedInClassDiagram(class_=self.clazz, field_name=name)
 
     @cached_property
     def factory_methods(self) -> tuple[str, ...]:
@@ -376,10 +412,11 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
         return module_and_class_name(self.clazz)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class WrappedSpecializedGeneric(WrappedClass):
     """
-    Specialization of WrappedClass for completely parameterized generic types, e.g. Generic[float].
+    Specialization of WrappedClass for completely parameterized generic types, e.g.
+    Generic[float].
     """
 
     @property
@@ -395,9 +432,11 @@ class WrappedSpecializedGeneric(WrappedClass):
         return self.class_to_introspect.__name__
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassDiagram:
-    """A graph of classes and their relations discovered via attribute introspection."""
+    """
+    A graph of classes and their relations discovered via attribute introspection.
+    """
 
     classes: list[type]
     """
@@ -426,10 +465,12 @@ class ClassDiagram:
     """
 
     def __post_init__(self):
-        """Initialize the diagram with the provided classes and build relations."""
-        self._rebuild_diagram(self.classes)
+        """
+        Initialize the diagram with the provided classes and build relations.
+        """
+        self._rebuild_diagram(classes=self.classes)
 
-    def _rebuild_diagram(self, classes: Iterable[type]) -> None:
+    def _rebuild_diagram(self, *, classes: Iterable[type]) -> None:
         self.classes = list(classes)
         self._cls_wrapped_cls_map = {}
         self._dependency_graph = rx.PyDiGraph()
@@ -439,18 +480,23 @@ class ClassDiagram:
                 generics.append(clazz)
                 clazz = get_origin(clazz)
             # pass the bare class so add_node() dedupes it against classes/generics
-            self.add_node(clazz)
-        self._create_nodes_for_specialized_generic_type_hints(generics)
+            self.add_node(clazz=clazz)
+        self._create_nodes_for_specialized_generic_type_hints(
+            additional_classes=generics
+        )
         self._create_all_relations()
 
-    def get_roles_of_class(self, cls: type) -> tuple[WrappedClass[Role], ...]:
+    def get_roles_of_class(self, *, cls: type) -> tuple[WrappedClass[Role], ...]:
         """
         Get all roles that are subclasses of the given class.
 
         :param cls: The class for which to retrieve roles.
-        :return: A tuple of role classes that are roles for the given class (the role taker).
+        :return: A tuple of role classes that are roles for the given class (the role
+            taker).
         """
-        return self.get_incoming_neighbors_with_relation_type(cls, HasRoleTaker)
+        return self.get_incoming_neighbors_with_relation_type(
+            cls=cls, relation_type=HasRoleTaker
+        )
 
     @cached_property
     def role_takers(self) -> tuple[type, ...]:
@@ -474,70 +520,80 @@ class ClassDiagram:
 
     def get_outgoing_associations_with_condition(
         self,
+        *,
         clazz: type | WrappedClass,
         condition: Callable[[Association], bool],
     ) -> Iterator[Association]:
         """
         Get all outgoing associations that match the condition.
 
-        :param clazz: The source class or wrapped class for which outgoing edges are to be retrieved.
+        :param clazz: The source class or wrapped class for which outgoing edges are to
+            be retrieved.
         :param condition: The condition to filter relations by.
         """
-        for relation in self.get_outgoing_relations(clazz):
+        for relation in self.get_outgoing_relations(clazz=clazz):
             if isinstance(relation, Association) and condition(relation):
                 yield relation
 
     def get_incoming_associations_with_condition(
         self,
+        *,
         clazz: type | WrappedClass,
         condition: Callable[[Association], bool],
     ) -> Iterator[Association]:
         """
         Get all incoming associations that match the condition.
 
-        :param clazz: The target (class or wrapped class) for which incoming associations are to be retrieved.
+        :param clazz: The target (class or wrapped class) for which incoming
+            associations are to be retrieved.
         :param condition: The condition to filter relations by.
         """
-        for relation in self.get_incoming_relations(clazz):
+        for relation in self.get_incoming_relations(clazz=clazz):
             if isinstance(relation, Association) and condition(relation):
                 yield relation
 
     def get_outgoing_relations(
         self,
+        *,
         clazz: type | WrappedClass,
     ) -> Iterable[ClassRelation]:
         """
         Get all outgoing edge relations of the given class.
 
-        :param clazz: The source class or wrapped class for which outgoing edges are to be retrieved.
+        :param clazz: The source class or wrapped class for which outgoing edges are to
+            be retrieved.
         """
-        wrapped_cls = self.get_wrapped_class(clazz)
-        yield from self.get_out_edges(wrapped_cls)
+        wrapped_cls = self.get_wrapped_class(clazz=clazz)
+        yield from self.get_out_edges(cls=wrapped_cls)
 
     def get_incoming_relations(
         self,
+        *,
         clazz: type | WrappedClass,
     ) -> Iterable[ClassRelation]:
         """
         Get all incoming edge relations of the given class.
 
-        :param clazz: The target class or wrapped class for which incoming edges are to be retrieved.
+        :param clazz: The target class or wrapped class for which incoming edges are to
+            be retrieved.
         """
-        wrapped_cls = self.get_wrapped_class(clazz)
-        yield from self.get_in_edges(wrapped_cls)
+        wrapped_cls = self.get_wrapped_class(clazz=clazz)
+        yield from self.get_in_edges(cls=wrapped_cls)
 
     @memoize
     def get_common_role_taker_associations(
-        self, cls1: type | WrappedClass, cls2: type | WrappedClass
+        self, *, cls1: type | WrappedClass, cls2: type | WrappedClass
     ) -> tuple[HasRoleTaker | None, HasRoleTaker | None]:
-        """Return pair of role-taker associations if both classes point to the same target.
+        """
+        Return pair of role-taker associations if both classes point to the same target.
 
         The method checks whether both classes have a HasRoleTaker association to the
-        same target class and returns the matching associations, otherwise ``(None, None)``.
+        same target class and returns the matching associations, otherwise ``(None,
+        None)``.
         """
-        cls1 = self.get_wrapped_class(cls1)
-        cls2 = self.get_wrapped_class(cls2)
-        assoc1 = self.get_role_taker_associations_of_cls(cls1)
+        cls1 = self.get_wrapped_class(clazz=cls1)
+        cls2 = self.get_wrapped_class(clazz=cls2)
+        assoc1 = self.get_role_taker_associations_of_cls(cls=cls1)
         if not assoc1:
             return None, None
         target_1 = assoc1.target
@@ -552,14 +608,15 @@ class ClassDiagram:
 
     @memoize
     def get_role_taker_associations_of_cls(
-        self, cls: type | WrappedClass
+        self, *, cls: type | WrappedClass
     ) -> HasRoleTaker | None:
-        """Return the role-taker association of a class if present.
+        """
+        Return the role-taker association of a class if present.
 
         A role taker is a field that is a one-to-one relationship and is not optional.
         """
-        cls = self.get_wrapped_class(cls)
-        for assoc in self.get_out_edges(cls):
+        cls = self.get_wrapped_class(clazz=cls)
+        for assoc in self.get_out_edges(cls=cls):
             if isinstance(assoc, HasRoleTaker) and assoc.wrapped_field.is_role_taker:
                 return assoc
         return None
@@ -567,16 +624,19 @@ class ClassDiagram:
     @memoize
     def get_neighbors_with_relation_type(
         self,
+        *,
         cls: type | WrappedClass,
         relation_type: type[ClassRelation],
     ) -> tuple[WrappedClass, ...]:
-        """Return all neighbors of a class whose connecting edge matches the relation type.
+        """
+        Return all neighbors of a class whose connecting edge matches the relation type.
 
         :param cls: The class or wrapped class for which neighbors are to be found.
         :param relation_type: The type of the relation to filter edges by.
-        :return: A tuple containing the neighbors of the class, filtered by the specified relation type.
+        :return: A tuple containing the neighbors of the class, filtered by the
+            specified relation type.
         """
-        wrapped_cls = self.get_wrapped_class(cls)
+        wrapped_cls = self.get_wrapped_class(clazz=cls)
         edge_filter_func = lambda edge: isinstance(edge, relation_type)
         filtered_neighbors = [
             self._dependency_graph.get_node_data(n)
@@ -588,19 +648,20 @@ class ClassDiagram:
     @memoize
     def get_outgoing_neighbors_with_relation_type(
         self,
+        *,
         cls: type | WrappedClass,
         relation_type: type[ClassRelation],
     ) -> tuple[WrappedClass, ...]:
         """
-        Caches and retrieves the outgoing neighbors of a given class with a specific relation type
-        using the dependency graph.
+        Caches and retrieves the outgoing neighbors of a given class with a specific
+        relation type using the dependency graph.
 
         :param cls: The class or wrapped class for which outgoing neighbors are to be found.
             relation_type: The type of the relation to filter edges by.
         :return: A tuple containing the outgoing neighbors of the class, filtered by the specified relation type.
         :raises: Any exceptions raised internally by `find_successors_by_edge` or during class wrapping.
         """
-        wrapped_cls = self.get_wrapped_class(cls)
+        wrapped_cls = self.get_wrapped_class(clazz=cls)
         edge_filter_func = lambda edge: isinstance(edge, relation_type)
         find_successors_by_edge = self._dependency_graph.find_successors_by_edge
         return tuple(find_successors_by_edge(wrapped_cls.index, edge_filter_func))
@@ -608,38 +669,43 @@ class ClassDiagram:
     @memoize
     def get_incoming_neighbors_with_relation_type(
         self,
+        *,
         cls: type | WrappedClass,
         relation_type: type[ClassRelation],
     ) -> tuple[WrappedClass, ...]:
-        wrapped_cls = self.get_wrapped_class(cls)
+        wrapped_cls = self.get_wrapped_class(clazz=cls)
         edge_filter_func = lambda edge: isinstance(edge, relation_type)
         find_predecessors_by_edge = self._dependency_graph.find_predecessors_by_edge
         return tuple(find_predecessors_by_edge(wrapped_cls.index, edge_filter_func))
 
     @memoize
-    def get_out_edges(self, cls: type | WrappedClass) -> tuple[ClassRelation, ...]:
+    def get_out_edges(self, *, cls: type | WrappedClass) -> tuple[ClassRelation, ...]:
         """
         Caches and retrieves the outgoing edges (relations) for the provided class in a
         dependency graph.
 
-        :param cls: The class or wrapped class for which outgoing edges are to be retrieved.
-        :return: A tuple of outgoing edges (relations) associated with the provided class.
+        :param cls: The class or wrapped class for which outgoing edges are to be
+            retrieved.
+        :return: A tuple of outgoing edges (relations) associated with the provided
+            class.
         """
-        wrapped_cls = self.get_wrapped_class(cls)
+        wrapped_cls = self.get_wrapped_class(clazz=cls)
         out_edges = [
             edge for _, _, edge in self._dependency_graph.out_edges(wrapped_cls.index)
         ]
         return tuple(out_edges)
 
-    def get_in_edges(self, cls: type | WrappedClass) -> tuple[ClassRelation, ...]:
+    def get_in_edges(self, *, cls: type | WrappedClass) -> tuple[ClassRelation, ...]:
         """
         Caches and retrieves the incoming edges (relations) for the provided class in a
         dependency graph.
 
-        :param cls: The class or wrapped class for which incoming edges are to be retrieved.
-        :return: A tuple of incoming edges (relations) associated with the provided class.
+        :param cls: The class or wrapped class for which incoming edges are to be
+            retrieved.
+        :return: A tuple of incoming edges (relations) associated with the provided
+            class.
         """
-        wrapped_cls = self.get_wrapped_class(cls)
+        wrapped_cls = self.get_wrapped_class(clazz=cls)
         out_edges = [
             edge for _, _, edge in self._dependency_graph.in_edges(wrapped_cls.index)
         ]
@@ -657,7 +723,7 @@ class ClassDiagram:
                 parent_map.setdefault(child_index, set()).add(parent_index)
         return parent_map
 
-    def all_ancestors(self, node_index: int) -> set[int]:
+    def all_ancestors(self, *, node_index: int) -> set[int]:
         """
         :param node_index: The index of a class in the dependency graph.
         :return: The indices of every class it inherits from, directly or indirectly.
@@ -677,17 +743,18 @@ class ClassDiagram:
         return seen
 
     def get_association_keys_by_source(
-        self, include_field_name: bool = False
+        self, *, include_field_name: bool = False
     ) -> dict[int, set[tuple]]:
         """
-        Fetches association keys grouped by their source from the internal dependency graph.
+        Fetches association keys grouped by their source from the internal dependency
+        graph.
 
-        This method traverses the edges of the dependency graph, identifies associations,
-        and groups their keys by their source nodes. Optionally includes the field name
-        of associations in the resulting keys.
+        This method traverses the edges of the dependency graph, identifies
+        associations, and groups their keys by their source nodes. Optionally includes
+        the field name of associations in the resulting keys.
 
         :include_field_name: Optional; If True, includes the field name in the
-                association keys. Defaults to False.
+        association keys. Defaults to False.
 
         :return: A dictionary where the keys are source node identifiers (int), and the
             values are sets of tuples representing association keys.
@@ -697,13 +764,14 @@ class ClassDiagram:
         for source_index, _, relation in edges:
             if isinstance(relation, Association):
                 association_keys_by_source.setdefault(source_index, set()).add(
-                    relation.get_key(include_field_name)
+                    relation.get_key(include_field_name=include_field_name)
                 )
         return association_keys_by_source
 
     @memoize
     def to_subdiagram_without_inherited_associations(
         self,
+        *,
         include_field_name: bool = False,
     ) -> ClassDiagram:
         """
@@ -717,7 +785,7 @@ class ClassDiagram:
         dependency_graph = result._dependency_graph
 
         association_keys_by_source = result.get_association_keys_by_source(
-            include_field_name
+            include_field_name=include_field_name
         )
 
         # Mark redundant descendant association edges for removal
@@ -727,10 +795,10 @@ class ClassDiagram:
             if not isinstance(relation, Association):
                 continue
 
-            key = relation.get_key(include_field_name)
+            key = relation.get_key(include_field_name=include_field_name)
             # Collect all keys defined by any ancestor of the source
             inherited_keys: set[tuple] = set()
-            for ancestor_index in result.all_ancestors(source_index):
+            for ancestor_index in result.all_ancestors(node_index=source_index):
                 inherited_keys |= association_keys_by_source.get(ancestor_index, set())
 
             if key in inherited_keys:
@@ -743,12 +811,16 @@ class ClassDiagram:
 
     @property
     def wrapped_classes(self):
-        """Return all wrapped classes present in the diagram."""
+        """
+        Return all wrapped classes present in the diagram.
+        """
         return self._dependency_graph.nodes()
 
     @property
     def associations(self) -> list[Association]:
-        """Return all association relations present in the diagram."""
+        """
+        Return all association relations present in the diagram.
+        """
         return [
             edge
             for edge in self._dependency_graph.edges()
@@ -757,34 +829,36 @@ class ClassDiagram:
 
     @property
     def inheritance_relations(self) -> list[Inheritance]:
-        """Return all inheritance relations present in the diagram."""
+        """
+        Return all inheritance relations present in the diagram.
+        """
         return [
             edge
             for edge in self._dependency_graph.edges()
             if isinstance(edge, Inheritance)
         ]
 
-    def ensure_wrapped_class(self, clazz: type) -> WrappedClass:
+    def ensure_wrapped_class(self, *, clazz: type) -> WrappedClass:
         """
         Ensures that the provided class type has a corresponding WrappedClass instance.
-        If the class type is already a WrappedClass, it is returned as is. Otherwise, a new
-        WrappedClass instance is created and added to the internal mapping.
+        If the class type is already a WrappedClass, it is returned as is. Otherwise, a
+        new WrappedClass instance is created and added to the internal mapping.
 
         :param clazz: The class type to ensure has a WrappedClass instance.
         :return: The associated WrappedClass instance.
         """
         try:
-            return self.get_wrapped_class(clazz)
+            return self.get_wrapped_class(clazz=clazz)
         except ClassIsUnMappedInClassDiagram:
-            return WrappedClass(clazz)
+            return WrappedClass(clazz=clazz)
 
-    def get_wrapped_class(self, clazz: type) -> WrappedClass:
+    def get_wrapped_class(self, *, clazz: type) -> WrappedClass:
         """
         Gets the wrapped class corresponding to the provided class type.
 
-        If the class type is already a WrappedClass, it will be returned as is. Otherwise, the
-        method checks if the class type has an associated WrappedClass in the internal mapping
-        and returns it if found.
+        If the class type is already a WrappedClass, it will be returned as is.
+        Otherwise, the method checks if the class type has an associated WrappedClass in
+        the internal mapping and returns it if found.
 
         :param clazz : The class type to check or retrieve the associated WrappedClass.
         :return: The associated WrappedClass if it exists, None otherwise.
@@ -794,22 +868,22 @@ class ClassDiagram:
         try:
             return self._cls_wrapped_cls_map[clazz]
         except KeyError:
-            raise ClassIsUnMappedInClassDiagram(clazz)
+            raise ClassIsUnMappedInClassDiagram(class_=clazz)
 
-    def add_node(self, clazz: type | WrappedClass):
+    def add_node(self, *, clazz: type | WrappedClass):
         """
         Adds a new node to the dependency graph for the specified wrapped class.
 
         The method sets the position of the given wrapped class in the dependency graph,
-        links it with the current class diagram, and updates the mapping of the underlying
-        class to the wrapped class.
+        links it with the current class diagram, and updates the mapping of the
+        underlying class to the wrapped class.
 
         :param clazz: The wrapped class object to be added to the dependency graph.
         """
         try:
-            clazz = self.get_wrapped_class(clazz)
+            clazz = self.get_wrapped_class(clazz=clazz)
         except ClassIsUnMappedInClassDiagram:
-            clazz = WrappedClass(clazz)
+            clazz = WrappedClass(clazz=clazz)
         if clazz.index is not None:
             return
         clazz.index = self._dependency_graph.add_node(clazz)
@@ -844,7 +918,7 @@ class ClassDiagram:
 
             for superclass in bases:
                 try:
-                    source = self.get_wrapped_class(superclass)
+                    source = self.get_wrapped_class(clazz=superclass)
                 except ClassIsUnMappedInClassDiagram:
                     continue
                 if source:
@@ -852,7 +926,7 @@ class ClassDiagram:
                         source=source,
                         target=clazz,
                     )
-                    self.add_relation(relation)
+                    self.add_relation(relation=relation)
 
     def _create_association_relations(self):
         """
@@ -861,8 +935,8 @@ class ClassDiagram:
         This method analyzes the fields of wrapped classes and establishes relationships
         based on their target types. It determines the appropriate type of association
         (e.g., `Association` or `HasRoleTaker`) and adds the determined relations to the
-        internal collection. Relations are only created when the target class is found among
-        the wrapped classes.
+        internal collection. Relations are only created when the target class is found
+        among the wrapped classes.
 
         Resolving a class's field types is the long part of building a diagram, so a
         class finished here is what progress is reported against.
@@ -893,7 +967,7 @@ class ClassDiagram:
                         target_type = target_type.__bound__
                     if target_type is None:
                         continue
-                    wrapped_target_class = self.get_wrapped_class(target_type)
+                    wrapped_target_class = self.get_wrapped_class(clazz=target_type)
                 except ClassIsUnMappedInClassDiagram:
                     continue
 
@@ -902,26 +976,30 @@ class ClassDiagram:
                     source=clazz,
                     target=wrapped_target_class,
                 )
-                self.add_relation(relation)
+                self.add_relation(relation=relation)
             if report_wanted:
                 report_progress(clazz.name, total_classes)
 
     def _create_association_relations_inferred_from_role_takers(self):
         """
-        Create association relations in the roles for associations inferred from role takers.
+        Create association relations in the roles for associations inferred from role
+        takers.
         """
         wrapped_classes = (
             self.wrapped_classes_of_role_associations_subgraph_in_topological_order
         )
         for role_taker_clazz in reversed(wrapped_classes):
             role_taker_associations = self.get_outgoing_associations_with_condition(
-                role_taker_clazz, lambda rel: not isinstance(rel, HasRoleTaker)
+                clazz=role_taker_clazz,
+                condition=lambda rel: not isinstance(rel, HasRoleTaker),
             )
             for association in role_taker_associations:
-                self._infer_role_associations_for_role_taker_association(association)
+                self._infer_role_associations_for_role_taker_association(
+                    role_taker_assoc=association
+                )
 
     def _infer_role_associations_for_role_taker_association(
-        self, role_taker_assoc: Association
+        self, *, role_taker_assoc: Association
     ):
         """
         Infer role associations through their role taker association.
@@ -930,28 +1008,34 @@ class ClassDiagram:
         """
         role_taker_clazz = role_taker_assoc.source
         for role_clazz in role_taker_clazz.roles:
-            self._add_association_through_role_taker(role_clazz, role_taker_assoc)
+            self._add_association_through_role_taker(
+                role_clazz=role_clazz, role_taker_assoc=role_taker_assoc
+            )
 
     def _add_association_through_role_taker(
-        self, role_clazz: WrappedClass, role_taker_assoc: Association
+        self, *, role_clazz: WrappedClass, role_taker_assoc: Association
     ):
         """
-        Adds an association through a role taker to the class diagram. It connects the role class with the role taker
-         association target class through an AssociationThroughRoleTaker relation.
+        Adds an association through a role taker to the class diagram.
+
+        It connects the role class with the role taker association target class through
+        an AssociationThroughRoleTaker relation.
 
         :param role_clazz: Wrapped class of the role.
         :param role_taker_assoc: Association of the role taker.
         """
         role_taker_clazz = role_taker_assoc.source
         association_path = []
-        role_association_chain = list(self.role_chain_starting_from_node(role_clazz))
+        role_association_chain = list(
+            self.role_chain_starting_from_node(node=role_clazz)
+        )
         for role_association in role_association_chain:
             association_path.append(role_association)
             if role_association.target is role_taker_clazz:
                 break
         association_path.append(role_taker_assoc)
         self.add_relation(
-            AssociationThroughRoleTaker(
+            relation=AssociationThroughRoleTaker(
                 association_path=association_path,
                 source=role_clazz,
                 target=role_taker_assoc.target,
@@ -1009,7 +1093,9 @@ class ClassDiagram:
         return inheritance_graph
 
     @memoize
-    def role_chain_starting_from_node(self, node: WrappedClass) -> tuple[HasRoleTaker]:
+    def role_chain_starting_from_node(
+        self, *, node: WrappedClass
+    ) -> tuple[HasRoleTaker]:
         """
         :return: The role chain starting from the given node following HasRoleTaker edges.
         """
@@ -1037,7 +1123,7 @@ class ClassDiagram:
             ]
         )
 
-    def add_relation(self, relation: ClassRelation):
+    def add_relation(self, *, relation: ClassRelation):
         """
         Adds a relation to the internal dependency graph.
 
@@ -1053,7 +1139,7 @@ class ClassDiagram:
         )
         clear_memoization_cache(self)
 
-    def remove_relation(self, relation: ClassRelation) -> None:
+    def remove_relation(self, *, relation: ClassRelation) -> None:
         """
         Removes a relation that :meth:`add_relation` added.
 
@@ -1065,35 +1151,36 @@ class ClassDiagram:
 
     def to_dot(
         self,
+        *,
         filepath: str,
         format_: str = "svg",
         graph: rx.PyDiGraph | None = None,
         without_inherited_associations: bool = True,
     ):
         """
-        Convert the given graph or the current one if none is given to a dot file that can be converted to the given
-        specified output format.
+        Convert the given graph or the current one if none is given to a dot file that
+        can be converted to the given specified output format.
 
         :param filepath: Filepath to save the output file in.
         :param format_: Format of the output file.
         :param graph: Graph to save the output file to.
-        :param without_inherited_associations: Whether to remove association relations that are inherited or not.
+        :param without_inherited_associations: Whether to remove association relations
+            that are inherited or not.
         """
         if graph is None:
             if without_inherited_associations:
-                graph = (
-                    self.to_subdiagram_without_inherited_associations()._dependency_graph
-                )
+                graph = self.to_subdiagram_without_inherited_associations()._dependency_graph
             else:
                 graph = self._dependency_graph
 
-        self.graph_to_dot(filepath, graph, format_)
+        self.graph_to_dot(filepath=filepath, graph=graph, format_=format_)
 
     @staticmethod
-    def graph_to_dot(filepath: str, graph: rx.PyDiGraph, format_: str = "dot"):
+    def graph_to_dot(*, filepath: str, graph: rx.PyDiGraph, format_: str = "dot"):
         """
-        Convert the given graph to a dot file then output it in the given format. The format is `dot` by default which
-        will output the raw dot file.
+        Convert the given graph to a dot file then output it in the given format.
+
+        The format is `dot` by default which will output the raw dot file.
 
         :param filepath: Filepath to save the output file in.
         :param graph: Graph to save the output file to.
@@ -1144,9 +1231,11 @@ class ClassDiagram:
         return self is other
 
     def _collect_specialized_generic_types(
-        self, additional_classes: list | None = None
+        self, *, additional_classes: list | None = None
     ) -> set[type]:
-        """Return the set of unique specialized generic types referenced by wrapped class fields.
+        """
+        Return the set of unique specialized generic types referenced by wrapped class
+        fields.
 
         :param additional_classes: Extra types to include in the initial collection set.
         :return: A set of specialized generic type endpoints to be processed.
@@ -1160,25 +1249,31 @@ class ClassDiagram:
         return to_process
 
     def _create_nodes_for_specialized_generic_type_hints(
-        self, additional_classes: list | None = None
+        self, *, additional_classes: list | None = None
     ):
         """
-        Creates nodes for specialized generic type hints utilized in the wrapped classes. This process involves
-        analyzing fields for references to specialized generic types, creating corresponding nodes, and establishing
-        inheritance relations as appropriate. The method ensures that all unique specialized generics referenced
+        Creates nodes for specialized generic type hints utilized in the wrapped
+        classes.
+
+        This process involves analyzing fields for references to specialized generic
+        types, creating corresponding nodes, and establishing inheritance relations as
+        appropriate. The method ensures that all unique specialized generics referenced
         are represented as nodes. This is similar to C++ template resolving.
 
-        :raises ClassIsUnMappedInClassDiagram: If a class referenced by a field or origin type is not mapped
-            in the class diagram, it will skip further processing for that type.
+        :raises ClassIsUnMappedInClassDiagram: If a class referenced by a field or
+            origin type is not mapped in the class diagram, it will skip further
+            processing for that type.
         """
-        to_process = self._collect_specialized_generic_types(additional_classes)
+        to_process = self._collect_specialized_generic_types(
+            additional_classes=additional_classes
+        )
 
         while to_process:
             next_type = to_process.pop()
 
             # skip existing nodes
             try:
-                self.get_wrapped_class(next_type)
+                self.get_wrapped_class(clazz=next_type)
                 continue
             except ClassIsUnMappedInClassDiagram:
                 pass
@@ -1199,14 +1294,16 @@ class ClassDiagram:
                 else:
                     continue
 
-            node = WrappedSpecializedGeneric(next_type)
-            self.add_node(node)
+            node = WrappedSpecializedGeneric(clazz=next_type)
+            self.add_node(clazz=node)
 
             # Add explicit inheritance from the origin class
             if origin:
                 try:
-                    source_node = self.get_wrapped_class(origin)
-                    self.add_relation(Inheritance(source=source_node, target=node))
+                    source_node = self.get_wrapped_class(clazz=origin)
+                    self.add_relation(
+                        relation=Inheritance(source=source_node, target=node)
+                    )
                 except ClassIsUnMappedInClassDiagram:
                     pass
 
@@ -1214,7 +1311,7 @@ class ClassDiagram:
             for wrapped_field in node.fields:
                 if wrapped_field.is_instantiation_of_generic_class:
                     try:
-                        self.get_wrapped_class(wrapped_field.type_endpoint)
+                        self.get_wrapped_class(clazz=wrapped_field.type_endpoint)
                     except ClassIsUnMappedInClassDiagram:
                         to_process.add(wrapped_field.type_endpoint)
 
@@ -1222,14 +1319,15 @@ class ClassDiagram:
 @memoize
 def make_specialized_dataclass(alias: _GenericAlias) -> type:
     """
-    Build a concrete dataclass for a fully specialized generic alias, e.g., GenericClass[float].
+    Build a concrete dataclass for a fully specialized generic alias, e.g.,
+    GenericClass[float].
 
-    The resulting class is intended for internal use only and should never be used directly.
+    The resulting class is intended for internal use only and should never be used
+    directly.
 
     :param alias: The fully specialized generic alias to build a dataclass for.
     :return: A concrete dataclass corresponding to the provided alias.
     """
-
     # get the template class
     template_class = get_origin(alias)
     if template_class is None:

@@ -92,7 +92,7 @@ def test_importing_loads_no_optional_dependency(module_name: str):
 
 
 def test_rendering_a_graph_without_matplotlib_raises(matplotlib_not_installed: None):
-    visualizer = GraphVisualizer(RWXNode("Root", rx.PyDAG()))
+    visualizer = GraphVisualizer(RWXNode(name="Root", graph=rx.PyDAG()))
 
     with pytest.raises(ModuleNotFoundError) as error:
         visualizer.render()
@@ -104,7 +104,7 @@ def test_animating_a_rule_tree_without_matplotlib_raises(
     matplotlib_not_installed: None,
 ):
     with pytest.raises(ModuleNotFoundError) as error:
-        SingleClassRDR().fit([], animate_tree=True)
+        SingleClassRDR().fit(case_queries=[], animate_tree=True)
 
     assert error.value.name == OptionalModule.MATPLOTLIB
 

@@ -157,7 +157,7 @@ We can now use EQL to get us only the ProduceBoxes that actually contain apples!
 from semantic_digital_twin.reasoning.predicates import ContainsType
 
 fb = variable(ProduceBox, domain=world.semantic_annotations)
-produce_box_query = an(entity(fb).where(ContainsType(fb.produces, Apple)))
+produce_box_query = an(entity(fb).where(ContainsType(iterable=fb.produces, obj_type=Apple)))
 
 query_result = produce_box_query.evaluate()
 print(list(query_result)[0] == produce_box_with_apples)

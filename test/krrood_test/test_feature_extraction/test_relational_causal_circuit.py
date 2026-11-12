@@ -645,7 +645,7 @@ def test_a_part_attribute_whose_support_depends_on_the_sampled_count_is_no_cause
 # %% the circuit type a grounding is wrapped in
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GroundingInBothCircuitTypes:
     """
     One grounding of a relational circuit, wrapped as a causal circuit of each circuit
@@ -698,10 +698,10 @@ def _wrapped_in_both_circuit_types(
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(grounded)
     bridge = RelationalCausalCircuit()
     return GroundingInBothCircuitTypes(
-        bridge.from_grounded_circuit(grounded, [cause], [effect]),
-        bridge.from_grounded_circuit(layered, [cause], [effect]),
-        cause,
-        effect,
+        units=bridge.from_grounded_circuit(grounded, [cause], [effect]),
+        layers=bridge.from_grounded_circuit(layered, [cause], [effect]),
+        cause=cause,
+        effect=effect,
     )
 
 

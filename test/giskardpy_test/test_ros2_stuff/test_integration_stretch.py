@@ -6,15 +6,68 @@ with no hardware, which is the closest offline proxy for whether a goal the demo
 will actually be reached on the robot.
 """
 
+from dataclasses import dataclass, field
+
 import numpy as np
 import pytest
 
-from giskardpy.middleware.ros2.utils.utils_for_tests import StretchTester
+from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
+from giskardpy.middleware.ros2.robot_interface_config import (
+    StandAloneRobotInterfaceConfig,
+)
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world_description.connections import DifferentialDrive
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
+
+# %% standalone stretch
+
+
+@dataclass
+class StretchTester(GiskardTester):
+    """
+    A standalone Giskard driving Stretch through the same configuration the robot's own
+    ``stretch_standalone`` launcher uses.
+    """
+
+    tool_frame: KinematicStructureEntity = field(init=False)
+    """
+    The frame the demo's pick and place actions drive.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.tool_frame = self.api.world.get_kinematic_structure_entity_by_name(
+            "link_grasp_center"
+        )
+
+    def setup_giskard(self) -> Giskard:
+        return Giskard(
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(Stretch)]
+            ),
+            robot_interface_config=StandAloneRobotInterfaceConfig(),
+            server_config=GiskardServerConfig(debug_mode=True),
+            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
+        )
+
+    @property
+    def robot(self) -> AbstractRobot:
+        return self.world.get_semantic_annotations_by_type(Stretch)[0]
+
+
+# %% fixtures
 
 
 @pytest.fixture()

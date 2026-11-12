@@ -1,5 +1,5 @@
 """
-The modules that declare sections of ``AGENTS.md``.
+The modules that declare sections of ``AGENTS.md`` or skills.
 """
 
 from __future__ import annotations
@@ -15,12 +15,14 @@ from types import ModuleType
 
 from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
+from krrood.development_tools.agents.skill import Skill
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RuleModule:
     """
-    A module, or a package with all of its modules, declaring sections of ``AGENTS.md``.
+    A module, or a package with all of its modules, declaring sections of ``AGENTS.md``
+    or skills.
     """
 
     module: ModuleType
@@ -29,9 +31,12 @@ class RuleModule:
     """
 
     @classmethod
-    def import_from(cls, directory: Path, module_name: str) -> RuleModule | None:
+    def import_from(cls, *, directory: Path, module_name: str) -> RuleModule | None:
         """
         Import a module or package from a directory, once per process.
+
+        The directory joins the import path, so the module can import the rest of its
+        repository without the repository being installed.
 
         :param directory: The directory holding the module or package.
         :param module_name: The name of the module or package.
@@ -43,11 +48,13 @@ class RuleModule:
         if specification is None:
             return None
         if module_name in sys.modules:
-            return cls(sys.modules[module_name])
+            return cls(module=sys.modules[module_name])
+        if str(directory) not in sys.path:
+            sys.path.insert(0, str(directory))
         module = importlib.util.module_from_spec(specification)
         sys.modules[module_name] = module
         specification.loader.exec_module(module)
-        return cls(module)
+        return cls(module=module)
 
     @property
     def modules(self) -> list[ModuleType]:
@@ -90,3 +97,20 @@ class RuleModule:
         return tuple(
             checker for section in self.sections for checker in section.checkers
         )
+
+    @property
+    def skills(self) -> list[type[Skill]]:
+        """
+        The skills defined in :attr:`modules`, in alphabetical order of their names.
+
+        Skills a module only imports are not among them.
+        """
+        skills = [
+            value
+            for module in self.modules
+            for value in vars(module).values()
+            if isinstance(value, type)
+            and issubclass(value, Skill)
+            and value.__module__ == module.__name__
+        ]
+        return sorted(skills, key=lambda skill: skill.name)

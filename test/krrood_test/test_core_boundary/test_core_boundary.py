@@ -24,7 +24,7 @@ from krrood.development_tools.agents.core_boundary import (
 # %% loading core
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ImportedPackage:
     """
     A top-level package that an interpreter loaded, with the package that loaded it.
@@ -73,8 +73,8 @@ def packages_imported_while_running(source: str) -> list[ImportedPackage]:
         )
         imported_packages.append(
             ImportedPackage(
-                module.strip().partition(".")[0],
-                importer and importer.partition(".")[0],
+                package=module.strip().partition(".")[0],
+                importer=importer and importer.partition(".")[0],
             )
         )
     return imported_packages
@@ -88,7 +88,7 @@ def test_loading_core_loads_only_the_distributions_its_import_graph_predicts() -
     installed, is not core's to predict.
     """
     boundary = CoreBoundary.from_pyproject(
-        Path(krrood.__file__).parents[2] / DeclarationFile.PYPROJECT
+        path=Path(krrood.__file__).parents[2] / DeclarationFile.PYPROJECT
     )
     source = "\n".join(f"import {module}" for module in boundary.core_modules)
     startup_packages = {
@@ -106,8 +106,11 @@ def test_loading_core_loads_only_the_distributions_its_import_graph_predicts() -
         for distribution in distributions_by_package.get(package, [])
     }
     predicted = boundary.requirement_closure(
-        set().union(
-            *map(boundary.distributions_loaded_beyond_core, boundary.core_modules)
+        distributions=set().union(
+            *(
+                boundary.distributions_loaded_beyond_core(module=module)
+                for module in boundary.core_modules
+            )
         )
     )
 
@@ -151,7 +154,12 @@ def test_a_package_loaded_by_a_library_is_attributed_to_the_library(
         mimic_dataset_directory, "core_with_library_import"
     )
 
-    assert ImportedPackage("optional_extra", "library_with_optional_probe") in imports
+    assert (
+        ImportedPackage(
+            package="optional_extra", importer="library_with_optional_probe"
+        )
+        in imports
+    )
 
 
 def test_a_package_loaded_by_name_from_a_core_module_is_attributed_to_the_module(
@@ -166,7 +174,10 @@ def test_a_package_loaded_by_name_from_a_core_module_is_attributed_to_the_module
     )
 
     assert (
-        ImportedPackage("dynamically_imported", "core_with_dynamic_import") in imports
+        ImportedPackage(
+            package="dynamically_imported", importer="core_with_dynamic_import"
+        )
+        in imports
     )
 
 
@@ -180,4 +191,4 @@ def test_a_package_imported_by_the_interpreter_source_has_no_importer(
         mimic_dataset_directory, "core_with_library_import"
     )
 
-    assert ImportedPackage("core_with_library_import", None) in imports
+    assert ImportedPackage(package="core_with_library_import", importer=None) in imports

@@ -49,7 +49,7 @@ def draw(statement, number_of_draws: int = NUMBER_OF_DRAWS) -> list:
     return list(
         statement.evaluate(
             backend=ProbabilisticBackend(
-                UniformPriorRegistry(), number_of_samples=number_of_draws
+                model_registry=UniformPriorRegistry(), number_of_samples=number_of_draws
             )
         )
     )
@@ -77,7 +77,7 @@ def test_draws_come_from_every_allowed_region():
 
 def test_equally_large_regions_are_equally_likely():
     distribution = distribution_of(two_separate_regions()).first(
-        backend=ProbabilisticBackend(UniformPriorRegistry())
+        backend=ProbabilisticBackend(model_registry=UniformPriorRegistry())
     )
     [variable_a] = [
         variable for variable in distribution.variables if variable.name == "Coin.a"
@@ -92,7 +92,7 @@ def test_equally_large_regions_are_equally_likely():
 
 def test_the_prior_is_a_tensorized_circuit():
     distribution = distribution_of(two_separate_regions()).first(
-        backend=ProbabilisticBackend(UniformPriorRegistry())
+        backend=ProbabilisticBackend(model_registry=UniformPriorRegistry())
     )
 
     assert isinstance(distribution, LayeredProbabilisticCircuit)

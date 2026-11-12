@@ -10,7 +10,7 @@ from krrood.class_diagrams.attribute_introspector import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DescriptorAwareIntrospector(AttributeIntrospector):
     """
     Discover dataclass fields plus EQL descriptor-backed attributes.
@@ -20,7 +20,7 @@ class DescriptorAwareIntrospector(AttributeIntrospector):
     are presented under the public attribute name.
     """
 
-    def discover(self, owner_cls: type) -> list[DiscoveredAttribute]:
+    def discover(self, *, owner_cls: type) -> list[DiscoveredAttribute]:
         from krrood.ontomatic.property_descriptor.property_descriptor import (
             PropertyDescriptor,
         )

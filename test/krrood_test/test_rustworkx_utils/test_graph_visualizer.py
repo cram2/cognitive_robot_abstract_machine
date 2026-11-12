@@ -7,10 +7,10 @@ import rustworkx as rx
 def test_create_and_visualize_graph(tmp_path):
     # Build a small DAG using RWXNode
     graph = rx.PyDAG()
-    root = RWXNode("Root", graph, enclosed=True)
-    a = RWXNode("A", graph, color=ColorLegend(name="A", color="red"))
-    b = RWXNode("B", graph, color=ColorLegend(name="B", color="green"))
-    c = RWXNode("C", graph, color=ColorLegend(name="C", color="blue"))
+    root = RWXNode(name="Root", graph=graph, enclosed=True)
+    a = RWXNode(name="A", graph=graph, color=ColorLegend(name="A", color="red"))
+    b = RWXNode(name="B", graph=graph, color=ColorLegend(name="B", color="green"))
+    c = RWXNode(name="C", graph=graph, color=ColorLegend(name="C", color="blue"))
 
     # Establish primary parent relationships
     a.parent = root
@@ -18,7 +18,7 @@ def test_create_and_visualize_graph(tmp_path):
     c.parent = a
 
     # Add an additional non-primary edge to test multi-parent
-    c.add_parent(b)
+    c.add_parent(parent=b)
 
     # Visualize (should save a pdf called pdf_graph.pdf in CWD)
     # Change CWD to tmp to avoid cluttering repo root

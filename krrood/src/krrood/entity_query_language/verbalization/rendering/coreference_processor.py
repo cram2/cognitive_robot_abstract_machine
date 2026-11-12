@@ -42,7 +42,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 from krrood.entity_query_language.verbalization.rendering.passes import RealizationPass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubjectFrame:
     """
     One entry of the coreference pass's subject stack — the current pronoun-
@@ -61,7 +61,7 @@ class SubjectFrame:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CoreferenceProcessor(RealizationPass):
     """
     Resolve every referring noun phrase in document order (first / repeat / pronoun) — the one
@@ -134,7 +134,7 @@ class CoreferenceProcessor(RealizationPass):
     subject just before (centering theory, Grosz/Joshi/Weinstein 1995).
     """
 
-    def process(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
+    def process(self, *, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """
         :param fragment: Root of the fragment tree.
         :return: A new tree with referring noun phrases resolved (first / repeat / pronoun), seeded
@@ -148,18 +148,18 @@ class CoreferenceProcessor(RealizationPass):
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> robot = variable(Robot, [])
         >>> query = a(entity(robot))
-        >>> shared = MicroplanningServices.from_expression(robot)
-        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(query, shared))
+        >>> shared = MicroplanningServices.from_expression(expression=robot)
+        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(expression=query, services=shared))
         'Find a Robot'
-        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(query, shared))
+        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(expression=query, services=shared))
         'Find the Robot'
         """
         self._seen = set(self.previously_introduced_referents)
         self._subject_stack = []
         self._center = None
-        return self._walk(fragment)
+        return self._walk(fragment=fragment)
 
-    def _walk(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
+    def _walk(self, *, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """Document-order rebuild, threading the accumulating discourse state.
 
         A fragment built from a query node opens a discourse scope whose focus the
@@ -173,17 +173,17 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
         'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
         """
-        if self.discourse.is_scope(fragment.source):
+        if self.discourse.is_scope(source=fragment.source):
             self._subject_stack.append(
-                SubjectFrame(self.discourse.focus_of(fragment.source))
+                SubjectFrame(subject_id=self.discourse.focus_of(source=fragment.source))
             )
             try:
-                return self._dispatch(fragment)
+                return self._dispatch(fragment=fragment)
             finally:
                 self._subject_stack.pop()
-        return self._dispatch(fragment)
+        return self._dispatch(fragment=fragment)
 
-    def _dispatch(self, fragment: VerbalizationFragment) -> VerbalizationFragment:
+    def _dispatch(self, *, fragment: VerbalizationFragment) -> VerbalizationFragment:
         """Resolve *fragment* by kind (the scope, if any, is already on the stack).
 
         Its contribution is the routing: each possessive chain (*its salary*, *its starting_salary*)
@@ -196,20 +196,22 @@ class CoreferenceProcessor(RealizationPass):
         """
         match fragment:
             case NounPhrase():
-                return self._noun_phrase(fragment)
+                return self._noun_phrase(noun_phrase=fragment)
             case PossessiveChain():
-                return self._possessive_chain(fragment)
+                return self._possessive_chain(possessive_chain=fragment)
             case OwnedAttributes():
-                return self._owned_attributes(fragment)
+                return self._owned_attributes(owned=fragment)
             case Clause():
-                return self._subject_clause(fragment)
+                return self._subject_clause(clause=fragment)
             case PhraseFragment(parts=[PossessiveChain(), *_]):
-                return self._predicate_clause(fragment)
+                return self._predicate_clause(clause=fragment)
             case _:
-                rebuilt = map_structural_children(fragment, self._walk)
+                rebuilt = map_structural_children(
+                    fragment, lambda fragment: self._walk(fragment=fragment)
+                )
                 return rebuilt if rebuilt is not None else fragment
 
-    def _predicate_clause(self, clause: PhraseFragment) -> VerbalizationFragment:
+    def _predicate_clause(self, *, clause: PhraseFragment) -> VerbalizationFragment:
         """A clause led by its subject chain (*"<subject> <copula> <value>"* — a comparator
         predicate or a *"… is between …"* range) whose finite copula agrees with that subject.
 
@@ -229,26 +231,28 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(for_all(robot, and_(robot.battery > 10, robot.battery < 90)))
         'for all Robots, their batteries are between 10 and 90'
         """
-        subject_number = self._clause_subject_number(clause.parts[0])
-        rebuilt = map_structural_children(clause, self._walk)
+        subject_number = self._clause_subject_number(subject=clause.parts[0])
+        rebuilt = map_structural_children(
+            clause, lambda fragment: self._walk(fragment=fragment)
+        )
         if subject_number is GrammaticalNumber.PLURAL:
-            return self._with_agreed_copula(rebuilt, subject_number)
+            return self._with_agreed_copula(clause=rebuilt, number=subject_number)
         return rebuilt
 
     def _clause_subject_number(
-        self, subject: VerbalizationFragment
+        self, *, subject: VerbalizationFragment
     ) -> GrammaticalNumber:
         """:return: The grammatical number the clause's subject is realised with — plural only when
         a pronominalised chain distributes a scalar leaf over a plural population (*"their
         batteries"*); singular for every other subject (a deeper chain, a non-pronominalised one, or
         a plain noun phrase the build already agreed)."""
         if not isinstance(subject, PossessiveChain) or not self._pronominalises(
-            subject
+            possessive_chain=subject
         ):
             return GrammaticalNumber.SINGULAR
         return chain_head_number(subject.parts, self._subject_stack[-1].number)
 
-    def _subject_clause(self, clause: Clause) -> VerbalizationFragment:
+    def _subject_clause(self, *, clause: Clause) -> VerbalizationFragment:
         """A part-of-speech predicate clause (*"<subject> <verb/copula> …"* built by
         :func:`~krrood.entity_query_language.verbalization.vocabulary.parts_of_speech.clause`).
 
@@ -262,25 +266,27 @@ class CoreferenceProcessor(RealizationPass):
 
         >>> location = variable(Location, [])
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(for_all(location, IsReachable(location, robot)))
+        >>> verbalize_expression(for_all(location, IsReachable(location=location, body=robot)))
         'for all Locations, they are reachable for a Robot'
         """
         subject = clause.parts[0]
         if isinstance(subject, PossessiveChain):
-            return self._predicate_clause(clause)
-        number = self._subject_pronoun_number(subject)
+            return self._predicate_clause(clause=clause)
+        number = self._subject_pronoun_number(subject=subject)
         if number is None:
-            rebuilt = map_structural_children(clause, self._walk)
+            rebuilt = map_structural_children(
+                clause, lambda fragment: self._walk(fragment=fragment)
+            )
             return rebuilt if rebuilt is not None else clause
-        pronoun = Pronouns.nominative(number).as_fragment()
+        pronoun = Pronouns.nominative(number=number).as_fragment()
         agreed_rest = [
-            apply_subject_verb_agreement(self._walk(part), number)
+            apply_subject_verb_agreement(self._walk(fragment=part), number)
             for part in clause.parts[1:]
         ]
         return replace(clause, parts=[pronoun, *agreed_rest])
 
     def _subject_pronoun_number(
-        self, subject: VerbalizationFragment
+        self, *, subject: VerbalizationFragment
     ) -> GrammaticalNumber | None:
         """:return: The number to pronominalise the clause subject with — the in-scope subject's
         number when *subject* is the current, already-introduced discourse subject, else ``None``
@@ -298,7 +304,7 @@ class CoreferenceProcessor(RealizationPass):
 
     @staticmethod
     def _with_agreed_copula(
-        clause: PhraseFragment, number: GrammaticalNumber
+        *, clause: PhraseFragment, number: GrammaticalNumber
     ) -> VerbalizationFragment:
         """:return: *clause* with its finite copula tagged *number* (*"is"* → *"are"* once the
         morphology pass realises it). Only the operator slot's leading copula inflects — the subject
@@ -309,7 +315,7 @@ class CoreferenceProcessor(RealizationPass):
             parts=[apply_subject_verb_agreement(part, number) for part in clause.parts],
         )
 
-    def _owned_attributes(self, owned: OwnedAttributes) -> VerbalizationFragment:
+    def _owned_attributes(self, *, owned: OwnedAttributes) -> VerbalizationFragment:
         """:return: the owner's attributes as the possessive *"its/their <attrs>"* when the owner is
         the current subject, else the genitive *"the <attrs> of <owner>"* — the same pronominalise vs.
         spell-out choice :meth:`_possessive_chain` makes for a navigation chain, but for a coordinated
@@ -318,16 +324,19 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(a(Robot)(name="R2", battery=...))
         "Generate a Robot and predict its battery value given that its name is 'R2'"
         """
-        if self._owner_is_subject(owned):
+        if self._owner_is_subject(owned=owned):
             possessive = Pronouns.possessive(
-                self._subject_stack[-1].number
+                number=self._subject_stack[-1].number
             ).as_fragment()
-            return PhraseFragment(parts=[possessive, self._walk(owned.attributes)])
+            return PhraseFragment(
+                parts=[possessive, self._walk(fragment=owned.attributes)]
+            )
         return coordinated_genitive(
-            [self._walk(owned.attributes)], self._walk(owned.owner_fragment)
+            [self._walk(fragment=owned.attributes)],
+            self._walk(fragment=owned.owner_fragment),
         )
 
-    def _owner_is_subject(self, owned: OwnedAttributes) -> bool:
+    def _owner_is_subject(self, *, owned: OwnedAttributes) -> bool:
         """:return: whether *owned*'s owner is the current, already-introduced subject — the gate
         selecting the possessive *"its <attrs>"* over the genitive (the :class:`OwnedAttributes`
         analogue of :meth:`_pronominalises`)."""
@@ -339,7 +348,7 @@ class CoreferenceProcessor(RealizationPass):
         )
 
     def _possessive_chain(
-        self, possessive_chain: PossessiveChain
+        self, *, possessive_chain: PossessiveChain
     ) -> VerbalizationFragment:
         """:return: The chain as *"its/their …"* when its root is the current subject (the
         pronoun agreeing with the subject's number — *"their"* for a plural population), else as
@@ -363,26 +372,32 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(a(entity(mission).where(mission.assigned_to.battery > 50)))
         'Find a Mission such that the battery of the Robot to which it is assigned is greater than 50'
         """
-        reduced_quantity = self._reduced_selected_quantity(possessive_chain)
+        reduced_quantity = self._reduced_selected_quantity(
+            possessive_chain=possessive_chain
+        )
         if reduced_quantity is not None:
             resolved = reduced_quantity
-        elif (built := self._relational_possessive(possessive_chain)) is not None:
+        elif (
+            built := self._relational_possessive(possessive_chain=possessive_chain)
+        ) is not None:
             # An "its …" continuation keeps the centre it referred to.
-            return self._walk(built)
-        elif self._pronominalises(possessive_chain):
+            return self._walk(fragment=built)
+        elif self._pronominalises(possessive_chain=possessive_chain):
             subject_number = self._subject_stack[-1].number
             resolved = self._walk(
-                pronominal_path(possessive_chain.parts, subject_number)
+                fragment=pronominal_path(possessive_chain.parts, subject_number)
             )
         else:
             resolved = self._walk(
-                possessive_path(possessive_chain.parts, possessive_chain.root_fragment)
+                fragment=possessive_path(
+                    possessive_chain.parts, possessive_chain.root_fragment
+                )
             )
-        self._center = self._chain_topic(possessive_chain.parts)
+        self._center = self._chain_topic(parts=possessive_chain.parts)
         return resolved
 
     def _reduced_selected_quantity(
-        self, possessive_chain: PossessiveChain
+        self, *, possessive_chain: PossessiveChain
     ) -> VerbalizationFragment | None:
         """A query's selected / measured quantity (an aggregation's measured attribute) spells out
         in full where it is first named — *"the average of the battery of the Robot to which a
@@ -399,7 +414,7 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(an(entity(max(mission.assigned_to.battery)).where(mission.assigned_to.battery > 5)))
         'Find the maximum of the battery of the Robot to which a Mission is assigned such that the battery is greater than 5'
         """
-        if not self.discourse.is_selected_quantity(possessive_chain.node_id):
+        if not self.discourse.is_selected_quantity(node_id=possessive_chain.node_id):
             return None
         if possessive_chain.node_id not in self._seen:
             self._seen.add(possessive_chain.node_id)
@@ -410,7 +425,7 @@ class CoreferenceProcessor(RealizationPass):
         )
 
     @staticmethod
-    def _outermost_relation(parts: list[PathStep]) -> tuple[uuid.UUID, list] | None:
+    def _outermost_relation(*, parts: list[PathStep]) -> tuple[uuid.UUID, list] | None:
         """:return: ``(referent_id, tail)`` for the chain's outermost relational hop — the related
         entity it introduces and the attributes hanging off it — or ``None`` when the chain has no
         relational hop (or it carries no referent id).
@@ -431,7 +446,7 @@ class CoreferenceProcessor(RealizationPass):
                 )
         return None
 
-    def _chain_topic(self, parts: list[PathStep]) -> uuid.UUID | None:
+    def _chain_topic(self, *, parts: list[PathStep]) -> uuid.UUID | None:
         """:return: The referent the clause just said is grammatically *about* — the head of its
         subject noun phrase — to carry forward as the local centre for *"its …"*.
 
@@ -452,14 +467,14 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(a(entity(mission).where(and_(mission.assigned_to.operational, mission.assigned_to.battery > 50))))
         'Find a Mission such that the Robot to which it is assigned is operational, and its battery is greater than 50'
         """
-        relation = self._outermost_relation(parts)
+        relation = self._outermost_relation(parts=parts)
         if relation is None:
             return None
         referent_id, tail = relation
         return referent_id if not tail else None
 
     def _relational_possessive(
-        self, possessive_chain: PossessiveChain
+        self, *, possessive_chain: PossessiveChain
     ) -> VerbalizationFragment | None:
         """An attribute reached *through* the local centre reads as *"its <attribute>"* rather than
         re-naming the referent — after *"the Robot to which it is assigned is operational"* a
@@ -480,7 +495,7 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(a(entity(mission).where(and_(mission.assigned_to.operational, mission.assigned_to.battery > 50))))
         'Find a Mission such that the Robot to which it is assigned is operational, and its battery is greater than 50'
         """
-        relation = self._outermost_relation(possessive_chain.parts)
+        relation = self._outermost_relation(parts=possessive_chain.parts)
         if relation is None:
             return None
         referent_id, tail = relation
@@ -488,7 +503,7 @@ class CoreferenceProcessor(RealizationPass):
             return None
         return pronominal_path(tail, GrammaticalNumber.SINGULAR)
 
-    def _pronominalises(self, possessive_chain: PossessiveChain) -> bool:
+    def _pronominalises(self, *, possessive_chain: PossessiveChain) -> bool:
         """:return: ``True`` when the chain root is the current, already-introduced subject.
 
         It is the gate that decides pronominalisation: returning ``True`` for each chain rooted at the
@@ -511,7 +526,7 @@ class CoreferenceProcessor(RealizationPass):
             and self._subject_stack[-1].subject_id == possessive_chain.root_referent_id
         )
 
-    def _noun_phrase(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
+    def _noun_phrase(self, *, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """Every mention (singular or plural) marks its referent introduced.  A repeat **singular**
         mention is reduced to its head — dropping the first-mention modifiers and keeping the head
         label (*"a Robot, where …"* → *"the Robot"*, *"another Robot, to which …,"* → *"the other
@@ -523,16 +538,16 @@ class CoreferenceProcessor(RealizationPass):
             phrase rebuilt around its recursed children.
         """
         if noun_phrase.referent_id is None:
-            return self._rebuilt(noun_phrase)
-        noun_phrase = self._distinguished(noun_phrase)
-        self._record_subject_number(noun_phrase)
+            return self._rebuilt(noun_phrase=noun_phrase)
+        noun_phrase = self._distinguished(noun_phrase=noun_phrase)
+        self._record_subject_number(noun_phrase=noun_phrase)
         repeat = noun_phrase.referent_id in self._seen
         self._seen.add(noun_phrase.referent_id)
         if repeat and noun_phrase.number is GrammaticalNumber.SINGULAR:
-            return self._reduced(noun_phrase)
-        return self._rebuilt(noun_phrase)
+            return self._reduced(noun_phrase=noun_phrase)
+        return self._rebuilt(noun_phrase=noun_phrase)
 
-    def _distinguished(self, noun_phrase: NounPhrase) -> NounPhrase:
+    def _distinguished(self, *, noun_phrase: NounPhrase) -> NounPhrase:
         """Stamp the disambiguating feature (:class:`~…microplanning.referring.Distinguisher`) on a
         referent whose noun is shared with another referent, assigned lazily in the order referents
         are first encountered during this walk
@@ -558,7 +573,7 @@ class CoreferenceProcessor(RealizationPass):
         if noun_phrase.referent_id is None:
             return noun_phrase
         distinguisher = self.distinguisher_index.distinguisher_for(
-            noun_phrase.referent_id
+            referent_id=noun_phrase.referent_id
         )
         if distinguisher is None:
             return noun_phrase
@@ -568,7 +583,7 @@ class CoreferenceProcessor(RealizationPass):
         # (genitive owner / "is <attribute>" subject), so following text always supplies the
         # post-comma space.
         modifiers = (
-            self._comma_framed(noun_phrase.modifiers)
+            self._comma_framed(modifiers=noun_phrase.modifiers)
             if noun_phrase.relative_clause
             else noun_phrase.modifiers
         )
@@ -585,6 +600,7 @@ class CoreferenceProcessor(RealizationPass):
 
     @staticmethod
     def _comma_framed(
+        *,
         modifiers: list[VerbalizationFragment],
     ) -> list[VerbalizationFragment]:
         """:return: *modifiers* set off by a leading and trailing comma, so a non-restrictive relative
@@ -593,7 +609,7 @@ class CoreferenceProcessor(RealizationPass):
         comma = Punctuation.COMMA.as_fragment()
         return [comma, *modifiers, comma]
 
-    def _reduced(self, noun_phrase: NounPhrase) -> VerbalizationFragment:
+    def _reduced(self, *, noun_phrase: NounPhrase) -> VerbalizationFragment:
         """:return: A repeat mention reduced to its head — the first-mention modifiers dropped — as
         a definite reference (*"the Robot"*), preserving any distinguishing feature already
         stamped by :meth:`_distinguished` (*"the other Robot"*, *"the second Robot"*) so a
@@ -607,15 +623,16 @@ class CoreferenceProcessor(RealizationPass):
         >>> from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> robot = variable(Robot, [])
-        >>> query, shared = a(entity(robot)), MicroplanningServices.from_expression(robot)
-        >>> _ = EQLVerbalizer().build(query, shared)
-        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(query, shared))
+        >>> query, shared = a(entity(robot)), MicroplanningServices.from_expression(expression=robot)
+        >>> _ = EQLVerbalizer().build(expression=query, services=shared)
+        >>> flatten_fragment_to_plain_text(EQLVerbalizer().build(expression=query, services=shared))
         'Find the Robot'
         """
         return NounPhrase(
-            head=self._walk(noun_phrase.head),
+            head=self._walk(fragment=noun_phrase.head),
             additional_heads=[
-                self._walk(additional) for additional in noun_phrase.additional_heads
+                self._walk(fragment=additional)
+                for additional in noun_phrase.additional_heads
             ],
             number=noun_phrase.number,
             definiteness=Definiteness.DEFINITE,
@@ -624,7 +641,7 @@ class CoreferenceProcessor(RealizationPass):
             ordinal=noun_phrase.ordinal,
         )
 
-    def _record_subject_number(self, noun_phrase: NounPhrase) -> None:
+    def _record_subject_number(self, *, noun_phrase: NounPhrase) -> None:
         """If this noun phrase *is* an enclosing scope's subject, record its grammatical number on
         that frame — the subject is rendered before the chains that refer to it, so the number
         (*"its"*/*"their"*) is known by the time pronominalisation is decided. Rules supply none.
@@ -632,7 +649,7 @@ class CoreferenceProcessor(RealizationPass):
         A plural subject records a plural number, so its possessive reads *"their"*:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
         for frame in reversed(self._subject_stack):
@@ -640,7 +657,7 @@ class CoreferenceProcessor(RealizationPass):
                 frame.number = noun_phrase.number
                 return
 
-    def _rebuilt(self, noun_phrase: NounPhrase) -> NounPhrase:
+    def _rebuilt(self, *, noun_phrase: NounPhrase) -> NounPhrase:
         """Rebuild *noun_phrase* with its head and modifiers recursed (document order preserved).
 
         A referring noun phrase is the discourse subject *of its own modifiers*: a restrictive
@@ -656,18 +673,25 @@ class CoreferenceProcessor(RealizationPass):
         >>> verbalize_expression(an(entity(employee).where(employee.salary > employee.starting_salary)))
         'Find an Employee such that its salary is greater than its starting_salary'
         """
-        head = self._walk(noun_phrase.head)
+        head = self._walk(fragment=noun_phrase.head)
         additional_heads = [
-            self._walk(additional) for additional in noun_phrase.additional_heads
+            self._walk(fragment=additional)
+            for additional in noun_phrase.additional_heads
         ]
         if noun_phrase.referent_id is None or not noun_phrase.subject_of_modifiers:
-            modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
+            modifiers = [
+                self._walk(fragment=modifier) for modifier in noun_phrase.modifiers
+            ]
         else:
             self._subject_stack.append(
-                SubjectFrame(noun_phrase.referent_id, noun_phrase.number)
+                SubjectFrame(
+                    subject_id=noun_phrase.referent_id, number=noun_phrase.number
+                )
             )
             try:
-                modifiers = [self._walk(modifier) for modifier in noun_phrase.modifiers]
+                modifiers = [
+                    self._walk(fragment=modifier) for modifier in noun_phrase.modifiers
+                ]
             finally:
                 self._subject_stack.pop()
         return replace(

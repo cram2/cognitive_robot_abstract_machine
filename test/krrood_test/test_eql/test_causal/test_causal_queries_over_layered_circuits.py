@@ -111,11 +111,11 @@ def causal_circuit_over(model: RelationalProbabilisticCircuit) -> CausalCircuit:
     """
     np.random.seed(0)
     return RelationalCircuitRegistry(relational_probabilistic_circuit=model).get_model(
-        UnderspecifiedParameters(cause_query())
+        parameters=UnderspecifiedParameters(statement=cause_query())
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RankingsOfBothCircuitTypes:
     """
     The cause candidates of one query, ranked over the same data fitted in either
@@ -160,14 +160,14 @@ def rankings_with_the_same_samples(
     with patch.object(
         ExchangeablePartGrounder, "_sample_undetermined_latents", recording_sample
     ):
-        over_units = units_backend.rank_causes(make_query())
+        over_units = units_backend.rank_causes(expression=make_query())
     replayed = iter(drawn)
     with patch.object(
         ExchangeablePartGrounder,
         "_sample_undetermined_latents",
         lambda grounder, node=None: next(replayed),
     ):
-        over_layers = layers_backend.rank_causes(make_query())
+        over_layers = layers_backend.rank_causes(expression=make_query())
     assert next(replayed, None) is None
     return RankingsOfBothCircuitTypes(over_units=over_units, over_layers=over_layers)
 
@@ -198,7 +198,7 @@ def test_the_interventional_circuit_of_a_layered_fit_is_layered(layers_model):
 
 
 def test_a_layered_fit_narrows_a_ranked_candidate_to_a_layered_circuit(layers_model):
-    [first, *_] = backend_over(layers_model).rank_causes(cause_query())
+    [first, *_] = backend_over(layers_model).rank_causes(expression=cause_query())
     assert isinstance(first.narrowed_circuit, LayeredProbabilisticCircuit)
 
 
@@ -228,6 +228,6 @@ def test_both_circuit_types_score_the_candidates_the_same(units_model, layers_mo
 
 
 def test_a_layered_fit_answers_a_causal_query_with_rooms(layers_model):
-    generated = list(backend_over(layers_model).evaluate(cause_query()))
+    generated = list(backend_over(layers_model).evaluate(expression=cause_query()))
     assert len(generated) == 3
     assert all(isinstance(room, SceneRoom) for room in generated)

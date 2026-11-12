@@ -129,11 +129,11 @@ class CollisionCheck(SubclassJSONSerializer):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
-            body_a=tracker.get(from_json(data["body_a"])),
-            body_b=tracker.get(from_json(data["body_b"])),
+            body_a=tracker.get(key=from_json(data["body_a"])),
+            body_b=tracker.get(key=from_json(data["body_b"])),
             distance=data["distance"],
         )
 
@@ -317,10 +317,10 @@ class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule, SubclassJSONSeriali
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         body_subset_ids = from_json(data["bodies"], **kwargs)
         body_subset = None
         if body_subset_ids is not None:
-            body_subset = {tracker.get(body_id) for body_id in body_subset_ids}
+            body_subset = {tracker.get(key=body_id) for body_id in body_subset_ids}
         return cls(value=data["value"], bodies=body_subset)

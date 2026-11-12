@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 
 from rclpy.node import Node
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Self
 
 from coraplex.exceptions import (
     DebuggingWithoutRosNode,
@@ -20,6 +20,7 @@ from coraplex.plans.failures import (
     MotionExceededSimulationTimeLimit,
     MotionMadeNoProgress,
     MotionViolatedCollisionAvoidance,
+    PlanFailure,
 )
 from coraplex.plans.plan_transformation import PlanRewriting, PlanTransformation
 from coraplex.plans.underspecified import UnderspecifiedChildChooser
@@ -54,7 +55,7 @@ from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
     NoProgressError,
 )
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
@@ -73,6 +74,42 @@ logger = logging.getLogger(__name__)
 
 
 # %% executing a plan
+
+
+@dataclass(kw_only=True)
+class PlanOutcome:
+    """
+    How the run of a plan ended.
+    """
+
+    failure: PlanFailure | None = None
+    """
+    Why the plan failed; ``None`` if it succeeded.
+    """
+
+    @property
+    def succeeded(self) -> bool:
+        """
+        Whether the plan succeeded.
+        """
+        return self.failure is None
+
+    def raise_if_failed(self) -> None:
+        """
+        :raises PlanFailure: :attr:`failure`, if the plan failed.
+        """
+        if self.failure is not None:
+            raise self.failure
+
+    @classmethod
+    def failed_by(cls, *, failure: PlanFailure, cause: BaseException) -> Self:
+        """
+        :param failure: Why the plan failed.
+        :param cause: The error the failure was made from, kept as its cause.
+        :return: The outcome of a plan that failed.
+        """
+        failure.__cause__ = cause
+        return cls(failure=failure)
 
 
 @dataclass
@@ -259,26 +296,39 @@ class PlanExecutor(Executor, ABC):
         Run the compiled plan until every plan node succeeded.
 
         :raises PlanNotCompiled: If no plan was compiled.
-        :raises MotionDidNotFinish: If the plan did not succeed.
-        :raises EmptyUnderspecified: If an underspecified action ran out of actions to
-            try.
-        :raises CandidateLimitReached: If an underspecified action tried as many actions
-            as it may.
-        :raises MotionMadeNoProgress: When the plan stops approaching its goal.
-        :raises MotionExceededSimulationTimeLimit: When a simulated plan runs for longer
-            than :attr:`SimulatedPlanExecutor.simulation_time_limit`.
-        :raises MotionViolatedCollisionAvoidance: When the plan brings bodies closer to
-            each other than collision avoidance allows.
+        :raises PlanFailure: The failure :meth:`attempt` reports, if the plan did not
+            succeed.
+        """
+        self.attempt().raise_if_failed()
+
+    def attempt(self) -> PlanOutcome:
+        """
+        Run the compiled plan until it ended, and report how.
+
+        :return: The outcome, holding why the plan failed if it did:
+            :class:`MotionMadeNoProgress` when the plan stopped approaching its goal,
+            :class:`MotionViolatedCollisionAvoidance` when it brought bodies closer to
+            each other than collision avoidance allows,
+            :class:`MotionExceededSimulationTimeLimit` when a simulated plan ran longer
+            than :attr:`SimulatedPlanExecutor.simulation_time_limit`,
+            :class:`CandidateLimitReached` or :class:`EmptyUnderspecified` when an
+            underspecified action ran out of actions to try, and
+            :class:`MotionDidNotFinish` otherwise.
+        :raises PlanNotCompiled: If no plan was compiled.
         """
         if self.statechart is None:
             raise PlanNotCompiled()
         try:
             self._run()
         except NoProgressError as stalled:
-            raise MotionMadeNoProgress(stalled) from stalled
+            return PlanOutcome.failed_by(
+                failure=MotionMadeNoProgress(stalled), cause=stalled
+            )
         except CollisionViolatedError as violation:
-            raise MotionViolatedCollisionAvoidance(violation) from violation
-        self._raise_if_plan_failed()
+            return PlanOutcome.failed_by(
+                failure=MotionViolatedCollisionAvoidance(violation), cause=violation
+            )
+        return PlanOutcome(failure=self._failure_of_plan())
 
     @abstractmethod
     def _run(self) -> None:
@@ -304,17 +354,17 @@ class PlanExecutor(Executor, ABC):
             for plan_node in self.plan_nodes
         )
 
-    def _raise_if_plan_failed(self) -> None:
+    def _failure_of_plan(self) -> PlanFailure | None:
         """
-        :raises CandidateLimitReached: If a statement node tried as many actions
-            as it may, which is why the plan failed.
-        :raises EmptyUnderspecified: If a statement node ran out of actions to
-            try, which is why the plan failed.
-        :raises MotionDidNotFinish: If the plan failed for any other reason.
+        :return: Why the plan failed: the :meth:`_candidate_shortage` that made it fail
+            if there is one, a :class:`MotionDidNotFinish` naming the nodes that did not
+            succeed otherwise; ``None`` if the plan did not fail.
         """
         if not self._plan_failed():
-            return
-        self._raise_if_out_of_candidates()
+            return None
+        candidate_shortage = self._candidate_shortage()
+        if candidate_shortage is not None:
+            return candidate_shortage
         motion_did_not_finish = MotionDidNotFinish(
             [
                 node
@@ -325,23 +375,23 @@ class PlanExecutor(Executor, ABC):
             ]
         )
         logger.error(motion_did_not_finish.error_message())
-        raise motion_did_not_finish
+        return motion_did_not_finish
 
-    def _raise_if_out_of_candidates(self) -> None:
+    def _candidate_shortage(self) -> EmptyUnderspecified | None:
         """
-        :raises CandidateLimitReached: If a statement node tried as many actions
-            as it may.
-        :raises EmptyUnderspecified: If a statement node ran out of actions to
-            try.
+        :return: A :class:`CandidateLimitReached` if a statement node tried as many
+            actions as it may, an :class:`EmptyUnderspecified` if one ran out of actions
+            to try, ``None`` if none did.
         """
         for node in self.statechart.get_nodes_by_type(StatementNode):
             if not node.ran_out_of_children:
                 continue
             if node.reached_candidate_limit:
-                raise CandidateLimitReached(
+                return CandidateLimitReached(
                     node=node, candidate_limit=node.candidate_limit
                 )
-            raise EmptyUnderspecified(node=node)
+            return EmptyUnderspecified(node=node)
+        return None
 
 
 @dataclass
@@ -496,8 +546,9 @@ class PhysicallySimulatedPlanExecutor(SimulatedPlanExecutor):
         kw_only=True,
     )
     """
-    The plan transformations adapting every plan to being performed in physics. Unless
-    one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
+    The plan transformations adapting every plan to being performed in physics.
+
+    Unless one is given, a :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`
     is put first that squeezes by the
     :attr:`~semantic_digital_twin.robots.robot_part_mixins.HasTwoFingers.squeeze` of the
     robot's two-finger grippers.

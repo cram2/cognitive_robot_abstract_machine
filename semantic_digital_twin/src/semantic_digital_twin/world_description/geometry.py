@@ -625,7 +625,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             **{
                 field_.name: from_json(data[field_.name], **kwargs)
@@ -1539,7 +1539,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :param coordinates: The corner's coordinate along each of :meth:`axes`.
         :return: The corner, in the reference frame of the box's origin.
         """
-        point_type = self.get_type_of_generic_parameter(PointT)
+        point_type = self.get_type_of_generic_parameter(parameter=PointT)
         return point_type(*coordinates, reference_frame=self.origin.reference_frame)
 
     def to_array_bounds(self) -> CoordinateBounds:
@@ -1556,7 +1556,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         intervals = self._ordered_intervals
         lower = np.array([interval.lower for interval in intervals], dtype=np.float64)
         upper = np.array([interval.upper for interval in intervals], dtype=np.float64)
-        return CoordinateBounds(lower, upper)
+        return CoordinateBounds(lower=lower, upper=upper)
 
     @classmethod
     def from_array_bounds(

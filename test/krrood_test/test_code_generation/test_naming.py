@@ -1,4 +1,6 @@
-"""Tests for naming-convention helpers in ``krrood.code_generation.naming``."""
+"""
+Tests for naming-convention helpers in ``krrood.code_generation.naming``.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +14,9 @@ from krrood.code_generation.naming import (
 
 
 class TestToCamelCase:
-    """Tests for :func:`to_camel_case`."""
+    """
+    Tests for :func:`to_camel_case`.
+    """
 
     @pytest.mark.parametrize(
         "input_string, expected",
@@ -28,21 +32,29 @@ class TestToCamelCase:
             ("", ""),
         ],
     )
-    def test_converts_snake_to_camel(self, input_string: str, expected: str) -> None:
-        """Every underscore-separated segment is title-cased."""
+    def test_converts_snake_to_camel(self, *, input_string: str, expected: str) -> None:
+        """
+        Every underscore-separated segment is title-cased.
+        """
         assert to_camel_case(input_string) == expected
 
     def test_returns_str(self) -> None:
-        """The result is always a ``str``."""
+        """
+        The result is always a ``str``.
+        """
         assert isinstance(to_camel_case("distance"), str)
 
     def test_result_is_nonempty_for_nonempty_input(self) -> None:
-        """A non-empty input never yields an empty string."""
+        """
+        A non-empty input never yields an empty string.
+        """
         assert to_camel_case("x") != ""
 
 
 class TestToSnakeCase:
-    """Tests for :func:`to_snake_case`."""
+    """
+    Tests for :func:`to_snake_case`.
+    """
 
     @pytest.mark.parametrize(
         "input_string, expected",
@@ -53,12 +65,14 @@ class TestToSnakeCase:
             ("XMLParser", "xml_parser"),
         ],
     )
-    def test_converts_camel_to_snake(self, input_string: str, expected: str) -> None:
+    def test_converts_camel_to_snake(self, *, input_string: str, expected: str) -> None:
         assert to_snake_case(input_string) == expected
 
 
 class TestCamelCaseToLowerCamelCase:
-    """Tests for :func:`camel_case_to_lower_camel_case`."""
+    """
+    Tests for :func:`camel_case_to_lower_camel_case`.
+    """
 
     @pytest.mark.parametrize(
         "input_string, expected",
@@ -69,5 +83,7 @@ class TestCamelCaseToLowerCamelCase:
             ("", ""),
         ],
     )
-    def test_lowercases_first_character(self, input_string: str, expected: str) -> None:
+    def test_lowercases_first_character(
+        self, *, input_string: str, expected: str
+    ) -> None:
         assert camel_case_to_lower_camel_case(input_string) == expected

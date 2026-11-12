@@ -85,13 +85,13 @@ class GraphVisualizer:
         self._auto_figsize()
         fig, ax = self._setup_figure()
         self._wrap_labels_and_sizes()
-        self._compute_pixel_and_obstacles(fig, ax)
-        self._adjust_limits_and_center(ax)
-        self._draw_wrap_boxes(ax)
-        self._draw_edges(ax)
-        self._draw_nodes_and_labels(ax)
-        self._draw_legend(fig, ax)
-        self._style_and_save(fig, ax)
+        self._compute_pixel_and_obstacles(fig=fig, ax=ax)
+        self._adjust_limits_and_center(ax=ax)
+        self._draw_wrap_boxes(ax=ax)
+        self._draw_edges(ax=ax)
+        self._draw_nodes_and_labels(ax=ax)
+        self._draw_legend(fig=fig, ax=ax)
+        self._style_and_save(fig=fig, ax=ax)
         return fig, ax
 
     def _build_rooted_subgraph(self):
@@ -389,7 +389,7 @@ class GraphVisualizer:
             )
         )
 
-    def _compute_pixel_and_obstacles(self, fig, ax):
+    def _compute_pixel_and_obstacles(self, *, fig, ax):
         norm_pos = self.ctx["norm_pos"]
         size_per_node = self.ctx["size_per_node"]
         radii_pt = np.sqrt(size_per_node / np.pi)
@@ -442,7 +442,7 @@ class GraphVisualizer:
             )
         )
 
-    def _adjust_limits_and_center(self, ax):
+    def _adjust_limits_and_center(self, *, ax):
         # Compute padded content bounds from obstacles and center horizontally around the root when possible.
         norm_pos = self.ctx["norm_pos"]
         obstacles_rects = self.ctx["obstacles_rects"]
@@ -494,7 +494,7 @@ class GraphVisualizer:
         ax.set_xlim(self.ctx["xlim"])
         ax.set_ylim(self.ctx["ylim"])
 
-    def _draw_wrap_boxes(self, ax):
+    def _draw_wrap_boxes(self, *, ax):
         from matplotlib.patches import FancyBboxPatch
 
         ordered_nodes = self.ctx["ordered_nodes"]
@@ -560,7 +560,7 @@ class GraphVisualizer:
             ax.add_patch(box)
 
     @staticmethod
-    def _dist_pt_seg(px, py, ax_, ay_, bx_, by_):
+    def _dist_pt_seg(*, px, py, ax_, ay_, bx_, by_):
         vx, vy = bx_ - ax_, by_ - ay_
         wx, wy = px - ax_, py - ay_
         vv = vx * vx + vy * vy
@@ -572,6 +572,7 @@ class GraphVisualizer:
 
     def _seg_blocked(
         self,
+        *,
         p_start: tuple[float, float],
         p_end: tuple[float, float],
         ignore: tuple[int, int],
@@ -635,7 +636,7 @@ class GraphVisualizer:
                     code1 = outcode(x1, y1, xmin, xmax, ymin, ymax)
         return False
 
-    def _draw_edges(self, ax):
+    def _draw_edges(self, *, ax):
         from matplotlib.patches import FancyArrowPatch
         from matplotlib.path import Path
 
@@ -682,7 +683,10 @@ class GraphVisualizer:
                 if (min(x0, x1) <= cx <= max(x0, x1)) and (
                     min(y0, y1) <= cy <= max(y0, y1)
                 ):
-                    if self._dist_pt_seg(cx, cy, x0, y0, x1, y1) < 0.06:
+                    if (
+                        self._dist_pt_seg(px=cx, py=cy, ax_=x0, ay_=y0, bx_=x1, by_=y1)
+                        < 0.06
+                    ):
                         near_count += 1
 
             if edge_style == "straight":
@@ -765,8 +769,8 @@ class GraphVisualizer:
                     p3 = (xm, y1)
                     if (
                         within_x(xm)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -778,8 +782,8 @@ class GraphVisualizer:
                     p3 = (x1, ym)
                     if (
                         within_y(ym)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -792,9 +796,9 @@ class GraphVisualizer:
                     p4 = (x1, y1)
                     if (
                         within_y(ym)
-                        and (not self._seg_blocked(p1, p2, ignore=(u, v)))
-                        and (not self._seg_blocked(p2, p3, ignore=(u, v)))
-                        and (not self._seg_blocked(p3, p4, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p3, p_end=p4, ignore=(u, v)))
                     ):
                         return [p1, p2, p3, p4]
                     return None
@@ -1075,7 +1079,7 @@ class GraphVisualizer:
             )
             ax.add_patch(arrow)
 
-    def _draw_nodes_and_labels(self, ax):
+    def _draw_nodes_and_labels(self, *, ax):
         ordered_nodes = self.ctx["ordered_nodes"]
         norm_pos = self.ctx["norm_pos"]
         size_per_node = self.ctx["size_per_node"]
@@ -1141,7 +1145,7 @@ class GraphVisualizer:
         self.ctx["colors"] = colors
         self.ctx["any_enclosed"] = any_enclosed
 
-    def _draw_legend(self, fig, ax):
+    def _draw_legend(self, *, fig, ax):
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
 
@@ -1204,7 +1208,7 @@ class GraphVisualizer:
         )
         legend.get_title().set_color("black")
 
-    def _style_and_save(self, fig, ax):
+    def _style_and_save(self, *, fig, ax):
         from matplotlib import pyplot as plt
 
         # White backgrounds

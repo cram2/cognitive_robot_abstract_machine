@@ -1,25 +1,33 @@
 from datetime import timedelta
 
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.ros2_interface import get_robot_description
+from rclpy.node import Node
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.configs import (
     TracyVelocityInterface,
-    WorldWithTracyConfig,
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.qp.qp_controller_config import QPControllerConfig
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
+from semantic_digital_twin.robots.tracy import Tracy
 
 
-def create_giskard() -> Giskard:
+def create_giskard(node: Node) -> Giskard:
     """
     Build a Giskard that commands Tracy, described by what the robot publishes on
     ``/robot_description``.
 
-    .. note:: The ros node has to be initialized first, because the robot description is
-        read from its topic.
+    :param node: The node Giskard runs on, which reads the robot description.
     """
     return Giskard(
-        world_config=WorldWithTracyConfig(urdf=get_robot_description()),
+        world_source=WorldSpecification(
+            robots=[
+                RobotSpecification.specify_real_robot(
+                    Tracy, urdf=RosGraph(node).robot_description()
+                )
+            ]
+        ),
         robot_interface_config=TracyVelocityInterface(),
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(

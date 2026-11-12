@@ -28,7 +28,7 @@ The type of the domain object an :class:`AggregationStatistic` is a role of.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _AggregationStatisticDescriptor:
     """
     Descriptor returned by :func:`aggregation_statistic`.
@@ -109,7 +109,7 @@ def get_aggregation_class(owner: type) -> type[AggregationStatistic] | None:
     return None
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AggregationStatistic(Role[TAggregatedObject]):
     """
     Base class for aggregation statistics over a domain object's exchangeable-
@@ -161,7 +161,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
             cls.aggregation_registry = defaultdict(list)
 
     @classmethod
-    def _registered_names_for_field(cls, field_name: str) -> set[str]:
+    def _registered_names_for_field(cls, *, field_name: str) -> set[str]:
         """
         Collect the names of all statistics registered for ``field_name`` across the MRO
         so inherited registrations are included.
@@ -178,7 +178,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         return names
 
     @classmethod
-    def aggregation_features_of_field(cls, field_name: str) -> list[Callable]:
+    def aggregation_features_of_field(cls, *, field_name: str) -> list[Callable]:
         """
         All methods on this class marked with :func:`aggregation_statistic` for
         ``field_name``.
@@ -187,7 +187,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         :return: The marked callable methods for the given field, sorted alphabetically
             by name.
         """
-        registered = cls._registered_names_for_field(field_name)
+        registered = cls._registered_names_for_field(field_name=field_name)
         return [
             func
             for _, func in inspect.getmembers(cls, predicate=inspect.isfunction)
@@ -195,7 +195,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         ]
 
     @classmethod
-    def symbolic_features_of_field(cls, field_name: str) -> list[MappedVariable]:
+    def symbolic_features_of_field(cls, *, field_name: str) -> list[MappedVariable]:
         """
         Symbolic variables for the statistic methods that aggregate ``field_name``.
 
@@ -209,7 +209,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         aggregation_variable = variable(cls, [])
         return [
             getattr(aggregation_variable, func.__name__)()
-            for func in cls.aggregation_features_of_field(field_name)
+            for func in cls.aggregation_features_of_field(field_name=field_name)
         ]
 
     @property
@@ -224,7 +224,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         """
         if self.field_name is None:
             raise MissingFieldNameError()
-        return type(self).aggregation_features_of_field(self.field_name)
+        return type(self).aggregation_features_of_field(field_name=self.field_name)
 
     def symbolic_aggregation_features(self) -> list[MappedVariable]:
         """
@@ -237,7 +237,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         """
         if self.field_name is None:
             raise MissingFieldNameError()
-        return type(self).symbolic_features_of_field(self.field_name)
+        return type(self).symbolic_features_of_field(field_name=self.field_name)
 
     def apply_mapping(self) -> dict[str, Any]:
         """
@@ -246,7 +246,7 @@ class AggregationStatistic(Role[TAggregatedObject]):
         :return: A mapping from each statistic method name to its computed value.
         """
         return {
-            func.__name__: feature.apply_mapping_on_external_root(self)
+            func.__name__: feature.apply_mapping_on_external_root(instance=self)
             for func, feature in zip(
                 self.aggregation_features, self.symbolic_aggregation_features()
             )
@@ -277,11 +277,15 @@ def compute_aggregation_statistics(
         return {}
     aggregation_instance = aggregation_class(role_taker=domain_object)
     statistics = {}
-    for feature_function in aggregation_class.symbolic_features_of_field(field_name):
+    for feature_function in aggregation_class.symbolic_features_of_field(
+        field_name=field_name
+    ):
         feature_name = feature_function._name_
         if feature_name not in latent_variable_by_name:
             continue
-        value = feature_function.apply_mapping_on_external_root(aggregation_instance)
+        value = feature_function.apply_mapping_on_external_root(
+            instance=aggregation_instance
+        )
         latent_variable = latent_variable_by_name[feature_name]
         try:
             latent_variable.make_value(value)

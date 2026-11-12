@@ -19,22 +19,24 @@ from packaging.utils import canonicalize_name
 from typing_extensions import Any, Iterator, override
 
 from krrood.development_tools.agents.checker import CodeRuleChecker, CodeRuleViolation
+from krrood.patterns.path_enumeration import PathEnumeration
 from krrood.source_analysis.import_graph import ModuleGraph
 
 # %% file and key names
 
 
-class DeclarationFile(StrEnum):
+class DeclarationFile(PathEnumeration):
     """
-    The files that declare a distribution and its packages.
+    The files that declare a distribution and its packages, relative to the
+    distribution's directory.
     """
 
-    PYPROJECT = "pyproject.toml"
+    PYPROJECT = Path("pyproject.toml")
     """
     The distribution's project declaration.
     """
 
-    SOURCE_DIRECTORY = "src"
+    SOURCE_DIRECTORY = Path("src")
     """
     The directory of a src layout, which holds the distribution's packages.
     """
@@ -81,14 +83,15 @@ class PyprojectKey(StrEnum):
 
     DEPENDENCIES = "dependencies"
     """
-    The key in ``[tool.krrood.core-boundary]`` listing the distributions core may load.
+    The optional key in ``[tool.krrood.core-boundary]`` listing the distributions core
+    may load.
     """
 
 
 # %% the boundary
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CoreBoundary:
     """
     A distribution's core and the distributions core may load, as its
@@ -109,7 +112,8 @@ class CoreBoundary:
 
     dependencies: list[str]
     """
-    The distributions core may load, without what they require in turn.
+    The distributions core may load, without what they require in turn; empty when the
+    declaration lists none.
     """
 
     extras_by_distribution: dict[str, list[str]]
@@ -123,8 +127,8 @@ class CoreBoundary:
     """
 
     @classmethod
-    def from_json(
-        cls, pyproject: dict[str, Any], directory: Path
+    def from_pyproject_json_data(
+        cls, *, pyproject: dict[str, Any], directory: Path
     ) -> CoreBoundary | None:
         """
         :param pyproject: The parsed content of a ``pyproject.toml``.
@@ -155,26 +159,30 @@ class CoreBoundary:
             else directory
         )
         return cls(
-            canonicalize_name(project[PyprojectKey.NAME]),
-            declaration[PyprojectKey.CORE],
-            declaration[PyprojectKey.DEPENDENCIES],
-            extras_by_distribution,
-            ModuleGraph.from_packages(
-                [source_directory / package for package in sorted(top_level_packages)]
+            distribution=canonicalize_name(project[PyprojectKey.NAME]),
+            core=declaration[PyprojectKey.CORE],
+            dependencies=declaration.get(PyprojectKey.DEPENDENCIES, []),
+            extras_by_distribution=extras_by_distribution,
+            graph=ModuleGraph.from_packages(
+                package_directories=[
+                    source_directory / package for package in sorted(top_level_packages)
+                ]
             ),
         )
 
     @staticmethod
     @functools.cache
-    def from_pyproject(path: Path) -> CoreBoundary | None:
+    def from_pyproject(*, path: Path) -> CoreBoundary | None:
         """
         :param path: A ``pyproject.toml``.
         :return: The boundary it declares, or none if it declares no core.
         """
-        return CoreBoundary.from_json(tomllib.loads(path.read_text()), path.parent)
+        return CoreBoundary.from_pyproject_json_data(
+            pyproject=tomllib.loads(path.read_text()), directory=path.parent
+        )
 
     @classmethod
-    def from_enclosed_python_source_file(cls, path: Path) -> CoreBoundary | None:
+    def from_enclosed_python_source_file(cls, *, path: Path) -> CoreBoundary | None:
         """
         :param path: A Python source file.
         :return: The boundary the nearest ``pyproject.toml`` above it declares, or none
@@ -188,16 +196,18 @@ class CoreBoundary:
             ),
             None,
         )
-        return None if pyproject is None else cls.from_pyproject(pyproject)
+        return None if pyproject is None else cls.from_pyproject(path=pyproject)
 
     @cached_property
     def core_modules(self) -> list[str]:
         """
         The dotted names of every module of core.
         """
-        return [module for module in self.graph.paths if self.includes_module(module)]
+        return [
+            module for module in self.graph.paths if self.includes_module(module=module)
+        ]
 
-    def includes_module(self, module: str) -> bool:
+    def includes_module(self, *, module: str) -> bool:
         """
         :param module: The dotted name of one of the distribution's modules.
         :return: Whether it is part of core: one of :attr:`core`, a module below one,
@@ -216,10 +226,12 @@ class CoreBoundary:
         The normalized names of the distribution itself, of :attr:`dependencies` and of
         every installed distribution they require.
         """
-        return {self.distribution} | self.requirement_closure(set(self.dependencies))
+        return {self.distribution} | self.requirement_closure(
+            distributions=set(self.dependencies)
+        )
 
     @staticmethod
-    def requirement_closure(distributions: set[str]) -> set[str]:
+    def requirement_closure(*, distributions: set[str]) -> set[str]:
         """
         :param distributions: Names of distributions.
         :return: Their normalized names and those of every installed distribution they
@@ -255,7 +267,7 @@ class CoreBoundary:
         """
         return importlib.metadata.packages_distributions()
 
-    def disallowed_distributions(self, package: str) -> set[str]:
+    def disallowed_distributions(self, *, package: str) -> set[str]:
         """
         :param package: A top-level package outside the distribution.
         :return: The normalized names of the installed distributions providing it that
@@ -272,7 +284,7 @@ class CoreBoundary:
         return provided_by or {canonicalize_name(package)}
 
     @functools.cache
-    def distributions_loaded_beyond_core(self, module: str) -> frozenset[str]:
+    def distributions_loaded_beyond_core(self, *, module: str) -> frozenset[str]:
         """
         :param module: The dotted name of one of the distribution's modules.
         :return: The disallowed distributions that loading it loads, through any chain
@@ -286,15 +298,15 @@ class CoreBoundary:
             if current in visited:
                 continue
             visited.add(current)
-            for loaded in self.graph.imports(current):
+            for loaded in self.graph.imports(module=current):
                 if loaded.module in self.graph.paths:
                     pending.append(loaded.module)
                 else:
-                    reached |= self.disallowed_distributions(loaded.module)
+                    reached |= self.disallowed_distributions(package=loaded.module)
         return frozenset(reached)
 
     def describe_violations_to_core_boundary_in_loaded_modules(
-        self, loaded: list[str]
+        self, *, loaded: list[str]
     ) -> str | None:
         """
         :param loaded: The modules one import statement of a core module loads.
@@ -304,16 +316,20 @@ class CoreBoundary:
         outside_core = [
             module
             for module in loaded
-            if module in self.graph.paths and not self.includes_module(module)
+            if module in self.graph.paths and not self.includes_module(module=module)
         ]
         external = {
-            module: self.disallowed_distributions(module)
+            module: self.disallowed_distributions(package=module)
             for module in loaded
-            if module not in self.graph.paths and self.disallowed_distributions(module)
+            if module not in self.graph.paths
+            and self.disallowed_distributions(package=module)
         }
         if outside_core:
             distributions = set().union(
-                *map(self.distributions_loaded_beyond_core, outside_core)
+                *(
+                    self.distributions_loaded_beyond_core(module=module)
+                    for module in outside_core
+                )
             )
             loading = (
                 f" and loads {', '.join(sorted(distributions))}"
@@ -343,7 +359,7 @@ class CoreBoundary:
 # %% the checker
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CoreBoundaryChecker(CodeRuleChecker):
     """
     Finds the imports a core module runs when it is loaded that load a module outside
@@ -354,26 +370,28 @@ class CoreBoundaryChecker(CodeRuleChecker):
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+    def violations(self, *, path: Path) -> Iterator[CodeRuleViolation]:
         path = path.resolve()
-        boundary = CoreBoundary.from_enclosed_python_source_file(path)
+        boundary = CoreBoundary.from_enclosed_python_source_file(path=path)
         if boundary is None:
             return
-        module = boundary.graph.module_name(path)
-        if module is None or not boundary.includes_module(module):
+        module = boundary.graph.module_name(path=path)
+        if module is None or not boundary.includes_module(module=module):
             return
         loaded_by_statement: dict[ast.stmt, list[str]] = {}
-        for loaded in boundary.graph.imports(module):
+        for loaded in boundary.graph.imports(module=module):
             loaded_by_statement.setdefault(loaded.statement, []).append(loaded.module)
         for statement, loaded in loaded_by_statement.items():
             description = (
-                boundary.describe_violations_to_core_boundary_in_loaded_modules(loaded)
+                boundary.describe_violations_to_core_boundary_in_loaded_modules(
+                    loaded=loaded
+                )
             )
             if description is None:
                 continue
             yield CodeRuleViolation(
-                path,
-                statement.lineno,
-                statement.end_lineno,
-                f"{description}; import it inside the functions that need it",
+                path=path,
+                first_line=statement.lineno,
+                last_line=statement.end_lineno,
+                description=f"{description}; import it inside the functions that need it",
             )

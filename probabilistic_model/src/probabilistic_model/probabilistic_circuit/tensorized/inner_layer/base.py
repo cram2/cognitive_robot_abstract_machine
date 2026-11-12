@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
@@ -640,7 +641,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             **{
                 field_.name: json_serializer.from_json(data[field_.name], **kwargs)
@@ -672,6 +673,21 @@ class InnerLayer(Layer, ABC):
 
     def reset_variables(self):
         self._variables_cache = None
+
+    @property
+    def column_offsets(self) -> npt.NDArray[np.int64]:
+        """
+        :return: The first column of every child layer, followed by the number of
+            columns, where the columns are the nodes of all child layers in order.
+        """
+        return np.concatenate(
+            [
+                [0],
+                np.cumsum(
+                    [child_layer.number_of_nodes for child_layer in self.child_layers]
+                ),
+            ]
+        ).astype(np.int64)
 
     @memoized
     def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):

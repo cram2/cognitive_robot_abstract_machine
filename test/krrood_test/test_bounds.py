@@ -14,11 +14,11 @@ def test_the_bounds_interface_itself_cannot_be_instantiated():
 
 
 def test_bounds_stored_as_their_corners_implement_the_bounds_interface():
-    assert isinstance(Bounds(0.0, 1.0), BoundsInterface)
+    assert isinstance(Bounds(lower=0.0, upper=1.0), BoundsInterface)
 
 
 def test_bounds_bound_to_a_type_store_corners_of_that_type():
-    @dataclass
+    @dataclass(kw_only=True)
     class IntegerBounds(Bounds[int]): ...
 
     lower_field, upper_field = fields(IntegerBounds)
