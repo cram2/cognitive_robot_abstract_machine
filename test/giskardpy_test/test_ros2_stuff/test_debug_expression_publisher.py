@@ -686,6 +686,71 @@ def test_finishing_a_run_after_publishing_raised_releases_the_visualizations(
     assert publishing._visualizations_per_node == {}
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_submitting_after_publishing_raised_names_the_cause(publishing, monkeypatch):
+    """
+    The error a submission raises once the publishing thread ended carries the exception
+    that ended it.
+    """
+    marker_publisher = publishing._marker_publisher
+    cause = RuntimeError("publishing failed")
+
+    def raise_cause(
+        *, evaluated_visualizations: list[EvaluatedSpatialTypeVisualization]
+    ) -> None:
+        """
+        Fail like a publisher whose ROS node was destroyed.
+        """
+        raise cause
+
+    monkeypatch.setattr(marker_publisher.marker_publisher, "publish", raise_cause)
+    marker_publisher.submit(submission=MarkerSubmission(evaluated_visualizations=[]))
+    marker_publisher._thread.join()
+
+    with pytest.raises(MarkerPublishingThreadEndedError) as raised:
+        marker_publisher.submit(
+            submission=MarkerSubmission(evaluated_visualizations=[])
+        )
+
+    assert raised.value.__cause__ is cause
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_a_statechart_compiled_after_publishing_raised_publishes_again(
+    publishing, cylinder_bot_world, monkeypatch
+):
+    """
+    A failed publish ends the markers of the run it happened in, not those of the
+    statecharts compiled after it.
+    """
+    executor = create_executor(cylinder_bot_world, publishing)
+    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    failed_marker_publisher = publishing._marker_publisher
+
+    def raise_error(
+        *, evaluated_visualizations: list[EvaluatedSpatialTypeVisualization]
+    ) -> None:
+        """
+        Fail like a publisher whose ROS node was destroyed.
+        """
+        raise RuntimeError("publishing failed")
+
+    monkeypatch.setattr(
+        failed_marker_publisher.marker_publisher, "publish", raise_error
+    )
+    executor.tick()
+    failed_marker_publisher._thread.join()
+    executor.finish_run()
+    nodes = NodesStartingInTurn.build(executor.context)
+
+    executor.compile(nodes.statechart)
+    executor.tick()
+
+    assert published_namespaces(publishing) == collected_namespaces(
+        publishing, nodes.first
+    )
+
+
 # %% enabling the publishing
 
 

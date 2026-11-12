@@ -4,6 +4,7 @@ Visualizes the debug expressions of running motion statechart nodes as RViz mark
 
 from __future__ import annotations
 
+import sys
 import threading
 from dataclasses import dataclass, field
 
@@ -80,13 +81,15 @@ class BackgroundMarkerPublisher(HasROS2Node):
     )
     """
     Guards :attr:`_submission`, :attr:`_submission_being_published` and
-    :attr:`publishing_stopped`, and signals their changes.
+    :attr:`publishing_error`, and signals their changes.
     """
 
-    publishing_stopped: bool = field(init=False, default=False)
+    publishing_error: BaseException | None = field(init=False, default=None)
     """
-    Whether a publish raised, which ended the thread; nothing submitted is published
-    from then on.
+    The exception a publish raised, which ended the thread; nothing submitted is
+    published from then on.
+
+    None while the thread publishes.
     """
 
     _thread: threading.Thread = field(init=False)
@@ -112,11 +115,12 @@ class BackgroundMarkerPublisher(HasROS2Node):
         still waits.
 
         :param submission: Visualizations whose rendered values nothing changes anymore.
-        :raises MarkerPublishingThreadEndedError: If publishing raised before.
+        :raises MarkerPublishingThreadEndedError: If publishing raised before, caused by
+            :attr:`publishing_error`.
         """
         with self._condition:
-            if self.publishing_stopped:
-                raise MarkerPublishingThreadEndedError()
+            if self.publishing_error is not None:
+                raise MarkerPublishingThreadEndedError() from self.publishing_error
             self._submission = submission
             self._condition.notify_all()
 
@@ -128,7 +132,7 @@ class BackgroundMarkerPublisher(HasROS2Node):
         with self._condition:
             self._condition.wait_for(
                 lambda: (
-                    self.publishing_stopped
+                    self.publishing_error is not None
                     or (
                         self._submission is None
                         and self._submission_being_published is None
@@ -153,16 +157,14 @@ class BackgroundMarkerPublisher(HasROS2Node):
             submission = self._submission
             self._submission_being_published = submission
             self._submission = None
-        published = False
         try:
             self.marker_publisher.publish(
                 evaluated_visualizations=submission.evaluated_visualizations
             )
-            published = True
         finally:
             with self._condition:
                 self._submission_being_published = None
-                self.publishing_stopped = not published
+                self.publishing_error = sys.exception()
                 self._condition.notify_all()
 
 
@@ -231,9 +233,12 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     def after_compile(self, executor: StatechartExecutor) -> None:
         """
         Collect and compile the spatial debug expressions of every node of the compiled
-        statechart, replacing those of the previous one.
+        statechart, replacing those of the previous one, and start publishing again if a
+        publish raised before.
         """
         self._release_visualizations()
+        if self._marker_publisher.publishing_error is not None:
+            self._marker_publisher = BackgroundMarkerPublisher(node=self.ros_node)
         if not self.publishes_markers:
             return
         world = executor.context.world
@@ -305,7 +310,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         self._marker_publisher.wait_until_published()
         if (
             self._last_published_tick is not None
-            and not self._marker_publisher.publishing_stopped
+            and self._marker_publisher.publishing_error is None
         ):
             self._marker_publisher.submit(
                 submission=MarkerSubmission(evaluated_visualizations=[])

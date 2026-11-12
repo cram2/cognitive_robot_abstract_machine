@@ -388,7 +388,7 @@ class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
 class MarkerPublishingThreadEndedError(DataclassException):
     """
     Raised when markers are submitted for publishing after the thread publishing them
-    ended because publishing raised.
+    ended because publishing raised; the exception it raised is the cause.
     """
 
     def error_message(self) -> str:
@@ -399,6 +399,7 @@ class MarkerPublishingThreadEndedError(DataclassException):
 
     def suggest_correction(self) -> str:
         return (
-            "Read the exception the publishing thread printed when it ended, often a "
-            "ROS node that was destroyed while it still published."
+            "Read the cause of this error, often a ROS node that was destroyed while "
+            "it still published. Publishing starts again with the next compiled "
+            "statechart."
         )
