@@ -69,7 +69,7 @@ from giskardpy.motion_statechart.debug_expression_publisher import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Giskard:
     """
     A motion server for one robot.
@@ -155,7 +155,7 @@ class Giskard:
 
     @classmethod
     def standalone(
-        cls, world_source: WorldSource, qp_controller_config: QPControllerConfig
+        cls, *, world_source: WorldSource, qp_controller_config: QPControllerConfig
     ) -> Self:
         """
         :param world_source: Describes the world Giskard controls, including the robot
@@ -194,7 +194,7 @@ class Giskard:
         node_logger = background_node.get_node().get_logger()
         node_logger.info("Building the world.")
         self.debug_expression_publishing = DebugExpressionPublishing(
-            background_node.get_node(), publishes_markers=False
+            ros_node=background_node.get_node(), publishes_markers=False
         )
         self.world = self.world_source.create_world()
         with self.world.modify_world():

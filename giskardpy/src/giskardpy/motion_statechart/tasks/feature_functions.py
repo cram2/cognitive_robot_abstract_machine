@@ -85,7 +85,8 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
                 DebugExpression(
                     name="root_V_controlled_feature",
                     expression=self._vector_to_draw(
-                        self.root_V_controlled_feature, self.controlled_feature
+                        root_V_feature=self.root_V_controlled_feature,
+                        feature=self.controlled_feature,
                     ),
                     color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
                 )
@@ -106,7 +107,8 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
                 DebugExpression(
                     name="root_V_reference_feature",
                     expression=self._vector_to_draw(
-                        self.root_V_reference_feature, self.reference_feature
+                        root_V_feature=self.root_V_reference_feature,
+                        feature=self.reference_feature,
                     ),
                     color=Color.from_rgba(red=0, green=1, blue=0, opacity=1),
                 )
@@ -116,7 +118,7 @@ class FeatureFunctionGoal(ConvergingTask, ABC):
         artifacts.debug_expressions.extend(feature_debug_expressions)
         return artifacts
 
-    def _vector_to_draw(self, root_V_feature: Vector3, feature: Vector3) -> Vector3:
+    def _vector_to_draw(self, *, root_V_feature: Vector3, feature: Vector3) -> Vector3:
         """
         :param root_V_feature: `feature` expressed in :attr:`root_link`.
         :param feature: The vector feature as the task was given it.

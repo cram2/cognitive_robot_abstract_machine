@@ -587,7 +587,7 @@ def create_goal_json(
     if client is None:
         client = MetaData(node_name="unwatched_client", process_id=0)
     goal = MotionGoal.for_motion_statechart(
-        motion_statechart,
+        motion_statechart=motion_statechart,
         client=client,
         required_position=required_position,
         publishes_debug_expressions=publishes_debug_expressions,
@@ -619,7 +619,7 @@ class MotionServerFixture:
 @pytest.fixture()
 def motion_server(init_background_node) -> MotionServerFixture:
     debug_expression_publishing = DebugExpressionPublishing(
-        background_node.get_node(), publishes_markers=False
+        ros_node=background_node.get_node(), publishes_markers=False
     )
     executor = create_executor(debug_expression_publishing)
     world = executor.context.world

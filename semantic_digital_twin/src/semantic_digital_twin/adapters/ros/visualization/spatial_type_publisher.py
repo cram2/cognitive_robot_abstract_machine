@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 # %% evaluated visualizations
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MarkerIdentity:
     """
     Identifies a published marker by the fields RViz uses to track it.
@@ -56,7 +56,7 @@ class MarkerIdentity:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EvaluatedSpatialTypeVisualization:
     """
     A visualization request together with the value its markers are drawn from.
@@ -77,7 +77,7 @@ class EvaluatedSpatialTypeVisualization:
 # %% publishing evaluated spatial types
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EvaluatedSpatialTypePublisher(HasROS2Node):
     """
     Publishes already evaluated spatial type visualizations as one RViz marker array.
@@ -123,6 +123,7 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
 
     def publish(
         self,
+        *,
         evaluated_visualizations: Iterable[EvaluatedSpatialTypeVisualization],
         root_frame_name: str,
     ) -> None:
@@ -139,21 +140,22 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
         for evaluated_visualization in evaluated_visualizations:
             marker_array.markers.extend(
                 SpatialTypeMarkerRenderer.render(
-                    evaluated_visualization.visualization,
-                    evaluated_visualization.rendered_value,
-                    root_frame_name,
+                    request=evaluated_visualization.visualization,
+                    rendered_value=evaluated_visualization.rendered_value,
+                    root_frame_name=root_frame_name,
                 )
             )
         current_identities = {
-            MarkerIdentity(marker.ns, marker.id) for marker in marker_array.markers
+            MarkerIdentity(namespace=marker.ns, marker_id=marker.id)
+            for marker in marker_array.markers
         }
         for identity in self._published_marker_identities - current_identities:
-            marker_array.markers.append(self._delete_marker(identity))
+            marker_array.markers.append(self._delete_marker(identity=identity))
         self.publisher.publish(marker_array)
         self._published_marker_identities = current_identities
 
     @staticmethod
-    def _delete_marker(identity: MarkerIdentity) -> Marker:
+    def _delete_marker(*, identity: MarkerIdentity) -> Marker:
         """
         Build a marker that deletes the previously published marker with this identity.
         """
@@ -167,7 +169,7 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
 # %% evaluating spatial types
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CompiledSpatialTypeVisualizations:
     """
     Visualizations whose rendered expressions are compiled together once, so their
@@ -198,8 +200,8 @@ class CompiledSpatialTypeVisualizations:
         """
         rendered_expressions = [
             SpatialTypeMarkerRenderer.find_spatial_type_renderer(
-                visualization.spatial_type
-            ).rendered_expression(visualization.spatial_type)
+                spatial_type=visualization.spatial_type
+            ).rendered_expression(spatial_type=visualization.spatial_type)
             for visualization in self.visualizations
         ]
         self._variables = Matrix.vstack(
@@ -234,7 +236,7 @@ class CompiledSpatialTypeVisualizations:
 # %% live world-state visualization
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     """
     Publishes spatial types as RViz markers and keeps them updated as the robot moves.
@@ -260,19 +262,21 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         super().__post_init__()
         self.marker_publisher = EvaluatedSpatialTypePublisher(node=self.node)
 
-    def add(self, request: SpatialTypeVisualization) -> None:
+    def add(self, *, request: SpatialTypeVisualization) -> None:
         """
         Register a spatial type for visualization and publish immediately.
         """
-        self.add_all([request])
+        self.add_all(requests=[request])
 
-    def add_all(self, requests: Iterable[SpatialTypeVisualization]) -> None:
+    def add_all(self, *, requests: Iterable[SpatialTypeVisualization]) -> None:
         """
         Register several spatial types for visualization and publish immediately.
         """
-        self.set_requests([*self._compiled_visualizations.visualizations, *requests])
+        self.set_requests(
+            requests=[*self._compiled_visualizations.visualizations, *requests]
+        )
 
-    def set_requests(self, requests: Iterable[SpatialTypeVisualization]) -> None:
+    def set_requests(self, *, requests: Iterable[SpatialTypeVisualization]) -> None:
         """
         Replace all registered spatial types and publish immediately.
         """
@@ -285,7 +289,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         """
         Remove all registered spatial types and delete their markers.
         """
-        self.set_requests([])
+        self.set_requests(requests=[])
 
     def on_state_change(self, **kwargs) -> None:
         """
@@ -299,7 +303,8 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         publish them, deleting the markers of spatial types no longer registered.
         """
         self.marker_publisher.publish(
-            self._compiled_visualizations.evaluate(), str(self._world.root.name)
+            evaluated_visualizations=self._compiled_visualizations.evaluate(),
+            root_frame_name=str(self._world.root.name),
         )
 
     @classmethod
@@ -328,7 +333,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
             world = reference_frame._world
         publisher = cls(node=node, _world=world)
         publisher.add(
-            SpatialTypeVisualization(
+            request=SpatialTypeVisualization(
                 spatial_type=spatial_type, color=color or Color(), label=label
             )
         )

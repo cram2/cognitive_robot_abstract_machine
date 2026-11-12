@@ -89,7 +89,7 @@ def publishing(rclpy_node) -> Iterator[DebugExpressionPublishing]:
     Publishes at every tick of :func:`create_executor`'s default tick duration, and has
     published everything before the ROS node is destroyed.
     """
-    publishing = DebugExpressionPublishing(rclpy_node, publish_frequency=10)
+    publishing = DebugExpressionPublishing(ros_node=rclpy_node, publish_frequency=10)
     yield publishing
     publishing._marker_publisher.wait_until_published()
 
@@ -348,9 +348,9 @@ def test_vector_is_expressed_in_its_visualisation_frame(cylinder_bot_world):
     vector = Vector3(x=1, y=0, z=0, reference_frame=root, visualisation_frame=bot)
 
     visualization = DebugExpressionPublishing._create_visualization(
-        DebugExpression(name="vector", expression=vector),
-        NodeRegisteringDebugExpressions(name="node"),
-        cylinder_bot_world,
+        debug_expression=DebugExpression(name="vector", expression=vector),
+        node=NodeRegisteringDebugExpressions(name="node"),
+        world=cylinder_bot_world,
     )
 
     assert visualization.spatial_type.reference_frame is bot

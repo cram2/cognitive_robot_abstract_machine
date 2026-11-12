@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 # %% publishing on a thread of its own
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MarkerSubmission:
     """
     Evaluated visualizations handed over to be published together.
@@ -155,13 +155,14 @@ class BackgroundMarkerPublisher(HasROS2Node):
         """
         with self._condition:
             self._condition.wait_for(lambda: self._submission is not None)
-            self._submission_being_published = self._submission
+            submission = self._submission
+            self._submission_being_published = submission
             self._submission = None
         published = False
         try:
             self.marker_publisher.publish(
-                self._submission_being_published.evaluated_visualizations,
-                self._submission_being_published.root_frame_name,
+                evaluated_visualizations=submission.evaluated_visualizations,
+                root_frame_name=submission.root_frame_name,
             )
             published = True
         finally:
@@ -174,7 +175,7 @@ class BackgroundMarkerPublisher(HasROS2Node):
 # %% the executor extension
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpressionPublishing(TickingExecutorExtension):
     """
     Publishes the spatial debug expressions of every running node as RViz markers.
@@ -252,7 +253,9 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         world = executor.context.world
         for node in executor.statechart.get_nodes_by_type(MotionStatechartNode):
             visualizations = [
-                self._create_visualization(debug_expression, node, world)
+                self._create_visualization(
+                    debug_expression=debug_expression, node=node, world=world
+                )
                 for debug_expression in node.debug_expressions
                 if isinstance(debug_expression.expression, SpatialType)
             ]
@@ -331,7 +334,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
 
     @staticmethod
     def _create_visualization(
-        debug_expression: DebugExpression, node: MotionStatechartNode, world: World
+        *, debug_expression: DebugExpression, node: MotionStatechartNode, world: World
     ) -> SpatialTypeVisualization:
         """
         :param debug_expression: A debug expression whose expression is a spatial type.

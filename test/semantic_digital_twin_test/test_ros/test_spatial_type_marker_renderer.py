@@ -33,8 +33,10 @@ def rendered_value(spatial_type: SpatialType) -> np.ndarray:
     """
     The evaluated rendered expression of a spatial type.
     """
-    renderer = SpatialTypeMarkerRenderer.find_spatial_type_renderer(spatial_type)
-    return renderer.rendered_expression(spatial_type).evaluate()
+    renderer = SpatialTypeMarkerRenderer.find_spatial_type_renderer(
+        spatial_type=spatial_type
+    )
+    return renderer.rendered_expression(spatial_type=spatial_type).evaluate()
 
 
 def render(spatial_type: SpatialType, **kwargs) -> list[Marker]:
@@ -43,7 +45,9 @@ def render(spatial_type: SpatialType, **kwargs) -> list[Marker]:
     """
     request = SpatialTypeVisualization(spatial_type=spatial_type, **kwargs)
     return SpatialTypeMarkerRenderer.render(
-        request, rendered_value(spatial_type), ROOT_FRAME_NAME
+        request=request,
+        rendered_value=rendered_value(spatial_type),
+        root_frame_name=ROOT_FRAME_NAME,
     )
 
 
@@ -209,7 +213,9 @@ def test_markers_are_drawn_from_the_given_value():
     request = SpatialTypeVisualization(spatial_type=point)
 
     markers = SpatialTypeMarkerRenderer.render(
-        request, np.array([7.0, 8.0, 9.0]), ROOT_FRAME_NAME
+        request=request,
+        rendered_value=np.array([7.0, 8.0, 9.0]),
+        root_frame_name=ROOT_FRAME_NAME,
     )
 
     position = markers[0].pose.position

@@ -46,7 +46,7 @@ from krrood.exceptions import DataclassException
 # %% one configuration of the sweep
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControlLoopBenchmarkResult(ExperimentResult):
     """
     What the repetitions of one scenario measured.
@@ -95,7 +95,7 @@ class ControlLoopBenchmarkResult(ExperimentResult):
 
     @classmethod
     def from_profiles(
-        cls, profiles: list[CallTreeProfile]
+        cls, *, profiles: list[CallTreeProfile]
     ) -> ControlLoopBenchmarkResult:
         """
         Aggregate the repetitions of one configuration into a single row.
@@ -132,7 +132,7 @@ class ControlLoopBenchmarkResult(ExperimentResult):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoProfilesMeasuredError(DataclassException):
     """
     Raised when a configuration is aggregated that was never measured.
@@ -234,7 +234,7 @@ class PhaseBreakdownResult(ExperimentResult):
 # %% driving the measurements
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BenchmarkMultiRun:
     """
     Runs every requested configuration in a subprocess and collects the results.
@@ -266,13 +266,17 @@ class BenchmarkMultiRun:
         """
         for scenario_name in self.scenario_names:
             profiles = [
-                self._measure_in_subprocess(scenario_name, repetition)
+                self._measure_in_subprocess(
+                    scenario_name=scenario_name, repetition=repetition
+                )
                 for repetition in range(self.repeats)
             ]
-            self.results.append(ControlLoopBenchmarkResult.from_profiles(profiles))
+            self.results.append(
+                ControlLoopBenchmarkResult.from_profiles(profiles=profiles)
+            )
 
     def _measure_in_subprocess(
-        self, scenario_name: str, repetition: int
+        self, *, scenario_name: str, repetition: int
     ) -> CallTreeProfile:
         """
         Run one measurement in a process of its own and read its result.
@@ -356,7 +360,7 @@ def measure_one_scenario(arguments: argparse.Namespace) -> None:
         python_profiler=python_profiler,
     )
     with IsolatedBenchmarkSession():
-        profile = runner.run(scenario)
+        profile = runner.run(scenario=scenario)
         if python_profiler is not None:
             statistics = pstats.Stats(python_profiler)
             statistics.dump_stats(arguments.profile_to)

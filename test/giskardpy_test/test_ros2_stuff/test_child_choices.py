@@ -152,7 +152,7 @@ class ChoosingGoal:
     def goal_json(self) -> str:
         return json.dumps(
             MotionGoal.for_motion_statechart(
-                self.statechart,
+                motion_statechart=self.statechart,
                 client=MetaData(node_name="unwatched_client", process_id=0),
             ).to_json()
         )

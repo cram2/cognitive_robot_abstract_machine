@@ -567,7 +567,9 @@ class RealRobotPlanExecutor(PlanExecutor):
         extension that the run stopped.
         """
         if self._giskard is None:
-            self._giskard = GiskardClientExecutor(self.ros_node, context=self.context)
+            self._giskard = GiskardClientExecutor(
+                node_handle=self.ros_node, context=self.context
+            )
         try:
             self._giskard.compile(self.statechart)
             self._giskard.execute()

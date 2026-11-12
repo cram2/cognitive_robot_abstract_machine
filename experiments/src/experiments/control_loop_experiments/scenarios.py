@@ -83,7 +83,7 @@ class RealTimeStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
         return RealTimePacer()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BenchmarkRobot(GiskardTester):
     """
     A PR2 that runs its motions in place at the pace of a real robot, so the control
@@ -678,7 +678,7 @@ class IsolatedBenchmarkSession(AbstractContextManager):
         self._class_diagram.clear()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScenarioRunner:
     """
     Sets a scenario up, measures its motion and takes the robot down again.
@@ -697,7 +697,7 @@ class ScenarioRunner:
     meshes cannot drown out the control loop.
     """
 
-    def run(self, scenario: BenchmarkScenario) -> CallTreeProfile:
+    def run(self, *, scenario: BenchmarkScenario) -> CallTreeProfile:
         """
         Measure one motion of the given scenario on a freshly built robot.
 

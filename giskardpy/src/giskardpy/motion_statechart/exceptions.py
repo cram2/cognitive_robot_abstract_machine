@@ -384,7 +384,7 @@ class EmptyDebugExpressionTrajectoryError(MotionStatechartError):
         return "Call tick() at least once before plotting, or configure debug expressions to record."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MarkerPublishingThreadEndedError(DataclassException):
     """
     Raised when markers are submitted for publishing after the thread publishing them

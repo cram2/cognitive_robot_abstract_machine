@@ -45,7 +45,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionServer:
     """
     The goal lifecycle of Giskard.
@@ -221,7 +221,7 @@ class MotionServer:
             )
             self.client_watchdog.watch(goal.client)
             self.wait_for_required_world_updates(goal.required_position)
-            self.compile_goal(goal)
+            self.compile_goal(goal=goal)
             self.control_loop.run()
         except Exception as exception:
             if not (
@@ -231,7 +231,7 @@ class MotionServer:
                 traceback.print_exc()
             error = exception
         finally:
-            self.finish_goal(error)
+            self.finish_goal(error=error)
 
     def wait_for_required_world_updates(
         self, required_position: StreamPosition | None
@@ -265,7 +265,7 @@ class MotionServer:
                 )
             self.idle_pacer.sleep()
 
-    def compile_goal(self, goal: MotionGoal) -> None:
+    def compile_goal(self, *, goal: MotionGoal) -> None:
         """
         Turn the goal message into a compiled motion statechart.
         """
@@ -285,7 +285,7 @@ class MotionServer:
         self.feedback_publisher.publish_structure()
         background_node.get_node().get_logger().info("Done parsing goal message.")
 
-    def finish_goal(self, error: Exception | None) -> None:
+    def finish_goal(self, *, error: Exception | None) -> None:
         """
         Stop the robot, clean up the motion statechart and answer the client.
 

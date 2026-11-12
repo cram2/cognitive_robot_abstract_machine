@@ -46,7 +46,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardClientExecutor(Executor):
     """
     Executes a statechart by sending it to Giskard over ROS and waiting until it ended
@@ -181,7 +181,9 @@ class GiskardClientExecutor(Executor):
         """
         self.statechart.sanity_check()
         return self._client.send_goal_async(
-            self._create_goal_message(publishes_debug_expressions)
+            self._create_goal_message(
+                publishes_debug_expressions=publishes_debug_expressions
+            )
         )
 
     def execute(self, *, publishes_debug_expressions: bool = False) -> None:
@@ -199,7 +201,9 @@ class GiskardClientExecutor(Executor):
         """
         self.statechart.sanity_check()
         child_chooser_access = self.context.get_extension(ChildChooserAccess)
-        goal_message = self._create_goal_message(publishes_debug_expressions)
+        goal_message = self._create_goal_message(
+            publishes_debug_expressions=publishes_debug_expressions
+        )
         try:
             if child_chooser_access is None:
                 result = self._client.send_goal(
@@ -210,7 +214,8 @@ class GiskardClientExecutor(Executor):
                 )
             else:
                 result = self._send_action_goal_choosing_children(
-                    child_chooser_access, goal_message
+                    child_chooser_access=child_chooser_access,
+                    goal_message=goal_message,
                 )
             self._take_over_result(result)
         finally:
@@ -225,7 +230,7 @@ class GiskardClientExecutor(Executor):
         StatechartStateUpdate.from_json(feedback, statechart=self.statechart).apply()
 
     def _send_action_goal_choosing_children(
-        self, child_chooser_access: ChildChooserAccess, goal_message: JsonAction.Goal
+        self, *, child_chooser_access: ChildChooserAccess, goal_message: JsonAction.Goal
     ) -> JsonAction_Result:
         """
         Send the goal, follow the states Giskard reports, see :meth:`_follow_states`,
@@ -287,7 +292,7 @@ class GiskardClientExecutor(Executor):
             raise StatechartNotEndedByResultError()
 
     def _create_goal_message(
-        self, publishes_debug_expressions: bool
+        self, *, publishes_debug_expressions: bool
     ) -> JsonAction.Goal:
         """
         Wrap the compiled statechart into a goal that names the change of this world it
@@ -299,7 +304,7 @@ class GiskardClientExecutor(Executor):
         """
         goal_msg = JsonAction.Goal()
         goal = MotionGoal.for_motion_statechart(
-            self.statechart,
+            motion_statechart=self.statechart,
             client=self.client,
             required_position=self.world_updates.required_position(),
             publishes_debug_expressions=publishes_debug_expressions,

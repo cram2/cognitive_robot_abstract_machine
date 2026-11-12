@@ -111,7 +111,7 @@ class TestRepetitionAggregation:
             make_profile([0.02, 0.04], [0.005, 0.015], compile_duration=0.6),
         ]
 
-        result = ControlLoopBenchmarkResult.from_profiles(profiles)
+        result = ControlLoopBenchmarkResult.from_profiles(profiles=profiles)
 
         assert result.scenario_name == "measured_motion"
         # cycle means are 20 ms and 30 ms, so the budget of 50 ms is 40% and 60% used
@@ -134,7 +134,7 @@ class TestRepetitionAggregation:
             make_profile([0.01, 0.03], [0.005, 0.015]),
         ]
 
-        result = ControlLoopBenchmarkResult.from_profiles(profiles)
+        result = ControlLoopBenchmarkResult.from_profiles(profiles=profiles)
 
         assert result.cycle_maximum == MeanAndStandardDeviation.from_measurements(
             [0.09, 0.03], unit=Unit.SECONDS
@@ -142,7 +142,7 @@ class TestRepetitionAggregation:
 
     def test_a_configuration_that_was_never_measured_is_rejected(self):
         with pytest.raises(NoProfilesMeasuredError):
-            ControlLoopBenchmarkResult.from_profiles([])
+            ControlLoopBenchmarkResult.from_profiles(profiles=[])
 
     def test_every_measurement_becomes_a_column(self):
         assert ControlLoopBenchmarkResult.get_column_names() == [
@@ -222,12 +222,12 @@ class TestPhaseBreakdown:
 
 @pytest.fixture()
 def cartesian_goal_profile(init_background_node) -> CallTreeProfile:
-    return ScenarioRunner().run(CartesianGoalScenario())
+    return ScenarioRunner().run(scenario=CartesianGoalScenario())
 
 
 @pytest.fixture()
 def long_sequence_profile(init_background_node) -> CallTreeProfile:
-    return ScenarioRunner().run(LongSequenceScenario())
+    return ScenarioRunner().run(scenario=LongSequenceScenario())
 
 
 @pytest.mark.slow
@@ -299,7 +299,7 @@ class TestControlCycleBudget:
 
 @pytest.fixture()
 def deeply_nested_cascade_profile(init_background_node) -> CallTreeProfile:
-    return ScenarioRunner().run(DeeplyNestedCascadeScenario())
+    return ScenarioRunner().run(scenario=DeeplyNestedCascadeScenario())
 
 
 @pytest.mark.slow
