@@ -483,7 +483,7 @@ class OrmPackage(StrEnum):
 
     SEGMIND = "segmind"
     """
-    Its interface builds on :attr:`SEMANTIC_DIGITAL_TWIN`'s.
+    Its interface builds on :attr:`CRAMPH`'s.
     """
 
     CRAMPH = "cramph"
@@ -507,18 +507,14 @@ class OrmPackage(StrEnum):
     """
 
 
-# One interpreter runs every generator, so a package follows those it builds on, and
-# precedes every package it does not build on that defines alternative mappings, since
-# ORMatic collects those from all imported subclasses.
+# One interpreter runs every generator, so a package follows those it builds on.
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
         OrmInterface(OrmPackage.SEMANTIC_DIGITAL_TWIN, REPOSITORY_ROOT),
         OrmInterface(
-            OrmPackage.SEGMIND, REPOSITORY_ROOT, (OrmPackage.SEMANTIC_DIGITAL_TWIN,)
-        ),
-        OrmInterface(
             OrmPackage.CRAMPH, REPOSITORY_ROOT, (OrmPackage.SEMANTIC_DIGITAL_TWIN,)
         ),
+        OrmInterface(OrmPackage.SEGMIND, REPOSITORY_ROOT, (OrmPackage.CRAMPH,)),
         OrmInterface(OrmPackage.GISKARDPY, REPOSITORY_ROOT, (OrmPackage.CRAMPH,)),
         OrmInterface(OrmPackage.CORAPLEX, REPOSITORY_ROOT, (OrmPackage.GISKARDPY,)),
         OrmInterface(OrmPackage.EXPERIMENTS, REPOSITORY_ROOT, (OrmPackage.CORAPLEX,)),

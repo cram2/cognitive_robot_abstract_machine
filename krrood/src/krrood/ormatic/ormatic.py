@@ -10,9 +10,10 @@ import rustworkx as rx
 import sqlalchemy
 import krrood.ormatic.custom_types  # type: ignore
 import krrood.ormatic.data_access_objects.alternative_mappings  # type: ignore
-from krrood.ormatic.base import Base as SharedBase
+import krrood
 from krrood.ormatic.helper import (
     get_classes_of_ormatic_interface,
+    OrmaticInterfaceChain,
     OrmaticInterfaceInformation,
 )
 from sortedcontainers import SortedSet
@@ -369,9 +370,13 @@ class ORMatic:
         ignored_classes: set[type],
         type_mappings: dict[type, type],
         ignore_krrood_test_classes: bool = True,
-    ):
+    ) -> ORMatic:
         """
         Create an instance from a list of packages, dependencies, and ignored classes.
+
+        The interface reuses the tables of its dependencies and of every interface they
+        build on, and takes the alternative mappings of those interfaces, of *packages*
+        and of krrood itself, whatever else is loaded in the process.
 
         :param packages: The packages that should be scanned for dataclasses.
         :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
@@ -384,22 +389,22 @@ class ORMatic:
         all_classes, all_alternative_mappings, all_type_mappings = set(), set(), {}
         all_externally_mapped_classes: dict[type, type] = {}
 
-        # every interface shares one Base, so anything already mapped anywhere in the
-        # running process must be reused, not just what an explicit dependency mapped
-        for mapper in SharedBase.registry.mappers:
-            if issubclass(mapper.class_, DataAccessObject):
-                cls.register_externally_mapped_class(
-                    dao_class=mapper.class_,
-                    externally_mapped_classes=all_externally_mapped_classes,
-                )
+        dependency_chain = OrmaticInterfaceChain(
+            interfaces=list(ormatic_interface_dependencies)
+        )
+        for dao_class in dependency_chain.data_access_objects:
+            cls.register_externally_mapped_class(
+                dao_class=dao_class,
+                externally_mapped_classes=all_externally_mapped_classes,
+            )
 
         # classes already mapped by a dependency are kept in the class diagram but not
         # remapped, so inheritance/association edges to them still resolve
         for ormatic_interface in ormatic_interface_dependencies:
             interface_info = get_classes_of_ormatic_interface(ormatic_interface)
             all_classes |= set(interface_info.classes)
-            all_alternative_mappings |= set(interface_info.alternative_mappings)
             all_type_mappings.update(interface_info.type_mappings)
+        all_alternative_mappings |= set(dependency_chain.alternative_mappings)
 
         # externally_mapped_classes is transitive across the whole chain, unlike classes above
         all_classes |= set(all_externally_mapped_classes.keys())
@@ -409,11 +414,18 @@ class ORMatic:
 
         all_classes -= ignored_classes
 
+        mapping_module_names = [package.__name__ for package in [*packages, krrood]]
         all_alternative_mappings |= set(
             am
             for am in recursive_subclasses(AlternativeMapping)
-            if not ignore_krrood_test_classes
-            or "krrood_test" not in get_module_of_type(am.original_class())
+            if any(
+                am.__module__ == name or am.__module__.startswith(f"{name}.")
+                for name in mapping_module_names
+            )
+            and (
+                not ignore_krrood_test_classes
+                or "krrood_test" not in get_module_of_type(am.original_class())
+            )
         )
 
         # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses
