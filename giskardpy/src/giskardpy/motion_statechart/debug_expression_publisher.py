@@ -219,6 +219,12 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     its order; None while the current statechart publishes no markers.
     """
 
+    _owning_nodes: list[MotionStatechartNode] = field(init=False, default_factory=list)
+    """
+    The node of each visualization :attr:`_compiled_visualizations` evaluates, in the
+    order it returns their values.
+    """
+
     _last_published_tick: int | None = field(init=False, default=None)
     """
     The tick count of the last publish, None if nothing was published since compiling.
@@ -254,6 +260,11 @@ class DebugExpressionPublishing(TickingExecutorExtension):
                 self._visualizations_per_node[node] = visualizations
         if not self._visualizations_per_node:
             return
+        self._owning_nodes = [
+            node
+            for node, visualizations in self._visualizations_per_node.items()
+            for _ in visualizations
+        ]
         self._compiled_visualizations = CompiledSpatialTypeVisualizations(
             visualizations=[
                 visualization
@@ -283,18 +294,13 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         ):
             return
         self._last_published_tick = executor.tick_count
-        owning_nodes = [
-            node
-            for node, visualizations in self._visualizations_per_node.items()
-            for _ in visualizations
-        ]
         self._marker_publisher.submit(
             submission=MarkerSubmission(
                 evaluated_visualizations=[
                     evaluated_visualization
                     for evaluated_visualization, node in zip(
                         self._compiled_visualizations.evaluate(),
-                        owning_nodes,
+                        self._owning_nodes,
                         strict=True,
                     )
                     if node.life_cycle_state == LifeCycleValues.RUNNING
@@ -322,6 +328,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         Forget the visualizations of the previous statechart.
         """
         self._visualizations_per_node = {}
+        self._owning_nodes = []
         self._compiled_visualizations = None
         self._last_published_tick = None
 
