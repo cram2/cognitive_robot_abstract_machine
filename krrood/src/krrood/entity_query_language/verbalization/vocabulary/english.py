@@ -6,15 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 
-from typing_extensions import (
-    Callable,
-    ClassVar,
-    Dict,
-    FrozenSet,
-    List,
-    Optional,
-    Type,
-)
+from typing_extensions import Callable, ClassVar
 
 from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.operators.aggregators import (
@@ -60,7 +52,7 @@ from krrood.entity_query_language.verbalization.vocabulary.words import (
 # These add behaviour for phrases that depend on a runtime type_name argument.
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class SingularExistential(PlainWord):
     """
     Parameterised existential phrase: *"there's a/an TypeName"*.
@@ -70,7 +62,7 @@ class SingularExistential(PlainWord):
     """
 
     def build_phrase(
-        self, type_name: str, referent_id: Optional[uuid.UUID] = None
+        self, *, type_name: str, referent_id: uuid.UUID | None = None
     ) -> VerbalizationFragment:
         """
         Build *"there's a/an <type_name>"*.
@@ -80,7 +72,7 @@ class SingularExistential(PlainWord):
         :return: Phrase fragment with the correct indefinite article.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(SingularExistential("there's").build_phrase("Apple"))
+        >>> flatten_fragment_to_plain_text(SingularExistential(text="there's").build_phrase(type_name="Apple"))
         "there's an Apple"
         """
         if referent_id is not None:
@@ -102,13 +94,13 @@ class SingularExistential(PlainWord):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PluralExistential(PlainWord):
     """
     Parameterised existential phrase: *"there are TypeNames"*.
     """
 
-    def build_phrase(self, type_name: str) -> VerbalizationFragment:
+    def build_phrase(self, *, type_name: str) -> VerbalizationFragment:
         """
         Build *"there are <plural_type_name>"*.
 
@@ -118,7 +110,7 @@ class PluralExistential(PlainWord):
         :param type_name: English noun in singular form; pluralised automatically.
         :return: Phrase fragment with pluralised type name.
 
-        >>> PluralExistential("there are").build_phrase("Robot").parts[1].number
+        >>> PluralExistential(text="there are").build_phrase(type_name="Robot").parts[1].number
         <GrammaticalNumber.PLURAL: 'plural'>
         """
         return PhraseFragment(
@@ -133,7 +125,7 @@ class PluralExistential(PlainWord):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class FallbackNounWord(PlainWord):
     """
     A fallback noun used when no type information is available from the
@@ -145,19 +137,19 @@ class FallbackNounWord(PlainWord):
     def plural_fragment(self) -> WordFragment:
         """:return: A noun fragment tagged plural (e.g. ``"entity"`` → ``"entities"``).
 
-        >>> FallbackNounWord("entity").plural_fragment().number
+        >>> FallbackNounWord(text="entity").plural_fragment().number
         <GrammaticalNumber.PLURAL: 'plural'>
         """
         return WordFragment(text=self.text, number=GrammaticalNumber.PLURAL)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CommonGroupKeyWord(PlainWord):
     """
     Group-key binding phrase: *"the common <field> of the <plural_root>"*.
     """
 
-    def build_phrase(self, field_name: str, root: str) -> VerbalizationFragment:
+    def build_phrase(self, *, field_name: str, root: str) -> VerbalizationFragment:
         """
         Build *"the common <field_name> of the <plural root>"*.
 
@@ -166,7 +158,7 @@ class CommonGroupKeyWord(PlainWord):
         :return: Phrase fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(CommonGroupKeyWord("the common").build_phrase("location", "Robot"))
+        >>> flatten_fragment_to_plain_text(CommonGroupKeyWord(text="the common").build_phrase(field_name="location", root="Robot"))
         'the common location of the Robot'
         """
         return PhraseFragment(
@@ -188,28 +180,28 @@ class Keywords(VocabEnum):
     EQL structural keywords (IF, THEN, FIND, WHERE, etc.).
     """
 
-    IF = KeyWord("If")
-    THEN = KeyWord("then")
-    FIND = KeyWord("Find")
-    REPORT = KeyWord("report")
-    FOR = KeyWord("for")
-    FOR_EACH = KeyWord("For each")
-    SUCH_THAT = KeyWord("such that")
-    GIVEN_THAT = KeyWord("given that")
-    WHERE = KeyWord("where")
-    WHOSE = KeyWord("whose")
-    WHICH = KeyWord("which")
-    WHO = KeyWord("who")
-    THAT = KeyWord("that")
-    GROUPED_BY = KeyWord("grouped by")
-    HAVING = KeyWord("having")
-    ORDERED_BY = KeyWord("ordered by")
-    PREDICT = KeyWord("predict")
-    RESPECTIVELY = KeyWord("respectively")
-    TRUE = KeyWord("true")
-    WHAT_CAUSES = KeyWord("what causes")
-    TO_BE = KeyWord("to be")
-    THE_PROBABILITY_THAT = KeyWord("the probability that")
+    IF = KeyWord(text="If")
+    THEN = KeyWord(text="then")
+    FIND = KeyWord(text="Find")
+    REPORT = KeyWord(text="report")
+    FOR = KeyWord(text="for")
+    FOR_EACH = KeyWord(text="For each")
+    SUCH_THAT = KeyWord(text="such that")
+    GIVEN_THAT = KeyWord(text="given that")
+    WHERE = KeyWord(text="where")
+    WHOSE = KeyWord(text="whose")
+    WHICH = KeyWord(text="which")
+    WHO = KeyWord(text="who")
+    THAT = KeyWord(text="that")
+    GROUPED_BY = KeyWord(text="grouped by")
+    HAVING = KeyWord(text="having")
+    ORDERED_BY = KeyWord(text="ordered by")
+    PREDICT = KeyWord(text="predict")
+    RESPECTIVELY = KeyWord(text="respectively")
+    TRUE = KeyWord(text="true")
+    WHAT_CAUSES = KeyWord(text="what causes")
+    TO_BE = KeyWord(text="to be")
+    THE_PROBABILITY_THAT = KeyWord(text="the probability that")
 
 
 class Directive(VocabEnum):
@@ -221,9 +213,9 @@ class Directive(VocabEnum):
     without being one itself.
     """
 
-    FIND = KeyWord("Find")
-    GENERATE = KeyWord("Generate")
-    DISTRIBUTION_OVER = KeyWord("The distribution over")
+    FIND = KeyWord(text="Find")
+    GENERATE = KeyWord(text="Generate")
+    DISTRIBUTION_OVER = KeyWord(text="The distribution over")
 
 
 class Logicals(VocabEnum):
@@ -231,10 +223,10 @@ class Logicals(VocabEnum):
     Logical connectives (NOT, FOR ALL, THERE EXISTS, EITHER).
     """
 
-    NOT = LogicalWord("not")
-    EITHER = LogicalWord("either")
-    FOR_ALL = LogicalWord("for all")
-    THERE_EXISTS = LogicalWord("there exists")
+    NOT = LogicalWord(text="not")
+    EITHER = LogicalWord(text="either")
+    FOR_ALL = LogicalWord(text="for all")
+    THERE_EXISTS = LogicalWord(text="there exists")
 
 
 class Aggregations(VocabEnum):
@@ -242,23 +234,23 @@ class Aggregations(VocabEnum):
     Aggregation function phrases (number of, sum of, average of, etc.).
     """
 
-    COUNT = AggregationWord("number")
-    COUNT_ALL = AggregationWord("count of all", child_form=None)
-    SUM = AggregationWord("sum")
-    AVERAGE = AggregationWord("average")
-    MAX = AggregationWord("maximum", child_form=GrammaticalNumber.SINGULAR)
-    MIN = AggregationWord("minimum", child_form=GrammaticalNumber.SINGULAR)
-    MODE = AggregationWord("mode")
-    MULTI_MODE = AggregationWord("all modes")
+    COUNT = AggregationWord(text="number")
+    COUNT_ALL = AggregationWord(text="count of all", child_form=None)
+    SUM = AggregationWord(text="sum")
+    AVERAGE = AggregationWord(text="average")
+    MAX = AggregationWord(text="maximum", child_form=GrammaticalNumber.SINGULAR)
+    MIN = AggregationWord(text="minimum", child_form=GrammaticalNumber.SINGULAR)
+    MODE = AggregationWord(text="mode")
+    MULTI_MODE = AggregationWord(text="all modes")
 
     @classmethod
-    def for_aggregator(cls, aggregator_type: Type[Aggregator]) -> Aggregations:
+    def for_aggregator(cls, *, aggregator_type: type[Aggregator]) -> Aggregations:
         """:return: The aggregation phrase that verbalizes an aggregator type.
 
         :raises UnknownAggregatorError: When the aggregator type has no phrase.
 
         >>> from krrood.entity_query_language.operators.aggregators import Sum
-        >>> Aggregations.for_aggregator(Sum) is Aggregations.SUM
+        >>> Aggregations.for_aggregator(aggregator_type=Sum) is Aggregations.SUM
         True
         """
         phrase = _AGGREGATOR_PHRASES.get(aggregator_type)
@@ -290,7 +282,9 @@ class Aggregations(VocabEnum):
         """
         return self.value.child_form or GrammaticalNumber.SINGULAR
 
-    def complement(self, child: VerbalizationFragment) -> List[VerbalizationFragment]:
+    def complement(
+        self, *, child: VerbalizationFragment
+    ) -> list[VerbalizationFragment]:
         """
         :param child: The already-rendered complement, built at :attr:`child_number`.
         :return: The complement modifiers — *"of"* then the child — so the bare aggregation noun
@@ -298,9 +292,9 @@ class Aggregations(VocabEnum):
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> [flatten_fragment_to_plain_text(part)
-        ...  for part in Aggregations.SUM.complement(WordFragment(text="amounts"))]
+        ...  for part in Aggregations.SUM.complement(child=WordFragment(text="amounts"))]
         ['of', 'amounts']
-        >>> Aggregations.COUNT_ALL.complement(WordFragment(text="amounts"))
+        >>> Aggregations.COUNT_ALL.complement(child=WordFragment(text="amounts"))
         []
         """
         if self.value.child_form is None:
@@ -308,8 +302,8 @@ class Aggregations(VocabEnum):
         return [Prepositions.OF.as_fragment(), child]
 
     def compact_complement(
-        self, leaf: VerbalizationFragment
-    ) -> List[VerbalizationFragment]:
+        self, *, leaf: VerbalizationFragment
+    ) -> list[VerbalizationFragment]:
         """:return: The complement for the *compact* value form, where the leaf attaches directly to
         the aggregation noun — *"of <plural leaf>"* for a population (*"the sum of amounts"*), the
         bare singular leaf as a noun modifier otherwise (*"the maximum amount"*); empty for a
@@ -317,10 +311,10 @@ class Aggregations(VocabEnum):
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
         >>> [flatten_fragment_to_plain_text(part)
-        ...  for part in Aggregations.SUM.compact_complement(WordFragment(text="amounts"))]
+        ...  for part in Aggregations.SUM.compact_complement(leaf=WordFragment(text="amounts"))]
         ['of', 'amounts']
         >>> [flatten_fragment_to_plain_text(part)
-        ...  for part in Aggregations.MAX.compact_complement(WordFragment(text="amount"))]
+        ...  for part in Aggregations.MAX.compact_complement(leaf=WordFragment(text="amount"))]
         ['amount']
         """
         if self.value.child_form is GrammaticalNumber.PLURAL:
@@ -330,7 +324,7 @@ class Aggregations(VocabEnum):
 
 #: Maps each standard aggregator subtype to its lexicon phrase; consulted by
 #: :meth:`Aggregations.for_aggregator`.
-_AGGREGATOR_PHRASES: Dict[Type[Aggregator], Aggregations] = {
+_AGGREGATOR_PHRASES: dict[type[Aggregator], Aggregations] = {
     Count: Aggregations.COUNT,
     CountAll: Aggregations.COUNT_ALL,
     Sum: Aggregations.SUM,
@@ -348,17 +342,17 @@ class Copulas(VocabEnum):
     with comparators.
     """
 
-    IS = OperatorWord("is")
-    IS_NOT = OperatorWord("is not")
-    ARE = OperatorWord("are")
-    ARE_NOT = OperatorWord("are not")
+    IS = OperatorWord(text="is")
+    IS_NOT = OperatorWord(text="is not")
+    ARE = OperatorWord(text="are")
+    ARE_NOT = OperatorWord(text="are not")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> RoleFragment:
+    def for_number(cls, *, number: GrammaticalNumber) -> RoleFragment:
         """:return: The copula tagged with *number* for a directly-built leaf; the morphology
         pass agrees it (*is* / *are*).
 
-        >>> Copulas.for_number(GrammaticalNumber.PLURAL).number
+        >>> Copulas.for_number(number=GrammaticalNumber.PLURAL).number
         <GrammaticalNumber.PLURAL: 'plural'>
         """
         return RoleFragment(text=cls.IS.text, role=SemanticRole.OPERATOR, number=number)
@@ -381,94 +375,94 @@ class Prepositions(VocabEnum):
         field token, and the verbalizer emits none of them.
     """
 
-    ABOARD = PlainWord("aboard")
-    ABOUT = PlainWord("about")
-    ABOVE = PlainWord("above")
-    ACROSS = PlainWord("across")
-    AFTER = PlainWord("after")
-    AGAINST = PlainWord("against")
-    ALONG = PlainWord("along")
-    ALONGSIDE = PlainWord("alongside")
-    AMID = PlainWord("amid")
-    AMIDST = PlainWord("amidst")
-    AMONG = PlainWord("among")
-    AMONGST = PlainWord("amongst")
-    AROUND = PlainWord("around")
-    AS = PlainWord("as")
-    ASTRIDE = PlainWord("astride")
-    AT = PlainWord("at")
-    ATOP = PlainWord("atop")
-    BARRING = PlainWord("barring")
-    BEFORE = PlainWord("before")
-    BEHIND = PlainWord("behind")
-    BELOW = PlainWord("below")
-    BENEATH = PlainWord("beneath")
-    BESIDE = PlainWord("beside")
-    BESIDES = PlainWord("besides")
-    BETWEEN = PlainWord("between")
-    BEYOND = PlainWord("beyond")
-    BUT = PlainWord("but")
-    BY = PlainWord("by")
-    CONCERNING = PlainWord("concerning")
-    CONSIDERING = PlainWord("considering")
-    DESPITE = PlainWord("despite")
-    DOWN = PlainWord("down")
-    DURING = PlainWord("during")
-    EXCEPT = PlainWord("except")
-    EXCLUDING = PlainWord("excluding")
-    FOLLOWING = PlainWord("following")
-    FOR = PlainWord("for")
-    FROM = PlainWord("from")
-    GIVEN = PlainWord("given")
-    IN = PlainWord("in")
-    INCLUDING = PlainWord("including")
-    INSIDE = PlainWord("inside")
-    INTO = PlainWord("into")
-    LIKE = PlainWord("like")
-    MINUS = PlainWord("minus")
-    NEAR = PlainWord("near")
-    NOTWITHSTANDING = PlainWord("notwithstanding")
-    OF = PlainWord("of")
-    OFF = PlainWord("off")
-    ON = PlainWord("on")
-    ONTO = PlainWord("onto")
-    OPPOSITE = PlainWord("opposite")
-    OUT = PlainWord("out")
-    OUTSIDE = PlainWord("outside")
-    OVER = PlainWord("over")
-    PAST = PlainWord("past")
-    PENDING = PlainWord("pending")
-    PER = PlainWord("per")
-    PLUS = PlainWord("plus")
-    REGARDING = PlainWord("regarding")
-    RESPECTING = PlainWord("respecting")
-    ROUND = PlainWord("round")
-    SAVE = PlainWord("save")
-    SINCE = PlainWord("since")
-    THAN = PlainWord("than")
-    THROUGH = PlainWord("through")
-    THROUGHOUT = PlainWord("throughout")
-    TILL = PlainWord("till")
-    TO = PlainWord("to")
-    TOWARD = PlainWord("toward")
-    TOWARDS = PlainWord("towards")
-    UNDER = PlainWord("under")
-    UNDERNEATH = PlainWord("underneath")
-    UNLIKE = PlainWord("unlike")
-    UNTIL = PlainWord("until")
-    UNTO = PlainWord("unto")
-    UP = PlainWord("up")
-    UPON = PlainWord("upon")
-    VERSUS = PlainWord("versus")
-    VIA = PlainWord("via")
-    WITH = PlainWord("with")
-    WITHIN = PlainWord("within")
-    WITHOUT = PlainWord("without")
-    WORTH = PlainWord("worth")
+    ABOARD = PlainWord(text="aboard")
+    ABOUT = PlainWord(text="about")
+    ABOVE = PlainWord(text="above")
+    ACROSS = PlainWord(text="across")
+    AFTER = PlainWord(text="after")
+    AGAINST = PlainWord(text="against")
+    ALONG = PlainWord(text="along")
+    ALONGSIDE = PlainWord(text="alongside")
+    AMID = PlainWord(text="amid")
+    AMIDST = PlainWord(text="amidst")
+    AMONG = PlainWord(text="among")
+    AMONGST = PlainWord(text="amongst")
+    AROUND = PlainWord(text="around")
+    AS = PlainWord(text="as")
+    ASTRIDE = PlainWord(text="astride")
+    AT = PlainWord(text="at")
+    ATOP = PlainWord(text="atop")
+    BARRING = PlainWord(text="barring")
+    BEFORE = PlainWord(text="before")
+    BEHIND = PlainWord(text="behind")
+    BELOW = PlainWord(text="below")
+    BENEATH = PlainWord(text="beneath")
+    BESIDE = PlainWord(text="beside")
+    BESIDES = PlainWord(text="besides")
+    BETWEEN = PlainWord(text="between")
+    BEYOND = PlainWord(text="beyond")
+    BUT = PlainWord(text="but")
+    BY = PlainWord(text="by")
+    CONCERNING = PlainWord(text="concerning")
+    CONSIDERING = PlainWord(text="considering")
+    DESPITE = PlainWord(text="despite")
+    DOWN = PlainWord(text="down")
+    DURING = PlainWord(text="during")
+    EXCEPT = PlainWord(text="except")
+    EXCLUDING = PlainWord(text="excluding")
+    FOLLOWING = PlainWord(text="following")
+    FOR = PlainWord(text="for")
+    FROM = PlainWord(text="from")
+    GIVEN = PlainWord(text="given")
+    IN = PlainWord(text="in")
+    INCLUDING = PlainWord(text="including")
+    INSIDE = PlainWord(text="inside")
+    INTO = PlainWord(text="into")
+    LIKE = PlainWord(text="like")
+    MINUS = PlainWord(text="minus")
+    NEAR = PlainWord(text="near")
+    NOTWITHSTANDING = PlainWord(text="notwithstanding")
+    OF = PlainWord(text="of")
+    OFF = PlainWord(text="off")
+    ON = PlainWord(text="on")
+    ONTO = PlainWord(text="onto")
+    OPPOSITE = PlainWord(text="opposite")
+    OUT = PlainWord(text="out")
+    OUTSIDE = PlainWord(text="outside")
+    OVER = PlainWord(text="over")
+    PAST = PlainWord(text="past")
+    PENDING = PlainWord(text="pending")
+    PER = PlainWord(text="per")
+    PLUS = PlainWord(text="plus")
+    REGARDING = PlainWord(text="regarding")
+    RESPECTING = PlainWord(text="respecting")
+    ROUND = PlainWord(text="round")
+    SAVE = PlainWord(text="save")
+    SINCE = PlainWord(text="since")
+    THAN = PlainWord(text="than")
+    THROUGH = PlainWord(text="through")
+    THROUGHOUT = PlainWord(text="throughout")
+    TILL = PlainWord(text="till")
+    TO = PlainWord(text="to")
+    TOWARD = PlainWord(text="toward")
+    TOWARDS = PlainWord(text="towards")
+    UNDER = PlainWord(text="under")
+    UNDERNEATH = PlainWord(text="underneath")
+    UNLIKE = PlainWord(text="unlike")
+    UNTIL = PlainWord(text="until")
+    UNTO = PlainWord(text="unto")
+    UP = PlainWord(text="up")
+    UPON = PlainWord(text="upon")
+    VERSUS = PlainWord(text="versus")
+    VIA = PlainWord(text="via")
+    WITH = PlainWord(text="with")
+    WITHIN = PlainWord(text="within")
+    WITHOUT = PlainWord(text="without")
+    WORTH = PlainWord(text="worth")
 
     @classmethod
     @lru_cache(maxsize=None)
-    def texts(cls) -> FrozenSet[str]:
+    def texts(cls) -> frozenset[str]:
         """:return: the surface word of every preposition, for testing whether a token already reads
         as a preposition."""
         return frozenset(preposition.text for preposition in cls)
@@ -479,8 +473,8 @@ class Conjunctions(VocabEnum):
     Coordinating conjunctions (AND, OR).
     """
 
-    AND = PlainWord("and")
-    OR = PlainWord("or")
+    AND = PlainWord(text="and")
+    OR = PlainWord(text="or")
 
 
 class Absence(VocabEnum):
@@ -492,16 +486,16 @@ class Absence(VocabEnum):
     agrees the copula), so the right member is chosen here.
     """
 
-    HAS_NO = OperatorWord("has no")
-    HAVE_NO = OperatorWord("have no")
+    HAS_NO = OperatorWord(text="has no")
+    HAVE_NO = OperatorWord(text="have no")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> "Absence":
+    def for_number(cls, *, number: GrammaticalNumber) -> Absence:
         """:return: ``HAVE_NO`` for a plural owner, else ``HAS_NO``.
 
-        >>> Absence.for_number(GrammaticalNumber.PLURAL).text
+        >>> Absence.for_number(number=GrammaticalNumber.PLURAL).text
         'have no'
-        >>> Absence.for_number(GrammaticalNumber.SINGULAR).text
+        >>> Absence.for_number(number=GrammaticalNumber.SINGULAR).text
         'has no'
         """
         return cls.HAVE_NO if number is GrammaticalNumber.PLURAL else cls.HAS_NO
@@ -514,16 +508,16 @@ class NonExistence(VocabEnum):
     (no attribute to name).
     """
 
-    DOES_NOT_EXIST = OperatorWord("does not exist")
-    DO_NOT_EXIST = OperatorWord("do not exist")
+    DOES_NOT_EXIST = OperatorWord(text="does not exist")
+    DO_NOT_EXIST = OperatorWord(text="do not exist")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> "NonExistence":
+    def for_number(cls, *, number: GrammaticalNumber) -> NonExistence:
         """:return: ``DO_NOT_EXIST`` for a plural subject, else ``DOES_NOT_EXIST``.
 
-        >>> NonExistence.for_number(GrammaticalNumber.PLURAL).text
+        >>> NonExistence.for_number(number=GrammaticalNumber.PLURAL).text
         'do not exist'
-        >>> NonExistence.for_number(GrammaticalNumber.SINGULAR).text
+        >>> NonExistence.for_number(number=GrammaticalNumber.SINGULAR).text
         'does not exist'
         """
         return (
@@ -544,16 +538,16 @@ class PassiveAbsence(VocabEnum):
     agrees the copula).
     """
 
-    HAS_NOT_BEEN = OperatorWord("has not been")
-    HAVE_NOT_BEEN = OperatorWord("have not been")
+    HAS_NOT_BEEN = OperatorWord(text="has not been")
+    HAVE_NOT_BEEN = OperatorWord(text="have not been")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> "PassiveAbsence":
+    def for_number(cls, *, number: GrammaticalNumber) -> PassiveAbsence:
         """:return: ``HAVE_NOT_BEEN`` for a plural owner, else ``HAS_NOT_BEEN``.
 
-        >>> PassiveAbsence.for_number(GrammaticalNumber.PLURAL).text
+        >>> PassiveAbsence.for_number(number=GrammaticalNumber.PLURAL).text
         'have not been'
-        >>> PassiveAbsence.for_number(GrammaticalNumber.SINGULAR).text
+        >>> PassiveAbsence.for_number(number=GrammaticalNumber.SINGULAR).text
         'has not been'
         """
         return (
@@ -570,8 +564,8 @@ class Quantifiers(VocabEnum):
     is not a nameable class.
     """
 
-    ANY = PlainWord("any")
-    ANYTHING = PlainWord("anything")
+    ANY = PlainWord(text="any")
+    ANYTHING = PlainWord(text="anything")
 
 
 class SetMembership(VocabEnum):
@@ -580,7 +574,7 @@ class SetMembership(VocabEnum):
     of *"one of OPTION_A, OPTION_B, or OPTION_C"*.
     """
 
-    ONE_OF = PlainWord("one of")
+    ONE_OF = PlainWord(text="one of")
 
 
 class GroupingPhrases(VocabEnum):
@@ -590,12 +584,12 @@ class GroupingPhrases(VocabEnum):
     exactly the group key.
     """
 
-    ALL = PlainWord("all")
+    ALL = PlainWord(text="all")
     """
     Quantifies a per-group selection listing (*"report all Employees"*).
     """
 
-    DISTINCT = PlainWord("distinct")
+    DISTINCT = PlainWord(text="distinct")
     """
     Marks a key-only grouped selection as a distinct listing (*"the distinct
     departments"*).
@@ -608,7 +602,7 @@ class Specificity(VocabEnum):
     identity, not its repr) — the *"specific"* of *"a specific Body"*.
     """
 
-    SPECIFIC = PlainWord("specific")
+    SPECIFIC = PlainWord(text="specific")
 
 
 class Punctuation(VocabEnum):
@@ -617,9 +611,9 @@ class Punctuation(VocabEnum):
     (*"(v1, v2)"*) and the comma in a coordinated list (*"a, b, or c"*).
     """
 
-    COMMA = PunctuationWord(",", spacing=Spacing.LEFT)
-    OPEN_PAREN = PunctuationWord("(", spacing=Spacing.RIGHT)
-    CLOSE_PAREN = PunctuationWord(")", spacing=Spacing.LEFT)
+    COMMA = PunctuationWord(text=",", spacing=Spacing.LEFT)
+    OPEN_PAREN = PunctuationWord(text="(", spacing=Spacing.RIGHT)
+    CLOSE_PAREN = PunctuationWord(text=")", spacing=Spacing.LEFT)
 
 
 class Pronouns(VocabEnum):
@@ -627,29 +621,29 @@ class Pronouns(VocabEnum):
     Coreference pronouns standing in for a previously introduced variable.
     """
 
-    ITS = PronounWord("its")
-    THEIR = PronounWord("their")
-    IT = PronounWord("it")
-    THEY = PronounWord("they")
+    ITS = PronounWord(text="its")
+    THEIR = PronounWord(text="their")
+    IT = PronounWord(text="it")
+    THEY = PronounWord(text="they")
 
     @classmethod
-    def possessive(cls, number: GrammaticalNumber) -> "Pronouns":
+    def possessive(cls, *, number: GrammaticalNumber) -> Pronouns:
         """:return: The possessive pronoun — ``THEIR`` for a plural subject, else ``ITS``.
 
-        >>> Pronouns.possessive(GrammaticalNumber.PLURAL).text
+        >>> Pronouns.possessive(number=GrammaticalNumber.PLURAL).text
         'their'
-        >>> Pronouns.possessive(GrammaticalNumber.SINGULAR).text
+        >>> Pronouns.possessive(number=GrammaticalNumber.SINGULAR).text
         'its'
         """
         return cls.THEIR if number is GrammaticalNumber.PLURAL else cls.ITS
 
     @classmethod
-    def nominative(cls, number: GrammaticalNumber) -> "Pronouns":
+    def nominative(cls, *, number: GrammaticalNumber) -> Pronouns:
         """:return: The nominative (subject) pronoun — ``THEY`` for a plural subject, else ``IT``.
 
-        >>> Pronouns.nominative(GrammaticalNumber.PLURAL).text
+        >>> Pronouns.nominative(number=GrammaticalNumber.PLURAL).text
         'they'
-        >>> Pronouns.nominative(GrammaticalNumber.SINGULAR).text
+        >>> Pronouns.nominative(number=GrammaticalNumber.SINGULAR).text
         'it'
         """
         return cls.THEY if number is GrammaticalNumber.PLURAL else cls.IT
@@ -666,7 +660,7 @@ class RangePhrases(VocabEnum):
     by a duplicated plural member.
     """
 
-    BETWEEN = OperatorWord("between")
+    BETWEEN = OperatorWord(text="between")
 
 
 class CoindexedPhrases(VocabEnum):
@@ -676,8 +670,8 @@ class CoindexedPhrases(VocabEnum):
     natural equality form.
     """
 
-    THOSE_OF = PlainWord("those of")
-    HAVE_THE_SAME = PlainWord("have the same")
+    THOSE_OF = PlainWord(text="those of")
+    HAVE_THE_SAME = PlainWord(text="have the same")
 
 
 class OrderingRangeWords(VocabEnum):
@@ -688,8 +682,8 @@ class OrderingRangeWords(VocabEnum):
     Looked up from a :class:`SortDirection` by the ordered-by assembler.
     """
 
-    LOWEST_TO_HIGHEST = PlainWord("from lowest to highest")
-    HIGHEST_TO_LOWEST = PlainWord("from highest to lowest")
+    LOWEST_TO_HIGHEST = PlainWord(text="from lowest to highest")
+    HIGHEST_TO_LOWEST = PlainWord(text="from highest to lowest")
 
 
 class RankingWords(VocabEnum):
@@ -698,26 +692,26 @@ class RankingWords(VocabEnum):
     first two"*, *"the top three"*, *"the lowest"*, *"… by salary"*.
     """
 
-    FIRST = PlainWord("first")
+    FIRST = PlainWord(text="first")
     """
     No ordering — the first *n* in natural order.
     """
 
-    TOP = PlainWord("top")
+    TOP = PlainWord(text="top")
     """
     Descending order, *n > 1* (*"the top three …"*).
     """
 
-    BOTTOM = PlainWord("bottom")
+    BOTTOM = PlainWord(text="bottom")
     """
     Ascending order, *n > 1* (*"the bottom three …"*).
     """
 
-    HIGHEST = PlainWord("highest")
+    HIGHEST = PlainWord(text="highest")
     """Descending order, *n = 1* (*"the highest …"* / *"with the highest …"*)."""
-    LOWEST = PlainWord("lowest")
+    LOWEST = PlainWord(text="lowest")
     """Ascending order, *n = 1* (*"the lowest …"* / *"with the lowest …"*)."""
-    BY = PlainWord("by")
+    BY = PlainWord(text="by")
     """
     Introduces the order key for a plural attribute ranking (*"… by salary"*).
     """
@@ -729,29 +723,29 @@ class Articles(VocabEnum):
     determiners, and a static helper for indefinite articles.
     """
 
-    A = PlainWord("a")
-    AN = PlainWord("an")
-    THE = PlainWord("the")
-    THE_UNIQUE = PlainWord("the unique")
-    ANOTHER = PlainWord("another")
+    A = PlainWord(text="a")
+    AN = PlainWord(text="an")
+    THE = PlainWord(text="the")
+    THE_UNIQUE = PlainWord(text="the unique")
+    ANOTHER = PlainWord(text="another")
     """The fused indefinite alternative determiner — a second, distinct, freshly-introduced
     same-noun referent (*"another Robot"*), not *"an other Robot"* (:class:`NounPhrase.alternative`
     on first mention). Reference: :cite:t:`gundel1993givenness` — the given/new status of an
     indefinite alternative."""
-    THE_OTHER = PlainWord("the other")
+    THE_OTHER = PlainWord(text="the other")
     """The definite alternative determiner — the same referent once the pair is discourse-old
     (:class:`NounPhrase.alternative` on repeat mention)."""
 
     @classmethod
-    def indefinite(cls, following_word: str) -> WordFragment:
+    def indefinite(cls, *, following_word: str) -> WordFragment:
         """
         :param following_word: The word immediately following the article.
         :return: A word fragment containing *"a"* or *"an"* based on the phonological context of
             *following_word* — ``WordFragment("a")`` or ``WordFragment("an")``.
 
-        >>> Articles.indefinite("hour").text
+        >>> Articles.indefinite(following_word="hour").text
         'an'
-        >>> Articles.indefinite("robot").text
+        >>> Articles.indefinite(following_word="robot").text
         'a'
         """
         text = (
@@ -768,22 +762,22 @@ class ExistentialPhrase(VocabEnum):
     TypeNames"*).
     """
 
-    THERE_IS = SingularExistential("there's")
-    THERE_ARE = PluralExistential("there are")
+    THERE_IS = SingularExistential(text="there's")
+    THERE_ARE = PluralExistential(text="there are")
 
     @classmethod
-    def for_number(cls, number: GrammaticalNumber) -> ExistentialPhrase:
+    def for_number(cls, *, number: GrammaticalNumber) -> ExistentialPhrase:
         """:return: The existential frame agreeing with *number*: ``THERE_ARE`` / ``THERE_IS_A``.
 
-        >>> ExistentialPhrase.for_number(GrammaticalNumber.PLURAL).text
+        >>> ExistentialPhrase.for_number(number=GrammaticalNumber.PLURAL).text
         'there are'
-        >>> ExistentialPhrase.for_number(GrammaticalNumber.SINGULAR).text
+        >>> ExistentialPhrase.for_number(number=GrammaticalNumber.SINGULAR).text
         "there's"
         """
         return cls.THERE_ARE if number is GrammaticalNumber.PLURAL else cls.THERE_IS
 
     def build_phrase(
-        self, type_name: str, referent_id: Optional[uuid.UUID] = None
+        self, *, type_name: str, referent_id: uuid.UUID | None = None
     ) -> VerbalizationFragment:
         """
         Build the existential phrase for *type_name*.
@@ -793,12 +787,12 @@ class ExistentialPhrase(VocabEnum):
         :return: Existential phrase fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS.build_phrase("Apple"))
+        >>> flatten_fragment_to_plain_text(ExistentialPhrase.THERE_IS.build_phrase(type_name="Apple"))
         "there's an Apple"
         """
         if referent_id is not None and self is ExistentialPhrase.THERE_IS:
-            return self.value.build_phrase(type_name, referent_id=referent_id)
-        return self.value.build_phrase(type_name)
+            return self.value.build_phrase(type_name=type_name, referent_id=referent_id)
+        return self.value.build_phrase(type_name=type_name)
 
 
 class FallbackNouns(VocabEnum):
@@ -807,8 +801,8 @@ class FallbackNouns(VocabEnum):
     *"entities"*).
     """
 
-    ENTITY = FallbackNounWord("entity")
-    VARIABLE = FallbackNounWord("variable")
+    ENTITY = FallbackNounWord(text="entity")
+    VARIABLE = FallbackNounWord(text="variable")
 
     def plural_fragment(self) -> WordFragment:
         """:return: A pluralised noun fragment (e.g. ``"entities"``).
@@ -818,16 +812,16 @@ class FallbackNouns(VocabEnum):
         """
         return self.value.plural_fragment()
 
-    def name_of(self, node: object) -> str:
+    def name_of(self, *, node: object) -> str:
         """
         :param node: A variable/entity-like node, or ``None``.
         :return: *node*'s type noun (:func:`~…value_lexicon.type_noun`), or this fallback noun's
             text when *node* is ``None`` or carries no type. Centralises the one optional-
             ``_type_`` read every planner/assembler would otherwise repeat.
 
-        >>> FallbackNouns.ENTITY.name_of(variable(Robot, []))
+        >>> FallbackNouns.ENTITY.name_of(node=variable(Robot, []))
         'Robot'
-        >>> FallbackNouns.ENTITY.name_of(None)
+        >>> FallbackNouns.ENTITY.name_of(node=None)
         'entity'
         """
         node_type = node._type_ if isinstance(node, Selectable) else None
@@ -839,9 +833,11 @@ class GroupKeyPhrases(VocabEnum):
     Group-key binding phrases (*"the common <field> of the <plural_root>"*).
     """
 
-    COMMON_OF = CommonGroupKeyWord("the common")
+    COMMON_OF = CommonGroupKeyWord(text="the common")
 
-    def build_phrase(self, field_name: str, plural_root: str) -> VerbalizationFragment:
+    def build_phrase(
+        self, *, field_name: str, plural_root: str
+    ) -> VerbalizationFragment:
         """
         Build the group-key phrase.
 
@@ -850,10 +846,10 @@ class GroupKeyPhrases(VocabEnum):
         :return: Group-key phrase fragment.
 
         >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-        >>> flatten_fragment_to_plain_text(GroupKeyPhrases.COMMON_OF.build_phrase("location", "Robots"))
+        >>> flatten_fragment_to_plain_text(GroupKeyPhrases.COMMON_OF.build_phrase(field_name="location", plural_root="Robots"))
         'the common location of the Robots'
         """
-        return self.value.build_phrase(field_name, plural_root)
+        return self.value.build_phrase(field_name=field_name, root=plural_root)
 
 
 class Operators(Enum):
@@ -961,7 +957,7 @@ class Operators(Enum):
         return self.value.select(negated=negated, compact=compact, temporal=temporal)
 
     @classmethod
-    def from_callable(cls, function) -> Operators:
+    def from_callable(cls, *, function) -> Operators:
         """
         Map a Python ``operator`` module callable to the matching member.
 
@@ -970,27 +966,27 @@ class Operators(Enum):
         :return: The corresponding member.
         :raises KeyError: If *function* has no registered mapping.
 
-        >>> Operators.from_callable(operator.gt) is Operators.GT
+        >>> Operators.from_callable(function=operator.gt) is Operators.GT
         True
         """
         return _OPERATOR_CALLABLE_MAP[function]
 
     @classmethod
-    def for_callable(cls, function) -> Optional[Operators]:
+    def for_callable(cls, *, function) -> Operators | None:
         """
         :param function: Any callable.
         :return: The member for *function*, or ``None`` when it has no registered mapping (so a
             caller can fall back without catching an exception).
 
-        >>> Operators.for_callable(operator.lt) is Operators.LT
+        >>> Operators.for_callable(function=operator.lt) is Operators.LT
         True
-        >>> Operators.for_callable(len) is None
+        >>> Operators.for_callable(function=len) is None
         True
         """
         return _OPERATOR_CALLABLE_MAP.get(function)
 
     @classmethod
-    def is_value_comparison(cls, function: Callable) -> bool:
+    def is_value_comparison(cls, *, function: Callable) -> bool:
         """
         :param function: Any callable.
         :return: whether *function* is a scalar value comparison — an order/equality comparison of a
@@ -998,17 +994,17 @@ class Operators(Enum):
             membership (``contains``) or an unmapped callable. The canonical set the shared-subject
             folds coordinate over, read from this vocabulary rather than re-listed by each caller.
 
-        >>> Operators.is_value_comparison(operator.gt)
+        >>> Operators.is_value_comparison(function=operator.gt)
         True
-        >>> Operators.is_value_comparison(operator.contains)
+        >>> Operators.is_value_comparison(function=operator.contains)
         False
         """
-        member = cls.for_callable(function)
+        member = cls.for_callable(function=function)
         return member is not None and member not in (cls.CONTAINS, cls.NOT_CONTAINS)
 
 
 #: Map Python ``operator`` callables to ``Operators`` members.
-_OPERATOR_CALLABLE_MAP: Dict[Callable, Operators] = {
+_OPERATOR_CALLABLE_MAP: dict[Callable, Operators] = {
     operator.eq: Operators.EQ,
     operator.ne: Operators.NE,
     operator.lt: Operators.LT,
@@ -1044,7 +1040,7 @@ def copula_with(
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
     >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import MorphologyProcessor
-    >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
+    >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment=fragment))
     >>> realise(copula_with("greater than", GrammaticalNumber.SINGULAR))
     'is greater than'
     >>> realise(copula_with("greater than", GrammaticalNumber.PLURAL))
@@ -1059,7 +1055,7 @@ def copula_with(
     )
     if not core:
         return copula
-    return PhraseFragment(parts=[copula, RoleFragment.for_operator(core)])
+    return PhraseFragment(parts=[copula, RoleFragment.for_operator(label=core)])
 
 
 def predicative_operator(
@@ -1083,7 +1079,7 @@ def predicative_operator(
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
     >>> from krrood.entity_query_language.verbalization.rendering.morphology_processor import MorphologyProcessor
-    >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment))
+    >>> realise = lambda fragment: flatten_fragment_to_plain_text(MorphologyProcessor().process(fragment=fragment))
     >>> realise(predicative_operator("is greater than", GrammaticalNumber.PLURAL))
     'are greater than'
     >>> realise(predicative_operator("contains", GrammaticalNumber.PLURAL))
@@ -1091,7 +1087,7 @@ def predicative_operator(
     """
     tokens = text.split()
     if not tokens or tokens[0] != Copulas.IS.text:
-        return RoleFragment.for_operator(text)
+        return RoleFragment.for_operator(label=text)
     negated = len(tokens) > 1 and tokens[1] == Logicals.NOT.text
     return copula_with(predicative_core(text), number, negated=negated)
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
@@ -17,7 +17,7 @@ from giskardpy.data_types.exceptions import (
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
     from giskardpy.qp.qp_data import QPData
-    from semantic_digital_twin.spatial_types.derivatives import Derivatives
+    from semantic_digital_twin.world_description.derivatives import Derivatives
 
 
 @dataclass
@@ -234,6 +234,28 @@ class MismatchedLimitLengthsError(GiskardException):
 
 
 @dataclass
+class MissingCruiseVelocityError(QPSolverException):
+    """
+    Raised when a constraint on the position of its expression has no cruise velocity to
+    derive the change it may demand within the control horizon from.
+    """
+
+    constraint_name: str
+    """
+    The name of the constraint without a cruise velocity.
+    """
+
+    def error_message(self) -> str:
+        return f"Constraint {self.constraint_name!r} has no cruise velocity."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Set the cruise velocity of every constraint on the position of its "
+            "expression."
+        )
+
+
+@dataclass
 class ConstraintTypeMismatchError(QPSolverException):
     """
     Raised when an enforcement strategy receives a constraint of the wrong type for the
@@ -245,12 +267,12 @@ class ConstraintTypeMismatchError(QPSolverException):
     The name of the enforcement strategy that received the constraint.
     """
 
-    expected_type: Type[GiskardConstraint]
+    expected_type: type[GiskardConstraint]
     """
     The constraint type the strategy expected.
     """
 
-    actual_type: Type[GiskardConstraint]
+    actual_type: type[GiskardConstraint]
     """
     The constraint type that was actually received.
     """
@@ -276,7 +298,7 @@ class NoFactoryForQPDataTypeError(QPSolverException):
     Raised when no registered factory handles the requested QPData type.
     """
 
-    qp_data_type: Type[QPData]
+    qp_data_type: type[QPData]
     """
     The QPData type for which no factory is registered.
     """

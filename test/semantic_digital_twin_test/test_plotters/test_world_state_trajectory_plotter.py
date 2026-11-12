@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.testing import world_setup
 from semantic_digital_twin.world_description.world_state import WorldStateTrajectory
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (

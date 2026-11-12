@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from typing_extensions import List, Tuple
 
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
@@ -46,7 +45,7 @@ class RoboCasaTaskNotFoundError(DataclassException, LookupError):
     The task name that could not be resolved to a registered RoboCasa kitchen task.
     """
 
-    available_task_names: List[str]
+    available_task_names: list[str]
     """
     The names of the registered RoboCasa kitchen tasks.
     """
@@ -70,7 +69,7 @@ class RoboCasaObjectAssetsNotFoundError(DataclassException, FileNotFoundError):
     The object category whose assets could not be found.
     """
 
-    searched_object_groups: Tuple[str, ...]
+    searched_object_groups: tuple[str, ...]
     """
     The object asset groups that were searched.
     """
@@ -112,7 +111,7 @@ class RoboCasaObjectInstanceIndexError(DataclassException, IndexError):
     The number of downloaded instances that were found.
     """
 
-    searched_object_groups: Tuple[str, ...]
+    searched_object_groups: tuple[str, ...]
     """
     The object asset groups that were searched.
     """

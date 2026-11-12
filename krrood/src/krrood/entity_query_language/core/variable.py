@@ -8,24 +8,20 @@ variables that are instantiated from other expressions.
 
 from __future__ import annotations
 
-import inspect
 from abc import ABC
 from dataclasses import dataclass, field
 from functools import cached_property
 
 from typing_extensions import (
-    Type,
     Any,
-    Dict,
-    Optional,
     Iterable,
     Union as TypingUnion,
-    Union,
     Callable,
     Iterator,
-    List,
+    get_origin,
 )
 
+from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
@@ -33,13 +29,20 @@ from krrood.entity_query_language.core.base_expressions import (
     Selectable,
 )
 from krrood.entity_query_language.core.mapped_variable import CanBehaveLikeAVariable
-from krrood.entity_query_language.core.bound_value import HasBoundValue
+from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.ground_term import CallTerm, GroundTermExpression
 from krrood.entity_query_language.cache_data import ReEnterableLazyIterable
 from krrood.entity_query_language.enums import DomainSource
-from krrood.entity_query_language.exceptions import NoChildToReplace
+from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.entity_query_language.exceptions import (
+    NoChildToReplace,
+    ResultTypeCannotBeDetermined,
+    ResultTypeIsNotAType,
+)
 from krrood.entity_query_language.operators.set_operations import (
     MultiArityExpressionThatPerformsACartesianProduct,
 )
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.entity_query_language.utils import (
     T,
     is_iterable,
@@ -55,20 +58,20 @@ The type of the domain used for the variable.
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
     """
     A superclass for variables that can have a domain source.
     """
 
-    _type_: Union[Type[T], Callable] = field(kw_only=True, default=None)
+    _type_: type[T] | Callable = field(kw_only=True, default=None)
     """
     The values type of the variable.
 
     (The value of `T`)
     """
 
-    _domain_source_: Optional[DomainSource] = field(default=None, kw_only=True)
+    _domain_source_: DomainSource | None = field(default=None, kw_only=True)
     """
     The source type of the domain (e.g., EXPLICIT, DEDUCED, ...etc.).
     """
@@ -79,7 +82,7 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Variable(CanHaveDomainSource[T]):
     """
     An atomic expression of EQL that has a domain of possible values.
@@ -109,9 +112,9 @@ class Variable(CanHaveDomainSource[T]):
     def __post_init__(self):
         super().__post_init__()
 
-        self._update_domain_(self._domain_)
+        self._update_domain_(domain=self._domain_)
 
-    def _update_domain_(self, domain):
+    def _update_domain_(self, *, domain):
         """
         Set the domain and ensure it is a lazy re-enterable iterable.
         """
@@ -120,10 +123,11 @@ class Variable(CanHaveDomainSource[T]):
             return
         if not is_iterable(domain):
             domain = [domain]
-        self._re_enterable_domain_generator_.set_iterable(domain)
+        self._re_enterable_domain_generator_.set_iterable(iterable=domain)
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
@@ -132,12 +136,14 @@ class Variable(CanHaveDomainSource[T]):
         """
         for v in self._re_enterable_domain_generator_:
             bindings = sources.bindings | {self._id_: v}
-            yield self._build_operation_result_(bindings, sources)
+            yield self._build_operation_result_(bindings=bindings, child_result=sources)
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
-        raise NoChildToReplace(self, old_child, new_child)
+        raise NoChildToReplace(
+            expression=self, old_child=old_child, new_child=new_child
+        )
 
     @cached_property
     def _name_(self) -> str:
@@ -150,7 +156,7 @@ class Variable(CanHaveDomainSource[T]):
             return f"{self.__class__.__name__}()"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Literal(Variable[T]):
     """
     Literals are variables that do not necessarily have a type but they must
@@ -162,7 +168,7 @@ class Literal(Variable[T]):
     The value of the literal.
     """
 
-    _domain_: List[T] = field(init=False, repr=False)
+    _domain_: list[T] = field(init=False, repr=False)
     """
     The domain of the literal.
 
@@ -170,7 +176,7 @@ class Literal(Variable[T]):
     iterable.
     """
 
-    _name__: Optional[str] = field(default=None, kw_only=True)
+    _name__: str | None = field(default=None, kw_only=True)
     """
     The name to use for the variable.
     """
@@ -189,13 +195,16 @@ class Literal(Variable[T]):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class InstantiatedVariable(
-    MultiArityExpressionThatPerformsACartesianProduct, CanHaveDomainSource[T]
+    MultiArityExpressionThatPerformsACartesianProduct,
+    CanHaveDomainSource[T],
+    HasFactoryAndKwargs[T],
+    GroundTermExpression[CallTerm],
 ):
     """
-    A variable which does not have an explicit domain, but creates new
-    instances using the `_type_` and `_kwargs_` that are provided.
+    A variable which does not have an explicit domain, but builds its values by
+    calling :attr:`_factory_` with the `_kwargs_` that are provided.
 
     The `_kwargs_` are variables that can be used to generate
     combinations of bindings to create instances for each combination.
@@ -203,19 +212,28 @@ class InstantiatedVariable(
     Predicates and symbolic functions.
     """
 
-    _type_: Union[Type[T], Callable] = field(kw_only=True)
+    _factory_: Callable[..., T] = field(kw_only=True)
     """
-    The result type of the variable.
-
-    (The value of `T`)
-    """
-
-    _kwargs_: Dict[str, Any] = field(default_factory=dict)
-    """
-    The properties of the variable as keyword arguments.
+    The callable that builds the values this variable binds, such as a type, a factory
+    method or a symbolic function.
     """
 
-    _child_variables_: Dict[str, SymbolicExpression] = field(
+    _declared_factory_: Callable[..., Any] | None = field(default=None, kw_only=True)
+    """
+    The callable as the query states it: the decorated function for a
+    :func:`~krrood.entity_query_language.predicate.symbolic_function`, otherwise
+    :attr:`_factory_` when not given.
+    """
+
+    _type_: type[T] | None = field(default=None, kw_only=True)
+    """
+    The type of the values this variable binds (the value of `T`), always a type.
+
+    When not given, it is the type :attr:`_factory_` builds (see
+    :meth:`~krrood.patterns.factory_and_kwargs.HasFactoryAndKwargs._type_built_by_`).
+    """
+
+    _child_variables_: dict[str, SymbolicExpression] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -229,6 +247,19 @@ class InstantiatedVariable(
     """
 
     def __post_init__(self):
+        """
+        :raises ResultTypeCannotBeDetermined: If no :attr:`_type_` is given and
+            :attr:`_factory_` names no type it builds.
+        :raises ResultTypeIsNotAType: If the given :attr:`_type_` is not a type.
+        """
+        if self._declared_factory_ is None:
+            self._declared_factory_ = self._factory_
+        if self._type_ is None:
+            self._type_ = self._type_built_by_(factory=self._factory_)
+        if self._type_ is None:
+            raise ResultTypeCannotBeDetermined(factory=self._factory_)
+        if not isinstance(self._type_, type):
+            raise ResultTypeIsNotAType(result_type=self._type_)
         self._update_child_variables_from_kwargs_()
         self._operation_children_ = tuple(self._child_variables_.values())
         # This is done here as it uses `_operation_children_`
@@ -239,50 +270,63 @@ class InstantiatedVariable(
         Set the child variables from the kwargs dictionary.
         """
         for name, value in self._kwargs_.items():
-            self._child_variables_[name] = SymbolicExpression._as_operand_(value, name)
+            self._child_variables_[name] = SymbolicExpression._as_operand_(
+                value=value, name=name
+            )
+
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return tuple(self._child_variables_.values())
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
+        return CallTerm.from_call(
+            callee=self._factory_,
+            arguments=CallArguments(
+                keyword=dict(zip(self._child_variables_, operand_values))
+            ),
+        )
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        yield from self._instantiate_using_child_variables_and_yield_results_(sources)
+        yield from self._instantiate_using_child_variables_and_yield_results_(
+            sources=sources
+        )
 
     def _instantiate_using_child_variables_and_yield_results_(
-        self, sources: OperationResult
+        self, *, sources: OperationResult
     ) -> Iterator[OperationResult]:
         """
         Create new instances of the variable type and using as keyword
         arguments the child variables values.
         """
-        for child_result in self._evaluate_product_(sources):
+        for child_result in self._evaluate_product_(sources=sources):
             # An argument without a binding is left out, so its default applies.
             arguments = {
                 name: child_result.bindings[child._id_]
                 for name, child in self._child_variables_.items()
                 if child._id_ in child_result.bindings
             }
-            # A callable class (Predicate / SymbolicFunction) implements HasBoundValue -- it binds the
-            # constructed instance, or, for a value operation, its constructed-and-called value -- the
-            # class-form counterpart of a @symbolic_function being called. A plain function/type does
-            # not, so it binds the direct call result.
-            bind = (
-                self._type_._bound_value_
-                if inspect.isclass(self._type_)
-                and issubclass(self._type_, HasBoundValue)
-                else self._type_
-            )
-            instance = bind(**arguments)
+            instance = EvaluationContext.current_value_of_term(
+                term=CallTerm.from_call(
+                    callee=self._factory_, arguments=CallArguments(keyword=arguments)
+                )
+            ).value
 
             bindings = {self._id_: instance} | child_result.bindings
-            result = self._build_operation_result_(bindings, child_result)
+            result = self._build_operation_result_(
+                bindings=bindings, child_result=child_result
+            )
             result.previous_operation_result = child_result
             yield result
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         MultiArityExpressionThatPerformsACartesianProduct._replace_child_field_(
-            self, old_child, new_child
+            self, old_child=old_child, new_child=new_child
         )
         for name, child in self._child_variables_.items():
             if child._id_ == old_child._id_:
@@ -290,20 +334,20 @@ class InstantiatedVariable(
 
     @cached_property
     def _name_(self):
-        return self._type_.__name__
+        return self._factory_.__name__
 
-    def apply_mapping_on_external_root(self, *args, **kwargs: Dict[str, Any]) -> Any:
+    def apply_mapping_on_external_root(self, *args, **kwargs: dict[str, Any]) -> Any:
         """
-        Build an instance of this variable's type from the given arguments.
+        Build a value with this variable's factory from the given arguments.
 
-        :param args: Positional arguments for the type's constructor.
-        :param kwargs: Keyword arguments for the type's constructor.
-        :return: The constructed instance.
+        :param args: Positional arguments for the factory.
+        :param kwargs: Keyword arguments for the factory.
+        :return: The built value.
         """
-        return self._type_(*args, **kwargs)
+        return self._factory_(*args, **kwargs)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class ExternallySetVariable(CanHaveDomainSource[T]):
     """
     A variable that is externally set by another expression or another part of
@@ -311,11 +355,11 @@ class ExternallySetVariable(CanHaveDomainSource[T]):
     """
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         raise ValueError(f"class {self.__class__} does not have children")
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
         As this variable is externally set, it does not produce any results on
         its own, it just yields from an empty list to indicate that it has no

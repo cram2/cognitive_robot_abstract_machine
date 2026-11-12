@@ -8,7 +8,6 @@ from colorama import Fore, Style
 from pygments import highlight
 from pygments.formatters.terminal import TerminalFormatter
 from pygments.lexers.python import PythonLexer
-from typing_extensions import Optional, Tuple
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
@@ -38,10 +37,11 @@ class UserPrompt:
 
     def prompt_user_for_expression(
         self,
+        *,
         case_query: CaseQuery,
         prompt_for: PromptFor,
-        prompt_str: Optional[str] = None,
-    ) -> Tuple[Optional[str], Optional[CallableExpression]]:
+        prompt_str: str | None = None,
+    ) -> tuple[str | None, CallableExpression | None]:
         """
         Prompt the user for an executable python expression to the given case query.
 
@@ -52,12 +52,15 @@ class UserPrompt:
             it.
         """
         with self.shell_lock:
-            prev_user_input: Optional[str] = None
-            user_input_to_modify: Optional[str] = None
-            callable_expression: Optional[CallableExpression] = None
+            prev_user_input: str | None = None
+            user_input_to_modify: str | None = None
+            callable_expression: CallableExpression | None = None
             while True:
                 user_input, expression_tree = self.prompt_user_about_case(
-                    case_query, prompt_for, prompt_str, code_to_modify=prev_user_input
+                    case_query=case_query,
+                    prompt_for=prompt_for,
+                    prompt_str=prompt_str,
+                    code_to_modify=prev_user_input,
                 )
                 if user_input is None:
                     if prompt_for == PromptFor.Conclusion:
@@ -107,11 +110,12 @@ class UserPrompt:
 
     def prompt_user_about_case(
         self,
+        *,
         case_query: CaseQuery,
         prompt_for: PromptFor,
-        prompt_str: Optional[str] = None,
-        code_to_modify: Optional[str] = None,
-    ) -> Tuple[Optional[str], Optional[AST]]:
+        prompt_str: str | None = None,
+        code_to_modify: str | None = None,
+    ) -> tuple[str | None, AST | None]:
         """
         Prompt the user for input.
 
@@ -135,7 +139,7 @@ class UserPrompt:
         prompt_for_str = prompt_for_str.replace(":", f" {case_query.name}:")
         prompt_str = f"{Fore.WHITE}{initial_prompt_str}{Fore.MAGENTA}{prompt_for_str}"
         prompt_str = self.construct_prompt_str_for_shell(
-            case_query, prompt_for, prompt_str
+            case_query=case_query, prompt_for=prompt_for, prompt_str=prompt_str
         )
         shell = IPythonShell(
             header=prompt_str,
@@ -151,9 +155,10 @@ class UserPrompt:
 
     def build_prompt_str_for_ai(
         self,
+        *,
         case_query: CaseQuery,
         prompt_for: PromptFor,
-        initial_prompt_str: Optional[str] = None,
+        initial_prompt_str: str | None = None,
     ) -> str:
         initial_prompt_str = (
             f"{initial_prompt_str}\n" if initial_prompt_str is not None else ""
@@ -169,9 +174,10 @@ class UserPrompt:
 
     def construct_prompt_str_for_shell(
         self,
+        *,
         case_query: CaseQuery,
         prompt_for: PromptFor,
-        prompt_str: Optional[str] = None,
+        prompt_str: str | None = None,
     ) -> str:
         """
         Construct the prompt string for the shell.
@@ -194,8 +200,8 @@ class UserPrompt:
         return prompt_str
 
     def prompt_user_input_and_parse_to_expression(
-        self, shell: Optional[IPythonShell] = None, user_input: Optional[str] = None
-    ) -> Tuple[Optional[str], Optional[ast.AST]]:
+        self, *, shell: IPythonShell | None = None, user_input: str | None = None
+    ) -> tuple[str | None, ast.AST | None]:
         """
         Prompt the user for input.
 
@@ -226,8 +232,8 @@ class UserPrompt:
                 user_input = None
 
     def start_shell_and_get_user_input(
-        self, shell: Optional[IPythonShell] = None
-    ) -> Optional[str]:
+        self, *, shell: IPythonShell | None = None
+    ) -> str | None:
         """
         Start the shell and get user input.
 

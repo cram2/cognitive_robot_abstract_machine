@@ -17,7 +17,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ExpressionStandIn(Operand):
     """
     A value that contributes a given expression wherever an operand is expected.
@@ -33,7 +33,7 @@ class ExpressionStandIn(Operand):
         return self.expression
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AssignedVariableStandIn(MatchAssignedValue):
     """
     A value that, assigned to an attribute in a match pattern, stands for a given
@@ -51,7 +51,7 @@ class AssignedVariableStandIn(MatchAssignedValue):
     """
 
     def _as_assigned_variable_(
-        self, attribute_type: Optional[Type]
+        self, *, attribute_type: Optional[Type]
     ) -> SymbolicExpression:
         self.attribute_type = attribute_type
         return self.variable

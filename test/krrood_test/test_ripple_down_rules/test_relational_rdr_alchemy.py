@@ -12,7 +12,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-from typing_extensions import List, Any, Set
+from typing_extensions import Any, Set
 
 from krrood.ripple_down_rules.datastructures.case import CaseAttribute
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
@@ -25,14 +25,12 @@ from krrood.ripple_down_rules.utils import render_tree
 
 
 class Base(MappedAsDataclass, DeclarativeBase):
-
     @declared_attr.directive
     def __tablename__(cls) -> str:
         return cls.__name__
 
 
 class PolymorphicIdentityMixin:
-
     @declared_attr.directive
     def __mapper_args__(cls):
         return {
@@ -79,28 +77,28 @@ class ContainsObject(Base):
 class PhysicalObject(Base):
     id: Mapped[int] = mapped_column(primary_key=True, init=False, autoincrement=True)
     name: Mapped[str]
-    has_part_relations: Mapped[List[HasPart]] = relationship(
+    has_part_relations: Mapped[list[HasPart]] = relationship(
         init=False,
         back_populates="left",
         foreign_keys=[HasPart.left_id],
         repr=False,
         default_factory=list,
     )
-    part_of_relations: Mapped[List[HasPart]] = relationship(
+    part_of_relations: Mapped[list[HasPart]] = relationship(
         init=False,
         back_populates="right",
         foreign_keys=[HasPart.right_id],
         repr=False,
         default_factory=list,
     )
-    contains_objects_relations: Mapped[List[ContainsObject]] = relationship(
+    contains_objects_relations: Mapped[list[ContainsObject]] = relationship(
         init=False,
         back_populates="left",
         foreign_keys=[ContainsObject.left_id],
         repr=False,
         default_factory=list,
     )
-    is_contained_in_relations: Mapped[List[ContainsObject]] = relationship(
+    is_contained_in_relations: Mapped[list[ContainsObject]] = relationship(
         init=False,
         back_populates="right",
         foreign_keys=[ContainsObject.right_id],
@@ -110,19 +108,19 @@ class PhysicalObject(Base):
     type: Mapped[str] = mapped_column(init=False)
 
     @property
-    def parts(self) -> List[PhysicalObject]:
+    def parts(self) -> list[PhysicalObject]:
         return [has_part.right for has_part in self.has_part_relations]
 
     @property
-    def part_of(self) -> List[PhysicalObject]:
+    def part_of(self) -> list[PhysicalObject]:
         return [has_part.left for has_part in self.part_of_relations]
 
     @property
-    def contained_objects(self) -> List[PhysicalObject]:
+    def contained_objects(self) -> list[PhysicalObject]:
         return [cont_obj.right for cont_obj in self.contains_objects_relations]
 
     @property
-    def is_contained_in(self) -> List[PhysicalObject]:
+    def is_contained_in(self) -> list[PhysicalObject]:
         return [cont_obj.left for cont_obj in self.is_contained_in_relations]
 
     @declared_attr.directive
@@ -150,9 +148,9 @@ class RelationalRDRTestCase(TestCase):
     part_d: PhysicalObject
     part_e: PhysicalObject
     part_f: PhysicalObject
-    rob_has_parts: List[HasPart]
-    containments: List[ContainsObject]
-    target: List[PhysicalObject]
+    rob_has_parts: list[HasPart]
+    containments: list[ContainsObject]
+    target: list[PhysicalObject]
 
     @classmethod
     def setUpClass(cls):
@@ -174,7 +172,12 @@ class RelationalRDRTestCase(TestCase):
         cls.containments.append(ContainsObject(left=cls.part_d, right=cls.part_e))
         cls.containments.append(ContainsObject(left=cls.part_e, right=cls.part_f))
         cls.robot: PhysicalObject = robot
-        cls.case_query = CaseQuery(robot, "contained_objects", (PhysicalObject,), False)
+        cls.case_query = CaseQuery(
+            original_case=robot,
+            attribute_name="contained_objects",
+            _attribute_types=(PhysicalObject,),
+            mutually_exclusive=False,
+        )
         cls.target = [cls.part_b, cls.part_c, cls.part_d, cls.part_e]
 
     def test_setup(self):
@@ -196,11 +199,16 @@ class RelationalRDRTestCase(TestCase):
         filename = self.expert_answers_dir + "/relational_scrdr_expert_answers_classify"
         expert = Human(use_loaded_answers=use_loaded_answers)
         if use_loaded_answers:
-            expert.load_answers(filename)
+            expert.load_answers(path=filename)
 
         scrdr = SingleClassRDR()
         cat = scrdr.fit_case(
-            CaseQuery(self.robot, "contained_objects", (PhysicalObject,), False),
+            case_query=CaseQuery(
+                original_case=self.robot,
+                attribute_name="contained_objects",
+                _attribute_types=(PhysicalObject,),
+                mutually_exclusive=False,
+            ),
             expert=expert,
         )
         # render_tree(scrdr.start_rule, use_dot_exporter=True,
@@ -210,7 +218,7 @@ class RelationalRDRTestCase(TestCase):
         if save_answers:
             cwd = os.path.dirname(__file__)
             file = os.path.join(cwd, filename)
-            expert.save_answers(file)
+            expert.save_answers(path=file)
 
     def test_parse_relational_conditions(self):
         user_input = "case.parts is not None and len(case.parts) > 0"

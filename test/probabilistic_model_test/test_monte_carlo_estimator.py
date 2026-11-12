@@ -9,27 +9,14 @@ from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.monte_carlo_estimator import MonteCarloEstimator
 
-# %% fixtures
-
-
-@pytest.fixture
-def variable() -> Continuous:
-    return Continuous("x")
-
-
-@pytest.fixture(autouse=True)
-def seeded_random_state() -> None:
-    np.random.seed(69)
-
-
 # %% total variation distance
 
 
 def test_total_variation_distance_of_nearly_identical_models_is_accurate(
-    variable: Continuous,
+    x: Continuous,
 ):
-    model = GaussianDistribution(variable=variable, location=0.0, scale=1.0)
-    other = GaussianDistribution(variable=variable, location=0.01, scale=1.0)
+    model = GaussianDistribution(variable=x, location=0.0, scale=1.0)
+    other = GaussianDistribution(variable=x, location=0.01, scale=1.0)
 
     # The densities intersect at the midpoint of the locations, so the event where the
     # model is more likely than the other is everything below it.
@@ -46,20 +33,20 @@ def test_total_variation_distance_of_nearly_identical_models_is_accurate(
     assert estimate == pytest.approx(exact_total_variation_distance, abs=1e-3)
 
 
-def test_total_variation_distance_of_disjoint_models_is_one(variable: Continuous):
+def test_total_variation_distance_of_disjoint_models_is_one(x: Continuous):
     model = UniformDistribution(
-        variable=variable,
+        variable=x,
         interval=SimpleInterval.from_data(0, 1, Bound.CLOSED, Bound.OPEN),
     )
     other = UniformDistribution(
-        variable=variable,
+        variable=x,
         interval=SimpleInterval.from_data(2, 3, Bound.CLOSED, Bound.OPEN),
     )
 
     assert MonteCarloEstimator(model).total_variation_distance(other) == 1
 
 
-def test_total_variation_distance_of_identical_models_is_zero(variable: Continuous):
-    model = GaussianDistribution(variable=variable, location=0.0, scale=1.0)
+def test_total_variation_distance_of_identical_models_is_zero(x: Continuous):
+    model = GaussianDistribution(variable=x, location=0.0, scale=1.0)
 
     assert MonteCarloEstimator(model).total_variation_distance(model) == 0

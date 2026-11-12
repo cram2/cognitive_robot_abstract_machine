@@ -5,7 +5,7 @@ import threading
 import webbrowser
 from dataclasses import dataclass
 
-from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
+from typing_extensions import Any, ClassVar, Dict, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
@@ -23,7 +23,7 @@ VisEdge = Dict[str, Any]
 """A single vis-network edge."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisNetworkGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by vis-network.
 
@@ -39,7 +39,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
         delivery network, so viewing the page needs internet access.
     """
 
-    required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
+    required_modules: ClassVar[tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
 
     layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
@@ -67,23 +67,24 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
     )
     """The vis-network layout options for each :class:`GraphLayout`."""
 
-    def graph_nodes(self) -> List[VisNode]:
+    def graph_nodes(self) -> list[VisNode]:
         """
         :return: The vis-network nodes for the current graph.
         """
         return [
             {
                 "id": str(index),
-                "label": self.node_label(index),
+                "label": self.node_label(node_index=index),
                 "color": {
-                    "background": self.node_color(index),
-                    "border": self.node_border_color(index) or self.default_border_color,
+                    "background": self.node_color(node_index=index),
+                    "border": self.node_border_color(node_index=index)
+                    or self.default_border_color,
                 },
             }
             for index in self.graph.node_indices()
         ]
 
-    def graph_edges(self) -> List[VisEdge]:
+    def graph_edges(self) -> list[VisEdge]:
         """
         :return: The vis-network edges for the current graph.
         """
@@ -108,7 +109,9 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "visnetwork_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
+                layout_options_json=json.dumps(
+                    self.layout_options.get_options(layout=self.layout)
+                ),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
             )
 
@@ -124,7 +127,7 @@ class VisNetworkGraphVisualizer(GraphVisualizerBase):
             """
             Called for each node to parse the node details to json
             """
-            return jsonify(details=self.node_details(node_index))
+            return jsonify(details=self.node_details(node_index=node_index))
 
         return application
 

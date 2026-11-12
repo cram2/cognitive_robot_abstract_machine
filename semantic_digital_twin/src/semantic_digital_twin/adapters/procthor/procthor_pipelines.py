@@ -1,5 +1,7 @@
 import re
 
+import numpy as np
+
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
@@ -15,10 +17,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Door,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -41,12 +40,12 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
         )
         world_T_drawer = drawer_body.global_transform
         drawer_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=drawer_scale.x / 2
+            x=drawer_scale.x / 2, roll=np.pi / 2
         )
         world_T_handle = world_T_drawer @ drawer_T_handle
         handle = Handle.create_with_new_body_in_world(
             name=drawer_body.name.name + "_handle",
-            scale=Scale(0.05, 0.1, 0.02),
+            scale=Scale(0.05, 0.02, 0.1),
             world=world,
             world_root_T_self=world_T_handle,
         )
@@ -74,7 +73,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
         scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
     )
     door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
+        x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1], roll=np.pi / 2
     )
     world_T_door = door_body.global_transform
     world_T_handle = world_T_door @ door_T_handle
@@ -88,7 +87,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
 
         handle = Handle.create_with_new_body_in_world(
             name=door_body.name.name + "_handle",
-            scale=Scale(0.05, 0.1, 0.02),
+            scale=Scale(0.05, 0.02, 0.1),
             world=world,
             world_root_T_self=world_T_handle,
         )

@@ -1,4 +1,13 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world_description.connections import (
+        ActiveConnection1DOF,
+    )
 
 
 @dataclass
@@ -98,6 +107,45 @@ class JointServo:
 
 
 @dataclass
+class JointDrive:
+    """
+    What drives one joint in a physical simulation: a position servo, and the motor
+    turning the joint through its gearbox.
+    """
+
+    gains: ServoGains
+    """
+    How hard the servo pulls the joint towards the commanded position.
+    """
+
+    armature: float | None = None
+    """
+    The rotor inertia the motor adds to the joint through its gearbox; ``None`` keeps
+    the armature the description states.
+    """
+
+    joint_damping: float | None = None
+    """
+    The joint's own passive damping, on top of the servo's; ``None`` keeps the damping
+    the description states.
+    """
+
+    def servo_for(self, connection: ActiveConnection1DOF) -> JointServo:
+        """
+        :param connection: The joint to drive.
+        :return: The servo driving the joint, with the passive dynamics the description
+            gives the joint, apart from the :attr:`armature` and :attr:`joint_damping`
+            this drive states.
+        """
+        dynamics = connection.dynamics
+        if self.armature is not None:
+            dynamics = replace(dynamics, armature=self.armature)
+        if self.joint_damping is not None:
+            dynamics = replace(dynamics, damping=self.joint_damping)
+        return JointServo(gains=self.gains, dynamics=dynamics)
+
+
+@dataclass
 class VelocityServoGains:
     r"""
     How hard a velocity servo pushes its joint towards the velocity it was given.
@@ -141,4 +189,21 @@ class DriveServos:
     """
     How hard the servo on yaw turns the base towards its commanded angular velocity,
     in newton metre per radian per second.
+    """
+
+
+@dataclass
+class DriveVelocityLimits:
+    """
+    How fast a drive may move a mobile base across the floor.
+    """
+
+    translation: float
+    """
+    The fastest the base may move along the floor, in meter per second.
+    """
+
+    rotation: float
+    """
+    The fastest the base may turn about its yaw, in radian per second.
     """

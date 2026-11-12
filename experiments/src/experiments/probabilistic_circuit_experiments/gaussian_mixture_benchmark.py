@@ -18,7 +18,7 @@ import pandas as pd
 import tqdm
 from sklearn import datasets
 from sklearn.utils import Bunch
-from typing_extensions import List, Optional, Sequence
+from typing_extensions import Sequence
 
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -67,7 +67,7 @@ class Dataset(enum.StrEnum):
     """
 
     @property
-    def symbolic_column(self) -> Optional[str]:
+    def symbolic_column(self) -> str | None:
         """
         :return: The name of the symbolic column, if there is one.
         """
@@ -109,7 +109,7 @@ class Dataset(enum.StrEnum):
             case Dataset.CALIFORNIA_HOUSING:
                 return datasets.fetch_california_housing(as_frame=True)
 
-    def settings(self) -> List[Setting]:
+    def settings(self) -> list[Setting]:
         """
         :return: The configurations the dataset is fitted with.
         """
@@ -215,7 +215,7 @@ class TreeSetting(Setting):
         return Method.JOINT_PROBABILITY_TREE
 
     def learning_method(self) -> LearningMethod:
-        return self.method.value(min_samples_per_leaf=self.minimum_leaf_share)
+        return self.method.value(minimum_samples_per_leaf=self.minimum_leaf_share)
 
     def __str__(self) -> str:
         return f"leaves of at least {self.minimum_leaf_share:.0%} of the rows"
@@ -298,7 +298,7 @@ def log_likelihood(circuit: ProbabilisticCircuit, data: pd.DataFrame) -> np.ndar
 
 
 def benchmark(
-    dataset: Dataset, settings: Optional[Sequence[Setting]] = None
+    dataset: Dataset, settings: Sequence[Setting] | None = None
 ) -> ExperimentsTable:
     """
     :param dataset: The dataset to fit on.

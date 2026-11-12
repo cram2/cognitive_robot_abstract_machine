@@ -18,7 +18,7 @@ from random_events.interval import Interval, closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
 from sklearn.mixture import GaussianMixture
-from typing_extensions import List, Self
+from typing_extensions import Self
 
 from experiments.experiment_definitions import (
     ExperimentResult,
@@ -91,7 +91,7 @@ class GaussianMixtureConfiguration:
     """
 
     @classmethod
-    def variants(cls) -> List[Self]:
+    def variants(cls) -> list[Self]:
         """
         :return: The mixtures the benchmark measures, from the fewest components to the
             most.
@@ -206,7 +206,7 @@ class GaussianMixtureBenchmark:
     """
 
     @property
-    def variables(self) -> List[Continuous]:
+    def variables(self) -> list[Continuous]:
         """
         :return: The variables of the mixture, in the order of the circuit.
         """
@@ -263,7 +263,7 @@ class GaussianMixtureBenchmark:
         low, high = self.range_of_samples[:, self.variables.index(variable)]
         return closed(low + lower * (high - low), low + upper * (high - low))
 
-    def measure(self) -> List[GaussianMixtureQueryDurationResult]:
+    def measure(self) -> list[GaussianMixtureQueryDurationResult]:
         """
         :return: One result per query.
         """
@@ -275,7 +275,7 @@ class GaussianMixtureBenchmark:
 
     def measure_queries_without_truncation(
         self,
-    ) -> List[GaussianMixtureQueryDurationResult]:
+    ) -> list[GaussianMixtureQueryDurationResult]:
         """
         Time the likelihood, sampling and probability of a box on both circuits, which
         leave the circuit as it is.
@@ -326,7 +326,7 @@ class GaussianMixtureBenchmark:
         )
         return results
 
-    def measure_truncation(self) -> List[GaussianMixtureQueryDurationResult]:
+    def measure_truncation(self) -> list[GaussianMixtureQueryDurationResult]:
         """
         Time truncating both circuits to one box and to several boxes, and the
         likelihood and sampling of the circuit truncated to one box.
@@ -339,12 +339,12 @@ class GaussianMixtureBenchmark:
             lambda: rustworkx_circuit.truncated(box.__deepcopy__())
         )
         layered_call = TimedCall.of(lambda: layered.truncated(box.__deepcopy__()))
-        rustworkx_truncated, rustworkx_probability = rustworkx_call.result
-        layered_truncated, layered_probability = layered_call.result
+        rustworkx_truncated = rustworkx_call.result.distribution
+        layered_truncated = layered_call.result.distribution
         raise_if_answers_disagree(
             GaussianMixtureQuery.TRUNCATION_TO_A_BOX.value,
-            rustworkx_probability,
-            layered_probability,
+            rustworkx_call.result.probability,
+            layered_call.result.probability,
             self.configuration.numerical_integration_tolerance,
         )
         results = [
@@ -369,8 +369,8 @@ class GaussianMixtureBenchmark:
         )
         raise_if_answers_disagree(
             GaussianMixtureQuery.TRUNCATION_TO_SEVERAL_BOXES.value,
-            rustworkx_call.result[1],
-            layered_call.result[1],
+            rustworkx_call.result.probability,
+            layered_call.result.probability,
             self.configuration.numerical_integration_tolerance,
         )
         results.append(
@@ -408,7 +408,7 @@ class GaussianMixtureBenchmark:
         )
         return results
 
-    def measure_conditioning(self) -> List[GaussianMixtureQueryDurationResult]:
+    def measure_conditioning(self) -> list[GaussianMixtureQueryDurationResult]:
         """
         Time conditioning both circuits on a sample of one variable and of all but one
         variable.
@@ -434,7 +434,9 @@ class GaussianMixtureBenchmark:
             )
             layered_call = TimedCall.of(lambda: layered.log_conditional(point))
             raise_if_answers_disagree(
-                query.value, rustworkx_call.result[1], layered_call.result[1]
+                query.value,
+                rustworkx_call.result.log_likelihood,
+                layered_call.result.log_likelihood,
             )
             results.append(self.result_of(query, rustworkx_call, layered_call))
         return results

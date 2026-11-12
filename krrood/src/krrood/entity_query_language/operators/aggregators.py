@@ -15,13 +15,11 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from typing_extensions import (
-    Optional,
     Iterator,
     Iterable,
     Callable,
     Any,
     Collection,
-    Dict,
     TYPE_CHECKING,
 )
 
@@ -42,6 +40,7 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.query.query import Entity
     from krrood.entity_query_language.query.operations import GroupedBy
     from krrood.entity_query_language.backends import QueryBackend
+    from krrood.entity_query_language.ground_term import TermReader
 
 
 IntOrFloat = int | float
@@ -50,7 +49,7 @@ A type representing a number, which can be either an integer or a float.
 """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
     """
     Base class for aggregators.
@@ -69,22 +68,27 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     def __post_init__(self):
         if isinstance(self._child_, Aggregator):
-            raise NestedAggregationError(self)
+            raise NestedAggregationError(parent_aggregator=self)
         super().__post_init__()
         self._var_ = self
 
-    def evaluate(self, backend: Optional[QueryBackend] = None) -> Iterator[T]:
+    def evaluate(
+        self, *, backend: QueryBackend | None = None, state: TermReader | None = None
+    ) -> Iterator[T]:
         """
         Wrap the aggregator in an entity and evaluate it (i.e., make a query
         with this aggregator as the selected expression and evaluate it.).
 
         :param backend: The query backend to evaluate with; forwarded to
             the wrapping entity.
+        :param state: Forwarded to the wrapping entity.
         :return: An iterator over the aggregator results.
         """
         from krrood.entity_query_language.query.query import Entity
 
-        return Entity(_selected_variables_=(self,)).evaluate(backend=backend)
+        return Entity(_selected_variables_=(self,)).evaluate(
+            backend=backend, state=state
+        )
 
     def grouped_by(self, *variables: Selectable) -> Entity:
         """
@@ -96,23 +100,24 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterator[OperationResult]:
         yield from (
             OperationResult(
-                sources.bindings | aggregation_result,
-                self,
-                child_result,
+                bindings=sources.bindings | aggregation_result,
+                operand=self,
+                previous_operation_result=child_result,
             )
-            for child_result in self._child_._evaluate_(sources)
+            for child_result in self._child_._evaluate_(sources=sources)
             for aggregation_result in self._apply_aggregation_function_and_get_bindings_(
-                child_result
+                child_result=child_result
             )
         )
 
     @abstractmethod
     def _apply_aggregation_function_and_get_bindings_(
-        self, child_result: OperationResult
+        self, *, child_result: OperationResult
     ) -> Iterator[Bindings]:
         """
         Apply the aggregation function to the results of the child.
@@ -123,7 +128,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         ...
 
     @property
-    def _source_root_(self) -> Optional[Any]:
+    def _source_root_(self) -> Any | None:
         """
         :return: The root :class:`~krrood.entity_query_language.core.variable.Variable`
             this aggregator aggregates over (e.g. the ``BankTransaction`` behind
@@ -138,7 +143,7 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         return root if isinstance(root, Variable) else None
 
     @property
-    def _leaf_attribute_(self) -> Optional[Any]:
+    def _leaf_attribute_(self) -> Any | None:
         """
         :return: The leaf :class:`~krrood.entity_query_language.core.mapped_variable.Attribute`
             of this aggregator's child chain (e.g. the ``amount`` node behind
@@ -159,14 +164,14 @@ class Aggregator(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         return None
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Count(Aggregator[T]):
     """
     Count the number of child results.
     """
 
     def _apply_aggregation_function_and_get_bindings_(
-        self, child_result: OperationResult
+        self, *, child_result: OperationResult
     ) -> Iterator[Bindings]:
         if self._distinct_:
             yield {self._id_: len(set(child_result.value))}
@@ -174,7 +179,7 @@ class Count(Aggregator[T]):
             yield {self._id_: len(child_result.value)}
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CountAll(Count[T]):
     """
     Count all results per group.
@@ -187,21 +192,21 @@ class CountAll(Count[T]):
     without one corrupting another.
     """
 
-    _child_: Optional[GroupedBy] = field(init=False, default=None)
+    _child_: GroupedBy | None = field(init=False, default=None)
     """
     Always ``None``; the count of all rows per group is supplied by the grouping rather than by
     aggregating a child expression.
     """
 
-    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterator[OperationResult]:
         """
         Surface the per-group row count that the grouping already bound to this aggregator's
         identifier.
         """
-        yield OperationResult(sources.bindings, self)
+        yield OperationResult(bindings=sources.bindings, operand=self)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CountRange(Count[T]):
     """
     Count concrete matches and return an ``int`` when there is no uncertainty,
@@ -212,14 +217,14 @@ class CountRange(Count[T]):
     returned.
     """
 
-    _original_child_: Optional[Selectable[T]] = field(init=False, default=None)
+    _original_child_: Selectable[T] | None = field(init=False, default=None)
 
     def __post_init__(self):
         self._original_child_ = self._child_
         super().__post_init__()
 
     def _apply_aggregation_function_and_get_bindings_(
-        self, child_result: OperationResult
+        self, *, child_result: OperationResult
     ) -> Iterator[Bindings]:
         """
         Count concrete matches and yield an ``int`` when the count is certain,
@@ -264,12 +269,12 @@ class CountRange(Count[T]):
             return 0
         return sum(
             1
-            for result in self._original_child_._evaluate_(None)
+            for result in self._original_child_._evaluate_(sources=None)
             if result.value is ...
         )
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class EntityAggregator(Aggregator[T], ABC):
     """
     Entity aggregators are aggregators where the child (the entity to be
@@ -284,24 +289,26 @@ class EntityAggregator(Aggregator[T], ABC):
     The child entity to be aggregated.
     """
 
-    _default_value_: Optional[T] = field(kw_only=True, default=None)
+    _default_value_: T | None = field(kw_only=True, default=None)
     """
     The default value to be returned if the child results are empty.
     """
 
-    _key_function_: Optional[Callable[[Any], Any]] = field(kw_only=True, default=None)
+    _key_function_: Callable[[Any], Any] | None = field(kw_only=True, default=None)
     """
     An optional function that extracts the value to be used in the aggregation.
     """
 
     def __post_init__(self):
         if not isinstance(self._child_, Selectable):
-            raise InvalidChildType(type(self._child_), [Selectable])
+            raise InvalidChildType(
+                invalid_child_type=type(self._child_), correct_child_types=[Selectable]
+            )
         self._var_ = self
         super().__post_init__()
 
     def get_aggregation_result_from_child_result(
-        self, result: OperationResult
+        self, *, result: OperationResult
     ) -> Iterator:
         """
         :param result: The current operation result from the child.
@@ -313,10 +320,10 @@ class EntityAggregator(Aggregator[T], ABC):
         results = result.value
         if self._distinct_:
             results = set(results)
-        yield from self.aggregation_function(results)
+        yield from self.aggregation_function(result=results)
 
     @abstractmethod
-    def aggregation_function(self, result: Collection) -> Iterator:
+    def aggregation_function(self, *, result: Collection) -> Iterator:
         """
         :param result: The child result to be aggregated.
         :return: The aggregated result.
@@ -324,40 +331,40 @@ class EntityAggregator(Aggregator[T], ABC):
         ...
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Sum(EntityAggregator[numbers.Number]):
     """
     Calculate the sum of the child results.
     """
 
     def _apply_aggregation_function_and_get_bindings_(
-        self, child_result: OperationResult
-    ) -> Iterator[Dict[uuid.UUID, Optional[IntOrFloat]]]:
+        self, *, child_result: OperationResult
+    ) -> Iterator[dict[uuid.UUID, IntOrFloat | None]]:
         for aggregation_result in self.get_aggregation_result_from_child_result(
-            child_result
+            result=child_result
         ):
             yield {self._id_: aggregation_result}
 
     def aggregation_function(
-        self, result: Collection[IntOrFloat]
+        self, *, result: Collection[IntOrFloat]
     ) -> Iterator[IntOrFloat]:
         yield sum(result)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Average(Sum):
     """
     Calculate the average of the child results.
     """
 
     def aggregation_function(
-        self, result: Collection[IntOrFloat]
+        self, *, result: Collection[IntOrFloat]
     ) -> Iterator[IntOrFloat]:
-        for sum_value in super().aggregation_function(result):
+        for sum_value in super().aggregation_function(result=result):
             yield sum_value / len(result)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Extreme(EntityAggregator[T], ABC):
     """
     Find and return the extreme value among the child results.
@@ -367,15 +374,17 @@ class Extreme(EntityAggregator[T], ABC):
     """
 
     def _apply_aggregation_function_and_get_bindings_(
-        self, child_result: OperationResult
+        self, *, child_result: OperationResult
     ) -> Iterator[Bindings]:
-        for extreme_val in self.get_aggregation_result_from_child_result(child_result):
+        for extreme_val in self.get_aggregation_result_from_child_result(
+            result=child_result
+        ):
             bindings = child_result.bindings.copy()
             bindings[self._id_] = extreme_val
             yield bindings
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Max(Extreme[T]):
     """
     Find and return the maximum value among the child results.
@@ -384,11 +393,11 @@ class Max(Extreme[T]):
     compared.
     """
 
-    def aggregation_function(self, values: Iterable) -> Iterator[T]:
-        yield max(values, key=self._key_function_)
+    def aggregation_function(self, *, result: Iterable) -> Iterator[T]:
+        yield max(result, key=self._key_function_)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Min(Extreme[T]):
     """
     Find and return the minimum value among the child results.
@@ -397,11 +406,11 @@ class Min(Extreme[T]):
     compared.
     """
 
-    def aggregation_function(self, values: Iterable) -> Iterator[T]:
-        yield min(values, key=self._key_function_)
+    def aggregation_function(self, *, result: Iterable) -> Iterator[T]:
+        yield min(result, key=self._key_function_)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class MultiMode(Extreme[T]):
     """
     Find and return all the equivalent mode values among the child results.
@@ -410,13 +419,13 @@ class MultiMode(Extreme[T]):
     its documentation for more details: https://docs.python.org/3/library/statistics.html#statistics.multimode.
     """
 
-    def aggregation_function(self, values: Iterable) -> Iterator[T]:
-        counter = Counter(values)
+    def aggregation_function(self, *, result: Iterable) -> Iterator[T]:
+        counter = Counter(result)
         max_count = max(counter.values())
         yield from (k for k, v in counter.items() if v == max_count)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Mode(Extreme[T]):
     """
     Find and return the mode value among the child results.
@@ -425,5 +434,5 @@ class Mode(Extreme[T]):
     found.
     """
 
-    def aggregation_function(self, values: Iterable) -> Iterator[T]:
-        yield statistics.mode(values)
+    def aggregation_function(self, *, result: Iterable) -> Iterator[T]:
+        yield statistics.mode(result)

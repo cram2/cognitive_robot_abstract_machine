@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import pickle
+import tempfile
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -28,7 +29,7 @@ from krrood.ripple_down_rules.rdr_decorators import RDRDecorator
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ZooDataset:
     """
     The feature, target, and id columns of the zoo dataset, as fetched from the UCI ML
@@ -51,7 +52,7 @@ class ZooDataset:
     """
 
 
-def load_cached_dataset(cache_file) -> Optional[ZooDataset]:
+def load_cached_dataset(cache_file) -> ZooDataset | None:
     """
     Loads the dataset from cache if it exists.
     """
@@ -67,20 +68,24 @@ def load_cached_dataset(cache_file) -> Optional[ZooDataset]:
     return ZooDataset(**parts)
 
 
-def save_dataset_to_cache(dataset: ZooDataset, cache_file):
+def save_dataset_to_cache(dataset: ZooDataset, cache_file: str) -> None:
     """
     Saves only essential parts of the dataset to cache.
+
+    Each part file appears only once it is completely written, so a concurrent
+    :func:`load_cached_dataset` never reads a partially written part.
     """
-    with open(cache_file.replace(".pkl", "_features.pkl"), "wb") as f:
-        pickle.dump(dataset.features, f)
-    with open(cache_file.replace(".pkl", "_targets.pkl"), "wb") as f:
-        pickle.dump(dataset.targets, f)
-    with open(cache_file.replace(".pkl", "_ids.pkl"), "wb") as f:
-        pickle.dump(dataset.ids, f)
+    for key, part in vars(dataset).items():
+        part_file = cache_file.replace(".pkl", f"_{key}.pkl")
+        with tempfile.NamedTemporaryFile(
+            dir=os.path.dirname(part_file), delete=False
+        ) as temporary_file:
+            pickle.dump(part, temporary_file)
+        os.replace(temporary_file.name, part_file)
     logger.info("Dataset cached successfully.")
 
 
-def get_dataset(dataset_id, cache_file: Optional[str] = None) -> Optional[ZooDataset]:
+def get_dataset(dataset_id, cache_file: str | None = None) -> ZooDataset | None:
     """
     Fetches dataset from cache or downloads it if not available.
 
@@ -119,8 +124,8 @@ def get_dataset(dataset_id, cache_file: Optional[str] = None) -> Optional[ZooDat
 
 
 def load_zoo_dataset(
-    cache_file: Optional[str] = None,
-) -> Tuple[List[Case], List[Species]]:
+    cache_file: str | None = None,
+) -> tuple[list[Case], list[Species]]:
     """
     Load the zoo dataset.
 
@@ -154,11 +159,13 @@ def load_zoo_dataset(
     ]
     category_id_to_name = {i + 1: name for i, name in enumerate(category_names)}
     # targets = [getattr(SpeciesCol, category_id_to_name[i]) for i in y.values.flatten()]
-    targets = [Species.from_str(category_id_to_name[i]) for i in y.values.flatten()]
+    targets = [
+        Species.from_str(value=category_id_to_name[i]) for i in y.values.flatten()
+    ]
     return all_cases, targets
 
 
-def load_zoo_cases(cache_file: Optional[str] = None) -> List[Case]:
+def load_zoo_cases(cache_file: str | None = None) -> list[Case]:
     """
     Load the zoo dataset cases.
 
@@ -189,7 +196,7 @@ class Habitat(Category):
     air = "air"
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PhysicalObject:
     """
     A physical object is an object that can be contained in a container.
@@ -200,7 +207,7 @@ class PhysicalObject:
     The name of the object.
     """
 
-    _contained_objects: List[PhysicalObject] = field(default_factory=list)
+    _contained_objects: list[PhysicalObject] = field(default_factory=list)
     """
     The list of objects contained in this object.
     """
@@ -213,25 +220,31 @@ class PhysicalObject:
     """
 
     _is_a_robot_rdr: ClassVar[RDRDecorator] = RDRDecorator(
-        _rdr_json_dir, (bool,), True, package_name="test"
+        models_dir=_rdr_json_dir,
+        output_type=(bool,),
+        mutual_exclusive=True,
+        package_name="test",
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.
     """
 
     _select_parts_rdr: ClassVar[RDRDecorator] = RDRDecorator(
-        _rdr_json_dir, (Self,), False, package_name="test"
+        models_dir=_rdr_json_dir,
+        output_type=(Self,),
+        mutual_exclusive=False,
+        package_name="test",
     )
     """
     The RDR decorator that is used to determine if the object is a robot or not.
     """
 
     @property
-    def contained_objects(self) -> List[PhysicalObject]:
+    def contained_objects(self) -> list[PhysicalObject]:
         return self._contained_objects
 
     @contained_objects.setter
-    def contained_objects(self, value: List[PhysicalObject]):
+    def contained_objects(self, value: list[PhysicalObject]):
         self._contained_objects = value
 
     @_is_a_robot_rdr.decorator
@@ -240,8 +253,8 @@ class PhysicalObject:
 
     @_select_parts_rdr.decorator
     def select_objects_that_are_parts_of_robot(
-        self, objects: List[PhysicalObject], robot: Robot
-    ) -> List[PhysicalObject]:
+        self, *, objects: list[PhysicalObject], robot: Robot
+    ) -> list[PhysicalObject]:
         pass
 
     def __str__(self):
@@ -259,13 +272,13 @@ class PhysicalObject:
         return hash(self.name)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Part(PhysicalObject): ...
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Robot(PhysicalObject):
-    parts: List[Part] = field(default_factory=list)
+    parts: list[Part] = field(default_factory=list)
 
 
 class Base(sqlalchemy.orm.DeclarativeBase):
@@ -312,47 +325,47 @@ class MappedAnimal(MappedAsDataclass, Base):
     catsize: Mapped[bool]
     species: Mapped[Species] = mapped_column(nullable=True)
 
-    habitats: Mapped[Set[HabitatTable]] = relationship(default_factory=set)
+    habitats: Mapped[set[HabitatTable]] = relationship(default_factory=set)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class WorldEntity:
-    world: Optional[World] = field(default=None, kw_only=True, repr=False, hash=False)
+    world: World | None = field(default=None, kw_only=True, repr=False, hash=False)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Body(WorldEntity):
     name: str
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Handle(Body): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Container(Body): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class Connection(WorldEntity):
     parent: Body
     child: Body
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class FixedConnection(Connection): ...
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class PrismaticConnection(Connection): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class World:
     id: int = 0
-    bodies: List[Body] = field(default_factory=list)
-    connections: List[Connection] = field(default_factory=list)
-    views: List[View] = field(default_factory=list, repr=False)
+    bodies: list[Body] = field(default_factory=list)
+    connections: list[Connection] = field(default_factory=list)
+    views: list[View] = field(default_factory=list, repr=False)
 
     def __hash__(self):
         return hash(self.id)
@@ -363,15 +376,15 @@ class World:
         return self.id == other.id
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class View(WorldEntity): ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Drawer(View):
     handle: Handle
     container: Container
-    correct: Optional[bool] = None
+    correct: bool | None = None
 
     def __hash__(self):
         return hash((self.__class__.__name__, self.handle, self.container))
@@ -386,10 +399,10 @@ class Drawer(View):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cabinet(View):
     container: Container
-    drawers: List[Drawer] = field(default_factory=list)
+    drawers: list[Drawer] = field(default_factory=list)
 
     def __hash__(self):
         return hash((self.__class__.__name__, self.container))

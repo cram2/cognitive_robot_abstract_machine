@@ -11,7 +11,7 @@ from typing_extensions import Any
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.exceptions import DataclassException
-from semantic_digital_twin.world_description.geometry import Bounds
+from krrood.bounds import Bounds
 
 
 from krrood.class_diagrams.attribute_introspector import (
@@ -199,7 +199,7 @@ class ExperimentResult:
         """
         result = []
         type_hints = get_type_hints_of_object(cls)
-        for field_ in cls.introspector().discover(cls):
+        for field_ in cls.introspector().discover(owner_cls=cls):
             resolved_type = type_hints[field_.field.name]
             if isinstance(resolved_type, type) and issubclass(
                 resolved_type, ExperimentResult
@@ -224,7 +224,7 @@ class ExperimentResult:
         """
         values: list[Any] = []
         type_hints = get_type_hints_of_object(type(self))
-        for field_ in self.introspector().discover(type(self)):
+        for field_ in self.introspector().discover(owner_cls=type(self)):
             value = getattr(self, field_.field.name)
             resolved_type = type_hints[field_.field.name]
             if isinstance(resolved_type, type) and issubclass(

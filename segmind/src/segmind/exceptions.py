@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Type
 
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
@@ -19,7 +18,7 @@ class NoSemanticAnnotationToWatch(DataclassException):
     world holds none of that type.
     """
 
-    semantic_annotation_type: Type[SemanticAnnotation]
+    semantic_annotation_type: type[SemanticAnnotation]
     """
     The type asked for.
     """

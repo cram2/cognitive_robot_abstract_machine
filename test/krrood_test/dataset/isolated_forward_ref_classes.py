@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from .isolated_forward_ref_types import IsolatedTypeAlpha, IsolatedTypeBeta
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsolatedMixinAlpha(ABC):
     """
     A mixin with an isolated forward reference type.
@@ -31,7 +31,7 @@ class IsolatedMixinAlpha(ABC):
     alpha_ref: Optional[IsolatedTypeAlpha] = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsolatedMixinBeta(ABC):
     """
     Another mixin with a different isolated forward reference type.
@@ -40,7 +40,7 @@ class IsolatedMixinBeta(ABC):
     beta_ref: Optional[IsolatedTypeBeta] = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IsolatedClassWithMultipleMixins(IsolatedMixinAlpha, IsolatedMixinBeta, Symbol):
     """
     A class that inherits from multiple mixins with isolated forward references.

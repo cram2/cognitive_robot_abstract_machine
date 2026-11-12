@@ -26,27 +26,22 @@ from typing_extensions import (
     Collection,
     Dict,
     Any,
-    Optional,
     ClassVar,
-    List,
     Iterator,
-    Union as TypingUnion,
-    Tuple,
-    Set,
     Self,
     TYPE_CHECKING,
     Generic,
-    Type,
     TypeAlias,
 )
 
-from krrood.adapters.json_serializer import list_like_classes
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.evaluation_context import (
     EvaluationContext,
     get_evaluation_context,
 )
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
 from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
+from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
 if TYPE_CHECKING:
@@ -54,6 +49,8 @@ if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import MappedVariable
     from krrood.entity_query_language.core.variable import Variable
     from krrood.entity_query_language.query.query import Query
+    from krrood.entity_query_language.backends import QueryBackend
+    from krrood.entity_query_language.ground_term import TermReader
 
 Bindings: TypeAlias = Dict[uuid.UUID, Any]
 """
@@ -62,7 +59,7 @@ identifier to its value.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RuleTreeContext:
     """
     A ``with``-block anchor together with the parent edge its rule tree reaches it by.
@@ -78,7 +75,7 @@ class RuleTreeContext:
     The condition node the ``with`` block anchors on.
     """
 
-    owning_parent: Optional[SymbolicExpression]
+    owning_parent: SymbolicExpression | None
     """
     The parent through which the asking rule tree reaches :attr:`condition`, kept current
     by whoever splices a new node into that edge.
@@ -124,7 +121,7 @@ class MatchAssignedValue(ABC):
 
     @abstractmethod
     def _as_assigned_variable_(
-        self, attribute_type: Optional[Type]
+        self, *, attribute_type: type | None
     ) -> SymbolicExpression:
         """
         :param attribute_type: The type of the attribute this is assigned to.
@@ -132,7 +129,7 @@ class MatchAssignedValue(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SymbolicExpression(
     AbstractContextManager, HasExpression, Operand, MatchAssignedValue
 ):
@@ -148,35 +145,33 @@ class SymbolicExpression(
     Unique identifier of this node.
     """
 
-    _conclusions_: Set[Conclusion] = field(init=False, default_factory=set)
+    _conclusions_: set[Conclusion] = field(init=False, default_factory=set)
     """
     Set of conclusion expressions attached to this node, these are evaluated when the
     truth value of this node is true during evaluation.
     """
 
-    _symbolic_expression_stack_: ClassVar[List[RuleTreeContext]] = []
+    _symbolic_expression_stack_: ClassVar[list[RuleTreeContext]] = []
     """
     The current stack of symbolic expressions that has been entered using the ``with``
     statement, each paired with the parent edge its rule tree reaches it by.
     """
 
-    _children_: List[SymbolicExpression] = field(
+    _children_: list[SymbolicExpression] = field(
         init=False, repr=False, default_factory=list
     )
     """
     The children expressions of this symbolic expression.
     """
 
-    _parents_: List[SymbolicExpression] = field(
+    _parents_: list[SymbolicExpression] = field(
         init=False, repr=False, default_factory=list
     )
     """
     The parents expressions of this symbolic expression.
     """
 
-    _parent__: Optional[SymbolicExpression] = field(
-        init=False, repr=False, default=None
-    )
+    _parent__: SymbolicExpression | None = field(init=False, repr=False, default=None)
     """
     Internal attribute used to track the parent symbolic expression of this expression.
     """
@@ -189,7 +184,7 @@ class SymbolicExpression(
     This defaults to Self.
     """
 
-    _limit_: Optional[int] = field(init=False, repr=False, default=None)
+    _limit_: int | None = field(init=False, repr=False, default=None)
     """
     The maximum number of results to return during evaluation.
     """
@@ -215,7 +210,7 @@ class SymbolicExpression(
         return self
 
     def _as_assigned_variable_(
-        self, attribute_type: Optional[Type]
+        self, *, attribute_type: type | None
     ) -> SymbolicExpression:
         """
         :param attribute_type: The type of the attribute this is assigned to.
@@ -236,7 +231,7 @@ class SymbolicExpression(
         """
         return self
 
-    def _rerooted_on_selection_(self, chain: MappedVariable) -> SymbolicExpression:
+    def _rerooted_on_selection_(self, *, chain: MappedVariable) -> SymbolicExpression:
         """
         :param chain: A mapping chain based on this expression.
         :return: The chain as written, since this expression selects no variable it
@@ -267,7 +262,7 @@ class SymbolicExpression(
         clone._conclusions_ = set()
         return clone
 
-    def _get_expression_by_id_(self, id_: uuid.UUID) -> SymbolicExpression:
+    def _get_expression_by_id_(self, *, id_: uuid.UUID) -> SymbolicExpression:
         """
         Retrieve the expression with the given ID from the collection of all
         expressions.
@@ -289,7 +284,9 @@ class SymbolicExpression(
             if id_ in evaluation_scoped_index:
                 self._expression_id_cache_[id_] = evaluation_scoped_index[id_]
                 return self._expression_id_cache_[id_]
-            raise NoExpressionFoundForGivenID(self, id_)
+            raise NoExpressionFoundForGivenID(
+                symbolic_expression=self, expression_id=id_
+            )
 
         try:
             self._expression_id_cache_[id_] = next(
@@ -298,36 +295,47 @@ class SymbolicExpression(
                 if expression._id_ == id_
             )
         except StopIteration:
-            raise NoExpressionFoundForGivenID(self, id_)
+            raise NoExpressionFoundForGivenID(
+                symbolic_expression=self, expression_id=id_
+            )
         return self._expression_id_cache_[id_]
 
     def tolist(
         self,
-        backend=None,
-    ) -> list[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
+        *,
+        backend: QueryBackend | None = None,
+        state: TermReader | None = None,
+    ) -> list[T | dict[T | SymbolicExpression, T]]:
         """
         Evaluate and return the results as a list.
 
         :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
+        :param state: Forwarded to :py:meth:`evaluate`.
         """
-        return make_list(self.evaluate(backend=backend))
+        return make_list(self.evaluate(backend=backend, state=state))
 
     def first(
-        self, backend=None
-    ) -> TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]:
+        self,
+        *,
+        backend: QueryBackend | None = None,
+        state: TermReader | None = None,
+    ) -> T | dict[T | SymbolicExpression, T]:
         """
         Evaluate and return the first result of the query object descriptor.
 
         :param backend: Optional query backend; forwarded to :py:meth:`evaluate`.
+        :param state: Forwarded to :py:meth:`evaluate`.
         :return: The first result of the query object descriptor.
         :raises StopIteration: If no results are found.
         """
-        return next(self.evaluate(backend=backend))
+        return next(self.evaluate(backend=backend, state=state))
 
     def evaluate(
         self,
-        backend=None,
-    ) -> Iterator[TypingUnion[T, Dict[TypingUnion[T, SymbolicExpression], T]]]:
+        *,
+        backend: QueryBackend | None = None,
+        state: TermReader | None = None,
+    ) -> Iterator[T | dict[T | SymbolicExpression, T]]:
         """
         Evaluate the query and map the results to the correct output data structure.
         This is the exposed evaluation method for users.
@@ -335,9 +343,20 @@ class SymbolicExpression(
         :param backend: Accepted for interface uniformity with ``Query``/``Match``; the
             base symbolic-expression engine always evaluates natively and ignores this
             argument.
+        :param state: What the evaluation reads the values of attributes, indexes,
+            calls and predicates from; their live values when omitted.
+        """
+        return EvaluationContext.iterate_reading_from(
+            term_reader=state, results=self._processed_results_()
+        )
+
+    def _processed_results_(self) -> Iterator[T | dict[T | SymbolicExpression, T]]:
+        """
+        :return: The results of a new evaluation, mapped to the output data structure
+            and limited to :attr:`_limit_`.
         """
         SymbolGraph().remove_dead_instances()
-        results = (self._process_result_(res) for res in self._true_results_())
+        results = (self._process_result_(result=res) for res in self._true_results_())
         yield from itertools.islice(results, self._limit_)
 
     def _true_results_(self) -> Iterator[OperationResult]:
@@ -356,7 +375,7 @@ class SymbolicExpression(
             results = self._create_new_context_and_evaluate_()
         else:
             results = evaluation_context.iterate_as_current(
-                self._evaluate_within_(evaluation_context)
+                results=self._evaluate_within_(evaluation_context=evaluation_context)
             )
         return (
             result
@@ -365,7 +384,7 @@ class SymbolicExpression(
         )
 
     def _replace_child_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         """
         Replace a child expression with a new child expression.
@@ -384,12 +403,12 @@ class SymbolicExpression(
         if new_child._id_ not in children_ids:
             self._children_[old_child_index] = new_child
         new_child._parent_ = self
-        old_child._remove_parent_(self)
-        self._replace_child_field_(old_child, new_child)
+        old_child._remove_parent_(parent=self)
+        self._replace_child_field_(old_child=old_child, new_child=new_child)
 
     @abstractmethod
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         """
         Replace every child field that holds *old_child* with *new_child*.
@@ -399,7 +418,7 @@ class SymbolicExpression(
         """
         pass
 
-    def _remove_parent_(self, parent: SymbolicExpression):
+    def _remove_parent_(self, *, parent: SymbolicExpression):
         """
         Remove the parent relationship between this expression and the given parent
         expression.
@@ -422,7 +441,7 @@ class SymbolicExpression(
 
     def _update_children_(
         self, *children: SymbolicExpression
-    ) -> Tuple[SymbolicExpression, ...]:
+    ) -> tuple[SymbolicExpression, ...]:
         """
         Update multiple children expressions of this symbolic expression.
 
@@ -431,14 +450,16 @@ class SymbolicExpression(
         :return: A tuple of the updated child expressions corresponding to the provided
             ``children`` arguments.
         """
-        children = [self._as_operand_(child) for child in children]
-        embedded_children = tuple(v._as_embeddable_child_(self) for v in children)
+        children = [self._as_operand_(value=child) for child in children]
+        embedded_children = tuple(
+            v._as_embeddable_child_(parent=self) for v in children
+        )
         for child in embedded_children:
             child._parent_ = self
         return embedded_children
 
     @staticmethod
-    def _as_operand_(value: Any, name: Optional[str] = None) -> SymbolicExpression:
+    def _as_operand_(*, value: Any, name: str | None = None) -> SymbolicExpression:
         """
         Read a value as the expression it contributes where an operand is expected.
 
@@ -457,7 +478,9 @@ class SymbolicExpression(
             return Literal(_value_=value, _name__=name)
         return value._symbolic_expression_
 
-    def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
+    def _as_embeddable_child_(
+        self, *, parent: SymbolicExpression
+    ) -> SymbolicExpression:
         """
         :param parent: The expression about to take this expression as a child.
         :return: The node that should be stored as ``parent``'s child, defaulting to this
@@ -479,7 +502,7 @@ class SymbolicExpression(
                 self._expression_id_cache_[child._id_] = child
                 self._ensure_children_ids_are_cached_(*child._children_)
 
-    def _process_result_(self, result: OperationResult) -> Any:
+    def _process_result_(self, *, result: OperationResult) -> Any:
         """
         Map the result to the correct output data structure for user usage.
 
@@ -491,9 +514,9 @@ class SymbolicExpression(
         """
         if self._id_ in result:
             return result[self._id_]
-        return self._unification_of_(result)
+        return self._unification_of_(result=result)
 
-    def _unification_of_(self, result: OperationResult) -> UnificationDict:
+    def _unification_of_(self, *, result: OperationResult) -> UnificationDict:
         """
         :param result: The result to be mapped.
         :return: The value bindings of *result*, keyed by the expression that produced
@@ -503,7 +526,7 @@ class SymbolicExpression(
         a caller selects, so its binding is not part of the unification.
         """
         bound_expressions = (
-            (self._get_expression_by_id_(id_), value)
+            (self._get_expression_by_id_(id_=id_), value)
             for id_, value in result.bindings.items()
         )
         return UnificationDict(
@@ -514,7 +537,7 @@ class SymbolicExpression(
             }
         )
 
-    def _result_is_false_(self, result: OperationResult) -> bool:
+    def _result_is_false_(self, *, result: OperationResult) -> bool:
         """
         Read the truth of a result this expression produced.
 
@@ -530,9 +553,10 @@ class SymbolicExpression(
 
     def _build_operation_result_with_truth_(
         self,
+        *,
         truth: bool,
         bindings: Bindings,
-        child_result: Optional[OperationResult] = None,
+        child_result: OperationResult | None = None,
     ) -> OperationResult:
         """
         Build a result that records *truth* as this expression's own truth value.
@@ -545,11 +569,14 @@ class SymbolicExpression(
         """
         bindings = copy(bindings)
         bindings[self._id_] = truth
-        return OperationResult(bindings, self, child_result)
+        return OperationResult(
+            bindings=bindings, operand=self, previous_operation_result=child_result
+        )
 
     def _evaluate_(
         self,
-        sources: Optional[OperationResult] = None,
+        *,
+        sources: OperationResult | None = None,
     ):
         """
         Wrapper for ``SymbolicExpression._evaluate__`` that manages evaluation context
@@ -561,14 +588,17 @@ class SymbolicExpression(
         """
         evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
-            yield from self._evaluate_within_(evaluation_context, sources)
+            yield from self._evaluate_within_(
+                evaluation_context=evaluation_context, sources=sources
+            )
             return
 
-        yield from self._create_new_context_and_evaluate_(sources)
+        yield from self._create_new_context_and_evaluate_(sources=sources)
 
     def _create_new_context_and_evaluate_(
         self,
-        sources: Optional[OperationResult] = None,
+        *,
+        sources: OperationResult | None = None,
     ) -> Iterator[OperationResult]:
         """
         Start a new evaluation of this expression, independent of any evaluation already
@@ -585,13 +615,14 @@ class SymbolicExpression(
         )
 
         yield from self._evaluate_in_new_context_(
-            create_default_evaluation_context(), sources
+            evaluation_context=create_default_evaluation_context(), sources=sources
         )
 
     def _evaluate_in_new_context_(
         self,
+        *,
         evaluation_context: EvaluationContext,
-        sources: Optional[OperationResult] = None,
+        sources: OperationResult | None = None,
     ) -> Iterator[OperationResult]:
         """
         Start an evaluation of this expression in a context no evaluation has used yet.
@@ -602,16 +633,19 @@ class SymbolicExpression(
         :return: An iterator of OperationResult instances.
         """
         evaluation_context.active_conditions_root.set_active_root_if_not_set(
-            self._conditions_root_, has_condition=self._has_condition_
+            root=self._conditions_root_, has_condition=self._has_condition_
         )
         yield from evaluation_context.iterate_as_current(
-            self._evaluate_within_(evaluation_context, sources)
+            results=self._evaluate_within_(
+                evaluation_context=evaluation_context, sources=sources
+            )
         )
 
     def _evaluate_within_(
         self,
+        *,
         evaluation_context: EvaluationContext,
-        sources: Optional[OperationResult] = None,
+        sources: OperationResult | None = None,
     ) -> Iterator[OperationResult]:
         """
         Evaluate this expression within the given evaluation context, notifying its
@@ -631,15 +665,25 @@ class SymbolicExpression(
                 bindings = copy(sources.bindings)
             else:
                 bindings = {}
-                sources = OperationResult({})  # empty sentinel for _evaluate__()
+                sources = OperationResult(
+                    bindings={}
+                )  # empty sentinel for _evaluate__()
             if self._id_ in bindings:
-                result = OperationResult(bindings, self, previous_result)
+                result = OperationResult(
+                    bindings=bindings,
+                    operand=self,
+                    previous_operation_result=previous_result,
+                )
                 evaluation_context.on_result_yielded(expression=self, result=result)
                 yield result
             else:
                 for result in map(
-                    self._evaluate_conclusions_and_update_bindings_,
-                    self._evaluate__(sources),
+                    lambda current_result: (
+                        self._evaluate_conclusions_and_update_bindings_(
+                            current_result=current_result
+                        )
+                    ),
+                    self._evaluate__(sources=sources),
                 ):
                     evaluation_context.on_result_yielded(expression=self, result=result)
                     yield result
@@ -647,7 +691,7 @@ class SymbolicExpression(
             evaluation_context.on_evaluate_exit(expression=self)
 
     def _evaluate_conclusions_and_update_bindings_(
-        self, current_result: OperationResult
+        self, *, current_result: OperationResult
     ) -> OperationResult:
         """
         Update the bindings of the results by evaluating the conclusions using the
@@ -667,7 +711,7 @@ class SymbolicExpression(
         evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
             is_active_root = evaluation_context.active_conditions_root.is_active_root(
-                self
+                node=self
             )
         else:
             is_active_root = self._conditions_root_ is self
@@ -679,7 +723,7 @@ class SymbolicExpression(
         if self._conclusions_ and current_result.is_true:
             for conclusion in self._conclusions_:
                 current_result.bindings = next(
-                    conclusion._evaluate_(current_result)
+                    conclusion._evaluate_(sources=current_result)
                 ).bindings
 
         if evaluation_context is not None:
@@ -690,8 +734,8 @@ class SymbolicExpression(
         return current_result
 
     def conclusions_of_type(
-        self, conclusion_type: Type[ConclusionType]
-    ) -> List[ConclusionType]:
+        self, *, conclusion_type: type[ConclusionType]
+    ) -> list[ConclusionType]:
         """:return: The conclusions attached to this expression that are instances of *conclusion_type*."""
         return [
             conclusion
@@ -702,6 +746,7 @@ class SymbolicExpression(
     @abstractmethod
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterator[OperationResult]:
         """
@@ -714,7 +759,7 @@ class SymbolicExpression(
         """
         pass
 
-    def _contains_(self, expression: SymbolicExpression) -> bool:
+    def _contains_(self, *, expression: SymbolicExpression) -> bool:
         """
         :param expression: The expression to look for.
         :return: Whether this expression is that one or reaches it as a descendant.
@@ -724,8 +769,8 @@ class SymbolicExpression(
         )
 
     def _parent_outside_(
-        self, branch: SymbolicExpression
-    ) -> Optional[SymbolicExpression]:
+        self, *, branch: SymbolicExpression
+    ) -> SymbolicExpression | None:
         """
         The parent by which the surrounding graph reaches this expression, ignoring any
         that lies inside *branch*.
@@ -740,13 +785,20 @@ class SymbolicExpression(
         :return: That parent, or ``None`` when nothing outside *branch* holds this
             expression.
         """
-        if self._parent_ is not None and not branch._contains_(self._parent_):
+        if self._parent_ is not None and not branch._contains_(
+            expression=self._parent_
+        ):
             return self._parent_
         return next(
-            (parent for parent in self._parents_ if not branch._contains_(parent)), None
+            (
+                parent
+                for parent in self._parents_
+                if not branch._contains_(expression=parent)
+            ),
+            None,
         )
 
-    def _has_parent_(self, expression: SymbolicExpression) -> bool:
+    def _has_parent_(self, *, expression: SymbolicExpression) -> bool:
         """
         :param expression: The expression to look for among this expression's parents.
         :return: Whether the given expression is one of this expression's parents.
@@ -754,14 +806,14 @@ class SymbolicExpression(
         return expression._id_ in [parent._id_ for parent in self._parents_]
 
     @property
-    def _parent_(self) -> Optional[SymbolicExpression]:
+    def _parent_(self) -> SymbolicExpression | None:
         """
         :return: The parent symbolic expression of this expression.
         """
         return self._parent__
 
     @_parent_.setter
-    def _parent_(self, value: Optional[SymbolicExpression]):
+    def _parent_(self, value: SymbolicExpression | None):
         """
         Set the parent symbolic expression of this expression.
 
@@ -772,10 +824,10 @@ class SymbolicExpression(
 
         if value is None:
             if self._parent__ is not None:
-                self._remove_parent_(self._parent__)
+                self._remove_parent_(parent=self._parent__)
             return
 
-        if not self._has_parent_(value):
+        if not self._has_parent_(expression=value):
             self._parents_.append(value)
             value._ensure_children_ids_are_cached_(self)
 
@@ -790,7 +842,7 @@ class SymbolicExpression(
             self._parent__ = value
 
     @property
-    def _filter_condition_(self) -> Optional[SymbolicExpression]:
+    def _filter_condition_(self) -> SymbolicExpression | None:
         """
         :return: The condition of the first ``Filter`` in this expression's graph, or
             ``None`` when no ``Filter`` gates it.
@@ -849,7 +901,7 @@ class SymbolicExpression(
         return evaluation_context.outermost_query.node
 
     @property
-    def _root_query_(self) -> Optional[Query]:
+    def _root_query_(self) -> Query | None:
         """
         :return: The root query of the symbolic expression tree, or None if no query found.
         """
@@ -878,7 +930,7 @@ class SymbolicExpression(
 
     def _evaluation_scoped_expression_index_(
         self,
-    ) -> Optional[weakref.WeakValueDictionary[uuid.UUID, SymbolicExpression]]:
+    ) -> weakref.WeakValueDictionary[uuid.UUID, SymbolicExpression] | None:
         """
         :return: An ``id -> node`` index of the whole tree, built once per evaluation, or ``None``
             when called outside an active evaluation.
@@ -914,11 +966,11 @@ class SymbolicExpression(
         provided by :class:`~krrood.entity_query_language.query.query.Query`'s own
         ``_descendants_`` override).
         """
-        yield from self._iter_descendants_(set())
+        yield from self._iter_descendants_(visited_ids=set())
 
     def _subtree_expressions_with_ids_(
-        self, ids: Collection[uuid.UUID]
-    ) -> Set[SymbolicExpression]:
+        self, *, ids: Collection[uuid.UUID]
+    ) -> set[SymbolicExpression]:
         """
         :param ids: The identifiers to look for.
         :return: This expression and its descendants whose identifier is in *ids*.
@@ -930,7 +982,7 @@ class SymbolicExpression(
         }
 
     def _iter_descendants_(
-        self, visited_ids: Set[uuid.UUID]
+        self, *, visited_ids: set[uuid.UUID]
     ) -> Iterator[SymbolicExpression]:
         """
         Yield descendants once each, tracking already-seen ``_id_`` values across the
@@ -946,9 +998,9 @@ class SymbolicExpression(
             visited_ids.add(child._id_)
         yield from fresh_children
         for child in fresh_children:
-            yield from child._iter_descendants_(visited_ids)
+            yield from child._iter_descendants_(visited_ids=visited_ids)
 
-    def _subtree_contains_(self, expression_type: Type[SymbolicExpression]) -> bool:
+    def _subtree_contains_(self, *, expression_type: type[SymbolicExpression]) -> bool:
         """
         :return: Whether this expression's subtree contains a descendant of the given type.
 
@@ -960,15 +1012,17 @@ class SymbolicExpression(
         """
         evaluation_context = get_evaluation_context()
         if evaluation_context is None:
-            return self._compute_subtree_contains_(expression_type)
+            return self._compute_subtree_contains_(expression_type=expression_type)
         cache_key = (self._id_, expression_type)
         cache = evaluation_context.subtree_containment_cache
         if cache_key not in cache:
-            cache[cache_key] = self._compute_subtree_contains_(expression_type)
+            cache[cache_key] = self._compute_subtree_contains_(
+                expression_type=expression_type
+            )
         return cache[cache_key]
 
     def _compute_subtree_contains_(
-        self, expression_type: Type[SymbolicExpression]
+        self, *, expression_type: type[SymbolicExpression]
     ) -> bool:
         """
         :return: Whether this expression's subtree contains a descendant of the given type, computed
@@ -979,7 +1033,7 @@ class SymbolicExpression(
         )
 
     @classmethod
-    def _current_parent_in_context_stack_(cls) -> Optional[SymbolicExpression]:
+    def _current_parent_in_context_stack_(cls) -> SymbolicExpression | None:
         """
         :return: The current parent symbolic expression in the enclosing context of the ``with`` statement. Used when
         making rule trees.
@@ -990,7 +1044,7 @@ class SymbolicExpression(
         return innermost_context.condition
 
     @classmethod
-    def _innermost_rule_tree_context_(cls) -> Optional[RuleTreeContext]:
+    def _innermost_rule_tree_context_(cls) -> RuleTreeContext | None:
         """
         :return: The context of the innermost enclosing ``with`` statement, or ``None``
             outside any.
@@ -1001,8 +1055,8 @@ class SymbolicExpression(
 
     @classmethod
     def _rule_tree_context_anchored_on_(
-        cls, condition: SymbolicExpression
-    ) -> Optional[RuleTreeContext]:
+        cls, *, condition: SymbolicExpression
+    ) -> RuleTreeContext | None:
         """
         :param condition: The condition an edit is about to be made relative to.
         :return: The context of the innermost enclosing ``with`` statement that anchors on
@@ -1031,19 +1085,21 @@ class SymbolicExpression(
         enclosing_parent = (
             enclosing_context.owning_parent if enclosing_context is not None else None
         )
-        if enclosing_parent is None or not self._has_parent_(enclosing_parent):
-            return RuleTreeContext(self, self._parent_)
-        return RuleTreeContext(self, enclosing_parent)
+        if enclosing_parent is None or not self._has_parent_(
+            expression=enclosing_parent
+        ):
+            return RuleTreeContext(condition=self, owning_parent=self._parent_)
+        return RuleTreeContext(condition=self, owning_parent=enclosing_parent)
 
     @property
-    def _unique_variables_(self) -> Set[Variable]:
+    def _unique_variables_(self) -> set[Variable]:
         """
         :return: Set of unique variables in this symbolic expression.
         """
         return make_set(self._all_variable_instances_)
 
     @property
-    def _all_variable_instances_(self) -> List[Variable]:
+    def _all_variable_instances_(self) -> list[Variable]:
         """
         Get the leaf instances of the symbolic expression.
 
@@ -1071,7 +1127,7 @@ class SymbolicExpression(
         """
         from krrood.entity_query_language.operators.core_logical_operators import Not
 
-        return Not(self)
+        return Not(_child_=self)
 
     def __enter__(self) -> Self:
         """
@@ -1099,7 +1155,7 @@ class SymbolicExpression(
         return self._name_
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class UnaryExpression(SymbolicExpression, ABC):
     """
     A unary expression is a symbolic expression that takes a single argument (i.e., has
@@ -1118,7 +1174,7 @@ class UnaryExpression(SymbolicExpression, ABC):
         self._child_ = self._update_children_(self._child_)[0]
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         if self._child_._id_ == old_child._id_:
             self._child_ = new_child
@@ -1128,14 +1184,14 @@ class UnaryExpression(SymbolicExpression, ABC):
         return self.__class__.__name__
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class MultiArityExpression(SymbolicExpression, ABC):
     """
     A multi-arity expression is a symbolic expression that takes multiple arguments
     (i.e., has multiple child expressions).
     """
 
-    _operation_children_: Tuple[SymbolicExpression, ...] = field(default_factory=tuple)
+    _operation_children_: tuple[SymbolicExpression, ...] = field(default_factory=tuple)
     """
     The children expressions of this symbolic expression.
     """
@@ -1145,7 +1201,7 @@ class MultiArityExpression(SymbolicExpression, ABC):
         self.update_children(*self._operation_children_)
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         self._operation_children_ = tuple(
             new_child if child._id_ == old_child._id_ else child
@@ -1160,7 +1216,7 @@ class MultiArityExpression(SymbolicExpression, ABC):
         return self.__class__.__name__
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class BinaryExpression(SymbolicExpression, ABC):
     """
     A base class for binary operators that can be used to combine symbolic expressions.
@@ -1181,7 +1237,7 @@ class BinaryExpression(SymbolicExpression, ABC):
         self.left, self.right = self._update_children_(self.left, self.right)
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         if self.left._id_ == old_child._id_:
             self.left = new_child
@@ -1230,7 +1286,7 @@ class BinaryExpression(SymbolicExpression, ABC):
         value = self.right._value_
         if isinstance(value, EllipsisType):
             return False
-        return not isinstance(value, list_like_classes)
+        return not isinstance(value, CollectionKind.ELEMENT_SEQUENCE.value)
 
     def _is_literal_comparator_(self) -> bool:
         """
@@ -1253,7 +1309,7 @@ class BinaryExpression(SymbolicExpression, ABC):
         return True
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class TruthValuedExpression(SymbolicExpression, ABC):
     """
     An expression whose own binding is the truth of an operation rather than a value a
@@ -1265,7 +1321,7 @@ class TruthValuedExpression(SymbolicExpression, ABC):
     no truth claim of its own outside a condition.
     """
 
-    def _process_result_(self, result: OperationResult) -> UnificationDict:
+    def _process_result_(self, *, result: OperationResult) -> UnificationDict:
         """
         Map the result to the bindings it carries.
 
@@ -1273,10 +1329,10 @@ class TruthValuedExpression(SymbolicExpression, ABC):
         :return: Every binding of *result*, since this expression's own binding holds a
             truth value rather than a selectable one.
         """
-        return self._unification_of_(result)
+        return self._unification_of_(result=result)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class TruthValueOperator(SymbolicExpression, ABC):
     """
     An abstract superclass for operators that work with truth values of operations, thus
@@ -1285,7 +1341,7 @@ class TruthValueOperator(SymbolicExpression, ABC):
     """
 
     def _evaluate_child_as_condition_(
-        self, child: SymbolicExpression, sources: Optional[OperationResult]
+        self, *, child: SymbolicExpression, sources: OperationResult | None
     ) -> Iterator[OperationResult]:
         """
         Evaluate ``child`` in a truth-value context.
@@ -1302,15 +1358,17 @@ class TruthValueOperator(SymbolicExpression, ABC):
         """
         evaluation_context = get_evaluation_context()
         if evaluation_context is not None:
-            evaluation_context.truth_value_operator_children.record(child._id_)
-        for result in child._evaluate_(sources):
+            evaluation_context.truth_value_operator_children.record(
+                expression_id=child._id_
+            )
+        for result in child._evaluate_(sources=sources):
             if result.has_value:
                 yield result._as_fresh_observation_()
             else:
                 yield result
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class DerivedExpression(SymbolicExpression, ABC):
     """
     A symbolic expression that has its results derived from another symbolic expression,
@@ -1329,11 +1387,11 @@ class DerivedExpression(SymbolicExpression, ABC):
         """
         ...
 
-    def _process_result_(self, result: OperationResult) -> Any:
-        return self._original_expression_._process_result_(result)
+    def _process_result_(self, *, result: OperationResult) -> Any:
+        return self._original_expression_._process_result_(result=result)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Filter(DerivedExpression, TruthValueOperator, ABC):
     """
     Data source that evaluates the truth value for each data point according to a
@@ -1359,7 +1417,7 @@ class Filter(DerivedExpression, TruthValueOperator, ABC):
         return self.__class__.__name__
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OperationResult:
     """
     A data structure that carries information about the result of an operation in EQL.
@@ -1370,24 +1428,24 @@ class OperationResult:
     The bindings resulting from the operation, mapping variable IDs to their values.
     """
 
-    operand: Optional[SymbolicExpression] = None
+    operand: SymbolicExpression | None = None
     """
     The operand that produced the result.
     """
 
-    previous_operation_result: Optional[OperationResult] = None
+    previous_operation_result: OperationResult | None = None
     """
     The result of the operation that was evaluated before this one.
     """
 
-    satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
+    satisfied_condition_ids: OrderedSet[UUID] | None = None
     """
     A set of UUIDs of condition expressions in the condition tree that were satisfied (truth value = True)
     during this evaluation. Populated at the conditions root after all conditions have been evaluated.
     Only set when the overall condition result is True.
     """
 
-    evaluated_expression_ids: Optional[OrderedSet[UUID]] = None
+    evaluated_expression_ids: OrderedSet[UUID] | None = None
     """
     A snapshot of the cumulative set of expression IDs evaluated so far during this
     evaluation pass, populated by the
@@ -1397,20 +1455,20 @@ class OperationResult:
     ``satisfied_condition_ids``, this is populated on every yielded result, not only at the conditions root.
     """
 
-    _is_false_: Optional[bool] = field(default=None, init=False, repr=False)
+    _is_false_: bool | None = field(default=None, init=False, repr=False)
     """
     The truth read from the operand, once it has been read. See :attr:`is_false`.
     """
 
     @property
-    def result_chain(self) -> List[OperationResult]:
+    def result_chain(self) -> list[OperationResult]:
         """
         :return: The results this one was derived from, earliest first, ending with this
             one.
         """
-        chain: List[OperationResult] = []
-        seen: Set[int] = set()
-        result: Optional[OperationResult] = self
+        chain: list[OperationResult] = []
+        seen: set[int] = set()
+        result: OperationResult | None = self
         while result is not None and id(result) not in seen:
             seen.add(id(result))
             chain.append(result)
@@ -1440,7 +1498,9 @@ class OperationResult:
         empty — this evaluation is a new one to them.
         """
         fresh_observation = OperationResult(
-            self.bindings, self.operand, self.previous_operation_result
+            bindings=self.bindings,
+            operand=self.operand,
+            previous_operation_result=self.previous_operation_result,
         )
         fresh_observation._is_false_ = self._is_false_
         return fresh_observation
@@ -1464,7 +1524,7 @@ class OperationResult:
         """
         if self._is_false_ is None:
             self._is_false_ = (
-                self.operand is not None and self.operand._result_is_false_(self)
+                self.operand is not None and self.operand._result_is_false_(result=self)
             )
         return self._is_false_
 
@@ -1482,7 +1542,7 @@ class OperationResult:
         """
         if self.operand is None:
             raise ValueError("Cannot get value: operand is None")
-        return self.operand._process_result_(self)
+        return self.operand._process_result_(result=self)
 
     def __contains__(self, item):
         return item in self.bindings
@@ -1493,7 +1553,7 @@ class OperationResult:
     def __setitem__(self, key, value):
         self.bindings[key] = value
 
-    def update(self, other: Bindings | OperationResult):
+    def update(self, *, other: Bindings | OperationResult):
         if isinstance(other, OperationResult):
             self.bindings.update(other.bindings)
         else:
@@ -1512,6 +1572,18 @@ class OperationResult:
         )
 
 
+@dataclass(kw_only=True, eq=False)
+class ProbabilisticOperationResult(Role[OperationResult]):
+    """
+    An operation result whose bindings a probabilistic model assigns a likelihood to.
+    """
+
+    log_likelihood: float
+    """
+    The natural logarithm of the likelihood of the bindings under the model.
+    """
+
+
 class UnificationDict(UserDict):
     """
     A dictionary which maps all expressions that are on a single variable to the
@@ -1524,15 +1596,15 @@ class UnificationDict(UserDict):
             one - a match, which is read as the query it selects.
         :return: The value bound to that expression in this row.
         """
-        key = self._id_expression_map_[SymbolicExpression._as_operand_(key)._id_]
+        key = self._id_expression_map_[SymbolicExpression._as_operand_(value=key)._id_]
         return super().__getitem__(key)
 
     @cached_property
-    def _id_expression_map_(self) -> Dict[uuid.UUID, Selectable[T]]:
+    def _id_expression_map_(self) -> dict[uuid.UUID, Selectable[T]]:
         return {key._id_: key for key in self.data.keys()}
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Selectable(SymbolicExpression, Generic[T], ABC):
     _var_: Selectable[T] = field(init=False, default=None)
     """
@@ -1545,7 +1617,7 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
     single selected variable.
     """
 
-    _type_: Type[T] = field(init=False, default=None)
+    _type_: type[T] = field(init=False, default=None)
     """
     The type of the selectable.
     """
@@ -1557,8 +1629,9 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
 
     def _build_operation_result_(
         self,
+        *,
         bindings: Bindings,
-        child_result: Optional[OperationResult] = None,
+        child_result: OperationResult | None = None,
     ) -> OperationResult:
         """
         Build an OperationResult instance for this binding.
@@ -1568,7 +1641,9 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
         :param child_result: The result of the child operation, if any.
         :return: The OperationResult instance.
         """
-        return OperationResult(bindings, self, child_result)
+        return OperationResult(
+            bindings=bindings, operand=self, previous_operation_result=child_result
+        )
 
     @cached_property
     def _type__(self):
@@ -1578,7 +1653,7 @@ class Selectable(SymbolicExpression, Generic[T], ABC):
             else None
         )
 
-    def _process_result_(self, result: OperationResult) -> T:
+    def _process_result_(self, *, result: OperationResult) -> T:
         """
         Map the result to the correct output data structure for user usage.
 

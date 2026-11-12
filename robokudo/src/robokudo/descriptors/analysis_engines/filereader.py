@@ -22,6 +22,9 @@ The pipeline implements the following functionality:
     before running this pipeline.
 """
 
+from __future__ import annotations
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -55,7 +58,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     .. note::
         The pipeline is configured to loop through the input data continuously
-        and applies specific fixes for Kinect height data.
+    with calibration matching the recorded image data.
     """
 
     def name(self) -> str:
@@ -76,7 +79,6 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         Configuration details:
         - Data source: robokudo_test_data/data directory
-        - Kinect height fix mode enabled
         - Color to depth ratio: 0.5, 0.5 (for high-res mode)
         - Restricted FOV: -0.3m to 0.3m in X axis
 
@@ -91,7 +93,6 @@ class AnalysisEngine(AnalysisEngineInterface):
             loop=True,
             target_ros_package="robokudo_test_data",
             target_dir="data",
-            kinect_height_fix_mode=True,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
         )
 

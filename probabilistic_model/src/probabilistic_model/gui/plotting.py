@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, InitVar
-from typing import Optional, List, Union, Tuple
+from typing_extensions import List, Union, Tuple
 import numpy as np
 import plotly.colors
 
@@ -49,12 +49,12 @@ class InteractiveChartView(QChartView):
     A custom QChartView that supports zooming and resetting.
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.setRubberBand(QChartView.RectangleRubberBand)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -77,7 +77,7 @@ class ProbabilisticModelPlotWidget(QWidget):
     A widget for plotting 1D probabilistic models using QtCharts.
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
@@ -92,7 +92,7 @@ class ProbabilisticModelPlotWidget(QWidget):
     The chart view that displays the plot.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
         self.chart_view = InteractiveChartView()
@@ -262,7 +262,9 @@ class ProbabilisticModelPlotWidget(QWidget):
 
         # Mode and Expectation
         try:
-            mode_event, max_likelihood = model.mode()
+            mode = model.mode()
+            mode_event, max_likelihood = mode.event, mode.likelihood
+
         except Exception:
             max_likelihood = np.max(pdf)
             mode_event = None

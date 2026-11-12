@@ -17,17 +17,13 @@ from functools import cached_property, wraps
 from typing_extensions import (
     Iterable,
     Any,
-    Optional,
-    Type,
-    Dict,
-    Union as TypingUnion,
     TYPE_CHECKING,
-    List,
-    Set,
-    Tuple,
     Callable,
+    Concatenate,
+    ParamSpec,
     Self,
     Iterator,
+    TypeVar,
 )
 
 from krrood.entity_query_language.core.mapped_variable import (
@@ -97,6 +93,7 @@ from krrood.entity_query_language.utils import (
 if TYPE_CHECKING:
     from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.backends import QueryBackend
+    from krrood.entity_query_language.ground_term import TermReader
 
 ResultMapping = Callable[[Iterator[OperationResult]], Iterator[OperationResult]]
 """
@@ -104,7 +101,7 @@ A function that maps the results of a query to a new set of results.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CachedResultStream:
     """
     A lazily-filled, replayable view over a source iterator.
@@ -119,7 +116,7 @@ class CachedResultStream:
     """
     The underlying result iterator, advanced at most once per produced item.
     """
-    _buffer: List[OperationResult] = field(default_factory=list)
+    _buffer: list[OperationResult] = field(default_factory=list)
     """
     The results produced so far, replayed to every iterator.
     """
@@ -154,14 +151,36 @@ class CachedResultStream:
             index += 1
 
 
-def modifies_query_structure(modifier):
+ModifierParameters = ParamSpec("ModifierParameters")
+"""
+The parameters of a query modifier after the query itself.
+"""
+
+ModifiedQuery = TypeVar("ModifiedQuery", bound="Query")
+"""
+The query a modifier changes.
+"""
+
+ModifierResult = TypeVar("ModifierResult")
+"""
+The value a query modifier returns.
+"""
+
+
+def modifies_query_structure(
+    modifier: Callable[Concatenate[ModifiedQuery, ModifierParameters], ModifierResult],
+) -> Callable[Concatenate[ModifiedQuery, ModifierParameters], ModifierResult]:
     """
     Mark a query modifier so the query is flagged dirty once the modifier has updated its builders,
     causing the next :meth:`build` to recompile the product.
     """
 
     @wraps(modifier)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(
+        self: ModifiedQuery,
+        *args: ModifierParameters.args,
+        **kwargs: ModifierParameters.kwargs,
+    ) -> ModifierResult:
         result = modifier(self, *args, **kwargs)
         self._mark_dirty_()
         return result
@@ -170,7 +189,7 @@ def modifies_query_structure(modifier):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Query(
     Evaluable,
     HasQueryModifiers[T],
@@ -184,7 +203,7 @@ class Query(
     queried object(s).
     """
 
-    _selected_variables_: Tuple[Selectable, ...] = field(
+    _selected_variables_: tuple[Selectable, ...] = field(
         default_factory=tuple, kw_only=True
     )
     """
@@ -195,43 +214,43 @@ class Query(
     which nothing binds a row to.
     """
 
-    _distinct_on: Tuple[Selectable, ...] = field(default_factory=tuple, init=False)
+    _distinct_on: tuple[Selectable, ...] = field(default_factory=tuple, init=False)
     """
     Parameters for distinct results of the query.
     """
 
-    _results_mapping: List[ResultMapping] = field(init=False, default_factory=list)
+    _results_mapping: list[ResultMapping] = field(init=False, default_factory=list)
     """
     Mapping functions that map the results of the query to a new set of
     results.
     """
 
-    _seen_results: Optional[SeenSet] = field(init=False, default=None)
+    _seen_results: SeenSet | None = field(init=False, default=None)
     """
     A set of seen results, used when distinct is called in the query.
     """
 
-    _where_builder_: Optional[WhereBuilder] = field(init=False, default=None)
+    _where_builder_: WhereBuilder | None = field(init=False, default=None)
     """
     The builder for the `Where` expression of the query.
     """
 
-    _grouped_by_builder_: Optional[GroupedByBuilder] = field(init=False, default=None)
+    _grouped_by_builder_: GroupedByBuilder | None = field(init=False, default=None)
     """
     The builder for the `GroupedBy` expression of the query.
     """
 
-    _having_builder_: Optional[HavingBuilder] = field(init=False, default=None)
+    _having_builder_: HavingBuilder | None = field(init=False, default=None)
     """
     The builder for the `Having` expression of the query.
     """
 
-    _ordered_by_builder_: Optional[OrderedByBuilder] = field(default=None, init=False)
+    _ordered_by_builder_: OrderedByBuilder | None = field(default=None, init=False)
     """
     The ordering specification applied as a pipeline stage, if the query is ordered.
     """
 
-    _quantifier_builder_: Optional[QuantifierBuilder] = field(default=None, init=False)
+    _quantifier_builder_: QuantifierBuilder | None = field(default=None, init=False)
     """
     The quantification specification applied as a pipeline stage. Defaults to `An`, which accepts all
     results.
@@ -256,7 +275,7 @@ class Query(
 
     def __post_init__(self):
         self._selected_variables_ = tuple(
-            self._as_operand_(selected) for selected in self._selected_variables_
+            self._as_operand_(value=selected) for selected in self._selected_variables_
         )
         self._operation_children_ = tuple(self._selected_variables_)
         MultiArityExpressionThatPerformsACartesianProduct.__post_init__(self)
@@ -264,7 +283,7 @@ class Query(
         self._var_ = self
         Selectable.__post_init__(self)
 
-        self._quantifier_builder_ = QuantifierBuilder(self)
+        self._quantifier_builder_ = QuantifierBuilder(query=self)
 
     def _mark_dirty_(self) -> None:
         """
@@ -278,7 +297,9 @@ class Query(
         self.__dict__.pop("_group_", None)
         self.__dict__.pop("_distinct_on_ids_", None)
 
-    def evaluate(self, backend: Optional[QueryBackend] = None) -> Iterator:
+    def evaluate(
+        self, *, backend: QueryBackend | None = None, state: TermReader | None = None
+    ) -> Iterator:
         """
         Evaluate the query using the given backend, returning an iterator over
         the results.
@@ -289,9 +310,10 @@ class Query(
         :param backend: The query backend to evaluate with. Defaults to
             the ``EntityQueryLanguageBackend`` (native python
             evaluation).
+        :param state: Forwarded to :meth:`Evaluable.evaluate`.
         """
         self.build()
-        return super().evaluate(backend)
+        return super().evaluate(backend=backend, state=state)
 
     def _evaluate_natively_(self) -> Iterator:
         """
@@ -306,7 +328,7 @@ class Query(
 
     def _reroot_conditions_(
         self, *conditions: ConditionType
-    ) -> Tuple[ConditionType, ...]:
+    ) -> tuple[ConditionType, ...]:
         """
         Re-root the attribute chains that this query's own conditions take from the query
         itself onto the variable it selects.
@@ -320,9 +342,11 @@ class Query(
         :return: The conditions, with every chain rooted at this query re-rooted onto its
             selection.
         """
-        return tuple(self._reroot_condition_(condition) for condition in conditions)
+        return tuple(
+            self._reroot_condition_(condition=condition) for condition in conditions
+        )
 
-    def _reroot_condition_(self, condition: ConditionType) -> ConditionType:
+    def _reroot_condition_(self, *, condition: ConditionType) -> ConditionType:
         """
         Re-root every attribute chain that one condition takes from this query.
 
@@ -335,9 +359,9 @@ class Query(
         """
         if not isinstance(condition, SymbolicExpression):
             return condition
-        if self._is_attribute_of_self_(condition):
-            return self._rerooted_on_selection_(condition)
-        visited: Set[uuid.UUID] = set()
+        if self._is_attribute_of_self_(expression=condition):
+            return self._rerooted_on_selection_(chain=condition)
+        visited: set[uuid.UUID] = set()
         pending = [condition]
         while pending:
             expression = pending.pop()
@@ -345,19 +369,20 @@ class Query(
                 continue
             visited.add(expression._id_)
             for child in tuple(expression._children_):
-                if self._is_attribute_of_self_(child):
+                if self._is_attribute_of_self_(expression=child):
                     expression._replace_child_(
-                        child, self._rerooted_on_selection_(child)
+                        old_child=child,
+                        new_child=self._rerooted_on_selection_(chain=child),
                     )
-                elif self._is_self_(child):
+                elif self._is_self_(expression=child):
                     expression._replace_child_(
-                        child, self._selection_standing_for_self_()
+                        old_child=child, new_child=self._selection_standing_for_self_()
                     )
                 elif not isinstance(child, Query):
                     pending.append(child)
         return condition
 
-    def _is_self_(self, expression: SymbolicExpression) -> bool:
+    def _is_self_(self, *, expression: SymbolicExpression) -> bool:
         """
         :param expression: An expression appearing in this query's conditions.
         :return: Whether the expression is this query itself, rather than a nested
@@ -374,10 +399,10 @@ class Query(
             stands for no single one.
         """
         if len(self._selected_variables_) != 1:
-            raise AmbiguousQuerySubject(self)
+            raise AmbiguousQuerySubject(query=self)
         return self._selected_variables_[0]
 
-    def _is_attribute_of_self_(self, expression: SymbolicExpression) -> bool:
+    def _is_attribute_of_self_(self, *, expression: SymbolicExpression) -> bool:
         """
         .. note::
             Attaching a chain to a query, and compiling a query into its product, both copy
@@ -393,7 +418,7 @@ class Query(
         return isinstance(base, Query) and base._id_ == self._id_
 
     def _rerooted_on_selection_(
-        self, attribute: MappedVariable
+        self, *, chain: MappedVariable
     ) -> CanBehaveLikeAVariable:
         """
         :param attribute: A mapping chain based on this query.
@@ -402,15 +427,15 @@ class Query(
             variables nor belongs to a query that selects a single one, so it has no
             subject to follow.
         """
-        first_step = attribute._access_path_[0]
-        indexed_selection = self._selection_indexed_by_(first_step)
+        first_step = chain._access_path_[0]
+        indexed_selection = self._selection_indexed_by_(step=first_step)
         if indexed_selection is not None:
-            return attribute._reroot_on_(indexed_selection, first_step)
+            return chain._reroot_on_(root=indexed_selection, replaced=first_step)
         if len(self._selected_variables_) != 1:
-            raise AmbiguousQueryAttribute(self, attribute)
-        return attribute._reroot_on_(self._selected_variables_[0], self)
+            raise AmbiguousQueryAttribute(query=self, attribute=chain)
+        return chain._reroot_on_(root=self._selected_variables_[0], replaced=self)
 
-    def _selection_indexed_by_(self, step: MappedVariable) -> Optional[Selectable]:
+    def _selection_indexed_by_(self, *, step: MappedVariable) -> Selectable | None:
         """
         A query stands for the value its selection takes, so indexing it indexes that
         value rather than naming a variable.
@@ -457,9 +482,10 @@ class Query(
     @modifies_query_structure
     def ordered_by(
         self,
-        variable: TypingUnion[Selectable[T], Any],
+        *,
+        variable: Selectable[T] | Any,
         descending: bool = False,
-        key: Optional[Callable] = None,
+        key: Callable | None = None,
     ) -> Self:
         """
         Order the results by the given variable, using the given key function
@@ -472,15 +498,15 @@ class Query(
             value.
         """
         self._ordered_by_builder_ = OrderedByBuilder(
-            self, variable, descending=descending, key=key
+            query=self, variable=variable, descending=descending, key=key
         )
         return self
 
     @modifies_query_structure
     def distinct(
         self,
-        *on: TypingUnion[Selectable, Any],
-    ) -> TypingUnion[Self, T]:
+        *on: Selectable | Any,
+    ) -> Self | T:
         """
         Apply distinctness constraint to the query results.
 
@@ -489,13 +515,13 @@ class Query(
         """
         self._distinct_on = on if on else self._selected_variables_
         self._seen_results = SeenSet(keys=tuple(v._id_ for v in self._distinct_on))
-        self._results_mapping.append(self._get_distinct_results_)
+        self._results_mapping.append(
+            lambda results_gen: self._get_distinct_results_(results_gen=results_gen)
+        )
         return self
 
     @modifies_query_structure
-    def grouped_by(
-        self, *variables_to_group_by: TypingUnion[Selectable, Any]
-    ) -> TypingUnion[Self, T]:
+    def grouped_by(self, *variables_to_group_by: Selectable | Any) -> Self | T:
         """
         Specify the variables to group the results by.
 
@@ -503,11 +529,13 @@ class Query(
             by.
         :return: This query.
         """
-        self._grouped_by_builder_ = GroupedByBuilder(self, variables_to_group_by)
+        self._grouped_by_builder_ = GroupedByBuilder(
+            query=self, variables_to_group_by=variables_to_group_by
+        )
         return self
 
     @modifies_query_structure
-    def limit(self, n: int) -> Self:
+    def limit(self, *, n: int) -> Self:
         """
         Limit the number of results to n.
 
@@ -516,14 +544,15 @@ class Query(
         """
         self._limit_ = n
         if not isinstance(self._limit_, int) or self._limit_ <= 0:
-            raise NonPositiveLimitValue(self._limit_)
+            raise NonPositiveLimitValue(wrong_limit_value=self._limit_)
         return self
 
     @modifies_query_structure
     def _quantify_(
         self,
-        quantifier_type: Type[ResultQuantifier] = An,
-        quantification_constraint: Optional[ResultQuantificationConstraint] = None,
+        *,
+        quantifier_type: type[ResultQuantifier] = An,
+        quantification_constraint: ResultQuantificationConstraint | None = None,
     ) -> Self:
         """
         Specify the quantifier type and constraint for the query results, also
@@ -535,7 +564,9 @@ class Query(
         :return: This query.
         """
         self._quantifier_builder_ = QuantifierBuilder(
-            self, quantifier_type, quantification_constraint
+            query=self,
+            type=quantifier_type,
+            quantification_constraint=quantification_constraint,
         )
         return self
 
@@ -596,14 +627,19 @@ class Query(
         if self._ordered_by_builder_ is not None:
             ordering = self._ordered_by_builder_
             product.ordered_by(
-                ordering.variable, descending=ordering.descending, key=ordering.key
+                variable=ordering.variable,
+                descending=ordering.descending,
+                key=ordering.key,
             )
         if self._distinct_on:
             product.distinct(*self._distinct_on)
         if self._limit_ is not None:
-            product.limit(self._limit_)
+            product.limit(n=self._limit_)
         quantifier = self._quantifier_builder_
-        product._quantify_(quantifier.type, quantifier.quantification_constraint)
+        product._quantify_(
+            quantifier_type=quantifier.type,
+            quantification_constraint=quantifier.quantification_constraint,
+        )
         product._wire_in_place_()
         return product
 
@@ -636,7 +672,7 @@ class Query(
         )
         self.update_children(*children)
 
-    def _data_source_chain_head_(self) -> Optional[SymbolicExpression]:
+    def _data_source_chain_head_(self) -> SymbolicExpression | None:
         """
         Build the head of the data-source chain that feeds the selected variables. At most one of
         Having / GroupedBy / Where heads the chain, with precedence ``Having > GroupedBy > Where``
@@ -645,7 +681,7 @@ class Query(
         :return: The chain head, or ``None`` if the query is unfiltered/ungrouped.
         """
         if self._group_ and self._grouped_by_builder_ is None:
-            self._grouped_by_builder_ = GroupedByBuilder(self)
+            self._grouped_by_builder_ = GroupedByBuilder(query=self)
 
         if self._having_builder_ is not None:
             self._having_builder_.grouped_by = self._grouped_by_builder_.expression
@@ -658,6 +694,7 @@ class Query(
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
@@ -674,32 +711,36 @@ class Query(
         """
         if not self._is_compiled_product_:
             self.build()
-            yield from self._expression_._evaluate__(sources)
+            yield from self._expression_._evaluate__(sources=sources)
             return
 
         evaluation_context = get_evaluation_context()
         if evaluation_context is None or not self._is_nested_subquery_(
-            evaluation_context
+            evaluation_context=evaluation_context
         ):
-            yield from self._produce_results_(sources)
+            yield from self._produce_results_(sources=sources)
             return
 
         cached_stream = evaluation_context.subquery_result_cache.get_or_create(
-            self._id_,
-            lambda: CachedResultStream(self._produce_results_(OperationResult({}))),
+            query_id=self._id_,
+            factory=lambda: CachedResultStream(
+                _source=self._produce_results_(sources=OperationResult(bindings={}))
+            ),
         )
         yield from cached_stream
 
-    def _is_nested_subquery_(self, evaluation_context) -> bool:
+    def _is_nested_subquery_(self, *, evaluation_context) -> bool:
         """
         :param evaluation_context: The active evaluation context.
         :return: Whether this compiled query is evaluating as a nested subquery rather than as the
             outermost query of the current evaluation. The first compiled query to evaluate claims the
             outermost role; any other is nested.
         """
-        return evaluation_context.outermost_query.is_nested(self)
+        return evaluation_context.outermost_query.is_nested(query=self)
 
-    def _produce_results_(self, sources: OperationResult) -> Iterator[OperationResult]:
+    def _produce_results_(
+        self, *, sources: OperationResult
+    ) -> Iterator[OperationResult]:
         """
         Produce this product's results: the projected, result-mapped rows of its cartesian product.
 
@@ -707,25 +748,25 @@ class Query(
         :return: An iterator over the query's result rows.
         """
         results = (
-            self._get_operation_result_(result)
+            self._get_operation_result_(child_result=result)
             for result in self._apply_results_mapping_(
-                self._evaluate_product_(sources),
+                results=self._evaluate_product_(sources=sources),
             )
         )
         for transformer in self._result_transformers_:
-            results = transformer.transform(results)
+            results = transformer.transform(results=results)
         yield from results
 
         if self._seen_results is not None:
             self._seen_results.clear()
 
     @cached_property
-    def _result_transformers_(self) -> List[ResultTransformer]:
+    def _result_transformers_(self) -> list[ResultTransformer]:
         """
         :return: The ordered result-pipeline stages applied to this query's produced rows: ordering
             (when configured), then quantification. Inspectable as :attr:`_result_stages_`.
         """
-        transformers: List[ResultTransformer] = []
+        transformers: list[ResultTransformer] = []
         if self._ordered_by_builder_ is not None:
             ordering = self._ordered_by_builder_
             transformers.append(
@@ -748,7 +789,7 @@ class Query(
         return transformers
 
     @property
-    def _result_stages_(self) -> List[ResultTransformer]:
+    def _result_stages_(self) -> list[ResultTransformer]:
         """
         :return: The result-pipeline stages of this query's compiled product (ordering,
             quantification), so an inspector can identify how results are ordered and quantified
@@ -757,7 +798,7 @@ class Query(
         self.build()
         return self._expression_._result_transformers_
 
-    def _result_is_false_(self, result: OperationResult) -> bool:
+    def _result_is_false_(self, *, result: OperationResult) -> bool:
         """
         :param result: A result this query produced.
         :return: ``False`` always.
@@ -768,33 +809,35 @@ class Query(
         """
         return False
 
-    def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
         """
         :param child_result: The child result to construct the operation result from.
         :return: The operation result.
         """
         return OperationResult(
-            {v._id_: child_result[v._id_] for v in self._selected_variables_},
-            self,
-            child_result,
+            bindings={v._id_: child_result[v._id_] for v in self._selected_variables_},
+            operand=self,
+            previous_operation_result=child_result,
         )
 
     @property
-    def _where_expression_(self) -> Optional[Where]:
+    def _where_expression_(self) -> Where | None:
         """
         The built `Where` expression.
         """
         return self._where_builder_.expression if self._where_builder_ else None
 
     @property
-    def _having_expression_(self) -> Optional[Having]:
+    def _having_expression_(self) -> Having | None:
         """
         The built `Having` expression.
         """
         return self._having_builder_.expression if self._having_builder_ else None
 
     @property
-    def _grouped_by_expression_(self) -> Optional[GroupedBy]:
+    def _grouped_by_expression_(self) -> GroupedBy | None:
         """
         The built `GroupedDataSource` expression.
         """
@@ -803,14 +846,14 @@ class Query(
         )
 
     @cached_property
-    def _distinct_on_ids_(self) -> Tuple[int, ...]:
+    def _distinct_on_ids_(self) -> tuple[int, ...]:
         """
         Get the IDs of variables used for distinctness.
         """
         return tuple(k._id_ for k in self._distinct_on)
 
     def _get_distinct_results_(
-        self, results_gen: Iterator[OperationResult]
+        self, *, results_gen: Iterator[OperationResult]
     ) -> Iterator[OperationResult]:
         """
         Apply distinctness constraint to the query results.
@@ -820,13 +863,13 @@ class Query(
         """
         for result in results_gen:
             bindings = copy(result.bindings)
-            self._update_res_with_distinct_on_variables_(bindings)
-            if self._seen_results.check(bindings):
+            self._update_res_with_distinct_on_variables_(res=bindings)
+            if self._seen_results.check(assignment=bindings):
                 continue
-            self._seen_results.add(bindings)
+            self._seen_results.add(assignment=bindings)
             yield result
 
-    def _update_res_with_distinct_on_variables_(self, res: Dict[int, Any]):
+    def _update_res_with_distinct_on_variables_(self, *, res: dict[int, Any]):
         """
         Update the result dictionary with values from distinct-on variables if
         not already present.
@@ -836,7 +879,9 @@ class Query(
         for i, id_ in enumerate(self._distinct_on_ids_):
             if id_ in res:
                 continue
-            var_value = self._distinct_on[i]._evaluate_(OperationResult(copy(res)))
+            var_value = self._distinct_on[i]._evaluate_(
+                sources=OperationResult(bindings=copy(res))
+            )
             res[id_] = next(var_value).value
 
     @cached_property
@@ -864,7 +909,7 @@ class Query(
     @cached_property
     def _aggregators_and_non_aggregators_in_selection_(
         self,
-    ) -> Tuple[List[Aggregator], List[Selectable]]:
+    ) -> tuple[list[Aggregator], list[Selectable]]:
         """
         :return: The aggregated and non-aggregated variables from the selected variables.
         """
@@ -898,8 +943,8 @@ class Query(
         return aggregated_variables, non_aggregated_variables
 
     def aggregated_selections(
-        self, group_key_root_ids: Set[uuid.UUID]
-    ) -> List[SymbolicExpression]:
+        self, *, group_key_root_ids: set[uuid.UUID]
+    ) -> list[SymbolicExpression]:
         """
         :param group_key_root_ids: The chain-root variable ids of the GROUP BY keys (see
             :attr:`~krrood.entity_query_language.query.operations.GroupedBy.group_key_root_ids`).
@@ -913,7 +958,7 @@ class Query(
         ]
 
     def _apply_results_mapping_(
-        self, results: Iterator[OperationResult]
+        self, *, results: Iterator[OperationResult]
     ) -> Iterable[OperationResult]:
         """
         Process and transform an iterable of results based on predefined
@@ -932,7 +977,9 @@ class Query(
             results = result_mapping(results)
         return results
 
-    def _as_embeddable_child_(self, parent: SymbolicExpression) -> SymbolicExpression:
+    def _as_embeddable_child_(
+        self, *, parent: SymbolicExpression
+    ) -> SymbolicExpression:
         """
         Embed this query's compiled product when it becomes an operand of another expression.
 
@@ -1028,14 +1075,14 @@ class Query(
         UnaryExpression._parent_.__set__(self, parent)
 
     def _invert_(self):
-        raise UnsupportedNegation(self.__class__)
+        raise UnsupportedNegation(operation_type=self.__class__)
 
     @property
     def _name_(self) -> str:
         return f"({', '.join(var._name_ for var in self._selected_variables_)})"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class SetOf(Query):
     """
     A query over a set of variables.
@@ -1049,11 +1096,11 @@ class SetOf(Query):
         :raises UnselectedQueryVariable: If the key is not one of the selected
             variables, since a row holds nothing else.
         """
-        if self._selection_named_by_(key) is None:
-            raise UnselectedQueryVariable(self, key)
+        if self._selection_named_by_(key=key) is None:
+            raise UnselectedQueryVariable(query=self, key=key)
         return super().__getitem__(key)
 
-    def _selection_indexed_by_(self, step: MappedVariable) -> Optional[Selectable]:
+    def _selection_indexed_by_(self, *, step: MappedVariable) -> Selectable | None:
         """
         Indexing a query over several variables by one of them names that variable, the
         same way indexing one of the query's results does.
@@ -1064,9 +1111,9 @@ class SetOf(Query):
         """
         if not isinstance(step, Index):
             return None
-        return self._selection_named_by_(step._key_)
+        return self._selection_named_by_(key=step._key_)
 
-    def _selection_named_by_(self, key: Any) -> Optional[Selectable]:
+    def _selection_named_by_(self, *, key: Any) -> Selectable | None:
         """
         :param key: Something this query was indexed by.
         :return: The selected variable it names, or ``None`` if it names none of them.
@@ -1082,11 +1129,13 @@ class SetOf(Query):
             None,
         )
 
-    def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
         """
         Update the result bindings with this operation's bindings.
         """
-        operation_result = super()._get_operation_result_(child_result)
+        operation_result = super()._get_operation_result_(child_result=child_result)
         operation_result.bindings = {
             self._id_: UnificationDict(
                 {var: operation_result[var._id_] for var in self._selected_variables_}
@@ -1095,17 +1144,19 @@ class SetOf(Query):
         return operation_result
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Entity(Query[T]):
     """
     A query over a single variable.
     """
 
-    def _get_operation_result_(self, child_result: OperationResult) -> OperationResult:
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
         """
         Update the result bindings with this operation's bindings.
         """
-        operation_result = super()._get_operation_result_(child_result)
+        operation_result = super()._get_operation_result_(child_result=child_result)
         operation_result.bindings = {
             self._id_: operation_result[self.selected_variable._id_]
         }
@@ -1116,7 +1167,7 @@ class Entity(Query[T]):
         return self._selected_variables_[0] if self._selected_variables_ else None
 
     @cached_property
-    def _type__(self) -> Optional[Type[T]]:
+    def _type__(self) -> type[T] | None:
         """
         A query over one variable stands for the value that variable takes, so it is of
         that variable's type.
@@ -1135,7 +1186,7 @@ class Entity(Query[T]):
         return selected._type_
 
     @property
-    def selected_aggregator(self) -> "Optional[Aggregator]":
+    def selected_aggregator(self) -> Aggregator | None:
         """
         :return: The :class:`~krrood.entity_query_language.operators.aggregators.Aggregator`
             this entity selects, or ``None`` when its selection is not an aggregator.
@@ -1144,8 +1195,8 @@ class Entity(Query[T]):
         return var if isinstance(var, Aggregator) else None
 
     def aggregated_selections(
-        self, group_key_root_ids: Set[uuid.UUID]
-    ) -> List[SymbolicExpression]:
+        self, *, group_key_root_ids: set[uuid.UUID]
+    ) -> list[SymbolicExpression]:
         """
         When the selection is an :class:`InstantiatedVariable`, its aggregated
         fields are the child variables not rooted in a group key; otherwise the
@@ -1162,4 +1213,4 @@ class Entity(Query[T]):
                 for child in selected._child_variables_.values()
                 if chain_root(child)._id_ not in group_key_root_ids
             ]
-        return super().aggregated_selections(group_key_root_ids)
+        return super().aggregated_selections(group_key_root_ids=group_key_root_ids)

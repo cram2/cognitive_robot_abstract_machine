@@ -34,6 +34,10 @@ jobs:
     defaults:
       run:
         shell: ${{ inputs.use_container && 'bash -ieo pipefail {0}' || 'bash' }}
+    env:
+      # The CPU only torch build, as in ci_reusable.yml: the CUDA build exhausts the runner disk.
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,7 +65,7 @@ jobs:
           node-version: '18'
 
       - name: Install Graphviz
-        if: ${{ inputs.lib == 'coraplex' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' }}
+        if: ${{ inputs.lib == 'coraplex' || inputs.lib == 'probabilistic_model' || inputs.lib == 'random_events' || inputs.lib == 'krrood' || inputs.lib == 'semantic_digital_twin' || inputs.lib == 'cramph' }}
         run: |
           sudo apt-get update
           sudo apt-get install graphviz libgraphviz-dev -y

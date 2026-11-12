@@ -6,18 +6,68 @@ with no hardware, which is the closest offline proxy for whether a goal the demo
 will actually be reached on the robot.
 """
 
+from dataclasses import dataclass, field
+
 import numpy as np
 import pytest
 
-from giskardpy.middleware.ros2.scripts.iai_robots.stretch.configs import (
-    StretchStandaloneInterface,
+from giskardpy.middleware.ros2.giskard import Giskard
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
+from giskardpy.middleware.ros2.robot_interface_config import (
+    StandAloneRobotInterfaceConfig,
 )
-from giskardpy.middleware.ros2.utils.utils_for_tests import StretchTester
+from giskardpy.middleware.ros2.server_config import GiskardServerConfig
+from giskardpy.qp.qp_controller_config import QPControllerConfig
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
+from semantic_digital_twin.robots.robot_parts import AbstractRobot
+from semantic_digital_twin.robots.stretch import Stretch
+from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.world_description.connections import DifferentialDrive
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
+
+# %% standalone stretch
+
+
+@dataclass
+class StretchTester(GiskardTester):
+    """
+    A standalone Giskard driving Stretch through the same configuration the robot's own
+    ``stretch_standalone`` launcher uses.
+    """
+
+    tool_frame: KinematicStructureEntity = field(init=False)
+    """
+    The frame the demo's pick and place actions drive.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.tool_frame = self.api.world.get_kinematic_structure_entity_by_name(
+            "link_grasp_center"
+        )
+
+    def setup_giskard(self) -> Giskard:
+        return Giskard(
+            world_source=WorldSpecification(
+                robots=[RobotSpecification.specify_real_robot(Stretch)]
+            ),
+            robot_interface_config=StandAloneRobotInterfaceConfig(),
+            server_config=GiskardServerConfig(debug_mode=True),
+            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
+        )
+
+    @property
+    def robot(self) -> AbstractRobot:
+        return self.world.get_semantic_annotations_by_type(Stretch)[0]
+
+
+# %% fixtures
 
 
 @pytest.fixture()
@@ -61,25 +111,12 @@ def tool_frame_height(giskard: StretchTester) -> float:
 
 def test_standalone_interface_controls_the_base_drive(giskard: StretchTester):
     """
-    The standalone interface registers the base drive it resolved from the world, so the
-    controller can actually move the base rather than silently holding it.
+    The base drive is controlled in standalone, so the controller can actually move the
+    base rather than silently holding it.
     """
     drive = giskard.api.world.get_connections_by_type(DifferentialDrive)[0]
 
     assert drive.has_hardware_interface
-
-
-def test_standalone_interface_controls_every_declared_joint(giskard: StretchTester):
-    """
-    Every joint the interface declares ends up controlled; a name that no longer matches
-    the robot description would otherwise fail only once the robot is running.
-    """
-    interface = StretchStandaloneInterface()
-
-    for joint_name in interface.controlled_joint_names(giskard.api.world):
-        assert giskard.api.world.get_connection_by_name(
-            joint_name
-        ).has_hardware_interface
 
 
 # %% goal convergence
@@ -103,7 +140,7 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
     """
     height_before = tool_frame_height(giskard)
 
-    motion_statechart = MotionStatechart()
+    motion_statechart = Statechart(context=giskard.api.context)
     motion_statechart.add_node(
         lift_goal := JointPositionList(
             goal_state=JointState.from_str_dict(
@@ -112,7 +149,8 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
         )
     )
     motion_statechart.add_node(EndMotion.when_true(lift_goal))
-    giskard.api.execute(motion_statechart)
+    giskard.api.compile(motion_statechart)
+    giskard.api.execute()
 
     height_after = tool_frame_height(giskard)
     np.testing.assert_allclose(
@@ -128,7 +166,7 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
     """
     height_before = tool_frame_height(giskard)
 
-    motion_statechart = MotionStatechart()
+    motion_statechart = Statechart(context=giskard.api.context)
     motion_statechart.add_node(
         JointPositionList(
             goal_state=JointState.from_str_dict(
@@ -141,7 +179,8 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
     )
     motion_statechart.add_node(EndMotion.when_true(local_minimum))
 
-    giskard.api.execute(motion_statechart)
+    giskard.api.compile(motion_statechart)
+    giskard.api.execute()
 
     height_after = tool_frame_height(giskard)
     np.testing.assert_allclose(

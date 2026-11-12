@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from sortedcontainers import SortedSet
-from typing_extensions import TYPE_CHECKING, Dict
+from typing_extensions import TYPE_CHECKING
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeMask,
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 @dataclass
 class LayerWithLogProbabilities:
     """
-    A layer that a structural query created, with the log-probability of the query
-    under each of its nodes.
+    A layer that a structural query created, with the log-probability of the query under
+    each of its nodes.
     """
 
     layer: Layer
@@ -45,10 +45,10 @@ class LogProbabilitiesOfLayers:
     log-probability of ``-inf``. The prune pass that follows reads them back from here.
     """
 
-    by_layer_id: Dict[int, NodeValues] = field(default_factory=dict)
+    by_layer_id: dict[int, NodeValues] = field(default_factory=dict)
     """
-    The log-probabilities of the nodes of every recorded layer, keyed by the
-    :func:`id` of the layer.
+    The log-probabilities of the nodes of every recorded layer, keyed by the :func:`id`
+    of the layer.
     """
 
     def record(self, result: LayerWithLogProbabilities) -> LayerWithLogProbabilities:

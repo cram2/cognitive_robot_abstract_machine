@@ -2,13 +2,12 @@ from dataclasses import dataclass
 
 import pytest
 from random_events.interval import SimpleInterval
-from typing_extensions import List, Tuple
 
 from typing_extensions import get_args
 
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from semantic_digital_twin.spatial_types import Point2, Point3
+from krrood_spatial_math.spatial_types import Point2, Point3
 from semantic_digital_twin.world_description.geometry import (
     AxisAlignedBox,
     PointT,
@@ -68,14 +67,14 @@ def test_a_box_must_implement_contains():
     @dataclass(eq=False)
     class BoxWithoutContains(AxisAlignedBox[Point2]):
         @classmethod
-        def axes(cls) -> Tuple[SpatialVariables, ...]:
+        def axes(cls) -> tuple[SpatialVariables, ...]:
             return SpatialVariables.x, SpatialVariables.y
 
         @property
-        def _ordered_intervals(self) -> Tuple[SimpleInterval, ...]:
+        def _ordered_intervals(self) -> tuple[SimpleInterval, ...]:
             return ()
 
-        def get_points(self) -> List[Point2]:
+        def get_points(self) -> list[Point2]:
             return []
 
         @classmethod

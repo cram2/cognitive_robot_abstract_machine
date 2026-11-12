@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Event
-from typing import Callable
+from typing_extensions import Callable
 
 import pytest
 import rclpy
@@ -13,7 +13,7 @@ import std_msgs.msg
 from rclpy.node import Node
 from rclpy.timer import Timer
 
-from giskardpy.middleware.ros2 import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.client_presence import (
     ClientHeartbeatPublisher,
     ClientWatchdog,
@@ -347,8 +347,10 @@ class TestHeartbeatWhileNodeIsBusy:
     a stream of world updates, which must not look like a client that left.
     """
 
-    def test_giskard_receives_heartbeats_while_its_node_is_busy(self, init_rospy):
-        giskard_node = rospy.get_node()
+    def test_giskard_receives_heartbeats_while_its_node_is_busy(
+        self, init_background_node
+    ):
+        giskard_node = background_node.get_node()
         presence = HeartbeatPresence(node=giskard_node)
         busy = BusyDefaultCallbackGroup(node=giskard_node)
         client_node = rclpy.create_node("heartbeat_sender")
@@ -362,20 +364,24 @@ class TestHeartbeatWhileNodeIsBusy:
             assert wait_until(busy.started.is_set)
 
             assert wait_until(
-                lambda: sender.publish(heartbeat_of(client))
-                or client in presence.last_heartbeat
+                lambda: (
+                    sender.publish(heartbeat_of(client))
+                    or client in presence.last_heartbeat
+                )
             )
         finally:
             busy.release()
             client_node.destroy_node()
 
-    def test_a_client_keeps_announcing_itself_while_its_node_is_busy(self, init_rospy):
-        giskard_node = rospy.get_node()
+    def test_a_client_keeps_announcing_itself_while_its_node_is_busy(
+        self, init_background_node
+    ):
+        giskard_node = background_node.get_node()
         presence = HeartbeatPresence(node=giskard_node)
         client_node = rclpy.create_node("heartbeat_sender")
         client = MetaData(node_name=client_node.get_name(), process_id=7)
-        assert wait_until(lambda: rospy.executor is not None)
-        rospy.executor.add_node(client_node)
+        assert wait_until(lambda: background_node.executor is not None)
+        background_node.executor.add_node(client_node)
         busy = BusyDefaultCallbackGroup(node=client_node)
         publisher = ClientHeartbeatPublisher(
             node=client_node,
@@ -389,7 +395,7 @@ class TestHeartbeatWhileNodeIsBusy:
         finally:
             busy.release()
             publisher.stop()
-            rospy.executor.remove_node(client_node)
+            background_node.executor.remove_node(client_node)
             client_node.destroy_node()
 
 
@@ -416,8 +422,10 @@ class TestHeartbeatWithoutItsNodeBeingSpun:
         )
         try:
             assert wait_until(
-                lambda: sender.publish(heartbeat_of(client))
-                or client in presence.last_heartbeat
+                lambda: (
+                    sender.publish(heartbeat_of(client))
+                    or client in presence.last_heartbeat
+                )
             )
         finally:
             presence.stop()

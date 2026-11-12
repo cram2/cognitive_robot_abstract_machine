@@ -1,7 +1,7 @@
 # ===================== Possible World Configurations ========================
 from dataclasses import dataclass, field
 
-from typing_extensions import List, Callable
+from typing_extensions import Callable
 
 from .base_config import (
     WorldConf,
@@ -23,28 +23,28 @@ from .handles_and_containers import (
 from ...factories.world import create_world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Body1(BodyConf):
     name: str = "Body1"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Body2(BodyConf):
     name: str = "Body2"
     size: int = 2
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Body3(BodyConf):
     name: str = "Body3"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Body4(BodyConf):
     name: str = "Body4"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Handle4(HandleConf):
     name: str = "Handle4"
 
@@ -65,10 +65,10 @@ def bodies():
     ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DoorsAndDrawersWorld(WorldConf):
-    bodies: List[BodyConf] = field(default_factory=bodies, init=False)
-    connections: List[ConnectionConf] = field(
+    bodies: list[BodyConf] = field(default_factory=bodies, init=False)
+    connections: list[ConnectionConf] = field(
         default_factory=lambda: [
             FixedConnectionConf(parent=Container1(), child=Handle1()),
             FixedConnectionConf(parent=Body2(), child=Handle2()),

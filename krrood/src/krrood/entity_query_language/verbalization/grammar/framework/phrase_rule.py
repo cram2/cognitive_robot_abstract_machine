@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Optional, Sequence
+from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Sequence
 
 from krrood.entity_query_language.verbalization.fragments.base import (
     VerbalizationFragment,
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RenderOptions:
     """The per-recursion render flags, bundled so a new one is a single field here rather than a
     new positional parameter threaded through every recursion site.
@@ -56,7 +56,7 @@ class RenderOptions:
     candidate set (*"one of A, B, or C"*) rather than as a subject noun (*"an int"*)."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RuleContext:
     """
     Per-node context handed to a rule's ``build``.
@@ -66,7 +66,7 @@ class RuleContext:
     for cross-cutting state directly.
     """
 
-    recurse: Callable[["FoldNode", "RenderOptions"], VerbalizationFragment]
+    recurse: Callable[[FoldNode, RenderOptions], VerbalizationFragment]
     """The fold continuation — given a sub-expression and its render options, returns its fragment.
     Rules do not call this directly; they call :meth:`child`."""
 
@@ -78,8 +78,8 @@ class RuleContext:
 
     def child(
         self,
-        node: FoldNode,
         *,
+        node: FoldNode,
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
         inline: bool = False,
         as_value: bool = False,
@@ -160,7 +160,7 @@ class PhraseRule(ABC):
     """``True`` on a rule whose construct is itself a query body, so an entity found anywhere
     within it renders as a nested noun phrase."""
 
-    def when(self, node: FoldNode, context: RuleContext) -> bool:
+    def when(self, *, node: FoldNode, context: RuleContext) -> bool:
         """
         Extra precondition beyond ``isinstance(node, construct)``.
 
@@ -174,7 +174,7 @@ class PhraseRule(ABC):
         return True
 
     @abstractmethod
-    def build(self, node: FoldNode, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: FoldNode, context: RuleContext) -> VerbalizationFragment:
         """
         Build the fragment for *node*.
 
@@ -201,7 +201,7 @@ def _is_guarded(rule: PhraseRule) -> bool:
 
 def select(
     node: FoldNode, rules: Sequence[PhraseRule], context: RuleContext
-) -> Optional[PhraseRule]:
+) -> PhraseRule | None:
     """
     Specificity key, highest wins: ``(construct MRO depth, guarded over unguarded, rule-class MRO
     depth)``.
@@ -233,7 +233,7 @@ def select(
     candidates = [
         rule
         for rule in rules
-        if isinstance(node, rule.construct) and rule.when(node, context)
+        if isinstance(node, rule.construct) and rule.when(node=node, context=context)
     ]
     return sole_maximum(
         candidates,

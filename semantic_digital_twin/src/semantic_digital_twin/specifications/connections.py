@@ -6,15 +6,14 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field, fields
-from typing import Any, Generic, Type, cast
+from typing_extensions import TypeVar, Any, Generic, cast
 
-from typing_extensions import TypeVar
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.exceptions import MissingConnectionParentError
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.specifications.base import NamedSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -24,10 +23,12 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
     ScrewConnection,
 )
+from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.world_entity import (
+    Body,
     Connection,
     KinematicStructureEntity,
 )
@@ -76,7 +77,7 @@ class ConnectionSpecification(
     """
 
     @property
-    def connection_type(self) -> Type[TConnection]:
+    def connection_type(self) -> type[TConnection]:
         """
         The connection type this specification materializes, from its bound generic
         parameter.
@@ -97,7 +98,9 @@ class ConnectionSpecification(
         shared_field_names = {
             shared_field.name for shared_field in fields(ConnectionSpecification)
         }
-        discovered_attributes = DataclassOnlyIntrospector().discover(type(self))
+        discovered_attributes = DataclassOnlyIntrospector().discover(
+            owner_cls=type(self)
+        )
         instance_values = vars(self)
         result = {}
         for attribute in discovered_attributes:
@@ -163,7 +166,6 @@ class ConnectionSpecification(
                     ).evaluate()
                 ),
             )
-            placed_connection.name = connection.name
             world.remove_connection(connection)
             world.add_connection(placed_connection)
         return placed_connection
@@ -284,6 +286,11 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
     Limits for the generated degree of freedom.
     """
 
+    dynamics: JointDynamics = field(default_factory=JointDynamics)
+    """
+    The dynamic properties of the connection, such as its damping and friction.
+    """
+
 
 @dataclass
 class PrismaticConnectionSpecification(
@@ -329,3 +336,51 @@ class ScrewConnectionSpecification(ActiveConnection1DOFSpecification[ScrewConnec
     Mandatory: a thread without a pitch couples no translation to its rotation, so it
     cannot be constructed.
     """
+
+
+# %% connection specifications with endpoints
+
+
+@dataclass
+class ConnectionSpecificationWithEndpoints:
+    """
+    A connection specification together with the two bodies it joins and where it sits
+    on the parent, as world description formats state a joint.
+
+    Unlike a :class:`ConnectionSpecification`, it is bound to concrete bodies, so it
+    can be validated in full before any world is modified.
+    """
+
+    connection_specification: ConnectionSpecification
+    """
+    The connection the joint becomes.
+    """
+
+    parent: Body
+    """
+    The body the joint moves the child relative to.
+    """
+
+    child: Body
+    """
+    The body the joint moves.
+    """
+
+    parent_T_connection: HomogeneousTransformationMatrix
+    """
+    The pose of the joint relative to the parent body.
+    """
+
+    def connect(self, world: World) -> Connection:
+        """
+        Add the connection this joint becomes to ``world``.
+
+        :param world: The world holding :attr:`parent` and :attr:`child`.
+        :return: The added connection.
+        """
+        return self.connection_specification.connect(
+            world,
+            child=self.child,
+            parent=self.parent,
+            parent_T_connection=self.parent_T_connection,
+        )

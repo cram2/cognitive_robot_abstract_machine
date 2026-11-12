@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from textwrap import fill
 
-from typing_extensions import Optional, List, Dict, Tuple, TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any
 
 try:
     import matplotlib as mpl
@@ -50,10 +50,10 @@ class GraphVisualizer:
         curve_scale: float = 0.5,
         layout: str = "tidy",
         edge_style: str = "orthogonal",
-        label_max_chars_per_line: Optional[int] = 13,
+        label_max_chars_per_line: int | None = 13,
         orthogonal_spline_ratio_threshold: float = 3,
         orthogonal_crossings_threshold: int = 4,
-        orthogonal_min_length_threshold: Optional[float] = 4,
+        orthogonal_min_length_threshold: float | None = 4,
         filename: str = "pdf_graph.pdf",
         title: str = "Directed Query Graph (Top to Bottom)",
     ):
@@ -74,7 +74,7 @@ class GraphVisualizer:
             filename=filename,
             title=title,
         )
-        self.ctx: Dict[str, Any] = {}
+        self.ctx: dict[str, Any] = {}
 
     def render(self):
         self._check_dependencies()
@@ -88,13 +88,13 @@ class GraphVisualizer:
         self._auto_figsize()
         fig, ax = self._setup_figure()
         self._wrap_labels_and_sizes()
-        self._compute_pixel_and_obstacles(fig, ax)
-        self._adjust_limits_and_center(ax)
-        self._draw_wrap_boxes(ax)
-        self._draw_edges(ax)
-        self._draw_nodes_and_labels(ax)
-        self._draw_legend(fig, ax)
-        self._style_and_save(fig, ax)
+        self._compute_pixel_and_obstacles(fig=fig, ax=ax)
+        self._adjust_limits_and_center(ax=ax)
+        self._draw_wrap_boxes(ax=ax)
+        self._draw_edges(ax=ax)
+        self._draw_nodes_and_labels(ax=ax)
+        self._draw_legend(fig=fig, ax=ax)
+        self._style_and_save(fig=fig, ax=ax)
         return fig, ax
 
     @classmethod
@@ -119,8 +119,8 @@ class GraphVisualizer:
         rx_edges = [
             (u, v) for (u, v) in rx_edges_all if u in sub_id_set and v in sub_id_set
         ]
-        preds: Dict[int, List[int]] = defaultdict(list)
-        succs: Dict[int, List[int]] = defaultdict(list)
+        preds: dict[int, list[int]] = defaultdict(list)
+        succs: dict[int, list[int]] = defaultdict(list)
         for u, v in rx_edges:
             preds[v].append(u)
             succs[u].append(v)
@@ -143,7 +143,7 @@ class GraphVisualizer:
         root = self.ctx["root"]
         succs = self.ctx["succs"]
         sub_id_set = self.ctx["sub_id_set"]
-        layer: Dict[int, int] = {root.id: 0}
+        layer: dict[int, int] = {root.id: 0}
         from collections import deque
 
         dq = deque([root.id])
@@ -158,7 +158,7 @@ class GraphVisualizer:
         for nid in sub_id_set:
             layer.setdefault(nid, 0)
         max_layer = max(layer.values()) if layer else 0
-        layers: List[List[int]] = (
+        layers: list[list[int]] = (
             [[] for _ in range(max_layer + 1)] if max_layer >= 0 else []
         )
         for nid, l in layer.items():
@@ -172,12 +172,12 @@ class GraphVisualizer:
         preds = self.ctx["preds"]
         succs = self.ctx["succs"]
 
-        def compute_order_index(layer_nodes: List[int]) -> Dict[int, int]:
+        def compute_order_index(layer_nodes: list[int]) -> dict[int, int]:
             return {nid: idx for idx, nid in enumerate(layer_nodes)}
 
         def sort_by_barycenter(
-            current_layer: List[int], reference_layer: List[int], use_preds: bool
-        ) -> List[int]:
+            current_layer: list[int], reference_layer: list[int], use_preds: bool
+        ) -> list[int]:
             ref_pos = compute_order_index(reference_layer)
 
             def bary(nid: int) -> float:
@@ -212,11 +212,11 @@ class GraphVisualizer:
         usable_w = 1.0 - 2 * margin_x
         usable_h = 1.0 - 2 * margin_y
         depth = max_layer + 1 if max_layer >= 0 else 1
-        ordered_nodes: List[RWXNode] = []
-        coords: List[Tuple[float, float]] = []
+        ordered_nodes: list[RWXNode] = []
+        coords: list[tuple[float, float]] = []
 
         if layout == "tidy":
-            primary_children: Dict[int, List[int]] = defaultdict(list)
+            primary_children: dict[int, list[int]] = defaultdict(list)
             sub_id_set = self.ctx["sub_id_set"]
             for n in sub_nodes:
                 pid = n._primary_parent_id
@@ -224,7 +224,7 @@ class GraphVisualizer:
                     primary_children[pid].append(n.id)
             for pid, ch in primary_children.items():
                 ch.sort()
-            x_pos: Dict[int, float] = {}
+            x_pos: dict[int, float] = {}
             seen: set[int] = set()
             x_cursor = 0.0
 
@@ -248,7 +248,7 @@ class GraphVisualizer:
             xmin = min(xs) if xs else 0.0
             xmax = max(xs) if xs else 1.0
             span = (xmax - xmin) if (xmax - xmin) > 1e-9 else 1.0
-            x_norm: Dict[int, float] = {}
+            x_norm: dict[int, float] = {}
             for nid, xv in x_pos.items():
                 x_norm[nid] = margin_x + ((xv - xmin) / span) * usable_w
             for l, layer_nodes in enumerate(layers):
@@ -301,7 +301,7 @@ class GraphVisualizer:
     def _finalize_positions_and_edges(self):
         ordered_nodes = self.ctx["ordered_nodes"]
         rx_edges = self.ctx["rx_edges"]
-        id_map: Dict[int, int] = {n.id: i for i, n in enumerate(ordered_nodes)}
+        id_map: dict[int, int] = {n.id: i for i, n in enumerate(ordered_nodes)}
         edges = [
             (id_map[u], id_map[v]) for (u, v) in rx_edges if u in id_map and v in id_map
         ]
@@ -401,7 +401,7 @@ class GraphVisualizer:
             )
         )
 
-    def _compute_pixel_and_obstacles(self, fig, ax):
+    def _compute_pixel_and_obstacles(self, *, fig, ax):
         norm_pos = self.ctx["norm_pos"]
         size_per_node = self.ctx["size_per_node"]
         radii_pt = np.sqrt(size_per_node / np.pi)
@@ -419,7 +419,7 @@ class GraphVisualizer:
         radii_px = radii_pt * (fig.dpi / 72.0)
         radii_data_x = radii_px * dx_per_px
         radii_data_y = radii_px * dy_per_px
-        obstacles_rects: List[Tuple[float, float, float, float]] = []
+        obstacles_rects: list[tuple[float, float, float, float]] = []
         inflate_px_x = 3.0
         inflate_px_y = 3.0
         inflate_dx = dx_per_px * inflate_px_x
@@ -454,7 +454,7 @@ class GraphVisualizer:
             )
         )
 
-    def _adjust_limits_and_center(self, ax):
+    def _adjust_limits_and_center(self, *, ax):
         # Compute padded content bounds from obstacles and center horizontally around the root when possible.
         norm_pos = self.ctx["norm_pos"]
         obstacles_rects = self.ctx["obstacles_rects"]
@@ -506,7 +506,7 @@ class GraphVisualizer:
         ax.set_xlim(self.ctx["xlim"])
         ax.set_ylim(self.ctx["ylim"])
 
-    def _draw_wrap_boxes(self, ax):
+    def _draw_wrap_boxes(self, *, ax):
         ordered_nodes = self.ctx["ordered_nodes"]
         id_map = self.ctx["id_map"]
         obstacles_rects = self.ctx["obstacles_rects"]
@@ -570,7 +570,7 @@ class GraphVisualizer:
             ax.add_patch(box)
 
     @staticmethod
-    def _dist_pt_seg(px, py, ax_, ay_, bx_, by_):
+    def _dist_pt_seg(*, px, py, ax_, ay_, bx_, by_):
         vx, vy = bx_ - ax_, by_ - ay_
         wx, wy = px - ax_, py - ay_
         vv = vx * vx + vy * vy
@@ -582,9 +582,10 @@ class GraphVisualizer:
 
     def _seg_blocked(
         self,
-        p_start: Tuple[float, float],
-        p_end: Tuple[float, float],
-        ignore: Tuple[int, int],
+        *,
+        p_start: tuple[float, float],
+        p_end: tuple[float, float],
+        ignore: tuple[int, int],
     ):
         """
         Return True if the segment p_start->p_end intersects any obstacle rectangle.
@@ -645,7 +646,7 @@ class GraphVisualizer:
                     code1 = outcode(x1, y1, xmin, xmax, ymin, ymax)
         return False
 
-    def _draw_edges(self, ax):
+    def _draw_edges(self, *, ax):
         edge_style = self.params["edge_style"]
         curve_scale = float(self.params["curve_scale"])
         edges = self.ctx["edges"]
@@ -689,7 +690,10 @@ class GraphVisualizer:
                 if (min(x0, x1) <= cx <= max(x0, x1)) and (
                     min(y0, y1) <= cy <= max(y0, y1)
                 ):
-                    if self._dist_pt_seg(cx, cy, x0, y0, x1, y1) < 0.06:
+                    if (
+                        self._dist_pt_seg(px=cx, py=cy, ax_=x0, ay_=y0, bx_=x1, by_=y1)
+                        < 0.06
+                    ):
                         near_count += 1
 
             if edge_style == "straight":
@@ -774,8 +778,8 @@ class GraphVisualizer:
                     p3 = (xm, y1)
                     if (
                         within_x(xm)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -787,8 +791,8 @@ class GraphVisualizer:
                     p3 = (x1, ym)
                     if (
                         within_y(ym)
-                        and not self._seg_blocked(p1, p2, ignore=(u, v))
-                        and not self._seg_blocked(p2, p3, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v))
+                        and not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v))
                     ):
                         return [p1, p2, p3]
                     return None
@@ -801,20 +805,20 @@ class GraphVisualizer:
                     p4 = (x1, y1)
                     if (
                         within_y(ym)
-                        and (not self._seg_blocked(p1, p2, ignore=(u, v)))
-                        and (not self._seg_blocked(p2, p3, ignore=(u, v)))
-                        and (not self._seg_blocked(p3, p4, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p1, p_end=p2, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p2, p_end=p3, ignore=(u, v)))
+                        and (not self._seg_blocked(p_start=p3, p_end=p4, ignore=(u, v)))
                     ):
                         return [p1, p2, p3, p4]
                     return None
 
-                candidates: List[List[Tuple[float, float]]] = []
+                candidates: list[list[tuple[float, float]]] = []
                 for fn in (try_hv, try_vh, try_vhv):
                     pts = fn()
                     if pts is not None:
                         candidates.append(pts)
 
-                def count_crosses(points: List[Tuple[float, float]]):
+                def count_crosses(points: list[tuple[float, float]]):
                     crosses = 0
                     for i in range(len(points) - 1):
                         a0, a1 = points[i], points[i + 1]
@@ -866,7 +870,7 @@ class GraphVisualizer:
                     best = [(x0, y0), (x1, y1)]
 
                 # Evaluate path quality: length ratio and crossings
-                def total_len(points: List[Tuple[float, float]]):
+                def total_len(points: list[tuple[float, float]]):
                     acc = 0.0
                     for i in range(1, len(points)):
                         ax0, ay0 = points[i - 1]
@@ -947,7 +951,7 @@ class GraphVisualizer:
                 # Crop endpoints of the orthogonal path so it meets node borders
                 pts = list(best)
                 # Pre-cropping deduplication to ensure non-zero first/last segments
-                pre_pts: List[Tuple[float, float]] = []
+                pre_pts: list[tuple[float, float]] = []
                 for p in pts:
                     if not pre_pts:
                         pre_pts.append(p)
@@ -996,7 +1000,7 @@ class GraphVisualizer:
                         sB = min(sB, clamp_frac * seg_lenL)
                         pts[-1] = (b1x - uvecL[0] * sB, b1y - uvecL[1] * sB)
                 # Remove near-duplicate consecutive points after cropping
-                dedup_pts: List[Tuple[float, float]] = []
+                dedup_pts: list[tuple[float, float]] = []
                 for p in pts:
                     if not dedup_pts:
                         dedup_pts.append(p)
@@ -1005,8 +1009,8 @@ class GraphVisualizer:
                         if float(np.hypot(p[0] - px, p[1] - py)) > 1e-8:
                             dedup_pts.append(p)
                 pts = dedup_pts if len(dedup_pts) >= 2 else pts
-                verts: List[Tuple[float, float]] = []
-                codes: List[int] = []
+                verts: list[tuple[float, float]] = []
+                codes: list[int] = []
 
                 def add_moveto(pt):
                     verts.append(pt)
@@ -1086,7 +1090,7 @@ class GraphVisualizer:
             )
             ax.add_patch(arrow)
 
-    def _draw_nodes_and_labels(self, ax):
+    def _draw_nodes_and_labels(self, *, ax):
         ordered_nodes = self.ctx["ordered_nodes"]
         norm_pos = self.ctx["norm_pos"]
         size_per_node = self.ctx["size_per_node"]
@@ -1152,7 +1156,7 @@ class GraphVisualizer:
         self.ctx["colors"] = colors
         self.ctx["any_enclosed"] = any_enclosed
 
-    def _draw_legend(self, fig, ax):
+    def _draw_legend(self, *, fig, ax):
         from collections import OrderedDict
         from matplotlib.lines import Line2D
 
@@ -1215,7 +1219,7 @@ class GraphVisualizer:
         )
         legend.get_title().set_color("black")
 
-    def _style_and_save(self, fig, ax):
+    def _style_and_save(self, *, fig, ax):
         # White backgrounds
         fig.patch.set_facecolor("white")
         ax.set_facecolor("white")

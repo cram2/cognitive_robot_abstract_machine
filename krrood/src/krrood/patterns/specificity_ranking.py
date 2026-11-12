@@ -13,7 +13,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 
-from typing_extensions import Any, Callable, List, Optional, Sequence, Type, TypeVar
+from typing_extensions import Any, Callable, Sequence, TypeVar
 
 from krrood.patterns.exceptions import AmbiguousRuleError
 from krrood.utils import recursive_subclasses
@@ -21,7 +21,7 @@ from krrood.utils import recursive_subclasses
 _T = TypeVar("_T")
 
 
-def maxima(candidates: Sequence[_T], key: Callable[[_T], Any]) -> List[_T]:
+def maxima(candidates: Sequence[_T], key: Callable[[_T], Any]) -> list[_T]:
     """
     :param candidates: Items already filtered to those that apply.
     :param key: Specificity key; the highest value wins.
@@ -44,8 +44,8 @@ def maxima(candidates: Sequence[_T], key: Callable[[_T], Any]) -> List[_T]:
 def sole_maximum(
     candidates: Sequence[_T],
     key: Callable[[_T], Any],
-    collision_error: Callable[[List[_T]], Exception],
-) -> Optional[_T]:
+    collision_error: Callable[[list[_T]], Exception],
+) -> _T | None:
     """
     :param candidates: Items already filtered to those that apply.
     :param key: Specificity key; the highest value wins.
@@ -79,7 +79,7 @@ def mro_depth(cls: type) -> int:
     return len(cls.__mro__)
 
 
-def concrete_subclasses(base: Type[_T]) -> List[Type[_T]]:
+def concrete_subclasses(base: type[_T]) -> list[type[_T]]:
     """
     Every concrete (instantiable) transitive subclass of *base*, abstract intermediates
     excluded — the single subclass-discovery primitive.
@@ -111,7 +111,7 @@ class SpecificityRule(ABC):
     which at most one decides for any subject.
 
     An alternative is a concrete subclass that implements the ``applies(...)`` guard (its
-    signature is the family's concern) and whatever payload the family needs. Alternatives
+    keyword-only parameters are the family's concern) and whatever payload the family needs. Alternatives
     register themselves by subclassing and are ranked by class specificity: a more-derived
     alternative, one that subclasses another and refines its guard, outranks the alternative it
     refines. Alternatives that are not in a subclass relationship must have mutually exclusive
@@ -127,13 +127,14 @@ class SpecificityRule(ABC):
 
     @classmethod
     @abstractmethod
-    def applies(cls, *args: Any) -> bool:
+    def applies(cls, **subject: Any) -> bool:
         """
+        :param subject: The subject, keyed by the parameters of the family's guard.
         :return: True when this alternative decides for the given subject.
         """
 
     @classmethod
-    def alternatives(cls) -> List[Type[SpecificityRule]]:
+    def alternatives(cls) -> list[type[SpecificityRule]]:
         """
         :return: The concrete alternative subclasses of this family, transitively, with abstract
             family bases excluded.
@@ -141,21 +142,22 @@ class SpecificityRule(ABC):
         return concrete_subclasses(cls)
 
     @classmethod
-    def most_applicable(cls, *args: Any) -> Optional[Type[SpecificityRule]]:
+    def most_applicable(cls, **subject: Any) -> type[SpecificityRule] | None:
         """
-        :param args: Forwarded to each alternative's ``applies``.
-        :return: The most specific alternative whose ``applies(*args)`` holds, or ``None``.
+        :param subject: Forwarded to each alternative's ``applies``.
+        :return: The most specific alternative whose ``applies(**subject)`` holds, or
+            ``None``.
         :raises AmbiguousRuleError: When several alternatives are equally specific.
         """
         applicable = [
             alternative
             for alternative in cls.alternatives()
-            if alternative.applies(*args)
+            if alternative.applies(**subject)
         ]
         return sole_maximum(
             applicable,
             key=mro_depth,
             collision_error=lambda tied: AmbiguousRuleError(
-                subject=args, candidates=tied
+                subject=subject, candidates=tied
             ),
         )

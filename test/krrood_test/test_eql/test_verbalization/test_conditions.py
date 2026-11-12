@@ -9,7 +9,6 @@ exercised end-to-end through the verbalizer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
 from krrood.entity_query_language.verbalization.boolean_predicate import (
     AdjectivalPredicate,
@@ -43,15 +42,15 @@ from krrood.entity_query_language.verbalization.morphology import is_past_partic
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Task:
     completed: bool
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Robot:
     battery: int
-    tasks: List[_Task]
+    tasks: list[_Task]
 
 
 def test_single_hop_attr_recognizes_subject_attribute():
@@ -73,11 +72,11 @@ def test_is_concrete_object_literal_recognizer():
     not.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Obj:
         x: int
 
-    assert is_concrete_object_literal(Literal(_value_=_Obj(1))) is True
+    assert is_concrete_object_literal(Literal(_value_=_Obj(x=1))) is True
     assert is_concrete_object_literal(Literal(_value_=5)) is False
     assert (
         is_concrete_object_literal(Literal(_value_=_Obj)) is False
@@ -90,13 +89,13 @@ def test_is_atomic_value_recognizer():
     A plain scalar literal is atomic (groupable); a concrete object / ``None`` is not.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class _Obj:
         x: int
 
     assert is_atomic_value(Literal(_value_=5)) is True
     assert is_atomic_value(Literal(_value_="x")) is True
-    assert is_atomic_value(Literal(_value_=_Obj(1))) is False
+    assert is_atomic_value(Literal(_value_=_Obj(x=1))) is False
     assert is_atomic_value(Literal(_value_=None)) is False
 
 
@@ -127,38 +126,38 @@ def test_predicate_form_end_to_end():
 # ── Absence: ``== None`` as a predicate, not a value ─────────────────────────
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Robot2:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Address:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Author:
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Mission:
     assigned_to: _Robot2  # past participle + preposition → relational
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Parcel:
     shipped_to: _Address  # regular participle
     written_by: _Author  # irregular participle ("written", not "*writed")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Gadget:
     color_in: str  # noun + preposition → NOT a relation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Note:
     located_in: str  # relational, but the related type is a primitive → "anything"
 
@@ -313,7 +312,7 @@ def test_two_value_domain_drops_the_serial_comma():
 # ── Boolean attribute compared to a boolean: polarity, never "is True" ───────
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Coffee:
     # "decaf" is adjectival (the heuristic can't tell), so it declares its predicate form.
     decaf: bool = field(
@@ -356,31 +355,31 @@ def test_boolean_attribute_open_domain_is_either_or_not():
 # ── Co-indexed comparator factoring ──────────────────────────────────────────
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Date:
     month: int
     year: int
     day: int
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Period:
     begin: _Date
     end: _Date
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Inner:
     z: _Date
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Outer:
     x: _Date
     y: _Inner
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _Statement:
     period: _Period
     revenue: float

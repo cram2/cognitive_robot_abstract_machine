@@ -18,13 +18,13 @@ from krrood.parametrization.model_registries import CausalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pick:
     arm: float
     success: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Place:
     height: float
 
@@ -48,7 +48,7 @@ def _build_pick_causal_circuit() -> CausalCircuit:
     )
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph([arm], [success]),
+        MarginalDeterminismTreeNode.from_variable_order([arm]),
         [arm],
         [success],
     )
@@ -56,20 +56,25 @@ def _build_pick_causal_circuit() -> CausalCircuit:
 
 def test_registry_resolves_the_circuit_registered_for_the_queried_class():
     pick_circuit = _build_pick_causal_circuit()
-    registry = CausalCircuitRegistry({Pick: pick_circuit})
+    registry = CausalCircuitRegistry(circuits={Pick: pick_circuit})
 
     match = a(Pick)(arm=cause, success=...)
     match.causes_effect(match.success == 0.5)
-    parameters = UnderspecifiedParameters(match)
+    parameters = UnderspecifiedParameters(statement=match)
 
-    assert registry.get_model(parameters) is pick_circuit
+    assert registry.get_model(parameters=parameters) is pick_circuit
 
 
 def test_registry_distinguishes_between_multiple_registered_classes():
     pick_circuit = _build_pick_causal_circuit()
     place_circuit = _build_pick_causal_circuit()
-    registry = CausalCircuitRegistry({Pick: pick_circuit, Place: place_circuit})
+    registry = CausalCircuitRegistry(
+        circuits={Pick: pick_circuit, Place: place_circuit}
+    )
 
     pick_match = a(Pick)(arm=cause, success=...)
     pick_match.causes_effect(pick_match.success == 0.5)
-    assert registry.get_model(UnderspecifiedParameters(pick_match)) is pick_circuit
+    assert (
+        registry.get_model(parameters=UnderspecifiedParameters(statement=pick_match))
+        is pick_circuit
+    )

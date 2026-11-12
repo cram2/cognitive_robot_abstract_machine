@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field, InitVar
-from typing import List, Optional
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -34,26 +33,26 @@ class PosteriorWidget(QWidget):
     The model controller.
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
 
-    evidence_widgets: List[VariableConstraintWidget] = field(
+    evidence_widgets: list[VariableConstraintWidget] = field(
         default_factory=list, init=False, repr=False, compare=False
     )
     """
     The list of variable constraint widgets for the evidence.
     """
 
-    current_posterior_model: Optional[ProbabilisticModel] = field(
+    current_posterior_model: ProbabilisticModel | None = field(
         default=None, init=False, repr=False, compare=False
     )
     """
     The current posterior model after calculation.
     """
 
-    query_vars: List[str] = field(
+    query_vars: list[str] = field(
         default_factory=list, init=False, repr=False, compare=False
     )
     """
@@ -112,7 +111,7 @@ class PosteriorWidget(QWidget):
     The widget that renders the distribution plots.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.init_ui()
 
@@ -282,7 +281,7 @@ class PosteriorWidget(QWidget):
         self.current_var_index = 0
         self.update_plot()
 
-    def build_event(self, widgets_list: List[VariableConstraintWidget]) -> Event:
+    def build_event(self, widgets_list: list[VariableConstraintWidget]) -> Event:
         simple_event = SimpleEvent()
         for widget in widgets_list:
             constraint = widget.get_constraint()

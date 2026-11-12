@@ -6,7 +6,7 @@ from enum import Enum
 
 import daqp
 import numpy as np
-from typing_extensions import Dict, TYPE_CHECKING, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import (
@@ -16,7 +16,7 @@ from krrood.symbolic_math.symbolic_math import (
     Scalar,
     VariableParameters,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix,
     RotationMatrix,
@@ -167,7 +167,7 @@ class InverseKinematicsSolver:
         max_iterations: int = 200,
         translation_velocity: float = 0.2,
         rotation_velocity: float = 0.2,
-    ) -> Dict[DegreeOfFreedom, float]:
+    ) -> dict[DegreeOfFreedom, float]:
         """
         Solve inverse kinematics problem.
 
@@ -239,7 +239,7 @@ class InverseKinematicsSolver:
 
     def _solve_qp_step(
         self, qp_problem: QPProblem, solver_state: SolverState
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Evaluate the QP matrices at the current state and solve the QP.
 
@@ -339,7 +339,7 @@ class QPProblem:
 
     def _extract_dofs(
         self,
-    ) -> Tuple[
+    ) -> tuple[
         list[DegreeOfFreedom],
         list[DegreeOfFreedom],
         list[FloatVariable],
@@ -359,10 +359,10 @@ class QPProblem:
             active_dofs_set.update(connection.active_dofs)
             passive_dofs_set.update(connection.passive_dofs)
 
-        active_dofs: List[DegreeOfFreedom] = list(
+        active_dofs: list[DegreeOfFreedom] = list(
             sorted(active_dofs_set, key=lambda d: str(d.id))
         )
-        passive_dofs: List[DegreeOfFreedom] = list(
+        passive_dofs: list[DegreeOfFreedom] = list(
             sorted(passive_dofs_set, key=lambda d: str(d.id))
         )
 
@@ -389,7 +389,7 @@ class QPProblem:
         self.lower_box_constraints, self.upper_box_constraints = (
             self.constraint_builder.build_box_constraints(self.active_dofs)
         )
-        self.box_constraint_matrix = Matrix.eye(len(self.lower_box_constraints))
+        self.box_constraint_matrix = Matrix.eye(size=len(self.lower_box_constraints))
 
         # Goal constraints
         self.eq_bound_expr, self.neq_matrix = (
@@ -397,9 +397,15 @@ class QPProblem:
         )
 
         # Combine constraints
-        self.l = Matrix.vstack([self.lower_box_constraints, self.eq_bound_expr])
-        self.u = Matrix.vstack([self.upper_box_constraints, self.eq_bound_expr])
-        self.A = Matrix.vstack([self.box_constraint_matrix, self.neq_matrix])
+        self.l = Matrix.vstack(
+            list_of_matrices=[self.lower_box_constraints, self.eq_bound_expr]
+        )
+        self.u = Matrix.vstack(
+            list_of_matrices=[self.upper_box_constraints, self.eq_bound_expr]
+        )
+        self.A = Matrix.vstack(
+            list_of_matrices=[self.box_constraint_matrix, self.neq_matrix]
+        )
 
     def _setup_weights(self):
         """
@@ -412,7 +418,10 @@ class QPProblem:
         slack_weights = [2500 * (1.0 / 0.2) ** 2] * 6
 
         self.quadratic_weights = Matrix(dof_weights + slack_weights)
-        self.linear_weights = Matrix.zeros(*self.quadratic_weights.shape)
+        self.linear_weights = Matrix.zeros(
+            rows=self.quadratic_weights.shape[0],
+            columns=self.quadratic_weights.shape[1],
+        )
 
     def _compile_functions(self):
         """
@@ -420,14 +429,20 @@ class QPProblem:
         """
         variable_args = [self.active_variables, self.passive_variables]
 
-        self.l_f = self.l.compile(VariableParameters.from_lists(*variable_args))
-        self.u_f = self.u.compile(VariableParameters.from_lists(*variable_args))
-        self.A_f = self.A.compile(VariableParameters.from_lists(*variable_args))
+        self.l_f = self.l.compile(
+            parameters=VariableParameters.from_lists(*variable_args)
+        )
+        self.u_f = self.u.compile(
+            parameters=VariableParameters.from_lists(*variable_args)
+        )
+        self.A_f = self.A.compile(
+            parameters=VariableParameters.from_lists(*variable_args)
+        )
         self.quadratic_weights_f = self.quadratic_weights.compile(
-            VariableParameters.from_lists(*variable_args)
+            parameters=VariableParameters.from_lists(*variable_args)
         )
         self.linear_weights_f = self.linear_weights.compile(
-            VariableParameters.from_lists(*variable_args)
+            parameters=VariableParameters.from_lists(*variable_args)
         )
 
     def evaluate_at_state(self, solver_state) -> QPMatrices:
@@ -490,8 +505,8 @@ class ConstraintBuilder:
     """
 
     def build_box_constraints(
-        self, active_dofs: List[DegreeOfFreedom]
-    ) -> Tuple[Vector, Vector]:
+        self, active_dofs: list[DegreeOfFreedom]
+    ) -> tuple[Vector, Vector]:
         """
         Build position and velocity limit constraints for DOFs.
         """
@@ -521,8 +536,8 @@ class ConstraintBuilder:
         return Vector(lower_constraints), Vector(upper_constraints)
 
     def build_goal_constraints(
-        self, active_variables: List[FloatVariable]
-    ) -> Tuple[Matrix, Matrix]:
+        self, active_variables: list[FloatVariable]
+    ) -> tuple[Matrix, Matrix]:
         """
         Build position and rotation goal constraints.
         """
@@ -535,17 +550,19 @@ class ConstraintBuilder:
         rotation_state, rotation_error = self._compute_rotation_error(root_T_tip)
 
         # Current state and jacobian
-        current_expr = Matrix.vstack([position_state, rotation_state])
-        eq_bound_expr = Matrix.vstack([position_error, rotation_error])
+        current_expr = Matrix.vstack(list_of_matrices=[position_state, rotation_state])
+        eq_bound_expr = Matrix.vstack(list_of_matrices=[position_error, rotation_error])
 
-        J = current_expr.jacobian(active_variables)
-        neq_matrix = Matrix.hstack([J * self.dt, Matrix.eye(6) * self.dt])
+        J = current_expr.jacobian(variables=active_variables)
+        neq_matrix = Matrix.hstack(
+            list_of_matrices=[J * self.dt, Matrix.eye(size=6) * self.dt]
+        )
 
         return eq_bound_expr, neq_matrix
 
     def _compute_position_error(
         self, root_T_tip: HomogeneousTransformationMatrix
-    ) -> Tuple[Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
         Compute position error with velocity limits.
 
@@ -568,7 +585,7 @@ class ConstraintBuilder:
 
     def _compute_rotation_error(
         self, root_T_tip: HomogeneousTransformationMatrix
-    ) -> Tuple[Vector, Vector]:
+    ) -> tuple[Vector, Vector]:
         """
         Compute rotation error with velocity limits.
 

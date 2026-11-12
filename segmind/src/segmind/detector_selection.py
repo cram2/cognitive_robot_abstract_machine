@@ -11,7 +11,7 @@ import inspect
 from dataclasses import dataclass
 
 from krrood.utils import recursive_subclasses
-from typing_extensions import List, Self, Tuple, Type
+from typing_extensions import Self
 
 from segmind.detectors import (  # noqa: F401
     agent_event_detector_nodes,
@@ -32,7 +32,7 @@ class DetectorSelection:
     can use grasps as well, but does not need them, does not bring grasps along.
     """
 
-    detector_types: Tuple[Type[AbstractDetector], ...]
+    detector_types: tuple[type[AbstractDetector], ...]
     """
     Every kind chosen, each after the kinds it is read from.
     """
@@ -59,19 +59,19 @@ class DetectorSelection:
         )
 
     @classmethod
-    def of(cls, *asked_for: Type[AbstractDetector]) -> Self:
+    def of(cls, *asked_for: type[AbstractDetector]) -> Self:
         """
         :param asked_for: The kinds of detector a run is asked to use.
         :return: Those kinds and everything they need.
         """
-        chosen: List[Type[AbstractDetector]] = []
+        chosen: list[type[AbstractDetector]] = []
         for detector_type in asked_for:
             cls._choose(detector_type, chosen)
         return cls(detector_types=tuple(chosen))
 
     @classmethod
     def _choose(
-        cls, detector_type: Type[AbstractDetector], chosen: List[Type[AbstractDetector]]
+        cls, detector_type: type[AbstractDetector], chosen: list[type[AbstractDetector]]
     ) -> None:
         """
         Add ``detector_type`` to ``chosen`` after what it is read from.

@@ -1,12 +1,10 @@
-import unittest
-from enum import IntEnum
+from __future__ import annotations
 
 import numpy as np
-from matplotlib import pyplot as plt
-from random_events.interval import singleton, closed
+import pytest
+from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
-from random_events.set import SetElement
-from random_events.variable import Continuous, Symbolic
+
 from probabilistic_model.exceptions import UnboundedEventError
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     fully_factorized,
@@ -14,75 +12,60 @@ from probabilistic_model.probabilistic_circuit.rx.helper import (
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
-    LeafUnit,
 )
-import json
-import plotly.graph_objects as go
+
+# %% fully factorized circuits
 
 
-class FullyFactorizedTestCase(unittest.TestCase):
-
-    x = Continuous("x")
-    y = Continuous("y")
-    model: ProbabilisticCircuit
-
-    @classmethod
-    def setUpClass(cls):
-        mean = {cls.x: 1, cls.y: 0}
-        variance = {cls.x: 2, cls.y: 1}
-        cls.model = fully_factorized([cls.x, cls.y], mean, variance)
-
-    def test_fully_factorized(self):
-        self.assertEqual(len(list(self.model.nodes())), 3)
-        self.assertEqual(len(list(self.model.edges())), 2)
-
-    def test_conditioning_on_mode(self):
-        event = (
-            SimpleEvent.from_data({self.x: closed(0, 2), self.y: closed(0, 2)})
-            .as_composite_set()
-            .complement()
-        )
-        model = self.model
-        model, _ = model.truncated(event)
-        mode, _ = model.mode()
-        # TODO this does not work due to numeric impression. Wait for david for updates
-        # truncated, _ = model.truncated(mode)
-        # self.assertIsNotNone(truncated)
-        # model = uniform_measure_of_event(event)
-        # self.assertIsNotNone(model)
+@pytest.fixture
+def fully_factorized_circuit(x, y) -> ProbabilisticCircuit:
+    """
+    A product of a Gaussian over *x* and a Gaussian over *y*.
+    """
+    return fully_factorized([x, y], {x: 1, y: 0}, {x: 2, y: 1})
 
 
-class UniformMeasureTestCase(unittest.TestCase):
-
-    x = Continuous("x")
-    y = Continuous("y")
-
-    def test_uniform_measure_of_a_bounded_event(self):
-        event = SimpleEvent.from_data(
-            {self.x: closed(0, 1) | closed(3, 4), self.y: closed(0, 2)}
-        ).as_composite_set()
-
-        model = uniform_measure_of_event(event)
-
-        self.assertAlmostEqual(
-            model.probability(
-                SimpleEvent.from_data(
-                    {self.x: closed(0, 1), self.y: closed(0, 2)}
-                ).as_composite_set()
-            ),
-            0.5,
-        )
-
-    def test_an_unbounded_event_has_no_uniform_measure(self):
-        event = SimpleEvent.from_data(
-            {self.x: closed(0, np.inf), self.y: closed(0, 2)}
-        ).as_composite_set()
-
-        with self.assertRaises(UnboundedEventError) as raised:
-            uniform_measure_of_event(event)
-
-        self.assertEqual(raised.exception.variable, self.x)
+def test_fully_factorized_circuit_is_a_product_of_one_leaf_per_variable(
+    fully_factorized_circuit,
+):
+    assert len(list(fully_factorized_circuit.nodes())) == 3
+    assert len(list(fully_factorized_circuit.edges())) == 2
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.xfail(
+    strict=True,
+    reason="The mode of the truncated circuit lies on the boundary of the event, "
+    "outside it by numeric imprecision",
+)
+def test_mode_of_a_truncated_fully_factorized_circuit_lies_in_the_event(
+    fully_factorized_circuit, x, y
+):
+    event = (
+        SimpleEvent.from_data({x: closed(0, 2), y: closed(0, 2)})
+        .as_composite_set()
+        .complement()
+    )
+    truncated = fully_factorized_circuit.truncated(event).distribution
+    mode = truncated.mode().event
+    assert (mode - event).is_empty()
+
+
+# %% uniform measures
+
+
+def test_uniform_measure_of_a_bounded_event(x, y):
+    event = SimpleEvent.from_data(
+        {x: closed(0, 1) | closed(3, 4), y: closed(0, 2)}
+    ).as_composite_set()
+    measure = uniform_measure_of_event(event)
+    half = SimpleEvent.from_data({x: closed(0, 1), y: closed(0, 2)}).as_composite_set()
+    assert measure.probability(half) == pytest.approx(0.5)
+
+
+def test_an_unbounded_event_has_no_uniform_measure(x, y):
+    event = SimpleEvent.from_data(
+        {x: closed(0, np.inf), y: closed(0, 2)}
+    ).as_composite_set()
+    with pytest.raises(UnboundedEventError) as raised:
+        uniform_measure_of_event(event)
+    assert raised.value.variable == x

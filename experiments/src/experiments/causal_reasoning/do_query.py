@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Tuple
-
 
 @dataclass(frozen=True)
 class CauseRegion:
@@ -64,7 +62,7 @@ class DoQueryAnswer:
     How many examples the circuit was fitted on.
     """
 
-    regions: Tuple[CauseRegion, ...]
+    regions: tuple[CauseRegion, ...]
     """
     One entry per region of the cause the grounded circuit's support covers.
     """

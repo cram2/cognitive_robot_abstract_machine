@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, field
-from typing import List, Tuple, Optional
 
 import numpy as np
 import rclpy
@@ -336,7 +335,7 @@ class DerivativeEstimator:
     First derivative via sample-to-sample difference using provided dt.
     """
 
-    previous: Optional[float] = None
+    previous: float | None = None
     """
     Previous sample value used to compute the discrete derivative.
     """
@@ -421,7 +420,7 @@ class WrenchProcessor:
         ]
 
     @staticmethod
-    def _axes_from_wrench(w: Wrench) -> List[float]:
+    def _axes_from_wrench(w: Wrench) -> list[float]:
         """
         Extract the six scalar components from a wrench message.
 
@@ -433,7 +432,7 @@ class WrenchProcessor:
         return [w.force.x, w.force.y, w.force.z, w.torque.x, w.torque.y, w.torque.z]
 
     @staticmethod
-    def _wrench_from_axes(a: List[float]) -> Wrench:
+    def _wrench_from_axes(a: list[float]) -> Wrench:
         """
         Build a wrench message from six scalar components.
 
@@ -446,7 +445,7 @@ class WrenchProcessor:
         t = Vector3(x=float(a[3]), y=float(a[4]), z=float(a[5]))
         return Wrench(force=f, torque=t)
 
-    def process(self, w: Wrench, dt: float) -> Tuple[Wrench, Wrench]:
+    def process(self, w: Wrench, dt: float) -> tuple[Wrench, Wrench]:
         """
         Filter a wrench and compute its smoothed first derivative.
 
@@ -491,7 +490,7 @@ class ForceTorqueFilterNode(Node):
     """
     Internal processor that performs filtering and derivative computation.
     """
-    last_stamp_ns: Optional[int] = None
+    last_stamp_ns: int | None = None
     """
     Timestamp of the last processed message in nanoseconds.
     """

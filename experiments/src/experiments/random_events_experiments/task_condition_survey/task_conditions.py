@@ -23,7 +23,7 @@ from __future__ import annotations
 import enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing_extensions import Any, ClassVar, Iterator, Optional
+from typing_extensions import Any, ClassVar, Iterator
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import (
@@ -220,13 +220,17 @@ class StatedRelation(Predicate, ABC):
         raise ConditionIsNotObservable(stated_under=self.stated_under)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :return: The clause *"<objects> satisfies <relation>"*, which is all a relation read
             from source says: the suite names the requirement and the objects meet it.
         """
         return clause(
-            Noun(fields["objects"]), Verb("satisfy"), Noun(fields["stated_under"])
+            Noun(content=fields["objects"]),
+            Verb(lemma="satisfy"),
+            Noun(content=fields["stated_under"]),
         )
 
 
@@ -302,13 +306,15 @@ class MeasuredValue(SymbolicFunction, ABC):
         raise ConditionIsNotObservable(stated_under=self.stated_under)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :return: The noun phrase naming the value, as *"the <kind> value of <measure> and
             <objects>"*.
         """
         return FunctionVerbalizationTemplates.possessive(
-            cls, fields["stated_under"], fields["objects"]
+            fields["stated_under"], fields["objects"], function_class=cls
         )
 
 
@@ -379,11 +385,17 @@ class UnreadCondition(Predicate):
         raise ConditionIsNotObservable(stated_under=self.description._value_)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :return: The clause *"<description> stays unread"*.
         """
-        return clause(Noun(fields["description"]), Verb("stay"), Noun.bare("unread"))
+        return clause(
+            Noun(content=fields["description"]),
+            Verb(lemma="stay"),
+            Noun.bare(head="unread"),
+        )
 
 
 # %% a condition that holds always or never
@@ -413,7 +425,7 @@ class ConstantCondition(enum.Enum):
         return Literal(_value_=self.value, _name__=self.name.lower())
 
     @classmethod
-    def stated_by(cls, expression: SymbolicExpression) -> Optional[ConstantCondition]:
+    def stated_by(cls, expression: SymbolicExpression) -> ConstantCondition | None:
         """
         :param expression: An EQL condition.
         :return: The outcome it states outright, or ``None`` when it depends on a scene.
@@ -444,7 +456,7 @@ class StatedProposition(ABC):
     """
 
     @classmethod
-    def stated_by(cls, expression: SymbolicExpression) -> Optional[StatedProposition]:
+    def stated_by(cls, expression: SymbolicExpression) -> StatedProposition | None:
         """
         :param expression: A node of an EQL condition.
         :return: The proposition it states, or ``None`` when it composes others rather than
@@ -464,9 +476,9 @@ class StatedProposition(ABC):
     ) -> bool:
         """
         EQL represents a predicate or a symbolic function applied to variables as an
-        :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable` naming the
-        class rather than as an instance of it, so what a node applies is read off that
-        name.
+        :class:`~krrood.entity_query_language.core.variable.InstantiatedVariable` whose
+        factory is the class rather than as an instance of it, so what a node applies is
+        read off that factory.
 
         :param expression: A node of an EQL condition.
         :param applied: The predicate or symbolic function the node may apply.
@@ -474,8 +486,8 @@ class StatedProposition(ABC):
         """
         return (
             isinstance(expression, InstantiatedVariable)
-            and isinstance(expression._type_, type)
-            and issubclass(expression._type_, applied)
+            and isinstance(expression._factory_, type)
+            and issubclass(expression._factory_, applied)
         )
 
     @property
@@ -516,7 +528,7 @@ class AssertedRelation(StatedProposition):
 
     @property
     def kind(self) -> PredicateKind:
-        return self.expression._type_.kind
+        return self.expression._factory_.kind
 
     @property
     def stated_under(self) -> str:
@@ -542,7 +554,7 @@ class MeasuredComparison(StatedProposition):
     """
 
     @staticmethod
-    def measure_of(comparison: Comparator) -> Optional[InstantiatedVariable]:
+    def measure_of(comparison: Comparator) -> InstantiatedVariable | None:
         """
         :param comparison: A comparison a condition states.
         :return: The measured value it compares, or ``None`` when it compares none.
@@ -573,7 +585,7 @@ class MeasuredComparison(StatedProposition):
 
     @property
     def kind(self) -> PredicateKind:
-        return self.measure._type_.kind
+        return self.measure._factory_.kind
 
     @property
     def stated_under(self) -> str:

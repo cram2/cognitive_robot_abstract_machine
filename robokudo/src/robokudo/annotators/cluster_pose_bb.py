@@ -28,7 +28,7 @@ import cv2
 import numpy.linalg
 import open3d as o3d
 from py_trees.common import Status
-from typing_extensions import TYPE_CHECKING, List, Tuple
+from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
@@ -79,7 +79,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                 In that case, x will always point in the direction of the largest side (extent) of the bounding box
                 """
 
-                self.bounding_box_visualization_color: Tuple[int, int, int] = (0, 0, 0)
+                self.bounding_box_visualization_color: tuple[int, int, int] = (0, 0, 0)
                 """RGB color for box visualization"""
 
         # Overwrite the parameters explicitly to enable auto-completion
@@ -99,8 +99,8 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def adjust_bb_orientation_by_bb_size(
-        self, pose_orientation: npt.NDArray, bounding_box_extents: List
-    ) -> Tuple[npt.NDArray, List]:
+        self, pose_orientation: npt.NDArray, bounding_box_extents: list
+    ) -> tuple[npt.NDArray, list]:
         """Align bounding box axes with extent dimensions.
 
         Reorients the bounding box so that:

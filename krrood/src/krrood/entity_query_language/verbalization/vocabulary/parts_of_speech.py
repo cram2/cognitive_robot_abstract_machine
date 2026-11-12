@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from typing_extensions import ClassVar, Iterable, Protocol, Union, runtime_checkable
+from typing_extensions import ClassVar, Iterable, Protocol, runtime_checkable
 
 from krrood.entity_query_language.predicate import VerbalizationField
 from krrood.entity_query_language.utils import camel_case_to_words
@@ -57,7 +57,7 @@ class ClauseElement(ABC):
         """:return: the fragment this element contributes to the clause."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Noun(ClauseElement):
     """
     A noun constituent — a predicate
@@ -65,7 +65,7 @@ class Noun(ClauseElement):
     rendered fragment, or a literal noun given by its *head word only*.
     """
 
-    content: Union[str, "ClauseConstituent"]
+    content: str | ClauseConstituent
     """
     A literal noun *head* (the article is a feature, not part of the text — write
     ``"instance"``, not ``"an instance"``), or any constituent (a field, a rendered
@@ -85,7 +85,7 @@ class Noun(ClauseElement):
         chosen by the determiner pass (*"a"* / *"an"*) and the head pluralises and reduces with
         coreference — else the constituent's own fragment.
 
-        >>> Noun("instance").as_fragment().definiteness
+        >>> Noun(content="instance").as_fragment().definiteness
         <Definiteness.INDEFINITE: 'indefinite'>
         """
         if isinstance(self.content, str):
@@ -95,25 +95,25 @@ class Noun(ClauseElement):
         return self.content.as_fragment()
 
     @classmethod
-    def the(cls, head: str) -> "Noun":
+    def the(cls, *, head: str) -> Noun:
         """:return: a definite literal noun (*"the name"*).
 
-        >>> Noun.the("name").as_fragment().definiteness
+        >>> Noun.the(head="name").as_fragment().definiteness
         <Definiteness.DEFINITE: 'definite'>
         """
-        return cls(head, definiteness=Definiteness.DEFINITE)
+        return cls(content=head, definiteness=Definiteness.DEFINITE)
 
     @classmethod
-    def bare(cls, head: str) -> "Noun":
+    def bare(cls, *, head: str) -> Noun:
         """:return: a bare literal noun with no article (*"of type"*, not *"of a type"*).
 
-        >>> Noun.bare("type").as_fragment().definiteness
+        >>> Noun.bare(head="type").as_fragment().definiteness
         <Definiteness.BARE: 'bare'>
         """
-        return cls(head, definiteness=Definiteness.BARE)
+        return cls(content=head, definiteness=Definiteness.BARE)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Verb(ClauseElement):
     """
     A lexical verb given as its lemma.
@@ -136,13 +136,13 @@ class Verb(ClauseElement):
     def as_fragment(self) -> RoleFragment:
         """:return: a ``VERB``-role leaf carrying the lemma for the morphology pass to inflect.
 
-        >>> Verb("work").as_fragment().role
+        >>> Verb(lemma="work").as_fragment().role
         <SemanticRole.VERB: 'verb'>
         """
         return RoleFragment(text=self.lemma, role=SemanticRole.VERB, number=self.number)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Adjective(ClauseElement):
     """
     A predicative adjective complement after a copula (*"is **reachable**"*).
@@ -156,13 +156,13 @@ class Adjective(ClauseElement):
     def as_fragment(self) -> WordFragment:
         """:return: a plain word leaf for the adjective.
 
-        >>> Adjective("reachable").as_fragment().text
+        >>> Adjective(word="reachable").as_fragment().text
         'reachable'
         """
         return WordFragment(text=self.word)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Copula(ClauseElement):
     """
     The copula *"is"* of a predicative clause — realised for number (*"is"* / *"are"*)
@@ -184,7 +184,7 @@ class Copula(ClauseElement):
         return Copulas.IS.as_fragment()
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class OneOf(ClauseElement):
     """
     A bounded membership set — *"one of A, B, or C"* — over a collection of admissible
@@ -199,7 +199,7 @@ class OneOf(ClauseElement):
     domain-constrained variable uses.
     """
 
-    members: Union[Iterable, VerbalizationField]
+    members: Iterable | VerbalizationField
     """
     The admissible values — a predicate
     :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to a
@@ -214,7 +214,7 @@ class OneOf(ClauseElement):
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
         ...     flatten_fragment_to_plain_text,
         ... )
-        >>> flatten_fragment_to_plain_text(OneOf((int, str)).as_fragment())
+        >>> flatten_fragment_to_plain_text(OneOf(members=(int, str)).as_fragment())
         'one of Integer or Text'
         """
         members = list(
@@ -224,7 +224,7 @@ class OneOf(ClauseElement):
         )
         listed = one_of(
             [
-                RoleFragment.for_value(member)
+                RoleFragment.for_value(value=member)
                 for member in members[: MAX_SET_MEMBERS + 1]
             ]
         )
@@ -242,7 +242,7 @@ class OneOf(ClauseElement):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class DisjunctivePhrase(ClauseElement):
     """
     A disjunctive coordination of admissible values — *"A, B, or C"* — over a
@@ -256,7 +256,7 @@ class DisjunctivePhrase(ClauseElement):
     bound to a single (non- iterable) value keeps that value's own rendered fragment.
     """
 
-    members: Union[Iterable, VerbalizationField]
+    members: Iterable | VerbalizationField
     """
     The admissible values — a predicate
     :class:`~krrood.entity_query_language.predicate.VerbalizationField` bound to an
@@ -269,7 +269,7 @@ class DisjunctivePhrase(ClauseElement):
         >>> from krrood.entity_query_language.verbalization.fragments.base import (
         ...     flatten_fragment_to_plain_text,
         ... )
-        >>> flatten_fragment_to_plain_text(DisjunctivePhrase((int, str)).as_fragment())
+        >>> flatten_fragment_to_plain_text(DisjunctivePhrase(members=(int, str)).as_fragment())
         'Integer or Text'
         """
         value = (
@@ -278,11 +278,13 @@ class DisjunctivePhrase(ClauseElement):
             else self.members
         )
         if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
-            return Noun(self.members).as_fragment()
-        return disjunctive_phrase([RoleFragment.for_value(member) for member in value])
+            return Noun(content=self.members).as_fragment()
+        return disjunctive_phrase(
+            [RoleFragment.for_value(value=member) for member in value]
+        )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ConjunctivePhrase(ClauseElement):
     """
     A conjunctive coordination of clause constituents — *"A, B, and C"* — the
@@ -310,7 +312,7 @@ class ConjunctivePhrase(ClauseElement):
         ... )
         >>> flatten_fragment_to_plain_text(
         ...     ConjunctivePhrase(
-        ...         [WordFragment(text="a"), WordFragment(text="b")]
+        ...         items=[WordFragment(text="a"), WordFragment(text="b")]
         ...     ).as_fragment()
         ... )
         'a and b'
@@ -367,8 +369,8 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     ...     flatten_fragment_to_plain_text, WordFragment,
     ... )
     >>> flatten_fragment_to_plain_text(
-    ...     clause(Noun(WordFragment(text="an Employee")), Verb("work"), Prepositions.IN,
-    ...            Noun(WordFragment(text="a Department")))
+    ...     clause(Noun(content=WordFragment(text="an Employee")), Verb(lemma="work"), Prepositions.IN,
+    ...            Noun(content=WordFragment(text="a Department")))
     ... )
     'an Employee work in a Department'
     """
@@ -376,7 +378,7 @@ def clause(*constituents: ClauseConstituent) -> Clause:
     coordinated = isinstance(leading, ConjunctivePhrase)
     if coordinated:
         items = list(leading.items)
-        constituents = (ConjunctivePhrase(items), *constituents[1:])
+        constituents = (ConjunctivePhrase(items=items), *constituents[1:])
     parts = [constituent.as_fragment() for constituent in constituents]
     if coordinated and len(items) >= 2 and len(parts) > 1:
         parts[1] = apply_subject_verb_agreement(parts[1], GrammaticalNumber.PLURAL)
@@ -420,7 +422,7 @@ class FunctionVerbalizationTemplates:
 
     @staticmethod
     def possessive(
-        function_class: type, *operands: ClauseConstituent
+        *operands: ClauseConstituent, function_class: type
     ) -> VerbalizationFragment:
         """
         Build *"the <noun> of <operands>"* — the operands read as a possessive genitive
@@ -440,26 +442,26 @@ class FunctionVerbalizationTemplates:
         ...     realize_tree,
         ... )
         >>> flatten_fragment_to_plain_text(realize_tree(
-        ...     FunctionVerbalizationTemplates.possessive(type("GetQuarter", (), {}))
+        ...     FunctionVerbalizationTemplates.possessive(function_class=type("GetQuarter", (), {}))
         ... ))
         'quarter'
         >>> flatten_fragment_to_plain_text(realize_tree(
         ...     FunctionVerbalizationTemplates.possessive(
-        ...         type("RemainingLoad", (), {}), Noun.the("capacity")
+        ...         Noun.the(head="capacity"), function_class=type("RemainingLoad", (), {})
         ...     )
         ... ))
         'the remaining load of the capacity'
         """
         noun = function_as_noun(function_class.__name__)
         if not operands:
-            return Noun.bare(noun).as_fragment()
+            return Noun.bare(head=noun).as_fragment()
         return possessive_path(
-            [PathStep(noun)], ConjunctivePhrase(operands).as_fragment()
+            [PathStep(name=noun)], ConjunctivePhrase(items=operands).as_fragment()
         )
 
     @staticmethod
     def custom_relation(
-        function_class: type, relation: ClauseConstituent, *operands: ClauseConstituent
+        *operands: ClauseConstituent, function_class: type, relation: ClauseConstituent
     ) -> VerbalizationFragment:
         """
         Build *"the <noun> <relation> <operands...>"* — the general value noun
@@ -483,19 +485,19 @@ class FunctionVerbalizationTemplates:
         ... )
         >>> flatten_fragment_to_plain_text(realize_tree(
         ...     FunctionVerbalizationTemplates.custom_relation(
-        ...         type("InheritancePathLength", (), {}),
-        ...         Prepositions.BETWEEN,
-        ...         Noun.the("begin"),
-        ...         Noun.the("end"),
+        ...         Noun.the(head="begin"),
+        ...         Noun.the(head="end"),
+        ...         function_class=type("InheritancePathLength", (), {}),
+        ...         relation=Prepositions.BETWEEN,
         ...     )
         ... ))
         'the inheritance path length between the begin and the end'
         """
         return PhraseFragment(
             parts=[
-                Noun.the(function_as_noun(function_class.__name__)).as_fragment(),
+                Noun.the(head=function_as_noun(function_class.__name__)).as_fragment(),
                 relation.as_fragment(),
-                ConjunctivePhrase(operands).as_fragment(),
+                ConjunctivePhrase(items=operands).as_fragment(),
             ]
         )
 
@@ -542,13 +544,13 @@ def predicate_clause(
     >>> def render(fragment):
     ...     return flatten_fragment_to_plain_text(realize_tree(fragment))
     >>> class IsReachable: pass
-    >>> render(predicate_clause(IsReachable, Noun("Robot")))
+    >>> render(predicate_clause(IsReachable, Noun(content="Robot")))
     'a Robot is reachable'
     >>> class ConnectsTo: pass
-    >>> render(predicate_clause(ConnectsTo, Noun("body"), Noun("gripper")))
+    >>> render(predicate_clause(ConnectsTo, Noun(content="body"), Noun(content="gripper")))
     'a body connects to a gripper'
     >>> class IsOneMonth: pass
-    >>> render(predicate_clause(IsOneMonth, Noun.the("begin"), Noun.the("end")))
+    >>> render(predicate_clause(IsOneMonth, Noun.the(head="begin"), Noun.the(head="end")))
     'one month holds given the begin and the end'
     """
     head, *rest = camel_case_to_words(predicate_class.__name__).split()
@@ -556,17 +558,19 @@ def predicate_clause(
     is_copular = morphology.verb_lemma(head) == Copula.lemma
     if is_copular and objects and (not rest or rest[-1] not in Prepositions.texts()):
         operands = ConjunctivePhrase(
-            [Noun(subject), *(Noun(obj) for obj in objects)]
+            items=[Noun(content=subject), *(Noun(content=obj) for obj in objects)]
         ).as_fragment()
         return clause(
-            Noun(PhraseFragment(parts=complement)),
-            Verb("hold"),
+            Noun(content=PhraseFragment(parts=complement)),
+            Verb(lemma="hold"),
             WordFragment(text="given"),
             operands,
         )
     predicate = (
         [Copula(), *complement]
         if is_copular
-        else [Verb(morphology.verb_lemma(head)), *complement]
+        else [Verb(lemma=morphology.verb_lemma(head)), *complement]
     )
-    return clause(Noun(subject), *predicate, *(Noun(obj) for obj in objects))
+    return clause(
+        Noun(content=subject), *predicate, *(Noun(content=obj) for obj in objects)
+    )

@@ -1,13 +1,14 @@
 """
-The montessori demo carried out against MuJoCo physics, in a MuJoCo viewer. Run it from
-this folder::
+The montessori demo carried out against MuJoCo physics, in a MuJoCo viewer.
+
+Run it from this folder::
 
     python mujoco_demo.py
 
 The physics is stepped from the control loop rather than from a thread of its own: every
 tick of the controller writes its command into the world, the servos take it as their set
 point, and the physics advances one cycle before the next tick reads the world back. That
-is what :class:`~coraplex.execution_environment.PhysicallySimulatedRobot` has every
+is what :class:`~coraplex.plans.executors.PhysicallySimulatedPlanExecutor` has every
 motion of a plan do.
 """
 
@@ -18,8 +19,9 @@ from datetime import timedelta
 
 import mujoco
 
-from coraplex.datastructures.dataclasses import Context
-from coraplex.execution_environment import PhysicallySimulatedRobot
+from coraplex.plans.context_extensions import RobotAccess
+from coraplex.plans.executors import PhysicallySimulatedPlanExecutor
+from cramph.context import StatechartContext
 from demo import DemoRunner, ShapeSortingPlan
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.robots.tracy import Tracy
@@ -44,7 +46,8 @@ class MujocoRunner(DemoRunner):
     friction_cone: mujoco.mjtCone = mujoco.mjtCone.mjCONE_ELLIPTIC
     """
     The friction cone the contacts use: the elliptic cone is the exact one, where the
-    default pyramid only approximates it and lets a squeezed piece creep between the pads.
+    default pyramid only approximates it and lets a squeezed piece creep between the
+    pads.
     """
 
     impedance_ratio: float = 10.0
@@ -69,9 +72,6 @@ class MujocoRunner(DemoRunner):
     def run(self) -> None:
         world = self.scene.build_world()
         [tracy] = world.get_semantic_annotations_by_type(Tracy)
-        plan = ShapeSortingPlan(scene=self.scene).build(
-            Context(world=world, robot=tracy, evaluate_conditions=False)
-        )
         simulation = MujocoSim(
             world=world,
             headless=self.headless,
@@ -83,8 +83,13 @@ class MujocoRunner(DemoRunner):
         simulation.start_stepped_simulation()
         try:
             simulation.step_simulation(self.settling_duration)
-            with PhysicallySimulatedRobot(simulation=simulation):
-                plan.perform()
+            executor = PhysicallySimulatedPlanExecutor(
+                StatechartContext.with_extensions(world, [RobotAccess(tracy)]),
+                simulation=simulation,
+            )
+            executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+            executor.execute()
+            executor.close()
         finally:
             simulation.stop_simulation()
 

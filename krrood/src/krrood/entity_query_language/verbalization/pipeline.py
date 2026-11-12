@@ -5,7 +5,7 @@ import tempfile
 import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing_extensions import TYPE_CHECKING, Optional
+from typing_extensions import TYPE_CHECKING
 
 from jinja2 import Template
 
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def directive_for_backend(backend: Optional[QueryBackend]) -> Optional[Directive]:
+def directive_for_backend(backend: QueryBackend | None) -> Directive | None:
     """
     Resolve the opening directive implied by an evaluating backend.
 
@@ -96,7 +96,7 @@ def _is_ipython() -> bool:
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VerbalizationPipeline:
     """
     Pairs a fragment builder with a renderer to produce a finished string in one output mode:
@@ -117,9 +117,10 @@ class VerbalizationPipeline:
 
     def verbalize(
         self,
+        *,
         expression: SymbolicExpression,
-        services: Optional[MicroplanningServices] = None,
-        backend: Optional[QueryBackend] = None,
+        services: MicroplanningServices | None = None,
+        backend: QueryBackend | None = None,
     ) -> str:
         """
         Verbalize *expression* to a string using this pipeline's renderer.
@@ -135,7 +136,7 @@ class VerbalizationPipeline:
         It runs the full path — build the fragment tree, then render it — whereas
         :meth:`verbalize_fragment` renders an already-built fragment.
 
-        >>> VerbalizationPipeline.plain().verbalize(a(entity(variable(Robot, []))))
+        >>> VerbalizationPipeline.plain().verbalize(expression=a(entity(variable(Robot, []))))
         'Find a Robot'
         """
         # Match/Distribution/Probability all resolve, via _get_expression_, to the
@@ -145,15 +146,17 @@ class VerbalizationPipeline:
         if isinstance(target, Query):
             target.build()
         fragment = self._verbalizer.build(
-            expression, services, performative=directive_for_backend(backend)
+            expression=expression,
+            services=services,
+            performative=directive_for_backend(backend),
         )
-        return self.verbalize_fragment(fragment)
+        return self.verbalize_fragment(fragment=fragment)
 
     def _is_html_renderer(self) -> bool:
         """:return: ``True`` when this pipeline's renderer emits HTML."""
         return isinstance(self.renderer.formatter, HTMLFormatter)
 
-    def verbalize_fragment(self, fragment: VerbalizationFragment) -> str:
+    def verbalize_fragment(self, *, fragment: VerbalizationFragment) -> str:
         """
         Render a pre-built fragment using this pipeline's renderer.
 
@@ -166,31 +169,31 @@ class VerbalizationPipeline:
         :class:`EQLVerbalizer`, it applies this pipeline's renderer (and HTML wrapping) without
         re-building — the step :meth:`verbalize` calls after building.
 
-        >>> tree = EQLVerbalizer().build(a(entity(variable(Robot, []))))
-        >>> VerbalizationPipeline.plain().verbalize_fragment(tree)
+        >>> tree = EQLVerbalizer().build(expression=a(entity(variable(Robot, []))))
+        >>> VerbalizationPipeline.plain().verbalize_fragment(fragment=tree)
         'Find a Robot'
         """
-        result = self.renderer.render(fragment)
+        result = self.renderer.render(fragment=fragment)
         if self._is_html_renderer():
             return _HTML_CELL_WRAPPER.render(body=result)
         return result
 
-    def display(self, expression: SymbolicExpression) -> None:
+    def display(self, *, expression: SymbolicExpression) -> None:
         """
         Render *expression* and display it in the current environment — inline in
         Jupyter / IPython, or in the default browser elsewhere.
 
         :param expression: Any EQL expression or query.
         """
-        self.display_fragment(self._verbalizer.build(expression))
+        self.display_fragment(fragment=self._verbalizer.build(expression=expression))
 
-    def display_fragment(self, fragment: VerbalizationFragment) -> None:
+    def display_fragment(self, *, fragment: VerbalizationFragment) -> None:
         """
         Display a pre-built fragment, with the same environment routing as ``display``.
 
         :param fragment: Root of the fragment tree to display.
         """
-        raw_html = self.renderer.render(fragment)
+        raw_html = self.renderer.render(fragment=fragment)
         if _is_ipython():
             from IPython.display import display as _ipython_display, HTML
 
@@ -221,13 +224,14 @@ class VerbalizationPipeline:
 
         :return: A plain-text pipeline.
         """
-        return cls(ParagraphRenderer(PlainFormatter()))
+        return cls(renderer=ParagraphRenderer(formatter=PlainFormatter()))
 
     @classmethod
     def ansi(
         cls,
+        *,
         hierarchical: bool = False,
-        link_resolver: Optional[SourceLinkResolver] = None,
+        link_resolver: SourceLinkResolver | None = None,
     ) -> VerbalizationPipeline:
         """
         Create an ANSI true-colour (24-bit) pipeline for terminal display.
@@ -249,17 +253,18 @@ class VerbalizationPipeline:
             )
             link_resolver = None
         renderer: FragmentRenderer = (
-            HierarchicalRenderer(formatter, link_resolver)
+            HierarchicalRenderer(formatter=formatter, link_resolver=link_resolver)
             if hierarchical
-            else ParagraphRenderer(formatter, link_resolver)
+            else ParagraphRenderer(formatter=formatter, link_resolver=link_resolver)
         )
-        return cls(renderer)
+        return cls(renderer=renderer)
 
     @classmethod
     def html(
         cls,
+        *,
         hierarchical: bool = False,
-        link_resolver: Optional[SourceLinkResolver] = None,
+        link_resolver: SourceLinkResolver | None = None,
     ) -> VerbalizationPipeline:
         """
         Create an HTML ``<span>`` colour pipeline for Jupyter / inline-HTML rendering.
@@ -273,15 +278,15 @@ class VerbalizationPipeline:
         """
         formatter = HTMLFormatter()
         renderer = (
-            HierarchicalRenderer(formatter, link_resolver)
+            HierarchicalRenderer(formatter=formatter, link_resolver=link_resolver)
             if hierarchical
-            else ParagraphRenderer(formatter, link_resolver)
+            else ParagraphRenderer(formatter=formatter, link_resolver=link_resolver)
         )
-        return cls(renderer)
+        return cls(renderer=renderer)
 
 
 def verbalize_expression(
-    expression: SymbolicExpression, backend: Optional[QueryBackend] = None
+    expression: SymbolicExpression, backend: QueryBackend | None = None
 ) -> str:
     """
     Verbalize any EQL expression into a plain-text English phrase.
@@ -298,4 +303,6 @@ def verbalize_expression(
     >>> verbalize_expression(a(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
     """
-    return VerbalizationPipeline.plain().verbalize(expression, backend=backend)
+    return VerbalizationPipeline.plain().verbalize(
+        expression=expression, backend=backend
+    )

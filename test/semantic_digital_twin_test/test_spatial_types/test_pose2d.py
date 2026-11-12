@@ -5,15 +5,12 @@ import pytest
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import (
-    Point2,
-    Pose2D,
-    Pose,
-    Point3,
-    Quaternion,
-)
-from semantic_digital_twin.spatial_types.spatial_types import RotationMatrix
+from krrood_spatial_math.spatial_types import Point2, Pose2D, Pose, Point3, Quaternion
+from krrood_spatial_math.spatial_types import RotationMatrix
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+from .reference_implementations import quaternion_from_rpy
+from .utils_for_tests import compare_orientations
 
 
 class TestPose2DConstruction:
@@ -29,11 +26,18 @@ class TestPose2DConstruction:
         assert p.y.to_np() == pytest.approx(2.0)
         assert p.yaw.to_np() == pytest.approx(math.pi / 2)
 
-    def test_fixed_z_roll_pitch(self):
+    def test_has_no_height_or_tilt(self):
+        """
+        A 2D pose has no height or tilt of its own, so :class:`Pose2D` does not carry
+        ``z``, ``roll`` or ``pitch`` at all.
+        """
         p = Pose2D.from_xy_yaw(x=1, y=2, yaw=0.5)
-        assert p.z == 0
-        assert p.roll == 0
-        assert p.pitch == 0
+        with pytest.raises(AttributeError):
+            p.z
+        with pytest.raises(AttributeError):
+            p.roll
+        with pytest.raises(AttributeError):
+            p.pitch
 
     def test_shape(self):
         p = Pose2D.from_xy_yaw(x=1, y=2, yaw=0.5)
@@ -105,7 +109,7 @@ class TestPose2DToPose:
         assert np.allclose(r.to_np()[:3, :3], np.eye(3), atol=1e-6)
 
     def test_to_homogeneous_matrix(self):
-        from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+        from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
         p2 = Pose2D.from_xy_yaw(x=1, y=2, yaw=0)
         m = p2.homogeneous_matrix
@@ -126,9 +130,10 @@ class TestPose2DToPose:
         assert p2.position.reference_frame is frame
 
     def test_orientation_property(self):
-        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0)
+        p2 = Pose2D.from_xy_yaw(x=0, y=0, yaw=0.3)
         q = p2.orientation
         assert isinstance(q, Quaternion)
+        compare_orientations(q.to_np(), quaternion_from_rpy(0, 0, 0.3))
 
 
 class TestPose2DFromPosition:
@@ -168,12 +173,23 @@ class TestPose2DFromPose:
         p2 = Pose2D.from_pose(pose)
         assert p2.reference_frame is frame
 
-    def test_from_pose_override_reference_frame(self):
-        frame1 = Body(name=PrefixedName("a"))
-        frame2 = Body(name=PrefixedName("b"))
-        pose = Pose.from_xyz_rpy(0, 0, 0, 0, 0, 0, reference_frame=frame1)
-        p2 = Pose2D.from_pose(pose, reference_frame=frame2)
-        assert p2.reference_frame is frame2
+    def test_from_pose_transforms_into_another_frame(self, mini_world: World):
+        """
+        Asking for another frame expresses the pose in that frame instead of attaching
+        the frame to the pose's own coordinates.
+        """
+        mini_world.connections[0].position = math.pi / 2
+        root, tip = mini_world.root, mini_world.bodies[1]
+        tip_pose = Pose.from_xyz_rpy(1, 0, 2, 0, 0, 0.3, reference_frame=tip)
+
+        p2 = Pose2D.from_pose(tip_pose, plane_frame=root)
+
+        assert p2.reference_frame is root
+        np.testing.assert_allclose(
+            p2.to_np(),
+            Pose2D.from_pose(mini_world.transform(tip_pose, root)).to_np(),
+            atol=1e-12,
+        )
 
 
 class TestPose2DSymbolic:

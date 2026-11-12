@@ -44,7 +44,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     clause,
     predicate_clause,
 )
-from typing_extensions import Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing_extensions import Iterable, Sequence, Union
 
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -114,7 +114,7 @@ class NamedKind(Enum):
     SIDE_TABLE = SideTable
 
     @classmethod
-    def recognised_from_the_joints(cls) -> Tuple[NamedKind, ...]:
+    def recognised_from_the_joints(cls) -> tuple[NamedKind, ...]:
         """
         The kinds a joint gives away, which a name is therefore never asked to decide.
 
@@ -153,7 +153,7 @@ annotation class.
 # %% what a body's name asserts
 
 
-def _name_words(body: Body, word_separator: str = "_") -> List[str]:
+def _name_words(body: Body, word_separator: str = "_") -> list[str]:
     """
     The words of a body's name, in order, with numbering removed.
 
@@ -193,7 +193,7 @@ class NameMatch:
     """
 
 
-def _match_name(words: Sequence[str], kind: AnnotationKind) -> Optional[NameMatch]:
+def _match_name(words: Sequence[str], kind: AnnotationKind) -> NameMatch | None:
     """
     What ``words`` say about ``kind``, or ``None`` when they do not mention it.
 
@@ -215,7 +215,7 @@ def _match_name(words: Sequence[str], kind: AnnotationKind) -> Optional[NameMatc
 
 def asserted_kind(
     words: Sequence[str], candidates: Iterable[AnnotationKind]
-) -> Optional[AnnotationKind]:
+) -> AnnotationKind | None:
     """
     The kind a name settles on, or ``None`` when it mentions none of ``candidates``.
 
@@ -256,7 +256,7 @@ class IsNamedAfter(Predicate):
     The body whose name is read.
     """
 
-    annotation_type: Type[SemanticAnnotation]
+    annotation_type: type[SemanticAnnotation]
     """
     The type the name has to settle on.
     """
@@ -266,13 +266,15 @@ class IsNamedAfter(Predicate):
         return kind is not None and kind.value is self.annotation_type
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after <annotation type>"*.
         """
         return predicate_clause(
-            cls, Noun(fields["body"]), Noun(fields["annotation_type"])
+            cls, Noun(content=fields["body"]), Noun(content=fields["annotation_type"])
         )
 
 
@@ -293,12 +295,14 @@ class NamesARecognisedKind(Predicate):
         return asserted_kind(_name_words(self.body), NamedKind) is not None
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> names a recognised kind"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 @dataclass(eq=False)
@@ -321,12 +325,14 @@ class IsNamedAfterFurniture(Predicate):
         return kind is not None and kind.is_furniture
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is named after furniture"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 @dataclass(eq=False)
@@ -341,7 +347,7 @@ class NamedContainerKind(SymbolicFunction):
     The body whose branch is read.
     """
 
-    def __call__(self) -> Optional[ContainerKind]:
+    def __call__(self) -> ContainerKind | None:
         for part in self.body._world.get_kinematic_structure_entities_of_branch(
             self.body
         ):
@@ -351,12 +357,16 @@ class NamedContainerKind(SymbolicFunction):
         return None
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the named container kind of <body>"*.
         """
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 # %% what the rules leave alone
@@ -393,12 +403,14 @@ class IsPartOfARobot(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> is part of a robot"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 # %% the geometry a body carries
@@ -422,12 +434,14 @@ class HasCollisionGeometry(Predicate):
         return self.body.has_collision()
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has collision geometry"*.
         """
-        return predicate_clause(cls, Noun(fields["body"]))
+        return predicate_clause(cls, Noun(content=fields["body"]))
 
 
 # %% identities the world already holds
@@ -448,7 +462,7 @@ class HasAnotherAnnotation(Predicate):
     The body whose identity is looked up.
     """
 
-    annotation_type: Type[SemanticAnnotation]
+    annotation_type: type[SemanticAnnotation]
     """
     The type being inferred, which therefore does not count as another one.
     """
@@ -467,25 +481,27 @@ class HasAnotherAnnotation(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> has an annotation besides <annotation type>"*, which
             names the annotations it was looked up in no more than the rule does.
         """
         return clause(
-            Noun(fields["body"]),
-            Verb("have"),
-            Noun("annotation"),
+            Noun(content=fields["body"]),
+            Verb(lemma="have"),
+            Noun(content="annotation"),
             Prepositions.BESIDES,
-            Noun(fields["annotation_type"]),
+            Noun(content=fields["annotation_type"]),
         )
 
 
 # %% the parts a container holds
 
 
-def _holder_of(body: Body) -> Optional[Body]:
+def _holder_of(body: Body) -> Body | None:
     """
     The nearest body above this one that is a real part of the furniture.
 
@@ -506,8 +522,8 @@ def _holder_of(body: Body) -> Optional[Body]:
 def _parts_held_by(
     body: Body,
     annotations: Sequence[SemanticAnnotation],
-    part_type: Type[SemanticAnnotation],
-) -> List:
+    part_type: type[SemanticAnnotation],
+) -> list:
     """
     The annotations of ``part_type`` whose body opens out of ``body``.
 
@@ -527,7 +543,7 @@ def _parts_held_by(
 
 
 @symbolic_function
-def drawers_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> List[Drawer]:
+def drawers_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> list[Drawer]:
     """
     :param body: The body the drawers have to slide out of.
     :param annotations: The annotations inferred so far.
@@ -537,7 +553,7 @@ def drawers_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> List[Dr
 
 
 @symbolic_function
-def doors_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> List[Door]:
+def doors_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> list[Door]:
     """
     :param body: The body the doors have to swing off.
     :param annotations: The annotations inferred so far.
@@ -569,19 +585,25 @@ class HoldsOpenableParts(Predicate):
         )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The clause *"<body> holds openable parts"*, which names the annotations
             it looked them up in no more than the rule does.
         """
-        return clause(Noun(fields["body"]), Verb("hold"), Noun.bare("openable parts"))
+        return clause(
+            Noun(content=fields["body"]),
+            Verb(lemma="hold"),
+            Noun.bare(head="openable parts"),
+        )
 
 
 # %% graspable parts
 
 
-def handles(world: World) -> List[Handle]:
+def handles(world: World) -> list[Handle]:
     """
     Every body that is a grip for opening something.
 
@@ -599,10 +621,16 @@ def handles(world: World) -> List[Handle]:
         entity(inference(Handle)(root=grip))
         .where(
             joint.child == mount.parent,
-            HasCollisionGeometry(grip),
-            not_(IsPartOfARobot(grip)),
-            not_(IsNamedAfterFurniture(grip)),
-            not_(HasAnotherAnnotation(grip, Handle, world.semantic_annotations)),
+            HasCollisionGeometry(body=grip),
+            not_(IsPartOfARobot(body=grip)),
+            not_(IsNamedAfterFurniture(body=grip)),
+            not_(
+                HasAnotherAnnotation(
+                    body=grip,
+                    annotation_type=Handle,
+                    annotations=world.semantic_annotations,
+                )
+            ),
         )
         .tolist()
     )
@@ -611,7 +639,7 @@ def handles(world: World) -> List[Handle]:
 # %% things that open
 
 
-def drawers_with_a_handle(world: World) -> List[Drawer]:
+def drawers_with_a_handle(world: World) -> list[Drawer]:
     """
     :param world: The world to read.
     :return: Every body a slider pulls straight out of a container, opened by a handle.
@@ -622,8 +650,8 @@ def drawers_with_a_handle(world: World) -> List[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child, handle=handle))
         .where(
-            HasCollisionGeometry(slider.child),
-            not_(IsPartOfARobot(slider.child)),
+            HasCollisionGeometry(body=slider.child),
+            not_(IsPartOfARobot(body=slider.child)),
             mount.parent == slider.child,
             mount.child == handle.root,
         )
@@ -631,7 +659,7 @@ def drawers_with_a_handle(world: World) -> List[Drawer]:
     )
 
 
-def drawers_without_a_handle(world: World) -> List[Drawer]:
+def drawers_without_a_handle(world: World) -> list[Drawer]:
     """
     :param world: The world to read.
     :return: Every body a slider pulls straight out of a container that offers nothing to
@@ -643,8 +671,8 @@ def drawers_without_a_handle(world: World) -> List[Drawer]:
     return (
         entity(inference(Drawer)(root=slider.child))
         .where(
-            HasCollisionGeometry(slider.child),
-            not_(IsPartOfARobot(slider.child)),
+            HasCollisionGeometry(body=slider.child),
+            not_(IsPartOfARobot(body=slider.child)),
             not_(
                 exists(
                     mount,
@@ -656,7 +684,7 @@ def drawers_without_a_handle(world: World) -> List[Drawer]:
     )
 
 
-def doors_with_a_handle(world: World) -> List[Door]:
+def doors_with_a_handle(world: World) -> list[Door]:
     """
     :param world: The world to read.
     :return: Every body a hinge swings to uncover an opening, opened by a handle.
@@ -667,8 +695,8 @@ def doors_with_a_handle(world: World) -> List[Door]:
     return (
         entity(inference(Door)(root=hinge.child, handle=handle))
         .where(
-            HasCollisionGeometry(hinge.child),
-            not_(IsPartOfARobot(hinge.child)),
+            HasCollisionGeometry(body=hinge.child),
+            not_(IsPartOfARobot(body=hinge.child)),
             mount.parent == hinge.child,
             mount.child == handle.root,
         )
@@ -678,7 +706,7 @@ def doors_with_a_handle(world: World) -> List[Door]:
 
 def doors_without_a_handle(
     world: World, independent_joint_multiplier: float = 1.0
-) -> List[Door]:
+) -> list[Door]:
     """
     Every leaf of a folding front that carries no handle itself, but that another leaf
     follows and is opened by.
@@ -703,8 +731,8 @@ def doors_without_a_handle(
     return (
         entity(inference(Door)(root=hinge.child))
         .where(
-            HasCollisionGeometry(hinge.child),
-            not_(IsPartOfARobot(hinge.child)),
+            HasCollisionGeometry(body=hinge.child),
+            not_(IsPartOfARobot(body=hinge.child)),
             follower.parent == hinge.child,
             follower.multiplier != independent_joint_multiplier,
             mount.parent == follower.child,
@@ -726,7 +754,7 @@ def doors_without_a_handle(
 # %% containers
 
 
-def _containers_of_kind(world: World, kind: Optional[ContainerKind]) -> List[Cabinet]:
+def _containers_of_kind(world: World, kind: ContainerKind | None) -> list[Cabinet]:
     """
     :param world: The world to read.
     :param kind: The kind the body must resolve to, or ``None`` for a container that
@@ -747,16 +775,16 @@ def _containers_of_kind(world: World, kind: Optional[ContainerKind]) -> List[Cab
             )
         )
         .where(
-            not_(IsPartOfARobot(container)),
-            HoldsOpenableParts(container, annotations),
-            NamedContainerKind(container) == kind,
-            not_(NamesARecognisedKind(container)),
+            not_(IsPartOfARobot(body=container)),
+            HoldsOpenableParts(body=container, annotations=annotations),
+            NamedContainerKind(body=container) == kind,
+            not_(NamesARecognisedKind(body=container)),
         )
         .tolist()
     )
 
 
-def cabinets(world: World) -> List[Cabinet]:
+def cabinets(world: World) -> list[Cabinet]:
     """
     :param world: The world to read.
     :return: Every container whose name says nothing more than that it holds things.
@@ -764,7 +792,7 @@ def cabinets(world: World) -> List[Cabinet]:
     return _containers_of_kind(world, None)
 
 
-def wardrobes(world: World) -> List[Wardrobe]:
+def wardrobes(world: World) -> list[Wardrobe]:
     """
     :param world: The world to read.
     :return: Every container named as a wardrobe.
@@ -772,7 +800,7 @@ def wardrobes(world: World) -> List[Wardrobe]:
     return _containers_of_kind(world, ContainerKind.WARDROBE)
 
 
-def dishwashers(world: World) -> List[Dishwasher]:
+def dishwashers(world: World) -> list[Dishwasher]:
     """
     :param world: The world to read.
     :return: Every container named as a dishwasher, by itself or by one of its parts.
@@ -780,7 +808,7 @@ def dishwashers(world: World) -> List[Dishwasher]:
     return _containers_of_kind(world, ContainerKind.DISHWASHER)
 
 
-def fridges(world: World) -> List[Fridge]:
+def fridges(world: World) -> list[Fridge]:
     """
     :param world: The world to read.
     :return: Every container named as a fridge, by itself or by one of its parts.
@@ -792,8 +820,8 @@ def fridges(world: World) -> List[Fridge]:
 
 
 def _furniture_named_after(
-    world: World, annotation_type: Type[SemanticAnnotation]
-) -> List:
+    world: World, annotation_type: type[SemanticAnnotation]
+) -> list:
     """
     :param world: The world to read.
     :param annotation_type: The type the name must settle on.
@@ -805,15 +833,15 @@ def _furniture_named_after(
     return (
         entity(inference(annotation_type)(root=body))
         .where(
-            HasCollisionGeometry(body),
-            not_(IsPartOfARobot(body)),
-            IsNamedAfter(body, annotation_type),
+            HasCollisionGeometry(body=body),
+            not_(IsPartOfARobot(body=body)),
+            IsNamedAfter(body=body, annotation_type=annotation_type),
         )
         .tolist()
     )
 
 
-def ovens(world: World) -> List[Oven]:
+def ovens(world: World) -> list[Oven]:
     """
     :param world: The world to read.
     :return: Every oven.
@@ -821,7 +849,7 @@ def ovens(world: World) -> List[Oven]:
     return _furniture_named_after(world, Oven)
 
 
-def sinks(world: World) -> List[Sink]:
+def sinks(world: World) -> list[Sink]:
     """
     :param world: The world to read.
     :return: Every sink.
@@ -829,7 +857,7 @@ def sinks(world: World) -> List[Sink]:
     return _furniture_named_after(world, Sink)
 
 
-def cooktops(world: World) -> List[Cooktop]:
+def cooktops(world: World) -> list[Cooktop]:
     """
     :param world: The world to read.
     :return: Every cooktop.
@@ -837,7 +865,7 @@ def cooktops(world: World) -> List[Cooktop]:
     return _furniture_named_after(world, Cooktop)
 
 
-def counter_tops(world: World) -> List[CounterTop]:
+def counter_tops(world: World) -> list[CounterTop]:
     """
     :param world: The world to read.
     :return: Every worktop.
@@ -845,7 +873,7 @@ def counter_tops(world: World) -> List[CounterTop]:
     return _furniture_named_after(world, CounterTop)
 
 
-def sofas(world: World) -> List[Sofa]:
+def sofas(world: World) -> list[Sofa]:
     """
     :param world: The world to read.
     :return: Every sofa.
@@ -853,7 +881,7 @@ def sofas(world: World) -> List[Sofa]:
     return _furniture_named_after(world, Sofa)
 
 
-def walls(world: World) -> List[Wall]:
+def walls(world: World) -> list[Wall]:
     """
     :param world: The world to read.
     :return: Every wall.
@@ -861,7 +889,7 @@ def walls(world: World) -> List[Wall]:
     return _furniture_named_after(world, Wall)
 
 
-def shelf_layers(world: World) -> List[ShelfLayer]:
+def shelf_layers(world: World) -> list[ShelfLayer]:
     """
     :param world: The world to read.
     :return: Every board that things are stored on.
@@ -869,7 +897,7 @@ def shelf_layers(world: World) -> List[ShelfLayer]:
     return _furniture_named_after(world, ShelfLayer)
 
 
-def coffee_machines(world: World) -> List[CoffeeMachine]:
+def coffee_machines(world: World) -> list[CoffeeMachine]:
     """
     :param world: The world to read.
     :return: Every coffee machine.
@@ -877,7 +905,7 @@ def coffee_machines(world: World) -> List[CoffeeMachine]:
     return _furniture_named_after(world, CoffeeMachine)
 
 
-def tables(world: World) -> List[Table]:
+def tables(world: World) -> list[Table]:
     """
     :param world: The world to read.
     :return: Every table that is no more specific kind of table.
@@ -885,7 +913,7 @@ def tables(world: World) -> List[Table]:
     return _furniture_named_after(world, Table)
 
 
-def coffee_tables(world: World) -> List[CoffeeTable]:
+def coffee_tables(world: World) -> list[CoffeeTable]:
     """
     :param world: The world to read.
     :return: Every coffee table.
@@ -893,7 +921,7 @@ def coffee_tables(world: World) -> List[CoffeeTable]:
     return _furniture_named_after(world, CoffeeTable)
 
 
-def side_tables(world: World) -> List[SideTable]:
+def side_tables(world: World) -> list[SideTable]:
     """
     :param world: The world to read.
     :return: Every table that stands beside something.

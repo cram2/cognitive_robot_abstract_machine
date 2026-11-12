@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from enum import Enum
 from unittest import skip
 
-from typing_extensions import List
 
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
 from krrood.ripple_down_rules.experts import Human
@@ -23,7 +22,7 @@ class Element(str, Enum):
         return self.name
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Atom:
     element: Element
     type: int
@@ -33,7 +32,7 @@ class Atom:
         return id(self)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Bond:
     atom1: Atom
     atom2: Atom
@@ -43,7 +42,7 @@ class Bond:
         return id(self)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Molecule:
     ind1: int
     inda: int
@@ -51,8 +50,8 @@ class Molecule:
     lumo: float
     mutagenic: bool
 
-    atoms: List[Atom]
-    bonds: List[Bond]
+    atoms: list[Atom]
+    bonds: list[Bond]
 
     def __hash__(self):
         return id(self)
@@ -206,32 +205,32 @@ def get_two_molecules_model(
 ) -> SingleClassRDR:
     expert = Human(use_loaded_answers=load_answers)
     if load_answers:
-        expert.load_answers(filename)
+        expert.load_answers(path=filename)
 
     molecule_1 = make_molecule_1()
     molecule_2 = make_molecule_2()
     case_queries = [
         CaseQuery(
-            molecule_1,
-            "mutagenic",
-            (bool,),
-            True,
+            original_case=molecule_1,
+            attribute_name="mutagenic",
+            _attribute_types=(bool,),
+            mutually_exclusive=True,
             _target=molecule_1.mutagenic,
         ),
         CaseQuery(
-            molecule_2,
-            "mutagenic",
-            (bool,),
-            True,
+            original_case=molecule_2,
+            attribute_name="mutagenic",
+            _attribute_types=(bool,),
+            mutually_exclusive=True,
             _target=molecule_2.mutagenic,
         ),
     ]
 
     rdr = SingleClassRDR()
-    rdr.fit(case_queries, expert=expert, animate_tree=draw_tree)
+    rdr.fit(case_queries=case_queries, expert=expert, animate_tree=draw_tree)
 
     for case_query in case_queries:
-        r = rdr.classify(case_query.case)
+        r = rdr.classify(case=case_query.case)
         if isinstance(rdr, GeneralRDR):
             assert r[case_query.attribute_name] == case_query.target_value
         else:
@@ -240,7 +239,7 @@ def get_two_molecules_model(
     if save_answers:
         cwd = os.path.dirname(__file__)
         file = os.path.join(cwd, filename)
-        expert.save_answers(file)
+        expert.save_answers(path=file)
 
     return rdr
 
@@ -258,10 +257,10 @@ def test_write_two_molecules_model_to_python():
     filename = os.path.join(
         os.path.dirname(__file__), "test_generated_rdrs", "two_molecules"
     )
-    rdr._write_to_python(filename)
-    loaded_rdr = rdr.get_rdr_classifier_from_python_file(filename)
-    assert rdr.classify(make_molecule_1()) == loaded_rdr(make_molecule_1())
-    assert rdr.classify(make_molecule_2()) == loaded_rdr(make_molecule_2())
+    rdr._write_to_python(model_dir=filename)
+    loaded_rdr = rdr.get_rdr_classifier_from_python_file(package_name=filename)
+    assert rdr.classify(case=make_molecule_1()) == loaded_rdr(make_molecule_1())
+    assert rdr.classify(case=make_molecule_2()) == loaded_rdr(make_molecule_2())
 
 
 if __name__ == "__main__":

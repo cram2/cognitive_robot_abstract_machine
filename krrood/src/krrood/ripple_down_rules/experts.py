@@ -10,8 +10,7 @@ from dataclasses import is_dataclass
 from textwrap import dedent, indent
 from sqlalchemy.orm import DeclarativeBase as SQLTable
 
-from typing_extensions import Any, Optional, TYPE_CHECKING, List
-from typing_extensions import Tuple, Dict
+from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.ripple_down_rules.datastructures.callable_expression import (
     CallableExpression,
@@ -59,7 +58,7 @@ class Expert(ABC):
     case.
     """
 
-    all_expert_answers: Optional[List] = None
+    all_expert_answers: list | None = None
     """
     A list of all expert answers, used for testing purposes.
     """
@@ -78,7 +77,7 @@ class Expert(ABC):
         self,
         use_loaded_answers: bool = False,
         append: bool = False,
-        answers_save_path: Optional[str] = None,
+        answers_save_path: str | None = None,
     ):
         self.all_expert_answers = []
         self.use_loaded_answers = use_loaded_answers
@@ -88,7 +87,7 @@ class Expert(ABC):
             or os.path.exists(answers_save_path + ".json")
         ):
             if use_loaded_answers:
-                self.load_answers(answers_save_path)
+                self.load_answers(path=answers_save_path)
             if not append:
                 try:
                     os.remove(answers_save_path + ".py")
@@ -98,7 +97,7 @@ class Expert(ABC):
 
     @abstractmethod
     def ask_for_conditions(
-        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
     ) -> CallableExpression:
         """
         Ask the expert to provide the differentiating features between two cases or
@@ -112,7 +111,7 @@ class Expert(ABC):
         pass
 
     @abstractmethod
-    def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
         """
         Ask the expert to provide a relational conclusion for the case.
 
@@ -121,7 +120,7 @@ class Expert(ABC):
             argument.
         """
 
-    def clear_answers(self, path: Optional[str] = None):
+    def clear_answers(self, *, path: str | None = None):
         """
         Clear the expert answers.
 
@@ -141,8 +140,9 @@ class Expert(ABC):
 
     def save_answers(
         self,
-        path: Optional[str] = None,
-        expert_answers: Optional[List[Tuple[Dict, str]]] = None,
+        *,
+        path: str | None = None,
+        expert_answers: list[tuple[dict, str]] | None = None,
     ):
         """
         Save the expert answers to a file.
@@ -154,12 +154,12 @@ class Expert(ABC):
         if not any(expert_answers):
             return
         if path is None and self.answers_save_path is None:
-            raise NoSavePathFoundForExpertAnswers(self)
+            raise NoSavePathFoundForExpertAnswers(expert=self)
         if path is None:
             path = self.answers_save_path
-        self._save_to_python(path, expert_answers=expert_answers)
+        self._save_to_python(path=path, expert_answers=expert_answers)
 
-    def _save_to_json(self, path: str):
+    def _save_to_json(self, *, path: str):
         """
         Save the expert answers to a JSON file.
 
@@ -175,7 +175,7 @@ class Expert(ABC):
             json.dump(all_answers, f)
 
     def _save_to_python(
-        self, path: str, expert_answers: Optional[List[Tuple[Dict, str]]] = None
+        self, *, path: str, expert_answers: list[tuple[dict, str]] | None = None
     ):
         """
         Save the expert answers to a Python file.
@@ -206,25 +206,29 @@ class Expert(ABC):
                 if func_source is None:
                     func_source = "pass  # No user input provided for this case.\n"
                 f.write(
-                    imports + func_source + "\n\n\n\n" + self.answer_delimiter + "\n\n\n"
+                    imports
+                    + func_source
+                    + "\n\n\n\n"
+                    + self.answer_delimiter
+                    + "\n\n\n"
                 )
 
-    def load_answers(self, path: Optional[str] = None):
+    def load_answers(self, *, path: str | None = None):
         """
         Load the expert answers from a file.
 
         :param path: The path to load the answers from.
         """
         if path is None and self.answers_save_path is None:
-            raise NoLoadPathFoundForExpertAnswers(self)
+            raise NoLoadPathFoundForExpertAnswers(expert=self)
         if path is None:
             path = self.answers_save_path
         if os.path.exists(path + ".py"):
-            self._load_answers_from_python(path)
+            self._load_answers_from_python(path=path)
         elif os.path.exists(path + ".json"):
-            self._load_answers_from_json(path)
+            self._load_answers_from_json(path=path)
 
-    def _load_answers_from_json(self, path: str):
+    def _load_answers_from_json(self, *, path: str):
         """
         Load the expert answers from a JSON file.
 
@@ -234,7 +238,7 @@ class Expert(ABC):
             all_answers = json.load(f)
         self.all_expert_answers = [({}, answer) for answer in all_answers]
 
-    def _load_answers_from_python(self, path: str):
+    def _load_answers_from_python(self, *, path: str):
         """
         Load the expert answers from a Python file.
 
@@ -285,22 +289,26 @@ class AI(Expert):
         self.user_prompt = UserPrompt()
 
     def ask_for_conditions(
-        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
     ) -> CallableExpression:
-        prompt_str = self.get_prompt_for_ai(case_query, PromptFor.Conditions)
+        prompt_str = self.get_prompt_for_ai(
+            case_query=case_query, prompt_for=PromptFor.Conditions
+        )
         print(prompt_str)
         sys.exit()
 
-    def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
-        prompt_str = self.get_prompt_for_ai(case_query, PromptFor.Conclusion)
-        output_type_source = self.get_output_type_class_source(case_query)
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
+        prompt_str = self.get_prompt_for_ai(
+            case_query=case_query, prompt_for=PromptFor.Conclusion
+        )
+        output_type_source = self.get_output_type_class_source(case_query=case_query)
         prompt_str = (
             f"\n\n\nOutput type(s) class source:\n{output_type_source}\n\n" + prompt_str
         )
         print(prompt_str)
         sys.exit()
 
-    def get_output_type_class_source(self, case_query: CaseQuery) -> str:
+    def get_output_type_class_source(self, *, case_query: CaseQuery) -> str:
         """
         Get the output type class source for the AI expert.
 
@@ -313,7 +321,7 @@ class AI(Expert):
             cls_source_file = get_class_file_path(cls)
             found_class_source = extract_class_source(
                 [cls.__name__], file_path=cls_source_file
-            ).source_of(cls.__name__)
+            ).source_of(name=cls.__name__)
             class_signature = found_class_source.split("\n")[0]
             if "(" in class_signature:
                 parent_class_names = list(
@@ -343,7 +351,7 @@ class AI(Expert):
         found_class_sources = "\n\n\n".join(found_class_sources)
         return found_class_sources
 
-    def get_prompt_for_ai(self, case_query: CaseQuery, prompt_for: PromptFor) -> str:
+    def get_prompt_for_ai(self, *, case_query: CaseQuery, prompt_for: PromptFor) -> str:
         """
         Get the prompt for the AI expert.
 
@@ -357,7 +365,9 @@ class AI(Expert):
         boilerplate_code = template_file_creator.build_boilerplate_code()
         initial_prompt_str = data_to_show + "\n\n" + boilerplate_code + "\n\n"
         return self.user_prompt.build_prompt_str_for_ai(
-            case_query, prompt_for=prompt_for, initial_prompt_str=initial_prompt_str
+            case_query=case_query,
+            prompt_for=prompt_for,
+            initial_prompt_str=initial_prompt_str,
         )
 
 
@@ -375,7 +385,7 @@ class Human(Expert):
         self.user_prompt = UserPrompt()
 
     def ask_for_conditions(
-        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
     ) -> CallableExpression:
         data_to_show = None
         if not self.use_loaded_answers or len(self.all_expert_answers) == 0:
@@ -384,10 +394,10 @@ class Human(Expert):
                 {case_query.attribute_name: case_query.target_value},
                 last_evaluated_rule=last_evaluated_rule,
             )
-        return self._get_conditions(case_query, data_to_show)
+        return self._get_conditions(case_query=case_query, data_to_show=data_to_show)
 
     def _get_conditions(
-        self, case_query: CaseQuery, data_to_show: Optional[str] = None
+        self, *, case_query: CaseQuery, data_to_show: str | None = None
     ) -> CallableExpression:
         """
         Ask the expert to provide the differentiating features between two cases or
@@ -413,11 +423,16 @@ class Human(Expert):
             condition = CallableExpression(user_input, bool, scope=case_query.scope)
             if self.answers_save_path is not None and not any(loaded_scope):
                 self.convert_json_answer_to_python_answer(
-                    case_query, user_input, condition, PromptFor.Conditions
+                    case_query=case_query,
+                    user_input=user_input,
+                    callable_expression=condition,
+                    prompt_for=PromptFor.Conditions,
                 )
         else:
             user_input, condition = self.user_prompt.prompt_user_for_expression(
-                case_query, PromptFor.Conditions, prompt_str=data_to_show
+                case_query=case_query,
+                prompt_for=PromptFor.Conditions,
+                prompt_str=data_to_show,
             )
         if user_input in ["exit", "quit"]:
             sys.exit()
@@ -430,6 +445,7 @@ class Human(Expert):
 
     def convert_json_answer_to_python_answer(
         self,
+        *,
         case_query: CaseQuery,
         user_input: str,
         callable_expression: CallableExpression,
@@ -456,15 +472,15 @@ class Human(Expert):
             code = code.replace("pass", f"return {user_input}")
         self.save_answers(expert_answers=[({}, code)])
 
-    def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
         """
         Ask the expert to provide a conclusion for the case.
 
         :param case_query: The case query containing the case to find a conclusion for.
         :return: The conclusion for the case as a callable expression.
         """
-        expression: Optional[CallableExpression] = None
-        expert_input: Optional[str] = None
+        expression: CallableExpression | None = None
+        expert_input: str | None = None
         if (
             self.use_loaded_answers
             and len(self.all_expert_answers) == 0
@@ -484,14 +500,19 @@ class Human(Expert):
                     )
                     if self.answers_save_path is not None and not any(loaded_scope):
                         self.convert_json_answer_to_python_answer(
-                            case_query, expert_input, expression, PromptFor.Conclusion
+                            case_query=case_query,
+                            user_input=expert_input,
+                            callable_expression=expression,
+                            prompt_for=PromptFor.Conclusion,
                         )
             except IndexError:
                 self.use_loaded_answers = False
         if not self.use_loaded_answers:
             data_to_show = show_current_and_corner_cases(case_query.case)
             expert_input, expression = self.user_prompt.prompt_user_for_expression(
-                case_query, PromptFor.Conclusion, prompt_str=data_to_show
+                case_query=case_query,
+                prompt_for=PromptFor.Conclusion,
+                prompt_str=data_to_show,
             )
             if expert_input is None:
                 self.all_expert_answers.append(({}, None))
@@ -521,30 +542,30 @@ class Oracle(Expert):
     differs.
     """
 
-    simple_attribute_value_types: Tuple[type, ...] = (bool, int, float, str, type(None))
+    simple_attribute_value_types: tuple[type, ...] = (bool, int, float, str, type(None))
     """
     The attribute value types the oracle is willing to build a differentiating condition
     from.
     """
 
     def ask_for_conditions(
-        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule] = None
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None = None
     ) -> CallableExpression:
         condition_source = self._differentiating_condition_source(
-            case_query, last_evaluated_rule
+            case_query=case_query, last_evaluated_rule=last_evaluated_rule
         )
         condition = CallableExpression(condition_source, bool, scope=case_query.scope)
         self.all_expert_answers.append((condition.scope, condition_source))
         case_query.conditions = condition
         return condition
 
-    def ask_for_conclusion(self, case_query: CaseQuery) -> Optional[CallableExpression]:
+    def ask_for_conclusion(self, *, case_query: CaseQuery) -> CallableExpression | None:
         if case_query._target is None:
-            raise OracleCannotInferConclusionWithoutTarget(case_query)
+            raise OracleCannotInferConclusionWithoutTarget(case_query=case_query)
         return case_query.target
 
     def _differentiating_condition_source(
-        self, case_query: CaseQuery, last_evaluated_rule: Optional[Rule]
+        self, *, case_query: CaseQuery, last_evaluated_rule: Rule | None
     ) -> str:
         """
         Build the source of a condition that is true for the case in the given case
@@ -562,13 +583,15 @@ class Oracle(Expert):
         if corner_case is None:
             return "return True"
         attribute_name, attribute_value = self._first_distinguishing_attribute(
-            case_query.case, corner_case, exclude={case_query.attribute_name.lower()}
+            case=case_query.case,
+            corner_case=corner_case,
+            exclude={case_query.attribute_name.lower()},
         )
         return f"return case.{attribute_name} == {attribute_value!r}"
 
     def _first_distinguishing_attribute(
-        self, case: Any, corner_case: Any, exclude: set
-    ) -> Tuple[str, Any]:
+        self, *, case: Any, corner_case: Any, exclude: set
+    ) -> tuple[str, Any]:
         """
         Find the first simple attribute that differs between a case and its corner case.
 
@@ -580,8 +603,8 @@ class Oracle(Expert):
             ``case``.
         :raises NoDistinguishingAttributeFound: if no such attribute exists.
         """
-        case_attributes = self._attribute_dict(case)
-        corner_case_attributes = self._attribute_dict(corner_case)
+        case_attributes = self._attribute_dict(obj=case)
+        corner_case_attributes = self._attribute_dict(obj=corner_case)
         for name, value in case_attributes.items():
             if name in exclude or not isinstance(
                 value, self.simple_attribute_value_types
@@ -589,10 +612,10 @@ class Oracle(Expert):
                 continue
             if corner_case_attributes.get(name, object()) != value:
                 return name, value
-        raise NoDistinguishingAttributeFound(case, corner_case)
+        raise NoDistinguishingAttributeFound(case=case, corner_case=corner_case)
 
     @staticmethod
-    def _attribute_dict(obj: Any) -> Dict[str, Any]:
+    def _attribute_dict(*, obj: Any) -> dict[str, Any]:
         """
         Get a name-to-value mapping of an object's attributes, regardless of whether it
         is a SQLAlchemy mapped instance, a dataclass, or any other object.

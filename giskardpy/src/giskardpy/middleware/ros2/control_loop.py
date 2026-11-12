@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
 
-from giskardpy.executor import Executor
+from cramph.executor import StatechartExecutor
 from giskardpy.middleware.ros2.action_server import ActionServerHandler
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
@@ -16,6 +15,7 @@ from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
 from semantic_digital_twin.input_synchronization import WorldStateInputs
 from giskardpy.middleware.ros2.world_updates import IncomingWorldUpdates
+from giskardpy.motion_control import MotionControl
 from semantic_digital_twin.world import World
 
 
@@ -28,7 +28,7 @@ class ControlLoop:
     resulting velocities back to the robot.
     """
 
-    executor: Executor
+    executor: StatechartExecutor
     """
     Computes the next command from the motion statechart.
     """
@@ -67,7 +67,7 @@ class ControlLoop:
     instead.
     """
 
-    command_publishers: List[CommandPublisher] = field(default_factory=list)
+    command_publishers: list[CommandPublisher] = field(default_factory=list)
     """
     Sends the computed velocities to the robot at the end of every cycle.
     """
@@ -85,7 +85,7 @@ class ControlLoop:
         """
         while True:
             self.run_cycle()
-            if self.executor.motion_statechart.is_end_motion():
+            if self.executor.statechart.is_ended():
                 return
             self.executor.pacer.sleep()
 
@@ -155,5 +155,5 @@ class ControlLoop:
         """
         for command_publisher in self.command_publishers:
             command_publisher.stop()
-        self.executor.set_velocity_acceleration_jerk_to_zero()
+        MotionControl.set_velocity_acceleration_jerk_to_zero(self.world)
         self.world.notify_state_change()

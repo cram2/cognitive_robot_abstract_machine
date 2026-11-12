@@ -133,8 +133,9 @@ from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized i
 
 numpy_model = RustworkxCircuitToLayeredCircuitConverter.convert(model)
 event = SimpleEvent.from_data({x: closed(0.25, 2.5)}).as_composite_set()
-truncated, probability = numpy_model.truncated(event)
-print(probability)
+truncation = numpy_model.truncated(event)
+print(truncation.probability)
+
 ```
 
 ## JAX Implementation

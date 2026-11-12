@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -62,7 +61,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
 
     planner = MatchPlanner
 
-    def realize(self, node: Match, plan: MatchPlan) -> VerbalizationFragment:
+    def realize(self, *, node: Match, plan: MatchPlan) -> VerbalizationFragment:
         """
         :param node: The match being verbalised.
         :param plan: The match plan.
@@ -73,24 +72,24 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         "Generate a Mission given that the name of the Robot to which it is assigned is 'R2'"
         """
         predict_groups = [group for group in plan.groups if group.predicted]
-        inline_predict = self._inline_predict(predict_groups, plan)
+        inline_predict = self._inline_predict(predict_groups=predict_groups, plan=plan)
 
-        header_parts: List[VerbalizationFragment] = [
+        header_parts: list[VerbalizationFragment] = [
             (
                 self.context.services.performative_override or Directive.GENERATE
             ).as_fragment(),
-            self.context.child(plan.selection),
+            self.context.child(node=plan.selection),
         ]
         if inline_predict is not None:
             header_parts.append(inline_predict)
 
-        items: List[VerbalizationFragment] = []
+        items: list[VerbalizationFragment] = []
         if inline_predict is None and predict_groups:
-            items.append(self._predict_block(predict_groups, plan))
-        given = self._given_that_block(plan)
+            items.append(self._predict_block(predict_groups=predict_groups, plan=plan))
+        given = self._given_that_block(plan=plan)
         if given is not None:
             items.append(given)
-        where = self._where_block(plan)
+        where = self._where_block(plan=plan)
         if where is not None:
             items.append(where)
 
@@ -103,8 +102,8 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
     # %% predict
 
     def _inline_predict(
-        self, predict_groups: List[AttributeGroup], plan: MatchPlan
-    ) -> Optional[VerbalizationFragment]:
+        self, *, predict_groups: list[AttributeGroup], plan: MatchPlan
+    ) -> VerbalizationFragment | None:
         """:return: The header-folded *"and predict its <attrs> value(s)"* clause when the only
         predicted attributes are the selection's own (the simple case), else ``None`` (a *"predict"*
         block is used instead — see :meth:`_predict_block`).
@@ -123,13 +122,13 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             parts=[
                 Conjunctions.AND.as_fragment(),
                 Keywords.PREDICT.as_fragment(),
-                self._owned_attributes(attributes, group.object),
+                self._owned_attributes(attributes=attributes, owner=group.object),
                 WordFragment(text=noun),
             ]
         )
 
     def _predict_block(
-        self, predict_groups: List[AttributeGroup], plan: MatchPlan
+        self, *, predict_groups: list[AttributeGroup], plan: MatchPlan
     ) -> VerbalizationFragment:
         """:return: The *"and predict"* block — one point per object whose attributes are generated
         (*"x, y, and z of its position"*, or *"its <attrs>"* for the selection's own).
@@ -137,7 +136,9 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         >>> verbalize_expression(a(Mission)(assigned_to=a(Robot)(battery=...)))
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
-        points = [self._predict_point(group, plan) for group in predict_groups]
+        points = [
+            self._predict_point(group=group, plan=plan) for group in predict_groups
+        ]
         return BlockFragment(
             header=PhraseFragment(
                 parts=[Conjunctions.AND.as_fragment(), Keywords.PREDICT.as_fragment()]
@@ -146,7 +147,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         )
 
     def _predict_point(
-        self, group: AttributeGroup, plan: MatchPlan
+        self, *, group: AttributeGroup, plan: MatchPlan
     ) -> VerbalizationFragment:
         """:return: a single predict point — the object's predicted attributes as an
         :class:`OwnedAttributes`, which coreference renders as *"its <attrs>"* for the selection's own
@@ -157,12 +158,13 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         'Generate a Mission and predict the battery of the Robot to which it is assigned'
         """
         return self._owned_attributes(
-            [assignment.attribute for assignment in group.predicted], group.object
+            attributes=[assignment.attribute for assignment in group.predicted],
+            owner=group.object,
         )
 
     # %% given that
 
-    def _given_that_block(self, plan: MatchPlan) -> Optional[VerbalizationFragment]:
+    def _given_that_block(self, *, plan: MatchPlan) -> VerbalizationFragment | None:
         """:return: The *"given that"* block — one point per attribute group (concrete assignments)
         and per non-grouping condition — or ``None`` when there is nothing to give.
 
@@ -173,11 +175,13 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         >>> verbalize_expression(a(Robot)(name="R2", battery=80))
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
         """
-        points: List[VerbalizationFragment] = []
+        points: list[VerbalizationFragment] = []
         for group in plan.groups:
             if group.concrete:
-                points += self._concrete_points(group)
-        points += ConditionAssembler(self.context).as_statements(plan.other_conditions)
+                points += self._concrete_points(group=group)
+        points += ConditionAssembler(context=self.context).as_statements(
+            conditions=plan.other_conditions
+        )
         if not points:
             return None
         return BlockFragment(
@@ -186,7 +190,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
             conjunction=Conjunctions.AND.as_fragment(),
         )
 
-    def _concrete_points(self, group: AttributeGroup) -> List[VerbalizationFragment]:
+    def _concrete_points(self, *, group: AttributeGroup) -> list[VerbalizationFragment]:
         """:return: The given-that points for a group's concrete assignments. Atomic scalar values
         coordinate under one *"x, y, and z of the <object> are 1, 2, and 3 respectively"* point — but
         only up to :data:`_MAX_RESPECTIVELY` of them, since the reader must zip attributes to values
@@ -200,19 +204,19 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """
         present = [a for a in group.concrete if not is_none_literal(a.value)]
         absent = [a for a in group.concrete if is_none_literal(a.value)]
-        grouped, singles = self._split_groupable(present)
-        points: List[VerbalizationFragment] = []
+        grouped, singles = self._split_groupable(present=present)
+        points: list[VerbalizationFragment] = []
         if grouped:
-            points.append(self._group_point(group, grouped))
-        points += ConditionAssembler(self.context).as_statements(
-            [a.comparator for a in singles]
+            points.append(self._group_point(group=group, concrete=grouped))
+        points += ConditionAssembler(context=self.context).as_statements(
+            conditions=[a.comparator for a in singles]
         )
         if absent:
-            points.append(self._absence_point(group, absent))
+            points.append(self._absence_point(group=group, absent=absent))
         return points
 
     @staticmethod
-    def _split_groupable(present: List) -> tuple:
+    def _split_groupable(*, present: list) -> tuple:
         """:return: ``(grouped, singles)`` — the atomic-scalar assignments to coordinate under one
         *"respectively"* point, and the assignments to say each on their own. Grouping applies only
         when 2..:data:`_MAX_RESPECTIVELY` atomic values are present; otherwise every assignment stands
@@ -227,7 +231,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         return [], present
 
     def _absence_point(
-        self, group: AttributeGroup, absent: List
+        self, *, group: AttributeGroup, absent: list
     ) -> VerbalizationFragment:
         """:return: *"the <object> has no <attrs>"* for attributes assigned ``None``.
 
@@ -236,14 +240,14 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """
         return PhraseFragment(
             parts=[
-                self.context.child(group.object),
+                self.context.child(node=group.object),
                 Absence.HAS_NO.as_fragment(),
-                self._attribute_list([a.attribute for a in absent]),
+                self._attribute_list(attributes=[a.attribute for a in absent]),
             ]
         )
 
     def _group_point(
-        self, group: AttributeGroup, concrete: List
+        self, *, group: AttributeGroup, concrete: list
     ) -> VerbalizationFragment:
         """:return: *"x, y, and z of the <object> are 1, 2, and 3 respectively"* for the several
         atomic-valued attributes coordinated under one point.
@@ -257,13 +261,13 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         "Generate a Robot given that the name and battery of the Robot are 'R2' and 80 respectively"
         """
         value_list = oxford_comma(
-            [self.context.child(a.value, as_value=True) for a in concrete],
+            [self.context.child(node=a.value, as_value=True) for a in concrete],
             Conjunctions.AND.as_fragment(),
         )
         return PhraseFragment(
             parts=[
                 self._genitive_attribute_phrase(
-                    [a.attribute for a in concrete], group.object
+                    attributes=[a.attribute for a in concrete], owner=group.object
                 ),
                 Copulas.ARE.as_fragment(),
                 value_list,
@@ -272,7 +276,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         )
 
     def _genitive_attribute_phrase(
-        self, attributes: List[Attribute], owner: SymbolicExpression
+        self, *, attributes: list[Attribute], owner: SymbolicExpression
     ) -> VerbalizationFragment:
         """:return: the definite genitive *"the <attrs> of <owner>"* the grouped *"respectively"*
         point's attributes take (*"the name and battery of the Robot"*).
@@ -283,28 +287,28 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         return PhraseFragment(
             parts=[
                 Articles.THE.as_fragment(),
-                self._attribute_list(attributes),
+                self._attribute_list(attributes=attributes),
                 Prepositions.OF.as_fragment(),
-                self.context.child(owner),
+                self.context.child(node=owner),
             ]
         )
 
     def _owned_attributes(
-        self, attributes: List[Attribute], owner: SymbolicExpression
+        self, *, attributes: list[Attribute], owner: SymbolicExpression
     ) -> VerbalizationFragment:
         """:return: an :class:`OwnedAttributes` naming *attributes* on *owner* — coreference renders
         it as the possessive *"its <attrs>"* when *owner* is the discourse subject, else the genitive
         *"the <attrs> of <owner>"*. The pronoun choice is the coreference pass's, not this assembler's.
         """
         return OwnedAttributes(
-            attributes=self._attribute_list(attributes),
-            owner_fragment=self.context.child(owner),
+            attributes=self._attribute_list(attributes=attributes),
+            owner_fragment=self.context.child(node=owner),
             owner_referent_id=owner._id_,
         )
 
     # %% where
 
-    def _where_block(self, plan: MatchPlan) -> Optional[VerbalizationFragment]:
+    def _where_block(self, *, plan: MatchPlan) -> VerbalizationFragment | None:
         """:return: The *"where"* block — one point per free condition — or ``None`` when absent.
 
         The points are whatever the condition verbalizer makes of the ``where`` conditions — the
@@ -321,7 +325,9 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """
         if not plan.where_conditions:
             return None
-        points = ConditionAssembler(self.context).as_statements(plan.where_conditions)
+        points = ConditionAssembler(context=self.context).as_statements(
+            conditions=plan.where_conditions
+        )
         return BlockFragment(
             header=Keywords.WHERE.as_fragment(),
             items=points,
@@ -330,7 +336,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
 
     # %% shared
 
-    def _attribute_list(self, attributes: List[Attribute]) -> VerbalizationFragment:
+    def _attribute_list(self, *, attributes: list[Attribute]) -> VerbalizationFragment:
         """:return: The attribute names as a single fragment — *"x, y, and z"* or *"x"*.
 
         Its contribution is only the attribute-name list — the *"name and battery"* span in the shown
@@ -342,7 +348,7 @@ class MatchAssembler(Assembler[Match, MatchPlan]):
         """
         fragments = [
             RoleFragment.for_attribute(
-                attribute._owner_class_, attribute._attribute_name_
+                owner=attribute._owner_class_, attribute_name=attribute._attribute_name_
             )
             for attribute in attributes
         ]

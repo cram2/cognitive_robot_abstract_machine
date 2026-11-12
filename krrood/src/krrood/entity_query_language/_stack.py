@@ -13,10 +13,10 @@ import linecache
 import sys
 from dataclasses import dataclass
 from types import FrameType
-from typing_extensions import Callable, List, Optional, Any, Dict
+from typing_extensions import Callable, Any
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StackFrame:
     """
     A single frame in a captured call stack.
@@ -26,6 +26,7 @@ class StackFrame:
     """
     Full path to the source file.
     """
+
     lineno: int
     """
     Line number within the source file.
@@ -35,31 +36,34 @@ class StackFrame:
     """
     Name of the function or method.
     """
-    code_snippet: Optional[str]
+
+    code_snippet: str | None
     """
     One source line, stripped; ``None`` if unavailable.
     """
 
-    class_object: Optional[type]
+    class_object: type | None
     """
     The class that owns this method, or ``None`` for free functions.
     """
-    function_object: Optional[Callable]
+
+    function_object: Callable | None
     """
     The callable object for this frame, or ``None`` if not resolvable.
     """
 
-    module_name: Optional[str]
+    module_name: str | None
     """
     Dotted module name (string, not ``ModuleType``) to avoid reference leaks.
     """
-    global_namespace: Optional[Dict[str, Any]] = None
+
+    global_namespace: dict[str, Any] | None = None
     """
     Shallow snapshot of the frame's ``f_globals``, or ``None`` when scope was not
     captured.
     """
 
-    local_namespace: Optional[Dict[str, Any]] = None
+    local_namespace: dict[str, Any] | None = None
     """
     Shallow snapshot of the frame's ``f_locals``, or ``None`` when scope was not
     captured.
@@ -73,13 +77,13 @@ class StackFrame:
         return self.class_object is not None
 
     @property
-    def scope(self) -> Dict[str, Any]:
+    def scope(self) -> dict[str, Any]:
         """
         Merged ``{**globals, **locals}`` snapshot (locals win).
 
         Empty if scope was not captured.
         """
-        merged: Dict[str, Any] = {}
+        merged: dict[str, Any] = {}
         if self.global_namespace:
             merged.update(self.global_namespace)
         if self.local_namespace:
@@ -88,7 +92,7 @@ class StackFrame:
 
     @classmethod
     def from_frame_info(
-        cls, frame_info: inspect.FrameInfo, capture_scope: bool = False
+        cls, *, frame_info: inspect.FrameInfo, capture_scope: bool = False
     ) -> StackFrame:
         """
         Eagerly extract all data from a live ``FrameInfo`` and drop the frame reference.
@@ -104,7 +108,7 @@ class StackFrame:
             frame_info.code_context[0].strip() if frame_info.code_context else None
         )
         return cls._from_frame(
-            frame_info.frame,
+            frame=frame_info.frame,
             filename=frame_info.filename,
             lineno=frame_info.lineno,
             function_name=frame_info.function,
@@ -114,7 +118,7 @@ class StackFrame:
 
     @classmethod
     def from_raw_frame(
-        cls, frame: FrameType, capture_scope: bool = False
+        cls, *, frame: FrameType, capture_scope: bool = False
     ) -> StackFrame:
         """
         Eagerly extract all data from a live frame object and drop the frame reference.
@@ -133,7 +137,7 @@ class StackFrame:
         lineno = frame.f_lineno
         snippet = linecache.getline(filename, lineno).strip() or None
         return cls._from_frame(
-            frame,
+            frame=frame,
             filename=filename,
             lineno=lineno,
             function_name=frame.f_code.co_name,
@@ -144,12 +148,12 @@ class StackFrame:
     @classmethod
     def _from_frame(
         cls,
-        frame: FrameType,
         *,
+        frame: FrameType,
         filename: str,
         lineno: int,
         function_name: str,
-        code_snippet: Optional[str],
+        code_snippet: str | None,
         capture_scope: bool = False,
     ) -> StackFrame:
         """
@@ -171,10 +175,10 @@ class StackFrame:
         :return: The constructed :class:`StackFrame`.
         """
         instance = frame.f_locals.get("self", None)
-        owner_class: Optional[type] = frame.f_locals.get("cls", None)
+        owner_class: type | None = frame.f_locals.get("cls", None)
         if owner_class is None and instance is not None:
             owner_class = type(instance)
-        resolved_function: Optional[Callable] = frame.f_globals.get(function_name, None)
+        resolved_function: Callable | None = frame.f_globals.get(function_name, None)
         if resolved_function is None and owner_class is not None:
             resolved_function = owner_class.__dict__.get(function_name, None)
         return cls(
@@ -199,13 +203,13 @@ def _is_external_filename(filename: str) -> bool:
     return "site-packages" in filename or "dist-packages" in filename
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CallStack:
     """
     An ordered sequence of :class:`StackFrame` objects, innermost frame first.
     """
 
-    frames: List[StackFrame]
+    frames: list[StackFrame]
     """
     The captured stack frames.
     """
@@ -217,7 +221,7 @@ class CallStack:
         return iter(self.frames)
 
     @classmethod
-    def capture(cls, skip: int = 0) -> CallStack:
+    def capture(cls, *, skip: int = 0) -> CallStack:
         """
         Capture the current call stack, building :class:`StackFrame` objects only for
         frames that are not in installed third-party packages.
@@ -234,17 +238,17 @@ class CallStack:
         :return: A new :class:`CallStack` of the retained frames, innermost first.
         """
         try:
-            frame: Optional[FrameType] = sys._getframe(1 + skip)
+            frame: FrameType | None = sys._getframe(1 + skip)
         except ValueError:
-            return cls([])
-        kept: List[StackFrame] = []
+            return cls(frames=[])
+        kept: list[StackFrame] = []
         while frame is not None:
             if not _is_external_filename(frame.f_code.co_filename):
-                kept.append(StackFrame.from_raw_frame(frame))
+                kept.append(StackFrame.from_raw_frame(frame=frame))
             frame = frame.f_back
-        return cls(kept)
+        return cls(frames=kept)
 
-    def filter(self, package: Optional[str] = None) -> CallStack:
+    def filter(self, *, package: str | None = None) -> CallStack:
         """
         Build a new :class:`CallStack` with external-library frames removed.
 
@@ -259,9 +263,9 @@ class CallStack:
             if package is not None and package not in frame.filename:
                 continue
             kept.append(frame)
-        return CallStack(kept)
+        return CallStack(frames=kept)
 
-    def root_frame_in(self, package: str) -> Optional[StackFrame]:
+    def root_frame_in(self, *, package: str) -> StackFrame | None:
         """
         Find the outermost frame (highest in the call hierarchy) whose ``module_name``
         contains *package*.  This is the entry point into the library from the caller's
@@ -278,21 +282,21 @@ class CallStack:
         ]
         return matches[-1] if matches else None
 
-    def classes(self) -> List[type]:
+    def classes(self) -> list[type]:
         """
         Distinct class objects appearing in the stack, in order of first occurrence.
         """
-        seen: List[type] = []
+        seen: list[type] = []
         for frame in self.frames:
             if frame.class_object is not None and frame.class_object not in seen:
                 seen.append(frame.class_object)
         return seen
 
-    def functions(self) -> List[Callable]:
+    def functions(self) -> list[Callable]:
         """
         Distinct function objects appearing in the stack, in order of first occurrence.
         """
-        seen: List[Callable] = []
+        seen: list[Callable] = []
         for frame in self.frames:
             if frame.function_object is not None and frame.function_object not in seen:
                 seen.append(frame.function_object)

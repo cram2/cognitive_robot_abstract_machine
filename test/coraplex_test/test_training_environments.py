@@ -1,8 +1,6 @@
 from sqlalchemy import select
 
 from krrood.ormatic.data_access_objects.helper import to_dao
-from giskardpy.motion_statechart.data_types import LifeCycleValues
-from coraplex.robot_plans.motions import *  # type: ignore
 from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.training_environments.training_environment import (
     MoveToReachTrainingEnvironment,
@@ -19,12 +17,5 @@ def test_move_to_reach(coraplex_testing_session):
     coraplex_testing_session.add(to_dao(training_environment))
     coraplex_testing_session.commit()
 
-    query = select(DesignatorNodeDAO.status).join(
-        MoveToReachDAO, DesignatorNodeDAO._designator_id == MoveToReachDAO.database_id
-    )
-    results = coraplex_testing_session.execute(query).all()
-
-    success_rate = len([r for r in results if r[0] == LifeCycleValues.SUCCEEDED]) / len(
-        results
-    )
-    assert success_rate >= 0.0
+    stored_reaches = coraplex_testing_session.scalars(select(MoveToReachDAO)).all()
+    assert len(stored_reaches) == len(training_environment.tried_actions)

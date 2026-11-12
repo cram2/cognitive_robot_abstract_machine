@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 from threading import Thread
 from time import sleep
-from typing import Any, List
+from typing_extensions import Any
 
 import pytest
 
@@ -21,7 +21,7 @@ class HandlerWithoutRosAdvertisement(ActionServerHandler):
     Exercises the handler's goal bookkeeping without advertising a ROS action.
     """
 
-    messages: List[str] = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
     """
     Everything the handler logged, instead of writing it to a ROS logger.
     """
@@ -39,7 +39,7 @@ class GoalStateRecorder:
     Stands in for a goal handle and records which state transition was requested.
     """
 
-    transitions: List[str] = field(default_factory=list)
+    transitions: list[str] = field(default_factory=list)
     """
     The name of every transition that was requested, in order.
     """
@@ -205,7 +205,7 @@ def test_the_callback_returns_the_result_and_reports_the_outcome_of_its_goal():
         action_name="giskard/command", action_type=None
     )
     goal_handle = GoalStateRecorder(request="goal")
-    returned: List[Any] = []
+    returned: list[Any] = []
     callback = Thread(
         target=lambda: returned.append(
             asyncio.run(handler.execute_callback(goal_handle))

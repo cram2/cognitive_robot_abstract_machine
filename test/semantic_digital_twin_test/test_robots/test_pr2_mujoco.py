@@ -8,7 +8,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import timedelta
 
-from typing_extensions import List
 
 import mujoco
 import numpy as np
@@ -24,6 +23,7 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoFixedConnectionJoints,
     MujocoOmniDriveJoints,
     MujocoSim,
+    SimulatorModelNames,
 )
 from semantic_digital_twin.datastructures.definitions import (
     GripperState,
@@ -32,9 +32,7 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
@@ -55,16 +53,18 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-def _spawn_pr2(odom_T_robot_start: HomogeneousTransformationMatrix | None) -> PR2:
+def _spawn_pr2(odometry_T_robot_start: HomogeneousTransformationMatrix | None) -> PR2:
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    return RobotSpecification(PR2, odom_T_robot_start=odom_T_robot_start).spawn(world)
+    return RobotSpecification(PR2, odometry_T_robot_start=odometry_T_robot_start).spawn(
+        world
+    )
 
 
 @pytest.fixture
 def pr2() -> PR2:
-    return _spawn_pr2(odom_T_robot_start=None)
+    return _spawn_pr2(odometry_T_robot_start=None)
 
 
 def _drive_joints(builder: MujocoBuilder, pr2: PR2) -> list[mujoco.MjsJoint]:
@@ -107,7 +107,7 @@ def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo
         arm.end_effector.thumb.root.parent_connection.raw_dof for arm in pr2.all_arms
     }
 
-    def driven_by(servo_type: type) -> List[str]:
+    def driven_by(servo_type: type) -> list[str]:
         return sorted(
             str(degree_of_freedom.name)
             for actuator in world.actuators
@@ -214,10 +214,19 @@ def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
         if isinstance(connection, FixedConnection)
     )
 
-    assert type(MujocoConnectionJoints.of(pr2.drive, world)) is MujocoOmniDriveJoints
-    assert type(MujocoConnectionJoints.of(revolute, world)) is MujocoConnectionJoint
-    assert type(MujocoConnectionJoints.of(fixed, world)) is (
-        MujocoFixedConnectionJoints
+    element_names = SimulatorModelNames()
+
+    assert (
+        type(MujocoConnectionJoints.of(pr2.drive, world, element_names))
+        is MujocoOmniDriveJoints
+    )
+    assert (
+        type(MujocoConnectionJoints.of(revolute, world, element_names))
+        is MujocoConnectionJoint
+    )
+    assert (
+        type(MujocoConnectionJoints.of(fixed, world, element_names))
+        is MujocoFixedConnectionJoints
     )
 
 
@@ -390,7 +399,9 @@ def test_the_drive_is_commanded_in_the_frame_of_the_base():
     A base facing along the ``odom``'s y-axis drives along it when commanded forward.
     """
     pr2 = _spawn_pr2(
-        odom_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2)
+        odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
+            yaw=np.pi / 2
+        )
     )
 
     simulation = MujocoSim(world=pr2._world, headless=True)
@@ -478,14 +489,16 @@ def test_a_base_too_weak_to_move_does_not_report_the_pose_it_was_commanded_to(pr
 
 
 def _spawn_localized_pr2(
-    world_T_odom: HomogeneousTransformationMatrix,
-    odom_T_robot_start: HomogeneousTransformationMatrix | None = None,
+    world_T_odometry: HomogeneousTransformationMatrix,
+    odometry_T_robot_start: HomogeneousTransformationMatrix | None = None,
 ) -> PR2:
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
     return RobotSpecification(
-        PR2, world_T_odom=world_T_odom, odom_T_robot_start=odom_T_robot_start
+        PR2,
+        localization_pose=world_T_odometry,
+        odometry_T_robot_start=odometry_T_robot_start,
     ).spawn(world)
 
 
@@ -493,13 +506,13 @@ def _spawn_localized_pr2(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
 )
 def test_a_localized_base_starts_where_the_world_has_it():
-    world_T_odom = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=-0.5, yaw=np.pi / 2
     )
-    odom_T_robot_start = HomogeneousTransformationMatrix.from_xyz_rpy(
+    odometry_T_robot_start = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=0.5, y=0.2, yaw=0.3
     )
-    pr2 = _spawn_localized_pr2(world_T_odom, odom_T_robot_start)
+    pr2 = _spawn_localized_pr2(world_T_odometry, odometry_T_robot_start)
 
     simulation = MujocoSim(world=pr2._world, headless=True)
     simulation.start_stepped_simulation()
@@ -521,10 +534,10 @@ def test_a_localized_base_drives_along_its_odom_and_reports_odometry_in_it():
     The odom is turned by a quarter against the world's root, so driving forward moves
     the base along the root's y-axis, while its odometry counts along the odom's x-axis.
     """
-    world_T_odom = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_odometry = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=-0.5, yaw=np.pi / 2
     )
-    pr2 = _spawn_localized_pr2(world_T_odom)
+    pr2 = _spawn_localized_pr2(world_T_odometry)
     world = pr2._world
     drive = pr2.drive
 
@@ -551,7 +564,7 @@ def test_a_localized_base_drives_along_its_odom_and_reports_odometry_in_it():
 )
 def test_the_base_starts_where_the_world_has_it():
     start = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, yaw=0.5)
-    pr2 = _spawn_pr2(odom_T_robot_start=start)
+    pr2 = _spawn_pr2(odometry_T_robot_start=start)
 
     simulation = MujocoSim(world=pr2._world, headless=True)
     simulation.start_stepped_simulation()

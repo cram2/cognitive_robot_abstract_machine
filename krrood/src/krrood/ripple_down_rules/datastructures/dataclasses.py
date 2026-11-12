@@ -9,7 +9,6 @@ from omegaconf import MISSING
 from sqlalchemy.orm import DeclarativeBase as SQLTable
 from typing_extensions import (
     Any,
-    Optional,
     Dict,
     Type,
     Tuple,
@@ -38,7 +37,7 @@ if TYPE_CHECKING:
     from ..rules import Rule
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseQuery:
     """
     This is a dataclass that represents an attribute of an object and its target value. If attribute name is
@@ -54,7 +53,7 @@ class CaseQuery:
     """
     The name of the attribute.
     """
-    _attribute_types: Tuple[Type, ...]
+    _attribute_types: tuple[type, ...]
     """
     The type(s) of the attribute.
     """
@@ -62,16 +61,16 @@ class CaseQuery:
     """
     Whether the attribute can only take one value (i.e. True) or multiple values (i.e. False).
     """
-    _target: Optional[CallableExpression] = None
+    _target: CallableExpression | None = None
     """
     The relational target (the evaluatable conclusion of the rule) which is a callable expression that varies with
      the case.
     """
-    default_value: Optional[Any] = None
+    default_value: Any | None = None
     """
     The default value of the attribute. This is used when the target value is not provided.
     """
-    scope: Optional[Dict[str, Any]] = field(
+    scope: dict[str, Any] | None = field(
         default_factory=lambda: inspect.currentframe().f_back.f_back.f_globals
     )
     """
@@ -79,15 +78,15 @@ class CaseQuery:
     to the user when they are prompted for input. If it is not provided, it will be set to the global scope of the
     caller.
     """
-    _case: Optional[Union[Case, SQLTable]] = None
+    _case: Case | SQLTable | None = None
     """
     The created case from the original case that the attribute belongs to.
     """
-    _target_value: Optional[Any] = None
+    _target_value: Any | None = None
     """
     The target value of the case query. (This is the result of the target expression evaluation on the case.)
     """
-    conditions: Optional[CallableExpression] = None
+    conditions: CallableExpression | None = None
     """
     The conditions that must be satisfied for the target value to be valid.
     """
@@ -96,16 +95,16 @@ class CaseQuery:
     Whether the case is a dict representing the arguments of an actual function or not,
     most likely means it came from RDRDecorator, the the rdr takes function arguments and outputs the function output.
     """
-    function_args_type_hints: Optional[Dict[str, Type]] = None
+    function_args_type_hints: dict[str, type] | None = None
     """
     The type hints of the function arguments. This is used to recreate the function signature.
     """
-    rdr: Optional[RippleDownRules] = None
+    rdr: RippleDownRules | None = None
     """
     The Ripple Down Rules that was used to answer the case query.
     """
 
-    def render_rule_tree(self, filepath: Optional[str] = None, view: bool = False):
+    def render_rule_tree(self, *, filepath: str | None = None, view: bool = False):
         if self.rdr is None:
             return
         render_tree(
@@ -144,7 +143,7 @@ class CaseQuery:
             )
 
     @property
-    def case_type(self) -> Type:
+    def case_type(self) -> type:
         """
         :return: The type of the case that the attribute belongs to.
         """
@@ -212,14 +211,14 @@ class CaseQuery:
         return ",".join([t.__name__ for t in self.core_attribute_type])
 
     @property
-    def core_attribute_type(self) -> Tuple[Type, ...]:
+    def core_attribute_type(self) -> tuple[type, ...]:
         """
         :return: The core type of the attribute.
         """
         return tuple(t for t in self.attribute_type if t not in (set, list))
 
     @property
-    def attribute_type(self) -> Tuple[Type, ...]:
+    def attribute_type(self) -> tuple[type, ...]:
         """
         :return: The type of the attribute.
         """
@@ -246,7 +245,7 @@ class CaseQuery:
         return self._attribute_types
 
     @attribute_type.setter
-    def attribute_type(self, value: Type):
+    def attribute_type(self, value: type):
         """
         Set the type of the attribute.
         """
@@ -271,7 +270,7 @@ class CaseQuery:
         )
 
     @property
-    def target(self) -> Optional[CallableExpression]:
+    def target(self) -> CallableExpression | None:
         """
         :return: The target expression of the attribute.
         """
@@ -287,7 +286,7 @@ class CaseQuery:
         return self._target
 
     @target.setter
-    def target(self, value: Optional[CallableExpression]):
+    def target(self, value: CallableExpression | None):
         """
         Set the target expression of the attribute.
         """
@@ -329,10 +328,10 @@ class CaseQuery:
 
     def __copy__(self):
         return CaseQuery(
-            self.original_case,
-            self.attribute_name,
-            self.attribute_type,
-            self.mutually_exclusive,
+            original_case=self.original_case,
+            attribute_name=self.attribute_name,
+            _attribute_types=self.attribute_type,
+            mutually_exclusive=self.mutually_exclusive,
             _target=self.target,
             default_value=self.default_value,
             scope=self.scope,
@@ -345,7 +344,7 @@ class CaseQuery:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CaseConf:
     factory_method: Callable[[Any], Any] = MISSING
 
@@ -353,7 +352,7 @@ class CaseConf:
         return self.factory_method()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RDRConclusion:
     """
     This dataclass represents a conclusion of a Ripple Down Rule.
@@ -389,7 +388,7 @@ class RDRConclusion:
 
             value = getattr(conclusion, name)
 
-            self._record_dependency(name)
+            self._record_dependency(attr_name=name)
 
             return value
 
@@ -399,7 +398,7 @@ class RDRConclusion:
         else:
             setattr(self._wrapped, name, value)
 
-    def _record_dependency(self, attr_name):
+    def _record_dependency(self, *, attr_name):
         # Inspect stack to find instance of CallableExpression
         for frame_info in inspect.stack():
             func_name = frame_info.function

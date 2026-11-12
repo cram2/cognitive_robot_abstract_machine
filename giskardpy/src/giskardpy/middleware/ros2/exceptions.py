@@ -5,13 +5,14 @@ Exceptions raised while executing a trajectory on a robot.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Type
+from datetime import timedelta
 
 from giskardpy.data_types.exceptions import (
     GiskardException,
     SetupException,
 )
 from semantic_digital_twin.adapters.ros.messages import MetaData
+from semantic_digital_twin.world_description.connections import WheeledDrive
 
 
 @dataclass
@@ -25,7 +26,7 @@ class UnknownMinimumVelocityJointError(SetupException):
     The joint the override was written for.
     """
 
-    commanded_joint_names: List[str]
+    commanded_joint_names: list[str]
     """
     The joints the publisher actually commands.
     """
@@ -38,6 +39,82 @@ class UnknownMinimumVelocityJointError(SetupException):
 
     def suggest_correction(self) -> str:
         return f"Use one of {sorted(self.commanded_joint_names)}."
+
+
+@dataclass
+class ControllersNotLoadedError(SetupException):
+    """
+    Raised when controllers Giskard was told to use are not loaded by their controller
+    manager.
+    """
+
+    controller_manager_name: str
+    """
+    The controller manager that was asked.
+    """
+
+    missing_controllers: list[str]
+    """
+    The requested controllers the manager does not report.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f'The controller manager "{self.controller_manager_name}" has not loaded '
+            f"the controllers {self.missing_controllers}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Load the controllers or remove them from the whitelist."
+
+
+@dataclass
+class ControllersNotActiveError(SetupException):
+    """
+    Raised when controllers Giskard was told to use are loaded by their controller
+    manager but do not run.
+    """
+
+    controller_manager_name: str
+    """
+    The controller manager that was asked.
+    """
+
+    inactive_controllers: list[str]
+    """
+    The requested controllers the manager reports in another state than active.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The controllers {self.inactive_controllers} of the controller manager "
+            f'"{self.controller_manager_name}" are not active.'
+        )
+
+    def suggest_correction(self) -> str:
+        return "Activate the controllers or remove them from the whitelist."
+
+
+@dataclass
+class NoUniqueDriveError(SetupException):
+    """
+    Raised when Giskard is told to command the drive of a world without being told which
+    drive, and the world does not hold exactly one.
+    """
+
+    drives: list[WheeledDrive]
+    """
+    The drives the world holds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Expected exactly one drive to command, but the world holds "
+            f"{[str(drive.name) for drive in self.drives]}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Name the drive to command."
 
 
 @dataclass
@@ -117,7 +194,7 @@ class NoWatchedClientError(GiskardException):
     Raised when a presence check is asked about a client while it watches none.
     """
 
-    check_type: Type
+    check_type: type
     """
     The check that was asked.
     """
@@ -209,60 +286,19 @@ class GiskardWorldUpdateNotReceivedError(ExecutionException):
     The position in Giskard's stream that was waited for.
     """
 
-    timeout: float
+    timeout: timedelta
     """
-    Seconds that were spent waiting.
+    The time that was spent waiting.
     """
 
     def error_message(self) -> str:
         return (
             f"Update #{self.awaited_sequence_number} of Giskard did not arrive within "
-            f"{self.timeout}s."
+            f"{self.timeout.total_seconds()}s."
         )
 
     def suggest_correction(self) -> str:
         return "Check that this world is still connected to the world sync topic."
-
-
-@dataclass
-class ExecutionPreemptedException(ExecutionException):
-    """
-    Raised when the execution of a goal is preempted.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that was preempted.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.namespace}' preempted. Stopping execution."
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class ExecutionTimeoutException(ExecutionException):
-    """
-    Raised when the execution of a goal takes too long.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that timed out.
-    """
-
-    reason: str
-    """
-    A description of why the execution timed out.
-    """
-
-    def error_message(self) -> str:
-        return f"'{self.namespace}' timed out. {self.reason}"
-
-    def suggest_correction(self) -> str:
-        return ""
 
 
 @dataclass
@@ -276,6 +312,79 @@ class ExecutionAbortedException(ExecutionException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class GoalRequestNotAnsweredError(ExecutionException):
+    """
+    Raised when no action server answered a goal request in time.
+
+    A server whose node is no longer spun still advertises its action, so a client can
+    find it and send its goal there, where nobody will ever accept or reject it.
+    """
+
+    action_name: str
+    """
+    The action the goal was sent to.
+    """
+
+    timeout: timedelta
+    """
+    How long the client waited for the answer.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No server of '{self.action_name}' accepted or rejected the goal within "
+            f"{self.timeout.total_seconds()}s."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Check that exactly one running server offers '{self.action_name}', for "
+            f"example with 'ros2 action info', then send the goal again."
+        )
+
+
+@dataclass
+class ActionClientClosedError(ExecutionException):
+    """
+    Raised when a goal is sent through an action client that was closed.
+    """
+
+    action_name: str
+    """
+    The action the closed client was built for.
+    """
+
+    def error_message(self) -> str:
+        return f"The client of '{self.action_name}' was closed and sends no more goals."
+
+    def suggest_correction(self) -> str:
+        return "Build a new client for the action and send the goal through it."
+
+
+@dataclass
+class UnexpectedGoalStatusError(ExecutionException):
+    """
+    Raised when a goal ends in a status that a finished goal cannot have.
+    """
+
+    action_name: str
+    """
+    The action the goal was sent to.
+    """
+
+    status: int
+    """
+    The :class:`action_msgs.msg.GoalStatus` the goal reported.
+    """
+
+    def error_message(self) -> str:
+        return f"A goal of '{self.action_name}' ended with status {self.status}."
+
+    def suggest_correction(self) -> str:
+        return "Report this to the maintainers of the action server."
 
 
 @dataclass
@@ -303,79 +412,77 @@ class UnserializableGoalError(ExecutionException):
 
 
 @dataclass
-class ExecutionSucceededPrematurely(ExecutionException):
+class StatechartOutOfStepError(ExecutionException):
     """
-    Raised when the execution finishes before the minimum execution time.
-    """
-
-    namespace: str
-    """
-    The namespace of the action server that finished too early.
+    Raised when a client sends a child for a statechart that holds other nodes than the
+    client's copy of it.
     """
 
-    def error_message(self) -> str:
-        return f"'{self.namespace}' executed too quickly, stopping execution."
-
-    def suggest_correction(self) -> str:
-        return ""
-
-
-@dataclass
-class FollowJointTrajectoryError(ExecutionException):
+    node_count: int
     """
-    Raised when a follow joint trajectory action server fails to execute a goal.
+    How many nodes the running statechart holds.
     """
 
-    namespace: str
+    first_sent_node_index: int
     """
-    The namespace of the action server that failed.
-    """
-
-    error_description: str
-    """
-    A human-readable description of the action server error code.
+    The index the client gave the first node it sent.
     """
 
     def error_message(self) -> str:
-        return f"'{self.namespace}' failed to execute goal. Error: '{self.error_description}'"
+        return (
+            f"The client sent nodes from index {self.first_sent_node_index} on, but the "
+            f"running statechart holds {self.node_count}."
+        )
 
     def suggest_correction(self) -> str:
-        return ""
+        return "Send children only for the goal the client's statechart was sent as."
 
 
 @dataclass
-class FollowJointTrajectory_INVALID_GOAL(FollowJointTrajectoryError):
+class StatechartNotEndedByResultError(ExecutionException):
     """
-    Raised when the action server reports an invalid goal.
+    Raised when the result of a goal that succeeded leaves the client's statechart in a
+    state that has not ended.
     """
+
+    def error_message(self) -> str:
+        return "The result of the finished goal does not end the client's statechart."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Check that the statechart Giskard ran holds the same nodes as the "
+            "client's copy of it."
+        )
 
 
 @dataclass
-class FollowJointTrajectory_INVALID_JOINTS(FollowJointTrajectoryError):
+class StateUpdateAheadOfStatechartError(ExecutionException):
     """
-    Raised when the action server reports invalid joints.
-    """
-
-
-@dataclass
-class FollowJointTrajectory_OLD_HEADER_TIMESTAMP(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports an outdated header timestamp.
+    Raised when Giskard reports the states of more nodes than the client's copy of the
+    statechart holds.
     """
 
-
-@dataclass
-class FollowJointTrajectory_PATH_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
+    node_count: int
     """
-    Raised when the action server reports a path tolerance violation.
+    How many nodes the client's copy holds.
     """
 
+    reported_node_count: int
+    """
+    How many nodes Giskard reported a state for.
+    """
 
-@dataclass
-class FollowJointTrajectory_GOAL_TOLERANCE_VIOLATED(FollowJointTrajectoryError):
-    """
-    Raised when the action server reports a goal tolerance violation.
-    """
+    def error_message(self) -> str:
+        return (
+            f"Giskard reported the states of {self.reported_node_count} nodes, but the "
+            f"client's statechart holds {self.node_count}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Apply the states only to the statechart that was sent as the running goal."
+        )
+
 
 @dataclass
 class MotionServerThreadStillRunningError(GiskardException):

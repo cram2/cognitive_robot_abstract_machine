@@ -1,23 +1,12 @@
 from __future__ import annotations
 
 import inspect
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field, is_dataclass, fields, MISSING
 from functools import lru_cache
 from inspect import isclass
-from typing import (
-    Any,
-    Callable,
-    Set,
-    Dict,
-    NamedTuple,
-    Tuple,
-    Type,
-    List,
-    TYPE_CHECKING,
-    Optional,
-    Union,
-)
+from typing_extensions import Any, Callable, TYPE_CHECKING, Optional, Union
 
 import rustworkx
 
@@ -41,14 +30,28 @@ if TYPE_CHECKING:
     )
 
 
-class _StaticDefault(NamedTuple):
+@dataclass(kw_only=True, frozen=True)
+class _FieldDefault(ABC):
     """
-    A field name paired with its static default value.
+    The default of one field of a domain class, written when the class is allocated.
     """
 
     name: str
     """
     Name of the dataclass field.
+    """
+
+    @abstractmethod
+    def produce(self) -> Any:
+        """
+        :return: The value to assign to the field.
+        """
+
+
+@dataclass(kw_only=True, frozen=True)
+class _StaticDefault(_FieldDefault):
+    """
+    A field default that is a fixed value.
     """
 
     value: Any
@@ -56,15 +59,14 @@ class _StaticDefault(NamedTuple):
     The literal default value to assign.
     """
 
+    def produce(self) -> Any:
+        return self.value
 
-class _DefaultFactory(NamedTuple):
-    """
-    A field name paired with its zero-argument factory callable.
-    """
 
-    name: str
+@dataclass(kw_only=True, frozen=True)
+class _DefaultFactory(_FieldDefault):
     """
-    Name of the dataclass field.
+    A field default produced by a zero-argument factory.
     """
 
     factory: Callable[[], Any]
@@ -72,52 +74,34 @@ class _DefaultFactory(NamedTuple):
     Callable that produces a fresh default value when invoked.
     """
 
-
-@dataclass(frozen=True)
-class _AllocationPlan:
-    """
-    Precomputed default-value information for a single domain class.
-
-    Separates fields with literal defaults from fields whose defaults are produced by a
-    factory, so the allocation loop can handle each case without re-inspecting the
-    dataclass on every call.
-    """
-
-    static_defaults: Tuple[_StaticDefault, ...]
-    """
-    Fields whose default is a fixed value.
-    """
-
-    default_factories: Tuple[_DefaultFactory, ...]
-    """
-    Fields whose default must be produced by calling a factory.
-    """
+    def produce(self) -> Any:
+        return self.factory()
 
 
 @lru_cache(maxsize=None)
-def _get_allocation_plan(original_clazz: Type) -> _AllocationPlan:
+def _get_field_defaults(original_clazz: type) -> tuple[_FieldDefault, ...]:
     """
     Precompute the default values of a domain class for allocation.
 
     :param original_clazz: The domain class.
-    :return: Static defaults and default factories for each field with a default.
+    :return: The default of each field that has one, in the order the fields are
+        declared, which is the order the class's constructor assigns them in.
     """
     if not is_dataclass(original_clazz):
-        return _AllocationPlan((), ())
+        return ()
 
-    static_defaults = []
-    default_factories = []
+    defaults = []
     for field_ in fields(original_clazz):
         if field_.default is not MISSING:
-            static_defaults.append(_StaticDefault(field_.name, field_.default))
+            defaults.append(_StaticDefault(name=field_.name, value=field_.default))
         elif field_.default_factory is not MISSING:
-            default_factories.append(
-                _DefaultFactory(field_.name, field_.default_factory)
+            defaults.append(
+                _DefaultFactory(name=field_.name, factory=field_.default_factory)
             )
-    return _AllocationPlan(tuple(static_defaults), tuple(default_factories))
+    return tuple(defaults)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FromDataAccessObjectWorkItem(DataAccessObjectWorkItem):
     """
     Work item for converting a Data Access Object back to a domain object.
@@ -126,7 +110,49 @@ class FromDataAccessObjectWorkItem(DataAccessObjectWorkItem):
     domain_object: Any
 
 
-@dataclass
+@dataclass(kw_only=True)
+class ObjectInheritingFromAlternativeMapping:
+    """
+    A domain object whose class inherits from an alternatively mapped class, and so
+    takes the attributes it inherits from the domain object of that class's mapping.
+    """
+
+    domain_object: Any
+    """
+    The object whose inherited attributes are set.
+    """
+
+    parent: AlternativeMapping
+    """
+    The mapping of the alternatively mapped base class, built from the object's row.
+    """
+
+    own_attribute_keys: tuple[str, ...]
+    """
+    The attributes the object's own columns and relationships set, which the parent does
+    not override.
+    """
+
+    def copy_inherited_attributes(self, *, parent_domain_object: Any) -> None:
+        """
+        Set every field of the object that the parent's domain object has and the
+        object's own columns and relationships do not set.
+
+        :param parent_domain_object: The domain object the parent mapping converted to.
+        """
+        for field_ in fields(self.domain_object):
+            if field_.name in self.own_attribute_keys:
+                continue
+            if not hasattr(parent_domain_object, field_.name):
+                continue
+            object.__setattr__(
+                self.domain_object,
+                field_.name,
+                getattr(parent_domain_object, field_.name),
+            )
+
+
+@dataclass(kw_only=True)
 class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkItem]):
     """
     State for converting Data Access Objects back to domain objects.
@@ -137,7 +163,7 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     Whether the state is currently in discovery mode.
     """
 
-    initialized_ids: Set[int] = field(default_factory=set)
+    initialized_ids: set[int] = field(default_factory=set)
     """
     Set of DAO ids that have been fully initialized.
     """
@@ -147,8 +173,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     Whether the state is currently in the processing loop.
     """
 
-    synthetic_parent_daos: Dict[
-        Tuple[int, Type[DataAccessObject]], DataAccessObject
+    synthetic_parent_daos: dict[
+        tuple[int, type[DataAccessObject]], DataAccessObject
     ] = field(default_factory=dict)
     """
     Cache for synthetic parent DAOs to maintain identity across discovery and filling
@@ -157,6 +183,14 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     Synthentic DAOs are used when the parent of a DAO uses and AlternativeMapping. In
     this case the, the parent has to be converted using its specialized routine. After
     that, the child can copy its inherited fields from the parent.
+    """
+
+    objects_inheriting_from_alternative_mappings: list[
+        ObjectInheritingFromAlternativeMapping
+    ] = field(default_factory=list)
+    """
+    The objects of this conversion whose classes inherit from an alternatively mapped
+    class, waiting for their parent mappings to be converted.
     """
 
     _class_dependencies: rustworkx.PyDiGraph = field(
@@ -171,8 +205,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     `target`.
     """
 
-    _alternative_mappings_being_referenced: Dict[
-        AlternativeMapping, List[Tuple[Any, MappedVariable]]
+    _alternative_mappings_being_referenced: dict[
+        AlternativeMapping, list[tuple[Any, MappedVariable]]
     ] = field(default_factory=lambda: defaultdict(list))
     """
     A dictionary that maps remembers all occurrences of an alternative mapping in any
@@ -184,7 +218,15 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
     descriptions are MappedVariable instances from EQL.
     """
 
-    _converted_alternative_mappings: Dict[AlternativeMapping, Any] = field(
+    _alternative_mappings_being_resolved: set[AlternativeMapping] = field(
+        default_factory=set
+    )
+    """
+    The alternative mappings whose conversion has started and not finished, which a
+    reference cycle leads back to.
+    """
+
+    _converted_alternative_mappings: dict[AlternativeMapping, Any] = field(
         default_factory=dict
     )
     """
@@ -208,23 +250,39 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         self._alternative_mappings_being_referenced = defaultdict(list)
 
     def resolve_alternative_mapping(
-        self, alternative_mapping: AlternativeMapping
+        self, *, alternative_mapping: AlternativeMapping
     ) -> Any:
         """
         Convert an alternative mapping to its final domain object exactly once per
-        instance.
+        instance, after the mappings of the same class its fields hold directly, so that
+        its :meth:`~AlternativeMapping.to_domain_object` sees their domain objects. The
+        class dependencies order mappings of different classes.
 
         :param alternative_mapping: The alternative mapping instance to convert.
         :return: The final domain object.
         """
-        try:
+        if alternative_mapping in self._converted_alternative_mappings:
             return self._converted_alternative_mappings[alternative_mapping]
-        except KeyError:
-            domain_object = alternative_mapping.to_domain_object()
-            self._converted_alternative_mappings[alternative_mapping] = domain_object
-            return domain_object
 
-    def resolve_result(self, result: Any) -> Any:
+        self._alternative_mappings_being_resolved.add(alternative_mapping)
+        for field_ in fields(alternative_mapping):
+            value = getattr(alternative_mapping, field_.name)
+            if (
+                type(value) is type(alternative_mapping)
+                and value not in self._alternative_mappings_being_resolved
+            ):
+                object.__setattr__(
+                    alternative_mapping,
+                    field_.name,
+                    self.resolve_alternative_mapping(alternative_mapping=value),
+                )
+        domain_object = alternative_mapping.to_domain_object()
+        self._alternative_mappings_being_resolved.discard(alternative_mapping)
+
+        self._converted_alternative_mappings[alternative_mapping] = domain_object
+        return domain_object
+
+    def resolve_result(self, *, result: Any) -> Any:
         """
         Resolve a memoized conversion result to its final domain object.
 
@@ -232,10 +290,10 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         :return: The final domain object.
         """
         if isinstance(result, AlternativeMapping):
-            return self.resolve_alternative_mapping(result)
+            return self.resolve_alternative_mapping(alternative_mapping=result)
         return result
 
-    def is_initialized(self, dao_instance: DataAccessObject) -> bool:
+    def is_initialized(self, *, dao_instance: DataAccessObject) -> bool:
         """
         Check if the given DAO instance has been fully initialized.
 
@@ -244,7 +302,7 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         """
         return id(dao_instance) in self.initialized_ids
 
-    def mark_initialized(self, dao_instance: DataAccessObject):
+    def mark_initialized(self, *, dao_instance: DataAccessObject):
         """
         Mark the given DAO instance as fully initialized.
 
@@ -252,7 +310,7 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         """
         self.initialized_ids.add(id(dao_instance))
 
-    def push_work_item(self, dao_instance: DataAccessObject, domain_object: Any):
+    def push_work_item(self, *, dao_instance: DataAccessObject, domain_object: Any):
         """
         Add a new work item to the processing queue.
 
@@ -266,7 +324,7 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         )
 
     def allocate_and_memoize(
-        self, dao_instance: DataAccessObject, original_clazz: Type
+        self, *, dao_instance: DataAccessObject, original_clazz: type
     ) -> Any:
         """
         Allocate a new instance and store it in the memoization dictionary.
@@ -278,16 +336,13 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         :return: The uninitialized domain object instance.
         """
         result = original_clazz.__new__(original_clazz)
-        plan = _get_allocation_plan(original_clazz)
-        for entry in plan.static_defaults:
-            object.__setattr__(result, entry.name, entry.value)
-        for entry in plan.default_factories:
-            object.__setattr__(result, entry.name, entry.factory())
-        self.register(dao_instance, result)
+        for field_default in _get_field_defaults(original_clazz):
+            object.__setattr__(result, field_default.name, field_default.produce())
+        self.register(source=dao_instance, target=result)
         return result
 
     def _build_class_dependencies(
-        self, alternative_mapping_types: List[Type[AlternativeMapping]]
+        self, *, alternative_mapping_types: list[type[AlternativeMapping]]
     ):
         """
         Build the class dependencies for the given types that can be used to infer the
@@ -296,23 +351,25 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
         :param alternative_mapping_types: The types to build the dependency graph for.
         """
-        types_to_index: Dict[Type, int] = {
+        types_to_index: dict[type, int] = {
             type_: self._class_dependencies.add_node(type_)
             for type_ in alternative_mapping_types
         }  # add all dao types to the dependency graph
 
         # add all dependencies between the classes defined from the alternative mappings
         for alternative_mapping_type in alternative_mapping_types:
-
             self._build_dependencies_of_alternative_mapping(
-                alternative_mapping_type, alternative_mapping_types, types_to_index
+                alternative_mapping=alternative_mapping_type,
+                concrete_alternative_mappings=alternative_mapping_types,
+                types_to_index=types_to_index,
             )
 
     def _build_dependencies_of_alternative_mapping(
         self,
-        alternative_mapping: Type[AlternativeMapping],
-        concrete_alternative_mappings: List[Type[AlternativeMapping]],
-        types_to_index: Dict[Type, int],
+        *,
+        alternative_mapping: type[AlternativeMapping],
+        concrete_alternative_mappings: list[type[AlternativeMapping]],
+        types_to_index: dict[type, int],
     ):
         """
         Builds the dependencies of a given alternative mapping and updates the internal
@@ -327,10 +384,8 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         """
         # get all concrete types that are affected by the dependencies
         for required_domain_type in alternative_mapping.required_pre_build_classes():
-
             # for every concrete dao type discovered in the discovery phase
             for concrete_alternative_mapping in concrete_alternative_mappings:
-
                 # get the concrete domain type of the dao current dao type
                 concrete_domain_type = concrete_alternative_mapping.original_class()
 
@@ -347,7 +402,9 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
                 self._class_dependencies.add_edge(
                     types_to_index[concrete_alternative_mapping],
                     types_to_index[alternative_mapping],
-                    DeclaredOrder(concrete_alternative_mapping, alternative_mapping),
+                    DeclaredOrder(
+                        earlier=concrete_alternative_mapping, later=alternative_mapping
+                    ),
                 )
 
     def convert_alternative_mappings_to_domain_objects(self):
@@ -359,14 +416,15 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
         objects. The class dependency graph determines the conversion order so that the
         alternative mappings respect their dependencies.
         """
-        instances_by_type: Dict[Type, List[AlternativeMapping]] = defaultdict(list)
+        instances_by_type: dict[type, list[AlternativeMapping]] = defaultdict(list)
         for instance in self._alternative_mappings_being_referenced:
             instances_by_type[type(instance)].append(instance)
 
         # types in conversion order first, then any referenced types not in the graph
         # (e.g. instances that were already converted in a previous conversion)
         ordered_types = ConversionOrder(
-            self._class_dependencies, self._alternative_mappings_being_referenced
+            declared_dependencies=self._class_dependencies,
+            references=self._alternative_mappings_being_referenced,
         ).sort_types()
         ordered_types += [
             type_ for type_ in instances_by_type if type_ not in set(ordered_types)
@@ -374,11 +432,26 @@ class FromDataAccessObjectState(DataAccessObjectState[FromDataAccessObjectWorkIt
 
         for alternative_mapping_type in ordered_types:
             for instance in instances_by_type[alternative_mapping_type]:
-                domain_object = self.resolve_alternative_mapping(instance)
+                domain_object = self.resolve_alternative_mapping(
+                    alternative_mapping=instance
+                )
                 for (
                     referencing_instance,
                     reference,
                 ) in self._alternative_mappings_being_referenced[instance]:
                     reference._set_external_root_instance_value_(
-                        referencing_instance, domain_object
+                        instance=referencing_instance, value=domain_object
                     )
+
+    def copy_attributes_inherited_from_alternative_mappings(self) -> None:
+        """
+        Convert the parent mapping of every object whose class inherits from an
+        alternatively mapped class, and copy the inherited attributes onto the object.
+        """
+        for inheriting_object in self.objects_inheriting_from_alternative_mappings:
+            inheriting_object.copy_inherited_attributes(
+                parent_domain_object=self.resolve_alternative_mapping(
+                    alternative_mapping=inheriting_object.parent
+                )
+            )
+        self.objects_inheriting_from_alternative_mappings.clear()

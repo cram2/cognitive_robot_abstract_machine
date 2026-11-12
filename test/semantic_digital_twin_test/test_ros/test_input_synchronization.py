@@ -5,12 +5,15 @@ Tests for the synchronizers that write ROS topics and tf frames into the world s
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
-from typing import Any, Optional
+from typing_extensions import Any, Optional
 
 import pytest
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Odometry
 from numpy.testing import assert_allclose
+from rclpy._rclpy_pybind11 import RCLError
+from rclpy.node import Node
+from rclpy.subscription import Subscription
 from sensor_msgs.msg import JointState
 
 from semantic_digital_twin.adapters.ros.input_synchronization import (
@@ -29,10 +32,7 @@ from semantic_digital_twin.exceptions import (
     ConnectionCannotBeTrackedByTfFrameError,
     UnboundMessageTypeError,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -69,6 +69,17 @@ class RecordedTransformLookup:
 
     def lookup_pose(self, target_frame: str, source_frame: str) -> PoseStamped:
         return self.parent_T_child
+
+
+def subscriptions_on_topic(node: Node, topic_name: str) -> list[Subscription]:
+    """
+    The subscriptions a node holds on the given fully qualified topic.
+    """
+    return [
+        subscription
+        for subscription in node.subscriptions
+        if subscription.topic_name == topic_name
+    ]
 
 
 def latest_message_field_type(synchronizer_type: type) -> Any:
@@ -138,9 +149,9 @@ def omni_drive_world() -> World:
 
 
 @pytest.fixture()
-def world_with_two_connections() -> (
-    tuple[World, ActiveConnection1DOF, ActiveConnection1DOF]
-):
+def world_with_two_connections() -> tuple[
+    World, ActiveConnection1DOF, ActiveConnection1DOF
+]:
     """
     A world whose root drives two separate one degree of freedom connections, standing
     for the joints of two different robot parts.
@@ -159,6 +170,30 @@ def world_with_two_connections() -> (
         world.add_connection(part_connection)
         world.add_connection(other_connection)
     return world, part_connection, other_connection
+
+
+@pytest.fixture()
+def two_part_sources_of_one_topic(
+    rclpy_node, world_with_two_connections
+) -> tuple[PendingJointPositionSource, PendingJointPositionSource]:
+    """
+    The sources of two robot parts whose joints a robot publishes on the same topic.
+    """
+    world, part_connection, other_connection = world_with_two_connections
+    return (
+        PendingJointPositionSource(
+            world=world,
+            node=rclpy_node,
+            topic_name="joint_states",
+            connections=[part_connection],
+        ),
+        PendingJointPositionSource(
+            world=world,
+            node=rclpy_node,
+            topic_name="joint_states",
+            connections=[other_connection],
+        ),
+    )
 
 
 @pytest.fixture()
@@ -379,6 +414,160 @@ def test_closing_the_source_of_a_base_destroys_its_subscription(
     source.close()
 
     assert subscription not in rclpy_node.subscriptions
+
+
+# %% sharing one subscription between the readers of a topic
+
+
+def test_readers_of_one_topic_share_one_subscription(
+    rclpy_node, two_part_sources_of_one_topic
+):
+    source, other_source = two_part_sources_of_one_topic
+
+    assert subscriptions_on_topic(rclpy_node, source.topic_name) == [
+        source.subscription
+    ]
+    assert other_source.subscription is source.subscription
+
+
+def test_a_rewriting_reader_shares_the_subscription_of_its_source(
+    two_part_sources_of_one_topic,
+):
+    source, _ = two_part_sources_of_one_topic
+
+    rewriting_source = source.rewriting_every_cycle()
+
+    assert rewriting_source.subscription is source.subscription
+
+
+def test_one_message_reaches_every_reader_of_a_topic(two_part_sources_of_one_topic):
+    source, other_source = two_part_sources_of_one_topic
+    message = joint_state_message("joint", 0.42)
+
+    source.subscription.callback(message)
+
+    assert source.latest_message is message
+    assert other_source.latest_message is message
+
+
+def test_a_reader_consuming_a_message_leaves_it_to_the_other_readers(
+    two_part_sources_of_one_topic,
+):
+    source, other_source = two_part_sources_of_one_topic
+    message = joint_state_message(source.connections[0].name.name, 0.42)
+    source.subscription.callback(message)
+
+    source.apply()
+
+    assert source.latest_message is None
+    assert other_source.latest_message is message
+
+
+def test_closing_one_reader_keeps_the_subscription_for_the_others(
+    rclpy_node, two_part_sources_of_one_topic
+):
+    source, other_source = two_part_sources_of_one_topic
+    message = joint_state_message("joint", 0.42)
+
+    source.close()
+    source.subscription.callback(message)
+
+    assert other_source.subscription in rclpy_node.subscriptions
+    assert other_source.latest_message is message
+    assert source.latest_message is None
+
+
+def test_closing_the_last_reader_destroys_the_subscription(
+    rclpy_node, two_part_sources_of_one_topic
+):
+    source, other_source = two_part_sources_of_one_topic
+
+    source.close()
+    other_source.close()
+
+    assert subscriptions_on_topic(rclpy_node, source.topic_name) == []
+
+
+def test_closing_a_reader_twice_keeps_the_subscription_for_the_others(
+    rclpy_node, two_part_sources_of_one_topic
+):
+    source, other_source = two_part_sources_of_one_topic
+
+    source.close()
+    source.close()
+
+    assert other_source.subscription in rclpy_node.subscriptions
+
+
+def test_a_reader_after_the_last_one_closed_receives_on_a_new_subscription(
+    rclpy_node, two_part_sources_of_one_topic
+):
+    source, other_source = two_part_sources_of_one_topic
+    source.close()
+    other_source.close()
+
+    new_source = PendingJointStateSynchronizer(
+        world=source.world, node=rclpy_node, topic_name=source.topic_name
+    )
+
+    assert subscriptions_on_topic(rclpy_node, source.topic_name) == [
+        new_source.subscription
+    ]
+    assert new_source.subscription is not source.subscription
+
+
+def test_readers_of_different_topics_have_separate_subscriptions(
+    rclpy_node, mini_world: World
+):
+    source = PendingJointStateSynchronizer(
+        world=mini_world, node=rclpy_node, topic_name="joint_states"
+    )
+    other_source = PendingJointStateSynchronizer(
+        world=mini_world, node=rclpy_node, topic_name="other_joint_states"
+    )
+
+    assert source.subscription is not other_source.subscription
+
+
+def test_a_reader_of_another_message_type_does_not_join_the_subscription(
+    rclpy_node, omni_drive_world: World
+):
+    """
+    Joining would hand the reader messages of the wrong type, so the attempt is left to
+    ROS, which rejects a second type on a topic of the same node.
+    """
+    joint_state_reader = PendingJointStateSynchronizer(
+        world=omni_drive_world, node=rclpy_node, topic_name="shared_name"
+    )
+
+    with pytest.raises(RCLError):
+        OdometrySynchronizer(
+            world=omni_drive_world,
+            node=rclpy_node,
+            topic_name="shared_name",
+            connection=omni_drive_world.get_connection_by_name("root_T_base"),
+        )
+
+    assert joint_state_reader.subscription.callback.receivers == [
+        joint_state_reader.buffer_message
+    ]
+
+
+def test_a_reader_leaves_a_subscription_it_did_not_create_alone(
+    rclpy_node, mini_world: World
+):
+    received_messages = []
+    foreign_subscription = rclpy_node.create_subscription(
+        JointState, "/joint_states", received_messages.append, 1
+    )
+
+    source = PendingJointStateSynchronizer(
+        world=mini_world, node=rclpy_node, topic_name="joint_states"
+    )
+    source.close()
+
+    assert source.subscription is not foreign_subscription
+    assert foreign_subscription in rclpy_node.subscriptions
 
 
 # %% writing the base pose

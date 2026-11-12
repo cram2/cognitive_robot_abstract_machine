@@ -9,7 +9,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Callable, List, Optional, Tuple
+from typing_extensions import Any, Callable
 
 from krrood.patterns.caching import MemoizationCache, copy_memoize, memoize
 
@@ -23,16 +23,16 @@ that the two computations cannot overlap.
 
 
 def run_concurrently(
-    calls: List[Callable[[], Any]],
-) -> Tuple[List[Any], List[BaseException]]:
+    calls: list[Callable[[], Any]],
+) -> tuple[list[Any], list[BaseException]]:
     """
     Runs every call in its own thread and collects the results and the errors raised.
 
     Threads are daemons joined with a timeout, so a deadlock fails the test instead of
     hanging the suite.
     """
-    results: List[Any] = []
-    errors: List[BaseException] = []
+    results: list[Any] = []
+    errors: list[BaseException] = []
     lock = threading.Lock()
 
     def run(call: Callable[[], Any]) -> None:
@@ -59,7 +59,7 @@ def run_concurrently(
 # %% mimics for the hazard: a value whose copy is unsafe to run concurrently
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _ReentrancyDetectingValue:
     """
     A value whose copy detects if another thread is copying the same value at the same
@@ -73,7 +73,7 @@ class _ReentrancyDetectingValue:
     equal to the original.
     """
 
-    _copy_in_progress: List[bool] = field(default_factory=lambda: [False])
+    _copy_in_progress: list[bool] = field(default_factory=lambda: [False])
     """
     One-element flag shared by every copy made directly from this instance, marking
     whether some thread is currently inside :meth:`__deepcopy__` on it.
@@ -90,7 +90,7 @@ class _ReentrancyDetectingValue:
             self._copy_in_progress[0] = False
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class _CopyMemoizingOwner:
     """
     Minimal host object exercising :func:`~krrood.patterns.caching.copy_memoize` under
@@ -104,12 +104,12 @@ class _CopyMemoizingOwner:
     """
 
     @copy_memoize
-    def build_value(self, payload: int) -> _ReentrancyDetectingValue:
+    def build_value(self, *, payload: int) -> _ReentrancyDetectingValue:
         self.build_count += 1
         return _ReentrancyDetectingValue(payload=payload)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class _MemoizingOwner:
     """
     Minimal host object exercising :func:`~krrood.patterns.caching.memoize` under
@@ -123,7 +123,7 @@ class _MemoizingOwner:
     """
 
     @memoize
-    def compute(self, key: int) -> int:
+    def compute(self, *, key: int) -> int:
         self.call_count += 1
         return key * key
 
@@ -131,7 +131,7 @@ class _MemoizingOwner:
 # %% mimics for lock granularity
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class _RendezvousingOwner:
     """
     An owner whose memoized computations meet at a barrier, so a computation only
@@ -144,12 +144,12 @@ class _RendezvousingOwner:
     """
 
     @memoize
-    def compute(self, key: int) -> int:
+    def compute(self, *, key: int) -> int:
         self.rendezvous.wait(timeout=BARRIER_TIMEOUT_IN_SECONDS)
         return key * key
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class _NestingOwner:
     """
     An owner whose memoized method calls a memoized method of another owner, mimicking
@@ -162,18 +162,18 @@ class _NestingOwner:
     before either descends into the other owner.
     """
 
-    nested_owner: Optional[_NestingOwner] = None
+    nested_owner: _NestingOwner | None = None
     """
     The owner whose :meth:`inner` the outer call descends into.
     """
 
     @memoize
-    def outer(self, key: int) -> int:
+    def outer(self, *, key: int) -> int:
         self.rendezvous.wait(timeout=BARRIER_TIMEOUT_IN_SECONDS)
-        return self.nested_owner.inner(key)
+        return self.nested_owner.inner(key=key)
 
     @memoize
-    def inner(self, key: int) -> int:
+    def inner(self, *, key: int) -> int:
         return key * 2
 
 
@@ -191,7 +191,7 @@ def test_concurrent_copy_memoize_hits_on_the_same_key_do_not_race():
     thread_count = 16
 
     results, errors = run_concurrently(
-        [lambda: owner.build_value(42) for _ in range(thread_count)]
+        [lambda: owner.build_value(payload=42) for _ in range(thread_count)]
     )
 
     assert errors == []
@@ -213,7 +213,7 @@ def test_concurrent_memoize_misses_on_distinct_keys_each_compute_once():
 
     results, errors = run_concurrently(
         [
-            (lambda captured_key=key: owner.compute(captured_key))
+            (lambda captured_key=key: owner.compute(key=captured_key))
             for key in distinct_keys
             for _ in range(callers_per_key)
         ]
@@ -222,8 +222,8 @@ def test_concurrent_memoize_misses_on_distinct_keys_each_compute_once():
     assert errors == []
     assert owner.call_count == len(distinct_keys)
     assert len(results) == len(distinct_keys) * callers_per_key
-    assert len(MemoizationCache.existing_for(owner)) == len(distinct_keys)
-    assert all(owner.compute(key) == key * key for key in distinct_keys)
+    assert len(MemoizationCache.existing_for(owner=owner)) == len(distinct_keys)
+    assert all(owner.compute(key=key) == key * key for key in distinct_keys)
 
 
 # %% distinct keys never wait for each other
@@ -237,7 +237,7 @@ def test_distinct_keys_on_one_owner_are_computed_concurrently():
     owner = _RendezvousingOwner(rendezvous=threading.Barrier(2))
 
     results, errors = run_concurrently(
-        [lambda: owner.compute(2), lambda: owner.compute(3)]
+        [lambda: owner.compute(key=2), lambda: owner.compute(key=3)]
     )
 
     assert errors == []
@@ -256,7 +256,7 @@ def test_memoized_calls_nested_into_two_owners_in_opposite_orders_do_not_deadloc
     second_owner.nested_owner = first_owner
 
     results, errors = run_concurrently(
-        [lambda: first_owner.outer(1), lambda: second_owner.outer(2)]
+        [lambda: first_owner.outer(key=1), lambda: second_owner.outer(key=2)]
     )
 
     assert errors == []

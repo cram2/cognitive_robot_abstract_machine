@@ -4,7 +4,6 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from typing_extensions import List, Optional
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.expression_structure import (
@@ -81,7 +80,7 @@ class RankingKeyRelation(Enum):
     """The order key roots at a different variable — no clean noun-relative form."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RankingPlan:
     """The *what to say* decomposition of a query's ``limit`` (with optional ordering): how many,
     in which direction, and how the order key relates to the selection. Present only when the query
@@ -97,11 +96,11 @@ class RankingPlan:
     relation: RankingKeyRelation
     """How the order key relates to the selection (``SELF`` when there is no ordering)."""
 
-    order_key: Optional[SymbolicExpression]
+    order_key: SymbolicExpression | None
     """The ``ordered_by`` key expression, or ``None`` for a bare ``limit``."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RestrictionPlan:
     """A subject's WHERE condition decomposed into its conjuncts — the *content* of the restriction.
 
@@ -110,28 +109,28 @@ class RestrictionPlan:
     only the flattened conjuncts, neither folded nor placed.
     """
 
-    conditions: List[SymbolicExpression] = field(default_factory=list)
+    conditions: list[SymbolicExpression] = field(default_factory=list)
     """The subject's WHERE conjuncts (an ``AND`` flattened to a list, not range-folded)."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class AggregationData:
     """A collapsed aggregation subquery (*"the maximum amount among …"*)."""
 
-    aggregator: Optional[Aggregator]
+    aggregator: Aggregator | None
     """The selected aggregator."""
 
-    leaf: Optional[MappedVariable]
+    leaf: MappedVariable | None
     """The leaf attribute of the aggregator chain, or ``None``."""
 
     is_constrained_or_grouped: bool
     """``True`` when the aggregation is constrained by a WHERE/HAVING clause."""
 
-    source: Optional[Variable]
+    source: Variable | None
     """The chain-root source variable aggregated over, or ``None``."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ReportPlan:
     """A query that *presents* its results — a report/listing — rather than *searching* for a match.
 
@@ -143,10 +142,10 @@ class ReportPlan:
     kind: ReportKind
     """Why the query is a report — it drives the body (aggregate columns vs. an ordered listing)."""
 
-    group_keys: List[SymbolicExpression] = field(default_factory=list)
+    group_keys: list[SymbolicExpression] = field(default_factory=list)
     """The GROUP BY keys, rendered as the *"for each <key>"* frame (``AGGREGATION`` only)."""
 
-    columns: List[SymbolicExpression] = field(default_factory=list)
+    columns: list[SymbolicExpression] = field(default_factory=list)
     """The reported aggregate selections, group keys removed (``AGGREGATION`` only)."""
 
     @property
@@ -161,7 +160,7 @@ class ReportPlan:
         return bool(self.group_keys)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class QueryPlan:
     """Complete *what to say* decomposition of a query (the plan)."""
 
@@ -174,36 +173,36 @@ class QueryPlan:
     selected_type: str
     """Display name of the selected type (e.g. ``"Robot"``)."""
 
-    subject: Optional[Variable]
+    subject: Variable | None
     """The variable the WHERE restricts, or ``None`` when there is no groupable subject."""
 
-    subject_restriction: Optional[RestrictionPlan]
+    subject_restriction: RestrictionPlan | None
     """The subject's WHERE, range-folded into conjuncts for the assembler to place, or ``None``."""
 
-    where_condition: Optional[SymbolicExpression]
+    where_condition: SymbolicExpression | None
     """The query's raw WHERE condition, or ``None``."""
 
     is_aggregation_subquery: bool
     """``True`` when the query is an aggregation value-subquery."""
 
-    aggregation_data: Optional[AggregationData]
+    aggregation_data: AggregationData | None
     """The collapsed aggregation details when this is an aggregation subquery, else ``None``."""
 
-    ranking: Optional[RankingPlan]
+    ranking: RankingPlan | None
     """The ``limit`` (+ ordering) decomposition, or ``None`` when the query has no ``limit``."""
 
-    discourse_root: Optional[uuid.UUID]
+    discourse_root: uuid.UUID | None
     """The single variable every chain in this query's scope roots at, or ``None`` when the roots
     are not unique. Used as the pronominalisation focus (*"its …"*) for a query that has no
     restriction subject (e.g. a ``set_of``); kept separate from :attr:`subject` so it never triggers
     *"whose"*-folding."""
 
-    report: Optional[ReportPlan]
+    report: ReportPlan | None
     """The report decomposition when the set-of selection computes aggregates, else ``None`` (a
     plain *"Find …"* search)."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QueryPlanner(Planner[Query, QueryPlan]):
     """
     Decompose an entity or set-of query into a ``QueryPlan`` (the *what to say* decisions): the
@@ -213,14 +212,14 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
-    >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+    >>> QueryPlanner(node=entity(variable(Robot, []))).plan().selected_type
     'Robot'
     """
 
     def plan(self) -> QueryPlan:
         """:return: The plan: selection shape, definiteness, restriction partition, aggregation.
 
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind.name
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().kind.name
         'SUBJECT'
         """
         self.node.build()
@@ -236,10 +235,10 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             aggregation_data=self._aggregation_data(),
             ranking=ranking,
             discourse_root=self._discourse_root(),
-            report=self._report(ranking),
+            report=self._report(ranking=ranking),
         )
 
-    def _report(self, ranking: Optional[RankingPlan]) -> Optional[ReportPlan]:
+    def _report(self, *, ranking: RankingPlan | None) -> ReportPlan | None:
         """:return: The report decomposition when the query *presents* results rather than searching
         — a set-of computing aggregates, any grouped query, or any query with an ``ordered_by``
         listing — else ``None``.
@@ -261,7 +260,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
             return ReportPlan(kind=ReportKind.ORDERING)
         return None
 
-    def _selections(self) -> List[SymbolicExpression]:
+    def _selections(self) -> list[SymbolicExpression]:
         """:return: the query's selected expressions — the tuple members of a set-of, else the
         single selected variable (empty when there is none)."""
         if isinstance(self.node, SetOf):
@@ -269,20 +268,20 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         selected = self._selected
         return [selected] if selected is not None else []
 
-    def _group_keys(self) -> List[SymbolicExpression]:
+    def _group_keys(self) -> list[SymbolicExpression]:
         """:return: the query's GROUP BY key expressions (empty when it is not grouped)."""
         grouped = self.node._grouped_by_expression_
         return list(grouped.variables_to_group_by) if grouped is not None else []
 
     def _columns_without_keys(
-        self, keys: List[SymbolicExpression]
-    ) -> List[SymbolicExpression]:
+        self, *, keys: list[SymbolicExpression]
+    ) -> list[SymbolicExpression]:
         """:return: the selected expressions with the group keys removed (so a key is named once, in
         the *"For each …"* frame, not restated as a reported column)."""
         key_ids = {key._id_ for key in keys}
         return [s for s in self._selections() if s._id_ not in key_ids]
 
-    def _aggregation_report(self) -> Optional[ReportPlan]:
+    def _aggregation_report(self) -> ReportPlan | None:
         """:return: The ``AGGREGATION`` report for a set-of selecting at least one aggregate (its
         GROUP BY keys split out of the reported columns), else ``None``."""
         if not isinstance(self.node, SetOf):
@@ -293,10 +292,10 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return ReportPlan(
             kind=ReportKind.AGGREGATION,
             group_keys=keys,
-            columns=self._columns_without_keys(keys),
+            columns=self._columns_without_keys(keys=keys),
         )
 
-    def _grouping_report(self) -> Optional[ReportPlan]:
+    def _grouping_report(self) -> ReportPlan | None:
         """:return: The ``GROUPING`` report for a grouped query with no aggregates — its columns are
         the selection minus the keys (empty when the selection is exactly the key), else ``None``.
         """
@@ -306,19 +305,19 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return ReportPlan(
             kind=ReportKind.GROUPING,
             group_keys=keys,
-            columns=self._columns_without_keys(keys),
+            columns=self._columns_without_keys(keys=keys),
         )
 
     # %% selection shape
 
     @property
-    def _selected(self) -> Optional[SymbolicExpression]:
+    def _selected(self) -> SymbolicExpression | None:
         return getattr(self.node, "selected_variable", None)
 
     def _kind(self) -> SelectionKind:
         """:return: The selection kind — ``SET_OF``, ``ENTITY_SELECTOR``, ``EMPTY`` or ``SUBJECT``.
 
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().kind
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().kind
         <SelectionKind.SUBJECT: 3>
         """
         if isinstance(self.node, SetOf):
@@ -333,9 +332,9 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     def _is_the(self) -> bool:
         """:return: ``True`` when the query is quantified by ``the`` (a uniqueness claim).
 
-        >>> QueryPlanner(the(entity(variable(Robot, [])))).plan().is_the
+        >>> QueryPlanner(node=the(entity(variable(Robot, [])))).plan().is_the
         True
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().is_the
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().is_the
         False
         """
         builder = getattr(self.node, "_quantifier_builder_", None)
@@ -344,19 +343,19 @@ class QueryPlanner(Planner[Query, QueryPlan]):
     def _selected_type(self) -> str:
         """:return: The display name of the selected entity's type (*"Robot"*).
 
-        >>> QueryPlanner(entity(variable(Robot, []))).plan().selected_type
+        >>> QueryPlanner(node=entity(variable(Robot, []))).plan().selected_type
         'Robot'
         """
-        return FallbackNouns.ENTITY.name_of(self._selected)
+        return FallbackNouns.ENTITY.name_of(node=self._selected)
 
     # %% subject restriction (WHERE partition)
 
-    def _subject(self) -> Optional[Variable]:
+    def _subject(self) -> Variable | None:
         if not isinstance(self.node, Entity):
             return None
         return restriction_subject(self.node, self._selected)
 
-    def _subject_restriction(self) -> Optional[RestrictionPlan]:
+    def _subject_restriction(self) -> RestrictionPlan | None:
         """:return: The subject's WHERE flattened into conjuncts (folding and placement are the
         registry's concern), or ``None`` when there is no groupable subject or no WHERE.
         """
@@ -368,13 +367,13 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     # %% clauses
 
-    def _where_condition(self) -> Optional[SymbolicExpression]:
+    def _where_condition(self) -> SymbolicExpression | None:
         where = getattr(self.node, "_where_expression_", None)
         return where.condition if where is not None else None
 
     # %% aggregation value-subquery
 
-    def _aggregation_data(self) -> Optional[AggregationData]:
+    def _aggregation_data(self) -> AggregationData | None:
         if not is_aggregation_subquery(self.node):
             return None
         return AggregationData(
@@ -386,7 +385,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     # %% ranking (limit + ordering)
 
-    def _ranking(self) -> Optional[RankingPlan]:
+    def _ranking(self) -> RankingPlan | None:
         """:return: The ``limit`` (+ ordering) decomposition, or ``None`` when the query has no
         ``limit`` (ordering without a limit keeps the standalone *"ordered by …"* clause).
         """
@@ -407,11 +406,11 @@ class QueryPlanner(Planner[Query, QueryPlan]):
         return RankingPlan(
             limit_number=limit,
             direction=direction,
-            relation=self._key_relation(builder.variable),
+            relation=self._key_relation(order_key=builder.variable),
             order_key=builder.variable,
         )
 
-    def _key_relation(self, order_key: SymbolicExpression) -> RankingKeyRelation:
+    def _key_relation(self, *, order_key: SymbolicExpression) -> RankingKeyRelation:
         """:return: How *order_key* relates to the selected variable — ``SELF`` (the key is the
         selection), ``ATTRIBUTE`` (a chain on it), or ``OTHER`` (a different root)."""
         chain, root = walk_chain(order_key)
@@ -422,7 +421,7 @@ class QueryPlanner(Planner[Query, QueryPlan]):
 
     # %% discourse focus (pronominalisation)
 
-    def _discourse_root(self) -> Optional[uuid.UUID]:
+    def _discourse_root(self) -> uuid.UUID | None:
         """:return: The single variable every chain in this query roots at, or ``None`` when the
         roots are not unique — the pronominalisation focus for a query with no restriction subject
         (e.g. a ``set_of``), so its chains read *"its …"* instead of restating the full root.

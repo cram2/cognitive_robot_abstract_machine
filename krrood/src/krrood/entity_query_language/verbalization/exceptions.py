@@ -10,7 +10,7 @@ only a formatted string), consistent with the rest of krrood.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from krrood.exceptions import DataclassException
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PredicateFragmentRequiredError(DataclassException):
     """
     A :class:`~krrood.entity_query_language.predicate.Verbalizable` predicate was verbalized without
@@ -35,12 +35,14 @@ class PredicateFragmentRequiredError(DataclassException):
     a degraded *"a HasHighSalary, where …"* rendering.
     """
 
-    node: "InstantiatedVariable"
-    """The instantiated predicate whose type supplies no verbalization fragment."""
+    node: InstantiatedVariable
+    """
+    The instantiated predicate whose type supplies no verbalization fragment.
+    """
 
     def error_message(self) -> str:
         return (
-            f"{self.node._type_.__name__!r} is a predicate but does not implement "
+            f"{self.node._factory_.__name__!r} is a predicate but does not implement "
             "`_verbalization_fragment_`, so it has no verbalization."
         )
 
@@ -51,7 +53,7 @@ class PredicateFragmentRequiredError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NonFragmentPredicateError(DataclassException):
     """
     A predicate's ``_verbalization_fragment_`` returned something that is not a
@@ -62,7 +64,9 @@ class NonFragmentPredicateError(DataclassException):
     """
 
     predicate_type: type
-    """The predicate type whose hook returned a non-fragment."""
+    """
+    The predicate type whose hook returned a non-fragment.
+    """
 
     returned: object
     """
@@ -82,15 +86,17 @@ class NonFragmentPredicateError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnverbalizableExpressionError(DataclassException):
     """
     No grammar rule covers an EQL construct — a coverage gap, surfaced as an error
     rather than silently degrading the node to its class name.
     """
 
-    node: "SymbolicExpression"
-    """The EQL expression no grammar rule matched."""
+    node: SymbolicExpression
+    """
+    The EQL expression no grammar rule matched.
+    """
 
     def error_message(self) -> str:
         return (
@@ -104,15 +110,17 @@ class UnverbalizableExpressionError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnloweredFragmentError(DataclassException):
     """
     A fragment kind with no fold handler reached a renderer — a realisation pass was
     skipped, leaving an un-lowered ``NounPhrase`` or ``PossessiveChain`` in the tree.
     """
 
-    fragment: "VerbalizationFragment"
-    """The un-lowered fragment that reached the renderer."""
+    fragment: VerbalizationFragment
+    """
+    The un-lowered fragment that reached the renderer.
+    """
 
     def error_message(self) -> str:
         return (
@@ -124,7 +132,7 @@ class UnloweredFragmentError(DataclassException):
         return "Run the realisation passes (realize_tree) before rendering."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UndeclaredFormPositionError(DataclassException):
     """
     A concrete :class:`~krrood.entity_query_language.verbalization.grammar.conditions.pl
@@ -133,8 +141,10 @@ class UndeclaredFormPositionError(DataclassException):
     ``place``.
     """
 
-    form: "type[ConditionForm]"
-    """The condition-form subclass missing its ``position``."""
+    form: type[ConditionForm]
+    """
+    The condition-form subclass missing its ``position``.
+    """
 
     def error_message(self) -> str:
         return (
@@ -146,7 +156,7 @@ class UndeclaredFormPositionError(DataclassException):
         return "Add e.g. `position = SurfacePosition.WHOSE` to the class body."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownAggregatorError(DataclassException):
     """
     An aggregator type has no verbalization phrase — a coverage gap surfaced when a new
@@ -155,8 +165,10 @@ class UnknownAggregatorError(DataclassException):
     n.vocabulary.english.Aggregations`.
     """
 
-    aggregator_type: "type[Aggregator]"
-    """The aggregator type that maps to no aggregation phrase."""
+    aggregator_type: type[Aggregator]
+    """
+    The aggregator type that maps to no aggregation phrase.
+    """
 
     def error_message(self) -> str:
         return (

@@ -22,7 +22,7 @@ def main(model_path: str = None):
         model = None
     else:
         with open(model_path) as f:
-            model = ProbabilisticCircuit.from_json(json.load(f))
+            model = ProbabilisticCircuit.from_json(data=json.load(f))
 
     factory = GUIFactory(model=model, theme="dark_amber.xml")
     factory.start_gui()

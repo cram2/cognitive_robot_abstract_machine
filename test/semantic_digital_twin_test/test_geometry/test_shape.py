@@ -1,15 +1,20 @@
+import gc
 import math
 import os
+import tracemalloc
 from importlib.resources import files
 from pathlib import Path
 
 import numpy as np
 import pytest
 import trimesh
+from PIL import Image
+from trimesh.visual import TextureVisuals
+from trimesh.visual.material import SimpleMaterial
 
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -17,10 +22,12 @@ from semantic_digital_twin.world_description.geometry import (
     Color,
     Cylinder,
     Mesh,
+    MeshFileFormat,
     Scale,
     Sphere,
     SurfaceFinish,
     Texture,
+    TrimeshMetadataKey,
 )
 from semantic_digital_twin.world_description.mesh_file_storage import MeshFileStorage
 from semantic_digital_twin.world_description.world_entity import Body
@@ -95,17 +102,16 @@ def test_mesh_color_survives_serialization(tmp_path):
     """
     Per-vertex mesh color survives the to_json/from_json round-trip.
 
-    Color travels inside the serialized geometry (re-exported as OBJ, which the
-    collision loader and visualizer can read), so a receiver renders it without needing
-    the original mesh file.
+    Color travels inside the serialized geometry (re-exported as GLB, which keeps it),
+    so a receiver renders it without needing the original mesh file.
     """
     source = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
 
     mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="ply")
-    restored = Mesh.from_json(mesh.to_json())
+    restored = Mesh.from_json(data=mesh.to_json())
 
-    assert restored.filename.endswith(".obj")
+    assert Path(restored.filename).suffix == f".{MeshFileFormat.GLB}"
     assert (restored.mesh.visual.vertex_colors[:, :3] == [200, 50, 50]).all()
 
 
@@ -172,6 +178,12 @@ def test_exported_mesh_basenames_are_unique(tmp_path):
     assert Path(first.filename).stem != Path(second.filename).stem
 
 
+def test_a_mesh_made_from_a_trimesh_is_written_as_glb(tmp_path):
+    mesh = Mesh.from_trimesh(mesh=trimesh.creation.box(), directory=tmp_path)
+
+    assert Path(mesh.filename).suffix == f".{MeshFileFormat.GLB}"
+
+
 def test_explicit_directory_overrides_session_root(tmp_path):
     mesh = Mesh.from_trimesh(
         mesh=trimesh.creation.box(extents=(1.0, 1.0, 1.0)), directory=tmp_path
@@ -230,7 +242,7 @@ def test_per_vertex_colors_survive_serialization_unwelded(tmp_path):
     source = coplanar_triangles_with_shared_positions()
     mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="obj")
 
-    restored = Mesh.from_json(mesh.to_json())
+    restored = Mesh.from_json(data=mesh.to_json())
 
     np.testing.assert_array_equal(
         np.asarray(restored.mesh.visual.vertex_colors),
@@ -253,7 +265,7 @@ def test_serialization_reproduces_the_same_mesh():
         )
     )
 
-    restored = Mesh.from_json(original.to_json())
+    restored = Mesh.from_json(data=original.to_json())
 
     np.testing.assert_allclose(
         np.asarray(restored.mesh.vertices),
@@ -281,7 +293,7 @@ def test_serialization_preserves_watertightness_of_a_closed_mesh():
     )
     assert original.mesh.is_volume
 
-    restored = Mesh.from_json(original.to_json())
+    restored = Mesh.from_json(data=original.to_json())
 
     assert restored.mesh.is_volume
     np.testing.assert_allclose(restored.mesh.volume, original.mesh.volume, rtol=1e-6)
@@ -315,7 +327,7 @@ def test_textured_primitive_survives_serialization():
         scale=Scale(1.0, 1.0, 1.0), texture=Texture(file_path="/textures/marble.png")
     )
 
-    restored = Box.from_json(box.to_json())
+    restored = Box.from_json(data=box.to_json())
 
     assert restored.texture == box.texture
     assert restored == box
@@ -400,6 +412,52 @@ def test_mesh_volume(tmp_path):
     mesh = Mesh.from_trimesh(mesh=source, directory=tmp_path, file_type="stl")
 
     assert mesh.volume == pytest.approx(8.0)
+
+
+# %% what a mesh read from a file keeps
+
+
+def test_a_mesh_read_from_a_ply_file_keeps_no_copy_of_the_raw_file(tmp_path):
+    mesh = Mesh.from_trimesh(
+        mesh=trimesh.creation.box(), directory=tmp_path, file_type="ply"
+    )
+
+    assert TrimeshMetadataKey.RAW_PLY_FILE not in mesh.mesh.metadata
+
+
+def test_a_file_of_one_mesh_in_place_is_read_without_merging_its_scene(
+    tmp_path, monkeypatch
+):
+    """
+    Every serialization of a mesh reads its file again, and merging the file's scene
+    copies the mesh twice, converting its colours each time.
+    """
+    mesh = Mesh.from_trimesh(mesh=trimesh.creation.box(), directory=tmp_path)
+
+    def merge_scene(scene: trimesh.Scene) -> trimesh.Trimesh:
+        raise AssertionError("the scene of a file of one mesh in place was merged")
+
+    monkeypatch.setattr(trimesh.Scene, "to_mesh", merge_scene)
+
+    np.testing.assert_array_equal(
+        mesh.unscaled_mesh.faces, trimesh.creation.box().faces
+    )
+
+
+def test_a_file_of_several_meshes_reads_as_all_of_them_in_place(tmp_path):
+    scene = trimesh.Scene()
+    scene.add_geometry(trimesh.creation.box(extents=(1.0, 1.0, 1.0)), node_name="first")
+    scene.add_geometry(
+        trimesh.creation.box(extents=(1.0, 1.0, 1.0)),
+        node_name="moved",
+        transform=trimesh.transformations.translation_matrix([3.0, 0.0, 0.0]),
+    )
+    file_path = tmp_path / "two_boxes.glb"
+    scene.export(str(file_path))
+
+    mesh = Mesh(filename=str(file_path))
+
+    np.testing.assert_allclose(mesh.unscaled_mesh.bounds, scene.bounds)
 
 
 # %% the units a mesh file declares
@@ -522,7 +580,7 @@ def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
         Box(scale=Scale(1.0, 2.0, 3.0)),
         Box(
             scale=Scale(1.0, 1.0, 1.0),
-            color=Color(0.1, 0.2, 0.3, 0.4),
+            color=Color.from_rgba(red=0.1, green=0.2, blue=0.3, opacity=0.4),
             texture=Texture(file_path="/textures/wood.png"),
         ),
     ],
@@ -538,6 +596,51 @@ def test_a_shape_survives_a_json_round_trip(shape):
 
     assert restored == shape
     assert restored.to_json() == payload
+
+
+def test_a_mesh_restored_from_json_is_written_as_glb_whatever_file_it_came_from(
+    tmp_path,
+):
+    mesh = Mesh.from_trimesh(
+        mesh=trimesh.creation.box(), directory=tmp_path, file_type="stl"
+    )
+
+    restored = Mesh.from_json(data=mesh.to_json())
+
+    assert Path(restored.filename).suffix == f".{MeshFileFormat.GLB}"
+
+
+def test_a_mesh_keeps_its_positions_exactly_through_a_json_round_trip(tmp_path):
+    """
+    A mesh holds the positions its file stores, so serializing it loses nothing more,
+    however far from the origin it lies.
+    """
+    sphere = trimesh.creation.icosphere(subdivisions=2, radius=0.3)
+    sphere.apply_translation([10.123456789, -7.3, 2.0])
+    mesh = Mesh.from_trimesh(mesh=sphere, directory=tmp_path)
+
+    restored = Mesh.from_json(data=mesh.to_json())
+
+    np.testing.assert_array_equal(restored.mesh.vertices, mesh.mesh.vertices)
+
+
+def test_serializing_a_mesh_holds_less_than_twice_the_memory_of_its_arrays(tmp_path):
+    """
+    A mesh is serialized whenever it changes or is synchronized, so its json must not
+    take many times the memory of the mesh itself.
+    """
+    sphere = trimesh.creation.icosphere(subdivisions=5)
+    sphere.visual.vertex_colors = np.tile([200, 50, 50, 128], (len(sphere.vertices), 1))
+    mesh = Mesh.from_trimesh(mesh=sphere, directory=tmp_path)
+    arrays = [mesh.mesh.vertices, mesh.mesh.faces, mesh.mesh.visual.vertex_colors]
+
+    tracemalloc.start()
+    payload = mesh.to_json()
+    gc.collect()
+    held, _ = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert held < 2 * sum(np.asarray(array).nbytes for array in arrays)
 
 
 # %% a prism of equilateral cross-section
@@ -595,3 +698,58 @@ def test_a_triangular_prism_points_its_apex_along_x():
     assert np.sum(np.isclose(vertices[:, 0], apex_x)) < np.sum(
         np.isclose(vertices[:, 0], face_x)
     )
+
+
+# %% whether a mesh file is textured
+
+
+@pytest.fixture
+def two_textured_parts(tmp_path) -> Path:
+    """
+    :return: A file holding two boxes, each painted with a texture of its own.
+    """
+    scene = trimesh.Scene()
+    for index in range(2):
+        box = trimesh.creation.box(extents=(1.0, 1.0, 1.0))
+        box.apply_translation((2.0 * index, 0.0, 0.0))
+        generator = np.random.default_rng(index)
+        image = Image.fromarray(
+            generator.integers(0, 255, (1024, 1024, 3), dtype=np.uint8)
+        )
+        box.visual = TextureVisuals(
+            uv=generator.random((len(box.vertices), 2)),
+            material=SimpleMaterial(image=image),
+        )
+        scene.add_geometry(box, geom_name=f"part_{index}")
+    path = tmp_path / "two_textured_parts.glb"
+    scene.export(path)
+    return path
+
+
+def test_a_file_painting_its_parts_with_textures_is_textured(two_textured_parts):
+    assert Mesh(filename=str(two_textured_parts)).is_textured
+
+
+def test_a_file_without_textures_is_not_textured(tmp_path):
+    path = tmp_path / "box.stl"
+    trimesh.creation.box(extents=(1.0, 1.0, 1.0)).export(path)
+
+    assert not Mesh(filename=str(path)).is_textured
+
+
+def test_telling_a_file_textured_does_not_merge_the_textures_of_its_parts(
+    two_textured_parts,
+):
+    """
+    Merging the parts of a file into one mesh packs their textures into one image, so
+    telling whether the file is textured must not merge them.
+    """
+    tracemalloc.start()
+    trimesh.load_mesh(str(two_textured_parts), process=False)
+    _, merging_peak = tracemalloc.get_traced_memory()
+    tracemalloc.reset_peak()
+    Mesh(filename=str(two_textured_parts)).is_textured
+    _, checking_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    assert checking_peak < merging_peak / 2

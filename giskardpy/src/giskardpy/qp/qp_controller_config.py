@@ -5,9 +5,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
-from typing import Dict, Type
-
 from typing_extensions import TYPE_CHECKING
+
 
 from giskardpy.qp.exceptions import (
     BrakingTimeExceedsHorizonError,
@@ -16,8 +15,8 @@ from giskardpy.qp.exceptions import (
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.solvers.qp_solver_piqp import QPSolverPIQP
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.derivatives import DerivativeMap
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import DerivativeMap
+from semantic_digital_twin.world_description.derivatives import Derivatives
 
 if TYPE_CHECKING:
     from giskardpy.qp.solvers.qp_solver import QPSolver
@@ -82,7 +81,7 @@ class QPControllerConfig:
     .. warning:: Minimum value is :attr:`minimum_prediction_horizon`.
     """
 
-    dof_weights: Dict[PrefixedName, DerivativeMap[float]] = field(
+    dof_weights: dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
             lambda: DerivativeMap(None, 0.01, None, None)
         )
@@ -118,7 +117,7 @@ class QPControllerConfig:
     If True, prints config.
     """
 
-    qp_solver_class: Type[QPSolver] = field(default=QPSolverPIQP)
+    qp_solver_class: type[QPSolver] = field(default=QPSolverPIQP)
     """
     Reference to the resolved QP solver class.
     """
@@ -197,6 +196,30 @@ class QPControllerConfig:
         horizon by the final steps that only bring the system to rest.
         """
         return self.prediction_horizon - self.number_of_resting_steps
+
+    def horizon_weight_scale(self, step: int) -> float:
+        """
+        :param step: Index of a prediction horizon step.
+        :return: The fraction of a dof weight applied at that step, growing linearly
+            from :attr:`horizon_weight_gain_scalar` at the first step to 1 at the last
+            step of the control horizon.
+        """
+        gain = self.horizon_weight_gain_scalar
+        return gain + (1 - gain) * step / (self.control_horizon - 1)
+
+    @property
+    def executed_to_mean_velocity_ratio(self) -> float:
+        """
+        How much faster the executed first step of a plan moves than the plan's mean
+        velocity over the control horizon, while no jerk limit binds.
+
+        The cheaper early steps take a share of the motion inversely proportional to
+        their :meth:`horizon_weight_scale`.
+        """
+        inverse_scales = [
+            1 / self.horizon_weight_scale(step) for step in range(self.control_horizon)
+        ]
+        return inverse_scales[0] / (sum(inverse_scales) / self.control_horizon)
 
     @classmethod
     def create_with_simulation_defaults(cls):

@@ -317,12 +317,12 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
     4), so conditioning on 4 objects there pins the aggregates down to a single value
     regardless of sample count.
 
-    Both rooms are fitted into one leaf (``min_samples_per_leaf=2``): grounding draws a
+    Both rooms are fitted into one leaf (``minimum_samples_per_leaf=2``): grounding draws a
     leaf's own samples whenever the shared ones miss its values, so an ambiguity has to
     sit within one leaf for the sample count to decide how much of it is discovered.
     """
     model = RelationalProbabilisticCircuit(
-        learning_method=JointProbabilityTree(min_samples_per_leaf=2)
+        learning_method=JointProbabilityTree(minimum_samples_per_leaf=2)
     )
     model.fit(_rooms_with_ambiguous_total_count_4())
     return model
@@ -331,7 +331,9 @@ def relational_probabilistic_circuit_with_ambiguous_total_count_4():
 @pytest.fixture
 def layered_relational_probabilistic_circuit_with_ambiguous_total_count_4():
     return RelationalProbabilisticCircuit(
-        learning_method=LayeredLearning(JointProbabilityTree(min_samples_per_leaf=2)),
+        learning_method=LayeredLearning(
+            JointProbabilityTree(minimum_samples_per_leaf=2)
+        ),
         part_learning_methods=PartLearningMethods(
             LayeredLearning(JointProbabilityTree())
         ),
@@ -346,18 +348,14 @@ def test_monte_carlo_sample_count_controls_mixture_size(
     exchangeable-distribution instance (and its sum units) to the mixture.
     """
     np.random.seed(0)
-    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = (
-        1
-    )
+    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = 1
     single = len(
         relational_probabilistic_circuit_with_ambiguous_total_count_4.ground(
             room_query_4
         ).nodes()
     )
     np.random.seed(0)
-    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = (
-        50
-    )
+    relational_probabilistic_circuit_with_ambiguous_total_count_4.monte_carlo_sample_count = 50
     many = len(
         relational_probabilistic_circuit_with_ambiguous_total_count_4.ground(
             room_query_4
@@ -519,9 +517,7 @@ def _causal_circuit_for(model):
         for variable in model.variables
         if variable.name == "SceneRoom.objects[0].type"
     )
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
+    tree = MarginalDeterminismTreeNode.from_variable_order([chair_count_variable])
     return CausalCircuit.from_probabilistic_circuit(
         model, tree, [chair_count_variable], [object_type_variable]
     )
@@ -736,11 +732,10 @@ def test_exact_grounding_preserves_correlation_with_the_retained_latent(
     point) into conditioning, which always failed and silently fell back to grounding
     every branch from the same unconditioned distribution -- and even after fixing that,
     a single, undifferentiated partition branch was treated as trivially valid instead
-    of being rejected, discarding the correlation either way.
-    P(objects[0].type=CHAIR | do(chair_count=1)) and P(objects[0].type=CHAIR |
-    do(chair_count=3)) must therefore differ, reflecting chair_count=1 rooms never
-    having their first object be a chair and chair_count=3 rooms always having it be
-    one.
+    of being rejected, discarding the correlation either way. P(objects[0].type=CHAIR |
+    do(chair_count=1)) and P(objects[0].type=CHAIR | do(chair_count=3)) must therefore
+    differ, reflecting chair_count=1 rooms never having their first object be a chair
+    and chair_count=3 rooms always having it be one.
     """
     np.random.seed(0)
     grounded = correlated_relational_probabilistic_circuit.ground(
@@ -757,9 +752,7 @@ def test_exact_grounding_preserves_correlation_with_the_retained_latent(
         if variable.name == "SceneRoom.objects[0].type"
     )
 
-    tree = MarginalDeterminismTreeNode.from_causal_graph(
-        [chair_count_variable], [object_type_variable]
-    )
+    tree = MarginalDeterminismTreeNode.from_variable_order([chair_count_variable])
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         grounded, tree, [chair_count_variable], [object_type_variable]
     )
@@ -807,11 +800,9 @@ def test_representative_value_returns_a_point_not_a_region():
     )
 
     assert representative_value == {variable: 2.0}
-    conditioning_result, log_likelihood = branch.distribution.log_conditional(
-        representative_value
-    )
-    assert conditioning_result is not None
-    assert log_likelihood > -np.inf
+    conditioning = branch.distribution.log_conditional(representative_value)
+    assert conditioning.distribution is not None
+    assert conditioning.log_likelihood > -np.inf
 
 
 def test_node_local_branch_log_probabilities_reflect_each_nodes_own_correlation():

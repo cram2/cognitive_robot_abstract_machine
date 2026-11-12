@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Optional
 
 from krrood.entity_query_language.query.query import Query
 from krrood.entity_query_language.verbalization.fragments.base import (
@@ -26,7 +25,7 @@ from krrood.entity_query_language.verbalization.grammar.framework.phrase_rule im
 from krrood.entity_query_language.verbalization.grammar.query.planner import QueryPlan
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClauseComposer:
     """
     The single place that knows *which* assembler renders a query/aggregation body's
@@ -40,12 +39,14 @@ class ClauseComposer:
     """
 
     context: RuleContext
-    """The per-node context (recursion entry and microplanning services) the clause assemblers are
-    built with."""
+    """
+    The per-node context (recursion entry and microplanning services) the clause
+    assemblers are built with.
+    """
 
     def restriction(
-        self, plan: QueryPlan, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-    ) -> Optional[RestrictionFragments]:
+        self, *, plan: QueryPlan, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
+    ) -> RestrictionFragments | None:
         """:return: The placed subject-restriction pieces (superlatives / whose / residual), or
         ``None`` when the query has no groupable subject restriction. The predicate agrees with
         *number* — a plural subject gives *"whose salaries are …"*.
@@ -63,7 +64,7 @@ class ClauseComposer:
             plan.subject_restriction.conditions, plan.subject, self.context, number
         )
 
-    def grouped_by(self, node: Query) -> Optional[VerbalizationFragment]:
+    def grouped_by(self, *, node: Query) -> VerbalizationFragment | None:
         """:return: The *"grouped by …"* clause, or ``None`` when the query has no GROUP BY.
 
         It routes to the grouped-by assembler for the grouping span; in this fronted report that span
@@ -75,25 +76,25 @@ class ClauseComposer:
         ... )
         'For each department, report the sum of salaries of Employees'
         """
-        return GroupedByAssembler(self.context).clause(node)
+        return GroupedByAssembler(context=self.context).clause(node=node)
 
-    def having(self, node: Query) -> Optional[VerbalizationFragment]:
+    def having(self, *, node: Query) -> VerbalizationFragment | None:
         """:return: The trailing *"where …"* HAVING clause, or ``None`` when the query has no HAVING.
 
         It routes to the having assembler for the trailing *"where the sum is greater than 30000"*
         span. A grouped report fronts its HAVING onto the group key instead (*"For each department
         whose …"*), so this trailing form is used for a constrained aggregation scope.
         """
-        return HavingAssembler(self.context).clause(node)
+        return HavingAssembler(context=self.context).clause(query=node)
 
-    def ordered_by(self, node: Query) -> Optional[VerbalizationFragment]:
+    def ordered_by(self, *, node: Query) -> VerbalizationFragment | None:
         """:return: The *"ordered by …"* clause, or ``None`` when the query has no ORDER BY.
 
         It routes to the ordered-by assembler, which contributes only the trailing *"ordered by their
         salaries from lowest to highest"* span after the *"Report Employees"* selection:
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(an(entity(employee).ordered_by(employee.salary)))
+        >>> verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary)))
         'Report Employees ordered by their salaries from lowest to highest'
         """
-        return OrderedByAssembler(self.context).clause(node)
+        return OrderedByAssembler(context=self.context).clause(query=node)

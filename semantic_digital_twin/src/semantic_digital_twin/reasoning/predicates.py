@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+# %% Imports
 from abc import ABC
 from dataclasses import dataclass
-from typing import Optional, Any
 
 import numpy as np
 import trimesh.boolean
 from trimesh.collision import CollisionManager
-from typing_extensions import List, TYPE_CHECKING, Iterable, Type
+from typing_extensions import TYPE_CHECKING, Iterable, Any
 
 from krrood.entity_query_language.predicate import (
     Predicate,
@@ -30,15 +30,13 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
     Verb,
 )
 from krrood.inheritance_path_length import inheritance_path_length
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.spatial_computations.ik_solver import (
     MaxIterationsException,
     UnreachableException,
 )
-from semantic_digital_twin.spatial_types import Vector3, Point3, math
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
+from krrood_spatial_math.spatial_types import Vector3, Point3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -89,7 +87,7 @@ class InContactWith(Triple[TBody, TBody]):
         distance = self.compute_distance()
         return distance is not None and distance < self.maximum_distance
 
-    def compute_distance(self) -> Optional[float]:
+    def compute_distance(self) -> float | None:
         """
         :return: How far apart the two bodies' collision geometry is, or ``None`` when
             the collision detector reports no result for the pair at all.
@@ -103,19 +101,21 @@ class InContactWith(Triple[TBody, TBody]):
         return result.distance
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is in contact with the other body"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["body1"]),
+            Noun(content=fields["body1"]),
             Copula(),
             Prepositions.IN,
-            Noun.bare("contact"),
+            Noun.bare(head="contact"),
             Prepositions.WITH,
-            Noun(fields["body2"]),
+            Noun(content=fields["body2"]),
         )
 
 
@@ -158,25 +158,27 @@ class Reachable(Predicate):
         return True
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the pose is reachable by the tip"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["pose"]),
+            Noun(content=fields["pose"]),
             Copula(),
-            Adjective("reachable"),
+            Adjective(word="reachable"),
             Prepositions.BY,
-            Noun(fields["tip"]),
+            Noun(content=fields["tip"]),
         )
 
 
 @symbolic_function
 def compute_euclidean_planar_distance(
     body1: Body, body2: Body, ignore_dimension: Vector3
-):
+) -> Scalar:
     """
     Computes the Euclidean distance between two bodies in 2D space, ignoring a specific
     dimension specified by the user. The ignored dimension is set to zero before the
@@ -232,20 +234,24 @@ class SupportedBy(Triple[TBody, TBody]):
 
     maximum_intersection_height: float = 0.1
     """
-    How deep, in metres, the two may sink into each other. Sunk deeper, they are a
-    clipping the simulation did not resolve, and the reading is refused.
+    How deep, in metres, the two may sink into each other.
+
+    Sunk deeper, they are a clipping the simulation did not resolve, and the reading is
+    refused.
     """
 
     contact_tolerance: float = 0.005
     """
-    How far apart, in metres, the two may be and still count as touching, and so how
-    far above the supporting body the supported body may stand and still rest on it.
+    How far apart, in metres, the two may be and still count as touching, and so how far
+    above the supporting body the supported body may stand and still rest on it.
 
-    A body is set down by a motion that stops where it can rather than exactly on the
-    surface, so a support read from overlapping volume alone would hold for almost no
-    placement at all. Measured on a robot stacking boxes, a placement missed the surface
-    it was aimed at by 1.9 mm; the default leaves room for that while staying far below
-    the centimetres by which a body that is genuinely in the air clears a surface.
+    A body is set down by a motion that stops where it can rather than
+    exactly on the surface, so a support read from overlapping volume
+    alone would hold for almost no placement at all. Measured on a robot
+    stacking boxes, a placement missed the surface it was aimed at by
+    1.9 mm; the default leaves room for that while staying far below the
+    centimetres by which a body that is genuinely in the air clears a
+    surface.
     """
 
     maximum_slope: float = np.radians(30.0)
@@ -263,7 +269,9 @@ class SupportedBy(Triple[TBody, TBody]):
         return self.supporting
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the supported body is supported by the supporting body"*.
 
@@ -273,11 +281,11 @@ class SupportedBy(Triple[TBody, TBody]):
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["supported"]),
+            Noun(content=fields["supported"]),
             Copula(),
-            Adjective("supported"),
+            Adjective(word="supported"),
             Prepositions.BY,
-            Noun(fields["supporting"]),
+            Noun(content=fields["supporting"]),
         )
 
     def __call__(self) -> bool:
@@ -322,13 +330,17 @@ class Supports(Predicate):
             if candidate is self.supporting_body:
                 continue
             if SupportedBy(
-                candidate, self.supporting_body, self.maximum_intersection_height
+                supported=candidate,
+                supporting=self.supporting_body,
+                maximum_intersection_height=self.maximum_intersection_height,
             )():
                 return True
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is supporting a body"*, naming what is held up, which the
         class name leaves implicit.
@@ -336,10 +348,10 @@ class Supports(Predicate):
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["supporting_body"]),
+            Noun(content=fields["supporting_body"]),
             Copula(),
-            Adjective("supporting"),
-            Noun("body"),
+            Adjective(word="supporting"),
+            Noun(content="body"),
         )
 
 
@@ -405,17 +417,19 @@ class InsideRegion(Triple[TBody, TRegion]):
         return intersection.volume / body_volume
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is inside the region"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["body"]),
+            Noun(content=fields["body"]),
             Copula(),
             Prepositions.INSIDE,
-            Noun(fields["region"]),
+            Noun(content=fields["region"]),
         )
 
 
@@ -466,7 +480,9 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the point is left of the other point, seen from the point of view"*,
         with the direction taken from the relation's own name.
@@ -475,12 +491,12 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
         """
         direction = camel_case_to_words(cls.__name__).lower()
         return clause(
-            Noun(fields["point"]),
+            Noun(content=fields["point"]),
             Copula(),
-            Adjective(direction),
-            Noun(fields["other"]),
+            Adjective(word=direction),
+            Noun(content=fields["other"]),
             Prepositions.FROM,
-            Noun(fields["point_of_view"]),
+            Noun(content=fields["point_of_view"]),
         )
 
     point_of_view: HomogeneousTransformationMatrix
@@ -624,54 +640,48 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
 
     def compute_containment_ratio(self) -> float:
         """
-        Compute the containment ratio of self.body inside self.other.
+        :return: The fraction of the vertices of :attr:`body` that lie within the
+            world-aligned bounding box of :attr:`other`, or 0 when either has no mesh or
+            that box encloses no volume.
         """
-        if self.other.combined_mesh is None:
-            return 0.0
-
-        # Get meshes in their local (body) frames
-        mesh_a_local = self.body.combined_mesh
-        mesh_b_local = self.other.combined_mesh
-
-        # Check if either mesh is empty
+        body_mesh = self.body.combined_mesh
+        other_mesh = self.other.combined_mesh
         if (
-            mesh_a_local is None
-            or mesh_a_local.is_empty
-            or mesh_b_local is None
-            or mesh_b_local.is_empty
+            body_mesh is None
+            or body_mesh.is_empty
+            or other_mesh is None
+            or other_mesh.is_empty
         ):
             return 0.0
 
-        # Transform meshes from body frame to world frame
-        mesh_a = mesh_a_local.copy()
-        mesh_a.apply_transform(self.body.global_transform.to_np())
-
-        mesh_b = mesh_b_local.copy()
-        mesh_b.apply_transform(self.other.global_transform.to_np())
-
-        # Use bounding box of mesh_b to check if mesh_a is inside mesh_b
-        mesh_b_bbox = mesh_b.bounding_box
-
-        if not mesh_b_bbox.is_watertight:
+        other_vertices = trimesh.transform_points(
+            other_mesh.vertices, self.other.global_transform.to_np()
+        )
+        lower = other_vertices.min(axis=0)
+        upper = other_vertices.max(axis=0)
+        if np.any(upper <= lower):
             return 0.0
 
-        inside = mesh_b_bbox.contains(mesh_a.vertices)
-        if len(inside) == 0:
-            return 0.0
-        return sum(inside) / len(inside)
+        body_vertices = trimesh.transform_points(
+            body_mesh.vertices, self.body.global_transform.to_np()
+        )
+        inside = np.all((body_vertices >= lower) & (body_vertices <= upper), axis=1)
+        return float(inside.mean())
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the body is inside the other"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
         return clause(
-            Noun(fields["body"]),
+            Noun(content=fields["body"]),
             Copula(),
             Prepositions.INSIDE,
-            Noun(fields["other"]),
+            Noun(content=fields["other"]),
         )
 
 
@@ -686,7 +696,7 @@ class ContainsType(Predicate):
     Iterable to check for objects of the given type.
     """
 
-    obj_type: Type
+    obj_type: type
     """
     Object type to check for.
     """
@@ -695,13 +705,13 @@ class ContainsType(Predicate):
         return any(isinstance(obj, self.obj_type) for obj in self.iterable)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         return clause(
-            Noun(fields["iterable"]),
-            Verb("contain"),
-            Noun("instance"),
+            Noun(content=fields["iterable"]),
+            Verb(lemma="contain"),
+            Noun(content="instance"),
             Prepositions.OF,
-            Noun(fields["obj_type"]),
+            Noun(content=fields["obj_type"]),
         )
 
 
@@ -729,7 +739,7 @@ class PlaceIsOccupied(Predicate):
     The world whose collidable bodies are tested against it.
     """
 
-    allowed_bodies: Optional[List[Body]] = None
+    allowed_bodies: list[Body] | None = None
     """
     Bodies that may stand there without the place counting as occupied.
     """
@@ -768,13 +778,15 @@ class PlaceIsOccupied(Predicate):
         return False
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Reads as *"the place is occupied"*.
 
         :param fields: The rendered fragment for each field, keyed by field name.
         """
-        return clause(Noun(fields["box"]), Copula(), Adjective("occupied"))
+        return clause(Noun(content=fields["box"]), Copula(), Adjective(word="occupied"))
 
 
 @symbolic_function

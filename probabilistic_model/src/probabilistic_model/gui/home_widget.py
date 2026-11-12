@@ -7,7 +7,6 @@ from PySide6.QtGui import QPixmap
 from .controller import ModelController
 from random_events.interval import Interval
 from random_events.set import Set
-from typing import Optional
 
 
 @dataclass
@@ -23,7 +22,7 @@ class HomeWidget(QWidget):
     The model controller.
     """
 
-    parent: InitVar[Optional[QWidget]] = None
+    parent: InitVar[QWidget | None] = None
     """
     The parent widget.
     """
@@ -38,7 +37,7 @@ class HomeWidget(QWidget):
     Layout for the list of variables.
     """
 
-    def __post_init__(self, parent: Optional[QWidget]):
+    def __post_init__(self, parent: QWidget | None):
         super().__init__(parent)
         self.init_ui()
 

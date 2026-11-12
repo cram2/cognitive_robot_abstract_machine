@@ -5,7 +5,7 @@ import inspect
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from typing_extensions import Callable, Dict, Optional, ClassVar, Type, Any, List, Self
+from typing_extensions import Callable, ClassVar, Any, Self
 
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.code_generation import templates
@@ -23,7 +23,7 @@ from krrood.code_generation.type_hints import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FunctionCase:
     """
     Base class for function cases (dataclass representations of a function).
@@ -40,7 +40,7 @@ class FunctionCase:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FunctionParameter:
     """
     A single parameter of a function.
@@ -63,13 +63,13 @@ class FunctionParameter:
         return stringify_type_hint(self.type_hint)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FunctionMetaData:
     """
     Metadata about a function.
     """
 
-    parameter_data: List[FunctionParameter] = field(default_factory=list)
+    parameter_data: list[FunctionParameter] = field(default_factory=list)
     """
     The data of the parameters of the function.
     """
@@ -79,13 +79,13 @@ class FunctionMetaData:
     """
 
     @classmethod
-    def from_function(cls, function: Callable) -> Self:
+    def from_function(cls, *, function: Callable) -> Self:
         """
         :param function: The function to extract metadata from.
         :return: A FunctionMetaData instance containing the given function's metadata.
         """
         try:
-            type_hints: Dict[str, object] = get_type_hints_of_object(function)
+            type_hints: dict[str, object] = get_type_hints_of_object(function)
         except NameError:
             type_hints = {}
 
@@ -110,13 +110,13 @@ class FunctionMetaData:
         return stringify_type_hint(self.return_type_hint)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FunctionCaseGenerator:
     """
     Generates a dataclass FunctionCase subclass source for a given function.
     """
 
-    base_class: Type[FunctionCase] = FunctionCase
+    base_class: type[FunctionCase] = FunctionCase
     """
     The base class to inherit from.  Must be a subclass of ``FunctionCase``.
     """
@@ -135,7 +135,7 @@ class FunctionCaseGenerator:
         templates_path = importlib.resources.files(templates)
         self.code_generator = CodeGenerator(template_directory=str(templates_path))
 
-    def generate(self, function: Callable, class_name: Optional[str] = None) -> str:
+    def generate(self, *, function: Callable, class_name: str | None = None) -> str:
         """
         Generate Python source for a ``@dataclass`` subclass of ``FunctionCase``.
 
@@ -165,14 +165,16 @@ class FunctionCaseGenerator:
         # Generate type-import lines using the centralized import generator.
         type_import_lines = get_imports_from_types(list(types_to_import))
 
-        function_meta_data = FunctionMetaData.from_function(function)
+        function_meta_data = FunctionMetaData.from_function(function=function)
 
         function_attribute_setter_line = ""
         if callable_import and callable_import.access_expression:
-            function_attribute_setter_line = f"{class_name}.function = {callable_import.access_expression}"
+            function_attribute_setter_line = (
+                f"{class_name}.function = {callable_import.access_expression}"
+            )
 
         return self.code_generator.render(
-            self.template_file_name,
+            template_name=self.template_file_name,
             class_name=class_name,
             base_class_name=self.base_class.__name__,
             base_class_module=self.base_class.__module__,
@@ -181,5 +183,5 @@ class FunctionCaseGenerator:
             access_expression=callable_import.access_expression,
             type_imports=type_import_lines,
             function_meta_data=function_meta_data,
-            function_attribute_setter_line=function_attribute_setter_line
+            function_attribute_setter_line=function_attribute_setter_line,
         )

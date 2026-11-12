@@ -6,16 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import partial, wraps
 
-from typing_extensions import (
-    Any,
-    Callable,
-    ClassVar,
-    Dict,
-    FrozenSet,
-    Optional,
-    Tuple,
-    TypeVar,
-)
+from typing_extensions import Any, Callable, ClassVar, TypeVar
 
 from krrood.patterns.exceptions import UnmemoizableOwnerError
 
@@ -50,7 +41,7 @@ def weak_key_cache(
     :param function: A one-argument function keyed on a weak-referenceable value.
     :return: The memoized function, with a ``cache_clear`` attribute.
     """
-    cache: "weakref.WeakKeyDictionary[_Key, _Value]" = weakref.WeakKeyDictionary()
+    cache: weakref.WeakKeyDictionary[_Key, _Value] = weakref.WeakKeyDictionary()
 
     @wraps(function)
     def wrapper(key: _Key) -> _Value:
@@ -70,7 +61,7 @@ def weak_key_cache(
 TCallable = TypeVar("TCallable", bound=Callable[..., Any])
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class MemoizationKey:
     """
     Identifies one memoized call within the cache of a single owner.
@@ -81,18 +72,18 @@ class MemoizationKey:
     The undecorated function whose result is cached.
     """
 
-    arguments: Tuple[Any, ...]
+    arguments: tuple[Any, ...]
     """
     The positional arguments the call was made with, excluding the owner.
     """
 
-    keyword_arguments: FrozenSet[Tuple[str, Any]]
+    keyword_arguments: frozenset[tuple[str, Any]]
     """
     The keyword arguments the call was made with, as name-value pairs.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MemoizedValue:
     """
     The result of one memoized call, together with the lock that keeps its computation
@@ -113,7 +104,7 @@ class MemoizedValue:
     The computed result, or the sentinel while it has not been computed yet.
     """
 
-    def resolve(self, computation: Callable[[], Any]) -> Any:
+    def resolve(self, *, computation: Callable[[], Any]) -> Any:
         """
         Returns the result, running the computation if it has not run yet.
 
@@ -124,7 +115,7 @@ class MemoizedValue:
                 self.value = computation()
             return self.value
 
-    def resolve_copy(self, computation: Callable[[], Any]) -> Any:
+    def resolve_copy(self, *, computation: Callable[[], Any]) -> Any:
         """
         Returns an independent copy of the result, running the computation if it has not
         run yet.
@@ -140,7 +131,7 @@ class MemoizedValue:
             return deepcopy(self.value)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MemoizationCache:
     """
     The memoized results of one owner.
@@ -166,7 +157,7 @@ class MemoizationCache:
     on the same owner cannot end up with a cache each.
     """
 
-    entries: Dict[MemoizationKey, MemoizedValue] = field(default_factory=dict)
+    entries: dict[MemoizationKey, MemoizedValue] = field(default_factory=dict)
     """
     The result of every memoized call made on the owner so far.
     """
@@ -179,7 +170,7 @@ class MemoizationCache:
     """
 
     @classmethod
-    def of(cls, owner: Any, function_name: str) -> MemoizationCache:
+    def of(cls, *, owner: Any, function_name: str) -> MemoizationCache:
         """
         Returns the owner's cache, creating it on first use.
 
@@ -187,20 +178,20 @@ class MemoizationCache:
         :param function_name: The name of the memoized function, for error reporting.
         :raises UnmemoizableOwnerError: If the owner cannot hold a cache.
         """
-        cache = cls.existing_for(owner)
+        cache = cls.existing_for(owner=owner)
         if cache is not None:
             return cache
-        if not cls.can_own_a_cache(owner):
-            raise UnmemoizableOwnerError(owner, function_name)
+        if not cls.can_own_a_cache(owner=owner):
+            raise UnmemoizableOwnerError(owner=owner, function_name=function_name)
         with cls.registration_lock:
-            cache = cls.existing_for(owner)
+            cache = cls.existing_for(owner=owner)
             if cache is None:
                 cache = cls()
                 setattr(owner, cls.attribute_name, cache)
             return cache
 
     @classmethod
-    def existing_for(cls, owner: Any) -> Optional[MemoizationCache]:
+    def existing_for(cls, *, owner: Any) -> MemoizationCache | None:
         """
         Looks up an owner's own cache, ignoring the cache of its class or of any class
         it inherits from.
@@ -208,19 +199,19 @@ class MemoizationCache:
         :param owner: The object to look up the cache of.
         :return: The owner's cache, or None if it has never memoized a call.
         """
-        if not cls.can_own_a_cache(owner):
+        if not cls.can_own_a_cache(owner=owner):
             return None
         return vars(owner).get(cls.attribute_name)
 
     @classmethod
-    def can_own_a_cache(cls, owner: Any) -> bool:
+    def can_own_a_cache(cls, *, owner: Any) -> bool:
         """
         :param owner: The receiver of a memoized call.
         :return: Whether the owner can store attributes of its own.
         """
         return type(owner).__dictoffset__ != 0
 
-    def entry_for(self, key: MemoizationKey) -> MemoizedValue:
+    def entry_for(self, *, key: MemoizationKey) -> MemoizedValue:
         """
         Returns the entry holding the result of one call, creating it on first use.
 
@@ -248,14 +239,14 @@ class MemoizationCache:
         """
         return len(self.entries)
 
-    def __deepcopy__(self, memo: Dict[int, Any]) -> MemoizationCache:
+    def __deepcopy__(self, memo: dict[int, Any]) -> MemoizationCache:
         """
         Returns an empty cache, so a copy of an owner starts out with nothing cached
         instead of inheriting results computed for the original.
         """
         return MemoizationCache()
 
-    def __reduce__(self) -> Tuple[Callable[[], MemoizationCache], Tuple[()]]:
+    def __reduce__(self) -> tuple[Callable[[], MemoizationCache], tuple[()]]:
         """
         Pickles as an empty cache, since a lock cannot be pickled and cached results do
         not survive the owner they were computed for.
@@ -278,9 +269,17 @@ def _wrap_with_memoization(
 
     @wraps(function)
     def wrapper(owner: Any, *arguments: Any, **keyword_arguments: Any) -> Any:
-        key = MemoizationKey(function, arguments, frozenset(keyword_arguments.items()))
-        entry = MemoizationCache.of(owner, function.__name__).entry_for(key)
-        return resolve(entry, partial(function, owner, *arguments, **keyword_arguments))
+        key = MemoizationKey(
+            function=function,
+            arguments=arguments,
+            keyword_arguments=frozenset(keyword_arguments.items()),
+        )
+        entry = MemoizationCache.of(
+            owner=owner, function_name=function.__name__
+        ).entry_for(key=key)
+        return resolve(
+            entry, computation=partial(function, owner, *arguments, **keyword_arguments)
+        )
 
     return wrapper  # type: ignore
 
@@ -312,7 +311,7 @@ def clear_memoization_cache(owner: Any) -> None:
 
     :param owner: The object whose memoized results are no longer valid.
     """
-    cache = MemoizationCache.existing_for(owner)
+    cache = MemoizationCache.existing_for(owner=owner)
     if cache is None:
         return
     cache.clear()

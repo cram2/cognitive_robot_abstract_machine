@@ -22,7 +22,6 @@
 - Motion building blocks: ready-to-use motion designators (e.g., TCP and gripper control) compose into higher-level actions like pick-up and transport.
 - World model integration: operate over bodies, links, transforms, and semantic annotations; reason about objects and places, not only coordinates.
 - Simulation-first workflow: run end-to-end plans in simulation for rapid iteration, with optional visualization.
-- Clear validation points: action and motion steps can declare pre/post conditions to verify success (e.g., object grasped).
 - Data-driven improvement: stored execution traces support benchmarking, failure analysis, and experiment tracking.
 - Modular and extensible: define custom designators, actions, and plan patterns while leveraging the common orchestration and logging.
 - Tested examples and demos: runnable scenarios (e.g., PR2 pick-and-place) illustrate typical workflows and best practices.
@@ -61,7 +60,7 @@ Source documentation is located in the `doc` directory. Instructions for buildin
 
 ## Examples
 
-Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/language.html). Refer to the examples folder's `README` for instructions on executing these notebooks.
+Comprehensive examples are provided as Jupyter Notebooks in the `examples` folder and documented in the [Examples section](https://cram2.github.io/cognitive_robot_abstract_machine/coraplex/notebooks/plan.html). Refer to the examples folder's `README` for instructions on executing these notebooks.
 
 
 

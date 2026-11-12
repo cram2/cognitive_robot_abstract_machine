@@ -11,15 +11,7 @@ import operator
 from copy import copy
 from dataclasses import dataclass
 
-from typing_extensions import (
-    Callable,
-    Any,
-    ClassVar,
-    Dict,
-    Optional,
-    Tuple,
-    Iterable,
-)
+from typing_extensions import Callable, Any, ClassVar, Iterable
 
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
@@ -33,7 +25,7 @@ from krrood.entity_query_language.operators.set_operations import (
 from krrood.entity_query_language.utils import is_iterable, make_set
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Comparator(BinaryExpression, PerformsCartesianProduct):
     """
     A symbolic equality check that can be used to compare symbolic variables using a
@@ -43,7 +35,7 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     left: Selectable
     right: Selectable
     operation: Callable[[Any, Any], bool]
-    operation_name_map: ClassVar[Dict[Any, str]] = {
+    operation_name_map: ClassVar[dict[Any, str]] = {
         operator.eq: "==",
         operator.ne: "!=",
         operator.lt: "<",
@@ -53,7 +45,7 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     }
 
     @property
-    def _product_operands_(self) -> Tuple[SymbolicExpression, ...]:
+    def _product_operands_(self) -> tuple[SymbolicExpression, ...]:
         return self.left, self.right
 
     @property
@@ -64,17 +56,18 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Compares the left and right symbolic variables using the "operation".
         """
         yield from (
-            self.get_operation_result(result)
-            for result in self._evaluate_product_(sources)
+            self.get_operation_result(child_result=result)
+            for result in self._evaluate_product_(sources=sources)
         )
 
-    def get_operation_result(self, child_result: OperationResult) -> OperationResult:
+    def get_operation_result(self, *, child_result: OperationResult) -> OperationResult:
         """
         Evaluate the comparator operation and return the result.
 
@@ -83,8 +76,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         :return: The result of the operation.
         """
         left_value, right_value = (
-            self.left._process_result_(child_result),
-            self.right._process_result_(child_result),
+            self.left._process_result_(result=child_result),
+            self.right._process_result_(result=child_result),
         )
         if (
             self.operation in [operator.eq, operator.ne]
@@ -97,14 +90,14 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         bindings = copy(child_result.bindings)
         bindings[self._id_] = comparison_result
         return OperationResult(
-            bindings, operand=self, previous_operation_result=child_result
+            bindings=bindings, operand=self, previous_operation_result=child_result
         )
 
     def _optimize_operands_order_(
-        self, sources: Optional[OperationResult]
-    ) -> Tuple[SymbolicExpression, SymbolicExpression]:
-        left_is_definite = self._operand_contains_definite_query_(self.left)
-        right_is_definite = self._operand_contains_definite_query_(self.right)
+        self, *, sources: OperationResult | None
+    ) -> tuple[SymbolicExpression, SymbolicExpression]:
+        left_is_definite = self._operand_contains_definite_query_(operand=self.left)
+        right_is_definite = self._operand_contains_definite_query_(operand=self.right)
         if left_is_definite and not right_is_definite:
             return self.left, self.right
         if right_is_definite and not left_is_definite:
@@ -117,7 +110,7 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             return self.left, self.right
 
     @staticmethod
-    def _operand_contains_definite_query_(operand: SymbolicExpression) -> bool:
+    def _operand_contains_definite_query_(*, operand: SymbolicExpression) -> bool:
         """
         :param operand: A comparator operand.
         :return: Whether the operand is, or contains, a definite (``the``) query, which yields a
