@@ -65,7 +65,7 @@ class StatechartPayloadKey(StrEnum):
 # %% following the payloads
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReportedStatechart:
     """
     A copy of the statechart a server reports on, holding the structure and the states
@@ -77,7 +77,7 @@ class ReportedStatechart:
     The copy, None until a payload carried the structure of a statechart.
     """
 
-    def take_over(self, payload: dict[str, Any]) -> None:
+    def take_over(self, *, payload: dict[str, Any]) -> None:
         """
         Take over the structure, the joined nodes and the states `payload` reports.
 
@@ -95,7 +95,7 @@ class ReportedStatechart:
             return
         if StatechartPayloadKey.JOINED_NODES in payload:
             self.statechart.add_nodes_from_json(
-                payload[StatechartPayloadKey.JOINED_NODES]
+                data=payload[StatechartPayloadKey.JOINED_NODES]
             )
         self.statechart.compiler.add_transitions()
         self.statechart.life_cycle_state.data = LifeCycleState.from_json(

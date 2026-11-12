@@ -93,11 +93,15 @@ class RealRunner(DemoRunner):
             self.scene.populate(robot.world)
             [tracy] = robot.world.get_semantic_annotations_by_type(Tracy)
             executor = RealRobotPlanExecutor(
-                StatechartContext.with_extensions(robot.world, [RobotAccess(tracy)]),
+                context=StatechartContext.with_extensions(
+                    world=robot.world, extensions=[RobotAccess(robot=tracy)]
+                ),
                 ros_node=robot.node,
                 collision_avoidance=False,
             )
-            executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+            executor.compile(
+                statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+            )
             executor.execute()
             executor.close()
 

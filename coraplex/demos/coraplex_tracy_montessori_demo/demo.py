@@ -446,7 +446,7 @@ class ShapeSortingPlan:
         :param context: The context of the executor that performs the plan.
         :return: The statechart that sorts the pieces.
         """
-        robot = context.require_extension(RobotAccess).robot
+        robot = context.require_extension(extension_type=RobotAccess).robot
         actions = [ParkArmsAction(arms=robot.all_arms)]
         for piece, hole in self.scene.holes_of_pieces.items():
             [grasp] = piece.grasp_candidates()
@@ -459,7 +459,7 @@ class ShapeSortingPlan:
             )
         actions.append(ParkArmsAction(arms=robot.all_arms))
         statechart = Statechart(context=context)
-        statechart.add_node(Sequence(nodes=actions))
+        statechart.add_node(node=Sequence(nodes=actions))
         return statechart
 
     def release_pose_over(self, hole: HoleShape, world: World) -> Pose:

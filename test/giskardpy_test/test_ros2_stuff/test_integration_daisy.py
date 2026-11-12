@@ -41,10 +41,16 @@ def add_trajectory_length_limit(motion_statechart: Statechart) -> None:
     :data:`MAX_TRAJECTORY_LENGTH_SECONDS`.
     """
     motion_statechart.add_node(
-        max_length := CountSimulationTimeSeconds(seconds=MAX_TRAJECTORY_LENGTH_SECONDS)
+        node=(
+            max_length := CountSimulationTimeSeconds(
+                seconds=MAX_TRAJECTORY_LENGTH_SECONDS
+            )
+        )
     )
     motion_statechart.add_node(
-        CancelStatechart.when_true(max_length, MaxTrajectoryLengthException())
+        node=CancelStatechart.when_true(
+            node=max_length, exception=MaxTrajectoryLengthException()
+        )
     )
 
 
@@ -89,20 +95,22 @@ def robot():
 def test_joints1(giskard: DAiSyTester) -> None:
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                {
-                    "left_wrist_1_joint": 1.23,
-                    "left_wrist_2_joint": 1.23,
-                    "left_wrist_3_joint": 1.23,
-                },
-                giskard.api.world,
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    {
+                        "left_wrist_1_joint": 1.23,
+                        "left_wrist_2_joint": 1.23,
+                        "left_wrist_3_joint": 1.23,
+                    },
+                    giskard.api.world,
+                )
             )
         ),
     )
-    statechart.add_node(EndMotion.when_true(joint_goal))
+    statechart.add_node(node=EndMotion.when_true(node=joint_goal))
     add_trajectory_length_limit(statechart)
-    giskard.api.compile(statechart)
+    giskard.api.compile(statechart=statechart)
     giskard.api.execute()
 
     base = giskard.world.get_kinematic_structure_entity_by_name("left_base_link")

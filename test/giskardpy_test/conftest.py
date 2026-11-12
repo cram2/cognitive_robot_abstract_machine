@@ -207,14 +207,14 @@ def giskard_factory(init_background_node, robot: GiskardTester):
             name="initial configuration",
             seed_configuration=JointState.from_mapping(parse_seed_joint_state),
         )
-        statechart.add_node(initial_config)
+        statechart.add_node(node=initial_config)
 
         if robot.has_odometry_joint():
             base_goal = HomogeneousTransformationMatrix(
                 reference_frame=robot.api.world.root
             )
             base_pose_reached = SetOdometry(name="initial pose", base_pose=base_goal)
-            statechart.add_node(base_pose_reached)
+            statechart.add_node(node=base_pose_reached)
             done = logic_and(
                 initial_config.observes_true,
                 base_pose_reached.observes_true,
@@ -222,9 +222,9 @@ def giskard_factory(init_background_node, robot: GiskardTester):
         else:
             done = initial_config.observes_true
         end = EndMotion(name="end")
-        statechart.add_node(end)
+        statechart.add_node(node=end)
         end.start_condition = done
-        robot.api.compile(statechart)
+        robot.api.compile(statechart=statechart)
         robot.api.execute()
         return robot
 

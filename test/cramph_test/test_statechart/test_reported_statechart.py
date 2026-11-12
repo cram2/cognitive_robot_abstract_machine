@@ -50,11 +50,11 @@ def test_states_reported_before_any_structure_are_ignored(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_context)
-    statechart.add_node(ConstTrueNode(name="running"))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=ConstTrueNode(name="running"))
+    statechart_executor.compile(statechart=statechart)
     reported_statechart = ReportedStatechart()
 
-    reported_statechart.take_over(_states_payload(statechart_executor))
+    reported_statechart.take_over(payload=_states_payload(statechart_executor))
 
     assert reported_statechart.statechart is None
 
@@ -64,23 +64,23 @@ def test_the_copy_holds_the_children_chosen_while_the_statechart_runs(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart_context.add_extension(
-        ChildChooserAccess(
+        extension=ChildChooserAccess(
             choosers=[ChooserAnsweringInTurn(children=[ConstTrueNode(name="chosen")])]
         )
     )
     statechart = Statechart(context=statechart_context)
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             nodes=[
                 CountTicks(name="delay", ticks=2),
                 CompositeNodeChoosingItsChild(name="statement"),
             ]
         )
     )
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     reported_statechart = ReportedStatechart()
     reported_statechart.take_over(
-        {
+        payload={
             **_states_payload(statechart_executor),
             StatechartPayloadKey.STATECHART: json.loads(
                 json.dumps(statechart.create_structure_copy().to_json())
@@ -92,7 +92,7 @@ def test_the_copy_holds_the_children_chosen_while_the_statechart_runs(
     for _ in range(4):
         statechart_executor.tick()
     reported_statechart.take_over(
-        {
+        payload={
             **_states_payload(statechart_executor),
             StatechartPayloadKey.JOINED_NODES: json.loads(
                 json.dumps(

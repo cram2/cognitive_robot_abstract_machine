@@ -1016,7 +1016,7 @@ def test_an_object_that_lies_in_no_drawer_is_picked_up_unchanged(pr2_apartment_c
     assert steps_of(plan) == [pick_up]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChoosesTheGivenChild(PlanChildChooser[StatementNode]):
     """
     Answers a node choosing its child with the child it was given, once, and prepares it
@@ -1028,7 +1028,7 @@ class ChoosesTheGivenChild(PlanChildChooser[StatementNode]):
     The child handed over, None once it was.
     """
 
-    def choose_child(self, node: StatementNode) -> StatechartNode | None:
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         child, self.child = self.child, None
         return child
 
@@ -1058,7 +1058,7 @@ def test_the_opening_joins_the_sequence_a_grounded_pick_up_is_a_child_of(
     candidate_steps = Sequence(nodes=[candidate])
 
     underspecified.choose_child_with(
-        ChoosesTheGivenChild(child=candidate_steps),
+        chooser=ChoosesTheGivenChild(child=candidate_steps),
     )
 
     [parking, opening, parking_again, drive_to_the_spoon, chosen] = steps_of(

@@ -30,7 +30,7 @@ from cramph.statechart import Statechart
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionComingToRest(TickingExecutorExtension):
     """
     An executor extension that reports rest only after it was asked to hold still a few
@@ -47,7 +47,7 @@ class ExtensionComingToRest(TickingExecutorExtension):
     How often it was asked to hold still.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         self.questions += 1
         if self.questions_until_at_rest == 0:
             return True
@@ -55,7 +55,7 @@ class ExtensionComingToRest(TickingExecutorExtension):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserNotingTheTick(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Chooses one prepared child, noting the tick it was asked on.
@@ -77,13 +77,13 @@ class ChooserNotingTheTick(ChildChooser[CompositeNodeChoosingItsChild]):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.asked_on_ticks.append(self.executor.tick_count)
         return self.child
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionRecordingCompiles(TickingExecutorExtension):
     """
     An executor extension that records in which order it was told about compiling.
@@ -94,11 +94,11 @@ class ExtensionRecordingCompiles(TickingExecutorExtension):
     The hooks that ran, in order, each by its method name.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         self.events.append(self.before_recompile.__name__)
         return True
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.events.append(self.after_compile.__name__)
 
 
@@ -116,11 +116,11 @@ def _choosing_statechart(
             name="child", observation=ObservationStateValues.TRUE
         ),
     )
-    executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=[chooser]))
     statechart = Statechart(context=executor.context)
     choosing = CompositeNodeChoosingItsChild(name="choosing")
-    statechart.add_node(choosing)
-    executor.compile(statechart)
+    statechart.add_node(node=choosing)
+    executor.compile(statechart=statechart)
     return executor, chooser, choosing
 
 
@@ -173,7 +173,7 @@ def test_the_extensions_are_asked_to_hold_still_once_per_choice(
 # %% resetting while not at rest
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionBrakingOnceAskedToHoldStill(TickingExecutorExtension):
     """
     An executor extension that starts moving after the first tick and comes to rest on
@@ -203,16 +203,16 @@ class ExtensionBrakingOnceAskedToHoldStill(TickingExecutorExtension):
     How often the statechart compiled again while this extension was not at rest.
     """
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         if not self.is_at_rest:
             self.is_braking = True
         return self.is_at_rest
 
-    def after_recompile(self, executor: StatechartExecutor) -> None:
+    def after_recompile(self, *, executor: StatechartExecutor) -> None:
         if not self.is_at_rest:
             self.compiles_while_not_at_rest += 1
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         if self.is_braking:
             self.is_at_rest = True
             self.is_braking = False
@@ -221,14 +221,14 @@ class ExtensionBrakingOnceAskedToHoldStill(TickingExecutorExtension):
             self.has_started_moving = True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserWithoutChildren(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Says that no child is left whenever it is asked.
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         return None
 
@@ -243,7 +243,7 @@ def test_resetting_a_node_choosing_its_child_compiles_nothing_while_moving(
     extension = ExtensionBrakingOnceAskedToHoldStill()
     executor = StatechartExecutor(context=statechart_context, extensions=[extension])
     executor.context.add_extension(
-        ChildChooserAccess(choosers=[ChooserWithoutChildren()])
+        extension=ChildChooserAccess(choosers=[ChooserWithoutChildren()])
     )
     statechart = Statechart(context=executor.context)
     choosing = CompositeNodeChoosingItsChild(name="choosing")
@@ -252,9 +252,9 @@ def test_resetting_a_node_choosing_its_child_compiles_nothing_while_moving(
         task=choosing,
         stop_retry_monitor=CountNodeResets(name="resets", node=choosing, target=2),
     )
-    statechart.add_node(loop)
-    statechart.add_node(EndStatechart.when_failed(loop))
-    executor.compile(statechart)
+    statechart.add_node(node=loop)
+    statechart.add_node(node=EndStatechart.when_failed(node=loop))
+    executor.compile(statechart=statechart)
 
     executor.tick_until_end(timeout=60)
 

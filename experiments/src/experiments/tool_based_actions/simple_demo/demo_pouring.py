@@ -86,13 +86,15 @@ def main() -> None:
 
     with RobotDemonstrationRosSession.start("pouring_demo") as ros_session:
         executor = KinematicallySimulatedPlanExecutor(
-            StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+            context=StatechartContext.with_extensions(
+                world=world, extensions=[RobotAccess(robot=pr2)]
+            ),
             ros_node=ros_session.node,
             extensions=selected_visualizations(ros_session.node),
         )
         statechart = Statechart(context=executor.context)
-        statechart.add_node(plan)
-        executor.compile(statechart)
+        statechart.add_node(node=plan)
+        executor.compile(statechart=statechart)
         executor.execute()
 
 

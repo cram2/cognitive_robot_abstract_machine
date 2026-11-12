@@ -25,7 +25,7 @@ from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeAssertionError(StatechartError):
     """
     Raised by test statechart nodes when a behaviour they assert on is violated.
@@ -43,7 +43,7 @@ class NodeAssertionError(StatechartError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeAssertionErrorNamingANode(NodeAssertionError):
     """
     Raised by test statechart nodes when a behaviour they assert on is violated by one
@@ -157,9 +157,9 @@ class CompositeNodeWithChainedChildren(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.sub_node1 = ConstTrueNode(name="sub muh1")
-        self._add_child_to_statechart(self.sub_node1)
+        self._add_child_to_statechart(node=self.sub_node1)
         self.sub_node2 = ConstTrueNode(name="sub muh2")
-        self._add_child_to_statechart(self.sub_node2)
+        self._add_child_to_statechart(node=self.sub_node2)
         self.sub_node1.success_condition = self.sub_node1.observes_true
         self.sub_node2.start_condition = self.sub_node1.observes_true
 
@@ -181,7 +181,7 @@ class SequenceCreatingItsSteps(Sequence):
 
     def expand(self) -> None:
         for _ in range(3):
-            self.add_node(ConstTrueNode())
+            self.add_node(node=ConstTrueNode())
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
@@ -197,7 +197,7 @@ class CompositeNodeWithNestedCompositeChild(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.inner = CompositeNodeWithChainedChildren(name="inner")
-        self._add_child_to_statechart(self.inner)
+        self._add_child_to_statechart(node=self.inner)
 
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar(self.inner.observation_variable))
@@ -381,8 +381,10 @@ class CompositeNodeResumingItsPausedChildren(SucceedsOnObservingTrue, CompositeN
             exception=NodeAssertionError(reason="Node did not unpause correctly"),
         )
 
-        self._add_child_to_statechart(self.count_ticks1)
-        self._add_child_to_statechart(Sequence(nodes=[self.count_ticks2, self.cancel]))
+        self._add_child_to_statechart(node=self.count_ticks1)
+        self._add_child_to_statechart(
+            node=Sequence(nodes=[self.count_ticks2, self.cancel])
+        )
 
     def build_artifacts(self) -> NodeArtifacts:
         """
@@ -543,7 +545,7 @@ class CompositeNodeCuttingOffItsChildAtItsGoal(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.child = ConstTrueNode()
-        self._add_child_to_statechart(self.child)
+        self._add_child_to_statechart(node=self.child)
 
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
@@ -563,7 +565,7 @@ class CompositeNodeCuttingOffItsChild(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.child = ConstFalseNode()
-        self._add_child_to_statechart(self.child)
+        self._add_child_to_statechart(node=self.child)
 
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
@@ -695,7 +697,7 @@ class CompositeNodeCuttingOffItsUndecidedChild(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.child = NodeObservingNothingYet()
-        self._add_child_to_statechart(self.child)
+        self._add_child_to_statechart(node=self.child)
 
     def build_artifacts(self) -> NodeArtifacts:
         return NodeArtifacts(observation=sm.Scalar.const_true())
@@ -715,7 +717,7 @@ class CompositeNodeCuttingOffItsGrandchild(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.inner_node = CompositeNodeCuttingOffItsChild()
-        self._add_child_to_statechart(self.inner_node)
+        self._add_child_to_statechart(node=self.inner_node)
 
     @property
     def grandchild(self) -> ConstFalseNode:
@@ -927,7 +929,7 @@ class CompositeNodeWithARecordingChild(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.child = NodeRecordingItsCallbacks()
-        self._add_child_to_statechart(self.child)
+        self._add_child_to_statechart(node=self.child)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)

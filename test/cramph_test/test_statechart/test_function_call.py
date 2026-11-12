@@ -42,9 +42,9 @@ def run_until_end(
     Run a statechart holding only `function_call` until it ends.
     """
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(function_call)
-    statechart.add_node(EndStatechart.when_true(function_call))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=function_call)
+    statechart.add_node(node=EndStatechart.when_true(node=function_call))
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick_until_end(timeout=10)
 
 
@@ -81,8 +81,8 @@ def test_an_expected_failure_makes_the_node_fail(
 
     statechart = Statechart(context=statechart_executor.context)
     function_call = FunctionCall(function=fail, failure_types=(ExpectedFailure,))
-    statechart.add_node(function_call)
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=function_call)
+    statechart_executor.compile(statechart=statechart)
 
     for _ in range(5):
         statechart_executor.tick()
