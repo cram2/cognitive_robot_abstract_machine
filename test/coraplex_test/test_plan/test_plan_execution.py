@@ -37,9 +37,12 @@ from cramph.data_types import LifeCycleValues, ObservationStateValues
 from cramph.executor import Pacer, StatechartExecutor
 from cramph.node import CancelStatechart
 from cramph.nodes_for_testing import NodeFailingOnObservingFalse
+from cramph.orm.ormatic_interface import StatechartMappingDAO
+from krrood.ormatic.data_access_objects.helper import to_dao
+from sqlalchemy import select
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
 )
@@ -198,12 +201,13 @@ def test_compiling_watches_the_plan_for_progress(pr2_apartment_context) -> None:
     assert len(plan.statechart.get_nodes_by_type(CancelStatechart)) == 1
 
 
-def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
+@pytest.fixture
+def executor_reaching_out_of_range(
     pr2_apartment_context,
-) -> None:
+) -> KinematicallySimulatedPlanExecutor:
     """
-    Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
-    to end the run rather than tick forever.
+    :return: An executor with a reach for a milk carton far above the robot, which the
+        arm cannot close on.
     """
     world, robot_view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
@@ -214,10 +218,44 @@ def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
         grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
     )
     executor = simulated_executor(extensions)
+    executor.compile(statechart_of(executor, plan))
+    return executor
 
+
+def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
+    executor_reaching_out_of_range: KinematicallySimulatedPlanExecutor,
+) -> None:
+    """
+    Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
+    to end the run rather than tick forever.
+    """
     with pytest.raises(MotionMadeNoProgress):
-        executor.compile(statechart_of(executor, plan))
-        executor.execute()
+        executor_reaching_out_of_range.execute()
+
+
+def test_a_plan_given_up_on_keeps_the_stalled_tasks_in_its_stored_history(
+    executor_reaching_out_of_range: KinematicallySimulatedPlanExecutor,
+    coraplex_testing_session,
+) -> None:
+    """
+    Once the statechart of the plan is stored and read back, it still names the tasks
+    that stopped approaching their goal, as copies of them.
+    """
+    with pytest.raises(MotionMadeNoProgress) as failure:
+        executor_reaching_out_of_range.execute()
+    statechart = executor_reaching_out_of_range.statechart
+
+    coraplex_testing_session.add(to_dao(statechart))
+    coraplex_testing_session.commit()
+    coraplex_testing_session.expunge_all()
+    statechart_read_back = (
+        coraplex_testing_session.scalars(select(StatechartMappingDAO)).one().from_dao()
+    )
+    read_back = statechart_read_back.state_history.latest_item.cancellation_error
+
+    assert [(type(task), task.name) for task in read_back.stalled_tasks] == [
+        (type(task), task.name) for task in failure.value.no_progress.stalled_tasks
+    ]
 
 
 def test_a_plan_that_outlasts_the_simulation_time_limit_is_given_up_on(
@@ -330,6 +368,46 @@ def test_a_plan_that_violates_collision_avoidance_fails_as_a_plan_failure(
     assert failure.value.violation is violation
 
 
+# %% the outcome of an attempted plan
+
+
+def test_an_attempted_plan_that_succeeds_reports_no_failure(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+
+    outcome = executor.attempt()
+
+    assert outcome.succeeded
+    assert outcome.failure is None
+
+
+def test_an_attempted_plan_that_fails_reports_its_failure_instead_of_raising_it(
+    pr2_apartment_context, monkeypatch
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    violation = CollisionViolatedError(violated_collisions=[])
+
+    def violate_collision_avoidance(executor: StatechartExecutor) -> None:
+        raise violation
+
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+    monkeypatch.setattr(StatechartExecutor, "tick", violate_collision_avoidance)
+
+    outcome = executor.attempt()
+
+    assert not outcome.succeeded
+    assert isinstance(outcome.failure, MotionViolatedCollisionAvoidance)
+    assert outcome.failure.violation is violation
+
+
 # %% avoiding collisions in a world with several robots
 
 
@@ -340,7 +418,7 @@ def tiago_world_with_a_stretch(_tiago_world_setup) -> World:
     """
     world = deepcopy(_tiago_world_setup)
     RobotSpecification(
-        Stretch, world_T_odom=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
+        Stretch, localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
     ).spawn(world)
     return world
 

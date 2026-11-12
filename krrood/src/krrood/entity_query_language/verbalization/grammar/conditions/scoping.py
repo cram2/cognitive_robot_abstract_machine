@@ -42,7 +42,7 @@ from krrood.entity_query_language.verbalization.relational_attributes import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalBindingFold:
     """
     A subject→entity relational binding collapsed with the entity's own restrictions.
@@ -52,8 +52,10 @@ class RelationalBindingFold:
     """
 
     relation_hop: Attribute
-    """The subject's single relational-attribute hop (``robot.assigned_to``) whose verb names the
-    clause."""
+    """
+    The subject's single relational-attribute hop (``robot.assigned_to``) whose verb
+    names the clause.
+    """
 
     entity: Variable
     """
@@ -61,8 +63,10 @@ class RelationalBindingFold:
     """
 
     nested: list[FoldNode]
-    """The entity's own conjuncts, transitively (removed from the subject's list); empty for a bare
-    binding that only names the entity."""
+    """
+    The entity's own conjuncts, transitively (removed from the subject's list); empty
+    for a bare binding that only names the entity.
+    """
 
 
 BoundConjunct = Union[FoldNode, RelationalBindingFold]

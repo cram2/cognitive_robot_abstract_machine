@@ -32,7 +32,8 @@ def test_every_import_crossing_the_boundary_is_reported() -> None:
     ]
 
     reported_lines = [
-        violation.first_line for violation in CoreBoundaryChecker().violations(path)
+        violation.first_line
+        for violation in CoreBoundaryChecker().violations(path=path)
     ]
 
     assert reported_lines == marked_lines
@@ -47,15 +48,15 @@ def test_every_import_crossing_the_boundary_is_reported() -> None:
     ],
 )
 def test_imports_inside_the_boundary_are_not_reported(path: Path) -> None:
-    assert list(CoreBoundaryChecker().violations(path)) == []
+    assert list(CoreBoundaryChecker().violations(path=path)) == []
 
 
 def test_a_module_outside_core_reports_what_it_loads_through_its_imports() -> None:
     boundary = CoreBoundary.from_pyproject(
-        CoreBoundarySnippet.DISTRIBUTION / DeclarationFile.PYPROJECT
+        path=CoreBoundarySnippet.DISTRIBUTION / DeclarationFile.PYPROJECT
     )
 
-    assert boundary.distributions_loaded_beyond_core(MimicModule.DRAWING) == {
+    assert boundary.distributions_loaded_beyond_core(module=MimicModule.DRAWING) == {
         MimicDistribution.MATPLOTLIB
     }
 
@@ -71,7 +72,7 @@ def test_checking_a_core_module_crossing_the_boundary_fails(
     repository_root: Path,
 ) -> None:
     exit_status = CommandLine.main(
-        [
+        command_line=[
             Subcommand.CHECK,
             Option.ALL_LINES,
             str(CoreBoundarySnippet.CROSSING_THE_BOUNDARY),

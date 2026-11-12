@@ -15,6 +15,8 @@
 - Never duplicate code. Never put methods in a catch-all module such as `utils.py`; move them onto the class that owns the behaviour
 - Access attributes with `.`, never with `getattr`, and never wrap attribute access in try-except
 - Never use mutable objects as default arguments
+- Every dataclass is declared with `kw_only=True`, so its fields are passed by keyword. A dataclass an `Enum` mixes in is exempt, since the enum passes its member values positionally (checked by `krrood check`)
+- Every parameter of a method after `self` or `cls` is keyword-only: a `*` comes before them, as in `def move_to(self, *, target: Pose)`. Dunder methods, property setters and deleters, and methods that a standard library or third-party base class defines or dispatches to by name, such as the `visit_` methods of `ast.NodeVisitor`, are exempt, since Python or that library passes their arguments positionally. Mark any other method a caller outside our control calls positionally, such as a method applied as a decorator, with `krrood.patterns.called_positionally.called_positionally` (checked by `krrood check`)
 - A descriptor that manages a dataclass field subclasses `krrood.patterns.dataclass_field_descriptor.DataclassFieldDescriptor`, implementing `read` and `write`, and the owning class inherits `DataclassFieldDescriptorOwner` so its subclasses keep the descriptor
 - Never define `__set__` in a class other than `DataclassFieldDescriptor`, and never manage a dataclass field `value` or `_value` with a property setter `value` (checked by `krrood check`)
 - Never reimplement what the codebase or an existing dependency already provides. When searching for it, never cut off the output of grep or other searches; narrow the search instead
@@ -193,7 +195,7 @@
 - `ormatic_interface.py` files are generated, never written, and git-ignored (see `.gitignore`). Never edit them, and never read them to debug an ORM problem; regenerate them with `scripts/regenerate_all_orm.py` instead
 - The test suite builds them for its runs; a local checkout builds them with `scripts/regenerate_all_orm.py`
 - Never track one again: git refuses to overwrite a tracked path a checkout has generated its own copy of, which makes every branch switch fail
-- Pass `--orm-build never` to the test runs you start, and regenerate them with `scripts/regenerate_all_orm.py` when a change needs it
+- Set `CRAM_ORM_BUILD=never` in the environment of the test runs you start, and regenerate them with `scripts/regenerate_all_orm.py` when a change needs it; the `--orm-build` option is rejected when `--confcutdir` excludes `test/conftest.py`, which registers it
 - When regenerating the ORM interfaces does not fix an ORM problem, ask the developer
 - If an ORM import creates an import cycle, ask the user if a local import is fine
 

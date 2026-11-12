@@ -12,13 +12,15 @@ can use the same conventions:
   krrood ships and the repository's own, replacing whatever the file held.
   With `--check` it writes nothing and exits non-zero when the file differs; run that in
   CI.
-
+- `krrood skills [--check]` generates the `.claude/skills/<name>/SKILL.md` of every
+  skill the repository declares, replacing whatever those files held. `--check` works
+  as for `agents-md`.
 - `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
   enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
   the staged change (`git diff --cached`) adds or changes are checked, because existing
   code has many violations; `--all-lines` checks every line.
 
-`format` and `agents-md` exit with 1 when they modified a file, and `check` when it
+`format`, `agents-md` and `skills` exit with 1 when they modified a file, and `check` when it
 found a violation, following pre-commit's convention for hooks.
 
 ## Rules
@@ -117,6 +119,13 @@ repos:
         entry: krrood check
         language: system
         types: [python]
+      - id: krrood-skills
+        name: Update the generated skills
+        entry: krrood skills
+        language: python
+        additional_dependencies: ["krrood[development-tools]==<version>"]
+        pass_filenames: false
+        always_run: true
 ```
 
 `krrood-check` runs with `language: system`, in the environment that has the
@@ -148,6 +157,54 @@ class DeploymentRules(Section):
     DEPLOY_FROM_TAGS = "Deploy only tagged commits"
     TAG_RELEASES = "Tag every release", ("Use semantic versions", "Sign the tag")
 ```
+
+## Skills
+
+A skill is code as well: a class subclassing `Skill`, named for the skill followed by
+`Skill`, in an `agent_skills.py` module at the repository root or in the modules of an
+`agent_skills` package there. `krrood skills` writes each skill defined in it to the
+path its `path` classproperty gives, relative to the repository root, usually
+`.claude/skills/<name>/SKILL.md`. The name is the class name's words in kebab case
+(`CRAMLiveSessionSkill` becomes `cram-live-session`). The skill's other classproperties
+give the front matter (`description`, `allowed_tools`), the paragraphs below its title
+(`introduction`) and its sections, which are `Section`s like the rules and are written
+in the order `sections` lists them, one heading level below the title:
+
+```python
+from pathlib import Path
+
+from krrood.development_tools.agents.rule import Section
+from krrood.development_tools.agents.skill import AgentTool, Skill
+
+
+class LoopRules(Section):
+    ONE_STEP_PER_INSTRUCTION = "Do what the developer asked, then stop and wait"
+
+
+class LiveSessionSkill(Skill):
+    @classproperty
+    def path(cls) -> Path:
+        return Path(".claude/skills/live-session/SKILL.md")
+
+    @classproperty
+    def description(cls) -> str:
+        return "Drive a simulated robot step by step. Use when ..."
+
+    @classproperty
+    def allowed_tools(cls) -> list[AgentTool]:
+        return [AgentTool.BASH, AgentTool.READ]
+
+    @classproperty
+    def introduction(cls) -> str:
+        return "The developer says what the robot does next. ..."
+
+    @classproperty
+    def sections(cls) -> list[type[Section]]:
+        return [LoopRules]
+```
+
+Never edit a generated `SKILL.md`; the comment below its front matter names the class
+and module it comes from. Skills written by hand in `.claude/skills` are left alone.
 
 ## Changing a rule
 

@@ -74,11 +74,11 @@ class VelocityBoundProfiles:
         :return: Bounds at plus and minus the velocity limit, with a goal profile at
             rest.
         """
-        upper_bound = sm.Vector.ones(prediction_horizon) * velocity_limit
+        upper_bound = sm.Vector.ones(size=prediction_horizon) * velocity_limit
         return cls(
             lower_bound=-upper_bound,
             upper_bound=upper_bound,
-            goal_profile=sm.Vector.zeros(prediction_horizon),
+            goal_profile=sm.Vector.zeros(size=prediction_horizon),
             skip_first=sm.Scalar.const_false(),
         )
 
@@ -351,7 +351,7 @@ class DegreeOfFreedomLimitProfiler:
         velocity_lower_bound = velocity_bounds.lower_bound
         velocity_upper_bound = velocity_bounds.upper_bound
 
-        jerk_profile = sm.Vector.ones(velocity_upper_bound.shape[0]) * jerk_limit
+        jerk_profile = sm.Vector.ones(size=velocity_upper_bound.shape[0]) * jerk_limit
 
         projected_velocity_profile, projected_jerk_profile_violated = (
             self._project_velocity_profiles(
@@ -719,7 +719,9 @@ class DegreeOfFreedomDecisionVariables:
                 ),
             )
             quadratic_weights.append(normalized_weight)
-        return sm.Vector(quadratic_weights), sm.Vector.zeros(len(quadratic_weights))
+        return sm.Vector(quadratic_weights), sm.Vector.zeros(
+            size=len(quadratic_weights)
+        )
 
     def _decision_variable_limits(
         self, upper_limits: DerivativeMap[float], time_step: timedelta

@@ -157,15 +157,15 @@ class UnivariateInputLayer(LeafLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeVariableValues:
-        result = np.zeros((self.number_of_nodes, query.number_of_variables))
         if not query.requested[self.variable]:
-            return result
-        result[:, self.variable] = self.moment_of_nodes_own(
+            return np.zeros((self.number_of_nodes, query.number_of_variables))
+        own_moments = self.moment_of_nodes_own(
             int(query.order[self.variable]),
             float(query.center[self.variable]),
             variables[self.variable],
         )
-        return result
+        is_own_variable = np.arange(query.number_of_variables) == self.variable
+        return np.where(is_own_variable, own_moments[:, None], 0.0)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -402,7 +402,7 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
             values = self.cumulative_distribution_of_nodes_from_column(
                 np.array([simple_interval.lower, simple_interval.upper], dtype=float)
             )
-            result += values[1] - values[0]
+            result = result + (values[1] - values[0])
         return result
 
     @memoized

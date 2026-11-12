@@ -73,7 +73,9 @@ class TestProfileSerialization:
     def test_phases_survive_the_round_trip(self):
         profile = make_profile([0.02, 0.04], [0.01, 0.03])
 
-        restored = CallTreeProfile.from_json(json.loads(json.dumps(profile.to_json())))
+        restored = CallTreeProfile.from_json(
+            data=json.loads(json.dumps(profile.to_json()))
+        )
 
         assert restored == profile
 
@@ -84,7 +86,9 @@ class TestProfileSerialization:
         """
         profile = make_profile([0.02, 0.04], [0.01, 0.03])
 
-        restored = CallTreeProfile.from_json(json.loads(json.dumps(profile.to_json())))
+        restored = CallTreeProfile.from_json(
+            data=json.loads(json.dumps(profile.to_json()))
+        )
 
         assert set(restored.phases) == {
             ("control_cycle",),
@@ -228,12 +232,12 @@ class TestPhaseBreakdown:
 
 
 @pytest.fixture()
-def cartesian_goal_profile(init_rospy) -> CallTreeProfile:
+def cartesian_goal_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(CartesianGoalScenario())
 
 
 @pytest.fixture()
-def long_sequence_profile(init_rospy) -> CallTreeProfile:
+def long_sequence_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(LongSequenceScenario())
 
 
@@ -256,7 +260,7 @@ class TestPhaseAccounting:
 
 
 @pytest.fixture()
-def benchmark_robot(init_rospy) -> Iterator[BenchmarkRobot]:
+def benchmark_robot(init_background_node) -> Iterator[BenchmarkRobot]:
     robot = BenchmarkRobot(
         plotter_mode=PlotterMode.PLAIN,
         target_frequency=ScenarioRunner.target_frequency,
@@ -308,7 +312,7 @@ class TestControlCycleBudget:
 
 
 @pytest.fixture()
-def deeply_nested_cascade_profile(init_rospy) -> CallTreeProfile:
+def deeply_nested_cascade_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(
         DeeplyNestedCascadeScenario()
     )

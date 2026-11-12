@@ -21,7 +21,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 from krrood.patterns.role import Role
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsSameSemanticEntity(Predicate):
     """
     Whether two operands are the same underlying entity, as decided by
@@ -40,16 +40,20 @@ class IsSameSemanticEntity(Predicate):
     """
 
     def __call__(self) -> bool:
-        return Role.is_same_semantic_entity(self.first_entity, self.second_entity)
+        return Role.is_same_semantic_entity(
+            first_entity=self.first_entity, second_entity=self.second_entity
+        )
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<first_entity> is the same semantic entity as
         <second_entity>"*."""
         return clause(
-            Noun(fields["first_entity"]),
+            Noun(content=fields["first_entity"]),
             Copula(),
-            Noun.the("same semantic entity"),
+            Noun.the(head="same semantic entity"),
             Prepositions.AS,
-            Noun(fields["second_entity"]),
+            Noun(content=fields["second_entity"]),
         )

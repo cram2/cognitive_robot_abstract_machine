@@ -163,7 +163,7 @@ def test_a_life_cycle_predicate_expression_matches_its_truth_table(
     life_cycle = FloatVariable(name="life_cycle")
 
     expression = predicate.expression(life_cycle).substitute(
-        [life_cycle], [Scalar(life_cycle_state)]
+        old_variables=[life_cycle], new_variables=[Scalar(life_cycle_state)]
     )
 
     assert float(expression) == predicate.truth_value(life_cycle_state)

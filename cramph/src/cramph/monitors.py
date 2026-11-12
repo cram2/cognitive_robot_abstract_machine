@@ -5,7 +5,7 @@ from typing_extensions import Callable
 
 from cramph.node import EndedByOwner
 from cramph.data_types import LifeCycleValues, ObservationStateValues
-from cramph.node import StatechartNode, NodeArtifacts
+from cramph.node import NodeArtifacts, StatechartNode
 
 # %% tick count check
 

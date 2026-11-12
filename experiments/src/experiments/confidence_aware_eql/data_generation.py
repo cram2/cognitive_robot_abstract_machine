@@ -54,8 +54,8 @@ class MassDistribution:
         :return: The generated objects.
         """
         query = a(self.object_class)(root=a(Body)(inertial=an(Inertial)(mass=...)))
-        query.limit(self.number_of_samples)
-        parameters = UnderspecifiedParameters(query)
+        query.limit(n=self.number_of_samples)
+        parameters = UnderspecifiedParameters(statement=query)
         [mass_variable] = parameters.variables.values()
 
         circuit = fully_factorized(
@@ -63,9 +63,9 @@ class MassDistribution:
             means={mass_variable: self.mean},
             variances={mass_variable: self.standard_deviation},
         )
-        registry = DictRegistry({self.object_class: circuit})
-        backend = ProbabilisticBackend(registry)
-        return list(backend.evaluate(query))
+        registry = DictRegistry(models={self.object_class: circuit})
+        backend = ProbabilisticBackend(model_registry=registry)
+        return list(backend.evaluate(expression=query))
 
 
 def generate_familiar_objects(mass_distributions: list[MassDistribution]) -> list[Any]:

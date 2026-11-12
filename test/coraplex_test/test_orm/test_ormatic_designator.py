@@ -1,3 +1,7 @@
+"""
+Persisting plans and the actions they are made of through the ORM.
+"""
+
 import pytest
 
 from krrood.ormatic.data_access_objects.helper import (
@@ -123,6 +127,7 @@ def complex_plan(pr2_apartment_context):
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             object_designator=milk,
+            arm=robot_view.left_arm,
         ),
     )
 

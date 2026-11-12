@@ -46,7 +46,7 @@ class SimulatorAdditionalProperty:
         :param field_name: One of this property's fields.
         :return: The simulator's name for it.
         """
-        renamed = SimulatorAttributeName.of_field(cls, field_name)
+        renamed = SimulatorAttributeName.of_field(clazz=cls, field_name=field_name)
         return field_name if renamed is None else renamed.attribute_name
 
 

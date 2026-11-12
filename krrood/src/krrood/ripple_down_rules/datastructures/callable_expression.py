@@ -173,7 +173,7 @@ class CallableExpression:
         self.mutually_exclusive: bool = mutually_exclusive
 
     @classmethod
-    def get_encapsulating_function(cls, postfix: str = "") -> str:
+    def get_encapsulating_function(cls, *, postfix: str = "") -> str:
         """
         Get the encapsulating function that is used to wrap the user input.
         """
@@ -213,7 +213,7 @@ class CallableExpression:
                 f"Error during evaluation: {e}, user_input: {self.user_input}"
             )
 
-    def combine_with(self, other: CallableExpression) -> CallableExpression:
+    def combine_with(self, *, other: CallableExpression) -> CallableExpression:
         """
         Combine this callable expression with another callable expression using the
         'and' operator.
@@ -235,7 +235,7 @@ class CallableExpression:
             mutually_exclusive=self.mutually_exclusive,
         )
 
-    def update_user_input_from_file(self, file_path: str, function_name: str):
+    def update_user_input_from_file(self, *, file_path: str, function_name: str):
         """
         Update the user input from a file.
         """
@@ -250,7 +250,7 @@ class CallableExpression:
             return
         self.user_input = self.get_encapsulating_function() + "\n" + new_function_body
 
-    def write_to_python_file(self, file_path: str, append: bool = False):
+    def write_to_python_file(self, *, file_path: str, append: bool = False):
         """
         Write the callable expression to a python file.
 

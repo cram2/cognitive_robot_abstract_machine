@@ -10,7 +10,7 @@ from dataclasses import dataclass
 # %% a value that cannot be hashed
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnhashableLabel:
     """
     A label that compares by its text and, being a mutable dataclass, cannot be hashed.
@@ -25,7 +25,7 @@ class UnhashableLabel:
 # %% a holder whose method takes such values
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LabelHolder:
     """
     Something that carries one label and can be asked whether it carries another.
@@ -37,7 +37,7 @@ class LabelHolder:
     """
 
     def carries(
-        self, label: UnhashableLabel, also: tuple[UnhashableLabel, ...] = ()
+        self, *, label: UnhashableLabel, also: tuple[UnhashableLabel, ...] = ()
     ) -> bool:
         """
         :param label: The label to look for.

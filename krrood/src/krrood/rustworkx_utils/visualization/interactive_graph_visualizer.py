@@ -19,7 +19,7 @@ NodePosition = Tuple[float, float]
 """A node's two-dimensional position in the drawing."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InteractiveGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Dash application backed by Plotly.
 
@@ -54,7 +54,10 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
 
         positions = self.compute_positions()
         return go.Figure(
-            data=[self._edge_trace(positions), self._node_trace(positions)],
+            data=[
+                self._edge_trace(positions=positions),
+                self._node_trace(positions=positions),
+            ],
             layout=self._figure_layout(),
         )
 
@@ -100,12 +103,12 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
                 positions[index] = (float(position_in_layer), float(-depth))
         return positions
 
-    def _node_trace(self, positions: dict[int, NodePosition]) -> go.Scatter:
+    def _node_trace(self, *, positions: dict[int, NodePosition]) -> go.Scatter:
         """The scatter trace holding one clickable marker per node."""
         import plotly.graph_objects as go
 
         indices = list(positions)
-        labels = [self.node_label(index) for index in indices]
+        labels = [self.node_label(node_index=index) for index in indices]
         return go.Scatter(
             name="nodes",
             x=[positions[index][0] for index in indices],
@@ -116,10 +119,12 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
             hovertext=labels,
             hoverinfo="text",
             customdata=indices,
-            marker=dict(size=18, color=[self.node_color(index) for index in indices]),
+            marker=dict(
+                size=18, color=[self.node_color(node_index=index) for index in indices]
+            ),
         )
 
-    def _edge_trace(self, positions: dict[int, NodePosition]) -> go.Scatter:
+    def _edge_trace(self, *, positions: dict[int, NodePosition]) -> go.Scatter:
         """The line trace connecting adjacent nodes."""
         import plotly.graph_objects as go
 
@@ -196,7 +201,7 @@ class InteractiveGraphVisualizer(GraphVisualizerBase):
             if click_data is None:
                 return self._render_details()
             self._selected_details = self.node_details(
-                click_data["points"][0]["customdata"]
+                node_index=click_data["points"][0]["customdata"]
             )
             return self._render_details()
 
