@@ -31,9 +31,8 @@ from json_msgs.action import JsonAction
 from json_msgs.action._json_action import JsonAction_FeedbackMessage
 from typing_extensions import Any
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
 from cramph.plotters.graphviz import StatechartGraphviz
-from cramph.reported_statechart import ReportedStatechart
 from semantic_digital_twin.adapters.ros import background_node
 
 # %% the window

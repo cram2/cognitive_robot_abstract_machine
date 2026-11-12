@@ -340,6 +340,17 @@ def prismatic_world_with_acceleration_limit(request):
     )
 
 
+@pytest.fixture()
+def prismatic_bot_with_acceleration_limit():
+    """
+    A prismatic joint like :func:`prismatic_bot` with an acceleration limit of its own,
+    which brakes with a jerk limit far below the one of the default braking time.
+    """
+    return _make_prismatic_world(
+        [_symmetric_prismatic_limits(1, 1, acceleration=ACCELERATION_LIMIT)]
+    )
+
+
 @pytest.fixture(
     params=[1, None], ids=["with_position_limits", "without_position_limits"]
 )
