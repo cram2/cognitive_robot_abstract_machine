@@ -1,3 +1,8 @@
+"""
+Enumerations of named numbers, such as limits and weights, whose members are used
+wherever a float is expected.
+"""
+
 from __future__ import annotations
 
 from enum import ReprEnum
