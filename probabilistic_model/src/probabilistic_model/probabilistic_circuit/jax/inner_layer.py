@@ -329,9 +329,9 @@ class DifferentiableSparseSumLayer(DifferentiableSumLayer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         child_layers = [
-            DifferentiableLayer.from_json(child_layer)
+            DifferentiableLayer.from_json(data=child_layer)
             for child_layer in data["child_layers"]
         ]
         log_weights = [
@@ -413,9 +413,9 @@ class DifferentiableDenseSumLayer(DifferentiableSumLayer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         child_layers = [
-            DifferentiableLayer.from_json(child_layer)
+            DifferentiableLayer.from_json(data=child_layer)
             for child_layer in data["child_layers"]
         ]
         log_weights = [
@@ -518,9 +518,9 @@ class DifferentiableProductLayer(DifferentiableInnerLayer):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         child_layers = [
-            DifferentiableLayer.from_json(child_layer)
+            DifferentiableLayer.from_json(data=child_layer)
             for child_layer in data["child_layers"]
         ]
         edges = BCOO(

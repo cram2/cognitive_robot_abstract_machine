@@ -128,7 +128,11 @@ def test_plural_subject_agreement_runs_through_the_whole_pipeline():
     """
     employee = variable(Employee, domain=None)
     assert verbalize_expression(
-        an(entity(employee).where(employee.salary > 5).ordered_by(employee.salary))
+        an(
+            entity(employee)
+            .where(employee.salary > 5)
+            .ordered_by(variable=employee.salary)
+        )
     ) == (
         "Report Employees whose salaries are greater than 5, "
         "ordered by their salaries from lowest to highest"

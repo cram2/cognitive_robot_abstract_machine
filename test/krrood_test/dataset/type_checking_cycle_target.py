@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from .type_checking_cycle_owner import HolderBindingItsContent
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContainerOfBoundHolder:
     """
     A container of holders that bind their content type.

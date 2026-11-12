@@ -77,7 +77,7 @@ class CartesianFrame3DReference(ObjectReference):
     How a serialized spatial type points at a :class:`CartesianFrame3D`.
     """
 
-    def resolve(self, data: dict[str, Any], **kwargs) -> CartesianFrame3D:
+    def resolve(self, *, data: dict[str, Any], **kwargs) -> CartesianFrame3D:
         """
         :param data: The serialized spatial type that refers to the frame.
         :param kwargs: The keyword arguments of the ``from_json`` call, which carry the
@@ -94,5 +94,5 @@ class CartesianFrame3DReference(ObjectReference):
         if not resolvers:
             raise MissingCartesianFrame3DResolver(frame_id_key=self.id_key)
         return resolvers[0].get(
-            from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
+            key=from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
         )

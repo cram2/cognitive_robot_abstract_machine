@@ -25,14 +25,14 @@ from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValues
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.goals.base_pose_goals import (
+from giskardpy.motion_statechart.tasks.drive_tasks import (
     DifferentialDriveBaseGoal,
     HolonomicBaseGoal,
 )
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from giskardpy.motion_statechart.graph_node import ConvergingTask
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes

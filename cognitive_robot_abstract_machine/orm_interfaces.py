@@ -8,10 +8,12 @@ be persisted or turned into a data access object until they have been generated 
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from functools import cached_property
 from enum import StrEnum
 from pathlib import Path
 
@@ -24,6 +26,7 @@ from cognitive_robot_abstract_machine.exceptions import (
     MissingORMGeneratorError,
     UnknownOrmPackageError,
 )
+from krrood.utils import module_level_imports
 from krrood.class_diagrams.progress_report import (
     ClassDiagramProgress,
     ProgressEnvironmentVariable,
@@ -171,10 +174,35 @@ class OrmInterface:
     Root of the checkout the package lives in.
     """
 
-    dependencies: tuple[str, ...] = ()
-    """
-    Names of the packages whose ORM model this interface builds on.
-    """
+    @cached_property
+    def dependencies(self) -> tuple[str, ...]:
+        """
+        Names of the packages whose generated interface this interface's generator
+        imports at module level, and so builds on.
+        """
+        tree = ast.parse(self.generator.read_text(encoding="utf-8"))
+        imported_modules = []
+        for statement in module_level_imports(tree):
+            if isinstance(statement, ast.Import):
+                imported_modules.extend(alias.name for alias in statement.names)
+            elif statement.module is not None:
+                imported_modules.append(statement.module)
+                imported_modules.extend(
+                    f"{statement.module}.{alias.name}" for alias in statement.names
+                )
+        interface_module_suffix = f".orm.{Path(INTERFACE_FILE_NAME).stem}"
+        imported_interface_packages = [
+            module.removesuffix(interface_module_suffix)
+            for module in imported_modules
+            if module.endswith(interface_module_suffix)
+        ]
+        return tuple(
+            dict.fromkeys(
+                package_name
+                for package_name in imported_interface_packages
+                if "." not in package_name and package_name != self.package_name
+            )
+        )
 
     @property
     def generator(self) -> Path:
@@ -296,7 +324,7 @@ class GenerationOutput:
         if started is not None:
             self.start(started.package_name)
             return
-        report = ClassDiagramProgress.from_line(line)
+        report = ClassDiagramProgress.from_line(line=line)
         if report is None:
             self.written.append(line)
             return
@@ -483,7 +511,7 @@ class OrmPackage(StrEnum):
 
     SEGMIND = "segmind"
     """
-    Its interface builds on :attr:`SEMANTIC_DIGITAL_TWIN`'s.
+    Its interface builds on :attr:`CRAMPH`'s.
     """
 
     CRAMPH = "cramph"
@@ -507,21 +535,15 @@ class OrmPackage(StrEnum):
     """
 
 
-# One interpreter runs every generator, so a package follows those it builds on, and
-# precedes every package it does not build on that defines alternative mappings, since
-# ORMatic collects those from all imported subclasses.
+# One interpreter runs every generator, so a package follows those it builds on.
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
         OrmInterface(OrmPackage.SEMANTIC_DIGITAL_TWIN, REPOSITORY_ROOT),
-        OrmInterface(
-            OrmPackage.SEGMIND, REPOSITORY_ROOT, (OrmPackage.SEMANTIC_DIGITAL_TWIN,)
-        ),
-        OrmInterface(
-            OrmPackage.CRAMPH, REPOSITORY_ROOT, (OrmPackage.SEMANTIC_DIGITAL_TWIN,)
-        ),
-        OrmInterface(OrmPackage.GISKARDPY, REPOSITORY_ROOT, (OrmPackage.CRAMPH,)),
-        OrmInterface(OrmPackage.CORAPLEX, REPOSITORY_ROOT, (OrmPackage.GISKARDPY,)),
-        OrmInterface(OrmPackage.EXPERIMENTS, REPOSITORY_ROOT, (OrmPackage.CORAPLEX,)),
+        OrmInterface(OrmPackage.CRAMPH, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.SEGMIND, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.GISKARDPY, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.CORAPLEX, REPOSITORY_ROOT),
+        OrmInterface(OrmPackage.EXPERIMENTS, REPOSITORY_ROOT),
     )
 )
 """

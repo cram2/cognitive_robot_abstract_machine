@@ -126,7 +126,7 @@ class StatechartContext:
         :return: The number of ticks run since the statechart started, as held by
             :attr:`tick_variable`.
         """
-        return int(self.float_variable_data.get_value(self.tick_variable))
+        return int(self.float_variable_data.get_value(variable=self.tick_variable))
 
     def require_extension(
         self, extension_type: type[GenericContextExtension]

@@ -11,7 +11,7 @@ from krrood.entity_query_language.verbalization.pipeline import verbalize_expres
 from krrood.patterns.role_predicates import IsSameSemanticEntity
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Document:
     """
     A minimal entity the identity predicate is verbalized over.
@@ -31,6 +31,8 @@ def test_is_same_semantic_entity_reads_with_a_single_determiner():
     """
     first, second = variable(Document, []), variable(Document, [])
     assert (
-        verbalize_expression(IsSameSemanticEntity(first, second))
+        verbalize_expression(
+            IsSameSemanticEntity(first_entity=first, second_entity=second)
+        )
         == "a Document is the same semantic entity as another Document"
     )

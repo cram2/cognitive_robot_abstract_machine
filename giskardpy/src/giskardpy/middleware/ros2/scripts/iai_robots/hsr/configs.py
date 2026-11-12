@@ -1,26 +1,13 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from giskardpy.model.world_config import WorldWithMobileRobot
 from giskardpy.middleware.ros2.robot_interface_config import (
     ClosedLoopRobotInterfaceConfig,
 )
-from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
+from semantic_digital_twin.robots.hsrb import HSRBJoint
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     Connection6DoF,
 )
-
-
-@dataclass
-class WorldWithHSRConfig(WorldWithMobileRobot):
-    """
-    A world containing only the HSR, which drives on an omnidirectional base.
-    """
-
-    robot_class: type[HSRB] = field(kw_only=True, default=HSRB, init=False)
-    """
-    The robot class that is applied to the parsed description.
-    """
 
 
 @dataclass
@@ -33,7 +20,7 @@ class HSRVelocityInterface(ClosedLoopRobotInterfaceConfig):
         self.sync_6dof_joint_with_tf_frame(
             joint=self.world.get_connections_by_type(Connection6DoF)[0],
             tf_parent_frame="map",
-            tf_child_frame="odom",
+            tf_child_frame=self.robot.mobile_base.odometry_body_name,
         )
 
         self.sync_robot_parts()

@@ -5,9 +5,9 @@ import pytest
 from json_msgs.action import JsonAction
 from rclpy.node import Node
 
-from giskardpy.middleware.ros2 import ros2_interface
-from semantic_digital_twin.adapters.ros import rospy
-from giskardpy.middleware.ros2.ros2_interface import MyActionClient
+from giskardpy.middleware.ros2 import action_client
+from semantic_digital_twin.adapters.ros import background_node
+from giskardpy.middleware.ros2.action_client import GiskardActionClient
 
 # %% test doubles
 
@@ -59,10 +59,10 @@ def test_waiting_for_a_late_server_uses_the_given_node(rclpy_node, monkeypatch):
     A client built with an explicit node must report through that node while it waits,
     so that a server which starts late is waited out rather than turned into a crash.
     """
-    monkeypatch.setattr(rospy, "get_node", None)
-    monkeypatch.setattr(ros2_interface, "ActionClient", LateServerActionClient)
+    monkeypatch.setattr(background_node, "get_node", None)
+    monkeypatch.setattr(action_client, "ActionClient", LateServerActionClient)
 
-    client = MyActionClient(rclpy_node, JsonAction, "late_server_action")
+    client = GiskardActionClient(rclpy_node, JsonAction, "late_server_action")
 
     assert client.node_handle is rclpy_node
     assert (

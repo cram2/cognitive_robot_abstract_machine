@@ -31,7 +31,7 @@ def pytest_configure(config):
     # Build the symbol graph
     SymbolGraph.clear()
     class_diagram = ClassDiagram(
-        recursive_subclasses(Symbol) + [World],
+        classes=recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
     SymbolGraph(_class_diagram=class_diagram)

@@ -17,10 +17,10 @@ def test_load_answers_recovers_every_saved_answer(tmp_path):
         ({}, make_answer_source("case.legs == 2")),
         ({}, make_answer_source("case.legs == 8")),
     ]
-    expert.save_answers(path)
+    expert.save_answers(path=path)
 
     loaded = Human(use_loaded_answers=True)
-    loaded.load_answers(path)
+    loaded.load_answers(path=path)
 
     assert len(loaded.all_expert_answers) == 3
 
@@ -39,7 +39,7 @@ def test_load_answers_recovers_the_last_answer_even_without_trailing_blank_lines
         ({}, make_answer_source("case.legs == 4")),
         ({}, make_answer_source("case.legs == 2")),
     ]
-    expert.save_answers(path)
+    expert.save_answers(path=path)
 
     with open(path + ".py", "r") as f:
         content = f.read()
@@ -47,6 +47,6 @@ def test_load_answers_recovers_the_last_answer_even_without_trailing_blank_lines
         f.write(content.rstrip("\n") + "\n")
 
     loaded = Human(use_loaded_answers=True)
-    loaded.load_answers(path)
+    loaded.load_answers(path=path)
 
     assert len(loaded.all_expert_answers) == 2

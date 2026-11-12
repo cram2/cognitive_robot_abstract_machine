@@ -61,7 +61,7 @@ dependencies = [
     "imageio",
     "imageio-ffmpeg",
     "psutil~=5.9.0",
-    "giskardpy>=26.10.0",
+    "giskardpy_bullet_bindings==1.0.1",
     "krrood>=26.10.0",
     "krrood_spatial_math[casadi]>=26.10.0",
     "physics_simulators>=26.10.0",
@@ -88,7 +88,6 @@ version = {attr = "semantic_digital_twin._version.__version__"}
 
 [dependency-groups]
 workspace = [
-    "giskardpy",
     "krrood",
     "krrood_spatial_math",
     "physics_simulators",

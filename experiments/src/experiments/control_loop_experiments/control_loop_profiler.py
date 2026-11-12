@@ -323,7 +323,7 @@ class CallTreeProfile(SubclassJSONSerializer):
         :param kwargs: Additional arguments passed down by the deserializer.
         :return: The restored profile.
         """
-        phases = [PhaseSamples.from_json(entry) for entry in data["phases"]]
+        phases = [PhaseSamples.from_json(data=entry) for entry in data["phases"]]
         return cls(
             scenario_name=data["scenario_name"],
             control_dt=data["control_dt"],

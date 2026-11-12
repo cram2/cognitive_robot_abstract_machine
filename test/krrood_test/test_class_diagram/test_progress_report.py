@@ -13,13 +13,16 @@ from ..dataset.department_and_employee import Department, Employee
 
 
 def test_a_report_survives_being_written_and_read_back():
-    report = ClassDiagramProgress("Employee", 12)
+    report = ClassDiagramProgress(class_name="Employee", total_classes=12)
 
-    assert ClassDiagramProgress.from_line(report.to_line()) == report
+    assert ClassDiagramProgress.from_line(line=report.to_line()) == report
 
 
 def test_a_line_of_logging_carries_no_report():
-    assert ClassDiagramProgress.from_line("INFO:krrood:resolving Employee.name") is None
+    assert (
+        ClassDiagramProgress.from_line(line="INFO:krrood:resolving Employee.name")
+        is None
+    )
 
 
 # %% reporting while a diagram is built
@@ -33,11 +36,11 @@ def reported(capfd, monkeypatch) -> list:
     :return: The reports the build wrote, in the order it wrote them.
     """
     monkeypatch.setenv(ProgressEnvironmentVariable.REPORT_PROGRESS, "1")
-    ClassDiagram([Department, Employee])
+    ClassDiagram(classes=[Department, Employee])
     return [
-        ClassDiagramProgress.from_line(line)
+        ClassDiagramProgress.from_line(line=line)
         for line in capfd.readouterr().out.splitlines()
-        if ClassDiagramProgress.from_line(line) is not None
+        if ClassDiagramProgress.from_line(line=line) is not None
     ]
 
 
@@ -55,6 +58,6 @@ def test_a_report_names_how_many_classes_there_are(reported):
 def test_nothing_is_reported_when_no_one_asked(capfd, monkeypatch):
     monkeypatch.delenv(ProgressEnvironmentVariable.REPORT_PROGRESS, raising=False)
 
-    ClassDiagram([Department, Employee])
+    ClassDiagram(classes=[Department, Employee])
 
     assert LINE_PREFIX not in capfd.readouterr().out

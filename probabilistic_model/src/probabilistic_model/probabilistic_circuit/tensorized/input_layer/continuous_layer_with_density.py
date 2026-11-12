@@ -11,6 +11,7 @@ from typing_extensions import Any, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIntervalBounds,
     NodeIntervals,
     NodeMask,
@@ -146,6 +147,10 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
     """
 
     @property
+    def parameters(self) -> list[BackendArray]:
+        return [self.interval]
+
+    @property
     def lower(self) -> NodeValues:
         """
         :return: The lower bounds of the supports of the nodes.
@@ -200,18 +205,22 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         :param values: The values with shape (#events,).
         :return: A boolean array of shape (#events, #nodes).
         """
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
+        column = self.float_column(values=values)
 
         # these arrays hold one entry per event per node, so the homogeneous cases get
         # their own path rather than evaluating both comparisons and selecting between
-        # them
+        # them; the bounds are structure, so this branches on the host only
         left_closed = self.left_closed
         if left_closed.all():
             left = self.lower <= column
         elif not left_closed.any():
             left = self.lower < column
         else:
-            left = np.where(left_closed, self.lower <= column, self.lower < column)
+            left = self.namespace.where(
+                self.namespace.asarray(left_closed),
+                self.lower <= column,
+                self.lower < column,
+            )
 
         right_closed = self.right_closed
         if right_closed.all():
@@ -219,7 +228,11 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         elif not right_closed.any():
             right = column < self.upper
         else:
-            right = np.where(right_closed, column <= self.upper, column < self.upper)
+            right = self.namespace.where(
+                self.namespace.asarray(right_closed),
+                column <= self.upper,
+                column < self.upper,
+            )
 
         return left & right
 

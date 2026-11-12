@@ -10,6 +10,7 @@ import itertools
 from dataclasses import dataclass, field
 
 from probabilistic_model.causal_structure.exceptions import UnknownGraphNode
+from probabilistic_model.causal_structure.graph import GraphEdge, GraphNode
 
 # %% edges known in advance
 
@@ -107,6 +108,24 @@ class DomainCausalKnowledge:
         unknown = sorted(named - set(known_names))
         if unknown:
             raise UnknownGraphNode(unknown[0], known_names)
+
+    def orient_edge(self, cause: GraphNode, adjacent: GraphNode) -> GraphEdge:
+        """
+        :param cause: The node taken to be the cause.
+        :param adjacent: A node known to be adjacent to it.
+        :return: The edge from the cause to the adjacent node, reversed if the tiers place
+            the adjacent node before the cause.
+        """
+        tier_of = {
+            name: index for index, tier in enumerate(self.tiers) for name in tier
+        }
+        if (
+            cause.name in tier_of
+            and adjacent.name in tier_of
+            and tier_of[adjacent.name] < tier_of[cause.name]
+        ):
+            return GraphEdge.directed_edge(adjacent, cause)
+        return GraphEdge.directed_edge(cause, adjacent)
 
     def restricted_to(self, names: list[str]) -> DomainCausalKnowledge:
         """

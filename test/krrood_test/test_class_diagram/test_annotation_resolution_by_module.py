@@ -32,12 +32,12 @@ from .annotation_resolution_helper_module import FallbackHolder, OccupiedBase
 # %% Domain
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ResolutionOrganization(Symbol):
     name: str
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Person(Symbol):
     """
     Deliberately named like the university dataset's ``Person``.
@@ -47,14 +47,14 @@ class Person(Symbol):
     is_dean_of: set[ResolutionOrganization] = field(default_factory=set)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ResolutionCourse(Symbol):
     name: str
     is_taught_by: set[Person] = field(default_factory=set)
     coordinator: Optional[Person] = None
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Occupant(Symbol):
     """
     Deliberately named like the helper module's ``Occupant``.
@@ -63,7 +63,7 @@ class Occupant(Symbol):
     name: str = ""
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class OccupiedSubclass(OccupiedBase):
     """
     Inherits a field typed by the helper module's ``Occupant`` and declares one typed by

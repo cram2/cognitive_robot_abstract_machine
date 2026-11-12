@@ -104,7 +104,7 @@ def test_a_node_is_drawn_labelled_by_its_unique_name(
         backend=GraphVisualizerBackend.CYTOSCAPE, layout=GraphLayout.LAYERED
     )
 
-    assert visualizer.node_label(middle.index) == middle.unique_name
+    assert visualizer.node_label(node_index=middle.index) == middle.unique_name
 
 
 def test_a_node_is_drawn_in_the_color_of_its_current_state(
@@ -124,4 +124,7 @@ def test_a_node_is_drawn_in_the_color_of_its_current_state(
     statechart_executor.tick_until_end(timeout=100)
 
     assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert visualizer.node_color(node.index) == LifeCycleValues.SUCCEEDED.color.to_hex()
+    assert (
+        visualizer.node_color(node_index=node.index)
+        == LifeCycleValues.SUCCEEDED.color.to_hex()
+    )
