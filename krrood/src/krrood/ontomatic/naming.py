@@ -40,7 +40,10 @@ class NamingRegistry:
         if intersections:
             items = NamingRegistry._get_rdf_list(graph=graph, head=intersections[0])
             return "AND".join(
-                [NamingRegistry._get_node_name(graph=graph, node=i) for i in items]
+                [
+                    NamingRegistry._get_node_name(graph=graph, node=item)
+                    for item in items
+                ]
             )
 
         # Union
@@ -48,7 +51,10 @@ class NamingRegistry:
         if unions:
             items = NamingRegistry._get_rdf_list(graph=graph, head=unions[0])
             return "OR".join(
-                [NamingRegistry._get_node_name(graph=graph, node=i) for i in items]
+                [
+                    NamingRegistry._get_node_name(graph=graph, node=item)
+                    for item in items
+                ]
             )
 
         # Enumeration of individuals
@@ -56,23 +62,23 @@ class NamingRegistry:
         if enumerations:
             items = NamingRegistry._get_rdf_list(graph=graph, head=enumerations[0])
             return "OneOf" + "".join(
-                NamingRegistry._get_node_name(graph=graph, node=i) for i in items
+                NamingRegistry._get_node_name(graph=graph, node=item) for item in items
             )
 
         # Restrictions
-        on_prop = graph.value(bnode, OWL.onProperty)
-        if on_prop:
-            prop_name = NamingRegistry.uri_to_python_name(uri=on_prop)
+        restricted_property = graph.value(bnode, OWL.onProperty)
+        if restricted_property:
+            property_name = NamingRegistry.uri_to_python_name(uri=restricted_property)
             if graph.value(bnode, OWL.someValuesFrom):
                 target = graph.value(bnode, OWL.someValuesFrom)
-                return f"{prop_name}SOME{NamingRegistry._get_node_name(graph=graph, node=target)}"
+                return f"{property_name}SOME{NamingRegistry._get_node_name(graph=graph, node=target)}"
             if graph.value(bnode, OWL.allValuesFrom):
                 target = graph.value(bnode, OWL.allValuesFrom)
                 target_name = NamingRegistry._get_node_name(graph=graph, node=target)
-                return f"{prop_name}ALL{target_name}"
+                return f"{property_name}ALL{target_name}"
             if graph.value(bnode, OWL.hasValue):
                 target = graph.value(bnode, OWL.hasValue)
-                return f"{prop_name}HAS{NamingRegistry._get_node_name(graph=graph, node=target)}"
+                return f"{property_name}HAS{NamingRegistry._get_node_name(graph=graph, node=target)}"
             if graph.value(bnode, OWL.maxQualifiedCardinality):
                 target = NamingRegistry.uri_to_python_name(
                     uri=graph.value(bnode, OWL.maxQualifiedCardinality)
@@ -80,14 +86,14 @@ class NamingRegistry:
                 on_class = NamingRegistry.uri_to_python_name(
                     uri=graph.value(bnode, OWL.onClass)
                 )
-                return f"{prop_name}MAX{target}{on_class}"
+                return f"{property_name}MAX{target}{on_class}"
             for cardinality, word in (
                 (OWL.minCardinality, "MIN"),
                 (OWL.maxCardinality, "MAX"),
                 (OWL.cardinality, "EXACTLY"),
             ):
                 if graph.value(bnode, cardinality) is not None:
-                    return f"{prop_name}{word}{graph.value(bnode, cardinality)}"
+                    return f"{property_name}{word}{graph.value(bnode, cardinality)}"
             if graph.value(bnode, OWL.complementOf):
                 target = NamingRegistry.uri_to_python_name(
                     uri=graph.value(bnode, OWL.complementOf)
@@ -124,7 +130,7 @@ class NamingRegistry:
         while head != rdflib.RDF.nil:
             items.append(graph.value(head, rdflib.RDF.first))
             head = graph.value(head, rdflib.RDF.rest)
-        return [i for i in items if i is not None]
+        return [item for item in items if item is not None]
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -143,9 +149,9 @@ class NamingRegistry:
         """
         Convert a name like 'worksFor' or 'WorksFor' to 'works_for'.
         """
-        s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
-        s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
-        return s2.lower()
+        with_word_breaks = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+        with_all_breaks = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_word_breaks)
+        return with_all_breaks.lower()
 
     @staticmethod
     def to_pascal_case(*, name: str) -> str:
@@ -155,6 +161,6 @@ class NamingRegistry:
         # If it contains underscores or hyphens, split and capitalize parts
         parts = re.split(r"[_\-\s]+", name)
         if len(parts) > 1:
-            return "".join(p.capitalize() for p in parts if p)
+            return "".join(part.capitalize() for part in parts if part)
         # Otherwise just capitalize first char
         return name[:1].upper() + name[1:]

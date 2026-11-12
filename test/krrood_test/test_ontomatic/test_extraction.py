@@ -67,7 +67,7 @@ def test_a_class_records_its_named_superclass(class_extractor, extraction):
     """
     A subclass records the class it is declared a subclass of.
     """
-    assert class_extractor.extract_info(class_uri=extraction.Student).superclasses == [
+    assert class_extractor.extract(class_uri=extraction.Student).superclasses == [
         "Person"
     ]
 
@@ -76,7 +76,7 @@ def test_a_class_without_a_superclass_derives_from_symbol(class_extractor, extra
     """
     A class declared under no other class gets the symbol class as its superclass.
     """
-    assert class_extractor.extract_info(class_uri=extraction.Person).superclasses == [
+    assert class_extractor.extract(class_uri=extraction.Person).superclasses == [
         Symbol.__name__
     ]
 
@@ -85,7 +85,7 @@ def test_a_class_keeps_its_label_and_comment(class_extractor, extraction):
     """
     The label and the comment of a class are kept.
     """
-    person = class_extractor.extract_info(class_uri=extraction.Person)
+    person = class_extractor.extract(class_uri=extraction.Person)
     assert (person.label, person.comment) == ("person", "A human being.")
 
 
@@ -98,7 +98,7 @@ def test_an_object_property_records_its_domain_and_range(
     """
     An object property records the classes of its declared domain and range.
     """
-    has_advisor = property_extractor.extract_info(property_uri=extraction.hasAdvisor)
+    has_advisor = property_extractor.extract(property_uri=extraction.hasAdvisor)
     assert (has_advisor.type, has_advisor.domains, has_advisor.ranges) == (
         PropertyType.OBJECT_PROPERTY,
         ["Student"],
@@ -112,8 +112,8 @@ def test_an_inverse_is_recorded_on_both_properties(property_extractor, extractio
     other.
     """
     assert (
-        property_extractor.extract_info(property_uri=extraction.hasAdvisor).inverse_of,
-        property_extractor.extract_info(property_uri=extraction.advises).inverse_of,
+        property_extractor.extract(property_uri=extraction.hasAdvisor).inverse_of,
+        property_extractor.extract(property_uri=extraction.advises).inverse_of,
     ) == ("advises", "hasAdvisor")
 
 
@@ -121,7 +121,7 @@ def test_a_property_records_its_characteristics(property_extractor, extraction):
     """
     A property declared symmetric and transitive is recorded as both.
     """
-    knows = property_extractor.extract_info(property_uri=extraction.knows)
+    knows = property_extractor.extract(property_uri=extraction.knows)
     assert (knows.is_symmetric, knows.is_transitive) == (True, True)
 
 
@@ -133,12 +133,8 @@ def test_a_functional_property_is_recorded_as_functional(
     is not stays not functional.
     """
     assert (
-        property_extractor.extract_info(
-            property_uri=extraction.hasMentor
-        ).is_functional,
-        property_extractor.extract_info(
-            property_uri=extraction.hasAdvisor
-        ).is_functional,
+        property_extractor.extract(property_uri=extraction.hasMentor).is_functional,
+        property_extractor.extract(property_uri=extraction.hasAdvisor).is_functional,
     ) == (True, False)
 
 
@@ -146,7 +142,7 @@ def test_a_subproperty_records_its_superproperty(property_extractor, extraction)
     """
     A subproperty records the property it is declared a subproperty of.
     """
-    assert property_extractor.extract_info(
+    assert property_extractor.extract(
         property_uri=extraction.hasSupervisor
     ).superproperties == ["knows"]
 
@@ -155,7 +151,7 @@ def test_a_datatype_property_is_a_data_property(property_extractor, extraction):
     """
     A datatype property is a data property whose range is its datatype.
     """
-    age = property_extractor.extract_info(property_uri=extraction.age)
+    age = property_extractor.extract(property_uri=extraction.age)
     assert (age.type, age.ranges) == (PropertyType.DATA_PROPERTY, ["integer"])
 
 
@@ -165,7 +161,7 @@ def test_a_property_is_named_for_its_field_and_its_descriptor(
     """
     A property's field is named in snake case and its descriptor class in Pascal case.
     """
-    has_advisor = property_extractor.extract_info(property_uri=extraction.hasAdvisor)
+    has_advisor = property_extractor.extract(property_uri=extraction.hasAdvisor)
     assert (has_advisor.field_name, has_advisor.descriptor_name) == (
         "has_advisor",
         "HasAdvisor",

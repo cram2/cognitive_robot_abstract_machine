@@ -124,7 +124,7 @@ class ClassInfo:
     class). They hold for every member of the class but do not make an individual a member, so they are not used for
     classification.
     """
-    onto: Optional[OntologyInfo] = field(default=None, repr=False)
+    ontology: Optional[OntologyInfo] = field(default=None, repr=False)
     """
     The ontology the class belongs to.
     """
@@ -137,11 +137,11 @@ class ClassInfo:
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == "onto":
-                setattr(result, k, self.onto)
+        for name, value in self.__dict__.items():
+            if name == "ontology":
+                setattr(result, name, self.ontology)
             else:
-                setattr(result, k, deepcopy(v, memo))
+                setattr(result, name, deepcopy(value, memo))
         return result
 
     def __hash__(self):
@@ -298,7 +298,7 @@ class PropertyInfo:
     """
     The names of the descriptor classes of every property chain implying the property.
     """
-    onto: Optional[OntologyInfo] = field(default=None, repr=False)
+    ontology: Optional[OntologyInfo] = field(default=None, repr=False)
     """
     The ontology the property belongs to.
     """
@@ -316,10 +316,13 @@ class PropertyInfo:
         """
         Get superproperties sorted by inheritance path length (shortest first).
         """
-        if not self._sorted_superproperties and self.onto:
+        if not self._sorted_superproperties and self.ontology:
             self._sorted_superproperties = OntologyInfo.topological_order(
-                items={sp: self.onto.properties[sp] for sp in self.ancestors},
-                dep_key="superproperties",
+                items={
+                    superproperty: self.ontology.properties[superproperty]
+                    for superproperty in self.ancestors
+                },
+                dependency_key="superproperties",
             )
         return self._sorted_superproperties
 
@@ -330,12 +333,12 @@ class PropertyInfo:
         """
         if self._all_superproperties:
             return self._all_superproperties
-        if not self.onto:
+        if not self.ontology:
             return []
         # Compute full ancestor sets for each class (transitive closure)
         name_to_bases = {
-            name: set(info.superproperties)
-            for name, info in self.onto.properties.items()
+            name: set(property_information.superproperties)
+            for name, property_information in self.ontology.properties.items()
         }
         ancestors = set()
         stack = list(self.superproperties)
@@ -356,11 +359,11 @@ class PropertyInfo:
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
-        for k, v in self.__dict__.items():
-            if k == "onto":
-                setattr(result, k, self.onto)
+        for name, value in self.__dict__.items():
+            if name == "ontology":
+                setattr(result, name, self.ontology)
             else:
-                setattr(result, k, deepcopy(v, memo))
+                setattr(result, name, deepcopy(value, memo))
         return result
 
     def __hash__(self):
@@ -398,7 +401,7 @@ class OntologyInfo:
     """
     The label of the ontology, naming its base class.
     """
-    role_cls_name: str = Role.__name__
+    role_class_name: str = Role.__name__
     """
     The name of the role class generated classes take roles from.
     """
@@ -415,18 +418,18 @@ class OntologyInfo:
         """
         Link the classes and properties to the ontology.
         """
-        for prop_info in self.original_properties.values():
-            prop_info.onto = self
-        for cls_info in self.classes.values():
-            cls_info.onto = self
+        for property_information in self.original_properties.values():
+            property_information.ontology = self
+        for class_information in self.classes.values():
+            class_information.ontology = self
 
     def description_for(self, *, description_name: str) -> Optional[str]:
         """
         :return: The name of the named class the anonymous class expression of this name describes, if any.
         """
-        for cls_name, cls_info in self.class_descriptions.items():
-            if cls_info.name == description_name:
-                return cls_name
+        for class_name, class_information in self.class_descriptions.items():
+            if class_information.name == description_name:
+                return class_name
         return None
 
     @property
@@ -436,28 +439,32 @@ class OntologyInfo:
         """
         if not self._properties:
             self._properties = {
-                n: deepcopy(info) for n, info in self.original_properties.items()
+                name: deepcopy(property_information)
+                for name, property_information in self.original_properties.items()
             }
         return self._properties
 
     @cached_property
-    def base_cls_name(self):
+    def base_class_name(self):
         """
         The name of the base class every generated class inherits from.
         """
-        base_cls_name = NamingRegistry.to_pascal_case(
+        base_class_name = NamingRegistry.to_pascal_case(
             name=re.sub(r"\W+", " ", self.ontology_label).strip()
         )
-        if not base_cls_name.endswith("Thing"):
-            base_cls_name += "Thing"
-        return base_cls_name
+        if not base_class_name.endswith("Thing"):
+            base_class_name += "Thing"
+        return base_class_name
 
     @cached_property
     def class_ancestors(self) -> Dict[str, Set[str]]:
         """
         The class ancestors map as a dictionary mapping class names to their ancestors.
         """
-        return {name: set(info.all_base_classes) for name, info in self.classes.items()}
+        return {
+            name: set(class_information.all_base_classes)
+            for name, class_information in self.classes.items()
+        }
 
     @lru_cache
     def properties_inheritance_path_length(
@@ -568,29 +575,32 @@ class OntologyInfo:
         return hash(id(self))
 
     @staticmethod
-    def topological_order(*, items: Dict[str, Any], dep_key: str) -> List[str]:
-        """Return a topological order based on dependency names in dep_key; if cycles, append remaining alphabetically."""
+    def topological_order(*, items: Dict[str, Any], dependency_key: str) -> List[str]:
+        """Return a topological order based on the dependency names under the dependency key; if cycles, append remaining alphabetically."""
 
-        def get_deps(item):
+        def dependencies_of(item):
             """
             :return: The names of the items the item depends on.
             """
-            if hasattr(item, dep_key):
-                return getattr(item, dep_key, [])
-            return item.get(dep_key, [])
+            if hasattr(item, dependency_key):
+                return getattr(item, dependency_key, [])
+            return item.get(dependency_key, [])
 
         remaining = {
-            name: set(get_deps(items[name])) & set(items.keys()) for name in items
+            name: set(dependencies_of(items[name])) & set(items.keys())
+            for name in items
         }
         ordered: List[str] = []
         while remaining:
-            ready = sorted([name for name, deps in remaining.items() if not deps])
+            ready = sorted(
+                [name for name, dependencies in remaining.items() if not dependencies]
+            )
             if not ready:
                 ordered.extend(sorted(remaining.keys()))
                 break
             for name in ready:
                 ordered.append(name)
                 del remaining[name]
-            for deps in remaining.values():
-                deps.difference_update(ready)
+            for dependencies in remaining.values():
+                dependencies.difference_update(ready)
         return ordered

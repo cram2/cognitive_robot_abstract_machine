@@ -67,13 +67,13 @@ class ClassExtractor:
     Reads the labels and comments of the classes.
     """
 
-    def extract_info(self, *, class_uri: Any) -> ClassInfo:
+    def extract(self, *, class_uri: Any) -> ClassInfo:
         """
         Extract information about a class.
         """
-        is_b_node = False
+        is_blank_node = False
         if isinstance(class_uri, rdflib.BNode):
-            is_b_node = True
+            is_blank_node = True
             class_name = NamingRegistry.bnode_to_name(graph=self.graph, bnode=class_uri)
         else:
             class_name = NamingRegistry.uri_to_python_name(uri=class_uri)
@@ -94,7 +94,7 @@ class ClassExtractor:
                             uri=superclass, graph=self.graph
                         )
                     )
-        if not is_b_node:
+        if not is_blank_node:
             superclasses.extend(
                 self.named_conjuncts_of_definitions(class_uri=class_uri)
             )
@@ -102,10 +102,10 @@ class ClassExtractor:
         # De-duplicate while preserving order
         seen = set()
         unique_superclasses: List[str] = []
-        for sc in superclasses:
-            if sc not in seen:
-                unique_superclasses.append(sc)
-                seen.add(sc)
+        for superclass_name in superclasses:
+            if superclass_name not in seen:
+                unique_superclasses.append(superclass_name)
+                seen.add(superclass_name)
 
         # disjoint with
         disjoint_with: List[str] = []
@@ -117,22 +117,22 @@ class ClassExtractor:
 
         # equivalent classes
         equivalent_classes: List[str] = []
-        for eq_class in self.graph.objects(class_uri, OWL.equivalentClass):
-            if isinstance(eq_class, rdflib.URIRef):
+        for equivalent_class in self.graph.objects(class_uri, OWL.equivalentClass):
+            if isinstance(equivalent_class, rdflib.URIRef):
                 equivalent_classes.append(
-                    NamingRegistry.uri_to_python_name(uri=eq_class)
+                    NamingRegistry.uri_to_python_name(uri=equivalent_class)
                 )
 
         # Get label
         label = self.metadata_extractor.get_label(uri=class_uri)
         is_description_for = None
-        if is_b_node and unique_superclasses:
+        if is_blank_node and unique_superclasses:
             if len(unique_superclasses) > 1:
                 raise NotImplemented(
                     f"BNode class {class_name} has multiple superclasses: {unique_superclasses}"
                 )
             is_description_for = unique_superclasses[0]
-        elif is_b_node and not unique_superclasses:
+        elif is_blank_node and not unique_superclasses:
             subclasses = list(self.graph.subjects(RDFS.subClassOf, class_uri))
             if len(subclasses) > 1:
                 raise NotImplemented(
@@ -251,11 +251,11 @@ class PropertyExtractor:
     Reads the labels and comments of the properties.
     """
 
-    def extract_info(self, *, property_uri: Any) -> PropertyInfo:
+    def extract(self, *, property_uri: Any) -> PropertyInfo:
         """
         Extract information about a property.
         """
-        prop_local = NamingRegistry.uri_to_python_name(uri=property_uri)
+        property_name = NamingRegistry.uri_to_python_name(uri=property_uri)
 
         # Get domain and range
         domains: List[str] = []
@@ -275,68 +275,74 @@ class PropertyExtractor:
             domains.append(NamingRegistry.uri_to_python_name(uri=domain))
 
         range_uris: List[rdflib.term.Identifier] = []
-        for range_val in self.graph.objects(property_uri, RDFS.range):
-            ranges.append(NamingRegistry.uri_to_python_name(uri=range_val))
-            range_uris.append(range_val)
+        for range_class in self.graph.objects(property_uri, RDFS.range):
+            ranges.append(NamingRegistry.uri_to_python_name(uri=range_class))
+            range_uris.append(range_class)
 
         # Inheritance between properties
-        for super_prop in self.graph.objects(property_uri, RDFS.subPropertyOf):
-            if isinstance(super_prop, rdflib.URIRef):
+        for superproperty in self.graph.objects(property_uri, RDFS.subPropertyOf):
+            if isinstance(superproperty, rdflib.URIRef):
                 superproperties.append(
-                    NamingRegistry.uri_to_python_name(uri=super_prop)
+                    NamingRegistry.uri_to_python_name(uri=superproperty)
                 )
 
         # Inverses
-        for inv in self.graph.objects(property_uri, OWL.inverseOf):
-            if isinstance(inv, rdflib.URIRef):
-                inverses.append(NamingRegistry.uri_to_python_name(uri=inv))
+        for inverse_property in self.graph.objects(property_uri, OWL.inverseOf):
+            if isinstance(inverse_property, rdflib.URIRef):
+                inverses.append(NamingRegistry.uri_to_python_name(uri=inverse_property))
         # Also collect when current property is the object of inverseOf
-        for inv_subj in self.graph.subjects(OWL.inverseOf, property_uri):
-            if isinstance(inv_subj, rdflib.URIRef):
-                inverses.append(NamingRegistry.uri_to_python_name(uri=inv_subj))
+        for inverse_property in self.graph.subjects(OWL.inverseOf, property_uri):
+            if isinstance(inverse_property, rdflib.URIRef):
+                inverses.append(NamingRegistry.uri_to_python_name(uri=inverse_property))
 
         # Equivalent properties
-        for eq_prop in self.graph.objects(property_uri, OWL.equivalentProperty):
-            if isinstance(eq_prop, rdflib.URIRef):
+        for equivalent_property in self.graph.objects(
+            property_uri, OWL.equivalentProperty
+        ):
+            if isinstance(equivalent_property, rdflib.URIRef):
                 equivalent_properties.append(
-                    NamingRegistry.uri_to_python_name(uri=eq_prop)
+                    NamingRegistry.uri_to_python_name(uri=equivalent_property)
                 )
-        for eq_prop_subj in self.graph.subjects(OWL.equivalentProperty, property_uri):
-            if isinstance(eq_prop_subj, rdflib.URIRef):
+        for equivalent_property in self.graph.subjects(
+            OWL.equivalentProperty, property_uri
+        ):
+            if isinstance(equivalent_property, rdflib.URIRef):
                 equivalent_properties.append(
-                    NamingRegistry.uri_to_python_name(uri=eq_prop_subj)
+                    NamingRegistry.uri_to_python_name(uri=equivalent_property)
                 )
 
         # Disjoint properties
-        for dis_prop in self.graph.objects(property_uri, OWL.propertyDisjointWith):
-            if isinstance(dis_prop, rdflib.URIRef):
+        for disjoint_property in self.graph.objects(
+            property_uri, OWL.propertyDisjointWith
+        ):
+            if isinstance(disjoint_property, rdflib.URIRef):
                 disjoint_properties.append(
-                    NamingRegistry.uri_to_python_name(uri=dis_prop)
+                    NamingRegistry.uri_to_python_name(uri=disjoint_property)
                 )
-        for dis_prop_subj in self.graph.subjects(
+        for disjoint_property in self.graph.subjects(
             OWL.propertyDisjointWith, property_uri
         ):
-            if isinstance(dis_prop_subj, rdflib.URIRef):
+            if isinstance(disjoint_property, rdflib.URIRef):
                 disjoint_properties.append(
-                    NamingRegistry.uri_to_python_name(uri=dis_prop_subj)
+                    NamingRegistry.uri_to_python_name(uri=disjoint_property)
                 )
 
         # Determine property type
-        prop_type = PropertyType.OBJECT_PROPERTY
-        for prop_type_uri in self.graph.objects(property_uri, RDF.type):
-            if prop_type_uri == OWL.DatatypeProperty:
-                prop_type = PropertyType.DATA_PROPERTY
-            if prop_type_uri == OWL.TransitiveProperty:
+        property_type = PropertyType.OBJECT_PROPERTY
+        for rdf_type in self.graph.objects(property_uri, RDF.type):
+            if rdf_type == OWL.DatatypeProperty:
+                property_type = PropertyType.DATA_PROPERTY
+            if rdf_type == OWL.TransitiveProperty:
                 is_transitive = True
-            if prop_type_uri == OWL.SymmetricProperty:
+            if rdf_type == OWL.SymmetricProperty:
                 is_symmetric = True
-            if prop_type_uri == OWL.AsymmetricProperty:
+            if rdf_type == OWL.AsymmetricProperty:
                 is_asymmetric = True
-            if prop_type_uri == OWL.ReflexiveProperty:
+            if rdf_type == OWL.ReflexiveProperty:
                 is_reflexive = True
-            if prop_type_uri == OWL.IrreflexiveProperty:
+            if rdf_type == OWL.IrreflexiveProperty:
                 is_irreflexive = True
-            if prop_type_uri == OWL.FunctionalProperty:
+            if rdf_type == OWL.FunctionalProperty:
                 is_functional = True
 
         # Choose a single inverse if any (stable order)
@@ -345,9 +351,9 @@ class PropertyExtractor:
             inverse_of = sorted(set(inverses))[0]
 
         return PropertyInfo(
-            name=prop_local,
+            name=property_name,
             uri=str(property_uri),
-            type=prop_type,
+            type=property_type,
             domains=domains,
             ranges=ranges,
             range_uris=range_uris,
@@ -355,8 +361,8 @@ class PropertyExtractor:
             disjoint_properties=disjoint_properties,
             label=self.metadata_extractor.get_label(uri=property_uri),
             comment=self.metadata_extractor.get_comment(uri=property_uri),
-            field_name=NamingRegistry.to_snake_case(name=prop_local),
-            descriptor_name=NamingRegistry.to_pascal_case(name=prop_local),
+            field_name=NamingRegistry.to_snake_case(name=property_name),
+            descriptor_name=NamingRegistry.to_pascal_case(name=property_name),
             superproperties=superproperties,
             inverses=sorted(set(inverses)),
             inverse_of=inverse_of,
@@ -435,10 +441,12 @@ class OntologyExtractor:
         """
         :return: The information about the ontology: its classes, its class descriptions and its properties.
         """
-        for s in self.graph.subjects(RDF.type, OWL.Ontology):
-            self.ontology_label = self.metadata_extractor.get_label(uri=s)
+        for ontology_node in self.graph.subjects(RDF.type, OWL.Ontology):
+            self.ontology_label = self.metadata_extractor.get_label(uri=ontology_node)
             if not self.ontology_label:
-                self.ontology_label = NamingRegistry.uri_to_python_name(uri=s)
+                self.ontology_label = NamingRegistry.uri_to_python_name(
+                    uri=ontology_node
+                )
             break
 
         if not self.ontology_label:
@@ -446,70 +454,76 @@ class OntologyExtractor:
 
         all_class_subjects = set(self.graph.subjects(RDF.type, OWL.Class))
 
-        for cls_uri in all_class_subjects:
+        for class_node in all_class_subjects:
             # Anonymous unions inside other expressions are checked against their members, and anonymous intersections
             # with the members of a named class's definition stand for that class; neither is a class of its own.
-            if isinstance(cls_uri, rdflib.BNode):
+            if isinstance(class_node, rdflib.BNode):
                 if not (
-                    list(self.graph.objects(cls_uri, OWL.intersectionOf))
-                    or list(self.graph.objects(cls_uri, OWL.unionOf))
+                    list(self.graph.objects(class_node, OWL.intersectionOf))
+                    or list(self.graph.objects(class_node, OWL.unionOf))
                 ):
                     continue
                 if not self.class_extractor.is_attached_to_a_named_class(
-                    class_expression=cls_uri
+                    class_expression=class_node
                 ) and (
-                    list(self.graph.objects(cls_uri, OWL.unionOf))
+                    list(self.graph.objects(class_node, OWL.unionOf))
                     or self.class_extractor.named_class_defined_alike(
-                        class_expression=cls_uri
+                        class_expression=class_node
                     )
                     is not None
                 ):
                     continue
 
-            unions = list(self.graph.objects(cls_uri, OWL.unionOf))
+            unions = list(self.graph.objects(class_node, OWL.unionOf))
             if unions:
                 # 2. Register the parent class
-                info = self.class_extractor.extract_info(class_uri=cls_uri)
-                super_classes = info.superclasses[:]
+                class_information = self.class_extractor.extract(class_uri=class_node)
+                super_classes = class_information.superclasses[:]
 
                 # 3. Process members and make them inherit from the parent union class
                 members = NamingRegistry._get_rdf_list(graph=self.graph, head=unions[0])
                 for member in members:
-                    member_info = self.class_extractor.extract_info(class_uri=member)
+                    member_information = self.class_extractor.extract(class_uri=member)
                     # Ensure member inherits from the union parent
-                    for sc in super_classes:
-                        if sc not in member_info.superclasses:
-                            member_info.superclasses.append(sc)
+                    for superclass_name in super_classes:
+                        if superclass_name not in member_information.superclasses:
+                            member_information.superclasses.append(superclass_name)
 
                     # Update/Register member
-                    self._register_class(info=member_info)
+                    self._register_class(class_information=member_information)
                 continue
 
             # Handle regular classes and other BNodes (Intersections, Restrictions)
-            info = self.class_extractor.extract_info(class_uri=cls_uri)
-            if not info:
+            class_information = self.class_extractor.extract(class_uri=class_node)
+            if not class_information:
                 continue
-            self._register_class(info=info)
+            self._register_class(class_information=class_information)
 
-        for p_type in [
+        for property_type in [
             OWL.ObjectProperty,
             OWL.DatatypeProperty,
             OWL.TransitiveProperty,
         ]:
-            for p_uri in self.graph.subjects(RDF.type, p_type):
-                if isinstance(p_uri, rdflib.term.BNode):
+            for property_uri in self.graph.subjects(RDF.type, property_type):
+                if isinstance(property_uri, rdflib.term.BNode):
                     continue
-                info = self.property_extractor.extract_info(property_uri=p_uri)
-                if info.name in self.properties:
-                    existing = self.properties[info.name]
-                    if p_type == OWL.TransitiveProperty:
+                property_information = self.property_extractor.extract(
+                    property_uri=property_uri
+                )
+                if property_information.name in self.properties:
+                    existing = self.properties[property_information.name]
+                    if property_type == OWL.TransitiveProperty:
                         existing.is_transitive = True
-                    existing.domains = sorted(set(existing.domains) | set(info.domains))
-                    existing.ranges = sorted(set(existing.ranges) | set(info.ranges))
+                    existing.domains = sorted(
+                        set(existing.domains) | set(property_information.domains)
+                    )
+                    existing.ranges = sorted(
+                        set(existing.ranges) | set(property_information.ranges)
+                    )
                     if not existing.inverse_of:
-                        existing.inverse_of = info.inverse_of
+                        existing.inverse_of = property_information.inverse_of
                 else:
-                    self.properties[info.name] = info
+                    self.properties[property_information.name] = property_information
 
         return OntologyInfo(
             graph=self.graph,
@@ -520,16 +534,16 @@ class OntologyExtractor:
             ontology_label=self.ontology_label,
         )
 
-    def _register_class(self, *, info: ClassInfo):
+    def _register_class(self, *, class_information: ClassInfo):
         """
         Register or update class information.
         """
-        if info.name in self.classes:
-            existing = self.classes[info.name]
+        if class_information.name in self.classes:
+            existing = self.classes[class_information.name]
             # Merge superclasses
-            for sc in info.superclasses:
-                if sc not in existing.superclasses:
-                    existing.superclasses.append(sc)
+            for superclass_name in class_information.superclasses:
+                if superclass_name not in existing.superclasses:
+                    existing.superclasses.append(superclass_name)
 
             # Special handling for "Symbol"
             if (
@@ -539,16 +553,18 @@ class OntologyExtractor:
                 existing.superclasses.remove(Symbol.__name__)
 
             # Merge declared properties
-            for dp in info.declared_properties:
-                if dp not in existing.declared_properties:
-                    existing.declared_properties.append(dp)
+            for declared_property in class_information.declared_properties:
+                if declared_property not in existing.declared_properties:
+                    existing.declared_properties.append(declared_property)
 
             # Merge other metadata
             if not existing.label:
-                existing.label = info.label
+                existing.label = class_information.label
             if not existing.comment:
-                existing.comment = info.comment
-        elif info.is_description_for:
-            self.class_descriptions[info.is_description_for] = info
+                existing.comment = class_information.comment
+        elif class_information.is_description_for:
+            self.class_descriptions[class_information.is_description_for] = (
+                class_information
+            )
         else:
-            self.classes[info.name] = info
+            self.classes[class_information.name] = class_information
