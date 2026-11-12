@@ -156,7 +156,7 @@ class NoMonitoredTaskApproachingItsGoal(EndedByOwner, MotionStatechartNode):
         """
         super().set_up()
         self._control_dt = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).qp_controller_config.control_time_step.total_seconds()
         self._errors_at_last_progress_variables = self._registered_variables(
             "error_at_last_progress"
@@ -502,7 +502,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         timer = CountSimulationTimeSeconds(
             name=f"{self.name}/timer", seconds=self.timeout.total_seconds()
         )
-        self._add_child_to_statechart(timer)
+        self._add_child_to_statechart(node=timer)
         stall_monitors = self._expand_stall_detection(
             self._find_converging_tasks(self.monitored_node)
         )
@@ -540,7 +540,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         still_working = AnyMonitoredTaskShortOfItsGoal(
             name=f"{self.name}/short_of_its_goal", monitored_tasks=monitored_tasks
         )
-        self._add_children_to_statechart([not_approaching, still_working])
+        self._add_children_to_statechart(nodes=[not_approaching, still_working])
         return [not_approaching, still_working]
 
     def build_artifacts(self) -> NodeArtifacts:

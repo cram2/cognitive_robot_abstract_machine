@@ -424,8 +424,8 @@ class DrivenBaseGoal(
                 threshold=self.threshold,
             )
         )
-        self._add_child_to_statechart(self.motion)
-        self._succeed_at_its_goal(self.motion)
+        self._add_child_to_statechart(node=self.motion)
+        self._succeed_at_its_goal(child=self.motion)
 
     def set_up(self) -> None:
         """

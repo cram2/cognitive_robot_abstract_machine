@@ -48,7 +48,7 @@ def nested_statechart(statechart_executor: StatechartExecutor) -> Statechart:
         nodes=[ConstTrueNode(name="inner_first"), ConstTrueNode(name="inner_last")],
     )
     statechart.add_node(
-        Parallel(
+        node=Parallel(
             name="root",
             nodes=[ConstTrueNode(name="first"), middle, ConstTrueNode(name="last")],
         )
@@ -159,7 +159,9 @@ def test_a_node_that_fits_is_found_upwards_from_itself(
 ) -> None:
     middle = node_named(nested_statechart, "middle")
 
-    assert middle.find_upwards(lambda node: isinstance(node, Parallel)) is middle
+    assert (
+        middle.find_upwards(predicate=lambda node: isinstance(node, Parallel)) is middle
+    )
 
 
 def test_the_closest_fitting_node_above_is_found_upwards(
@@ -168,7 +170,7 @@ def test_the_closest_fitting_node_above_is_found_upwards(
     inner_first = node_named(nested_statechart, "inner_first")
 
     assert inner_first.find_upwards(
-        lambda node: isinstance(node, Parallel)
+        predicate=lambda node: isinstance(node, Parallel)
     ) is node_named(nested_statechart, "middle")
 
 
@@ -177,7 +179,10 @@ def test_no_node_is_found_upwards_if_none_up_to_the_root_fits(
 ) -> None:
     inner_first = node_named(nested_statechart, "inner_first")
 
-    assert inner_first.find_upwards(lambda node: isinstance(node, Sequence)) is None
+    assert (
+        inner_first.find_upwards(predicate=lambda node: isinstance(node, Sequence))
+        is None
+    )
 
 
 # %% is_leaf
@@ -207,7 +212,7 @@ def test_the_siblings_of_a_top_level_node_are_the_other_top_level_nodes(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_nodes([first := ConstTrueNode(), other := ConstTrueNode()])
+    statechart.add_nodes(nodes=[first := ConstTrueNode(), other := ConstTrueNode()])
 
     assert first.siblings == [other]
 
@@ -216,7 +221,7 @@ def test_the_only_top_level_node_has_no_siblings(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(only := ConstTrueNode())
+    statechart.add_node(node=(only := ConstTrueNode()))
 
     assert only.siblings == []
 
@@ -226,7 +231,7 @@ def test_siblings_of_the_same_name_are_told_apart_by_identity(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     statechart.add_node(
-        Parallel(
+        node=Parallel(
             name="root",
             nodes=[
                 first := ConstTrueNode(name="same"),
@@ -300,7 +305,7 @@ def test_siblings_that_compare_equal_are_told_apart(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     statechart.add_node(
-        Parallel(
+        node=Parallel(
             nodes=[
                 NodeComparedByItsSpeed(name="first"),
                 NodeComparedByItsSpeed(name="second"),
@@ -323,7 +328,7 @@ def test_the_closest_preceding_node_is_the_last_in_a_left_siblings_subtree(
     last = node_named(nested_statechart, "last")
 
     assert nested_statechart.get_preceding_node_by_type(
-        last, ConstTrueNode
+        node=last, node_type=ConstTrueNode
     ) is node_named(nested_statechart, "inner_last")
 
 
@@ -333,7 +338,9 @@ def test_the_preceding_nodes_are_listed_closest_first(
     last = node_named(nested_statechart, "last")
 
     assert names_of(
-        nested_statechart.get_preceding_nodes_by_type(last, ConstTrueNode)
+        nested_statechart.get_preceding_nodes_by_type(
+            node=last, node_type=ConstTrueNode
+        )
     ) == ["inner_last", "inner_first", "first"]
 
 
@@ -343,16 +350,16 @@ def test_a_preceding_node_is_found_left_of_an_ancestor(
     inner_first = node_named(nested_statechart, "inner_first")
 
     assert nested_statechart.get_preceding_node_by_type(
-        inner_first, ConstTrueNode
+        node=inner_first, node_type=ConstTrueNode
     ) is node_named(nested_statechart, "first")
 
 
 def test_a_left_sibling_itself_precedes_a_node(nested_statechart: Statechart) -> None:
     last = node_named(nested_statechart, "last")
 
-    assert nested_statechart.get_preceding_node_by_type(last, Parallel) is node_named(
-        nested_statechart, "middle"
-    )
+    assert nested_statechart.get_preceding_node_by_type(
+        node=last, node_type=Parallel
+    ) is node_named(nested_statechart, "middle")
 
 
 def test_an_ancestor_does_not_precede_its_descendants(
@@ -360,7 +367,12 @@ def test_an_ancestor_does_not_precede_its_descendants(
 ) -> None:
     inner_last = node_named(nested_statechart, "inner_last")
 
-    assert nested_statechart.get_preceding_node_by_type(inner_last, Parallel) is None
+    assert (
+        nested_statechart.get_preceding_node_by_type(
+            node=inner_last, node_type=Parallel
+        )
+        is None
+    )
 
 
 # %% the children of a goal
@@ -371,7 +383,7 @@ def test_the_children_of_a_sequence_are_the_steps_it_was_handed(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     steps = [ConstTrueNode(name="step"), ConstTrueNode(name="next")]
-    statechart.add_node(sequence := Sequence(nodes=list(steps)))
+    statechart.add_node(node=(sequence := Sequence(nodes=list(steps))))
 
     assert sequence.children == steps
 
@@ -404,10 +416,10 @@ class CompositeNodeNavigatingWhileItExpands(EndedByOwner, CompositeNode):
 
     def expand(self) -> None:
         self.preceding_fixed_value_node = self.statechart.get_preceding_node_by_type(
-            self, NodeObservingAFixedValue
+            node=self, node_type=NodeObservingAFixedValue
         )
         self.children_of_language_node = ControlStructureNode.closest_above(
-            self
+            node=self
         ).children
 
 
@@ -446,7 +458,7 @@ def test_a_step_finds_the_step_before_it_while_it_expands(
     preceding_step = preceding_step_factory()
     navigating = CompositeNodeNavigatingWhileItExpands()
 
-    statechart.add_node(language_node_type(nodes=[preceding_step, navigating]))
+    statechart.add_node(node=language_node_type(nodes=[preceding_step, navigating]))
 
     assert navigating.preceding_fixed_value_node is preceding_step
 
@@ -465,7 +477,7 @@ def test_a_node_below_a_step_finds_the_step_before_that_while_it_expands(
     navigating = CompositeNodeNavigatingWhileItExpands()
 
     statechart.add_node(
-        language_node_type(nodes=[preceding_step, _paused_until_true(navigating)])
+        node=language_node_type(nodes=[preceding_step, _paused_until_true(navigating)])
     )
 
     assert navigating.preceding_fixed_value_node is preceding_step
@@ -481,7 +493,7 @@ def test_an_expanding_step_sees_the_children_before_it_and_the_nodes_still_to_jo
         nodes=[_step_decided_by_its_owner(), navigating, following_step]
     )
 
-    statechart.add_node(sequence)
+    statechart.add_node(node=sequence)
 
     assert navigating.children_of_language_node == [
         *sequence.children[:2],
@@ -494,10 +506,10 @@ def test_an_inserted_step_finds_the_step_before_it_while_it_expands(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     preceding_step = _step_decided_by_its_owner()
-    statechart.add_node(sequence := Sequence(nodes=[preceding_step]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[preceding_step])))
     navigating = CompositeNodeNavigatingWhileItExpands()
 
-    sequence.insert_after(preceding_step, navigating)
+    sequence.insert_after(reference=preceding_step, node=navigating)
 
     assert navigating.preceding_fixed_value_node is preceding_step
 
@@ -507,10 +519,10 @@ def test_a_replacing_step_finds_the_step_before_it_while_it_expands(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     preceding_step, replaced = _step_decided_by_its_owner(), ConstTrueNode()
-    statechart.add_node(Sequence(nodes=[preceding_step, replaced]))
+    statechart.add_node(node=Sequence(nodes=[preceding_step, replaced]))
     navigating = CompositeNodeNavigatingWhileItExpands()
 
-    statechart.replace(replaced, navigating)
+    statechart.replace(node=replaced, replacement=navigating)
 
     assert navigating.preceding_fixed_value_node is preceding_step
 
@@ -523,6 +535,6 @@ def test_a_repeated_task_finds_the_step_before_its_repetition_while_it_expands(
     navigating = CompositeNodeNavigatingWhileItExpands()
     repetition = RepeatUntil(task=navigating, stop_retry_monitor=ConstFalseNode())
 
-    statechart.add_node(Sequence(nodes=[preceding_step, repetition]))
+    statechart.add_node(node=Sequence(nodes=[preceding_step, repetition]))
 
     assert navigating.preceding_fixed_value_node is preceding_step

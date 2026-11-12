@@ -29,15 +29,17 @@ def test_a_plan_avoiding_collisions_runs_against_a_controller_in_another_process
     WorldSynchronizer(_world=world, node=session.node)
     stretch = world.get_semantic_annotations_by_type(Stretch)[0]
     executor = RealRobotPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(stretch)]),
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=stretch)]
+        ),
         ros_node=session.node,
         collision_avoidance=True,
     )
     park_arms = ParkArmsAction(arms=stretch.all_arms)
     statechart = Statechart(context=executor.context)
-    statechart.add_node(park_arms)
+    statechart.add_node(node=park_arms)
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.execute()
     executor.close()
 

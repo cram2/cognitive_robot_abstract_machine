@@ -32,6 +32,7 @@ from json_msgs.action._json_action import JsonAction_FeedbackMessage
 from typing_extensions import Any
 
 from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
+from krrood.patterns.called_positionally import called_positionally
 from cramph.plotters.graphviz import StatechartGraphviz
 from semantic_digital_twin.adapters.ros import background_node
 
@@ -71,7 +72,7 @@ class SvgGrahpicsView(QGraphicsView):
             # Pass the event to parent if Ctrl or Shift is not pressed
             super().wheelEvent(event)
 
-    def load(self, svg_path):
+    def load(self, *, svg_path):
         with QMutexLocker(self.mutex):
             renderer = QSvgRenderer(svg_path)
             self.svg_item.setSharedRenderer(renderer)
@@ -228,15 +229,15 @@ class DotGraphViewer(QWidget):
             self.topic_selector.clear()
             self.topic_selector.addItems(execution_state_topics)
             if len(execution_state_topics) > 0:
-                self.on_topic_selected(0)
+                self.on_topic_selected(index=0)
 
     def on_topic_selector_clicked(self) -> None:
         # Stop refreshing topics once a topic is selected
         if self.topic_selector.currentIndex() != -1:
             self.topic_refresh_timer.stop()
-            self.on_topic_selected(self.topic_selector.currentIndex())
+            self.on_topic_selected(index=self.topic_selector.currentIndex())
 
-    def on_topic_selected(self, index: int) -> None:
+    def on_topic_selected(self, *, index: int) -> None:
         topic_name = self.topic_selector.currentText()
         if topic_name:
             background_node.get_node().create_subscription(
@@ -246,9 +247,11 @@ class DotGraphViewer(QWidget):
                 qos_profile=10,
             )
 
+    @called_positionally
     def on_new_message_received(self, msg: JsonAction.Feedback) -> None:
         self.new_message_signal.emit(msg)
 
+    @called_positionally
     def handle_new_message(self, msg: JsonAction_FeedbackMessage) -> None:
         """
         Take over the statechart `msg` reports and draw it, showing the drawing if the
@@ -259,7 +262,7 @@ class DotGraphViewer(QWidget):
         json_data = json.loads(msg.feedback.feedback)
         msg_goal_id = json_data[StatechartPayloadKey.GOAL_ID]
 
-        self.reported_statechart.take_over(json_data)
+        self.reported_statechart.take_over(payload=json_data)
         if self.reported_statechart.statechart is None:
             return
 
@@ -280,7 +283,7 @@ class DotGraphViewer(QWidget):
             self.graphs_by_goal[goal_id] = []
             self.goals.append(goal_id)
 
-        self.plot_motion_statechart(goal_id)
+        self.plot_motion_statechart(goal_id=goal_id)
 
         # Update the display to show the latest graph
         if at_last_msg:
@@ -291,22 +294,24 @@ class DotGraphViewer(QWidget):
 
         if at_last_msg:
             self.display_graph(
-                self.current_goal_index,
-                self.current_message_index,
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
                 update_position_label=False,
             )
 
-    def plot_motion_statechart(self, goal_id: int) -> None:
+    def plot_motion_statechart(self, *, goal_id: int) -> None:
         """
         Draw the reported statechart as the newest drawing of `goal_id`.
 
         :param goal_id: The goal, numbered in the order the goals arrived.
         """
-        graph = StatechartGraphviz(self.reported_statechart.statechart).to_dot_graph()
+        graph = StatechartGraphviz(
+            statechart=self.reported_statechart.statechart
+        ).to_dot_graph()
         self.graphs_by_goal[goal_id].append(graph)
 
     def display_graph(
-        self, goal_index: int, message_index: int, update_position_label: bool = True
+        self, *, goal_index: int, message_index: int, update_position_label: bool = True
     ) -> None:
         # Display the graph based on goal and message index
         goal_id = self.goals[goal_index]
@@ -318,7 +323,7 @@ class DotGraphViewer(QWidget):
         svg_path = "graph.svg"
         graph.write_svg(svg_path)
         graph.write_pdf("graph.pdf")
-        self.svg_widget.load(svg_path)
+        self.svg_widget.load(svg_path=svg_path)
 
     def update_position_label(self) -> None:
         goal_count = len(self.goals)
@@ -336,7 +341,10 @@ class DotGraphViewer(QWidget):
         if self.goals:
             self.current_goal_index = 0
             self.current_message_index = 0
-            self.display_graph(self.current_goal_index, self.current_message_index)
+            self.display_graph(
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
+            )
 
     def show_previous_image(self) -> None:
         if self.goals:
@@ -349,7 +357,10 @@ class DotGraphViewer(QWidget):
                         len(self.graphs_by_goal[self.goals[self.current_goal_index]])
                         - 1
                     )
-            self.display_graph(self.current_goal_index, self.current_message_index)
+            self.display_graph(
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
+            )
 
     def show_next_image(self) -> None:
         if self.goals:
@@ -362,19 +373,28 @@ class DotGraphViewer(QWidget):
                 if self.current_goal_index < len(self.goals) - 1:
                     self.current_goal_index += 1
                     self.current_message_index = 0
-            self.display_graph(self.current_goal_index, self.current_message_index)
+            self.display_graph(
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
+            )
 
     def show_prev_goal(self) -> None:
         if self.goals and self.current_goal_index > 0:
             self.current_goal_index -= 1
             self.current_message_index = 0
-            self.display_graph(self.current_goal_index, self.current_message_index)
+            self.display_graph(
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
+            )
 
     def show_next_goal(self) -> None:
         if self.goals and self.current_goal_index < len(self.goals) - 1:
             self.current_goal_index += 1
             self.current_message_index = 0
-            self.display_graph(self.current_goal_index, self.current_message_index)
+            self.display_graph(
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
+            )
 
     def show_latest_image(self) -> None:
         if self.goals:
@@ -382,7 +402,10 @@ class DotGraphViewer(QWidget):
             self.current_message_index = (
                 len(self.graphs_by_goal[self.goals[self.current_goal_index]]) - 1
             )
-            self.display_graph(self.current_goal_index, self.current_message_index)
+            self.display_graph(
+                goal_index=self.current_goal_index,
+                message_index=self.current_message_index,
+            )
 
 
 # %% running the tool

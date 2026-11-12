@@ -170,7 +170,7 @@ def test_what_happens_while_a_run_is_watched_is_detected(milk_in_the_apartment):
 # %% detectors that detect nothing, to watch the watching itself
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class DetectorCountingItsTicks(AbstractDetector):
     """
     Detects nothing, and records how often and on which thread it was ticked.
@@ -202,7 +202,7 @@ class DetectorCountingItsTicks(AbstractDetector):
         return []
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class DetectorTakingItsTime(AbstractDetector):
     """
     Detects nothing, and spends a fixed time on every tick.

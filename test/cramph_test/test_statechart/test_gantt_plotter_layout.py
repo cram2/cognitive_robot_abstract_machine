@@ -44,14 +44,14 @@ def _render_and_capture_axes(plotter: HistoryGanttChartPlotter, monkeypatch):
 
     original = plotter._build_subplots
 
-    def spy(labels):
-        ax_main, ax_final = original(labels)
+    def spy(*, ordered_nodes):
+        ax_main, ax_final = original(ordered_nodes=ordered_nodes)
         captured["main"], captured["final"] = ax_main, ax_final
         return ax_main, ax_final
 
     monkeypatch.setattr(plotter, "_build_subplots", spy)
 
-    plotter.plot_gantt_chart("/dev/null")
+    plotter.plot_gantt_chart(file_name="/dev/null")
     return captured
 
 
@@ -61,14 +61,16 @@ def test_main_and_final_widths_ticks(monkeypatch, ticks) -> None:
     kin = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin.context)
     counter = CountTicks(ticks=ticks)
-    msc.add_node(counter)
-    msc.add_node(EndStatechart.when_true(counter))
+    msc.add_node(node=counter)
+    msc.add_node(node=EndStatechart.when_true(node=counter))
 
-    kin.compile(msc)
-    kin.tick_until_end(ticks + 5)
+    kin.compile(statechart=msc)
+    kin.tick_until_end(timeout=ticks + 5)
 
     # Use ticks (no context)
-    plotter = HistoryGanttChartPlotter(msc, context=None, second_width_in_cm=2.0)
+    plotter = HistoryGanttChartPlotter(
+        statechart=msc, context=None, second_width_in_cm=2.0
+    )
     axes = _render_and_capture_axes(plotter, monkeypatch)
 
     ax_main, ax_final = axes["main"], axes["final"]
@@ -96,13 +98,15 @@ def test_final_column_placed_right_of_main_axis(monkeypatch):
     kin = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin.context)
     counter = CountTicks(ticks=4)
-    msc.add_node(counter)
-    msc.add_node(EndStatechart.when_true(counter))
+    msc.add_node(node=counter)
+    msc.add_node(node=EndStatechart.when_true(node=counter))
 
-    kin.compile(msc)
+    kin.compile(statechart=msc)
     kin.tick_until_end()
 
-    plotter = HistoryGanttChartPlotter(msc, context=None, second_width_in_cm=2.0)
+    plotter = HistoryGanttChartPlotter(
+        statechart=msc, context=None, second_width_in_cm=2.0
+    )
     axes = _render_and_capture_axes(plotter, monkeypatch)
     ax_main, ax_final = axes["main"], axes["final"]
 
@@ -123,13 +127,15 @@ def test_long_labels_not_clipped_on_right(monkeypatch):
     # Create a few nodes with long names
     n1 = ConstTrueNode(name="NODE_" + ("LONG_" * 10))
     n2 = ConstTrueNode(name="NODE_" + ("VERY_LONG_LABEL_" * 6))
-    msc.add_nodes([n1, n2])
-    msc.add_node(EndStatechart.when_true(n2))
+    msc.add_nodes(nodes=[n1, n2])
+    msc.add_node(node=EndStatechart.when_true(node=n2))
 
-    kin.compile(msc)
+    kin.compile(statechart=msc)
     kin.tick()
 
-    plotter = HistoryGanttChartPlotter(msc, context=None, second_width_in_cm=2.0)
+    plotter = HistoryGanttChartPlotter(
+        statechart=msc, context=None, second_width_in_cm=2.0
+    )
     axes = _render_and_capture_axes(plotter, monkeypatch)
 
     ax_final = axes["final"]
@@ -146,15 +152,17 @@ def test_x_axis_units_ticks_vs_seconds(
 ) -> None:
     msc = Statechart(context=statechart_executor.context)
     counter = CountTicks(ticks=5)
-    msc.add_nodes([counter])
-    msc.add_node(EndStatechart.when_true(counter))
+    msc.add_nodes(nodes=[counter])
+    msc.add_node(node=EndStatechart.when_true(node=counter))
 
     kin = statechart_executor
-    kin.compile(msc)
+    kin.compile(statechart=msc)
     kin.tick_until_end()
 
     # Ticks (no context)
-    plotter_ticks = HistoryGanttChartPlotter(msc, context=None, second_width_in_cm=2.0)
+    plotter_ticks = HistoryGanttChartPlotter(
+        statechart=msc, context=None, second_width_in_cm=2.0
+    )
     axes_ticks = _render_and_capture_axes(plotter_ticks, monkeypatch)
     ax_main_ticks = axes_ticks["main"]
     assert ax_main_ticks.get_xlabel() == "Tick"
@@ -163,7 +171,7 @@ def test_x_axis_units_ticks_vs_seconds(
     # Seconds (with context)
     context = kin.context
     plotter_seconds = HistoryGanttChartPlotter(
-        msc, context=context, second_width_in_cm=2.0
+        statechart=msc, context=context, second_width_in_cm=2.0
     )
     axes_seconds = _render_and_capture_axes(plotter_seconds, monkeypatch)
     ax_main_seconds = axes_seconds["main"]
@@ -182,12 +190,12 @@ def test_seconds_cannot_be_plotted_without_a_tick_duration(
     executor = StatechartExecutor(context=statechart_context_without_tick_duration)
     msc = Statechart(context=executor.context)
     counter = CountTicks(ticks=2)
-    msc.add_nodes([counter, EndStatechart.when_true(counter)])
-    executor.compile(msc)
+    msc.add_nodes(nodes=[counter, EndStatechart.when_true(node=counter)])
+    executor.compile(statechart=msc)
     executor.tick_until_end()
 
     plotter = HistoryGanttChartPlotter(
-        msc, context=statechart_context_without_tick_duration
+        statechart=msc, context=statechart_context_without_tick_duration
     )
 
     with pytest.raises(TickDurationUnknownError):
@@ -199,13 +207,15 @@ def test_tree_glyphs_in_labels(monkeypatch):
     msc = Statechart(context=kin.context)
     root1 = ConstTrueNode(name="A")
     nested = CompositeNodeWithNestedCompositeChild(name="B")
-    msc.add_nodes([root1, nested])
-    msc.add_node(EndStatechart.when_true(root1))
+    msc.add_nodes(nodes=[root1, nested])
+    msc.add_node(node=EndStatechart.when_true(node=root1))
 
-    kin.compile(msc)
+    kin.compile(statechart=msc)
     kin.tick()
 
-    plotter = HistoryGanttChartPlotter(msc, context=None, second_width_in_cm=2.0)
+    plotter = HistoryGanttChartPlotter(
+        statechart=msc, context=None, second_width_in_cm=2.0
+    )
     axes = _render_and_capture_axes(plotter, monkeypatch)
 
     ax_final = axes["final"]

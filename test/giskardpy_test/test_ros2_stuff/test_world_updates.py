@@ -438,10 +438,12 @@ def control_loop(init_background_node) -> ControlLoopFixture:
         ],
     )
     motion_statechart = Statechart(context=StatechartContext(world=controlled_world))
-    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=1000.0))
-    motion_statechart.add_node(EndMotion.when_true(counter))
+    motion_statechart.add_node(
+        node=(counter := CountSimulationTimeSeconds(seconds=1000.0))
+    )
+    motion_statechart.add_node(node=EndMotion.when_true(node=counter))
     executor.compile(
-        Statechart.from_json(
+        statechart=Statechart.from_json(
             data=json.loads(json.dumps(motion_statechart.to_json())),
             context=executor.context,
         )
@@ -582,9 +584,11 @@ def local_control_loop(init_background_node) -> ControlLoop:
         ],
     )
     motion_statechart = Statechart(context=executor.context)
-    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=1000.0))
-    motion_statechart.add_node(EndMotion.when_true(counter))
-    executor.compile(motion_statechart)
+    motion_statechart.add_node(
+        node=(counter := CountSimulationTimeSeconds(seconds=1000.0))
+    )
+    motion_statechart.add_node(node=EndMotion.when_true(node=counter))
+    executor.compile(statechart=motion_statechart)
     action_server = GoalQueueStub()
     return ControlLoop(
         executor=executor,
