@@ -13,7 +13,7 @@ from krrood.exceptions import DataclassException
 # Exceptions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FunctionMissingAnnotationsError(DataclassException):
     """
     Raised when a callable lacks a type annotation required for generation.

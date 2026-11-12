@@ -40,7 +40,7 @@ class TestExtractFunctionSource:
             module_level_function.__name__
         ]
         assert f"def {module_level_function.__name__}():" in result.source_of(
-            module_level_function.__name__
+            name=module_level_function.__name__
         )
 
     def test_extracts_all_when_names_empty(self):
@@ -70,9 +70,9 @@ class TestExtractFunctionSource:
             include_signature=False,
         )
         assert f"def {module_level_function.__name__}" not in result.source_of(
-            module_level_function.__name__
+            name=module_level_function.__name__
         )
-        assert "return 1" in result.source_of(module_level_function.__name__)
+        assert "return 1" in result.source_of(name=module_level_function.__name__)
 
     def test_lines_are_reported_individually(self):
         result = extract_function_source(
@@ -89,7 +89,7 @@ class TestExtractFunctionSource:
             source=inspect.getsource(example_classes),
         )
         assert f"def {module_level_function.__name__}():" in result.source_of(
-            module_level_function.__name__
+            name=module_level_function.__name__
         )
 
     def test_missing_source_raises(self):
@@ -110,7 +110,7 @@ class TestExtractClassSource:
             Department.__name__
         ]
         assert f"class {Department.__name__}(Symbol):" in result.source_of(
-            Department.__name__
+            name=Department.__name__
         )
 
     def test_does_not_extract_functions(self):
@@ -165,13 +165,13 @@ class TestExtractImportsFromSource:
         )
         assert imports == []
 
-    def test_reads_from_file(self, tmp_path):
+    def test_reads_from_file(self, *, tmp_path):
         file_path = tmp_path / "module.py"
         file_path.write_text("import os\n")
         imports = extract_imports_from(file_path=str(file_path))
         assert imports == ["import os"]
 
-    def test_reads_from_module(self, tmp_path):
+    def test_reads_from_module(self, *, tmp_path):
         file_path = tmp_path / "sample_module_for_import_extraction.py"
         file_path.write_text("import os\n")
         module = _import_module_from_file(file_path)
@@ -188,7 +188,7 @@ class TestExtractImportsFromSource:
                 source="from . import sibling\n", convert_relative_to_absolute=True
             )
 
-    def test_convert_relative_to_absolute_resolves_via_file_path(self, tmp_path):
+    def test_convert_relative_to_absolute_resolves_via_file_path(self, *, tmp_path):
         file_path = tmp_path / "sample_module_for_relative_import.py"
         file_path.write_text("from . import sibling\n")
         imports = extract_imports_from(

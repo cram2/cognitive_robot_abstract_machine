@@ -1,6 +1,6 @@
 """
 Dataclass records that nest a dataclass and an enum, for tests that turn instances into
-constructor source and back.
+constructor source.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ class Species(Enum):
 @dataclass(unsafe_hash=True)
 class Owner:
     """
-    Inner dataclass of a nested dataclass, used to exercise recursive (de)serialization.
+    Inner dataclass of a nested dataclass, used to exercise recursive serialization.
     """
 
     name: str

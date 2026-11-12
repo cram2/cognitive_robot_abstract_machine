@@ -46,7 +46,7 @@ class HandWrittenAccessor(StrEnum):
 # %% the check
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class HandWrittenFieldAccessorChecker(CodeRuleChecker):
     """
     Finds every class but :attr:`base_class` that defines ``__set__``, and every
@@ -59,22 +59,27 @@ class HandWrittenFieldAccessorChecker(CodeRuleChecker):
     """
 
     @override
-    def violations(self, path: Path) -> Iterator[CodeRuleViolation]:
+    def violations(self, *, path: Path) -> Iterator[CodeRuleViolation]:
         for node in ast.walk(ast.parse(path.read_text())):
             if not isinstance(node, ast.ClassDef):
                 continue
             for statement in node.body:
-                accessor = self.hand_written_accessor(path, node, statement)
+                accessor = self.hand_written_accessor(
+                    path=path, definition=node, statement=statement
+                )
                 if accessor is None:
                     continue
                 decorators = statement.decorator_list
                 first_line = decorators[0].lineno if decorators else statement.lineno
                 yield CodeRuleViolation(
-                    path, first_line, statement.end_lineno, accessor
+                    path=path,
+                    first_line=first_line,
+                    last_line=statement.end_lineno,
+                    description=accessor,
                 )
 
     def hand_written_accessor(
-        self, path: Path, definition: ast.ClassDef, statement: ast.stmt
+        self, *, path: Path, definition: ast.ClassDef, statement: ast.stmt
     ) -> HandWrittenAccessor | None:
         """
         :param path: The file *definition* is in.
@@ -84,21 +89,23 @@ class HandWrittenFieldAccessorChecker(CodeRuleChecker):
         """
         if not isinstance(statement, ast.FunctionDef | ast.AsyncFunctionDef):
             return None
-        if statement.name == "__set__" and not self.is_base_class(path, definition):
+        if statement.name == "__set__" and not self.is_base_class(
+            path=path, definition=definition
+        ):
             return HandWrittenAccessor.DATA_DESCRIPTOR
-        if not self.is_dataclass(definition):
+        if not self.is_dataclass(definition=definition):
             return None
         if any(
             isinstance(decorator, ast.Attribute)
             and decorator.attr == "setter"
-            and statement.name in self.field_names(definition)
+            and statement.name in self.field_names(definition=definition)
             for decorator in statement.decorator_list
         ):
             return HandWrittenAccessor.DATACLASS_PROPERTY_SETTER
         return None
 
     @staticmethod
-    def field_names(definition: ast.ClassDef) -> set[str]:
+    def field_names(*, definition: ast.ClassDef) -> set[str]:
         """
         :return: The names a field of *definition* is reached by: each field's own name
             and, for a field with a leading underscore, the name without it.
@@ -111,7 +118,7 @@ class HandWrittenFieldAccessorChecker(CodeRuleChecker):
         }
         return names | {name.removeprefix("_") for name in names}
 
-    def is_base_class(self, path: Path, definition: ast.ClassDef) -> bool:
+    def is_base_class(self, *, path: Path, definition: ast.ClassDef) -> bool:
         """
         :return: Whether *definition* in *path* is the definition of :attr:`base_class`.
         """
@@ -120,7 +127,7 @@ class HandWrittenFieldAccessorChecker(CodeRuleChecker):
         )
 
     @staticmethod
-    def is_dataclass(definition: ast.ClassDef) -> bool:
+    def is_dataclass(*, definition: ast.ClassDef) -> bool:
         """
         :return: Whether *definition* is decorated with :func:`dataclasses.dataclass`,
             called or not.

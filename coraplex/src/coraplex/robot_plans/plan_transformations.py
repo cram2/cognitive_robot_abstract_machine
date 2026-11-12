@@ -46,9 +46,9 @@ from coraplex.robot_plans.actions.core.robot_body import (
 from coraplex.robot_plans.mixins import ReattachesBranches
 from cramph.composites import Sequence, StatementNode
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.goals.base_pose_goals import HolonomicBaseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
 from krrood.entity_query_language.core.mapped_variable import FlatVariable
 from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
@@ -175,7 +175,7 @@ class DrawerOpening(
         return [
             drawer
             for drawer in world.get_semantic_annotations_by_type(Drawer)
-            if InsideOf(object_body, drawer.root).compute_containment_ratio()
+            if InsideOf(body=object_body, other=drawer.root).compute_containment_ratio()
             > self.minimum_containment_ratio
             and drawer.opening_ratio < self.minimum_opening_ratio
         ]
@@ -321,10 +321,10 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
             grounding.
         """
         grasp = move_and_pick_up.pick_up.grasp.apply_mapping_on_external_root(
-            move_and_pick_up
+            instance=move_and_pick_up
         )
         arm = move_and_pick_up.pick_up.arm.apply_mapping_on_external_root(
-            move_and_pick_up
+            instance=move_and_pick_up
         )
         if not isinstance(arm, Arm):
             return None

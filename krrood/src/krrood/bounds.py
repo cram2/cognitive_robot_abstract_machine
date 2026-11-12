@@ -28,7 +28,7 @@ class BoundsInterface(Generic[T], SubClassSafeGeneric, Interface):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Bounds(BoundsInterface[T]):
     """
     The lower and upper corner of an axis-aligned region, stored as given.

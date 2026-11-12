@@ -325,7 +325,7 @@ class BenchmarkMultiRun:
                     scenario_name=scenario_name, return_code=completed.returncode
                 )
             return CallTreeProfile.from_json(
-                json.loads(Path(result_file.name).read_text())
+                data=json.loads(Path(result_file.name).read_text())
             )
 
     def render_figure(self) -> str:

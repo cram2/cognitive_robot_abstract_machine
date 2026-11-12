@@ -943,7 +943,7 @@ class ChildChooser(Generic[GenericChoosingNode], SubClassSafeGeneric, ABC):
         :return: The kind of :class:`CompositeNodeChoosingItsChild` this chooser
             chooses the children of.
         """
-        return cls.get_type_of_generic_parameter(GenericChoosingNode)
+        return cls.get_type_of_generic_parameter(parameter=GenericChoosingNode)
 
     def has_choice_for(self, node: GenericChoosingNode) -> bool:
         """
@@ -1372,7 +1372,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
         if self._candidates is None:
             self._candidates_pulled = 0
             self.candidate_limit = self.statement._limit_ or default_candidate_limit
-            self._candidates = query_backend.evaluate(self.statement)
+            self._candidates = query_backend.evaluate(expression=self.statement)
         if self.reached_candidate_limit:
             self.stop_grounding()
             return None

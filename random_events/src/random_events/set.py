@@ -116,7 +116,7 @@ class SetElement(AbstractSimpleSet):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_data(from_json(data["value"]), from_json(data["content"]))
 
     def as_composite_set(self) -> AbstractCompositeSet:

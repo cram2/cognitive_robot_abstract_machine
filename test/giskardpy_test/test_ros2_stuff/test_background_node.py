@@ -8,44 +8,44 @@ from collections.abc import Iterator
 
 import pytest
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 
 @pytest.fixture()
-def initialized_rospy() -> Iterator[ROSNodeRegistry]:
+def initialized_background_node() -> Iterator[ROSNodeRegistry]:
     """
     Start Giskard's ROS runtime and stop it after the test.
     """
     registry = ROSNodeRegistry()
     registry.clear()
-    rospy.init_node("giskard_registry_test")
+    background_node.init_node("giskard_registry_test")
     yield registry
-    rospy.shutdown()
+    background_node.shutdown()
     registry.clear()
 
 
 def test_init_node_registers_giskards_node(
-    initialized_rospy: ROSNodeRegistry,
+    initialized_background_node: ROSNodeRegistry,
 ) -> None:
-    assert rospy.get_node() is initialized_rospy.get()
+    assert background_node.get_node() is initialized_background_node.get()
 
 
 def test_init_node_does_not_replace_an_initialized_node(
-    initialized_rospy: ROSNodeRegistry,
+    initialized_background_node: ROSNodeRegistry,
 ) -> None:
-    initialized_node = initialized_rospy.get()
+    initialized_node = initialized_background_node.get()
 
-    rospy.init_node("replacement")
+    background_node.init_node("replacement")
 
-    assert initialized_rospy.get() is initialized_node
+    assert initialized_background_node.get() is initialized_node
 
 
 def test_shutdown_clears_the_node_registration() -> None:
     registry = ROSNodeRegistry()
     registry.clear()
-    rospy.init_node("giskard_registry_test")
+    background_node.init_node("giskard_registry_test")
 
-    rospy.shutdown()
+    background_node.shutdown()
 
     assert not registry.has_node()

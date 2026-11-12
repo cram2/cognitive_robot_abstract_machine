@@ -30,7 +30,7 @@ class RosContextExtension(ContextExtension):
 
     Safe to share between multiple tasks that are active at the same time: each
     ``send_goal_async``/``get_result_async`` call returns its own future tracking that
-    specific goal, and callers (:class:`~giskardpy.motion_statechart.ros2_nodes.ros_tasks.ActionServerTask`)
+    specific goal, and callers (:class:`~giskardpy.motion_statechart.ros2_nodes.action_servers.ActionServerTask`)
     keep their own goal message and result on the task instance, not on the client. No
     state on the client itself is mutated per-goal.
     """

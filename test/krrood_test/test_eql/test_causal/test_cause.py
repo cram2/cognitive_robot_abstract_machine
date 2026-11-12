@@ -16,7 +16,7 @@ def test_cause_is_a_cause_instance_with_no_type_of_its_own():
 # %% flowing through Match (backfilled with a fresh, per-attribute copy on resolution)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pick:
     arm: float
     grasped: bool
@@ -76,13 +76,13 @@ def test_marking_attributes_as_cause_does_not_mutate_the_shared_instance():
 
 
 def test_new_kind_of_assigned_value_decides_the_variable_it_stands_for():
-    stand_in = AssignedVariableStandIn(variable(float, domain=[0.3]))
+    stand_in = AssignedVariableStandIn(variable=variable(float, domain=[0.3]))
     match = a(Pick)(arm=stand_in, grasped=True)
     assert _arm_attribute_match(match).assigned_variable is stand_in.variable
 
 
 def test_new_kind_of_assigned_value_is_told_the_attribute_type():
-    stand_in = AssignedVariableStandIn(variable(float, domain=[0.3]))
+    stand_in = AssignedVariableStandIn(variable=variable(float, domain=[0.3]))
     match = a(Pick)(arm=stand_in, grasped=True)
     _arm_attribute_match(match).assigned_variable
     assert stand_in.attribute_type is float

@@ -27,7 +27,7 @@ class ParseError(TypeError):
     pass
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class FieldInfo:
     """
     A class that wraps a field of dataclass and provides some utility functions.

@@ -9,7 +9,8 @@ from enum import StrEnum
 
 class RepositoryInstructionsFile(StrEnum):
     """
-    The agent instruction files at a repository's root, by name.
+    The agent instruction files of a repository and the modules they are generated from,
+    by their paths relative to the repository's root.
     """
 
     AGENTS = "AGENTS.md"
@@ -22,4 +23,10 @@ class RepositoryInstructionsFile(StrEnum):
     """
     The module or package ``krrood agents-md`` imports to find the repository's own
     rules: the sections defined in it.
+    """
+
+    PROJECT_SKILLS = "agent_skills"
+    """
+    The module or package ``krrood skills`` imports to find the repository's skills: the
+    skills defined in it.
     """

@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 
 import pytest
 import rclpy
+from rclpy.node import Node
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
@@ -58,11 +59,11 @@ class GiskardBuiltOnItsNode:
 
     node_names_when_built: list[str] = field(default_factory=list)
     """
-    The name of the ros node at each time a Giskard was built.
+    The name of the ros node each Giskard was built on.
     """
 
-    def __call__(self) -> Giskard:
-        self.node_names_when_built.append(rospy.get_node().get_name())
+    def __call__(self, node: Node) -> Giskard:
+        self.node_names_when_built.append(node.get_name())
         return Giskard(
             world_source=WorldWithMinimalRobot(world=self.world),
             robot_interface_config=InterruptedWhileIdleInterface(),
@@ -76,10 +77,10 @@ def shut_ros_down_afterwards():
     """
     Shuts down the ros node a launched Giskard leaves behind.
     """
-    if rospy is None:
+    if background_node is None:
         pytest.skip("ROS not installed")
     yield
-    rospy.shutdown()
+    background_node.shutdown()
 
 
 def test_launching_builds_giskard_on_its_node_and_runs_it_until_shutdown(

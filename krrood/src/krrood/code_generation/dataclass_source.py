@@ -1,5 +1,5 @@
 """
-Conversion of dataclass instances to eval-able Python constructor source and back.
+Conversion of dataclass instances to eval-able Python constructor source.
 
 :class:`ObjectSourceSerializer` is the pluggable strategy; the default,
 :class:`DataclassConstructorSerializer`, handles flat and nested dataclasses whose
@@ -15,7 +15,6 @@ from dataclasses import dataclass
 
 from typing_extensions import Any
 
-from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.code_generation.exceptions import ObjectNotSerializableError
 from krrood.code_generation.object_to_source import value_to_source
 from krrood.ormatic.utils import classproperty
@@ -46,8 +45,7 @@ class ObjectSource:
 @dataclass
 class ObjectSourceSerializer(ABC):
     """
-    Converts an object to Python constructor source and reconstructs it from stored
-    data.
+    Converts an object to eval-able Python constructor source.
     """
 
     @abstractmethod
@@ -57,16 +55,6 @@ class ObjectSourceSerializer(ABC):
 
         :param instance: The object to serialize.
         :return: The eval-able constructor expression and the types it needs imported.
-        """
-
-    @abstractmethod
-    def from_data(self, data: Any, instance_type: type) -> Any:
-        """
-        Reconstruct an instance of ``instance_type`` from ``data``.
-
-        :param data: The data representation of the object as stored by the subclass.
-        :param instance_type: The expected type of the reconstructed instance.
-        :return: An instance equal to the original.
         """
 
 
@@ -122,24 +110,3 @@ class DataclassConstructorSerializer(ObjectSourceSerializer):
         if isinstance(value, enum.Enum):
             referenced_types.add(type(value))
         return ObjectSource(value_to_source(value), referenced_types)
-
-    def from_data(self, data: Any, instance_type: type) -> Any:
-        """
-        Reconstructs from a ``dataclasses.asdict``-style mapping, recursing into fields
-        whose type hint is a dataclass; a non-dataclass ``instance_type`` returns
-        ``data`` unchanged.
-        """
-        if not dataclasses.is_dataclass(instance_type):
-            return data
-        type_hints = get_type_hints_of_object(instance_type)
-        constructor_arguments = {}
-        for instance_field in dataclasses.fields(instance_type):
-            value = data[instance_field.name]
-            field_type = type_hints.get(instance_field.name, type(value))
-            if isinstance(value, dict) and dataclasses.is_dataclass(field_type):
-                constructor_arguments[instance_field.name] = self.from_data(
-                    value, field_type
-                )
-            else:
-                constructor_arguments[instance_field.name] = value
-        return instance_type(**constructor_arguments)

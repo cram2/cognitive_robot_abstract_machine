@@ -865,7 +865,7 @@ def test_a_chosen_child_is_still_chosen_after_a_json_round_trip() -> None:
     choosing_node.choose_child_with(ChooserAnsweringInTurn([child]))
 
     received = Statechart.from_json(
-        json.loads(json.dumps(statechart.to_json())),
+        data=json.loads(json.dumps(statechart.to_json())),
         context=StatechartContext(world=World()),
     )
 

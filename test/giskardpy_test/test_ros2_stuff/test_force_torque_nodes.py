@@ -9,7 +9,7 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.ros2_nodes.force_torque_monitor import (
     ForceImpactMonitor,
 )
-from giskardpy.motion_statechart.ros2_nodes.topic_monitor import (
+from giskardpy.motion_statechart.ros2_nodes.topics import (
     PublishOnStart,
     WaitForMessage,
 )
@@ -52,7 +52,7 @@ def test_force_impact_node(rclpy_node):
         context=StatechartContext(world=World()),
         extensions=[RosNodeAccess(rclpy_node), MotionControl()],
     )
-    statechart_copy = Statechart.from_json(new_json_data, context=executor.context)
+    statechart_copy = Statechart.from_json(data=new_json_data, context=executor.context)
     executor.compile(statechart=statechart_copy)
 
     ft_node = statechart_copy.nodes[0].nodes[0]

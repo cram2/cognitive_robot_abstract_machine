@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from cramph.executor import StatechartExecutor
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.motion_control import WorldStateTrajectoryRecording
 from giskardpy.utils.utils import create_path
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
@@ -75,7 +75,7 @@ class GoalTrajectoryPlotter(PostGoalPlotter):
             return
         file_name = self.create_file_name("trajectories", goal_id)
         self.trajectory_plotter.plot_trajectory(file_name)
-        rospy.get_node().get_logger().info(f"saved {file_name}")
+        background_node.get_node().get_logger().info(f"saved {file_name}")
 
 
 @dataclass
@@ -98,7 +98,7 @@ class GoalGanttChartPlotter(PostGoalPlotter):
             context=self.executor.context,
             second_length_in_cm=self.second_length_in_cm,
         )
-        rospy.get_node().get_logger().info(f"saved {file_name}")
+        background_node.get_node().get_logger().info(f"saved {file_name}")
 
 
 @dataclass
@@ -110,4 +110,4 @@ class MotionStatechartPlotter(PostGoalPlotter):
     def plot(self, goal_id: int) -> None:
         file_name = self.create_file_name("motion_statecharts", goal_id)
         self.executor.statechart.draw(file_name)
-        rospy.get_node().get_logger().info(f"saved {file_name}")
+        background_node.get_node().get_logger().info(f"saved {file_name}")

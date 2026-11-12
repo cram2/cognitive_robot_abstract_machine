@@ -640,9 +640,9 @@ class HasLeftRightArm(
         return (
             first_arm
             if relation(
-                world_P_first_body,
-                world_P_second_body,
-                pov,
+                point=world_P_first_body,
+                other=world_P_second_body,
+                point_of_view=pov,
             )()
             else second_arm
         )

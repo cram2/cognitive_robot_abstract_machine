@@ -33,6 +33,6 @@ def test_core_exception_fields_resolve_without_ros():
     assert result.stdout.split() == [
         wrapped_class.clazz.__name__
         for wrapped_class in ClassDiagram(
-            classes_of_module(semantic_digital_twin.exceptions)
+            classes=classes_of_module(semantic_digital_twin.exceptions)
         ).wrapped_classes
     ]

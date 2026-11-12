@@ -18,7 +18,7 @@ from giskardpy.motion_statechart.error_signals import (
 )
 from cramph.exceptions import CyclicNodeDependencyError, PrerequisiteNotExpandedError
 from giskardpy.motion_statechart.exceptions import NoProgressError
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from cramph.node import NodeArtifacts

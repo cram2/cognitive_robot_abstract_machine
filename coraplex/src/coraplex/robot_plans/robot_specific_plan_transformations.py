@@ -24,17 +24,17 @@ from coraplex.robot_plans.mixins import MovesToolCenterPoint
 from cramph.composites import ControlStructureNode, Parallel
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
-    ArticulateGraspedMechanism,
-)
-from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianPose,
     CartesianPositionTrajectory,
     HoldOrientation,
 )
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
+    ArticulateGraspedMechanism,
+)
+from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.stretch import Stretch
 from krrood_spatial_math.spatial_types import Pose, Vector3
@@ -161,7 +161,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
     Moves the tool center point of a Stretch to each of its targets along a straight
     line, by giving every pose goal that an action moving it sets relative to its
     controlled root the tasks of a
-    :class:`~giskardpy.motion_statechart.goals.cartesian_goals.CartesianPoseStraight`
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPoseStraight`
     reaching the same pose. Pose goals inside another goal are left as they are.
     """
 
