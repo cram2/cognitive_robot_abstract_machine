@@ -13,9 +13,11 @@ from krrood.entity_query_language.query.match import Match
 from coraplex.querying.grasp_closeness import GraspsByCloseness
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.node import StatechartNode
-from coraplex.robot_plans.actions.core.pick_up import GraspingAction, HasGraspChoice
+from coraplex.robot_plans.actions.core.pick_up import GraspingAction
 from coraplex.robot_plans.mixins import (
-    HasApproachesGraspPoses,
+    HasArmParameter,
+    HasGraspApproachParameters,
+    HasGraspCandidateParameter,
     MovesToolCenterPoint,
     OperatesGripper,
 )
@@ -32,7 +34,7 @@ from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 # %% taking a container by its handle
@@ -40,14 +42,19 @@ from semantic_digital_twin.world_description.connections import ActiveConnection
 
 @dataclass(eq=False, repr=False, kw_only=True)
 class MovesContainerByItsHandle(
-    MovesToolCenterPoint, OperatesGripper, SequentialAction, HasGraspChoice, ABC
+    MovesToolCenterPoint,
+    OperatesGripper,
+    SequentialAction,
+    HasGraspCandidateParameter,
+    HasArmParameter,
+    ABC,
 ):
     """
     An action that takes hold of a container's handle by :attr:`grasp`, moves the
     container with it, lets go and clears the handle.
     """
 
-    approach_clearance: float = HasApproachesGraspPoses.approach_clearance
+    approach_clearance: float = HasGraspApproachParameters.approach_clearance
     """
     The gap in meters between the handle and the gripper before it closes on it.
     """
@@ -70,7 +77,7 @@ class MovesContainerByItsHandle(
         # A variable, so the grasps are ranked when the action is grounded, from where
         # the robot stands then.
         where_the_robot_stands = variable(
-            Pose, domain=[Pose(reference_frame=arm._robot.root)]
+            Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
         )
         return a(cls)(
             grasp=flat_variable(
@@ -109,12 +116,12 @@ class MovesContainerByItsHandle(
         :return: The pose the tool frame backs off to, in `grasp_pose`'s frame.
         """
         distance = (
-            HasApproachesGraspPoses.distance_to_boundary(
+            HasGraspApproachParameters.distance_to_boundary(
                 self.mechanism.child, grasp_pose
             )
             + self.release_clearance
         )
-        return HasApproachesGraspPoses.pre_grasp_pose(
+        return HasGraspApproachParameters.pre_grasp_pose(
             grasp_pose, end_effector, distance
         )
 
@@ -157,7 +164,7 @@ class OpenAction(MovesContainerByItsHandle):
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
             environment_link=self.grasp.graspable.root,
-            goal_joint_state=self.mechanism.dof.limits.upper.position,
+            goal_position=self.mechanism.dof.limits.upper.position,
         )
 
 
@@ -177,5 +184,5 @@ class CloseAction(MovesContainerByItsHandle):
         return ArticulateGraspedMechanism(
             tip_link=self.arm.end_effector.tool_frame,
             environment_link=self.grasp.graspable.root,
-            goal_joint_state=self.closed_joint_position,
+            goal_position=self.closed_joint_position,
         )

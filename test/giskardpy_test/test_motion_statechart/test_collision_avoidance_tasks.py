@@ -159,7 +159,7 @@ def test_external_collision_avoidance(
                 ]
             ),
             distance_violated := ExternalCollisionDistanceMonitor(
-                body=robot.root, threshold=0.049
+                body=robot.root, distance_threshold=0.049
             ),
             CartesianPose(
                 root_link=cylinder_bot_world.root,
@@ -377,7 +377,7 @@ def test_external_collision_avoidance_with_weight_above_ca(
                 ]
             ),
             distance_violated := ExternalCollisionDistanceMonitor(
-                body=robot.root, threshold=0.0
+                body=robot.root, distance_threshold=0.0
             ),
             CartesianPose(
                 root_link=cylinder_bot_world.root,
@@ -727,7 +727,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
             body=pr2_with_box.get_kinematic_structure_entity_by_name(
                 "r_gripper_palm_link"
             ),
-            threshold=0.0,
+            distance_threshold=0.0,
         ),
     )
     statechart.add_node(local_min := LocalMinimumReached())
@@ -809,7 +809,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
     )
     statechart.add_node(
         contact := SelfCollisionDistanceMonitor(
-            body_a=r_palm_link, body_b=l_forearm_link, threshold=0.01
+            body_a=r_palm_link, body_b=l_forearm_link, distance_threshold=0.01
         )
     )
     statechart.add_node(local_min := LocalMinimumReached())
@@ -1189,7 +1189,7 @@ def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
             body=pr2_with_box.get_kinematic_structure_entity_by_name(
                 "r_gripper_palm_link"
             ),
-            threshold=0.0,
+            distance_threshold=0.0,
         )
     )
 
@@ -2000,13 +2000,13 @@ def test_avoid_collision_box_between_3_boxes(
                 root_link=pr2_world_copy.root,
                 tip_link=box,
                 tip_normal=Vector3.X(reference_frame=box),
-                goal_normal=Vector3.X(reference_frame=pr2_world_copy.root),
+                reference_normal=Vector3.X(reference_frame=pr2_world_copy.root),
             ),
             AlignPlanes(
                 root_link=pr2_world_copy.root,
                 tip_link=box,
                 tip_normal=Vector3.Y(reference_frame=box),
-                goal_normal=Vector3.Y(reference_frame=pr2_world_copy.root),
+                reference_normal=Vector3.Y(reference_frame=pr2_world_copy.root),
             ),
             ExternalCollisionAvoidance(robot=robot),
             local_min,

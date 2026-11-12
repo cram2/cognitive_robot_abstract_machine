@@ -10,34 +10,31 @@ from cramph.node import (
     NodeArtifacts,
     expanded_child_field,
 )
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasTipLinkParameter,
+    HasWeightParameter,
+    HasKinematicChainParameters,
+)
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 
 # %% staying on a line
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class StayOnLineTask(ConvergingTask):
+class StayOnLineTask(
+    ConvergingTask,
+    HasKinematicChainParameters,
+    HasCruiseVelocityParameter,
+):
     """
-    Keeps a point on the tip on the line segment between two points.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain, which the controlled point is attached to.
+    Keeps a point on the tip on the line segment between two points, with an error in
+    meters.
     """
 
     tip_P_tool: Point3
@@ -53,11 +50,6 @@ class StayOnLineTask(ConvergingTask):
     root_P_end: Point3
     """
     End of the line segment.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the goal is approached, in m/s; not strictly enforced.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -97,7 +89,9 @@ class StayOnLineTask(ConvergingTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class InsertCylinder(EndedByOwner, CompositeNode):
+class InsertCylinder(
+    EndedByOwner, CompositeNode, HasTipLinkParameter, HasWeightParameter
+):
     """
     Inserts a grasped cylinder into a hole.
 
@@ -106,11 +100,6 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     3. Straighten the cylinder so it is aligned with the hole axis.
 
     Observes True once the cylinder is straightened.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Controlled tip of the kinematic chain; the grasped body to insert.
     """
 
     tip_P_tool: Point3
@@ -128,14 +117,15 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     Insertion axis of the cylinder.
     """
 
-    up_axis: Vector3
+    hole_normal: Vector3
     """
     Axis pointing out of the hole.
     """
 
     pre_grasp_height: float = 0.2
     """
-    Distance above the hole along :attr:`up_axis` at which the insertion starts, in m.
+    Distance above the hole along :attr:`hole_normal` at which the insertion starts, in
+    m.
     """
 
     tilt: float = np.pi / 10
@@ -165,7 +155,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Task priority relative to other tasks.
+    Above collision avoidance by default.
     """
 
     reach_top: ReachPoint = expanded_child_field()
@@ -196,7 +186,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     def expand(self) -> None:
         root = self.context.world.root
         root_V_up = self.context.world.transform(
-            target_frame=root, spatial_object=self.up_axis
+            target_frame=root, spatial_object=self.hole_normal
         )
         root_P_hole = self.context.world.transform(
             target_frame=root, spatial_object=self.hole_point
@@ -246,7 +236,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
             root_link=root,
             tip_link=self.tip_link,
             tip_normal=self.tip_V_axis,
-            goal_normal=root_V_up,
+            reference_normal=root_V_up,
             cruise_velocity=self.straightening_cruise_velocity,
             weight=self.weight,
         )

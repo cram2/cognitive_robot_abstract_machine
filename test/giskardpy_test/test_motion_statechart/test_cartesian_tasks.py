@@ -709,7 +709,7 @@ class TestCartesianTasks:
         assert np.allclose(
             cylinder_bot_world.compute_forward_kinematics(cylinder_bot_world.root, tip),
             goal.goal_pose,
-            atol=goal.translation_threshold,
+            atol=goal.position_threshold,
         )
 
     def test_orientation_threshold_decouples_rotation_tolerance(
@@ -743,14 +743,14 @@ class TestCartesianTasks:
                     root_link=cylinder_bot_world.root,
                     tip_link=tip,
                     goal_pose=goal_pose,
-                    translation_threshold=0.01,
+                    position_threshold=0.01,
                     name="strict",
                 ),
                 loose := CartesianPose(
                     root_link=cylinder_bot_world.root,
                     tip_link=tip,
                     goal_pose=goal_pose,
-                    translation_threshold=0.01,
+                    position_threshold=0.01,
                     orientation_threshold=0.1,
                     name="loose",
                 ),
@@ -794,7 +794,7 @@ class TestCartesianTasks:
                     goal_pose=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_world.root
                     ),
-                    translation_threshold=0.5,
+                    position_threshold=0.5,
                 ),
             ]
         )
@@ -913,7 +913,7 @@ class TestCartesianTasks:
         assert np.allclose(
             executor.context.world.compute_forward_kinematics(root, tip),
             expected,
-            atol=cart_goal.translation_threshold,
+            atol=cart_goal.position_threshold,
         )
 
     def test_unreachable_goal_ends_in_a_local_minimum(
@@ -1043,7 +1043,7 @@ class TestCartesianTasks:
         assert np.allclose(
             pr2_world_state_reset.compute_forward_kinematics(left_tip, right_tip),
             goal_pose,
-            atol=cart_goal.translation_threshold,
+            atol=cart_goal.position_threshold,
         )
 
     def test_root_link_not_equal_chain_root(self, pr2_world_state_reset: World) -> None:
@@ -1084,7 +1084,7 @@ class TestCartesianTasks:
                 torso_lift_link, right_tip
             ),
             expected,
-            atol=cart_goal.translation_threshold,
+            atol=cart_goal.position_threshold,
         )
 
     @pytest.mark.parametrize(
@@ -1132,7 +1132,7 @@ class TestCartesianTasks:
                 hsr_world_copy.root, base_footprint
             ),
             goal_pose,
-            atol=cart_goal.translation_threshold,
+            atol=cart_goal.position_threshold,
         )
 
     def test_daisy_finger_tip_reaches_its_goal(
@@ -1165,7 +1165,7 @@ class TestCartesianTasks:
         assert np.allclose(
             daisy_world_copy.compute_forward_kinematics(base, finger_tip),
             expected,
-            atol=cart_goal.translation_threshold,
+            atol=cart_goal.position_threshold,
         )
 
     def test_grasp_frame_orientation(self, _hsr_world_setup: World):
@@ -1268,7 +1268,7 @@ class TestCartesianTasks:
             root, tip
         )
         assert np.allclose(
-            forward_kinematics, tip_goal2.to_np(), atol=cart_goal2.translation_threshold
+            forward_kinematics, tip_goal2.to_np(), atol=cart_goal2.position_threshold
         )
 
     def test_cart_goal_sequence_on_start(self, pr2_world_state_reset: World):
@@ -1317,7 +1317,7 @@ class TestCartesianTasks:
         )
         expected = np.eye(4)
         assert np.allclose(
-            forward_kinematics, expected, atol=cart_goal2.translation_threshold
+            forward_kinematics, expected, atol=cart_goal2.position_threshold
         )
 
     def test_CartesianOrientation(self, pr2_world_state_reset: World):
@@ -1724,14 +1724,14 @@ class TestCartesianTasks:
             root_link=root,
             tip_link=tip,
             goal_pose=Pose.from_xyz_rpy(0.1, 0, 0, reference_frame=tip),
-            translation_threshold=0.03,
+            position_threshold=0.03,
             orientation_threshold=0.2,
         )
         motion_statechart.add_node(goal)
         executor.compile(statechart=motion_statechart)
 
         position_task, orientation_task = goal.nodes
-        assert position_task.threshold == goal.translation_threshold
+        assert position_task.threshold == goal.position_threshold
         assert orientation_task.threshold == goal.orientation_threshold
 
     def test_straight_path_while_the_orientation_changes(

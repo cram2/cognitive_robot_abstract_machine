@@ -38,8 +38,7 @@ from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -95,14 +94,8 @@ def _random_navigate_action(world: World):
     Return an underspecified :class:`NavigateAction` with randomised pose.
     """
     action = a(NavigateAction)(
-        target_location=a(Pose.from_xyz_rpy)(
-            x=...,
-            y=...,
-            z=0.0,
-            roll=0.0,
-            pitch=0.0,
-            yaw=...,
-            reference_frame=world.root,
+        goal_pose=a(Pose2D.from_xy_yaw)(
+            x=..., y=..., yaw=..., reference_frame=world.root
         ),
     )
     action.limit(n=10)

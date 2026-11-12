@@ -73,7 +73,7 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
                 tip_link=torso_tip,
                 root_link=root,
                 tip_normal=Vector3.X(torso_tip),
-                goal_normal=Vector3.Z(root),
+                reference_normal=Vector3.Z(root),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE.value,
             )
         ]
@@ -191,7 +191,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             root_link=plan_node.root_link,
             tip_link=plan_node.tip_link,
             goal_pose=plan_node.goal_pose,
-            translation_threshold=plan_node.translation_threshold,
+            position_threshold=plan_node.position_threshold,
             orientation_threshold=plan_node.orientation_threshold,
             binding_policy=plan_node.binding_policy,
         )
@@ -245,13 +245,13 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
                     AlignPlanes(
                         root_link=plan_node.world.root,
                         tip_link=robot_root,
-                        goal_normal=Vector3.X(handle),
+                        reference_normal=Vector3.X(handle),
                         tip_normal=Vector3.NEGATIVE_Y(robot_root),
                     ),
                     ArticulateGraspedMechanism(
                         tip_link=tool_frame,
                         environment_link=handle,
-                        goal_joint_state=closing_goal.goal_joint_state,
+                        goal_position=closing_goal.goal_position,
                     ),
                 ]
             ),

@@ -1,3 +1,12 @@
+"""
+Reusable parameters for actions: the inputs an action is given and the knobs that tune
+how it carries them out, and the behaviour several actions share.
+
+.. note:: This module does not use ``from __future__ import annotations``, so the
+    fields an action inherits from it carry their types as type objects rather than as
+    strings that would have to be resolved against the action's own module.
+"""
+
 from abc import ABC
 from dataclasses import dataclass, field
 
@@ -13,15 +22,24 @@ from giskardpy.motion_statechart.tasks.gripper import (
     MovesGripperToConfiguration,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.mixins import HasPoseThresholdParameters
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
     CartesianPositionVelocityLimit,
     CartesianRotationVelocityLimit,
 )
+from semantic_digital_twin.datastructures.definitions import TorsoState
+from semantic_digital_twin.datastructures.robots.gripper_configuration import (
+    GripperConfiguration,
+)
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.robots.robot_parts import Arm, Camera, EndEffector
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -29,47 +47,143 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(kw_only=True, eq=False)
-class HasMaxJointVelocity:
+class DesignatorParameterMixin:
     """
-    Adds an optional joint velocity cap to an action or motion.
+    Base of the reusable action parameters: mixins that each add the fields of one
+    parameter, and the helpers that read them, to an action.
     """
 
-    max_joint_velocity: float | None = None
+
+# %% what an action acts on
+
+
+@dataclass(kw_only=True, eq=False)
+class HasArmParameter(DesignatorParameterMixin):
     """
-    Maximum joint velocity (in rad/s or m/s, per joint), enforced via
-    :class:`~giskardpy.motion_statechart.tasks.joint_tasks.JointVelocityLimit`. ``None``
-    leaves the speed unconstrained.
+    Mixin for actions that operate one of the robot's arms.
+    """
+
+    arm: Arm
+    """
+    The arm the action uses.
     """
 
 
 @dataclass(kw_only=True, eq=False)
-class HasApproachVelocity:
+class HasCameraParameter(DesignatorParameterMixin):
     """
-    Adds an optional pre-approach speed to an action that reaches towards a target
-    before its main motion.
-
-    Shared by :class:`~coraplex.robot_plans.actions.core.pick_up.ReachAction` and
-    :class:`~coraplex.robot_plans.actions.core.pick_up.PickUpAction`, since a pick-up's
-    reach is itself a :class:`ReachAction` and forwards this same value to it.
+    Mixin for actions that point a camera.
     """
 
-    pre_approach_linear_velocity: float | None = None
+    camera: Camera | None = None
     """
-    Maximum linear speed (in m/s) for the initial pre-pose approach, enforced via
-    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
-    ``None`` leaves the speed unconstrained.
+    The camera the action points; ``None`` selects the robot's default camera.
     """
 
 
 @dataclass(kw_only=True, eq=False)
-class HasGraspDetectionThreshold:
+class HasGraspCandidateParameter(DesignatorParameterMixin):
     """
-    Adds a grasp-detection sensitivity threshold to an action that checks whether an
-    object is held between the gripper's fingers.
+    Mixin for actions that close a gripper on something. The grasp names the object it
+    is on, so that is not asked for separately.
+    """
 
-    Shared by :class:`~coraplex.robot_plans.actions.core.pick_up.ReachAction`,
-    :class:`~coraplex.robot_plans.actions.core.pick_up.PickUpAction` and
-    :class:`~coraplex.robot_plans.actions.core.placing.PlaceAction`.
+    grasp: GraspCandidate
+    """
+    The grasp to take hold by.
+
+    One of the object's own
+    :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasToolParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that manipulate an object with a held tool.
+    """
+
+    tool: Tool
+    """
+    The tool the action uses.
+    """
+
+
+# %% where an action goes
+
+
+@dataclass(kw_only=True, eq=False)
+class HasPlanarGoalPoseParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that drive the robot's base to a spot on the floor.
+    """
+
+    goal_pose: Pose2D
+    """
+    Where the robot's base ends up on the floor, and which way the robot faces, given as
+    the heading of the pose.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasLookTargetParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that orient the robot toward a pose.
+    """
+
+    target: Pose
+    """
+    The pose the action orients the robot toward.
+    """
+
+
+# %% robot states an action sets
+
+
+@dataclass(kw_only=True, eq=False)
+class HasGripperConfigurationParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that bring a gripper into a configuration.
+    """
+
+    configuration: GripperConfiguration
+    """
+    The configuration the gripper is to reach.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasTorsoStateParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that set the torso to a defined state.
+    """
+
+    torso_state: TorsoState
+    """
+    The torso state the action sets.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class HasGripperCollisionParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that may permit the gripper to collide with the environment.
+    """
+
+    allow_gripper_collision: bool = False
+    """
+    Whether the gripper is allowed to touch its surroundings during the action.
+    """
+
+
+# %% thresholds
+
+
+@dataclass(kw_only=True, eq=False)
+class HasGraspDetectionThresholdParameter(DesignatorParameterMixin):
+    """
+    Mixin for actions that check whether an object is held between the gripper's
+    fingers.
     """
 
     grasp_detection_threshold: float = 0.9
@@ -80,10 +194,20 @@ class HasGraspDetectionThreshold:
     """
 
 
+# %% per-action tuning
+
+
 @dataclass(kw_only=True, eq=False)
-class ReachTuningParameters(HasApproachVelocity):
+class HasReachTuningParameters(DesignatorParameterMixin):
     """
-    Tunable approach speeds for :class:`~coraplex.robot_plans.actions.core.pick_up.ReachAction`.
+    Mixin for actions that reach towards a target, with tunable approach speeds.
+    """
+
+    pre_approach_linear_velocity: float | None = None
+    """
+    Maximum linear speed (in m/s) for the initial pre-pose approach, enforced via
+    :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPositionVelocityLimit`.
+    ``None`` leaves the speed unconstrained.
     """
 
     final_approach_linear_velocity: float | None = None
@@ -96,17 +220,10 @@ class ReachTuningParameters(HasApproachVelocity):
 
 
 @dataclass(kw_only=True, eq=False)
-class PickUpTuningParameters(ReachTuningParameters):
+class HasPickUpTuningParameters(DesignatorParameterMixin):
     """
-    Tunable grasp speeds and target-object friction for
-    :class:`~coraplex.robot_plans.actions.core.pick_up.PickUpAction`.
-
-    Extends :class:`ReachTuningParameters` rather than just :class:`HasApproachVelocity`:
-    :class:`~coraplex.robot_plans.actions.core.pick_up.PickUpAction` forwards both
-    ``pre_approach_linear_velocity`` and ``final_approach_linear_velocity`` verbatim to
-    the internal :class:`~coraplex.robot_plans.actions.core.pick_up.ReachAction` it
-    builds, so both fields are literally the same value under the same name in both
-    places rather than two similarly-named-but-distinct fields.
+    Mixin for actions that take hold of an object, with tunable grasp and lift speeds
+    and target-object friction.
     """
 
     grasp_closing_velocity: float | None = None
@@ -125,13 +242,6 @@ class PickUpTuningParameters(ReachTuningParameters):
     ``None`` leaves the speed unconstrained.
     """
 
-    grasp_stall_minimum_time: float | None = None
-    """
-    Minimum stall dwell time (in seconds, see
-    :attr:`~giskardpy.motion_statechart.tasks.gripper.MoveFingers.stall_minimum_time`)
-    for the CLOSE motion. ``None`` keeps the default.
-    """
-
     object_friction: float | None = None
     """
     Sliding friction coefficient to apply to the target object's geom before this pick,
@@ -143,10 +253,10 @@ class PickUpTuningParameters(ReachTuningParameters):
 
 
 @dataclass(kw_only=True, eq=False)
-class PlaceTuningParameters:
+class HasPlaceTuningParameters(DesignatorParameterMixin):
     """
-    Tunable transport/placing/release speeds for
-    :class:`~coraplex.robot_plans.actions.core.placing.PlaceAction`.
+    Mixin for actions that put an object down, with tunable transport, placing, release
+    and retract speeds.
     """
 
     placing_linear_velocity: float | None = None
@@ -182,145 +292,7 @@ class PlaceTuningParameters:
     """
 
 
-@dataclass(eq=False, repr=False, kw_only=True)
-class MovesToolCenterPoint(Action, ABC):
-    """
-    An action that moves an arm's tool center point.
-    """
-
-    position_threshold: float = 0.005
-    """
-    Distance threshold in meters for goal achievement, tighter than giskard's own task
-    default so an approach does not stop short of a small object.
-    """
-
-    orientation_threshold: float = 0.02
-    """
-    Rotation threshold in rad for goal achievement.
-    """
-
-    def tool_center_point_goal(
-        self,
-        target: Pose,
-        arm: Arm,
-        max_linear_velocity: float | None = None,
-        max_angular_velocity: float | None = None,
-    ) -> MotionStatechartNode:
-        """
-        :param target: Where the tool center point should end up.
-        :param arm: The arm whose tool center point is moved.
-        :param max_linear_velocity: Cap on the speed of the tool center point, in m/s.
-        :param max_angular_velocity: Cap on how fast it turns, in rad/s.
-        :return: The goal moving the tool center point there, together with whatever
-            speed caps were asked for, and the task keeping the base still, see :meth:`~coraplex.robot_plans.actions.base.Action.keep_base_still`.
-            A goal that is a parallel of its tasks holds them itself; any other is put in
-            a parallel with them.
-        """
-        root = self.controlled_root
-        tip = arm.end_effector.tool_frame
-        accompanying: list[MotionStatechartNode] = self._velocity_limits(
-            root, tip, max_linear_velocity, max_angular_velocity
-        )
-        accompanying.extend(self.keep_base_still())
-        goal = self._reach_target(target, root, tip)
-        if not accompanying:
-            return goal
-        if isinstance(goal, Parallel):
-            for node in accompanying:
-                goal.add_node(node)
-            return goal
-        return Parallel(nodes=[goal, *accompanying], name=type(goal).__name__)
-
-    def _reach_target(
-        self,
-        target: Pose,
-        root: KinematicStructureEntity,
-        tip: KinematicStructureEntity,
-    ) -> MotionStatechartNode:
-        """
-        :return: The task that brings `tip` to `target`.
-        """
-        return CartesianPose(
-            root_link=root,
-            tip_link=tip,
-            goal_pose=target,
-            translation_threshold=self.position_threshold,
-            orientation_threshold=self.orientation_threshold,
-        )
-
-    @staticmethod
-    def _velocity_limits(
-        root: KinematicStructureEntity,
-        tip: KinematicStructureEntity,
-        max_linear_velocity: float | None,
-        max_angular_velocity: float | None,
-    ) -> list[MotionStatechartNode]:
-        """
-        :return: The speed caps that were asked for, if any.
-        """
-        limits: list[MotionStatechartNode] = []
-        if max_linear_velocity is not None:
-            limits.append(
-                CartesianPositionVelocityLimit(
-                    root_link=root,
-                    tip_link=tip,
-                    max_linear_velocity=max_linear_velocity,
-                )
-            )
-        if max_angular_velocity is not None:
-            limits.append(
-                CartesianRotationVelocityLimit(
-                    root_link=root,
-                    tip_link=tip,
-                    max_angular_velocity=max_angular_velocity,
-                )
-            )
-        return limits
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class OperatesGripper(Action, ABC):
-    """
-    An action that brings a gripper into a configuration, such as opening or closing
-    it.
-    """
-
-    gripper_goal_type: type[MovesGripperToConfiguration] = field(
-        default=MoveFingers, init=False
-    )
-    """
-    The kind of node bringing the gripper into the configurations this action asks for,
-    as set by the plan transformations configuring the action.
-    """
-
-
-@dataclass(eq=False, repr=False, kw_only=True)
-class ReattachesBranches(Action, ABC):
-    """
-    An action that moves a branch of the kinematic structure under a new parent in the
-    world model, such as an object it picks up or a robot it carries along.
-    """
-
-    reattaches_in_world_model: bool = field(default=True, init=False)
-    """
-    Whether the world model is told that a branch moved under its new parent, rather than
-    contact carrying it there.
-    """
-
-    def reattach(
-        self,
-        branch_root: KinematicStructureEntity,
-        new_parent: KinematicStructureEntity,
-    ) -> list[StatechartNode]:
-        """
-        :param branch_root: The root of the branch to move.
-        :param new_parent: The entity the branch is moved under.
-        :return: The node moving `branch_root` under `new_parent`, none unless this
-            action :attr:`reattaches_in_world_model`.
-        """
-        if not self.reattaches_in_world_model:
-            return []
-        return [MoveBranch(branch_root=branch_root, new_parent=new_parent)]
+# %% grasp approach poses
 
 
 @dataclass
@@ -346,7 +318,7 @@ class GraspPoseSequence:
 
 
 @dataclass(kw_only=True, eq=False)
-class HasApproachesGraspPoses:
+class HasGraspApproachParameters(DesignatorParameterMixin):
     """
     Turns a grasp frame (x-axis along the approach, see
     :class:`~semantic_digital_twin.grasping.grasp_candidates.GraspCandidate`) into the
@@ -478,3 +450,147 @@ class HasApproachesGraspPoses:
             tool_goal.quaternion,
             reference_frame=target,
         )
+
+
+# %% behaviour shared by actions
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class MovesToolCenterPoint(Action, HasPoseThresholdParameters, ABC):
+    """
+    An action that moves an arm's tool center point.
+    """
+
+    position_threshold: float = 0.005
+    """
+    Tighter than that of a pose goal, so an approach does not stop short of a small
+    object.
+    """
+
+    orientation_threshold: float = 0.02
+    """
+    Looser than that of a pose goal.
+    """
+
+    def tool_center_point_goal(
+        self,
+        target: Pose,
+        arm: Arm,
+        max_linear_velocity: float | None = None,
+        max_angular_velocity: float | None = None,
+    ) -> MotionStatechartNode:
+        """
+        :param target: Where the tool center point should end up.
+        :param arm: The arm whose tool center point is moved.
+        :param max_linear_velocity: Cap on the speed of the tool center point, in m/s.
+        :param max_angular_velocity: Cap on how fast it turns, in rad/s.
+        :return: The goal moving the tool center point there, together with whatever
+            speed caps were asked for, and the task keeping the base still, see :meth:`~coraplex.robot_plans.actions.base.Action.keep_base_still`.
+            A goal that is a parallel of its tasks holds them itself; any other is put in
+            a parallel with them.
+        """
+        root = self.controlled_root
+        tip = arm.end_effector.tool_frame
+        accompanying: list[MotionStatechartNode] = self._velocity_limits(
+            root, tip, max_linear_velocity, max_angular_velocity
+        )
+        accompanying.extend(self.keep_base_still())
+        goal = self._reach_target(target, root, tip)
+        if not accompanying:
+            return goal
+        if isinstance(goal, Parallel):
+            for node in accompanying:
+                goal.add_node(node)
+            return goal
+        return Parallel(nodes=[goal, *accompanying], name=type(goal).__name__)
+
+    def _reach_target(
+        self,
+        target: Pose,
+        root: KinematicStructureEntity,
+        tip: KinematicStructureEntity,
+    ) -> MotionStatechartNode:
+        """
+        :return: The task that brings `tip` to `target`.
+        """
+        return CartesianPose(
+            root_link=root,
+            tip_link=tip,
+            goal_pose=target,
+            position_threshold=self.position_threshold,
+            orientation_threshold=self.orientation_threshold,
+        )
+
+    @staticmethod
+    def _velocity_limits(
+        root: KinematicStructureEntity,
+        tip: KinematicStructureEntity,
+        max_linear_velocity: float | None,
+        max_angular_velocity: float | None,
+    ) -> list[MotionStatechartNode]:
+        """
+        :return: The speed caps that were asked for, if any.
+        """
+        limits: list[MotionStatechartNode] = []
+        if max_linear_velocity is not None:
+            limits.append(
+                CartesianPositionVelocityLimit(
+                    root_link=root,
+                    tip_link=tip,
+                    max_linear_velocity=max_linear_velocity,
+                )
+            )
+        if max_angular_velocity is not None:
+            limits.append(
+                CartesianRotationVelocityLimit(
+                    root_link=root,
+                    tip_link=tip,
+                    max_angular_velocity=max_angular_velocity,
+                )
+            )
+        return limits
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class OperatesGripper(Action, ABC):
+    """
+    An action that brings a gripper into a configuration, such as opening or closing
+    it.
+    """
+
+    gripper_goal_type: type[MovesGripperToConfiguration] = field(
+        default=MoveFingers, init=False
+    )
+    """
+    The kind of node bringing the gripper into the configurations this action asks for,
+    as set by the plan transformations configuring the action.
+    """
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class ReattachesBranches(Action, ABC):
+    """
+    An action that moves a branch of the kinematic structure under a new parent in the
+    world model, such as an object it picks up or a robot it carries along.
+    """
+
+    reattaches_in_world_model: bool = field(default=True, init=False)
+    """
+    Whether the world model is told that a branch moved under its new parent, rather than
+    contact carrying it there.
+    """
+
+    def reattach(
+        self,
+        branch_root: KinematicStructureEntity,
+        new_parent: KinematicStructureEntity,
+    ) -> list[StatechartNode]:
+        """
+        :param branch_root: The root of the branch to move.
+        :param new_parent: The entity the branch is moved under.
+        :return: The node moving `branch_root` under `new_parent`, none unless this
+            action :attr:`reattaches_in_world_model`.
+        """
+        if not self.reattaches_in_world_model:
+            return []
+        return [MoveBranch(branch_root=branch_root, new_parent=new_parent)]

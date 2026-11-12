@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     """
     Monitors the distance to the closest external object for a specific collision group
-    of a body. Turns True if the distance falls below a given threshold.
+    of a body. Turns True if the distance falls below :attr:`distance_threshold`.
 
     .. note:: the input bodies are only used to look up the collision groups.
     """
@@ -37,9 +37,9 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     The robot body to monitor.
     """
 
-    threshold: float
+    distance_threshold: float
     """
-    Distance threshold in meters.
+    The distance in meters below which this monitor turns True.
     """
 
     collision_index: int = 0
@@ -59,7 +59,7 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
         """
         :return: An observation that is True while the :attr:`collision_index`-th
             closest external contact of the group of :attr:`body` is closer than
-            :attr:`threshold`.
+            :attr:`distance_threshold`.
         """
         manager = self.context.require_extension(
             MotionControlContext
@@ -72,7 +72,9 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             AvoidedExternalContact(group=group, rank=self.collision_index)
         )
 
-        return MotionNodeArtifacts(observation=distance_symbol < self.threshold)
+        return MotionNodeArtifacts(
+            observation=distance_symbol < self.distance_threshold
+        )
 
 
 # %% distance between two parts of the robot
@@ -83,7 +85,7 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     """
     Monitors the distance between the collision groups of two robot bodies.
 
-    Turns True if the distance falls below a given threshold.
+    Turns True if the distance falls below :attr:`distance_threshold`.
 
     .. note:: the input bodies are only used to look up the collision groups.
     """
@@ -98,9 +100,9 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
     Second robot body to monitor.
     """
 
-    threshold: float
+    distance_threshold: float
     """
-    Distance threshold in meters.
+    The distance in meters below which this monitor turns True.
     """
 
     @classproperty
@@ -117,7 +119,7 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
         """
         :return: An observation that is True while the closest contact between the
             groups of :attr:`body_a` and :attr:`body_b` is closer than
-            :attr:`threshold`.
+            :attr:`distance_threshold`.
         """
         manager = self.context.require_extension(
             MotionControlContext
@@ -131,4 +133,6 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             manager.avoided_contacts_of(combination)[0]
         )
 
-        return MotionNodeArtifacts(observation=distance_symbol < self.threshold)
+        return MotionNodeArtifacts(
+            observation=distance_symbol < self.distance_threshold
+        )

@@ -7,6 +7,10 @@ from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import EmptyGoalStateError
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, Task
 from giskardpy.motion_statechart.graph_node import ConvergingTask
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasGoalStateParameter,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -15,30 +19,18 @@ from semantic_digital_twin.world_description.connections import (
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class JointPositionList(ConvergingTask):
+class JointPositionList(
+    ConvergingTask, HasGoalStateParameter, HasCruiseVelocityParameter
+):
     """
     Moves the robot to a given joint position.
-    """
 
-    goal_state: JointState
-    """
-    The goal joint state.
-    """
-
-    threshold: float = 0.01
-    """
-    If all joint position errors are smaller than this threshold, the task's observation
-    state is true.
-    """
-
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    The weight of this task.
+    Its error is the largest joint position error, in rad or m.
     """
 
     cruise_velocity: float = 2.0
     """
-    Sets how fast the joints approach the goal, in rad/s or m/s; not strictly enforced.
+    How fast the joints approach the goal, in rad/s or m/s; not strictly enforced.
 
     A joint never moves faster than its velocity limit.
     """
@@ -106,7 +98,7 @@ class JointVelocityLimit(Task):
     The joints whose velocity is constrained.
     """
 
-    max_velocity: float = 0.1
+    max_joint_velocity: float = 0.1
     """
     Maximum allowed velocity (in rad/s or m/s, per joint).
     """
@@ -129,8 +121,8 @@ class JointVelocityLimit(Task):
         for connection in self.connections:
             position = connection.dof.variables.position
             artifacts.constraints.add_velocity_constraint(
-                upper_velocity_limit=self.max_velocity,
-                lower_velocity_limit=-self.max_velocity,
+                upper_velocity_limit=self.max_joint_velocity,
+                lower_velocity_limit=-self.max_joint_velocity,
                 quadratic_weight=self.weight,
                 task_expression=position,
                 velocity_scale=connection.dof.limits.upper.velocity,
@@ -138,6 +130,6 @@ class JointVelocityLimit(Task):
             )
             velocities.append(connection.dof.variables.velocity)
         artifacts.observation = sm.logic_all(
-            sm.abs(sm.Vector(velocities)) <= self.max_velocity
+            sm.abs(sm.Vector(velocities)) <= self.max_joint_velocity
         )
         return artifacts

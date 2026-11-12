@@ -40,6 +40,8 @@ html:
 
 
 sphinx:
+  local_extensions:
+    parameter_mixin_map: _ext/
   extra_extensions:
     - sphinx_proof
     - 'sphinx.ext.autodoc'

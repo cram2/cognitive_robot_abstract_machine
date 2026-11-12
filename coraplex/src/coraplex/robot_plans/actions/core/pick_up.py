@@ -8,14 +8,17 @@ import numpy as np
 from coraplex.robot_plans.actions.base import ParallelAction, SequentialAction
 from cramph.composites import Parallel
 from cramph.node import StatechartNode
+from giskardpy.motion_statechart.mixins import HasFingerStallToleranceParameters
 from coraplex.robot_plans.mixins import (
-    ReattachesBranches,
-    HasApproachesGraspPoses,
-    HasGraspDetectionThreshold,
+    HasArmParameter,
+    HasGraspApproachParameters,
+    HasGraspCandidateParameter,
+    HasGraspDetectionThresholdParameter,
+    HasPickUpTuningParameters,
+    HasReachTuningParameters,
     MovesToolCenterPoint,
     OperatesGripper,
-    PickUpTuningParameters,
-    ReachTuningParameters,
+    ReattachesBranches,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.motion_statechart.weights import DefaultWeights
@@ -26,7 +29,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from krrood_spatial_math.spatial_types import RotationMatrix
 from krrood_spatial_math.spatial_types import Pose
@@ -34,50 +37,19 @@ from krrood_spatial_math.spatial_types import Pose
 logger = logging.getLogger(__name__)
 
 
-@dataclass(kw_only=True, eq=False)
-class HasGraspChoice:
-    """
-    Adds to an action the grasp it takes hold by.
-
-    Shared by every action that closes a gripper on something. The grasp names the
-    object it is on, so that is not asked for separately.
-    """
-
-    grasp: GraspCandidate
-    """
-    The grasp to take hold by.
-
-    One of the object's own
-    :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.grasp_candidates`.
-    """
-
-    arm: Arm
-    """
-    The arm that should be used.
-    """
-
-
 @dataclass(eq=False, repr=False, kw_only=True)
 class ReachAction(
     MovesToolCenterPoint,
     OperatesGripper,
     SequentialAction,
-    HasApproachesGraspPoses,
-    ReachTuningParameters,
-    HasGraspDetectionThreshold,
+    HasGraspCandidateParameter,
+    HasArmParameter,
+    HasGraspApproachParameters,
+    HasReachTuningParameters,
+    HasGraspDetectionThresholdParameter,
 ):
     """
     Let the robot reach a specific pose.
-    """
-
-    arm: Arm
-    """
-    The arm that should be used for pick up.
-    """
-
-    grasp: GraspCandidate
-    """
-    The grasp the fingers should close on, which also names the object it is on.
     """
 
     reverse_reach_order: bool = False
@@ -132,28 +104,20 @@ class PickUpAction(
     MovesToolCenterPoint,
     ReattachesBranches,
     SequentialAction,
-    HasGraspChoice,
-    HasApproachesGraspPoses,
-    PickUpTuningParameters,
-    HasGraspDetectionThreshold,
+    HasGraspCandidateParameter,
+    HasArmParameter,
+    HasGraspApproachParameters,
+    HasReachTuningParameters,
+    HasPickUpTuningParameters,
+    HasGraspDetectionThresholdParameter,
+    HasFingerStallToleranceParameters,
 ):
     """
     Let the robot pick up an object: take hold of it and lift it clear of its support.
     """
 
-    tolerate_grasp_stall: bool = False
-    """
-    Whether the CLOSE motion's completion also tolerates a stalled grasp (see
-    :attr:`~giskardpy.motion_statechart.tasks.gripper.MoveFingers.tolerate_stall`).
-
-    Opt-in rather than always on: building the stall monitor needs a velocity variable
-    for every one of the gripper's connections, which is not guaranteed for every robot
-    -- it crashes on Tracy's real-execution gripper, whose connections do not all have
-    one.
-    """
-
     @classmethod
-    def from_above(cls, graspable: HasGraspCandidates, arm: Arm) -> PickUpAction:
+    def from_above(cls, graspable: IsGraspable, arm: Arm) -> PickUpAction:
         """
         :param graspable: The annotation of an object standing upright.
         :param arm: The arm that picks it up.
@@ -185,8 +149,8 @@ class PickUpAction(
                 pre_approach_linear_velocity=self.pre_approach_linear_velocity,
                 final_approach_linear_velocity=self.final_approach_linear_velocity,
                 grasp_closing_velocity=self.grasp_closing_velocity,
-                grasp_stall_minimum_time=self.grasp_stall_minimum_time,
-                tolerate_grasp_stall=self.tolerate_grasp_stall,
+                finger_stall_minimum_time=self.finger_stall_minimum_time,
+                tolerate_finger_stall=self.tolerate_finger_stall,
                 grasp_detection_threshold=self.grasp_detection_threshold,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,
@@ -224,22 +188,19 @@ class GraspingAction(
     MovesToolCenterPoint,
     OperatesGripper,
     SequentialAction,
-    HasGraspChoice,
-    HasApproachesGraspPoses,
-    PickUpTuningParameters,
-    HasGraspDetectionThreshold,
+    HasGraspCandidateParameter,
+    HasArmParameter,
+    HasGraspApproachParameters,
+    HasReachTuningParameters,
+    HasPickUpTuningParameters,
+    HasGraspDetectionThresholdParameter,
+    HasFingerStallToleranceParameters,
 ):
     """
     Let the robot take hold of an object: reach onto a grasp and close on it.
 
     What a pick-up does before it lifts, and the whole of it when the object is meant to
     stay where it is -- a handle being pulled, say.
-    """
-
-    tolerate_grasp_stall: bool = False
-    """
-    Whether the CLOSE motion's completion also tolerates a stalled grasp (see
-    :attr:`~giskardpy.motion_statechart.tasks.gripper.MoveFingers.tolerate_stall`).
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
@@ -268,8 +229,8 @@ class GraspingAction(
                     self.arm.end_effector.default_configuration(
                         GripperState.CLOSE, finger_velocity=self.grasp_closing_velocity
                     ),
-                    stall_minimum_time=self.grasp_stall_minimum_time,
-                    tolerate_stall=self.tolerate_grasp_stall,
+                    finger_stall_minimum_time=self.finger_stall_minimum_time,
+                    tolerate_finger_stall=self.tolerate_finger_stall,
                 )
             ),
         ]

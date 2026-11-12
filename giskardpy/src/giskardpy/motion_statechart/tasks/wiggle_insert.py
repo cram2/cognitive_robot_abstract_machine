@@ -9,7 +9,6 @@ import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.ormatic.utils import classproperty
 from cramph.context import ContextExtension
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
@@ -17,28 +16,30 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
     MotionNodeArtifacts,
 )
-from krrood_spatial_math.spatial_types import AxisAngle, Point3, Vector3, RotationMatrix
-from semantic_digital_twin.world_description.world_entity import Body
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasKinematicChainParameters,
+)
+from krrood_spatial_math.spatial_types import (
+    AxisAngle,
+    Point3,
+    Vector3,
+    RotationMatrix,
+)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class WiggleInsert(ConvergingTask):
+class WiggleInsert(
+    ConvergingTask,
+    HasKinematicChainParameters,
+    HasCruiseVelocityParameter,
+):
     """
     Presses the tip link down towards a hole while wiggling it with random translational
-    and angular noise.
+    and angular noise. Its error is the distance to the hole, in meters.
 
     The wiggle is driven per control cycle through auxiliary variables that are updated
     in :meth:`on_tick`.
-    """
-
-    root_link: Body
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: Body
-    """
-    Tip link that is pressed into the hole.
     """
 
     hole_point: Point3
@@ -60,24 +61,11 @@ class WiggleInsert(ConvergingTask):
     Default is an untuned preset, not a calibrated value.
     """
 
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the tip is pressed into the hole, in m/s, and wiggled, in rad/s; not
-    strictly enforced.
-
-    Default is an untuned preset, not a calibrated value.
-    """
-
     hole_normal: Vector3 | None = None
     """
     Vector perpendicular to the hole.
 
     Defaults to the root z-axis.
-    """
-
-    threshold: float = 0.01
-    """
-    Distance to the hole point below which the task is achieved.
     """
 
     random_walk: bool = True

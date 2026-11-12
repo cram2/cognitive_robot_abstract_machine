@@ -9,7 +9,7 @@ from krrood_spatial_math.spatial_types import Vector3
 class AlignmentPair:
     """
     A pair of normals that should be aligned during a tool motion: the normal of the
-    tool tip and the normal of the goal it acts on.
+    tool tip and the normal of the target it acts on.
     """
 
     tip_normal: Vector3
@@ -17,7 +17,7 @@ class AlignmentPair:
     The normal of the tool tip, expressed in the tool's frame.
     """
 
-    goal_normal: Vector3
+    reference_normal: Vector3
     """
-    The normal of the goal, expressed in the goal's frame.
+    The normal of the target, expressed in the target's frame.
     """

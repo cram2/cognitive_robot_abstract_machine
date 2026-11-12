@@ -8,18 +8,27 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING, Self
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.motion_statechart.binding_policy import (
+    ForwardKinematicsBinding,
+    GoalBindingPolicy,
+)
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionControlContext
 from cramph.node import EndedByOwner
 from cramph.context import StatechartContext
-from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.exceptions import MissingErrorSignalError
+from giskardpy.motion_statechart.mixins import (
+    HasGoalBindingPolicyParameter,
+    HasThresholdParameter,
+    HasWeightParameter,
+)
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     Scalar,
 )
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
@@ -30,6 +39,9 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 from cramph.node import NodeArtifacts, StatechartNode, EndStatechart
 
@@ -267,17 +279,12 @@ class StructureCopyMotionStatechartNode(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class Task(EndedByOwner, MotionStatechartNode):
+class Task(EndedByOwner, MotionStatechartNode, HasWeightParameter):
     """
     Tasks are MotionStatechartNodes that add motion constraints.
 
     A task stops holding what it reached the moment it is released, so its owner decides
     when it succeeded.
-    """
-
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE.value
-    """
-    Task priority relative to other tasks.
     """
 
     plot_specifications: NodePlotSpec = plot_specification_field(
@@ -289,7 +296,7 @@ class Task(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ConvergingTask(ABC, Task):
+class ConvergingTask(Task, HasThresholdParameter, ABC):
     """
     A task that drives a single scalar error towards zero and counts as having reached
     its goal once that error is within :attr:`threshold`.
@@ -303,11 +310,6 @@ class ConvergingTask(ABC, Task):
     measured. Tasks that enforce an invariant instead of converging, such as a velocity
     limit or a collision predicate, are plain :class:`Task` and write their own
     observation.
-    """
-
-    threshold: float = 0.01
-    """
-    Error at or below which the goal counts as reached, in the task's own units.
     """
 
     def build(self) -> MotionNodeArtifacts:
@@ -361,6 +363,86 @@ class ConvergingTask(ABC, Task):
         :return: The threshold relative error of this task.
         """
         return self.error_signal / self.threshold
+
+
+# %% nodes reading where their goal lies
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC):
+    """
+    A node whose goal is given in a frame that may move, and which reads where that
+    frame lies as :attr:`binding_policy` says.
+    """
+
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
+    """
+    The pose of :attr:`goal_reference_frame` relative to :attr:`goal_binding_root`, as
+    :attr:`binding_policy` fixes it; None until this node is set up.
+    """
+
+    _goal_reference_frame_binding: ForwardKinematicsBinding = field(
+        init=False, repr=False
+    )
+    """
+    Fixes :attr:`root_T_goal_reference_frame` to the current pose of
+    :attr:`goal_reference_frame`.
+    """
+
+    @property
+    @abstractmethod
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        """
+        :return: The frame the goal of this node is given in.
+        """
+
+    @property
+    @abstractmethod
+    def goal_binding_root(self) -> KinematicStructureEntity:
+        """
+        :return: The frame the pose of :attr:`goal_reference_frame` is read relative to.
+        """
+
+    @property
+    def _goal_reference_frame_name(self) -> PrefixedName:
+        """
+        :return: The name the variables of :attr:`root_T_goal_reference_frame` are
+            created under.
+        """
+        return PrefixedName("root_T_goal_ref", str(self.name))
+
+    def _root_T_goal_reference_frame_to_bind(
+        self,
+    ) -> HomogeneousTransformationMatrix | None:
+        """
+        :return: The matrix :meth:`set_up` binds, or None to bind one over new
+            variables.
+        """
+        return None
+
+    def set_up(self) -> None:
+        """
+        Bind :attr:`root_T_goal_reference_frame`.
+        """
+        super().set_up()
+        self._goal_reference_frame_binding = ForwardKinematicsBinding(
+            name=self._goal_reference_frame_name,
+            root=self.goal_binding_root,
+            tip=self.goal_reference_frame,
+            float_variable_data=self.context.float_variable_data,
+            root_T_tip=self._root_T_goal_reference_frame_to_bind(),
+        )
+        self.root_T_goal_reference_frame = self._goal_reference_frame_binding.root_T_tip
+        self._goal_reference_frame_binding.bind(self.context.world)
+
+    def on_start(self) -> None:
+        super().on_start()
+        if self.binding_policy == GoalBindingPolicy.Bind_on_start:
+            self._goal_reference_frame_binding.bind(self.context.world)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

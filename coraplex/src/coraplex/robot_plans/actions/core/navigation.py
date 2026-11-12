@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass, field
 
+import numpy as np
 
 from coraplex.exceptions import NoFloorBelowRobot, NotOnASingleLevelException
 from cramph.node import StatechartNode
@@ -12,13 +13,19 @@ from coraplex.robot_plans.actions.base import (
     ParallelAction,
     SequentialAction,
 )
-from coraplex.robot_plans.mixins import ReattachesBranches
+from coraplex.robot_plans.mixins import (
+    HasCameraParameter,
+    HasLookTargetParameter,
+    HasPlanarGoalPoseParameter,
+    ReattachesBranches,
+)
 from cramph.composites import Parallel, PausedUntilTrue
 from giskardpy.motion_statechart.tasks.drive_tasks import (
     MobileBasePoseGoal,
     DifferentialDriveBaseGoal,
     HolonomicBaseGoal,
 )
+from giskardpy.motion_statechart.mixins import HasThresholdParameter
 from giskardpy.motion_statechart.monitors.joint_monitors import (
     JointPositionReached,
 )
@@ -26,18 +33,16 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from giskardpy.motion_statechart.tasks.pointing import Pointing
 from semantic_digital_twin.exceptions import MissingMovableJointError
 from semantic_digital_twin.reasoning.predicates import InsideOf
-from semantic_digital_twin.robots.robot_parts import Camera
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Level,
     Elevator,
     Floor,
 )
 from krrood_spatial_math.spatial_types import (
-    Pose,
     HomogeneousTransformationMatrix,
     Point2,
     Point3,
-    RotationMatrix,
+    Pose2D,
     Vector3,
 )
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -46,12 +51,12 @@ from semantic_digital_twin.world_description.geometry import VolumetricBoundingB
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class DrivesBase(Action, ABC):
+class DrivesBase(Action, HasThresholdParameter, ABC):
     """
     Base class for the actions that move the robot's base to a pose.
     """
 
-    base_pose_threshold: float = DifferentialDriveBaseGoal.threshold
+    threshold: float = DifferentialDriveBaseGoal.threshold
     """
     How far the base may be from a pose it drives to, in meters and in radians, to count
     as arrived.
@@ -67,40 +72,24 @@ class DrivesBase(Action, ABC):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class NavigateAction(DrivesBase, GoalAction):
+class NavigateAction(DrivesBase, GoalAction, HasPlanarGoalPoseParameter):
     """
     Navigates the Robot to a position.
-    """
-
-    target_location: Pose
-    """
-    Where the robot should stand, and which way it should face given as the pose's
-    x-axis.
     """
 
     def create_goal(self) -> StatechartNode:
         return self.base_goal_type.moving_base_of(
             self.robot,
-            self.robot.mobile_base.pose_facing(self.target_location),
-            self.base_pose_threshold,
+            self.robot.mobile_base.pose_facing(self.goal_pose),
+            self.threshold,
         )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class LookAtAction(ParallelAction):
+class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
     """
     Lets the robot look at a position, following it while the look runs when it is given
     relative to a body that moves.
-    """
-
-    target: Pose
-    """
-    Position at which the robot should look, given as 6D pose.
-    """
-
-    camera: Camera | None = None
-    """
-    Camera that should be looking at the target.
     """
 
     def create_steps(self) -> list[StatechartNode]:
@@ -128,17 +117,13 @@ class LookAtAction(ParallelAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FaceAtAction(ParallelAction):
+class FaceAtAction(ParallelAction, HasLookTargetParameter):
     """
-    Turns the robot's base on the spot until its front faces a target.
+    Turns the robot's base on the spot until its front faces a target, of which only
+    the horizontal position matters.
 
     The base keeps the position it has when the action starts, so the turn is towards
     the target from wherever an earlier action left it.
-    """
-
-    target: Pose
-    """
-    What to face; only its horizontal position matters.
     """
 
     def create_steps(self) -> list[StatechartNode]:
@@ -170,7 +155,9 @@ class FaceAtAction(ParallelAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PathPlanningNavigateAction(DrivesBase, SequentialAction):
+class PathPlanningNavigateAction(
+    DrivesBase, SequentialAction, HasPlanarGoalPoseParameter
+):
     """
     Navigates the robot to a pose along a path through the environment's free space.
 
@@ -181,15 +168,10 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
     those added during navigation.
     """
 
-    target: Pose
-    """
-    Where the robot should stand at the end of the path, with its base.
-    """
-
     def create_steps(self) -> list[StatechartNode]:
         return [
             self.base_goal_type.moving_base_of(
-                self.robot, waypoint, self.base_pose_threshold
+                self.robot, waypoint.pose, self.threshold
             )
             for waypoint in self._path()
         ]
@@ -237,7 +219,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
             and extent.max_z <= float(base_pose.z)
         )
 
-    def _path(self) -> list[Pose]:
+    def _path(self) -> list[Pose2D]:
         """
         The poses the robot drives to, one per leg of the path.
 
@@ -255,27 +237,17 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
         :return: The poses to drive to, in order.
         """
         waypoints = self._waypoints()
-        base_height = self.world.transform(
-            self.robot.root.global_transform, waypoints[0].reference_frame
-        ).z
         poses = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                Point3(waypoint.x, waypoint.y, base_height, waypoint.reference_frame),
-                RotationMatrix.from_vectors(
-                    x=Vector3(
-                        next_waypoint.x - waypoint.x,
-                        next_waypoint.y - waypoint.y,
-                        0,
-                        reference_frame=waypoint.reference_frame,
-                    ),
-                    z=Vector3.Z(),
-                    reference_frame=waypoint.reference_frame,
+            Pose2D(
+                waypoint,
+                yaw=np.arctan2(
+                    float(next_waypoint.y - waypoint.y),
+                    float(next_waypoint.x - waypoint.x),
                 ),
-                reference_frame=waypoint.reference_frame,
-            ).pose
+            )
             for waypoint, next_waypoint in zip(waypoints[1:], waypoints[2:])
         ]
-        return poses + [self.target]
+        return poses + [self.goal_pose]
 
     def _waypoints(self) -> list[Point2]:
         """
@@ -292,7 +264,7 @@ class PathPlanningNavigateAction(DrivesBase, SequentialAction):
             bloat_obstacles=self.robot.mobile_base.base_radius,
         )
         return free_space.path_from_to(
-            Point2.from_pose(base_pose), Point2.from_pose(self.target)
+            Point2.from_pose(base_pose), self.goal_pose.position
         )
 
 
@@ -327,22 +299,17 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
 
     def create_steps(self) -> list[StatechartNode]:
         return [
-            NavigateAction(target_location=self._pose_infront_of_elevator),
+            NavigateAction(goal_pose=self._pose_infront_of_elevator),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self._current_floor),
                 monitored_node=NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
-                        z=self._height_in_cabin,
-                        reference_frame=self.elevator.root,
-                    )
+                    goal_pose=Pose2D(reference_frame=self.elevator.root)
                 ),
             ),
             *self.reattach(self.robot.root, self.elevator.root),
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(self.target_floor),
-                monitored_node=NavigateAction(
-                    target_location=self._pose_infront_of_elevator
-                ),
+                monitored_node=NavigateAction(goal_pose=self._pose_infront_of_elevator),
             ),
             *self.reattach(self.robot.root, self.world.root),
         ]
@@ -369,24 +336,14 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         return current_floor[0]
 
     @property
-    def _pose_infront_of_elevator(self):
-        return Pose.from_xyz_rpy(
+    def _pose_infront_of_elevator(self) -> Pose2D:
+        """
+        Where the robot stands in front of the cabin's opening.
+        """
+        return Pose2D.from_xy_yaw(
             x=self.elevator.hole_direction[0]
             * (self.elevator.scale.x / 2 + self.exit_clearance),
-            z=self._height_in_cabin,
             reference_frame=self.elevator.root,
-        )
-
-    @property
-    def _height_in_cabin(self) -> float:
-        """
-        The robot's height in the cabin's frame.
-
-        Taken from where the robot stands now, because it is the same throughout the
-        ride and the robot's drive cannot change it anyway.
-        """
-        return float(
-            self.world.transform(self.robot.root.global_transform, self.elevator.root).z
         )
 
     def _elevator_open_at_floor(self, target_floor: Level) -> Parallel:

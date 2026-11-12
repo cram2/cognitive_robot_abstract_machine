@@ -12,6 +12,10 @@ from giskardpy.motion_statechart.graph_node import (
     MotionNodeArtifacts,
     DebugExpression,
 )
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasKinematicChainParameters,
+)
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -24,36 +28,26 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class AlignPlanes(ConvergingTask):
+class AlignPlanes(
+    ConvergingTask, HasKinematicChainParameters, HasCruiseVelocityParameter
+):
     """
-    Will orient the tip plane to align with the goal plane.
+    Will orient the plane fixed on :attr:`tip_link` to align with the plane fixed on
+    :attr:`root_link`, with an error in radians.
 
-    The planes are represented as normal vectors.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain.
-    """
-
-    goal_normal: Vector3
-    """
-    Normal vector of the goal plane.
+    The planes are represented by their normal vectors, :attr:`tip_normal` and
+    :attr:`reference_normal`.
     """
 
     tip_normal: Vector3
     """
-    Normal vector of the tip plane.
+    Normal vector of the plane fixed on :attr:`tip_link`.
     """
 
-    threshold: float = 0.01
+    reference_normal: Vector3
     """
-    Angle in radians below which the planes are considered aligned.
+    Normal vector of the plane fixed on :attr:`root_link`, which the other plane is
+    aligned to.
     """
 
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
@@ -63,7 +57,7 @@ class AlignPlanes(ConvergingTask):
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Priority weight relative to other tasks.
+    Above collision avoidance by default.
     """
 
     def build_artifacts(self) -> MotionNodeArtifacts:
@@ -79,7 +73,7 @@ class AlignPlanes(ConvergingTask):
         )
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
-            target_frame=self.root_link, spatial_object=self.goal_normal
+            target_frame=self.root_link, spatial_object=self.reference_normal
         )
         root_V_root_normal.scale(1)
 
@@ -96,7 +90,7 @@ class AlignPlanes(ConvergingTask):
             color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
         goal_dbg = DebugExpression(
-            name=f"{self.name}/goal_normal",
+            name=f"{self.name}/reference_normal",
             expression=root_V_root_normal,
             color=Color.from_rgba(red=0, green=0, blue=1, opacity=1),
         )
@@ -136,7 +130,7 @@ class KeepHeldBodyUpright(AlignPlanes):
     The tool frame of :attr:`end_effector`.
     """
 
-    goal_normal: Vector3 = field(init=False)
+    reference_normal: Vector3 = field(init=False)
     """
     The z-axis of :attr:`root_link`.
     """
@@ -157,7 +151,7 @@ class KeepHeldBodyUpright(AlignPlanes):
         """
         super().set_up()
         self.tip_link = self.end_effector.tool_frame
-        self.goal_normal = Vector3.Z(reference_frame=self.root_link)
+        self.reference_normal = Vector3.Z(reference_frame=self.root_link)
         self._tool_T_held_body = ForwardKinematicsBinding(
             name=PrefixedName("tool_T_held_body", str(self.name)),
             root=self.tip_link,

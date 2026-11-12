@@ -129,7 +129,7 @@ def navigation_to(world: World, **parameters) -> NavigateAction:
     :return: A drive to a pose two meters from the origin of `world`.
     """
     return NavigateAction(
-        target_location=Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root),
+        goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=world.root),
         **parameters,
     )
 
@@ -143,12 +143,12 @@ def assert_drives_differentially_to(
     """
     assert type(goal) is DifferentialDriveBaseGoal
     assert goal.mobile_base is robot.mobile_base
-    assert goal.threshold == action.base_pose_threshold
+    assert goal.threshold == action.threshold
     np.testing.assert_allclose(
         goal.goal_pose.to_np(),
-        robot.mobile_base.pose_facing(action.target_location).to_np(),
+        robot.mobile_base.pose_facing(action.goal_pose).to_np(),
     )
-    assert goal.goal_pose.reference_frame is action.target_location.reference_frame
+    assert goal.goal_pose.reference_frame is action.goal_pose.reference_frame
 
 
 # %% driving a differential drive
@@ -188,13 +188,11 @@ def test_the_differential_drive_goal_takes_the_threshold_of_the_action(
     default_action = navigation_to(world)
 
     action = prepared(
-        navigation_to(
-            world, base_pose_threshold=10 * default_action.base_pose_threshold
-        ),
+        navigation_to(world, threshold=10 * default_action.threshold),
         robot_executor(extensions),
     )
 
-    assert action.base_pose_threshold != default_action.base_pose_threshold
+    assert action.threshold != default_action.threshold
     assert_drives_differentially_to(action.goal, action, robot)
 
 
@@ -203,23 +201,22 @@ def test_the_base_pose_threshold_defaults_to_the_one_of_the_differential_drive_g
 ) -> None:
     world, robot, extensions = stretch_apartment_context
 
-    assert navigation_to(world).base_pose_threshold == (
-        DifferentialDriveBaseGoal.threshold
-    )
+    assert navigation_to(world).threshold == (DifferentialDriveBaseGoal.threshold)
 
 
 def test_stretch_drives_every_leg_of_a_path_with_its_differential_drive(
     stretch_apartment_context,
 ) -> None:
     world, robot, extensions = stretch_apartment_context
-    target = Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)
+    target = Pose2D.from_xy_yaw(2.0, 2.0, reference_frame=world.root)
     unchanged = prepared(
-        PathPlanningNavigateAction(target=target),
+        PathPlanningNavigateAction(goal_pose=target),
         simulated_executor(extensions, robot_adaptations=[]),
     )
 
     action = prepared(
-        PathPlanningNavigateAction(target=target), simulated_executor(extensions)
+        PathPlanningNavigateAction(goal_pose=target),
+        simulated_executor(extensions),
     )
 
     legs = action.nodes
@@ -227,8 +224,8 @@ def test_stretch_drives_every_leg_of_a_path_with_its_differential_drive(
         unchanged.nodes
     )
     assert all(leg.mobile_base is robot.mobile_base for leg in legs)
-    assert all(leg.threshold == action.base_pose_threshold for leg in legs)
-    np.testing.assert_allclose(legs[-1].goal_pose.to_np(), target.to_np())
+    assert all(leg.threshold == action.threshold for leg in legs)
+    np.testing.assert_allclose(legs[-1].goal_pose.to_np(), target.pose.to_np())
 
 
 @pytest.mark.parametrize("build_executor", [simulated_executor, robot_executor])
@@ -295,8 +292,8 @@ def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
 
     np.testing.assert_allclose(
         robot.root.global_pose.to_np(),
-        robot.mobile_base.pose_facing(action.target_location).to_np(),
-        atol=2 * action.base_pose_threshold,
+        robot.mobile_base.pose_facing(action.goal_pose).to_np(),
+        atol=2 * action.threshold,
     )
 
 
@@ -307,7 +304,7 @@ def test_a_simulated_stretch_drives_differentially_to_a_pose_chosen_while_runnin
     executor = simulated_executor(extensions)
     navigation = StatementNode(
         statement=a(NavigateAction)(
-            target_location=variable_from([navigation_to(world).target_location])
+            goal_pose=variable_from([navigation_to(world).goal_pose])
         )
     )
     executor.compile(statechart_of(executor, navigation))
@@ -329,7 +326,7 @@ def test_a_drive_chosen_while_running_is_watched_for_stalling_as_it_is_driven(
     executor = simulated_executor(extensions)
     navigation = StatementNode(
         statement=a(NavigateAction)(
-            target_location=variable_from([navigation_to(world).target_location])
+            goal_pose=variable_from([navigation_to(world).goal_pose])
         )
     )
     executor.compile(statechart_of(executor, navigation))
@@ -386,14 +383,14 @@ def test_a_simulated_stretch_stays_in_front_of_the_container_it_closes(
     assert type(facing) is AlignPlanes
     assert facing.root_link is world.root
     assert facing.tip_link is robot.root
-    np.testing.assert_allclose(facing.goal_normal.to_np()[:3], [1, 0, 0])
-    assert facing.goal_normal.reference_frame is action.grasp.graspable.root
+    np.testing.assert_allclose(facing.reference_normal.to_np()[:3], [1, 0, 0])
+    assert facing.reference_normal.reference_frame is action.grasp.graspable.root
     np.testing.assert_allclose(facing.tip_normal.to_np()[:3], [0, -1, 0])
     assert facing.tip_normal.reference_frame is robot.root
     assert type(close) is ArticulateGraspedMechanism
     assert close.tip_link is default_close.tip_link
     assert close.environment_link is default_close.environment_link
-    assert close.goal_joint_state == default_close.goal_joint_state
+    assert close.goal_position == default_close.goal_position
 
 
 def test_a_stretch_closes_a_container_with_its_base_free_to_turn(
@@ -488,7 +485,7 @@ def test_stretch_reaches_in_a_straight_line(
         np.testing.assert_allclose(
             goal.goal_pose.to_np(), default_goal.goal_pose.to_np()
         )
-        assert goal.translation_threshold == default_goal.translation_threshold
+        assert goal.position_threshold == default_goal.position_threshold
         assert goal.orientation_threshold == default_goal.orientation_threshold
         assert goal.binding_policy == default_goal.binding_policy
 
@@ -516,7 +513,7 @@ def test_stretch_lifts_in_a_straight_line(
     assert goal.root_link is unchanged.root_link
     assert goal.tip_link is unchanged.tip_link
     np.testing.assert_allclose(goal.goal_pose.to_np(), unchanged.goal_pose.to_np())
-    assert goal.translation_threshold == unchanged.translation_threshold
+    assert goal.position_threshold == unchanged.position_threshold
     assert goal.orientation_threshold == unchanged.orientation_threshold
 
 
@@ -616,7 +613,7 @@ def test_stretch_holds_the_orientation_of_its_base_only_once_it_drove_there(
                 x=0.7, y=-1.3, z=0.9, reference_frame=world.root
             ),
             hip_rotation=0.0,
-            end_effector=robot.all_arms[0].end_effector,
+            arm=robot.all_arms[0],
         ),
         simulated_executor(extensions),
     )

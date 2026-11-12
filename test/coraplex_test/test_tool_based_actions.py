@@ -37,8 +37,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Sponge,
     Whisk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -392,7 +395,7 @@ def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
     ]
     assert final_waypoint_reached.tip_link is tool_body
     assert final_waypoint_reached.goal_point is action._waypoints[-1]
-    assert final_waypoint_reached.threshold == action.final_waypoint_success_tolerance
+    assert final_waypoint_reached.threshold == action.final_waypoint_threshold
 
 
 def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
@@ -415,9 +418,7 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
-                    x=1.85, y=2.2, reference_frame=world.root
-                )
+                goal_pose=Pose2D.from_xy_yaw(x=1.85, y=2.2, reference_frame=world.root)
             ),
             wiping,
         ]
@@ -491,7 +492,7 @@ def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
 ) -> None:
     world, robot, extensions, container, tool_body = tool_action_world
     wiping = wipe_stuck_away_from_its_final_waypoint(
-        world, robot, WipingAction.final_waypoint_success_tolerance / 2
+        world, robot, WipingAction.final_waypoint_threshold / 2
     )
 
     run_plan(wiping, extensions)
@@ -507,7 +508,7 @@ def test_a_wipe_stalled_beyond_its_tolerance_of_the_final_waypoint_is_not_done(
 ) -> None:
     world, robot, extensions, container, tool_body = tool_action_world
     wiping = wipe_stuck_away_from_its_final_waypoint(
-        world, robot, 2 * WipingAction.final_waypoint_success_tolerance
+        world, robot, 2 * WipingAction.final_waypoint_threshold
     )
 
     with pytest.raises(MotionMadeNoProgress):

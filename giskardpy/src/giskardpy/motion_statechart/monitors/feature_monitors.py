@@ -5,22 +5,22 @@ from dataclasses import field, dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.mixins import (
+    HasKinematicChainParameters,
+)
 from cramph.node import NodeArtifacts
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import Body
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FeatureFunctionMonitor(EndedByOwner, MotionStatechartNode):
+class FeatureFunctionMonitor(
+    EndedByOwner, MotionStatechartNode, HasKinematicChainParameters
+):
     """
     Base for monitors that compare a controlled feature (attached to ``tip_link``) with a
     reference feature (attached to ``root_link``) expressed in the root link frame.
     """
 
-    tip_link: Body
-    """Link the controlled feature is attached to."""
-    root_link: Body
-    """Link the reference feature is attached to."""
     reference_feature: Point3 | Vector3 = field(init=False)
     """Reference feature, typically the target for `controlled_feature`."""
     controlled_feature: Point3 | Vector3 = field(init=False)

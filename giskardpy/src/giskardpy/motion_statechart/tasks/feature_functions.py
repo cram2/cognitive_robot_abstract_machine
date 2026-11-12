@@ -1,40 +1,36 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import field, dataclass
+from dataclasses import dataclass, field
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
-from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
+from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
     DebugExpression,
 )
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasKinematicChainParameters,
+)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FeatureFunctionGoal(ConvergingTask, ABC):
+class FeatureFunctionGoal(
+    ConvergingTask, HasKinematicChainParameters, HasCruiseVelocityParameter, ABC
+):
     """
     Base for feature tasks operating on geometric features.
 
-    Transforms the controlled feature (from `tip_link`) and the reference feature
-    (from `root_link`) into a common frame and registers debug visualizations.
+    :attr:`controlled_feature` is fixed on :attr:`tip_link` and :attr:`reference_feature`
+    on :attr:`root_link`. Both are transformed into a common frame, and debug
+    visualizations are registered for them.
     """
 
-    tip_link: KinematicStructureEntity
-    """
-    The link where the controlled feature is attached. Defines the moving frame of reference.
-    """
-    root_link: KinematicStructureEntity
-    """
-    The static reference link. Defines the fixed frame of reference.
-    """
     controlled_feature: Point3 | Vector3 = field(init=False)
     """
     The geometric feature (point or vector) that is being controlled, expressed in the tip link frame.
@@ -124,8 +120,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     Align two normal vectors to be perpendicular.
 
-    The goal drives the angle between `tip_normal` and `reference_normal` to π/2.
-    Completion occurs when |current_angle - π/2| < `threshold`.
+    The goal drives the dot product of :attr:`tip_normal` and :attr:`reference_normal`
+    to zero, and its error is the absolute dot product.
     """
 
     tip_normal: Vector3
@@ -136,18 +132,10 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     The reference normal vector to align against, defined in the root link frame.
     """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the alignment constraint in the optimization problem.
-    """
+
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Sets how fast the alignment goal is approached, in rad/s; not strictly enforced.
-    """
-    threshold: float = 0.01
-    """
-    Tolerance threshold in radians. The goal is considered achieved when the absolute
-    difference between the current angle and 90 degrees is below this value.
+    How fast the normals are turned perpendicular, in rad/s; not strictly enforced.
     """
 
     def get_controlled_and_reference_features(self):
@@ -177,7 +165,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False, kw_only=True)
 class HeightGoal(FeatureFunctionGoal):
     """
-    Moves the `tip_point` to be the specified distance away from the `reference_point`
+    Moves :attr:`tip_point` to be the specified distance away from
+    :attr:`reference_point`
     along the z-axis of the map frame.
     """
 
@@ -189,21 +178,14 @@ class HeightGoal(FeatureFunctionGoal):
     """
     Reference point to measure the distance against.
     """
+
     lower_limit: float
     """
-    Lower limit to control the distance away from the `reference_point`.
+    Lower limit to control the distance away from :attr:`reference_point`.
     """
     upper_limit: float
     """
-    Upper limit to control the distance away from the `reference_point`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the height constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the height goal is approached, in m/s; not strictly enforced.
+    Upper limit to control the distance away from :attr:`reference_point`.
     """
     threshold: float = 0.0
     """
@@ -241,7 +223,8 @@ class HeightGoal(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False, kw_only=True)
 class DistanceGoal(FeatureFunctionGoal):
     """
-    Moves the `tip_point` to be the specified distance away from the `reference_point`
+    Moves :attr:`tip_point` to be the specified distance away from
+    :attr:`reference_point`
     measured in the x-y-plane of the map frame.
     """
 
@@ -253,21 +236,14 @@ class DistanceGoal(FeatureFunctionGoal):
     """
     Reference point to measure the distance against.
     """
+
     lower_limit: float
     """
-    Lower limit to control the distance away from the `reference_point`.
+    Lower limit to control the distance away from :attr:`reference_point`.
     """
     upper_limit: float
     """
-    Upper limit to control the distance away from the `reference_point`.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the distance constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the distance goal is approached, in m/s; not strictly enforced.
+    Upper limit to control the distance away from :attr:`reference_point`.
     """
     threshold: float = 0.0
     """
@@ -317,7 +293,8 @@ class DistanceGoal(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False, kw_only=True)
 class ReachPoint(FeatureFunctionGoal):
     """
-    Drives a controlled point on the tip onto a reference point.
+    Drives a controlled point on the tip onto a reference point, with an error in
+    meters.
     """
 
     tip_point: Point3
@@ -327,18 +304,6 @@ class ReachPoint(FeatureFunctionGoal):
     reference_point: Point3
     """
     The target point to reach, defined in the root link frame.
-    """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the reach constraint in the optimization problem.
-    """
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the reaching goal is approached, in m/s; not strictly enforced.
-    """
-    threshold: float = 0.01
-    """
-    Distance at or below which the goal is considered achieved, in meters.
     """
 
     def get_controlled_and_reference_features(self) -> tuple[Point3, Point3]:
@@ -366,7 +331,7 @@ class ReachPoint(FeatureFunctionGoal):
 @dataclass(eq=False, repr=False, kw_only=True)
 class AngleGoal(FeatureFunctionGoal):
     """
-    Controls the angle between the `tip_vector` and the `reference_vector` to be between
+    Controls the angle between :attr:`tip_vector` and :attr:`reference_vector` to be between
     `lower_angle` and `upper_angle`.
     """
 
@@ -378,21 +343,19 @@ class AngleGoal(FeatureFunctionGoal):
     """
     Reference vector to measure the angle against.
     """
+
     lower_angle: float
     """
-    Lower limit to control the angle between the `tip_vector` and the `reference_vector`.
+    Lower limit to control the angle between the two features.
     """
     upper_angle: float
     """
-    Upper limit to control the angle between the `tip_vector` and the `reference_vector`.
+    Upper limit to control the angle between the two features.
     """
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE
-    """
-    Priority weight for the angle constraint in the optimization problem.
-    """
+
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Sets how fast the angle goal is approached, in rad/s; not strictly enforced.
+    How fast the angle goal is approached, in rad/s; not strictly enforced.
     """
     threshold: float = 0.0
     """

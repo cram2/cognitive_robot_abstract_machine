@@ -16,6 +16,7 @@ parts:
     - file: designators.md
       sections:
       - file: underspecified_grounding.md
+    - file: parameter_mixins.md
     - file: orm_concept.md
     - file: abstract_robot.md
     - file: motion_execution.md

@@ -513,13 +513,13 @@ class TestTemplates:
                         root_link=map,
                         tip_link=r_tip,
                         tip_normal=Vector3.X(reference_frame=r_tip),
-                        goal_normal=Vector3.X(reference_frame=map),
+                        reference_normal=Vector3.X(reference_frame=map),
                     ),
                     AlignPlanes(
                         root_link=map,
                         tip_link=r_tip,
                         tip_normal=Vector3.Y(reference_frame=r_tip),
-                        goal_normal=Vector3.Z(reference_frame=map),
+                        reference_normal=Vector3.Z(reference_frame=map),
                     ),
                 ]
             )
@@ -663,4 +663,4 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.translation_threshold)
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.position_threshold)

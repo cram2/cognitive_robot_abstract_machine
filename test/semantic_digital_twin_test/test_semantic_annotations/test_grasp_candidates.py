@@ -23,7 +23,7 @@ from krrood_spatial_math.exceptions import (
     ReferenceFrameMismatchError,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
-    HasGraspCandidates,
+    IsGraspable,
     HasRootBody,
     HasDrawnGraspsByDefault,
 )
@@ -985,10 +985,10 @@ def test_only_annotations_that_can_be_held_offer_grasps():
     dishwasher cannot be asked where to grasp it.
     """
     for graspable in (Bowl, Milk, Spoon, Handle, Mug, ShapeSortingPiece):
-        assert issubclass(graspable, HasGraspCandidates)
+        assert issubclass(graspable, IsGraspable)
     for fixed in (Dishwasher, Cabinet, Table, Floor):
         assert issubclass(fixed, HasRootBody)
-        assert not issubclass(fixed, HasGraspCandidates)
+        assert not issubclass(fixed, IsGraspable)
 
 
 def test_an_object_described_with_its_type_can_be_grasped(milk):

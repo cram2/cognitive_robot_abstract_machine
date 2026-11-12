@@ -215,7 +215,7 @@ def _driven_base_node(node_type: type[DrivenBaseTask], world: World) -> DrivenBa
         to a pose given in the drive's parent.
     """
     return node_type(
-        base=world.get_connections_by_type(DifferentialDrive)[0].child,
+        driven_body=world.get_connections_by_type(DifferentialDrive)[0].child,
         goal_pose=_pose(world),
         parent_T_goal_reference_frame=HomogeneousTransformationMatrix(
             reference_frame=_root(world)
@@ -409,7 +409,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                 AlignPlanes(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal_normal=_root_axis(world),
+                    reference_normal=_root_axis(world),
                     tip_normal=_tip_axis(world),
                 )
             ],
@@ -482,7 +482,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                     tip_P_tool=_tip_point(world),
                     hole_point=_point(world),
                     tip_V_axis=_tip_axis(world),
-                    up_axis=_root_axis(world),
+                    hole_normal=_root_axis(world),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -515,7 +515,7 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
                     tip_link=world.get_semantic_annotations_by_type(EndEffector)[
                         0
                     ].tool_frame,
-                    goal_joint_state=0.0,
+                    goal_position=0.0,
                     holding_end_effector=world.get_semantic_annotations_by_type(
                         EndEffector
                     )[0],
@@ -695,7 +695,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
                 VectorsAligned(
                     root_link=_root(world),
                     tip_link=_tip(world),
-                    goal_normal=_root_axis(world),
+                    reference_normal=_root_axis(world),
                     tip_normal=_tip_axis(world),
                 )
             ],
@@ -843,7 +843,7 @@ def _collision_cases() -> list[NodeRoundTripCase]:
             ExternalCollisionDistanceMonitor,
             lambda world: [
                 ExternalCollisionDistanceMonitor(
-                    body=_robot(world).root, threshold=0.05
+                    body=_robot(world).root, distance_threshold=0.05
                 )
             ],
             WorldFixture.CYLINDER_BOT_WORLD,
@@ -854,7 +854,7 @@ def _collision_cases() -> list[NodeRoundTripCase]:
                 SelfCollisionDistanceMonitor(
                     body_a=world.get_kinematic_structure_entity_by_name("l_thumb"),
                     body_b=world.get_kinematic_structure_entity_by_name("r_thumb"),
-                    threshold=0.05,
+                    distance_threshold=0.05,
                 )
             ],
             WorldFixture.SELF_COLLISION_BOT_WORLD,

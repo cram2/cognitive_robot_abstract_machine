@@ -57,12 +57,12 @@ from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
 
@@ -221,8 +221,8 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
         for drawer in self._closed_drawers_containing(graspable, plan_node.world):
             nodes.extend(self.opening_nodes(drawer, plan_node.arm, plan_node.context))
         drive_to_the_object = a(NavigateAction)(
-            target_location=variable(
-                Pose,
+            goal_pose=variable(
+                Pose2D,
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.
                 domain=ReachabilityLocation(
@@ -247,7 +247,7 @@ class PickUpTarget:
     The object a pick-up takes hold of, and the arm it takes hold with.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object that is picked up.
     """

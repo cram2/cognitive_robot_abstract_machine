@@ -1,0 +1,21 @@
+<div class="parameter-mixin-map full-width">
+  <div class="toolbar">
+    <div class="legend">
+      <span><i class="coraplex"></i>action takes a coraplex mixin</span>
+      <span><i class="shared"></i>action takes a giskardpy mixin</span>
+      <span><i class="giskardpy"></i>node takes a giskardpy mixin</span>
+    </div>
+    <label class="check"><input type="checkbox" class="show-common" checked> <span class="show-common-label"></span></label>
+  </div>
+  <div class="diagram-and-details">
+    <div class="scroll"><svg class="diagram" role="img" aria-label="Diagram linking coraplex actions and giskardpy nodes to the parameter mixins they inherit"></svg></div>
+    <aside class="details" aria-live="polite"></aside>
+  </div>
+  <p class="matrix-heading">The same relation as a grid. Each column is a mixin; a dot means the class takes it.</p>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-rows="coraplex" aria-selected="true">Coraplex actions</button>
+    <button type="button" role="tab" data-rows="giskardpy" aria-selected="false">Giskardpy nodes</button>
+  </div>
+  <div class="scroll"><table class="matrix"></table></div>
+  <script type="application/json" class="parameter-mixin-map-data">$map</script>
+</div>

@@ -4,22 +4,18 @@ from dataclasses import dataclass
 
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts
+from giskardpy.motion_statechart.mixins import HasGoalPointParameter
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class Pointing(CartesianTask):
+class Pointing(CartesianTask, HasGoalPointParameter):
     """
-    Will orient pointing_axis at goal_point.
-    """
-
-    goal_point: Point3
-    """
-    Where to point pointing_axis at.
+    Will orient :attr:`pointing_axis` at :attr:`goal_point`, with an error in radians.
     """
 
     pointing_axis: Vector3
@@ -30,11 +26,6 @@ class Pointing(CartesianTask):
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
     Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
-    """
-
-    threshold: float = 0.01
-    """
-    Observation is true if the pointing angle is below this threshold.
     """
 
     @property
@@ -84,14 +75,10 @@ class Pointing(CartesianTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class PointingCone(CartesianTask):
+class PointingCone(CartesianTask, HasGoalPointParameter):
     """
-    Will orient pointing_axis at goal_point with a cone-shaped tolerance region.
-    """
-
-    goal_point: Point3
-    """
-    Where to point pointing_axis at.
+    Will orient :attr:`pointing_axis` at :attr:`goal_point` with a cone-shaped tolerance
+    region, with an error in radians.
     """
 
     pointing_axis: Vector3
@@ -107,11 +94,6 @@ class PointingCone(CartesianTask):
     cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
     Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
-    """
-
-    threshold: float = 0.01
-    """
-    Observation is true if the pointing angle is below this threshold.
     """
 
     @property

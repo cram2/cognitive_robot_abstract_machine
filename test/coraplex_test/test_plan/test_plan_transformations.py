@@ -82,7 +82,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -877,7 +877,7 @@ def test_opening_a_drawer_stands_where_it_is_opened_from(pr2_apartment_context):
         drawer, view.right_arm, simulated_executor(extensions).context
     )
     standing_positions = (
-        opening.statement._kwargs_["navigate"]._kwargs_["target_location"]._domain_
+        opening.statement._kwargs_["navigate"]._kwargs_["goal_pose"]._domain_
     )
     location = standing_positions.domain
 
@@ -924,7 +924,7 @@ def test_the_drawer_is_opened_before_a_move_and_pick_up_rather_than_inside_it(
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=spoon.grasp_candidates()[0],
         arm=view.right_arm,
     )
@@ -1230,7 +1230,7 @@ def test_a_move_and_pick_up_whose_grasps_are_on_several_objects_is_opened_per_ca
 
     standing_pose = Pose(reference_frame=world.root)
     move_and_pick_up = a(MoveAndPickUpAction)(
-        navigate=NavigateAction(target_location=standing_pose),
+        navigate=NavigateAction(goal_pose=Pose2D.from_pose(standing_pose)),
         face_and_look_at=FaceAndLookAtAction(
             face_at=FaceAtAction(target=standing_pose),
             look_at=LookAtAction(target=standing_pose),
@@ -1260,7 +1260,7 @@ def test_a_move_and_pick_up_of_an_object_in_no_drawer_is_left_alone(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
         arm=view.right_arm,
     )

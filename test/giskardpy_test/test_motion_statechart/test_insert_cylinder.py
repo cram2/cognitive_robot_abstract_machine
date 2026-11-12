@@ -76,7 +76,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
         tip_link=cylinder,
         tip_P_tool=Point3(0.0, 0.0, cylinder_height / 2, reference_frame=cylinder),
         tip_V_axis=Vector3(0.0, 0.0, -1.0, reference_frame=cylinder),
-        up_axis=Vector3(0.0, 0.0, 1.0, reference_frame=world.root),
+        hole_normal=Vector3(0.0, 0.0, 1.0, reference_frame=world.root),
         hole_point=hole_point,
         pre_grasp_height=0.1,
     )

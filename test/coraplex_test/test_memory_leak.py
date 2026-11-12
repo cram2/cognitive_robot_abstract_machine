@@ -12,7 +12,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from cramph.composites import Sequence
 
@@ -40,9 +40,7 @@ def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
-                    1, -1, 0, reference_frame=copy_world.root
-                )
+                goal_pose=Pose2D.from_xy_yaw(x=1, y=-1, reference_frame=copy_world.root)
             )
         ]
     )

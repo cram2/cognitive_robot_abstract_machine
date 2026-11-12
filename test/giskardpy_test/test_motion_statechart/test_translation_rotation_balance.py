@@ -187,7 +187,7 @@ class BalanceRun:
         return ErrorTrace.settling_time(
             self.trace.times,
             self.trace.translation_errors,
-            self.goal.translation_threshold,
+            self.goal.position_threshold,
         )
 
     @property
@@ -325,7 +325,7 @@ def assert_every_goal_reached(runs: list[BalanceRun]):
     """
     assert [run.offset.label for run in runs if not run.reached] == []
     for run in runs:
-        assert run.trace.translation_errors[-1] <= run.goal.translation_threshold
+        assert run.trace.translation_errors[-1] <= run.goal.position_threshold
         assert run.trace.rotation_errors[-1] <= run.goal.orientation_threshold
 
 

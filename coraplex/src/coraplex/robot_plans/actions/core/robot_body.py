@@ -9,8 +9,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import CollisionR
 from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
-from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
-from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
+from semantic_digital_twin.robots.robot_parts import Arm
 from krrood_spatial_math.spatial_types import Pose
 
 from coraplex.datastructures.trajectory import PoseTrajectory
@@ -21,13 +20,22 @@ from coraplex.robot_plans.actions.base import (
 )
 from coraplex.robot_plans.actions.core.exceptions import WidthBeyondGripperOpening
 from coraplex.robot_plans.mixins import (
-    HasMaxJointVelocity,
+    HasArmParameter,
+    HasGripperCollisionParameter,
+    HasGripperConfigurationParameter,
+    HasTorsoStateParameter,
     MovesToolCenterPoint,
     OperatesGripper,
 )
 from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.mixins import (
+    HasGoalPoseParameter,
+    HasJointVelocityLimitParameter,
+    HasThresholdParameter,
+    HasTwoFingerGripperParameters,
+)
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
 )
@@ -37,24 +45,13 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from giskardpy.motion_statechart.tasks.gripper import MoveGripper
-from semantic_digital_twin.datastructures.definitions import (
-    TorsoState,
-    StaticJointState,
-)
-from semantic_digital_twin.datastructures.robots.gripper_configuration import (
-    GripperConfiguration,
-)
+from semantic_digital_twin.datastructures.definitions import StaticJointState
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveTorsoAction(SequentialAction):
+class MoveTorsoAction(SequentialAction, HasTorsoStateParameter):
     """
     Move the torso of the robot up and down.
-    """
-
-    torso_state: TorsoState
-    """
-    The state of the torso that should be set.
     """
 
     def create_steps(self) -> list[StatechartNode]:
@@ -63,14 +60,9 @@ class MoveTorsoAction(SequentialAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SetGripperAction(OperatesGripper, GoalAction):
+class SetGripperAction(OperatesGripper, GoalAction, HasGripperConfigurationParameter):
     """
     Moves a gripper to the given configuration.
-    """
-
-    configuration: GripperConfiguration
-    """
-    The configuration the gripper is to reach.
     """
 
     def create_goal(self) -> StatechartNode:
@@ -78,7 +70,9 @@ class SetGripperAction(OperatesGripper, GoalAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveFingersToWidthAction(GoalAction):
+class MoveFingersToWidthAction(
+    GoalAction, HasTwoFingerGripperParameters, HasThresholdParameter
+):
     """
     Closes a two-finger gripper until its fingertips stand a given distance apart,
     rather than driving it to a gripper state of its own.
@@ -90,16 +84,6 @@ class MoveFingersToWidthAction(GoalAction):
 
     .. note:: This only means anything where something pushes back, see
         :class:`~coraplex.robot_plans.plan_transformations.CloseFingersToObjectWidth`.
-    """
-
-    gripper: HasTwoFingers
-    """
-    The gripper whose fingers close.
-    """
-
-    width: float
-    """
-    How far apart the fingertips' facing surfaces are to stand, in metres.
     """
 
     squeeze: float = 0.0
@@ -128,13 +112,13 @@ class MoveFingersToWidthAction(GoalAction):
             gripper=self.gripper,
             width=max(0.0, self.width - 2 * self.squeeze),
             threshold=self.threshold,
-            tolerate_stall=self.squeeze > 0.0,
+            tolerate_finger_stall=self.squeeze > 0.0,
             name="MoveFingersToWidth",
         )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ParkArmsAction(ParallelAction, HasMaxJointVelocity):
+class ParkArmsAction(ParallelAction, HasJointVelocityLimitParameter):
     """
     Park the arms of the robot.
     """
@@ -153,7 +137,7 @@ class ParkArmsAction(ParallelAction, HasMaxJointVelocity):
             joint_goal,
             JointVelocityLimit(
                 connections=list(park_state.connections),
-                max_velocity=self.max_joint_velocity,
+                max_joint_velocity=self.max_joint_velocity,
             ),
         ]
 
@@ -172,7 +156,9 @@ class ParkArmsAction(ParallelAction, HasMaxJointVelocity):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class FollowToolCenterPointPathAction(MovesToolCenterPoint, ParallelAction):
+class FollowToolCenterPointPathAction(
+    MovesToolCenterPoint, ParallelAction, HasArmParameter
+):
     """
     Represents an action to move a robotic arm's TCP (Tool Center Point) along a path of
     poses.
@@ -183,12 +169,7 @@ class FollowToolCenterPointPathAction(MovesToolCenterPoint, ParallelAction):
     Path poses for the TCP motion.
     """
 
-    arm: Arm
-    """
-    The arm to use.
-    """
-
-    position_threshold: float = CartesianPose.translation_threshold
+    position_threshold: float = CartesianPose.position_threshold
     """
     Distance threshold in meters within which the tool center point passes a waypoint.
     """
@@ -213,7 +194,7 @@ class FollowToolCenterPointPathAction(MovesToolCenterPoint, ParallelAction):
             root_link=self.controlled_root,
             tip_link=self.arm.end_effector.tool_frame,
             goal_pose=target,
-            translation_threshold=self.position_threshold,
+            position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
         )
 
@@ -226,41 +207,32 @@ class FollowToolCenterPointPathAction(MovesToolCenterPoint, ParallelAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveManipulatorAction(MovesToolCenterPoint, GoalAction):
+class MoveManipulatorAction(
+    MovesToolCenterPoint,
+    GoalAction,
+    HasArmParameter,
+    HasGoalPoseParameter,
+    HasGripperCollisionParameter,
+):
     """
-    Move the end_effector to a specific pose.
-    """
-
-    target_pose: Pose
-    """
-    The pose where the end_effector should be moved to.
-    """
-
-    end_effector: EndEffector
-    """
-    The end_effector that should be moved.
-    """
-
-    allow_gripper_collision: bool
-    """
-    If the gripper can collide with something.
+    Move the end effector of :attr:`arm` to :attr:`goal_pose`.
     """
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
         """
-        :return: An allowance for :attr:`end_effector` to touch its surroundings if
-            :attr:`allow_gripper_collision`, none otherwise.
+        :return: An allowance for the end effector of :attr:`arm` to touch its
+            surroundings if :attr:`allow_gripper_collision`, none otherwise.
         """
         if not self.allow_gripper_collision:
             return []
-        return [AllowCollisionForEndEffector(end_effector=self.end_effector)]
+        return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
 
     def create_goal(self) -> StatechartNode:
         goal = CartesianPose(
             root_link=self.controlled_root,
-            tip_link=self.end_effector.tool_frame,
-            goal_pose=self.target_pose,
-            translation_threshold=self.position_threshold,
+            tip_link=self.arm.end_effector.tool_frame,
+            goal_pose=self.goal_pose,
+            position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
             binding_policy=GoalBindingPolicy.Bind_on_start,
         )

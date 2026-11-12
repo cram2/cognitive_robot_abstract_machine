@@ -11,7 +11,7 @@ from experiments.tool_based_actions.simple_demo.demo_world import (
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Sponge
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 
 from coraplex.robot_plans.actions.composite.tool_based import WipingAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -52,8 +52,8 @@ def main() -> None:
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
-                    *BASE_POSITION_XYZ, reference_frame=world.root
+                goal_pose=Pose2D.from_xy_yaw(
+                    *BASE_POSITION_XYZ[:2], reference_frame=world.root
                 )
             ),
             WipingAction(

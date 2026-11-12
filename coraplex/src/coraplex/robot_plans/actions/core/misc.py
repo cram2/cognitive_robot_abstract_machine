@@ -1,3 +1,7 @@
+"""
+Actions that detect objects around the robot and bring it within reach of a target.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -15,14 +19,15 @@ from coraplex.robot_plans.actions.base import SequentialAction
 from coraplex.robot_plans.actions.core.exceptions import DetectionTargetMissing
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
+from coraplex.robot_plans.mixins import HasArmParameter, MovesToolCenterPoint
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
+    Pose,
+    Point3,
+    Pose2D,
 )
-from krrood_spatial_math.spatial_types import Pose, Point3, Pose2D
-from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -143,14 +148,19 @@ class DetectAction(SequentialAction):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPoses):
+class MoveToReach(
+    MovesToolCenterPoint,
+    SequentialAction,
+    HasArmParameter,
+):
     """
-    Let the robot move to a position facing the target and reach with a end_effector.
+    Let the robot move to a position facing the target and reach with the end effector of
+    :attr:`arm`.
     """
 
     target_pose_offset_robot: Pose2D
     """
-    The pose where the robot should stand with regard to the end_effector target pose.
+    The pose where the robot should stand with regard to the end effector target pose.
 
     2D since z-axis is not relevant.
     """
@@ -165,19 +175,14 @@ class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPose
     The grasp frame the end effector is to reach.
     """
 
-    end_effector: EndEffector
-    """
-    The end effector that should reach it.
-    """
-
     def create_steps(self) -> list[StatechartNode]:
         return [
-            NavigateAction(target_location=self.standing_pose),
+            NavigateAction(goal_pose=self.standing_pose),
             MoveManipulatorAction(
-                target_pose=self.end_effector.tool_frame_goal_for_grasp(
+                goal_pose=self.arm.end_effector.tool_frame_goal_for_grasp(
                     self.reference_T_grasp
                 ),
-                end_effector=self.end_effector,
+                arm=self.arm,
                 allow_gripper_collision=False,
                 position_threshold=self.position_threshold,
                 orientation_threshold=self.orientation_threshold,
@@ -185,7 +190,7 @@ class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPose
         ]
 
     @property
-    def standing_pose(self) -> Pose:
+    def standing_pose(self) -> Pose2D:
         """
         Calculates the pose where the robot should stand to reach the target.
 
@@ -211,9 +216,4 @@ class MoveToReach(MovesToolCenterPoint, SequentialAction, HasApproachesGraspPose
         )
         reference_T_robot = reference_T_target @ target_T_robot
         world_T_robot = self.world.transform(reference_T_robot.pose, self.world.root)
-        return Pose.from_xyz_rpy(
-            x=world_T_robot.x,
-            y=world_T_robot.y,
-            yaw=world_T_robot.yaw,
-            reference_frame=self.world.root,
-        )
+        return Pose2D.from_pose(world_T_robot)

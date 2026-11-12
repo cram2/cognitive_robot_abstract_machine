@@ -24,7 +24,7 @@ from semantic_digital_twin.grasping.surface_grasp import SurfaceGrasp
 
 if TYPE_CHECKING:
     from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% the strategy
 
@@ -40,7 +40,7 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
 
     def statement(
         self,
-        graspable: HasGraspCandidates,
+        graspable: IsGraspable,
         result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> Match[GraspT]:
         """
@@ -56,7 +56,7 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
 
     @abstractmethod
     def conditions(
-        self, grasp: Match[GraspT], graspable: HasGraspCandidates
+        self, grasp: Match[GraspT], graspable: IsGraspable
     ) -> list[ConditionType]:
         """
         :param grasp: The grasp of a statement.
@@ -101,7 +101,7 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
     """
 
     def conditions(
-        self, grasp: Match[SurfaceGrasp], graspable: HasGraspCandidates
+        self, grasp: Match[SurfaceGrasp], graspable: IsGraspable
     ) -> list[ConditionType]:
         surface = graspable.grasp_surface()
         heights = self.grasped_heights(surface)
@@ -128,9 +128,7 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
         """
 
     @abstractmethod
-    def depth_unit(
-        self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
-    ) -> float:
+    def depth_unit(self, graspable: IsGraspable, surface: trimesh.Trimesh) -> float:
         """
         :param graspable: The object grasped.
         :param surface: The object's grasp surface, in its root body's frame.
@@ -164,9 +162,7 @@ class GraspFromAnySide(GraspBetweenHeights):
     extent deep.
     """
 
-    def depth_unit(
-        self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
-    ) -> float:
+    def depth_unit(self, graspable: IsGraspable, surface: trimesh.Trimesh) -> float:
         """
         :return: The narrower horizontal extent of the grasp surface.
         """
@@ -200,7 +196,7 @@ class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
     """
 
     def conditions(
-        self, grasp: Match[AxialGrasp], graspable: HasGraspCandidates
+        self, grasp: Match[AxialGrasp], graspable: IsGraspable
     ) -> list[ConditionType]:
         return [
             grasp.position >= self.position.lower,
@@ -259,9 +255,7 @@ class PinchAWall(SurfaceGraspStrategy, ABC):
     In how many directions around the object the wall's thickness is measured.
     """
 
-    def depth_unit(
-        self, graspable: HasGraspCandidates, surface: trimesh.Trimesh
-    ) -> float:
+    def depth_unit(self, graspable: IsGraspable, surface: trimesh.Trimesh) -> float:
         """
         Cast rays outward from the middle of the grasp surface, halfway between the
         grasped heights, and take the distance between the first two surfaces each ray

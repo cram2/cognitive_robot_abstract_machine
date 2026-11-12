@@ -184,7 +184,7 @@ def _whole_scene(world: World) -> VolumetricBoundingBox:
 
 
 def _navigate(world: World) -> NavigateAction:
-    return NavigateAction(target_location=_pose(world))
+    return NavigateAction(goal_pose=Pose2D.from_pose(_pose(world)))
 
 
 def _face_and_look_at(world: World) -> FaceAndLookAtAction:
@@ -199,7 +199,10 @@ def _pick_up(world: World) -> PickUpAction:
 
 
 def _place(world: World) -> PlaceAction:
-    return PlaceAction(object_designator=_milk(world), target_location=_pose(world))
+    """
+    :return: A place with the arm of `world`, which has to follow :func:`_pick_up`.
+    """
+    return PlaceAction(arm=_arm(world), goal_pose=_pose(world))
 
 
 def _move_and_pick_up(world: World) -> MoveAndPickUpAction:
@@ -253,6 +256,9 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
 
 
 def _robot_body_cases() -> list[ActionRoundTripCase]:
+    """
+    :return: The round trip cases of the actions moving the torso, the grippers and the arms of the robot.
+    """
     return [
         ActionRoundTripCase(
             MoveTorsoAction,
@@ -291,8 +297,8 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             MoveManipulatorAction,
             lambda world: [
                 MoveManipulatorAction(
-                    target_pose=_pose(world),
-                    end_effector=_arm(world).end_effector,
+                    goal_pose=_pose(world),
+                    arm=_arm(world),
                     allow_gripper_collision=False,
                 )
             ],
@@ -304,7 +310,7 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
                     target_pose_offset_robot=Pose2D.from_xy_yaw(0.2, -0.55),
                     reference_T_grasp=_pose(world),
                     hip_rotation=0.0,
-                    end_effector=_arm(world).end_effector,
+                    arm=_arm(world),
                 )
             ],
         ),
@@ -325,7 +331,9 @@ def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
         ),
         ActionRoundTripCase(
             PathPlanningNavigateAction,
-            lambda world: [PathPlanningNavigateAction(target=_pose(world))],
+            lambda world: [
+                PathPlanningNavigateAction(goal_pose=Pose2D.from_pose(_pose(world)))
+            ],
         ),
         ActionRoundTripCase(
             LookAtAction, lambda world: [LookAtAction(target=_pose(world))]

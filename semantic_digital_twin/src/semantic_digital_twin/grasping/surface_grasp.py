@@ -17,7 +17,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.object_relative_grasp import ObjectRelativeGrasp
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 
 # %% grasps on an object's surface
 
@@ -62,7 +62,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
     How far the closing direction is turned about the direction of approach, in radians.
     """
 
-    def grasp_candidate(self, graspable: HasGraspCandidates) -> GraspCandidate:
+    def grasp_candidate(self, graspable: IsGraspable) -> GraspCandidate:
         root_V_outward = self._outward_direction()
         root_P_surface = self._surface_point(graspable, root_V_outward)
         if root_P_surface is None:
@@ -86,7 +86,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         )
         return GraspCandidate(graspable, root_T_grasp.pose)
 
-    def reaches_surface_of(self, graspable: HasGraspCandidates) -> bool:
+    def reaches_surface_of(self, graspable: IsGraspable) -> bool:
         """
         :return: Whether the object's grasp surface reaches ``root_P_surface``.
         """
@@ -99,7 +99,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         return Vector3(math.cos(self.yaw), math.sin(self.yaw), 0.0)
 
     def _surface_point(
-        self, graspable: HasGraspCandidates, root_V_outward: Vector3
+        self, graspable: IsGraspable, root_V_outward: Vector3
     ) -> Point3 | None:
         """
         :param graspable: The object whose grasp surface the ray is cast against.

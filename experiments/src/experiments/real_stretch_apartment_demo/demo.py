@@ -66,8 +66,11 @@ from semantic_digital_twin.predefined_maps.apartment_environment import (
 )
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world import World
 from cramph.composites import Sequence, StatementNode
 
@@ -172,8 +175,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
-                        1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
+                    goal_pose=Pose2D.from_xy_yaw(
+                        x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
                 LookAtAction(
@@ -181,8 +184,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        target_location=Pose.from_xyz_rpy(
-                            0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
+                        goal_pose=Pose2D.from_xy_yaw(
+                            x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                         )
                     )
                 ),
@@ -201,13 +204,13 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
+                    goal_pose=Pose2D.from_xy_yaw(
+                        x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
                 PlaceAction(
-                    object_designator=cereal,
-                    target_location=Pose.from_xyz_rpy(
+                    arm=arm,
+                    goal_pose=Pose.from_xyz_rpy(
                         x=0.1,
                         z=0.56,
                         yaw=np.pi,
@@ -221,8 +224,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
-                        1.2, 1.2, 0, yaw=np.pi, reference_frame=world.root
+                    goal_pose=Pose2D.from_xy_yaw(
+                        x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
                 LookAtAction(
@@ -230,8 +233,8 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        target_location=Pose.from_xyz_rpy(
-                            0.8, 0, 0, yaw=np.pi, reference_frame=bedside_table_body
+                        goal_pose=Pose2D.from_xy_yaw(
+                            x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                         )
                     )
                 ),
@@ -252,14 +255,14 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, 0.6, 0, yaw=-np.pi / 2, reference_frame=world.root
+                    goal_pose=Pose2D.from_xy_yaw(
+                        x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),
                 StatementNode(
                     statement=a(PlaceAction)(
-                        object_designator=cereal,
-                        target_location=CEREAL_SHELF_LAYER_T_CEREAL.pose,
+                        arm=arm,
+                        goal_pose=CEREAL_SHELF_LAYER_T_CEREAL.pose,
                     )
                 ),
                 ParkArmsAction(arms=robot.all_arms),

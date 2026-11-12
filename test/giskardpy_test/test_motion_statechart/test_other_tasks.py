@@ -832,11 +832,14 @@ def test_align_planes(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_normal = Vector3.X(reference_frame=root)
+    reference_normal = Vector3.X(reference_frame=root)
     tip_normal = Vector3.Y(reference_frame=tip)
 
     align_planes = AlignPlanes(
-        root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
+        root_link=root,
+        tip_link=tip,
+        reference_normal=reference_normal,
+        tip_normal=tip_normal,
     )
     statechart.add_node(align_planes)
 
@@ -848,16 +851,16 @@ def test_align_planes(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     # Check if the angle between normal vectors is below the threshold
-    root_V_goal_normal = pr2_world_state_reset.transform(
-        target_frame=root, spatial_object=goal_normal
+    root_V_reference_normal = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=reference_normal
     )
-    root_V_goal_normal.scale(1)
+    root_V_reference_normal.scale(1)
     root_V_tip_normal = pr2_world_state_reset.transform(
         target_frame=root, spatial_object=tip_normal
     )
     root_V_tip_normal.scale(1)
     v_tip = root_V_tip_normal.to_np()[:3]
-    v_goal = root_V_goal_normal.to_np()[:3]
+    v_goal = root_V_reference_normal.to_np()[:3]
 
     eps = 1e-9
     assert np.linalg.norm(v_goal) > eps, "goal normal became zero-length"
@@ -960,13 +963,13 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_normal = Vector3.X(reference_frame=root)
+    reference_normal = Vector3.X(reference_frame=root)
     tip_normal = Vector3.X(reference_frame=tip)
 
     align_perp = AlignPerpendicular(
         root_link=root,
         tip_link=tip,
-        reference_normal=goal_normal,
+        reference_normal=reference_normal,
         tip_normal=tip_normal,
     )
     statechart.add_node(align_perp)
@@ -979,17 +982,17 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     # Check if the angle between normals is (approximately) 90 degrees
-    root_V_goal_normal = pr2_world_state_reset.transform(
-        target_frame=root, spatial_object=goal_normal
+    root_V_reference_normal = pr2_world_state_reset.transform(
+        target_frame=root, spatial_object=reference_normal
     )
-    root_V_goal_normal.scale(1)
+    root_V_reference_normal.scale(1)
     root_V_tip_normal = pr2_world_state_reset.transform(
         target_frame=root, spatial_object=tip_normal
     )
     root_V_tip_normal.scale(1)
 
     v_tip = root_V_tip_normal.to_np()[:3]
-    v_goal = root_V_goal_normal.to_np()[:3]
+    v_goal = root_V_reference_normal.to_np()[:3]
 
     eps = 1e-9
     assert np.linalg.norm(v_goal) > eps, "goal normal became zero-length"
@@ -1081,7 +1084,7 @@ class TestArticulateGraspedMechanism:
             open_goal := ArticulateGraspedMechanism(
                 environment_link=prismatic_bot2.get_body_by_name("robot"),
                 tip_link=prismatic_bot2.get_body_by_name("robot2"),
-                goal_joint_state=0.0,
+                goal_position=0.0,
             )
         )
         executor.compile(statechart=motion_statechart)
@@ -1155,7 +1158,7 @@ class TestArticulateGraspedMechanism:
                                 ArticulateGraspedMechanism(
                                     tip_link=r_tip,
                                     environment_link=handle,
-                                    goal_joint_state=open_goal,
+                                    goal_position=open_goal,
                                 ),
                                 JointPositionReached(
                                     connection=root_C_hinge,
@@ -1169,7 +1172,7 @@ class TestArticulateGraspedMechanism:
                                 ArticulateGraspedMechanism(
                                     tip_link=r_tip,
                                     environment_link=handle,
-                                    goal_joint_state=close_goal,
+                                    goal_position=close_goal,
                                 ),
                                 JointPositionReached(
                                     connection=root_C_hinge,
@@ -1238,7 +1241,7 @@ class TestArticulateGraspedMechanism:
                     opening := ArticulateGraspedMechanism(
                         tip_link=tip,
                         environment_link=handle.root,
-                        goal_joint_state=open_position,
+                        goal_position=open_position,
                     ),
                 ]
             )
@@ -1264,7 +1267,7 @@ class TestArticulateGraspedMechanism:
 
         [hold] = [node for node in opening.nodes if isinstance(node, CartesianPose)]
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert largest_drift <= hold.translation_threshold
+        assert largest_drift <= hold.position_threshold
 
     def test_unscrew_and_tighten_bottle_cap(self, pr2_world_copy):
         screw_pitch = 0.03
@@ -1328,7 +1331,7 @@ class TestArticulateGraspedMechanism:
                         open := ArticulateGraspedMechanism(
                             tip_link=r_tip,
                             environment_link=cap_body,
-                            goal_joint_state=unscrew_goal,
+                            goal_position=unscrew_goal,
                         ),
                     ]
                 ),
@@ -1367,7 +1370,7 @@ class TestArticulateGraspedMechanism:
                 close := ArticulateGraspedMechanism(
                     tip_link=r_tip,
                     environment_link=cap_body,
-                    goal_joint_state=tightened_goal_joint_state,
+                    goal_position=tightened_goal_joint_state,
                 ),
             ]
         )
@@ -1407,7 +1410,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=0.0,
+            goal_position=0.0,
         )
 
         nodes = self._expanded_nodes(goal, prismatic_bot)
@@ -1429,7 +1432,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=0.0,
+            goal_position=0.0,
             mechanism_weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
             grasp_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         )
@@ -1456,7 +1459,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=end_effector.tool_frame,
             environment_link=pr2_world_copy.get_body_by_name("torso_lift_link"),
-            goal_joint_state=0.0,
+            goal_position=0.0,
             holding_end_effector=end_effector,
         )
 
@@ -1479,7 +1482,7 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=prismatic_bot.get_body_by_name("robot"),
-            goal_joint_state=0.0,
+            goal_position=0.0,
         )
 
         Statechart(context=create_context_with_motion_control(prismatic_bot)).add_node(
@@ -1504,12 +1507,12 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=within_limits,
+            goal_position=within_limits,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal_joint_state == within_limits
+        assert goal.goal_position == within_limits
 
     def test_a_goal_beyond_the_upper_limit_is_clamped_to_it(self, prismatic_bot):
         """
@@ -1520,21 +1523,21 @@ class TestArticulateGraspedMechanism:
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=1e3,
+            goal_position=1e3,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal_joint_state == goal.connection.dof.limits.upper.position
+        assert goal.goal_position == goal.connection.dof.limits.upper.position
 
     def test_a_goal_below_the_lower_limit_is_clamped_to_it(self, prismatic_bot):
         grasped_part = prismatic_bot.get_body_by_name("robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
-            goal_joint_state=-1e3,
+            goal_position=-1e3,
         )
 
         self._expanded_nodes(goal, prismatic_bot)
 
-        assert goal.goal_joint_state == goal.connection.dof.limits.lower.position
+        assert goal.goal_position == goal.connection.dof.limits.lower.position

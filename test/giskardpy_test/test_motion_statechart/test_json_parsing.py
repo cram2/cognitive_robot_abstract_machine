@@ -193,7 +193,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal, atol=cart_goal.translation_threshold)
+    assert np.allclose(fk, tip_goal, atol=cart_goal.position_threshold)
 
 
 def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(

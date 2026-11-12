@@ -35,7 +35,7 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
 )
@@ -210,10 +210,10 @@ class MilkTransportDemonstration(RobotDemonstration):
                 nodes=[
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     ParkArmsAction(arms=hsrb.all_arms),
-                    NavigateAction(target_location=taking_pose),
+                    NavigateAction(goal_pose=taking_pose),
                     PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
-                    NavigateAction(target_location=self._standing_pose_facing(target)),
-                    PlaceAction(object_designator=milk, target_location=target),
+                    NavigateAction(goal_pose=self._standing_pose_facing(target)),
+                    PlaceAction(arm=arm, goal_pose=target),
                     ParkArmsAction(arms=hsrb.all_arms),
                 ]
             )
@@ -254,20 +254,22 @@ class MilkTransportDemonstration(RobotDemonstration):
             reference_frame=world.root,
         )
 
-    def _standing_pose_facing(self, milk_pose: Pose) -> Pose:
+    def _standing_pose_facing(self, milk_pose: Pose) -> Pose2D:
         """
         :param milk_pose: Where the milk stands or is set down.
         :return: Where the robot's base stands on the floor to reach the milk there,
             :attr:`standing_distance` before it and facing it.
         """
-        return (
-            milk_pose.homogeneous_matrix
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-self.standing_distance, z=-float(milk_pose.z)
-            )
-        ).pose
+        return Pose2D.from_pose(
+            (
+                milk_pose.homogeneous_matrix
+                @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-self.standing_distance
+                )
+            ).pose
+        )
 
-    def _grasp_from(self, standing_pose: Pose, milk: Milk) -> GraspCandidate:
+    def _grasp_from(self, standing_pose: Pose2D, milk: Milk) -> GraspCandidate:
         """
         :param standing_pose: Where the robot stands to take the milk.
         :param milk: The milk.

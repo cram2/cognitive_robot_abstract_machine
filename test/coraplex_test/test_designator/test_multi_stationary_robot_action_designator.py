@@ -36,9 +36,12 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
-from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+    Pose,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -116,13 +119,11 @@ def robot_setup(request):
 
         # The boxes stand in for any graspable object; the plans only need an annotation
         # to name them by, not a particular kind of object.
-        world.add_semantic_annotations(
-            [HasGraspCandidates(root=box1), HasGraspCandidates(root=box2)]
-        )
+        world.add_semantic_annotations([IsGraspable(root=box1), IsGraspable(root=box2)])
     return world, request.param[1]
 
 
-def graspable_annotation(world: World, body: Body) -> HasGraspCandidates:
+def graspable_annotation(world: World, body: Body) -> IsGraspable:
     """
     The annotation naming ``body`` for the actions that take one rather than a body.
 
@@ -133,7 +134,7 @@ def graspable_annotation(world: World, body: Body) -> HasGraspCandidates:
     return an(
         entity(
             semantic_annotation := variable(
-                HasGraspCandidates, domain=world.semantic_annotations
+                IsGraspable, domain=world.semantic_annotations
             )
         ).where(semantic_annotation.root == body)
     ).first()
@@ -302,6 +303,10 @@ def place_position(robot_setup) -> Point3:
 
 
 def test_place_multi(stationary_block_context, place_position):
+    """
+    On every stationary robot, the box is no longer attached to the tool frame once it
+    is placed.
+    """
     world, view, extensions = stationary_block_context
 
     left_arm = left_or_only_arm(view)
@@ -314,8 +319,8 @@ def test_place_multi(stationary_block_context, place_position):
                 grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
             ),
             PlaceAction(
-                object_designator=graspable_annotation(world, box_body),
-                target_location=Pose(place_position, reference_frame=world.root),
+                arm=left_or_only_arm(view),
+                goal_pose=Pose(place_position, reference_frame=world.root),
             ),
         ]
     )
@@ -402,7 +407,7 @@ def physically_simulated_block_context(stationary_block_context):
                 ),
             )
         )
-        world.add_semantic_annotations([HasGraspCandidates(root=narrow_box)])
+        world.add_semantic_annotations([IsGraspable(root=narrow_box)])
     for arm in view.all_arms:
         arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
     world.notify_state_change()
@@ -484,8 +489,8 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
-                object_designator=graspable_annotation(world, box),
-                target_location=Pose(target, reference_frame=world.root),
+                arm=arm,
+                goal_pose=Pose(target, reference_frame=world.root),
             ),
         ]
     )

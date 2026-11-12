@@ -44,7 +44,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
-from coraplex.robot_plans.mixins import HasApproachesGraspPoses
+from coraplex.robot_plans.mixins import HasGraspApproachParameters
 from cramph.composites import Parallel, Sequence, StartedWhenTrue
 from cramph.context import ContextExtension, StatechartContext
 from cramph.node import StatechartNode
@@ -65,13 +65,13 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.garmi import Garmi
 from semantic_digital_twin.robots.robot_parts import Arm
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Milk,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import Point3, Pose, Pose2D
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
 )
@@ -398,7 +398,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     # reaching out, and a simulated drive arrives at once.
                     ParkArmsAction(arms=robot.all_arms),
                     NavigateAction(
-                        target_location=ScenePose.GARMI_AT_DRAWER.value.pose(world.root)
+                        goal_pose=Pose2D.from_pose(
+                            ScenePose.GARMI_AT_DRAWER.value.pose(world.root)
+                        )
                     ),
                     *self._take_hold_of_the_milk_and_the_handle(
                         milk_grasp, handle_grasp, left_arm, right_arm
@@ -412,7 +414,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                     ArticulateGraspedMechanism(
                                         tip_link=left_hand.tool_frame,
                                         environment_link=drawer.handle.root,
-                                        goal_joint_state=drawer_mechanism.dof.limits.upper.position,
+                                        goal_position=drawer_mechanism.dof.limits.upper.position,
                                         holding_end_effector=left_hand,
                                     ),
                                     SetGripperAction(
@@ -451,7 +453,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                             ArticulateGraspedMechanism(
                                 tip_link=left_hand.tool_frame,
                                 environment_link=drawer.handle.root,
-                                goal_joint_state=drawer_mechanism.dof.limits.lower.position,
+                                goal_position=drawer_mechanism.dof.limits.lower.position,
                                 holding_end_effector=left_hand,
                             ),
                             UpdateTemporaryCollisionRules.for_end_effector(left_hand),
@@ -459,20 +461,20 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     ),
                     # Back off the handle the way the hand came in.
                     MoveManipulatorAction(
-                        target_pose=HasApproachesGraspPoses.pre_grasp_pose(
+                        goal_pose=HasGraspApproachParameters.pre_grasp_pose(
                             handle_grasp.grasp_pose,
                             left_hand,
                             HandDistance.HANDLE_RELEASE_CLEARANCE.value,
                         ),
-                        end_effector=left_hand,
+                        arm=left_arm,
                         allow_gripper_collision=True,
                     ),
                     Parallel(
                         nodes=[
                             ParkArmsAction(arms=robot.all_arms),
                             NavigateAction(
-                                target_location=ScenePose.GARMI_AT_COUNTER.value.pose(
-                                    world.root
+                                goal_pose=Pose2D.from_pose(
+                                    ScenePose.GARMI_AT_COUNTER.value.pose(world.root)
                                 )
                             ),
                         ]
@@ -552,7 +554,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         ]
 
     @staticmethod
-    def _grasps_by_closeness(graspable: HasGraspCandidates, arm: Arm) -> Match:
+    def _grasps_by_closeness(graspable: IsGraspable, arm: Arm) -> Match:
         """
         :param graspable: The object to grasp.
         :param arm: The arm that grasps it.
@@ -562,7 +564,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         # A variable, so the grasps are ranked when the statement is grounded, from
         # where the robot stands then.
         where_the_robot_stands = variable(
-            Pose, domain=[Pose(reference_frame=arm._robot.root)]
+            Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
         )
         return flat_variable(
             GraspsByCloseness(
@@ -599,8 +601,8 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             # grasp off the gripper holding it.
             return [
                 a(PlaceAction)(
-                    object_designator=milk,
-                    target_location=milk_in_drawer,
+                    arm=right_arm,
+                    goal_pose=milk_in_drawer,
                     retreat_distance=HandDistance.MILK_ABOVE_DRAWER_BEFORE_PLACING.value,
                 ),
                 hang_off_the_drawer,
@@ -618,14 +620,14 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         ).pose
         return [
             PlaceAction(
-                object_designator=milk,
-                target_location=milk_in_drawer,
+                arm=right_arm,
+                goal_pose=milk_in_drawer,
                 retreat_distance=HandDistance.MILK_ABOVE_DRAWER_BEFORE_PLACING.value,
             ),
             hang_off_the_drawer,
             MoveManipulatorAction(
-                target_pose=tool_above_place,
-                end_effector=right_hand,
+                goal_pose=tool_above_place,
+                arm=right_arm,
                 allow_gripper_collision=False,
             ),
         ]

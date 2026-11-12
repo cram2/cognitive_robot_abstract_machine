@@ -18,11 +18,7 @@ from krrood.parametrization.model_registries import (
 )
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.orm.model import (
-    Point3Mapping,
-    QuaternionMapping,
-    PoseMapping,
-)
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
@@ -65,14 +61,12 @@ def test_algebra_sequential_plan(apartment_world_pr2_copy_with_context):
     """
     world, robot_view, extensions = apartment_world_pr2_copy_with_context
 
-    target_location = a(PoseMapping.from_point_mapping_quaternion_mapping)(
-        position=a(Point3Mapping)(x=..., y=..., z=0.0, reference_frame=None),
-        orientation=QuaternionMapping(x=0, y=0, z=0, w=1, reference_frame=None),
-        reference_frame=variable_from([robot_view.root]),
+    target_location = a(Pose2D.from_xy_yaw)(
+        x=..., y=..., yaw=0.0, reference_frame=variable_from([robot_view.root])
     )
 
     navigate_action = a(NavigateAction)(
-        target_location=target_location,
+        goal_pose=target_location,
     )
     # navigate_action.resolve()
 

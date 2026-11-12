@@ -44,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasLegs,
     HasSink,
     HasShelfLayers,
-    HasGraspCandidates,
+    IsGraspable,
     HasRim,
     HasDrawnGraspsByDefault,
 )
@@ -98,7 +98,7 @@ class Furniture(SemanticAnnotation, ABC):
 
 
 @dataclass(eq=False)
-class Handle(HasGraspCandidates):
+class Handle(IsGraspable):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
     open or close an object.
@@ -920,21 +920,21 @@ class Wall(HasApertures):
 
 
 @dataclass(eq=False)
-class Container(HasGraspCandidates):
+class Container(IsGraspable):
     """
     An object that holds contents and has an opening they go in and out through.
     """
 
 
 @dataclass(eq=False)
-class Cookware(HasGraspCandidates):
+class Cookware(IsGraspable):
     """
     An object used to cook with.
     """
 
 
 @dataclass(eq=False)
-class Tableware(HasGraspCandidates):
+class Tableware(IsGraspable):
     """
     An object a table is set with for a meal.
     """
@@ -948,7 +948,7 @@ class Bottle(Container):
 
 
 @dataclass(eq=False)
-class Statue(HasGraspCandidates): ...
+class Statue(IsGraspable): ...
 
 
 @dataclass(eq=False)
@@ -1054,7 +1054,7 @@ class Bowl(HasRim, HasSupportingSurface, Container, Tableware, IsPerceivable):
 
 # Food Items
 @dataclass(eq=False)
-class Food(HasGraspCandidates):
+class Food(IsGraspable):
     """
     A Group class for Food.
     """
@@ -1333,7 +1333,7 @@ class WallDecor(Decor):
 
 
 @dataclass(eq=False)
-class Cloth(HasGraspCandidates): ...
+class Cloth(IsGraspable): ...
 
 
 @dataclass(eq=False)
@@ -1391,7 +1391,7 @@ class Vase(Container):
 
 
 @dataclass(eq=False)
-class Book(HasGraspCandidates):
+class Book(IsGraspable):
     """
     A book.
     """
@@ -1466,21 +1466,21 @@ class Spoon(Cutlery, IsPerceivable): ...
 
 
 @dataclass(eq=False)
-class Pencil(HasGraspCandidates):
+class Pencil(IsGraspable):
     """
     A pencil.
     """
 
 
 @dataclass(eq=False)
-class Pen(HasGraspCandidates):
+class Pen(IsGraspable):
     """
     A pen.
     """
 
 
 @dataclass(eq=False)
-class ShapeSortingPiece(HasGraspCandidates):
+class ShapeSortingPiece(IsGraspable):
     """
     A loose piece of a shape-sorting toy, which drops through the hole of its
     own outline.
@@ -1529,7 +1529,7 @@ class ShapeSortingPiece(HasGraspCandidates):
 
 
 @dataclass(eq=False)
-class Baseball(HasGraspCandidates):
+class Baseball(IsGraspable):
     """
     A baseball.
     """
@@ -1578,7 +1578,7 @@ class Human(Agent):
 
 
 @dataclass(eq=False)
-class Parcel(HasGraspCandidates):
+class Parcel(IsGraspable):
     """
     A parcel, as handled in a warehouse.
     """
@@ -1714,7 +1714,7 @@ class Cooktop(HasRootBody):
 
 
 @dataclass(eq=False)
-class Tool(HasGraspCandidates, ABC):
+class Tool(IsGraspable, ABC):
     """
     A tool that is held by a robot's end effector to act on other bodies.
     """
@@ -1805,7 +1805,7 @@ class Whisk(ToolWithHandle):
         return [
             AlignmentPair(
                 tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             )
         ]
 
@@ -1820,11 +1820,11 @@ class CuttingKnife(ToolWithHandle):
         return [
             AlignmentPair(
                 tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
-                goal_normal=Vector3(0, 1, 0, reference_frame=target),
+                reference_normal=Vector3(0, 1, 0, reference_frame=target),
             ),
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             ),
         ]
 
@@ -1839,7 +1839,7 @@ class PouringCup(Tool, Container):
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                goal_normal=Vector3(0, 0, 1, reference_frame=target),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target),
             )
         ]
 
@@ -1858,13 +1858,13 @@ class Sponge(Tool):
             return [
                 AlignmentPair(
                     tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
-                    goal_normal=Vector3(0, 0, -1, reference_frame=target),
+                    reference_normal=Vector3(0, 0, -1, reference_frame=target),
                 )
             ]
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, -1, reference_frame=self.root),
-                goal_normal=self._pose_surface_normal(target),
+                reference_normal=self._pose_surface_normal(target),
             )
         ]
 
