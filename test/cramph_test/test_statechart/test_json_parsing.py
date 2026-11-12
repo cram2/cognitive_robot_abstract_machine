@@ -5,13 +5,9 @@ from typing_extensions import Callable
 
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
-from cramph.data_types import (
-    LifeCyclePredicate,
-    StatechartJSONKey,
-    ObservationPredicate,
-    TransitionConditionJSONKey,
-    TransitionKind,
-)
+from cramph.data_types import LifeCyclePredicate, ObservationPredicate, TransitionKind
+from cramph.statechart import StatechartJSONKey
+from cramph.node import TransitionConditionJSONKey
 from cramph.exceptions import (
     NodeNotFoundError,
     NodeStateVariableNotSerializableError,

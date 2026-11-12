@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues, StatechartJSONKey
+from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.statechart import StatechartJSONKey
 from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue

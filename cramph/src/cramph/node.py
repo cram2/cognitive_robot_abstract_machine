@@ -11,6 +11,7 @@ import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import MISSING, field, dataclass, fields
+from enum import StrEnum
 
 from typing_extensions import (
     Any,
@@ -29,8 +30,6 @@ from cramph.data_types import (
     ObservationReading,
     ObservationStateValues,
     TransitionKind,
-    TransitionConditionJSONKey,
-    NodeJSONKey,
 )
 from cramph.exceptions import (
     CancelledByNodeFailing,
@@ -73,6 +72,44 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 logger = logging.getLogger(__name__)
+
+# %% serialization keys
+
+
+class NodeJSONKey(StrEnum):
+    """
+    Keys a serialized node carries on top of its dataclass fields.
+    """
+
+    NODE_ID = "node_id"
+    """
+    Tells apart the nodes of one JSON document, so every place referring to the same node
+    deserializes to the same instance.
+    """
+
+
+class TransitionConditionJSONKey(StrEnum):
+    """
+    Keys a serialized transition condition carries.
+    """
+
+    KIND = "kind"
+    """
+    The kind of transition the condition controls.
+    """
+
+    EXPRESSION = "expression"
+    """
+    The rendered condition, naming every variable by the id of its node.
+    """
+
+    OWNER = "owner"
+    """
+    The id of the node the condition belongs to.
+    """
+
+
+# %% transition conditions
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
@@ -1432,7 +1469,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         for transition_kind in TransitionKind.owner_wired_kinds():
             self.set_condition(
                 transition_kind=transition_kind,
-                expression=transition_kind.unwired_condition,
+                expression=transition_kind.default_condition,
             )
 
     def _get_transition(
@@ -2445,7 +2482,7 @@ class CompositeNode(StatechartNode):
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
             condition = node.get_condition(transition_kind=transition_kind)
-            if str(condition) != str(transition_kind.unwired_condition):
+            if str(condition) != str(transition_kind.default_condition):
                 raise ChildTransitionAlreadyWiredError(
                     node=self, child=node, transition_kind=transition_kind
                 )
