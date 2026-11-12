@@ -1,13 +1,12 @@
+"""
+The errors symbolic math raises.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    List,
-    Tuple,
-    TYPE_CHECKING,
-    Any,
-)
+from typing_extensions import TYPE_CHECKING, Any
 
 from krrood.exceptions import DataclassException
 
@@ -15,28 +14,33 @@ if TYPE_CHECKING:
     from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SymbolicMathError(DataclassException):
     """
     Represents an error specifically related to symbolic mathematics operations.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedOperationError(SymbolicMathError, TypeError):
     """
     Represents an error for unsupported operations between incompatible types.
     """
 
     operation: str
-    """The name of the operation that was attempted (e.g., '+', '-', etc.)."""
+    """
+    The name of the operation that was attempted (e.g., '+', '-', etc.).
+    """
+
     left: Any
     """
     The first argument involved in the operation.
     """
 
     right: Any
-    """The second argument involved in the operation."""
+    """
+    The second argument involved in the operation.
+    """
 
     def error_message(self) -> str:
         return f"unsupported operand type(s) for {self.operation}: '{self.left.__class__.__name__}' and '{self.right.__class__.__name__}'"
@@ -45,7 +49,25 @@ class UnsupportedOperationError(SymbolicMathError, TypeError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
+class UnhashableExpressionError(SymbolicMathError, TypeError):
+    """
+    Raised when an expression that is not a scalar is hashed.
+    """
+
+    expression: SymbolicMathType
+    """
+    The expression that was hashed.
+    """
+
+    def error_message(self) -> str:
+        return f"cannot hash a {self.expression.__class__.__name__} of shape {self.expression.shape}, only a scalar expression has a hash"
+
+    def suggest_correction(self) -> str:
+        return "Compare the expression by identity, or hash one scalar entry of it."
+
+
+@dataclass(kw_only=True)
 class CannotConvertToStringError(SymbolicMathError):
     """
     Raised when a symbolic math expression cannot be converted to a string.
@@ -60,14 +82,14 @@ class CannotConvertToStringError(SymbolicMathError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrongDimensionsError(SymbolicMathError):
     """
     Represents an error for mismatched dimensions.
     """
 
-    expected_dimensions: Tuple[int, int] | str
-    actual_dimensions: Tuple[int, int]
+    expected_dimensions: tuple[int, int] | str
+    actual_dimensions: tuple[int, int]
 
     def error_message(self) -> str:
         return f"Expected {self.expected_dimensions} dimensions, but got {self.actual_dimensions}."
@@ -76,43 +98,43 @@ class WrongDimensionsError(SymbolicMathError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotScalerError(WrongDimensionsError):
     """
     Exception raised for errors when a non-scalar input is provided.
     """
 
-    expected_dimensions: Tuple[int, int] = field(default=(1, 1), init=False)
+    expected_dimensions: tuple[int, int] = field(default=(1, 1), init=False)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotSquareMatrixError(WrongDimensionsError):
     """
     Represents an error raised when an operation requires a square matrix but the input
     is not.
     """
 
-    expected_dimensions: Tuple[int, int] = field(default="square", init=False)
-    actual_dimensions: Tuple[int, int]
+    expected_dimensions: tuple[int, int] = field(default="square", init=False)
+    actual_dimensions: tuple[int, int]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotColumnVectorError(WrongDimensionsError):
     """
     Raised when data that is expected to describe a vector has more than one column.
     """
 
     expected_dimensions: str = field(default="(n, 1)", init=False)
-    actual_dimensions: Tuple[int, int]
+    actual_dimensions: tuple[int, int]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasFreeVariablesError(SymbolicMathError):
     """
     Raised when an operation can't be performed on an expression with free variables.
     """
 
-    variables: List[FloatVariable]
+    variables: list[FloatVariable]
 
     def error_message(self) -> str:
         return f"Operation can't be performed on expression with free variables: {self.variables}."
@@ -121,7 +143,7 @@ class HasFreeVariablesError(SymbolicMathError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoFreeVariablesError(SymbolicMathError):
     """
     Raised when an operation can't be performed on an expression with NO free variables.
@@ -141,7 +163,7 @@ class ExpressionEvaluationError(SymbolicMathError):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrongNumberOfArgsError(ExpressionEvaluationError):
     """
     This error is specifically used in expression evaluation scenarios where a certain
@@ -158,7 +180,7 @@ class WrongNumberOfArgsError(ExpressionEvaluationError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotEnoughArgumentsError(SymbolicMathError):
     """
     Raised when an operation is called with fewer arguments than it requires.
@@ -184,14 +206,14 @@ class NotEnoughArgumentsError(SymbolicMathError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateVariablesError(SymbolicMathError):
     """
     Raised when duplicate variables are found in an operation that requires unique
     variables.
     """
 
-    variables: List[FloatVariable]
+    variables: list[FloatVariable]
 
     def error_message(self) -> str:
         return f"Operation failed due to duplicate variables: {self.variables}. All variables must be unique."
@@ -200,14 +222,14 @@ class DuplicateVariablesError(SymbolicMathError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FloatVariableDataError(DataclassException):
     """
     Represents an error specific to FloatVariableData operations.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
     """
     Raised when the float variables of an expression already have a resolver.
@@ -225,7 +247,7 @@ class FloatVariableAlreadyHasResolveError(FloatVariableDataError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
     """
     Raised when a symbolic math expression is not registered at this `FloatVariableData`
@@ -241,7 +263,7 @@ class SymbolicMathExpressionNotRegisteredError(FloatVariableDataError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SymbolicMathExpressionAlreadyRegisteredError(FloatVariableDataError):
     """
     Raised when a symbolic math expression is already registered at a different

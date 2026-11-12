@@ -1,6 +1,5 @@
 import unittest
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pytest
@@ -56,11 +55,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Toaster,
     CoffeeMachine,
 )
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -100,7 +96,7 @@ class TestFactories(unittest.TestCase):
             returned_handle = Handle.get_annotation_specification(
                 "handle",
                 Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.2, 0.03), thickness=0.03
+                    scale=Scale(0.1, 0.03, 0.2), thickness=0.03
                 ),
             ).spawn(world)
         semantic_handle_annotations = world.get_semantic_annotations_by_type(Handle)
@@ -977,7 +973,8 @@ class TestFactories(unittest.TestCase):
             cup = Cup.create_with_new_body_in_world(name="cup", world=world2)
 
         with self.assertRaises(MismatchingWorld):
-            cabinet.add_object(cup)
+            with world1.modify_world():
+                cabinet.add_object(cup)
 
     def test_double_door_view_point(self):
         world = World.create_with_root_body("root")
@@ -1197,11 +1194,11 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(
     both.
     """
 
-    door: Optional[Door] = field(
+    door: Door | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
-    typed_door: Optional[DoorWithType] = field(
+    typed_door: DoorWithType | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )

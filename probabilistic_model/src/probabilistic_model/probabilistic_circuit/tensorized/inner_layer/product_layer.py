@@ -1,22 +1,13 @@
 from __future__ import annotations
 
 import functools
-from dataclasses import (
-    dataclass,
-)
+from dataclasses import dataclass, field
 
 import numpy as np
 from random_events.product_algebra import Event, SimpleEvent
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
-from typing_extensions import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Self,
-    Tuple,
-)
+from typing_extensions import Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
@@ -48,6 +39,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     memoized,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
+    RowGroupedSparsity,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -78,8 +70,29 @@ class ProductLayer(InnerLayer):
     node of the child layer, not a missing entry.
     """
 
+    factors: RowGroupedSparsity = field(init=False, repr=False)
+    """
+    The child nodes every node multiplies, as the stored entries of the matrix of shape
+    (#nodes, total number of nodes of the child layers) whose columns are the nodes of
+    the child layers in order.
+    """
+
+    def __post_init__(self):
+        self.factors = self.factors_of_edges()
+
+    def factors_of_edges(self) -> RowGroupedSparsity:
+        """
+        :return: The value of :attr:`factors` for the current edges.
+        """
+        edges = self.inner_layer_edges
+        return RowGroupedSparsity(
+            edges.nodes,
+            self.column_offsets[edges.child_layer_indices] + edges.child_nodes,
+            (self.number_of_nodes, int(self.column_offsets[-1])),
+        )
+
     @classmethod
-    def product_of(cls, child_layers: List[Layer]) -> Self:
+    def product_of(cls, child_layers: list[Layer]) -> Self:
         """
         :param child_layers: The child layers, each contributing its first node.
         :return: A product layer with a single node that multiplies the first node of
@@ -94,7 +107,7 @@ class ProductLayer(InnerLayer):
         return cls(child_layers, edges)
 
     @classmethod
-    def node_wise_product_of(cls, child_layers: List[Layer]) -> Self:
+    def node_wise_product_of(cls, child_layers: list[Layer]) -> Self:
         """
         :param child_layers: The child layers, all with the same number of nodes.
         :return: A product layer whose node ``i`` multiplies node ``i`` of every child
@@ -112,7 +125,7 @@ class ProductLayer(InnerLayer):
 
     @classmethod
     def from_edges(
-        cls, child_layers: List[Layer], edges: InnerLayerEdges, number_of_nodes: int
+        cls, child_layers: list[Layer], edges: InnerLayerEdges, number_of_nodes: int
     ) -> Self:
         """
         :param child_layers: The child layers.
@@ -129,7 +142,7 @@ class ProductLayer(InnerLayer):
         )
 
     def with_edges(
-        self, child_layers: List[Layer], edges: InnerLayerEdges, copies: List[Self]
+        self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
     ) -> Self:
         return self.from_edges(child_layers, edges, len(copies) * self.number_of_nodes)
 
@@ -160,11 +173,8 @@ class ProductLayer(InnerLayer):
             (len(self.child_layers), self.number_of_nodes)
         )
         self.reset_variables()
-        for cached in (
-            ProductLayer.inner_layer_edges,
-            ProductLayer.edges_per_child_layer,
-        ):
-            self.__dict__.pop(cached.attrname, None)
+        self.__dict__.pop(ProductLayer.inner_layer_edges.attrname, None)
+        self.factors = self.factors_of_edges()
 
     @property
     def number_of_nodes(self) -> int:
@@ -239,88 +249,47 @@ class ProductLayer(InnerLayer):
             self.edges.data.astype(np.int64),
         )
 
-    @functools.cached_property
-    def edges_per_child_layer(self) -> List[InnerLayerEdges]:
-        """
-        :return: The edges into every child layer. A decomposable product has at most one
-            factor in each child layer, so every node appears at most once in each of
-            them; :attr:`InnerLayerEdges.every_node_at_most_once` keeps the reductions
-            correct for a circuit that is not decomposable.
-        """
-        return [
-            self.inner_layer_edges.into_child_layer(child_layer_index)
-            for child_layer_index in range(len(self.child_layers))
-        ]
-
-    def _gather_and_add(
-        self, child_results: List[SampleNodeValues], fill: float
+    def combine_factors(
+        self, child_results: list[SampleNodeValues], operation: np.ufunc
     ) -> SampleNodeValues:
         """
-        Sum, per node, the results of the child nodes the edges point to.
+        Combine, per node, the results of the child nodes it multiplies.
 
         :param child_results: The result per child layer with the child nodes last.
-        :param fill: The value of a node without any edge.
-        :return: The summed result with the nodes of this layer last.
+        :param operation: An associative and commutative numpy universal function of two
+            arrays, applied element by element, whose identity a node without factors
+            gets.
+        :return: The combined result with the nodes of this layer last.
         """
-        leading_shape = child_results[0].shape[:-1]
-        result = np.zeros(leading_shape + (self.number_of_nodes,))
-        touched = np.zeros(self.number_of_nodes, dtype=bool)
-
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            gathered = child_result[..., edges.child_nodes]
-            if edges.every_node_at_most_once:
-                result[..., edges.nodes] += gathered
-            else:
-                np.add.at(result, (Ellipsis, edges.nodes), gathered)
-            touched[edges.nodes] = True
-
-        if not touched.all():
-            result[..., ~touched] = fill
-        return result
+        values = self.factors.values_of_entries(np.concatenate(child_results, axis=-1))
+        return self.factors.reduce_by_row(values, operation)
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
             child_layer.log_likelihood_of_nodes(events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self._gather_and_add(child_results, fill=0.0)
+        return self.combine_factors(child_results, np.add)
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: Optional[QueryCache] = None
+        self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
             child_layer.cumulative_distribution_of_nodes(events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self._gather_and_multiply(child_results)
-
-    def _gather_and_multiply(
-        self, child_results: List[SampleNodeValues]
-    ) -> SampleNodeValues:
-        leading_shape = child_results[0].shape[:-1]
-        result = np.ones(leading_shape + (self.number_of_nodes,))
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            gathered = child_result[..., edges.child_nodes]
-            if edges.every_node_at_most_once:
-                result[..., edges.nodes] *= gathered
-            else:
-                np.multiply.at(result, (Ellipsis, edges.nodes), gathered)
-        return result
+        return self.combine_factors(child_results, np.multiply)
 
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
         event: SimpleEvent,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeValues:
         child_results = [
             child_layer.probability_of_simple_event_of_nodes(
@@ -328,19 +297,19 @@ class ProductLayer(InnerLayer):
             ).reshape(1, -1)
             for child_layer in self.child_layers
         ]
-        return self._gather_and_multiply(child_results).reshape(-1)
+        return self.combine_factors(child_results, np.multiply).reshape(-1)
 
     @memoized
     def support_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> List[Event]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> list[Event]:
         child_supports = [
             child_layer.support_of_nodes(variables, cache=cache)
             for child_layer in self.child_layers
         ]
 
         own_variables = {variables[index] for index in self.variables}
-        result: List[Optional[Event]] = [None] * self.number_of_nodes
+        result: list[Event | None] = [None] * self.number_of_nodes
 
         for edge in self.iterate_edges():
             support = child_supports[edge.child_layer_index][edge.child_node]
@@ -353,15 +322,15 @@ class ProductLayer(InnerLayer):
 
     @memoized
     def log_mode_of_nodes(
-        self, variables: SortedSet, cache: Optional[QueryCache] = None
-    ) -> Tuple[List[Event], NodeValues]:
+        self, variables: SortedSet, cache: QueryCache | None = None
+    ) -> tuple[list[Event], NodeValues]:
         child_modes = [
             child_layer.log_mode_of_nodes(variables, cache=cache)
             for child_layer in self.child_layers
         ]
 
         own_variables = {variables[index] for index in self.variables}
-        events: List[Optional[Event]] = [None] * self.number_of_nodes
+        events: list[Event | None] = [None] * self.number_of_nodes
         values = np.zeros(self.number_of_nodes)
 
         for edge in self.iterate_edges():
@@ -381,7 +350,7 @@ class ProductLayer(InnerLayer):
         self,
         query: MomentQuery,
         variables: SortedSet,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> NodeVariableValues:
         child_results = [
             child_layer.moment_of_nodes(query, variables, cache=cache)
@@ -389,15 +358,9 @@ class ProductLayer(InnerLayer):
         ]
         # the moments of a decomposable product are the moments of the factor that owns
         # the variable, so summing the (zero padded) child moments is the right reduction
-        result = np.zeros((self.number_of_nodes, query.number_of_variables))
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            if edges.every_node_at_most_once:
-                result[edges.nodes] += child_result[edges.child_nodes]
-            else:
-                np.add.at(result, edges.nodes, child_result[edges.child_nodes])
-        return result
+        return self.combine_factors(
+            [child_result.T for child_result in child_results], np.add
+        ).T
 
     def sample_forward(
         self,
@@ -420,7 +383,7 @@ class ProductLayer(InnerLayer):
 
     def _structural_pass(
         self,
-        child_results: List[LayerWithLogProbabilities],
+        child_results: list[LayerWithLogProbabilities],
         query: StructuralQuery,
     ) -> LayerWithLogProbabilities:
         """
@@ -435,18 +398,21 @@ class ProductLayer(InnerLayer):
             [child_result.layer for child_result in child_results], self.edges.copy()
         )
 
-        own_log_probabilities = np.zeros(self.number_of_nodes)
-        for edges, child_result in zip(self.edges_per_child_layer, child_results):
-            if len(edges) == 0:
-                continue
-            gathered = child_result.log_probabilities[edges.child_nodes]
-            if edges.every_node_at_most_once:
-                own_log_probabilities[edges.nodes] += gathered
-            else:
-                np.add.at(own_log_probabilities, edges.nodes, gathered)
-
         return query.log_probabilities.record(
-            LayerWithLogProbabilities(result, own_log_probabilities)
+            LayerWithLogProbabilities(
+                result, result.sum_of_factor_log_probabilities(child_results)
+            )
+        )
+
+    def sum_of_factor_log_probabilities(
+        self, child_results: list[LayerWithLogProbabilities]
+    ) -> NodeValues:
+        """
+        :param child_results: The log-probabilities of the nodes of every child layer.
+        :return: The log-probability of every node, the sum over its factors.
+        """
+        return self.combine_factors(
+            [child_result.log_probabilities for child_result in child_results], np.add
         )
 
     @memoized
@@ -454,7 +420,7 @@ class ProductLayer(InnerLayer):
         self,
         event: SimpleEvent,
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         child_results = [
             child_layer.log_truncated_of_simple_event(event, query, cache=cache)
@@ -465,9 +431,9 @@ class ProductLayer(InnerLayer):
     @memoized
     def log_truncated_of_simple_events(
         self,
-        events: List[SimpleEvent],
+        events: list[SimpleEvent],
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         number_of_events = len(events)
         number_of_nodes = self.number_of_nodes
@@ -499,16 +465,10 @@ class ProductLayer(InnerLayer):
             [child_result.layer for child_result in child_results], edges
         )
 
-        own_log_probabilities = np.zeros(number_of_events * number_of_nodes)
-        for child_layer_index, child_result in enumerate(child_results):
-            mask = rows == child_layer_index
-            np.add.at(
-                own_log_probabilities,
-                columns[mask],
-                child_result.log_probabilities[data[mask]],
-            )
         return query.log_probabilities.record(
-            LayerWithLogProbabilities(result, own_log_probabilities)
+            LayerWithLogProbabilities(
+                result, result.sum_of_factor_log_probabilities(child_results)
+            )
         )
 
     @memoized
@@ -516,7 +476,7 @@ class ProductLayer(InnerLayer):
         self,
         point: PartialPointType,
         query: StructuralQuery,
-        cache: Optional[QueryCache] = None,
+        cache: QueryCache | None = None,
     ) -> LayerWithLogProbabilities:
         child_results = [
             child_layer.log_conditional_of_point(point, query, cache=cache)
@@ -526,7 +486,7 @@ class ProductLayer(InnerLayer):
 
     def required_child_nodes(
         self, alive: NodeMask, log_probabilities: LogProbabilitiesOfLayers
-    ) -> List[Tuple[Layer, NodeMask]]:
+    ) -> list[tuple[Layer, NodeMask]]:
         kept_edges = alive[self.edges.col]
         result = []
         for child_layer_index, child_layer in enumerate(self.child_layers):
@@ -538,9 +498,9 @@ class ProductLayer(InnerLayer):
 
     def rebuild(
         self,
-        needed: Dict[int, NodeMask],
-        rebuilt: Dict[int, Optional[Layer]],
-    ) -> Optional[Layer]:
+        needed: dict[int, NodeMask],
+        rebuilt: dict[int, Layer | None],
+    ) -> Layer | None:
         alive = needed[id(self)]
         if not alive.any():
             return None
@@ -582,8 +542,8 @@ class ProductLayer(InnerLayer):
 
     @memoized
     def marginal(
-        self, kept: VariableMask, cache: Optional[QueryCache] = None
-    ) -> Optional[Layer]:
+        self, kept: VariableMask, cache: QueryCache | None = None
+    ) -> Layer | None:
         new_child_layers = []
         new_edges = []
 
@@ -610,7 +570,7 @@ class ProductLayer(InnerLayer):
         return self.__class__(new_child_layers, edges)
 
     @memoized
-    def simplify(self, cache: Optional[QueryCache] = None) -> Layer:
+    def simplify(self, cache: QueryCache | None = None) -> Layer:
         simplified_children = [
             child_layer.simplify(cache=cache) for child_layer in self.child_layers
         ]

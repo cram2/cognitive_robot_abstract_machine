@@ -6,7 +6,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
-from typing_extensions import ClassVar, List, Optional, Union
+from typing_extensions import ClassVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import Variable
@@ -80,11 +80,11 @@ class SurfacePosition(Enum):
     """Not attachable to the subject noun — said as its own clause (*"such that …"* / *"where …"*)."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Placement:
     """The request a :class:`ConditionForm` reads: one condition to say relative to a subject."""
 
-    item: Union[SymbolicExpression, RangeFold, RelationalBindingFold]
+    item: SymbolicExpression | RangeFold | RelationalBindingFold
     """The grouped ``WHERE`` conjunct — a raw expression, a range fold, or a relational binding."""
 
     subject: Variable
@@ -100,7 +100,7 @@ class Placement:
     keeps the full *"whose … is …"* clause."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Placed:
     """A rendered condition together with the position it occupies, for the caller to position."""
 
@@ -144,7 +144,7 @@ class ConditionForm(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """
         :param request: The condition and the subject it may attach to.
         :return: ``True`` when this form renders *request*.
@@ -156,7 +156,9 @@ class ConditionForm(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """
         :param request: The condition and its subject.
         :param context: The per-node context (recursion and services).
@@ -180,7 +182,7 @@ class StandaloneForm(ConditionForm):
     position = SurfacePosition.STANDALONE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """A self-referential comparator folds onto no subject noun, so it falls here.
 
         Returning ``True`` unconditionally, it is the catch-all gate that claims the comparator no
@@ -190,14 +192,16 @@ class StandaloneForm(ConditionForm):
         return True
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the residual condition as its own clause via the normal recursion.
 
         Deferring to the recursion is what supplies the whole *its salary is greater than its
         starting_salary* clause; this form contributes only the decision to render it standalone (its
         :attr:`position` is :attr:`SurfacePosition.STANDALONE`), so the caller frames it with *such that*.
         """
-        return context.child(request.item)
+        return context.child(node=request.item)
 
 
 class SuperlativeForm(StandaloneForm):
@@ -217,7 +221,7 @@ class SuperlativeForm(StandaloneForm):
     position = SurfacePosition.SELECTION_MODIFIER
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on ``subject.<chain> == max/min(over the same-type population)``.
 
         Recognising the equality-against-an-aggregate shape is the gate that selects this form over
@@ -227,14 +231,16 @@ class SuperlativeForm(StandaloneForm):
         return superlative_aggregation(request.item, request.subject) is not None
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the post-nominal superlative modifier *"with the maximum/minimum <leaf>"*.
 
         It owns the entire *with the maximum amount* span of the class example, reading the aggregator
         to choose *minimum* or *maximum* and naming the leaf attribute.
         """
-        return ConditionAssembler(context).superlative_modifier(
-            request.item, request.subject
+        return ConditionAssembler(context=context).superlative_modifier(
+            comparator=request.item, subject=request.subject
         )
 
 
@@ -251,7 +257,7 @@ class WhoseRangeForm(StandaloneForm):
     position = SurfacePosition.WHOSE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires when a lower/upper bound pair on a single-hop subject attribute has folded.
 
         Detecting the folded :class:`RangeFold` is the gate that selects this form over two separate
@@ -265,14 +271,16 @@ class WhoseRangeForm(StandaloneForm):
         )
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the *"<attribute> is between low and high"* whose-modifier.
 
         It owns the *salary is between 100 and 200* span — naming the attribute and emitting the
         *between … and …* frame over the two bounds — which the *whose* envelope then wraps.
         """
-        return ConditionAssembler(context).range_modifier(
-            request.item, request.subject, request.number
+        return ConditionAssembler(context=context).range_modifier(
+            range_fold=request.item, subject=request.subject, number=request.number
         )
 
 
@@ -288,7 +296,7 @@ class WhosePredicateForm(StandaloneForm):
     position = SurfacePosition.WHOSE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a single-hop, non-boolean subject attribute compared to a subject-free value.
 
         Passing this guard is what selects the *whose* form for ``robot.battery > 50``, so the
@@ -309,15 +317,17 @@ class WhosePredicateForm(StandaloneForm):
         return not references(item.right, subject)
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the bare *"<attribute> <operator> <value>"* the *"whose"* envelope wraps.
 
         It owns the *battery is greater than 50* span of the class example — the attribute noun,
         operator, and value with the subject dropped — leaving only the *whose* header for the
         envelope to add.
         """
-        return ConditionAssembler(context).attribute_modifier(
-            request.item, request.subject, request.number
+        return ConditionAssembler(context=context).attribute_modifier(
+            comparator=request.item, subject=request.subject, number=request.number
         )
 
 
@@ -335,7 +345,7 @@ class AbsenceForm(StandaloneForm):
     position = SurfacePosition.STANDALONE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a non-negated ``<chain> == None`` comparison.
 
         Recognising the ``== None`` shape is the gate that selects this form over
@@ -350,7 +360,9 @@ class AbsenceForm(StandaloneForm):
         )
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the standalone absence predicate *"<owner> has no <attribute>"*.
 
         It owns the *the Mission has no priority* span, flipping owner and attribute into the *has
@@ -379,22 +391,24 @@ class WithAttributeForm(WhosePredicateForm):
     position = SurfacePosition.SELECTION_MODIFIER
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a compact placement of a single-hop order comparison — the refinement over
         :class:`WhosePredicateForm` that routes it to the compact *"with …"* modifier.
         """
         return (
             request.compact
-            and super().applies(request)
+            and super().applies(request=request)
             and isinstance(request.item, Comparator)
             and request.item.operation in _ORDER_OPERATORS
         )
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render the compact *"with <attribute> <comparison>"* modifier."""
-        return ConditionAssembler(context).with_attribute_modifier(
-            request.item, request.subject
+        return ConditionAssembler(context=context).with_attribute_modifier(
+            comparator=request.item, subject=request.subject
         )
 
 
@@ -414,12 +428,14 @@ class RelationalBindingForm(StandaloneForm):
     position = SurfacePosition.RELATIVE_CLAUSE
 
     @classmethod
-    def applies(cls, request: Placement) -> bool:
+    def applies(cls, *, request: Placement) -> bool:
         """Fires on a :class:`RelationalBindingFold` — the artifact grouping produces."""
         return isinstance(request.item, RelationalBindingFold)
 
     @classmethod
-    def render(cls, request: Placement, context: RuleContext) -> VerbalizationFragment:
+    def render(
+        cls, *, request: Placement, context: RuleContext
+    ) -> VerbalizationFragment:
         """Render *"that is <participle> <preposition> <entity-with-restrictions>"*."""
         fold = request.item
         nested = as_subject_restrictions(
@@ -458,39 +474,41 @@ def place(request: Placement, context: RuleContext) -> Placed:
     >>> verbalize_expression(an(entity(robot).where(robot.battery > 50)))
     'Find a Robot whose battery is greater than 50'
     """
-    form = ConditionForm.most_applicable(request)
-    return Placed(position=form.position, fragment=form.render(request, context))
+    form = ConditionForm.most_applicable(request=request)
+    return Placed(
+        position=form.position, fragment=form.render(request=request, context=context)
+    )
 
 
 # %% placing a whole subject restriction
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RestrictionFragments:
     """The placed pieces of a subject's WHERE, for the caller to position — each goes to a different
     sentence position, so they are kept apart rather than pre-joined."""
 
-    inline_modifiers: List[VerbalizationFragment] = field(default_factory=list)
+    inline_modifiers: list[VerbalizationFragment] = field(default_factory=list)
     """Post-nominal prepositional phrases that attach inline, right after the selection noun — a
     superlative (*"with the maximum amount"*) or a compact attribute restriction (*"with battery
     greater than 50"*)."""
 
-    relative_clauses: List[VerbalizationFragment] = field(default_factory=list)
+    relative_clauses: list[VerbalizationFragment] = field(default_factory=list)
     """Subject-relative clauses on the selection noun — one per relational binding (*"that is
     assigned to a Robot …"*). Empty when the subject binds no related entity."""
 
-    whose: Optional[VerbalizationFragment] = None
+    whose: VerbalizationFragment | None = None
     """The *"whose"* group as a coordinated block (header *"whose"*, one bare predicate per item,
     Oxford-joined) — a sub-list of points in hierarchical rendering, *"whose a, and b"* inline / in
     paragraph. ``None`` when nothing folds into a *"whose"*."""
 
-    residual: Optional[VerbalizationFragment] = None
+    residual: VerbalizationFragment | None = None
     """The residual condition for a separate *"such that …"* / *"where …"* clause; the caller picks
     the keyword and position. ``None`` when the WHERE folds entirely into the other pieces."""
 
 
 def as_subject_restrictions(
-    conditions: List[SymbolicExpression],
+    conditions: list[SymbolicExpression],
     subject: Variable,
     context: RuleContext,
     number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
@@ -573,8 +591,8 @@ def as_subject_restrictions(
 
 
 def _join_residual(
-    fragments: List[VerbalizationFragment],
-) -> Optional[VerbalizationFragment]:
+    fragments: list[VerbalizationFragment],
+) -> VerbalizationFragment | None:
     """:return: The standalone conjuncts joined into one residual condition, or ``None``.
 
     It supplies the comma-and join that knits the two absence clauses of the example into the single

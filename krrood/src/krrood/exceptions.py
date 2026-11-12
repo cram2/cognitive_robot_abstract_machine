@@ -4,12 +4,15 @@ import ast
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Type, Tuple, Protocol
+from typing_extensions import Any, Protocol
 
-from typing_extensions import Optional
+from krrood.patterns.dataclass_field_descriptor import (
+    DataclassFieldDescriptor,
+    DataclassFieldDescriptorOwner,
+)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CanBehaveLikeDataclassException(Protocol):
     """
     A structural template that indicates the matching class is an exception or can be treated as one.
@@ -28,8 +31,48 @@ class CanBehaveLikeDataclassException(Protocol):
         """
 
 
-@dataclass
-class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
+# %% exception chaining
+
+
+@dataclass(kw_only=True, eq=False)
+class CauseLink(DataclassFieldDescriptor):
+    """
+    The link to the exception that an exception was raised from with ``raise ... from``.
+
+    .. note:: Writing the cause also suppresses the context in tracebacks, so writing the
+        cause the exception already has does nothing.
+    """
+
+    def read(self, *, instance: BaseException) -> BaseException | None:
+        return instance.__cause__
+
+    def write(self, *, instance: BaseException, value: BaseException | None) -> None:
+        if value is instance.__cause__:
+            return
+        instance.__cause__ = value
+
+
+@dataclass(kw_only=True, eq=False)
+class ContextLink(DataclassFieldDescriptor):
+    """
+    The link to the exception that was being handled when an exception was raised,
+    recorded whether or not ``raise ... from`` was used.
+    """
+
+    def read(self, *, instance: BaseException) -> BaseException | None:
+        return instance.__context__
+
+    def write(self, *, instance: BaseException, value: BaseException | None) -> None:
+        instance.__context__ = value
+
+
+# %% dataclass exceptions
+
+
+@dataclass(kw_only=True)
+class DataclassException(
+    Exception, CanBehaveLikeDataclassException, DataclassFieldDescriptorOwner, ABC
+):
     """
     A base exception class for dataclass-based exceptions.
     Subclasses implement error_message() and suggest_correction(); both are evaluated at
@@ -41,6 +84,16 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
     print_stack_trace: bool = field(default=True, kw_only=True)
     """
     Whether the stack trace of this exception should be printed when it is handled.
+    """
+
+    raised_from: Exception | None = field(default=None, kw_only=True)
+    """
+    The exception this one was raised from with ``raise ... from``, if any.
+    """
+
+    raised_while_handling: Exception | None = field(default=None, kw_only=True)
+    """
+    The exception that was being handled when this one was raised, if any.
     """
 
     def __post_init__(self):
@@ -62,30 +115,34 @@ class DataclassException(Exception, CanBehaveLikeDataclassException, ABC):
         return Exception.__str__(self)
 
 
-@dataclass
+DataclassException.raised_from = CauseLink()
+DataclassException.raised_while_handling = ContextLink()
+
+
+@dataclass(kw_only=True)
 class InputError(DataclassException, ABC):
     """
     Raised when there is an error with user input.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
     """
     Raised when the number of generic parameters does not match the number of resolved types.
     """
 
-    affected_class: Type
+    affected_class: type
     """
     The class that has the generic parameters.
     """
 
-    parameters: list[Type]
+    parameters: list[type]
     """
     The generic parameters of the class.
     """
 
-    resolved_types: Tuple[Type, ...]
+    resolved_types: tuple[type, ...]
     """
     The resolved types for the generic parameters.
     """
@@ -102,14 +159,14 @@ class MismatchingNumberOfGenericParametersAndResolvedTypes(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundGenericParameter(DataclassException):
     """
     Raised when a generic type parameter is read back from a class that binds it to no
     concrete type.
     """
 
-    affected_class: Type
+    affected_class: type
     """
     The class the parameter was read from.
     """
@@ -129,17 +186,17 @@ class UnboundGenericParameter(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
     """
     Raised when the current module is not given and/or not found for relative import conversion.
     """
 
-    path: Optional[str] = field(kw_only=True, default=None)
+    path: str | None = field(kw_only=True, default=None)
     """
     The path to the file that contains the relative import.
     """
-    source_code: Optional[str] = field(kw_only=True, default=None)
+    source_code: str | None = field(kw_only=True, default=None)
     """
     The source code of the file that contains the relative import.
     """
@@ -154,21 +211,21 @@ class ModuleNotFoundForConvertingImportsToAbsolute(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoSourceDataToParseImportsFrom(InputError):
     """
     Raised when there is no source data given to parse imports from.
     """
 
-    module: Optional[types.ModuleType] = None
+    module: types.ModuleType | None = None
     """
     The module to parse imports from.
     """
-    file_path: Optional[str] = None
+    file_path: str | None = None
     """
     The file path to the module to parse imports from.
     """
-    ast_tree: Optional[ast.AST] = None
+    ast_tree: ast.AST | None = None
     """
     The AST tree to parse imports from.
     """
@@ -184,17 +241,17 @@ class NoSourceDataToParseImportsFrom(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoModuleSourceProvided(InputError):
     """
     Raised when there is no source module data given to parse imports from.
     """
 
-    imported_module_path: Optional[str] = None
+    imported_module_path: str | None = None
     """
     The file path to the module to parse imports from.
     """
-    module_name: Optional[str] = None
+    module_name: str | None = None
     """
     The module to parse imports from.
     """
@@ -209,7 +266,7 @@ class NoModuleSourceProvided(InputError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoDefaultValueFound(DataclassException):
     """
     Raised when no default value for a given field in a dataclass is found.
@@ -231,7 +288,7 @@ class NoDefaultValueFound(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PackageNameNotFoundError(DataclassException):
     """
     Raised when a package name is not found in a given path.
@@ -253,7 +310,7 @@ class PackageNameNotFoundError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PathMissingRequiredPartsError(DataclassException):
     """
     Raised when a path does not contain all required parts.
@@ -276,7 +333,7 @@ class PathMissingRequiredPartsError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SubprocessExecutionError(DataclassException):
     """
     Raised when a subprocess execution fails.
@@ -309,21 +366,21 @@ class SubprocessExecutionError(DataclassException):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SourceDataNotProvided(InputError):
     """
     Raised when no source data is provided.
     """
 
-    file_path: Optional[str] = None
+    file_path: str | None = None
     """
     The file path that was missing source data.
     """
-    tree: Optional[ast.AST] = None
+    tree: ast.AST | None = None
     """
     The AST tree that was missing source data.
     """
-    source_code: Optional[str] = None
+    source_code: str | None = None
     """
     The source code that was missing.
     """

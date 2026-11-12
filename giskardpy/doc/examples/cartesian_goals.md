@@ -17,14 +17,15 @@ This example demonstrates how to use `CartesianPose` goals to move a robot to a 
 
 ```{code-cell} ipython3
 import os
-from giskardpy.executor import SimulationPacer, Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.context import StatechartContext
+from cramph.executor import SimulationPacer, StatechartExecutor
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Vector3, Quaternion
+from krrood_spatial_math.spatial_types import Pose, Vector3, Quaternion
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.world_entity import Body
@@ -35,7 +36,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF, 
 # We use the same configuration as in pr2_world_setup
 urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
 urdf_parser = URDFParser.from_file(file_path=urdf_path)
-world = urdf_parser.parse()
+world = urdf_parser.create_world()
 
 # Initialize PR2 semantic annotation
 try:
@@ -62,8 +63,17 @@ with world.modify_world():
     world.add_connection(c_root_bf)
     c_root_bf.has_hardware_interface = True
 
-# 2. Create a Motion Statechart
-msc = MotionStatechart()
+# 2. Set up the executor with motion control, and create a Motion Statechart in its context
+executor = StatechartExecutor(
+    context=StatechartContext(world=world),
+    pacer=SimulationPacer(real_time_factor=None), # None for fastest execution in docs
+    extensions=[
+        MotionControl(
+            qp_controller_config=QPControllerConfig.create_with_simulation_defaults()
+        )
+    ],
+)
+statechart = Statechart(context=executor.context)
 
 # 3. Define a Cartesian Pose Goal
 # We want to move the left gripper to a specific pose relative to the world root
@@ -82,19 +92,11 @@ goal = CartesianPose(
     goal_pose=goal_pose
 )
 
-msc.add_node(goal)
-msc.add_node(EndMotion.when_true(goal))
+statechart.add_node(goal)
+statechart.add_node(EndMotion.when_true(goal))
 
-# 4. Set up the Executor
-kin_sim = Executor(
-    context=MotionStatechartContext(
-        world=world,
-        qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-    ),
-    pacer=SimulationPacer(real_time_factor=None), # None for fastest execution in docs
-)
-
-kin_sim.compile(msc)
-kin_sim.tick_until_end(timeout=100)
-print(f"Motion finished after {kin_sim.control_cycles} cycles.")
+# 4. Compile and run the statechart
+executor.compile(statechart)
+executor.tick_until_end(timeout=100)
+print(f"Motion finished after {executor.tick_count} cycles.")
 ```

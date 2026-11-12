@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import dataclasses
-import math
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing_extensions import TYPE_CHECKING, Callable, Generic, Self, TypeVar
 
 import numpy as np
 import trimesh
@@ -13,6 +12,7 @@ from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.ormatic.utils import classproperty
 from krrood.parametrization.model_registries import ModelRegistry
+from krrood.patterns.mixin import Mixin
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.distributions.helper import make_dirac
@@ -28,16 +28,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.product_algebra import Event
 from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
-from typing_extensions import (
-    TYPE_CHECKING,
-    Generic,
-    List,
-    Optional,
-    Self,
-    Set,
-    Type,
-    TypeVar,
-)
 
 from semantic_digital_twin.specifications.connections import (
     ActiveConnection1DOFSpecification,
@@ -63,22 +53,23 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from krrood.entity_query_language.query.match import Match
-from semantic_digital_twin.grasping.surface_grasp import (
-    SurfaceGrasp,
-    any_surface_grasp,
-    draw_surface_grasps,
-    from_any_side,
+from semantic_digital_twin.grasping.grasp_strategies import (
+    GraspFromAnySide,
+    GraspStrategy,
+    PinchTheTopOfAWall,
 )
+from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
+    LineSegment3,
     Point3,
     HomogeneousTransformationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ActiveConnection1DOF,
@@ -103,6 +94,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
     from semantic_digital_twin.world import World
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Drawer,
@@ -114,6 +106,8 @@ if TYPE_CHECKING:
         Sink,
         ShelfLayer,
         Wall,
+        CounterTop,
+        Cabinet,
     )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
@@ -127,7 +121,7 @@ class IsPerceivable:
     A mixin class for semantic annotations that can be perceived.
     """
 
-    class_label: Optional[str] = field(default=None, kw_only=True)
+    class_label: str | None = field(default=None, kw_only=True)
     """
     The exact class label of the perceived object.
     """
@@ -140,7 +134,7 @@ TKinematicStructureEntity = TypeVar(
 
 @dataclass(eq=False)
 class HasRootKinematicStructureEntity(
-    SemanticAnnotation, Generic[TKinematicStructureEntity], SubClassSafeGeneric
+    SemanticAnnotation, Generic[TKinematicStructureEntity], SubClassSafeGeneric, Mixin
 ):
     """
     Base class for shared method for HasRootBody and HasRootRegion.
@@ -192,7 +186,7 @@ class HasRootKinematicStructureEntity(
         )
 
     @property
-    def min_max_points(self) -> Tuple[Point3, Point3]:
+    def min_max_points(self) -> tuple[Point3, Point3]:
         min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
         max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
         return min, max
@@ -205,8 +199,8 @@ class HasRootKinematicStructureEntity(
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> KinematicStructureEntitySpecification:
         """
         Build this type's default root entity specification, the geometry only.
@@ -236,9 +230,9 @@ class HasRootKinematicStructureEntity(
         name: str,
         root_specification: KinematicStructureEntitySpecification,
         *,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        annotation_kwargs: Optional[dict] = None,
-        part_specifications: Optional[dict] = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        annotation_kwargs: dict | None = None,
+        part_specifications: dict | None = None,
     ) -> SemanticAnnotationWithRootSpecification[Self]:
         """
         Wrap a root entity specification, typically from
@@ -275,7 +269,7 @@ class HasRootKinematicStructureEntity(
 
     @staticmethod
     def _to_part_bindings(
-        part_specifications: Optional[dict],
+        part_specifications: dict | None,
     ) -> list[PartSpecificationBinding]:
         """
         Convert the keyword-friendly mapping of parts into the bindings the
@@ -325,7 +319,7 @@ class HasRootKinematicStructureEntity(
         return self._world.get_connections_of_branch(self.root)
 
     def _kinematic_structure_entities(
-        self, visited: Set[int]
+        self, visited: set[int]
     ) -> list[KinematicStructureEntity]:
         if id(self) in visited:
             return []
@@ -334,7 +328,7 @@ class HasRootKinematicStructureEntity(
 
 
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity[Body]):
+class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
     """
     Abstract base class for all objects which have a unambiguous root reference frame.
 
@@ -348,9 +342,9 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
         cls,
         name: str,
         world: World,
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        scale: Optional[Scale] = None,
+        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        scale: Scale | None = None,
     ) -> Self:
         """
         Create a new semantic annotation with a new body in the given world.
@@ -374,8 +368,8 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> BodySpecification:
         """
         Build the default body specification whose geometry matches what
@@ -408,10 +402,10 @@ class HasRootBody(HasRootKinematicStructureEntity[Body]):
 
 
 @dataclass(eq=False)
-class HasGraspCandidates(HasRootBody):
+class HasGraspCandidates(HasRootBody, Mixin):
     """
-    A mixin class for semantic annotations that state where they may be grasped, in
-    :meth:`surface_grasp_statement`, and offer grasp candidates.
+    A mixin class for semantic annotations that state where they may be grasped, by
+    their :attr:`grasp_strategy`, and offer grasp candidates.
     """
 
     grasp_candidate_count: int = field(default=12, kw_only=True)
@@ -419,32 +413,42 @@ class HasGraspCandidates(HasRootBody):
     How many grasp candidates the annotation offers.
     """
 
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        """
+        :return: Where the annotation may be grasped.
+        """
+        return GraspFromAnySide()
+
     def grasp_candidates(
         self,
-        model_registry: Optional[ModelRegistry] = None,
-        require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+        model_registry: ModelRegistry | None = None,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
+    ) -> list[GraspCandidate]:
         """
         The grasps this annotation offers, in no particular order: those of its
-        :meth:`grasped_part` when it is grasped at one of its parts; otherwise grasps
-        drawn from the model, or the :meth:`default_grasp_candidates` without one.
+        :meth:`grasped_part` when it is grasped at one of its parts; otherwise
+        :meth:`drawn_grasp_candidates`, or the :meth:`default_grasp_candidates` while no
+        model is given.
 
         :param model_registry: Answers the statement of where the object may be grasped.
-        :param require_lifting: Whether to ask only for grasps that lift the object,
-            which needs a model learned over tried grasps and their results.
+        :param result_pattern: Builds the pattern of the result the grasps asked of
+            ``model_registry`` are to have had, such as
+            :meth:`~semantic_digital_twin.grasping.object_relative_grasp.GraspResult.lifting_pattern`;
+            any result when ``None``.
         """
         part = self.grasped_part()
         if part is not self:
-            return part.grasp_candidates(model_registry, require_lifting)
-        if model_registry is None and not require_lifting:
+            return part.grasp_candidates(model_registry, result_pattern)
+        if model_registry is None:
             return self.default_grasp_candidates()
-        return self.drawn_grasp_candidates(model_registry, require_lifting)
+        return self.drawn_grasp_candidates(model_registry, result_pattern)
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         :return: The grasps offered while no model is given: the object at its own
-            origin, approached from evenly spaced directions around its z-axis, which
-            needs no knowledge of its shape.
+            origin, approached from evenly spaced yaws about its
+            z-axis, which needs no knowledge of its shape.
         """
         return [
             GraspCandidate(
@@ -461,18 +465,19 @@ class HasGraspCandidates(HasRootBody):
 
     def drawn_grasp_candidates(
         self,
-        model_registry: Optional[ModelRegistry] = None,
-        require_lifting: bool = False,
-    ) -> List[GraspCandidate]:
+        model_registry: ModelRegistry | None = None,
+        result_pattern: Callable[[], Match[GraspResult]] | None = None,
+    ) -> list[GraspCandidate]:
         """
-        :param model_registry: Answers :meth:`surface_grasp_statement`; ``None`` draws
-            uniformly from what it allows.
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :return: Grasps drawn from :meth:`surface_grasp_statement` that reach the
-            object's surface, at most :attr:`grasp_candidate_count` of them.
+        :param model_registry: Answers the statement of :attr:`grasp_strategy`;
+            ``None`` draws uniformly from what it allows.
+        :param result_pattern: Builds the pattern of the result the grasps are to have
+            had; any result when ``None``.
+        :return: Grasps drawn from the statement of :attr:`grasp_strategy` that reach the
+            surface of the object, at most :attr:`grasp_candidate_count` of them.
         """
-        grasps = draw_surface_grasps(
-            self.surface_grasp_statement(require_lifting),
+        grasps = draw_grasps(
+            self.grasp_strategy.statement(self, result_pattern),
             self.grasp_candidate_count,
             model_registry,
         )
@@ -484,7 +489,7 @@ class HasGraspCandidates(HasRootBody):
 
     def grasp_surface(self) -> trimesh.Trimesh:
         """
-        :return: The surface that surface grasps are placed on, in the root body's frame:
+        :return: The surface that grasps are placed on, in the root body's frame:
             that of every body the annotation references, its parts included, each as
             what it looks like, or else what it collides as.
         :raises NoGraspGeometry: If none of the bodies has either.
@@ -504,35 +509,20 @@ class HasGraspCandidates(HasRootBody):
             raise NoGraspGeometry(self)
         return trimesh.util.concatenate(surfaces)
 
-    def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        lowest_height: float = 0.05,
-        highest_height: float = 0.95,
-        shallowest_depth: float = 0.0,
-        deepest_depth: float = 0.5,
-    ) -> Match[SurfaceGrasp]:
+    def grasp_axis(self) -> LineSegment3:
         """
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :param lowest_height: The lowest height to grasp at, as a fraction of the grasp
-            surface's bounding box from its bottom to its top.
-        :param highest_height: The height to grasp below, as such a fraction.
-        :param shallowest_depth: The least depth to close the fingers at, as a fraction
-            of the object's narrower horizontal extent.
-        :param deepest_depth: The depth to close the fingers short of, as such a
-            fraction.
-        :return: The statement of where the object may be grasped. The default allows
-            the object between the two heights, closing on it between the two depths.
+        :return: The axis an elongated object is grasped around, in the root body's
+            frame: through the centre of the bounding box of :meth:`grasp_surface`,
+            along its longest extent, from its lower to its upper end.
+        :raises NoGraspGeometry: If the object has no grasp surface.
         """
         lowest, highest = self.grasp_surface().bounds
-        narrower_extent = float(min(highest[:2] - lowest[:2]))
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= lowest_height,
-            grasp.height < highest_height,
-            grasp.depth >= shallowest_depth * narrower_extent,
-            grasp.depth < deepest_depth * narrower_extent,
-            *from_any_side(grasp),
+        axis_index = int(np.argmax(highest - lowest))
+        start, end = (lowest + highest) / 2, (lowest + highest) / 2
+        start[axis_index], end[axis_index] = lowest[axis_index], highest[axis_index]
+        return LineSegment3(
+            start=Point3.from_iterable(start, reference_frame=self.root),
+            end=Point3.from_iterable(end, reference_frame=self.root),
         )
 
     def grasped_part(self) -> HasGraspCandidates:
@@ -544,7 +534,22 @@ class HasGraspCandidates(HasRootBody):
 
 
 @dataclass(eq=False)
-class HasRootRegion(HasRootKinematicStructureEntity[Region]):
+class HasDrawnGraspsByDefault(HasGraspCandidates, Mixin):
+    """
+    A mixin class for semantic annotations whose shape is known well enough that, while
+    no model is given, their grasps are drawn uniformly from where their
+    :attr:`grasp_strategy` allows instead of taken at their origin.
+    """
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        :return: Grasps drawn uniformly from where :attr:`grasp_strategy` allows.
+        """
+        return self.drawn_grasp_candidates()
+
+
+@dataclass(eq=False)
+class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
     """
     A mixin class for semantic annotations that have a region.
     """
@@ -554,9 +559,9 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region]):
         cls,
         name: str,
         world: World,
-        world_root_T_self: Optional[HomogeneousTransformationMatrix] = None,
-        parent_connection_specification: Optional[ConnectionSpecification] = None,
-        scale: Optional[Scale] = None,
+        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_connection_specification: ConnectionSpecification | None = None,
+        scale: Scale | None = None,
     ) -> Self:
         """
         Create a new semantic annotation with a new region in the given world.
@@ -580,8 +585,8 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region]):
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
     ) -> RegionSpecification:
         """
         Build the default region specification whose geometry matches what
@@ -611,7 +616,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region]):
 
 
 @dataclass(eq=False)
-class PartWholeRelationship(HasRootKinematicStructureEntity):
+class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
     """
     Base for annotations that have structural *parts* (the part-whole relation).
 
@@ -640,8 +645,8 @@ class PartWholeRelationship(HasRootKinematicStructureEntity):
         :raises AmbiguousPart: If ``type(part)`` matches more than one part-whole
             relationship field.
         """
-        candidate_fields = WrappedClass(type(self)).fields_with_metadata(
-            IsPartWholeRelationship
+        candidate_fields = WrappedClass(clazz=type(self)).fields_with_metadata(
+            metadata_type=IsPartWholeRelationship
         )
         if field_name:
             named_fields = [
@@ -670,22 +675,24 @@ class PartWholeRelationship(HasRootKinematicStructureEntity):
             raise AmbiguousPart(self, part, [match.field for match in matches])
 
         [match] = matches
-        part._mount_strategy(self, IsPartWholeRelationship.of_wrapped_field(match))
+        part._mount_strategy(
+            self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=match)
+        )
         if match.is_many_to_many_relationship:
             getattr(self, match.field.name).append(part)
         else:
             setattr(self, match.field.name, part)
 
     @property
-    def parts(self) -> List[HasRootKinematicStructureEntity]:
+    def parts(self) -> list[HasRootKinematicStructureEntity]:
         """
         :return: The structural parts of this annotation, from all of its part-whole
             relationship fields.
         """
         parts = []
         for wrapped_part_whole_relationship_field in WrappedClass(
-            type(self)
-        ).fields_with_metadata(IsPartWholeRelationship):
+            clazz=type(self)
+        ).fields_with_metadata(metadata_type=IsPartWholeRelationship):
             value = getattr(self, wrapped_part_whole_relationship_field.field.name)
             if wrapped_part_whole_relationship_field.is_many_to_many_relationship:
                 parts.extend(value)
@@ -695,7 +702,7 @@ class PartWholeRelationship(HasRootKinematicStructureEntity):
 
 
 @dataclass(eq=False)
-class HasApertures(HasRootBody, PartWholeRelationship):
+class HasApertures(HasRootBody, PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have apertures.
 
@@ -703,7 +710,7 @@ class HasApertures(HasRootBody, PartWholeRelationship):
     removes its volume from the annotation's collision and visual geometry.
     """
 
-    apertures: List[Aperture] = field(
+    apertures: list[Aperture] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -717,7 +724,7 @@ class HasApertures(HasRootBody, PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasMovableJoint(HasRootBody, ABC):
+class HasMovableJoint(HasRootBody, Mixin, ABC):
     """
     A mixin class for semantic annotations whose root moves relative to its parent, such
     as a door on its hinge or a drawer on its rails.
@@ -773,12 +780,12 @@ class HasMovableJoint(HasRootBody, ABC):
 
 
 @dataclass(eq=False)
-class HasDrawers(PartWholeRelationship):
+class HasDrawers(PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have drawers.
     """
 
-    drawers: List[Drawer] = field(
+    drawers: list[Drawer] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -790,12 +797,12 @@ class HasDrawers(PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasShelfLayers(PartWholeRelationship):
+class HasShelfLayers(PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have shelf layers.
     """
 
-    shelf_layers: List[ShelfLayer] = field(
+    shelf_layers: list[ShelfLayer] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -807,12 +814,12 @@ class HasShelfLayers(PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasDoors(PartWholeRelationship):
+class HasDoors(PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have doors.
     """
 
-    doors: List[Door] = field(
+    doors: list[Door] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -824,13 +831,13 @@ class HasDoors(PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasHandle(HasGraspCandidates, PartWholeRelationship):
+class HasHandle(HasGraspCandidates, PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have a handle, and are grasped at it
     when they have one.
     """
 
-    handle: Optional[Handle] = field(
+    handle: Handle | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -849,102 +856,13 @@ class HasHandle(HasGraspCandidates, PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasPinchableWall(HasGraspCandidates):
-    """
-    A mixin class for semantic annotations with a thin upright wall that a gripper
-    pinches from above.
-    """
-
-    def wall_grasp_statement(
-        self,
-        lowest_height: float,
-        highest_height: float,
-        require_lifting: bool,
-        shallowest_depth: float = 0.25,
-        deepest_depth: float = 0.75,
-        largest_pitch: float = 0.5,
-        largest_roll: float = math.pi / 8,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param lowest_height: The lowest height to pinch the wall at, as a fraction of
-            the grasp surface's bounding box from its bottom to its top.
-        :param highest_height: The height to pinch the wall below, as such a fraction.
-        :param require_lifting: Whether to ask only for grasps that lift the object.
-        :param shallowest_depth: The least depth to close the fingers at, as a fraction
-            of the wall's thickness.
-        :param deepest_depth: The depth to close the fingers short of, as such a
-            fraction.
-        :param largest_pitch: How far the approach may tilt off vertical towards the
-            wall, in radians.
-        :param largest_roll: How far the fingers may turn off closing across the wall,
-            either way, in radians.
-        :return: The wall between the two heights, all around, closing between the two
-            depths, tilted and turned at most as far as given.
-        :raises NoGraspGeometry: If there is no wall to measure.
-        """
-        thickness = self.wall_thickness((lowest_height + highest_height) / 2)
-        grasp = any_surface_grasp(require_lifting)
-        return grasp.where(
-            grasp.height >= lowest_height,
-            grasp.height < highest_height,
-            grasp.depth >= shallowest_depth * thickness,
-            grasp.depth < deepest_depth * thickness,
-            grasp.azimuth >= 0.0,
-            grasp.azimuth < 2 * math.pi,
-            grasp.pitch >= 0.0,
-            grasp.pitch < largest_pitch,
-            grasp.roll >= -largest_roll,
-            grasp.roll < largest_roll,
-        )
-
-    def wall_thickness(
-        self, height: float = 0.5, number_of_directions: int = 12
-    ) -> float:
-        """
-        Cast rays outward from the middle of the grasp surface, at ``height``, and take
-        the distance between the first two surfaces each ray passes, the inside and the
-        outside of the wall, as the wall's thickness.
-
-        :param height: Where to measure, as a fraction of the grasp surface's bounding
-            box from its bottom to its top.
-        :param number_of_directions: In how many directions around the annotation the
-            wall is measured.
-        :return: The median thickness over the directions that hit the wall.
-        :raises NoGraspGeometry: If no direction hits a wall.
-        """
-        shape = self.grasp_surface()
-        yaws = np.linspace(0, 2 * np.pi, number_of_directions, endpoint=False)
-        directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
-        lowest, highest = shape.bounds
-        middle = (lowest + highest) / 2
-        middle[2] = lowest[2] + height * (highest[2] - lowest[2])
-        # Embree reports only the inner wall here, so the exact intersector is used.
-        intersector = trimesh.ray.ray_triangle.RayMeshIntersector(shape)
-        locations, ray_indices, _ = intersector.intersects_location(
-            ray_origins=np.tile(middle, (len(yaws), 1)), ray_directions=directions
-        )
-        thicknesses = []
-        for index in range(len(yaws)):
-            distances = np.sort(
-                np.linalg.norm(
-                    locations[ray_indices == index][:, :2] - middle[:2], axis=1
-                )
-            )
-            if len(distances) > 1:
-                thicknesses.append(float(distances[1] - distances[0]))
-        if not thicknesses:
-            raise NoGraspGeometry(self)
-        return float(np.median(thicknesses))
-
-
-@dataclass(eq=False)
-class HasRim(HasPinchableWall, PartWholeRelationship):
+class HasRim(HasDrawnGraspsByDefault, PartWholeRelationship, Mixin):
     """
     A mixin class for open containers that have a rim, and are grasped at it when they
     have one.
     """
 
-    rim: Optional[Rim] = field(
+    rim: Rim | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -961,47 +879,21 @@ class HasRim(HasPinchableWall, PartWholeRelationship):
             return super().grasped_part()
         return self.rim
 
-    def default_grasp_candidates(self) -> List[GraspCandidate]:
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
         """
-        :return: Grasps drawn uniformly from :meth:`surface_grasp_statement`.
+        :return: Pinching the top of the container's own wall, as its rim would be.
         """
-        return self.drawn_grasp_candidates()
-
-    def surface_grasp_statement(
-        self,
-        require_lifting: bool = False,
-        rim_depth: float = 0.02,
-        shallowest_rim_fraction: float = 0.25,
-        deepest_rim_fraction: float = 0.75,
-    ) -> Match[SurfaceGrasp]:
-        """
-        :param require_lifting: Whether to ask only for grasps that lift the container.
-        :param rim_depth: How far below the container's highest point its rim reaches,
-            in meters.
-        :param shallowest_rim_fraction: How far below the highest point to pinch at
-            least, as a fraction of ``rim_depth``.
-        :param deepest_rim_fraction: How far below the highest point to pinch at most,
-            as such a fraction.
-        :return: The container's own surface between the two fractions of its top
-            ``rim_depth``, pinched across its wall, as a :class:`Rim` part is.
-        :raises NoGraspGeometry: If the container has no wall to measure there.
-        """
-        lowest, highest = self.grasp_surface().bounds
-        rim_fraction = rim_depth / float(highest[2] - lowest[2])
-        return self.wall_grasp_statement(
-            1 - deepest_rim_fraction * rim_fraction,
-            1 - shallowest_rim_fraction * rim_fraction,
-            require_lifting,
-        )
+        return PinchTheTopOfAWall()
 
 
 @dataclass(eq=False)
-class HasHandles(HasRootBody, PartWholeRelationship):
+class HasHandles(HasRootBody, PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that may have more than one handle.
     """
 
-    handles: List[Handle] = field(
+    handles: list[Handle] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -1019,12 +911,12 @@ A type variable for HasRootBody.
 
 
 @dataclass(eq=False)
-class HasLegs(PartWholeRelationship):
+class HasLegs(PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have legs.
     """
 
-    legs: List[Leg] = field(
+    legs: list[Leg] = field(
         default_factory=list,
         hash=False,
         kw_only=True,
@@ -1036,12 +928,12 @@ class HasLegs(PartWholeRelationship):
 
 
 @dataclass(eq=False)
-class HasSink(PartWholeRelationship):
+class HasSink(PartWholeRelationship, Mixin):
     """
     A mixin class for semantic annotations that have a sink.
     """
 
-    sink: Optional[Sink] = field(
+    sink: Sink | None = field(
         default=None,
         metadata=IsPartWholeRelationship().as_dict(),
     )
@@ -1059,7 +951,7 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
     with the table when it is moved.
     """
 
-    objects: List[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
+    objects: list[THasRootBody] = field(default_factory=list, hash=False, kw_only=True)
     """
     The occupants currently contained in/on this annotation.
     """
@@ -1072,8 +964,8 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
         self.objects.append(object)
 
     def get_objects_of_type(
-        self, object_type: Type[SemanticAnnotation]
-    ) -> List[HasRootBody]:
+        self, object_type: type[SemanticAnnotation]
+    ) -> list[HasRootBody]:
         """
         Returns all objects of a given type in the semantic annotation.
 
@@ -1089,7 +981,7 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
 
 
 @dataclass(eq=False)
-class HasSupportingSurface(IsStorageSpace):
+class HasSupportingSurface(IsStorageSpace, Mixin):
     """
     A semantic annotation that represents a supporting surface.
     """
@@ -1104,7 +996,7 @@ class HasSupportingSurface(IsStorageSpace):
         upward_threshold: float = 0.95,
         clearance_threshold: float = 0.5,
         min_surface_area: float = 0.0225,  # 15cm x 15cm
-    ) -> Optional[Region]:
+    ) -> Region | None:
         """
         Calculate the supporting surface region for the semantic annotation, add it to
         the world, and set it as the supporting surface of self.
@@ -1236,10 +1128,10 @@ class HasSupportingSurface(IsStorageSpace):
 
     def sample_points_from_surface(
         self,
-        body_to_sample_for: Optional[HasRootBody] = None,
-        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        body_to_sample_for: HasRootBody | None = None,
+        category_of_interest: type[SemanticAnnotation] | None = None,
         amount: int = 100,
-    ) -> List[Point3]:
+    ) -> list[Point3]:
         """
         Samples points from a surface around the semantic annotation.
 
@@ -1295,7 +1187,7 @@ class HasSupportingSurface(IsStorageSpace):
 
     def _build_surface_sampler(
         self,
-        category_of_interest: Optional[Type[SemanticAnnotation]] = None,
+        category_of_interest: type[SemanticAnnotation] | None = None,
         object_bloat: float = 0.1,
     ):
         """
@@ -1349,10 +1241,10 @@ class HasSupportingSurface(IsStorageSpace):
 
     def _2d_gaussian_sampler_from_2d_sample_space(
         self,
-        objects_of_interest: List[HasRootBody],
+        objects_of_interest: list[HasRootBody],
         variance: float,
         sample_space: Event,
-    ) -> Optional[ProbabilisticCircuit]:
+    ) -> ProbabilisticCircuit | None:
         """
         Create a Gaussian mixture model from a list of points, truncated by an event.
 
@@ -1375,7 +1267,7 @@ class HasSupportingSurface(IsStorageSpace):
 
     def _untruncated_2d_gaussian_sampler(
         self,
-        objects_of_interest: List[HasRootBody],
+        objects_of_interest: list[HasRootBody],
         variance: float,
     ) -> ProbabilisticCircuit:
         """
@@ -1425,8 +1317,8 @@ class HasSupportingSurface(IsStorageSpace):
     def spawn_bounding_boxes_as_region(
         self,
         boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
-        name: Optional[PrefixedName] = None,
-        color: Optional[Color] = None,
+        name: PrefixedName | None = None,
+        color: Color | None = None,
     ) -> Region:
         """
         Spawn a collection of bounding boxes as a region, connected to this
@@ -1441,7 +1333,7 @@ class HasSupportingSurface(IsStorageSpace):
         if name is None:
             name = PrefixedName("region")
         if color is None:
-            color = Color(0.5, 1.0, 0.5, 0.5)
+            color = Color.from_rgba(red=0.5, green=1.0, blue=0.5, opacity=0.5)
 
         shapes = boxes.as_shapes()
         shapes.dye_shapes(color)
@@ -1458,7 +1350,7 @@ class HasSupportingSurface(IsStorageSpace):
         tolerance: float = 0.001,
         bloat_obstacles: float = 0.0,
         bloat_walls: float = 0.0,
-        semantic_wall_annotation: Optional[Wall] = None,
+        semantic_wall_annotation: Wall | None = None,
         obstacle_height_clearance: float = 0.01,
     ) -> PlanarGraphOfBoundingBoxes:
         """
@@ -1539,7 +1431,7 @@ class HasSupportingSurface(IsStorageSpace):
 
 
 @dataclass(eq=False)
-class HasCaseAsRootBody(HasSupportingSurface):
+class HasCaseAsRootBody(HasSupportingSurface, Mixin):
     """
     A mixin class for semantic annotations that have a case as root body.
     """
@@ -1593,8 +1485,8 @@ class HasCaseAsRootBody(HasSupportingSurface):
     def get_default_root_kinematic_structure_entity_specification(
         cls,
         name: str | None = None,
-        scale: Optional[Scale] = None,
-        connection_specification: Optional[ConnectionSpecification] = None,
+        scale: Scale | None = None,
+        connection_specification: ConnectionSpecification | None = None,
         *,
         wall_thickness: float = 0.01,
     ) -> BodySpecification:
@@ -1616,3 +1508,44 @@ class HasCaseAsRootBody(HasSupportingSurface):
             cls._create_container_event(scale, wall_thickness),
             connection_specification=connection_specification,
         )
+
+
+# %% furniture built from other furniture
+
+
+@dataclass(eq=False)
+class HasCabinets(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations built from cabinets.
+    """
+
+    cabinets: list[Cabinet] = field(
+        default_factory=list,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The cabinets the semantic annotation is built from.
+    """
+
+
+@dataclass(eq=False)
+class HasCounterTop(PartWholeRelationship, Mixin):
+    """
+    A mixin class for semantic annotations that carry a counter top.
+
+    Distinct from :class:`HasSupportingSurface`, which is the bare region something can
+    be put on: this is the worktop as a thing in its own right, which is what a scan
+    sees and what in turn carries the sink.
+    """
+
+    counter_top: CounterTop = field(
+        default=None,
+        hash=False,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The counter top of the semantic annotation.
+    """

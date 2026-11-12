@@ -24,7 +24,7 @@ keywords=["probabilistic models", "probabilistic machine learning", "probability
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
-    "random-events>=4.1.2",
+    "random-events>=26.10.0",
     "networkx",
     "plotly",
     "scipy>=1.10",
@@ -36,14 +36,14 @@ dependencies = [
     "N2G",
     "python-igraph",
     "rustworkx>=0.16.0",
-    "scikit-learn>=1.6.1",
+    "scikit-learn>=1.7",
     "stepmix>=3.0.0",
     "jax>=0.6.0",
     "jaxtyping>=0.3.2",
     "equinox>=0.12.1",
     "mlflow>=2.22.0",
     "optax>=0.2.4",
-    "pyjpt",
+    "pyjpt; sys_platform == 'linux'",
     "mlflow-skinny>=2.22.0",
     "dnutils",
     "arff",
@@ -51,12 +51,16 @@ dependencies = [
     "PySide6",
     "qt-material",
     "superqt",
-    "krrood",
+    "krrood>=26.10.0",
+    "causal-learn",
+    "array-api-compat>=1.15",
+    "array-api-extra>=0.11",
 ]
 
 [project.urls]
 "Source" = 'https://github.com/cram2/cognitive_robot_abstract_machine'
 "Bug Tracker" = 'https://github.com/cram2/cognitive_robot_abstract_machine/issues'
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]  # list of folders that contain the packages (["."] by default)

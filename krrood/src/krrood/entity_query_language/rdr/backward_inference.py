@@ -1,13 +1,13 @@
 """
 Backward inference for EQL-RDR rule trees.
 
-Given a target conclusion value (e.g. ``Species.molusc``), traverse the rule-tree
-(The rules form a tree, but if you look at the level of the used expressions, it is
-a directed acyclic graph)
-backwards to enumerate every rule path that could produce it. Each path accumulates
-*guard conditions* from the ``Refinement``/``Alternative``/``Next`` selectors and wraps
-the result as a :class:`SufficientConditionSet`. The full answer is the disjunction of all
-such sets (a DNF formula).
+Given a target conclusion value (e.g. ``Species.molusc``), traverse the rule-tree (The
+rules form a tree, but if you look at the level of the used expressions, it is a
+directed acyclic graph) backwards to enumerate every rule path that could produce it.
+Each path accumulates *guard conditions* from the
+``Refinement``/``Alternative``/``Next`` selectors and wraps the result as a
+:class:`SufficientConditionSet`. The full answer is the disjunction of all such sets (a
+DNF formula).
 
 This is backward chaining — goal-directed reasoning that works backwards through the
 rule tree, the inverse of forward evaluation / classification.
@@ -18,16 +18,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from typing_extensions import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-)
+from typing_extensions import TYPE_CHECKING, Any, Iterator
 
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.rdr.branch_semantics import SelectorBranchSemantics
@@ -44,49 +35,62 @@ if TYPE_CHECKING:
 # Data structures
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class SufficientConditionSet:
-    """One rule path's complete conditions to conclude a specific conclusion value.
+    """
+    One rule path's complete conditions to conclude a specific conclusion value.
 
     The conditions are stored as :class:`GuardCondition` tuples. Use
     :meth:`evaluate_against` to check them against a concrete case without mutating the
     original rule tree.
     """
 
-    conditions: Tuple[GuardCondition, ...]
+    conditions: tuple[GuardCondition, ...]
     """
     The conditions that all must hold to conclude a specific conclusion value.
     """
 
     def evaluate_against(
-            self,
-            shared_variable: Variable,
-            case: Any,
+        self,
+        *,
+        shared_variable: Variable,
+        case: Any,
     ) -> bool:
-        """Evaluate every condition against *case* bound to *shared_variable*.
-
-        Delegates per-guard evaluation to :meth:`GuardCondition.holds_for`.
-        All conditions must hold for the result to be ``True``.
-
-        :param shared_variable: The EQL variable the conditions range over
-            (the rule tree's ``case_variable``).
-        :param case: The concrete case object to evaluate against.
-        :return: ``True`` if every guard condition is satisfied.
         """
-        return all(guard.holds_for(shared_variable, case) for guard in self.conditions)
+        Evaluate every condition against *case* bound to *shared_variable*.
+
+        Delegates per-guard evaluation to :meth:`GuardCondition.holds_for`. All
+        conditions must hold for the result to be ``True``.
+
+        :param shared_variable: The EQL variable the conditions range over (the rule
+            tree's ``case_variable``).
+        :param case: The concrete case object to evaluate against.
+        :return:``True`` if every guard condition is satisfied.
+        """
+        return all(
+            guard.holds_for(shared_variable=shared_variable, case=case)
+            for guard in self.conditions
+        )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ConclusionSufficientConditionSets:
     """
-    The rule tree's complete backward-inference knowledge about one conclusion value. In other words, it is the
-    known sets of sufficient conditions any of which if satisfied implies the conclusion value
+    The rule tree's complete backward-inference knowledge about one conclusion value.
+
+    In other words, it is the known sets of sufficient conditions any of which if
+    satisfied implies the conclusion value
     """
 
     conclusion_value: Any
-    """The queried conclusion value (e.g. ``Species.molusc``)."""
-    sufficient_condition_sets: Tuple[SufficientConditionSet, ...]
-    """Every rule path that can produce this conclusion, as sufficient condition sets."""
+    """
+    The queried conclusion value (e.g. ``Species.molusc``).
+    """
+
+    sufficient_condition_sets: tuple[SufficientConditionSet, ...]
+    """
+    Every rule path that can produce this conclusion, as sufficient condition sets.
+    """
 
     def is_satisfiable(self) -> bool:
         """:return: ``True`` when at least one rule path exists for this value."""
@@ -97,21 +101,29 @@ class ConclusionSufficientConditionSets:
 # Tree traversal
 
 
-@dataclass
+@dataclass(kw_only=True)
 class _RulePath:
-    """An internal value object for one discovered rule path during traversal."""
+    """
+    An internal value object for one discovered rule path during traversal.
+    """
 
-    conditions: Tuple[GuardCondition, ...]
-    """Guard conditions accumulated along the path to these add nodes."""
-    add_nodes: Tuple[Add, ...]
-    """Conclusion nodes at the leaf of this rule path."""
+    conditions: tuple[GuardCondition, ...]
+    """
+    Guard conditions accumulated along the path to these add nodes.
+    """
+
+    add_nodes: tuple[Add, ...]
+    """
+    Conclusion nodes at the leaf of this rule path.
+    """
 
 
 def _leaf_guards(
-        expression: SymbolicExpression,
-        negated: bool,
-) -> List[GuardCondition]:
-    """Decompose an expression into leaf-level branch-choice predicates.
+    expression: SymbolicExpression,
+    negated: bool,
+) -> list[GuardCondition]:
+    """
+    Decompose an expression into leaf-level branch-choice predicates.
 
     This is not tree traversal — it is predicate decomposition. It answers the question:
     "when this expression appears as a path guard (i.e. a competing sibling branch), what
@@ -129,19 +141,24 @@ def _leaf_guards(
     :param negated: Whether the guard polarity is negated.
     :return: The flat list of leaf :class:`GuardCondition` objects.
     """
-    semantics = SelectorBranchSemantics.most_specific_for(expression)
+    semantics = SelectorBranchSemantics.most_specific_for(expression=expression)
     if semantics is not None:
-        return semantics.sibling_guards(expression, negated, _leaf_guards)
-    if isinstance(expression, Not) and isinstance(expression._child_, ConclusionSelector):
+        return semantics.sibling_guards(
+            selector=expression, negated=negated, decompose=_leaf_guards
+        )
+    if isinstance(expression, Not) and isinstance(
+        expression._child_, ConclusionSelector
+    ):
         return _leaf_guards(expression._child_, not negated)
-    return [GuardCondition(expression, negated)]
+    return [GuardCondition(original_expression=expression, negated=negated)]
 
 
 def _collect_rule_paths(
-        node: SymbolicExpression,
-        guard: List[GuardCondition],
+    node: SymbolicExpression,
+    guard: list[GuardCondition],
 ) -> Iterator[_RulePath]:
-    """Recursively walk the selector DAG, yielding a path for every leaf rule.
+    """
+    Recursively walk the selector DAG, yielding a path for every leaf rule.
 
     Which children a selector is descended into, and what entering each one contributes to
     the accumulated *guard*, is the selector's own
@@ -153,18 +170,22 @@ def _collect_rule_paths(
     :param guard: The guard conditions accumulated on the way to *node*.
     :return: One :class:`_RulePath` per leaf rule reachable from *node*.
     """
-    semantics = SelectorBranchSemantics.most_specific_for(node)
+    semantics = SelectorBranchSemantics.most_specific_for(expression=node)
     if semantics is None:
-        add_nodes = node.conclusions_of_type(Add)
+        add_nodes = node.conclusions_of_type(conclusion_type=Add)
         if add_nodes:
             yield _RulePath(
-                conditions=tuple(guard + [GuardCondition(node, negated=False)]),
+                conditions=tuple(
+                    guard + [GuardCondition(original_expression=node, negated=False)]
+                ),
                 add_nodes=tuple(add_nodes),
             )
         return
 
-    for branch in semantics.branches(node, _leaf_guards):
-        yield from _collect_rule_paths(branch.child_expression, guard + list(branch.entry_guards))
+    for branch in semantics.branches(selector=node, decompose=_leaf_guards):
+        yield from _collect_rule_paths(
+            branch.child_expression, guard + list(branch.entry_guards)
+        )
 
 
 # %%
@@ -172,35 +193,46 @@ def _collect_rule_paths(
 
 
 def _index_conclusions_by_value(
-        conditions_root: SymbolicExpression,
-) -> Dict[Any, ConclusionSufficientConditionSets]:
-    """One full traversal of the rule tree; buckets every conclusion value once.
+    conditions_root: SymbolicExpression,
+) -> dict[Any, ConclusionSufficientConditionSets]:
+    """
+    One full traversal of the rule tree; buckets every conclusion value once.
 
     :param conditions_root: The root of the rule tree's condition DAG.
     :return: A dict mapping each conclusion value to its
         :class:`ConclusionSufficientConditionSets`.
     """
-    buckets: Dict[Any, List[SufficientConditionSet]] = defaultdict(list)
+    buckets: dict[Any, list[SufficientConditionSet]] = defaultdict(list)
     for path in _collect_rule_paths(conditions_root, []):
-        seen: Set[Any] = set()
+        seen: set[Any] = set()
         for add_node in path.add_nodes:
             value = add_node.unwrapped_value
             if value not in seen:
-                buckets[value].append(SufficientConditionSet(path.conditions))
+                buckets[value].append(
+                    SufficientConditionSet(conditions=path.conditions)
+                )
                 seen.add(value)
-    return {v: ConclusionSufficientConditionSets(v, tuple(sets)) for v, sets in buckets.items()}
+    return {
+        v: ConclusionSufficientConditionSets(
+            conclusion_value=v, sufficient_condition_sets=tuple(sets)
+        )
+        for v, sets in buckets.items()
+    }
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BackwardInferenceIndex:
-    """Lazy cache of the rule tree's backward-inference results.
+    """
+    Lazy cache of the rule tree's backward-inference results.
 
-    On first query after construction (or after :meth:`invalidate`), one full
-    traversal builds the entire index for all conclusion values in a single pass.
-    Subsequent queries for any value are O(1) dict lookups.
+    On first query after construction (or after :meth:`invalidate`), one full traversal
+    builds the entire index for all conclusion values in a single pass. Subsequent
+    queries for any value are O(1) dict lookups.
     """
 
-    _cache: Optional[Dict[Any, ConclusionSufficientConditionSets]] = field(default=None, init=False)
+    _cache: dict[Any, ConclusionSufficientConditionSets] | None = field(
+        default=None, init=False
+    )
     """
     The full index of all conclusion values, or ``None`` if the index is not built.
     """
@@ -210,9 +242,10 @@ class BackwardInferenceIndex:
         self._cache = None
 
     def query(
-            self,
-            expression: Optional[SymbolicExpression],
-            conclusion_value: Any,
+        self,
+        *,
+        expression: SymbolicExpression | None,
+        conclusion_value: Any,
     ) -> ConclusionSufficientConditionSets:
         """
         :param expression: Any node belonging to the rule tree, or ``None`` for an empty
@@ -221,12 +254,16 @@ class BackwardInferenceIndex:
         :return: The backward-inference knowledge for *conclusion_value*.
         """
         if expression is None:
-            return ConclusionSufficientConditionSets(conclusion_value, ())
+            return ConclusionSufficientConditionSets(
+                conclusion_value=conclusion_value, sufficient_condition_sets=()
+            )
         if self._cache is None:
             self._cache = _index_conclusions_by_value(expression._conditions_root_)
         return self._cache.get(
             conclusion_value,
-            ConclusionSufficientConditionSets(conclusion_value, ()),
+            ConclusionSufficientConditionSets(
+                conclusion_value=conclusion_value, sufficient_condition_sets=()
+            ),
         )
 
 
@@ -235,14 +272,15 @@ class BackwardInferenceIndex:
 
 
 def get_conclusion_sufficient_conditions_from_a_rule_tree(
-        expression: Optional[SymbolicExpression],
-        conclusion_value: Any,
+    expression: SymbolicExpression | None,
+    conclusion_value: Any,
 ) -> ConclusionSufficientConditionSets:
-    """Inspect the rule tree for every rule path that produces *conclusion_value*.
+    """
+    Inspect the rule tree for every rule path that produces *conclusion_value*.
 
     Each discovered path yields one :class:`SufficientConditionSet` containing the
-    complete set of conditions (including guards from ``Refinement`` and
-    ``Alternative`` selectors) that must be true for the path to be traversed.
+    complete set of conditions (including guards from ``Refinement`` and ``Alternative``
+    selectors) that must be true for the path to be traversed.
 
     When no path exists, returns a :class:`ConclusionSufficientConditionSets` with
     ``is_satisfiable() == False``.
@@ -252,4 +290,6 @@ def get_conclusion_sufficient_conditions_from_a_rule_tree(
     :param conclusion_value: The target value to search for.
     :return: The backward-inference knowledge.
     """
-    return BackwardInferenceIndex().query(expression, conclusion_value)
+    return BackwardInferenceIndex().query(
+        expression=expression, conclusion_value=conclusion_value
+    )

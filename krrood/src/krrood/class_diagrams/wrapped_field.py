@@ -12,26 +12,29 @@ from datetime import datetime
 from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
-from typing import Generic, Any
-
 from typing_extensions import (
+    Annotated,
     get_origin,
     get_args,
     ClassVar,
-    List,
     Type,
     TYPE_CHECKING,
     Optional,
     TypeVar,
     Union,
+    Generic,
+    Any,
 )
+
 
 from krrood.class_diagrams.exceptions import MissingContainedTypeOfContainer
 from krrood.class_diagrams.utils import (
     behaves_like_a_built_in_type,
     common_base_class,
     get_type_hints_of_object,
+    is_union_annotation,
 )
+from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -41,7 +44,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeResolutionError(TypeError):
     """
     Error raised when a type cannot be resolved, even if searched for manually.
@@ -53,7 +56,7 @@ class TypeResolutionError(TypeError):
         super().__init__(f"Could not resolve type for {self.name}")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WrappedField:
     """
     A class that wraps a field of dataclass and provides some utility functions.
@@ -69,18 +72,18 @@ class WrappedField:
     The dataclass field object that is wrapped.
     """
 
-    public_name: Optional[str] = None
+    public_name: str | None = None
     """
     If the field is a relationship managed field, this is public name of the
     relationship that manages the field.
     """
 
-    property_descriptor: Optional[PropertyDescriptor] = None
+    property_descriptor: PropertyDescriptor | None = None
     """
     The property descriptor instance that manages the field.
     """
 
-    container_types: ClassVar[List[Type]] = [list, set, tuple, type, Sequence]
+    container_types: ClassVar[list[type]] = [list, set, tuple, type, Sequence]
     """
     A list of container types that are supported by the parser.
     """
@@ -107,43 +110,65 @@ class WrappedField:
         return f"{module_and_class_name(self.clazz.clazz)}.{self.field.name}"
 
     @cached_property
-    def resolved_type(self):
+    def resolved_type(self) -> Any:
         """
         Resolve the type hint for this field.
+
+        A field typed ``Annotated[T, ...]`` resolves to ``T``.
 
         :return: The resolved type hint.
         :raises CouldNotResolveType: If the type cannot be resolved.
         """
-        # Fast path: already-resolved type (e.g., provided by specialized generic introspector)
-        if not isinstance(self.field.type, str):
-            return self.field.type
+        type_hint = self.field.type
+        # A string is a postponed annotation; anything else is already resolved, e.g. by
+        # the specialized generic introspector.
+        if isinstance(type_hint, str):
+            type_hint = get_type_hints_of_object(
+                self.clazz.class_to_introspect,
+                namespace=tuple(self._build_initial_namespace().items()),
+            )[self.field.name]
 
-        local_namespace = self._build_initial_namespace()
-
-        # If it's a specialized generic, use its origin for get_type_hints
-        clazz = self.clazz.class_to_introspect
-
-        return get_type_hints_of_object(
-            clazz, namespace=tuple(local_namespace.items())
-        )[self.field.name]
+        if get_origin(type_hint) is not Annotated:
+            return type_hint
+        return type_hint.__origin__
 
     def _build_initial_namespace(self) -> dict:
         """
-        Build the initial namespace for type resolution from the class diagram.
+        Build the fallback namespace for resolving the class's annotations.
+
+        It holds the class diagram's classes whose names the declaring modules do not
+        bind, such as names imported only for type checking, so that a module's own
+        binding wins over a same-named class from another module.
         """
         class_diagram = self.clazz._class_diagram
         if class_diagram is None:
             return {}
+        names_bound_by_declaring_modules = self._names_bound_by_declaring_modules_()
         namespace = {}
         for cls in class_diagram.wrapped_classes:
             # Only add to namespace if it's a real type.
             # Specialized generics (which have _GenericAlias as clazz) are skipped
             # to avoid shadowing the origin classes.
-            if isinstance(cls.clazz, type):
+            if (
+                isinstance(cls.clazz, type)
+                and cls.name not in names_bound_by_declaring_modules
+            ):
                 namespace[cls.name] = cls.clazz
         return namespace
 
-    def _find_class_by_name(self, class_name: str) -> Type:
+    def _names_bound_by_declaring_modules_(self) -> set[str]:
+        """
+        :return: The global names of the modules of the introspected class and its base
+            classes, whose annotations the type resolution evaluates.
+        """
+        names = set()
+        for base in getattr(self.clazz.class_to_introspect, "__mro__", ()):
+            module = sys.modules.get(base.__module__)
+            if module is not None:
+                names.update(vars(module))
+        return names
+
+    def _find_class_by_name(self, *, class_name: str) -> type:
         """
         Find a class by name in the class diagram or sys.modules.
         """
@@ -165,7 +190,24 @@ class WrappedField:
         return get_origin(self.resolved_type) in self.container_types
 
     @cached_property
-    def container_type(self) -> Optional[Type]:
+    def holds_collection(self) -> bool:
+        """
+        Whether the field's value is a collection of any
+        :class:`~krrood.class_diagrams.collection_kind.CollectionKind`, or, for a union
+        such as ``Optional``, whether any member of the union is.
+        """
+        annotations = (
+            get_args(self.resolved_type)
+            if is_union_annotation(self.resolved_type)
+            else (self.resolved_type,)
+        )
+        return any(
+            get_origin(annotation) in CollectionKind.all_classes()
+            for annotation in annotations
+        )
+
+    @cached_property
+    def container_type(self) -> type | None:
         if not self.is_container:
             return None
         return get_origin(self.resolved_type)
@@ -174,6 +216,17 @@ class WrappedField:
     def is_collection_of_builtins(self):
         return self.is_container and all(
             behaves_like_a_built_in_type(field_type)
+            for field_type in get_args(self.resolved_type)
+        )
+
+    @cached_property
+    def is_collection_of_types(self) -> bool:
+        """
+        :return: Whether the field holds a collection of classes, such as
+            ``list[type[X]]``.
+        """
+        return self.is_container and all(
+            field_type in (type, Type) or get_origin(field_type) is type
             for field_type in get_args(self.resolved_type)
         )
 
@@ -220,7 +273,9 @@ class WrappedField:
                     return self.resolved_type
                 else:
                     raise MissingContainedTypeOfContainer(
-                        self.clazz.clazz, self.name, self.container_type
+                        class_=self.clazz.clazz,
+                        field_name=self.name,
+                        container_type=self.container_type,
                     )
 
     @cached_property
@@ -259,7 +314,7 @@ class WrappedField:
         )
 
     @cached_property
-    def type_endpoint(self) -> Type:
+    def type_endpoint(self) -> type:
         """
         The concrete type this field ultimately points to, ready to be used directly.
 
@@ -273,7 +328,7 @@ class WrappedField:
         return endpoint
 
     @cached_property
-    def _unresolved_type_endpoint(self) -> Type:
+    def _unresolved_type_endpoint(self) -> type:
         """
         The type this field points to before a bounded ``TypeVar`` is reduced to its
         bound: the contained type for containers and optionals, the lowest common
@@ -389,7 +444,7 @@ class WrappedField:
 
 
 @lru_cache(maxsize=None)
-def manually_search_for_class_name(target_class_name: str) -> Type:
+def manually_search_for_class_name(target_class_name: str) -> type:
     """
     Searches for a class with the specified name in the current module's `globals()`
     dictionary and all loaded modules present in `sys.modules`. This function attempts
@@ -405,7 +460,7 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
     found_classes += search_class_in_sys_modules(target_class_name)
 
     if len(found_classes) == 0:
-        raise TypeResolutionError(target_class_name)
+        raise TypeResolutionError(name=target_class_name)
     elif len(found_classes) == 1:
         resolved_class = found_classes[0]
     else:
@@ -417,7 +472,7 @@ def manually_search_for_class_name(target_class_name: str) -> Type:
     return resolved_class
 
 
-def search_class_in_globals(target_class_name: str) -> List[Type]:
+def search_class_in_globals(target_class_name: str) -> list[type]:
     """
     Searches for a class with the given name in the current module's globals.
 
@@ -431,7 +486,7 @@ def search_class_in_globals(target_class_name: str) -> List[Type]:
     ]
 
 
-def search_class_in_sys_modules(target_class_name: str) -> List[Type]:
+def search_class_in_sys_modules(target_class_name: str) -> list[type]:
     """
     Searches for a class with the given name in all loaded modules (via sys.modules).
     """

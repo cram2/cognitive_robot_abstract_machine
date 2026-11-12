@@ -4,13 +4,13 @@ import weakref
 from dataclasses import dataclass, field
 from weakref import ReferenceType
 
-from typing_extensions import TYPE_CHECKING, Any, Dict, Iterator, List
+from typing_extensions import TYPE_CHECKING, Any, Iterator
 
 if TYPE_CHECKING:
     from krrood.patterns.role import Role
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoleRegistry:
     """
     Runtime inverse index from a role taker to the roles attached to it.
@@ -24,14 +24,14 @@ class RoleRegistry:
     taker alive and never conflates two distinct takers that happen to compare equal.
     """
 
-    _roles_by_taker_identity: Dict[int, List[ReferenceType[Role]]] = field(
+    _roles_by_taker_identity: dict[int, list[ReferenceType[Role]]] = field(
         default_factory=dict
     )
     """
     Maps the identity of a taker to weak references to the roles attached to it.
     """
 
-    def register(self, role: Role) -> None:
+    def register(self, *, role: Role) -> None:
         """
         Index *role* under every taker in its taker chain.
 
@@ -41,9 +41,9 @@ class RoleRegistry:
         :param role: The role to index.
         """
         for role_taker in role.all_role_takers:
-            self._index_role_under_taker(role, role_taker)
+            self._index_role_under_taker(role=role, role_taker=role_taker)
 
-    def roles_of(self, role_taker: Any) -> Iterator[Role]:
+    def roles_of(self, *, role_taker: Any) -> Iterator[Role]:
         """
         Yield the live roles attached to *role_taker* directly or transitively.
 
@@ -61,7 +61,7 @@ class RoleRegistry:
         bucket[:] = [weakref.ref(role) for role in live_roles]
         yield from live_roles
 
-    def _index_role_under_taker(self, role: Role, role_taker: Any) -> None:
+    def _index_role_under_taker(self, *, role: Role, role_taker: Any) -> None:
         """
         Add *role* to the bucket of *role_taker*, creating the bucket on first use.
 

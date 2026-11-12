@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import functools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
 from scipy.sparse import coo_array
-from typing_extensions import Any, List, Self, Tuple
+from typing_extensions import Any, Self
 
 
 @dataclass
@@ -33,7 +32,7 @@ class SparseEntries:
     """
 
     @classmethod
-    def concatenate(cls, parts: List[SparseEntries]) -> Self:
+    def concatenate(cls, parts: list[SparseEntries]) -> Self:
         """
         :param parts: The entries to join, in order.
         :return: All entries of the parts.
@@ -44,7 +43,7 @@ class SparseEntries:
             np.concatenate([part.columns for part in parts]),
         )
 
-    def to_coo_array(self, shape: Tuple[int, int]) -> coo_array:
+    def to_coo_array(self, shape: tuple[int, int]) -> coo_array:
         """
         :param shape: The shape of the dense array.
         :return: The sparse array that stores these entries.
@@ -62,99 +61,127 @@ class SparseEntries:
 
 
 @dataclass(eq=False)
-class RowGroupedSparseArray:
+class RowGroupedSparsity:
     """
-    A two dimensional sparse array whose stored entries can be grouped by row.
+    Which entries of a two dimensional sparse array are stored, with the index arrays
+    that reduce per-entry values row by row.
 
-    Grouping lays the entries of every row out in one row of a rectangular array, padded
-    where a row has fewer entries than the fullest one, so that a reduction over the
-    entries of every row becomes one reduction over the last axis of that array.
-    """
-
-    array: coo_array
-    """
-    The stored entries in coordinate format.
-
-    The rows and columns of the entries are fixed; only their values may change.
+    The sparsity is structure: it is fixed once constructed and every index array is
+    computed at construction, so reducing values never computes an index.
     """
 
-    @classmethod
-    def from_entries(cls, entries: SparseEntries, shape: Tuple[int, int]) -> Self:
-        """
-        :param entries: The stored entries.
-        :param shape: The shape of the dense array.
-        :return: The sparse array.
-        """
-        return cls(entries.to_coo_array(shape))
+    rows: npt.NDArray[np.int64]
+    """
+    The row of every stored entry.
+    """
 
-    @property
-    def shape(self) -> Tuple[int, int]:
-        return self.array.shape
+    columns: npt.NDArray[np.int64]
+    """
+    The column of every stored entry.
+    """
 
-    @property
-    def number_of_stored_entries(self) -> int:
-        return self.array.nnz
+    shape: tuple[int, int]
+    """
+    The shape of the dense array.
+    """
 
-    @property
-    def rows(self) -> npt.NDArray[np.int64]:
-        """
-        :return: The row of every stored entry.
-        """
-        return self.array.row
+    gather: npt.NDArray[np.int64] = field(init=False)
+    """
+    The positions of the stored entries of every row, as a rectangular index matrix of
+    shape (#rows, largest number of entries of a row).
 
-    @property
-    def columns(self) -> npt.NDArray[np.int64]:
-        """
-        :return: The column of every stored entry.
-        """
-        return self.array.col
+    Rows with fewer entries are padded with the position one past the last entry, which
+    :meth:`pad` fills with a neutral value.
+    """
 
-    @property
-    def data(self) -> npt.NDArray:
-        """
-        :return: The value of every stored entry.
-        """
-        return self.array.data
+    rows_by_entry_count: npt.NDArray[np.int64] = field(init=False)
+    """
+    The rows ordered by their number of stored entries, the fullest first.
+    """
 
-    @data.setter
-    def data(self, value: npt.NDArray):
-        self.array.data = value
+    entry_count_ranks: npt.NDArray[np.int64] = field(init=False)
+    """
+    The position of every row in :attr:`rows_by_entry_count`.
+    """
 
-    @functools.cached_property
-    def gather(self) -> npt.NDArray[np.int64]:
-        """
-        The positions of the stored entries of every row, as a rectangular index matrix
-        of shape (#rows, largest number of entries of a row).
+    entry_positions_by_rank: list[npt.NDArray[np.int64]] = field(init=False)
+    """
+    Element ``k`` lists the position of the ``k``-th entry of every row with more than
+    ``k`` entries, the rows ordered as :attr:`rows_by_entry_count`. For entries stored
+    in rows ``[2, 0, 2, 1, 2, 0]``:
 
-        Rows with fewer entries are padded with the position one past the last entry,
-        which :meth:`pad` fills with a neutral value.
+    .. code-block:: python
+
+        rows_by_entry_count     = [2, 0, 1, 3]
+        entry_positions_by_rank = [[0, 1, 3],  # the first entry of rows 2, 0 and 1
+                                   [2, 5],     # the second entry of rows 2 and 0
+                                   [4]]        # the third entry of row 2
+    """
+
+    stores_every_column_once_in_order: bool = field(init=False)
+    """
+    Whether the ``k``-th stored entry is in column ``k`` and every column holds one
+    entry, so that taking the stored columns of a row of values is the identity.
+    """
+
+    def __post_init__(self):
+        self.rows = np.asarray(self.rows, dtype=np.int64)
+        self.columns = np.asarray(self.columns, dtype=np.int64)
+        self.shape = (int(self.shape[0]), int(self.shape[1]))
+
+        counts = np.bincount(self.rows, minlength=self.shape[0])
+        self.gather = self.gather_of_rows(counts)
+        self.rows_by_entry_count = np.argsort(-counts, kind="stable")
+        self.entry_count_ranks = np.argsort(self.rows_by_entry_count)
+
+        gather_by_entry_count = self.gather[self.rows_by_entry_count]
+        rows_per_rank = (gather_by_entry_count < self.number_of_stored_entries).sum(
+            axis=0
+        )
+        self.entry_positions_by_rank = [
+            gather_by_entry_count[:number_of_rows, rank]
+            for rank, number_of_rows in enumerate(rows_per_rank)
+            if number_of_rows > 0
+        ]
+        self.stores_every_column_once_in_order = len(self.columns) == self.shape[
+            1
+        ] and np.array_equal(self.columns, np.arange(len(self.columns)))
+
+    def gather_of_rows(self, counts: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
         """
-        rows = self.rows
-        number_of_entries = len(rows)
-        counts = np.bincount(rows, minlength=self.shape[0])
+        :param counts: The number of stored entries of every row.
+        :return: The value of :attr:`gather`.
+        """
+        number_of_entries = len(self.rows)
         width = max(int(counts.max()) if len(counts) else 0, 1)
 
         gather = np.full((self.shape[0], width), number_of_entries, dtype=np.int64)
         # the position of every entry inside its row
-        order = np.argsort(rows, kind="stable")
+        order = np.argsort(self.rows, kind="stable")
         offsets = np.arange(number_of_entries) - np.repeat(
             np.concatenate([[0], np.cumsum(counts)[:-1]]), counts
         )
-        gather[rows[order], offsets] = order
+        gather[self.rows[order], offsets] = order
         return gather
 
-    @functools.cached_property
-    def is_contiguous(self) -> bool:
+    @property
+    def number_of_stored_entries(self) -> int:
         """
-        :return: Whether the entries are stored row by row with the same number of
-            entries per row, in which case grouping them is a reshape rather than a
-            gather.
+        :return: The number of entries the array stores.
         """
-        gather = self.gather
-        return bool(
-            self.number_of_stored_entries == gather.size
-            and np.array_equal(gather, np.arange(gather.size).reshape(gather.shape))
-        )
+        return len(self.rows)
+
+    def values_of_entries(self, values: npt.NDArray) -> npt.NDArray:
+        """
+        :param values: One value per column, the columns in the last axis.
+        :return: The value of the column of every stored entry, the entries in the last
+            axis.
+        """
+        # usually every column is stored once and in order, in which case the gather
+        # would copy an array with one entry per event per column for nothing
+        if self.stores_every_column_once_in_order:
+            return values
+        return values[..., self.columns]
 
     def pad(self, values: npt.NDArray, padding: float) -> npt.NDArray:
         """
@@ -169,34 +196,79 @@ class RowGroupedSparseArray:
             [values, np.full(values.shape[:-1] + (1,), padding)], axis=-1
         )
 
-    def group_by_row(
-        self, values: npt.NDArray, padding: float = -np.inf
-    ) -> npt.NDArray:
+    def reduce_by_row(self, values: npt.NDArray, operation: np.ufunc) -> npt.NDArray:
         """
-        Rearrange per-entry values into one row per row of this array.
+        Combine the entries of every row with ``operation``, giving its identity for a
+        row without entries, without padding any row to the fullest one.
 
         :param values: Per-entry values with the entries in the last axis.
-        :param padding: The value for rows with fewer entries than the fullest one.
-        :return: The values with shape ``(..., #rows, entries per row)``.
+        :param operation: An associative and commutative numpy universal function of two
+            arrays, applied element by element, that has an identity.
+        :return: The values with shape ``(..., #rows)``.
         """
-        if self.is_contiguous:
-            return values.reshape(values.shape[:-1] + self.gather.shape)
-        return self.pad(values, padding)[..., self.gather]
+        result = np.full(values.shape[:-1] + (0,), operation.identity, dtype=float)
+        for positions in reversed(self.entry_positions_by_rank):
+            entries = values[..., positions]
+            number_of_reduced_rows = result.shape[-1]
+            result = np.concatenate(
+                [
+                    operation(entries[..., :number_of_reduced_rows], result),
+                    entries[..., number_of_reduced_rows:],
+                ],
+                axis=-1,
+            )
+        rows_without_entries = np.full(
+            values.shape[:-1] + (self.shape[0] - result.shape[-1],),
+            operation.identity,
+            dtype=float,
+        )
+        result = np.concatenate([result, rows_without_entries], axis=-1)
+        return result[..., self.entry_count_ranks]
+
+
+@dataclass(eq=False)
+class RowGroupedSparseArray:
+    """
+    A two dimensional sparse array whose stored entries can be reduced row by row.
+
+    The values of the stored entries are the only part that may change; which entries
+    are stored is fixed by :attr:`sparsity`.
+    """
+
+    data: npt.NDArray
+    """
+    The value of every stored entry.
+    """
+
+    sparsity: RowGroupedSparsity
+    """
+    Which entries are stored.
+    """
+
+    @classmethod
+    def from_entries(cls, entries: SparseEntries, shape: tuple[int, int]) -> Self:
+        """
+        :param entries: The stored entries.
+        :param shape: The shape of the dense array.
+        :return: The sparse array.
+        """
+        return cls(
+            np.asarray(entries.data),
+            RowGroupedSparsity(entries.rows, entries.columns, shape),
+        )
 
     def with_data(self, data: npt.NDArray) -> Self:
         """
         :param data: The new value of every stored entry.
         :return: A sparse array with the entries of this one and the given values.
         """
-        return self.from_entries(
-            SparseEntries(data, self.rows, self.columns), self.shape
-        )
+        return self.__class__(data, self.sparsity)
 
     def copy(self) -> Self:
         """
-        :return: A copy of this array that shares no memory with it.
+        :return: A copy of this array whose values share no memory with it.
         """
-        return self.__class__(self.array.copy())
+        return self.with_data(self.data.copy())
 
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
         return self.copy()

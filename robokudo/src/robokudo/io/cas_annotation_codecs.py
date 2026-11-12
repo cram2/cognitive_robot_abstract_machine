@@ -4,7 +4,7 @@ KRROOD-backed codecs for CAS annotation serialization.
 
 from __future__ import annotations
 
-from typing_extensions import Any, Dict, List
+from typing_extensions import Any
 
 import numpy as np
 
@@ -38,19 +38,19 @@ class Open3DPointCloudJSONSerializer(
     """
 
     @classmethod
-    def to_json(cls, obj: o3d.geometry.PointCloud, **kwargs) -> Dict[str, Any]:
+    def to_json(cls, instance: o3d.geometry.PointCloud, **kwargs) -> dict[str, Any]:
         """
         Convert an Open3D point cloud into a JSON-compatible payload.
         """
         return {
-            JSONField.TYPE: get_full_class_name(type(obj)),
-            "payload": encode_open3d_point_cloud_to_base64_pcd(obj),
+            JSONField.TYPE: get_full_class_name(type(instance)),
+            "payload": encode_open3d_point_cloud_to_base64_pcd(instance),
         }
 
     @classmethod
     def from_json(
         cls,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         clazz: type[o3d.geometry.PointCloud],
         **kwargs: Any,
     ) -> o3d.geometry.PointCloud:
@@ -66,20 +66,20 @@ class NumpyScalarJSONSerializer(ExternalClassJSONSerializer[np.generic]):
     """
 
     @classmethod
-    def to_json(cls, obj: np.generic, **kwargs) -> Dict[str, Any]:
+    def to_json(cls, instance: np.generic, **kwargs) -> dict[str, Any]:
         """
         Convert a NumPy scalar value to JSON-compatible data.
         """
         return {
-            JSONField.TYPE: get_full_class_name(type(obj)),
-            "dtype": str(obj.dtype),
-            "value": obj.item(),
+            JSONField.TYPE: get_full_class_name(type(instance)),
+            "dtype": str(instance.dtype),
+            "value": instance.item(),
         }
 
     @classmethod
     def from_json(
         cls,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         clazz: type[np.generic],
         **kwargs: Any,
     ) -> Any:
@@ -90,14 +90,14 @@ class NumpyScalarJSONSerializer(ExternalClassJSONSerializer[np.generic]):
         return np.array(data["value"], dtype=dtype).item()
 
 
-def serialize_annotations(annotations: List[Any]) -> List[Dict[str, Any]]:
+def serialize_annotations(annotations: list[Any]) -> list[dict[str, Any]]:
     """
     Serialize annotation objects with the KRROOD serializer.
     """
     return [to_json(annotation) for annotation in annotations]
 
 
-def deserialize_annotations(data: Any, **kwargs: Any) -> List[Any]:
+def deserialize_annotations(data: Any, **kwargs: Any) -> list[Any]:
     """
     Deserialize annotation payloads with optional constructor keyword arguments.
     """

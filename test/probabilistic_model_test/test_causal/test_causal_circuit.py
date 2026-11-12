@@ -52,7 +52,7 @@ def causal_circuit_of(
     """
     return CausalCircuit.from_probabilistic_circuit(
         circuit,
-        MarginalDeterminismTreeNode.from_causal_graph(causes, effects),
+        MarginalDeterminismTreeNode.from_variable_order(causes),
         causes,
         effects,
     )
@@ -135,23 +135,17 @@ def test_an_empty_query_set_is_not_listed(x):
     assert node.all_query_sets() == []
 
 
-def test_the_root_of_a_causal_graph_queries_the_first_variable_in_priority_order(
-    x, y, z
-):
-    effect = Continuous("effect")
-    assert MarginalDeterminismTreeNode.from_causal_graph(
-        [x, y, z], [effect], causal_priority_order=[z, x, y]
+def test_the_root_of_a_variable_order_queries_its_first_variable(x, y, z):
+    assert MarginalDeterminismTreeNode.from_variable_order(
+        [x, y, z], causal_priority_order=[z, x, y]
     ).query_set == {z}
-    assert MarginalDeterminismTreeNode.from_causal_graph(
-        [x, y], [effect]
-    ).query_set == {x}
+    assert MarginalDeterminismTreeNode.from_variable_order([x, y]).query_set == {x}
 
 
 @pytest.mark.parametrize("number_of_causes", [3, 5])
 def test_every_cause_and_no_effect_is_queried(number_of_causes):
     causes = [Continuous(f"x{index}") for index in range(number_of_causes)]
-    effect = Continuous("effect")
-    root = MarginalDeterminismTreeNode.from_causal_graph(causes, [effect])
+    root = MarginalDeterminismTreeNode.from_variable_order(causes)
     queried = set().union(*root.all_query_sets())
     assert queried == set(causes)
     assert not root.is_leaf

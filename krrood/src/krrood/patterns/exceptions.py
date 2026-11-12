@@ -3,12 +3,12 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 
-from typing_extensions import Any, Callable, List, Type
+from typing_extensions import Any, Callable
 
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DelegatedFactoryMethodError(DataclassException):
     """
     Raised when a role-taker factory method is invoked through a role.
@@ -18,12 +18,12 @@ class DelegatedFactoryMethodError(DataclassException):
     is refused to keep that mistake loud instead of quiet.
     """
 
-    role_type: Type
+    role_type: type
     """
     The role type the factory method was accessed through.
     """
 
-    taker_type: Type
+    taker_type: type
     """
     The role-taker type that declares the factory method.
     """
@@ -48,7 +48,7 @@ class DelegatedFactoryMethodError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoleAttributeNotDeclaredError(DataclassException):
     """
     Raised when assigning a name that the role does not declare as one of its own
@@ -58,7 +58,7 @@ class RoleAttributeNotDeclaredError(DataclassException):
     write cannot silently shadow a role-taker attribute.
     """
 
-    role_type: Type
+    role_type: type
     """
     The role class the assignment was attempted on.
     """
@@ -81,7 +81,7 @@ class RoleAttributeNotDeclaredError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnmemoizableOwnerError(DataclassException):
     """
     Raised when a memoized call's owner cannot hold a cache.
@@ -113,7 +113,7 @@ class UnmemoizableOwnerError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeywordNamesNoFactoryParameter(DataclassException, TypeError):
     """
     Raised when a keyword argument given for construction names no parameter of the
@@ -144,7 +144,7 @@ class KeywordNamesNoFactoryParameter(DataclassException, TypeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousRuleError(DataclassException):
     """
     Two or more rules of a family are equally specific for the same subject, a collision
@@ -158,7 +158,7 @@ class AmbiguousRuleError(DataclassException):
     What the rules were asked about when the collision occurred.
     """
 
-    candidates: List[Type]
+    candidates: list[type]
     """
     The equally specific rule classes that collided.
     """
@@ -174,13 +174,13 @@ class AmbiguousRuleError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InterfaceInstantiationError(DataclassException, TypeError):
     """
     Raised when an interface itself is instantiated instead of a class implementing it.
     """
 
-    interface: Type
+    interface: type
     """
     The interface that was instantiated.
     """

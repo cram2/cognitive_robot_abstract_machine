@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from unittest import TestCase
 
-from typing_extensions import List, Any
+from typing_extensions import Any
 
 from .datasets import Robot, Part, PhysicalObject
 from krrood.ripple_down_rules.datastructures.case import CaseAttribute
@@ -30,7 +30,7 @@ class RelationalRDRTestCase(TestCase):
     part_d: Part
     part_e: Part
     part_f: Part
-    target: List[PhysicalObject]
+    target: list[PhysicalObject]
 
     @classmethod
     def setUpClass(cls):
@@ -42,13 +42,20 @@ class RelationalRDRTestCase(TestCase):
         cls.part_d = Part(name="D")
         cls.part_e = Part(name="E")
         cls.part_f = Part(name="F")
-        robot = Robot("pr2", parts=[cls.part_a, cls.part_b, cls.part_c, cls.part_d])
+        robot = Robot(
+            name="pr2", parts=[cls.part_a, cls.part_b, cls.part_c, cls.part_d]
+        )
         cls.part_a.contained_objects = [cls.part_b, cls.part_c]
         cls.part_c.contained_objects = [cls.part_d]
         cls.part_d.contained_objects = [cls.part_e]
         cls.part_e.contained_objects = [cls.part_f]
         cls.robot: Robot = robot
-        cls.case_query = CaseQuery(robot, "contained_objects", (PhysicalObject,), False)
+        cls.case_query = CaseQuery(
+            original_case=robot,
+            attribute_name="contained_objects",
+            _attribute_types=(PhysicalObject,),
+            mutually_exclusive=False,
+        )
         cls.target = [cls.part_b, cls.part_c, cls.part_d, cls.part_e]
 
     def test_classify_scrdr(self):
@@ -59,11 +66,16 @@ class RelationalRDRTestCase(TestCase):
         )
         expert = Human(use_loaded_answers=use_loaded_answers)
         if use_loaded_answers:
-            expert.load_answers(filename)
+            expert.load_answers(path=filename)
 
         scrdr = SingleClassRDR()
         cat = scrdr.fit_case(
-            CaseQuery(self.robot, "contained_objects", (PhysicalObject,), False),
+            case_query=CaseQuery(
+                original_case=self.robot,
+                attribute_name="contained_objects",
+                _attribute_types=(PhysicalObject,),
+                mutually_exclusive=False,
+            ),
             expert=expert,
         )
         # render_tree(scrdr.start_rule, use_dot_exporter=True,
@@ -73,7 +85,7 @@ class RelationalRDRTestCase(TestCase):
         if save_answers:
             cwd = os.path.dirname(__file__)
             file = os.path.join(cwd, filename)
-            expert.save_answers(file)
+            expert.save_answers(path=file)
 
     def test_parse_relational_conditions(self):
         user_input = "case.parts is not None and len(case.parts) > 0"

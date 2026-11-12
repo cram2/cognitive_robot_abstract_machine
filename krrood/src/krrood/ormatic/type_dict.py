@@ -1,25 +1,23 @@
 from dataclasses import dataclass, field
-from typing import Type, Any, Iterator, Tuple
+from typing_extensions import Any, Iterator
 
-
-from typing_extensions import Dict
 
 from krrood.inheritance_path_length import inheritance_path_length
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TypeDict:
     """
     A dictionary that gets the closest key, using the inheritance path length instead of
     looking for direct matches.
     """
 
-    _dict: Dict[Type, Any] = field(default_factory=dict)
+    _dict: dict[type, Any] = field(default_factory=dict)
     """
     The pure data dict.
     """
 
-    def _get_inheritance_path_length_of_keys(self, clazz: Type) -> Dict[Type, int]:
+    def _get_inheritance_path_length_of_keys(self, *, clazz: type) -> dict[type, int]:
         """
         Get the inheritance path length of all keys in the dictionary relative to the
         given class.
@@ -30,11 +28,12 @@ class TypeDict:
         return {
             k: v
             for k in self._dict.keys()
-            if (v := inheritance_path_length(clazz, k)) is not None
+            if (v := inheritance_path_length(child_class=clazz, parent_class=k))
+            is not None
         }
 
-    def __getitem__(self, key: Type) -> Any:
-        distances = self._get_inheritance_path_length_of_keys(key)
+    def __getitem__(self, key: type) -> Any:
+        distances = self._get_inheritance_path_length_of_keys(clazz=key)
         if distances:
             return self._dict[min(distances, key=distances.get)]
         else:
@@ -42,32 +41,32 @@ class TypeDict:
                 f"No matching key found for {key} using inheritance path length"
             )
 
-    def get(self, key: Type, default: Any = None) -> Any:
+    def get(self, *, key: type, default: Any = None) -> Any:
         try:
             return self[key]
         except KeyError:
             return default
 
-    def __setitem__(self, key: Type, value: Any) -> None:
+    def __setitem__(self, key: type, value: Any) -> None:
         return self._dict.__setitem__(key, value)
 
-    def __delitem__(self, key: Type) -> None:
+    def __delitem__(self, key: type) -> None:
         return self._dict.__delitem__(key)
 
-    def __iter__(self) -> Iterator[Type]:
+    def __iter__(self) -> Iterator[type]:
         return self._dict.__iter__()
 
     def __len__(self) -> int:
         return self._dict.__len__()
 
-    def __contains__(self, key: Type) -> bool:
-        return len(self._get_inheritance_path_length_of_keys(key)) > 0
+    def __contains__(self, key: type) -> bool:
+        return len(self._get_inheritance_path_length_of_keys(clazz=key)) > 0
 
-    def keys(self) -> Iterator[Type]:
+    def keys(self) -> Iterator[type]:
         return self._dict.keys()
 
     def values(self) -> Iterator[Any]:
         return self._dict.values()
 
-    def items(self) -> Iterator[Tuple[Type, Any]]:
+    def items(self) -> Iterator[tuple[type, Any]]:
         return self._dict.items()

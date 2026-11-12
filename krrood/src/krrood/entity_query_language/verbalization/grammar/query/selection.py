@@ -17,7 +17,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional, Tuple
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute
@@ -55,7 +54,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 )
 
 
-def subject_referent_id(variable: SymbolicExpression) -> Optional[uuid.UUID]:
+def subject_referent_id(variable: SymbolicExpression) -> uuid.UUID | None:
     """:return: The referent id for a subject/selection variable (``None`` when *variable* is not a
     single variable, which suppresses pronominalisation).
 
@@ -68,7 +67,7 @@ def subject_referent_id(variable: SymbolicExpression) -> Optional[uuid.UUID]:
     return variable._id_ if isinstance(variable, Variable) else None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelectionAssembler:
     """Render a query's selected variables / columns into prose — the single owner of *how a
     selection is said* (natural prose, parenthesised tuple, plural population, co-owned genitive).
@@ -85,7 +84,8 @@ class SelectionAssembler:
 
     def prose(
         self,
-        variables: List[SymbolicExpression],
+        *,
+        variables: list[SymbolicExpression],
         number: GrammaticalNumber = GrammaticalNumber.SINGULAR,
     ) -> VerbalizationFragment:
         """:return: the selections joined as natural prose *"a, b, and c"* (Oxford comma, no
@@ -102,34 +102,38 @@ class SelectionAssembler:
         'Find the department and name of an Employee'
         """
         if number is GrammaticalNumber.PLURAL:
-            selections = [self.one(variable, number) for variable in variables]
+            selections = [
+                self.one(variable=variable, number=number) for variable in variables
+            ]
         else:
-            selections = self._folded(variables)
+            selections = self._folded(variables=variables)
         return oxford_comma(selections, Conjunctions.AND.as_fragment())
 
     def one(
-        self, variable: SymbolicExpression, number: GrammaticalNumber
+        self, *, variable: SymbolicExpression, number: GrammaticalNumber
     ) -> VerbalizationFragment:
         """:return: a single selection, as a bare plural population (*"Employees"*) when *number* is
         plural and the selection is a variable, else its default referring form.
 
         >>> employee = variable(Employee, [])
-        >>> verbalize_expression(a(set_of(employee)).ordered_by(employee.salary, descending=True))
+        >>> verbalize_expression(a(set_of(employee)).ordered_by(variable=employee.salary, descending=True))
         'Report Employees ordered by their salaries from highest to lowest'
         """
         if number is GrammaticalNumber.PLURAL and isinstance(variable, Variable):
             return NounPhrase(
                 head=RoleFragment.for_variable(
-                    variable._type_.__name__, variable, number=GrammaticalNumber.PLURAL
+                    label=variable._type_.__name__,
+                    expression=variable,
+                    number=GrammaticalNumber.PLURAL,
                 ),
                 number=GrammaticalNumber.PLURAL,
                 definiteness=Definiteness.INDEFINITE,
                 referent_id=subject_referent_id(variable),
             )
-        return self.context.child(variable)
+        return self.context.child(node=variable)
 
     def parenthesised(
-        self, variables: List[SymbolicExpression]
+        self, *, variables: list[SymbolicExpression]
     ) -> VerbalizationFragment:
         """:return: the selections as a parenthesised tuple *"(a, b)"* — for a ranked set-of, whose
         *"the top three"* pre-head needs the tuple grouped.
@@ -137,11 +141,11 @@ class SelectionAssembler:
         >>> employee = variable(Employee, [])
         >>> robot = variable(Robot, [])
         >>> verbalize_expression(a(set_of(employee.name, robot.name)).ordered_by(
-        ...     employee.salary, descending=True).limit(2))
+        ...     variable=employee.salary, descending=True).limit(n=2))
         'Find the top two (the name of an Employee, the name of a Robot)'
         """
         tuple_phrase = PhraseFragment(
-            parts=[self.context.child(variable) for variable in variables],
+            parts=[self.context.child(node=variable) for variable in variables],
             separator=Separator.COMMA,
         )
         return PhraseFragment(
@@ -153,8 +157,8 @@ class SelectionAssembler:
         )
 
     def _folded(
-        self, variables: List[SymbolicExpression]
-    ) -> List[VerbalizationFragment]:
+        self, *, variables: list[SymbolicExpression]
+    ) -> list[VerbalizationFragment]:
         """:return: the rendered selections, with each maximal run of plain attributes sharing one
         owner folded into a single coordinated genitive, and every other selection rendered alone.
 
@@ -166,22 +170,26 @@ class SelectionAssembler:
         >>> verbalize_expression(the(set_of(employee.department, employee.salary)))
         'Find the department and salary of an Employee'
         """
-        fragments: List[VerbalizationFragment] = []
-        for item in group_consecutive_by_owner(variables, self._foldable_attribute):
+        fragments: list[VerbalizationFragment] = []
+        for item in group_consecutive_by_owner(
+            variables, lambda selection: self._foldable_attribute(selection=selection)
+        ):
             if isinstance(item, OwnerGroup):
                 fragments.append(
                     coordinated_genitive(
                         [attribute_fragment(terminal) for terminal in item.items],
-                        self.context.child(item.owner, inline=True),
+                        self.context.child(node=item.owner, inline=True),
                     )
                 )
             else:
-                fragments.append(self.one(item, GrammaticalNumber.SINGULAR))
+                fragments.append(
+                    self.one(variable=item, number=GrammaticalNumber.SINGULAR)
+                )
         return fragments
 
     def _foldable_attribute(
-        self, selection: SymbolicExpression
-    ) -> Optional[Tuple[SymbolicExpression, PathStep]]:
+        self, *, selection: SymbolicExpression
+    ) -> tuple[SymbolicExpression, PathStep] | None:
         """:return: ``(owner, terminal_step)`` when *selection* is a plain genitive attribute that
         can share an owner with siblings, else ``None`` — a relational terminal (*"the Robot to
         which …"*) does not coordinate cleanly, so it is left alone.
@@ -196,7 +204,7 @@ class SelectionAssembler:
         """
         if not isinstance(selection, Attribute):
             return None
-        plan = self.context.microplan.plan_for(selection, ChainPlanner)
+        plan = self.context.microplan.plan_for(node=selection, planner=ChainPlanner)
         if not plan.parts or plan.parts[-1].is_relation:
             return None
         return selection._child_, plan.parts[-1]

@@ -6,7 +6,6 @@ from enum import StrEnum
 
 import numpy as np
 import rerun
-from typing_extensions import Optional
 
 from krrood.symbolic_math.symbolic_math import (
     CompiledFunction,
@@ -17,7 +16,7 @@ from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
     StateChangeCallback,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 
 class RerunMode(StrEnum):
@@ -91,7 +90,7 @@ class RerunModelCallback(ModelChangeCallback):
             )
             for body in bodies
         ]
-        stacked_body_fks = Matrix.vstack(body_fks)
+        stacked_body_fks = Matrix.vstack(list_of_matrices=body_fks)
         self.compiled_body_fks = stacked_body_fks.compile(
             parameters=VariableParameters.from_lists(
                 self._world.state.position_float_variables
@@ -99,7 +98,7 @@ class RerunModelCallback(ModelChangeCallback):
         )
         if not stacked_body_fks.is_constant():
             self.compiled_body_fks.bind_args_to_memory_view(
-                0, self._world.state.positions
+                arg_idx=0, numpy_array=self._world.state.positions
             )
 
     def compute(self) -> np.ndarray:
@@ -170,7 +169,7 @@ class RerunAdapter(StateChangeCallback):
     Where the recording sends its data.
     """
 
-    target: Optional[str] = field(default=None, kw_only=True)
+    target: str | None = field(default=None, kw_only=True)
     """
     GRPC URL for ``CONNECT`` or file path for ``SAVE``.
     """

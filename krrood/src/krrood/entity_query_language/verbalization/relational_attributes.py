@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Optional
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.vocabulary.english import (
@@ -27,7 +26,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 _RELATIONAL_PREPOSITIONS = {preposition.text for preposition in Prepositions} - {"of"}
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RelationVerb:
     """
     A relational field's verb, split into its parts — so callers can either strand the
@@ -82,7 +81,7 @@ class RelationVerb:
         return morphology.third_person_singular(morphology.verb_lemma(self.participle))
 
 
-def relational_verb(attribute_name: str) -> Optional[RelationVerb]:
+def relational_verb(attribute_name: str) -> RelationVerb | None:
     """
     :param attribute_name: An attribute identifier (snake_case).
     :return: The relation's verb, split into participle + preposition, when *attribute_name* names a
@@ -106,7 +105,7 @@ def relational_verb(attribute_name: str) -> Optional[RelationVerb]:
     return RelationVerb(participle=" ".join(tokens[:-1]), preposition=tokens[-1])
 
 
-def relational_verb_phrase(attribute_name: str) -> Optional[str]:
+def relational_verb_phrase(attribute_name: str) -> str | None:
     """
     :param attribute_name: An attribute identifier (snake_case).
     :return: The humanized stranded verb phrase (*"assigned to"*) for a relational field, else

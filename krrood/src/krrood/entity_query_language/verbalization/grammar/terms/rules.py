@@ -4,7 +4,7 @@ import enum
 import itertools
 from dataclasses import fields, is_dataclass
 
-from typing_extensions import Any, List, Optional
+from typing_extensions import Any
 
 from krrood.entity_query_language.core.mapped_variable import FlatVariable
 from krrood.entity_query_language.core.variable import (
@@ -69,23 +69,23 @@ class VariableRule(PhraseRule):
 
     construct = Variable
 
-    def build(self, node: Variable, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Variable, context: RuleContext) -> VerbalizationFragment:
         """:return: The variable noun phrase (*"a Robot"* / *"the Robot"*)."""
         if context.as_value:
-            choice = self._domain_choice(node, context)
+            choice = self._domain_choice(node=node, context=context)
             if choice is not None:
                 return choice
         if context.number is GrammaticalNumber.PLURAL:
-            return self._plural(node, context)
-        noun_form = context.refer.noun_for_parts(node)
+            return self._plural(node=node, context=context)
+        noun_form = context.refer.noun_for_parts(variable=node)
         if noun_form.type_alternatives:
             first, *rest = noun_form.type_alternatives
-            head = RoleFragment.for_type(first)
+            head = RoleFragment.for_type(type_=first)
             additional_heads = [
-                RoleFragment.for_type(alternative) for alternative in rest
+                RoleFragment.for_type(type_=alternative) for alternative in rest
             ]
         else:
-            head = RoleFragment.for_variable(noun_form.label, node)
+            head = RoleFragment.for_variable(label=noun_form.label, expression=node)
             additional_heads = []
         return NounPhrase(
             head=head,
@@ -96,8 +96,8 @@ class VariableRule(PhraseRule):
 
     @staticmethod
     def _domain_choice(
-        node: Variable, context: RuleContext
-    ) -> Optional[VerbalizationFragment]:
+        *, node: Variable, context: RuleContext
+    ) -> VerbalizationFragment | None:
         """In value position, a domain-constrained value-type variable says its candidate set —
         *"one of OPTION_A, OPTION_B, or OPTION_C"* (an enum) / *"one of 1, or 2"* (a primitive), or
         just the value for a singleton domain. ``None`` (use the type-name noun) unless the type is
@@ -119,10 +119,10 @@ class VariableRule(PhraseRule):
         values = itertools.islice(
             node._re_enterable_domain_generator_, MAX_SET_MEMBERS + 1
         )
-        return one_of([RoleFragment.for_literal(value) for value in values])
+        return one_of([RoleFragment.for_literal(value=value) for value in values])
 
     @staticmethod
-    def _plural(node: Variable, context: RuleContext) -> VerbalizationFragment:
+    def _plural(*, node: Variable, context: RuleContext) -> VerbalizationFragment:
         """
         Bare plural variable noun phrase (*"Robots"*); the determiner phase drops the
         article and the morphology pass inflects the head.
@@ -131,7 +131,9 @@ class VariableRule(PhraseRule):
         'the number of Robots'
         """
         return NounPhrase(
-            head=RoleFragment.for_variable(context.refer.head_noun_of(node), node),
+            head=RoleFragment.for_variable(
+                label=context.refer.head_noun_of(variable=node), expression=node
+            ),
             number=GrammaticalNumber.PLURAL,
             definiteness=Definiteness.INDEFINITE,
             referent_id=node._id_,
@@ -150,7 +152,7 @@ class LiteralRule(PhraseRule):
 
     construct = Literal
 
-    def build(self, node: Literal, context: RuleContext) -> VerbalizationFragment:
+    def build(self, *, node: Literal, context: RuleContext) -> VerbalizationFragment:
         """:return: The literal value, or *"a specific <Type>"* for a concrete object literal.
 
         A bare class used as a value renders as a linked type reference, and a tuple of classes as a
@@ -161,19 +163,19 @@ class LiteralRule(PhraseRule):
         """
         value = node._value_
         if is_concrete_object_literal(node):
-            return self._concrete_object(node, context)
+            return self._concrete_object(node=node, context=context)
         if isinstance(value, type):
-            return RoleFragment.for_type(value)
+            return RoleFragment.for_type(type_=value)
         class_members = type_members(value)
         if class_members is not None:
             return oxford_comma(
-                [RoleFragment.for_type(member) for member in class_members],
+                [RoleFragment.for_type(type_=member) for member in class_members],
                 Conjunctions.AND.as_fragment(),
             )
-        return RoleFragment.for_literal(value)
+        return RoleFragment.for_literal(value=value)
 
     def _concrete_object(
-        self, node: Literal, context: RuleContext
+        self, *, node: Literal, context: RuleContext
     ) -> VerbalizationFragment:
         """:return: *"a specific <Type>"* for a concrete object literal — identity, not its (possibly
         huge) repr — qualified by its identifying field(s) when any are known (*"a specific Body with
@@ -184,20 +186,20 @@ class LiteralRule(PhraseRule):
         identity head plus the qualifying detail :meth:`_identifying_fields` supplies:
 
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))
+        >>> verbalize_expression(a(entity(robot).where(robot == Robot(name="R2D2", battery=80, operational=True))))
         "Find a Robot such that the Robot is a specific Robot with name 'R2D2'"
         """
         value = node._value_
         details = [
             PhraseFragment(
                 parts=[
-                    RoleFragment.for_attribute(None, name),
-                    RoleFragment.for_literal(field_value),
+                    RoleFragment.for_attribute(owner=None, attribute_name=name),
+                    RoleFragment.for_literal(value=field_value),
                 ]
             )
-            for name, field_value in self._identifying_fields(value)
+            for name, field_value in self._identifying_fields(value=value)
         ]
-        modifiers: List[VerbalizationFragment] = (
+        modifiers: list[VerbalizationFragment] = (
             [
                 Prepositions.WITH.as_fragment(),
                 oxford_comma(details, Conjunctions.AND.as_fragment()),
@@ -206,14 +208,14 @@ class LiteralRule(PhraseRule):
             else []
         )
         return NounPhrase(
-            head=RoleFragment.for_variable(type(value).__name__, node),
+            head=RoleFragment.for_variable(label=type(value).__name__, expression=node),
             definiteness=Definiteness.INDEFINITE,
             pre_head=Specificity.SPECIFIC.as_fragment(),
             modifiers=modifiers,
         )
 
     @staticmethod
-    def _identifying_fields(value: Any) -> List[tuple]:
+    def _identifying_fields(*, value: Any) -> list[tuple]:
         """:return: The ``(name, value)`` pairs that identify *value* for display — the attributes a
         :class:`HasIdentifyingAttributes` declares, else the first present conventional identity
         field — keeping only scalar values.
@@ -223,10 +225,10 @@ class LiteralRule(PhraseRule):
         specific Robot"*):
 
         >>> robot = variable(Robot, [])
-        >>> verbalize_expression(a(entity(robot).where(robot == Robot("R2D2", 80, True))))
+        >>> verbalize_expression(a(entity(robot).where(robot == Robot(name="R2D2", battery=80, operational=True))))
         "Find a Robot such that the Robot is a specific Robot with name 'R2D2'"
         """
-        names = LiteralRule._declared_identifying_names(value)
+        names = LiteralRule._declared_identifying_names(value=value)
         return [
             (name, getattr(value, name))
             for name in names
@@ -235,18 +237,18 @@ class LiteralRule(PhraseRule):
         ]
 
     @staticmethod
-    def _declared_identifying_names(value: Any) -> List[str]:
+    def _declared_identifying_names(*, value: Any) -> list[str]:
         """:return: The identifying attribute names for *value* — the dataclass fields its class marks
         with :attr:`GrammarMetadata.is_identifying_field`, else the first present conventional
         identity field."""
-        marked = LiteralRule._identifying_attribute_fields(value)
+        marked = LiteralRule._identifying_attribute_fields(value=value)
         return (
             marked
             or [name for name in _CONVENTIONAL_ID_FIELDS if hasattr(value, name)][:1]
         )
 
     @staticmethod
-    def _identifying_attribute_fields(value: Any) -> List[str]:
+    def _identifying_attribute_fields(*, value: Any) -> list[str]:
         """:return: The names of *value*'s dataclass fields marked as identifying attributes, in
         declaration order (empty when *value* is not a dataclass or marks none)."""
         if not is_dataclass(value):
@@ -254,7 +256,12 @@ class LiteralRule(PhraseRule):
         return [
             data_field.name
             for data_field in fields(value)
-            if (grammar := GrammarMetadata.of_field(value, data_field.name)) is not None
+            if (
+                grammar := GrammarMetadata.of_field(
+                    clazz=value, field_name=data_field.name
+                )
+            )
+            is not None
             and grammar.is_identifying_field
         ]
 
@@ -270,11 +277,11 @@ class ExternalVariableRule(PhraseRule):
     construct = ExternallySetVariable
 
     def build(
-        self, node: ExternallySetVariable, context: RuleContext
+        self, *, node: ExternallySetVariable, context: RuleContext
     ) -> VerbalizationFragment:
         """:return: The indefinite type-name noun phrase for the externally-set variable."""
-        type_name = FallbackNouns.VARIABLE.name_of(node)
-        return NounPhrase(head=RoleFragment.for_type(node._type_, text=type_name))
+        type_name = FallbackNouns.VARIABLE.name_of(node=node)
+        return NounPhrase(head=RoleFragment.for_type(type_=node._type_, text=type_name))
 
 
 class FlatVariableRule(PhraseRule):
@@ -287,6 +294,8 @@ class FlatVariableRule(PhraseRule):
 
     construct = FlatVariable
 
-    def build(self, node: FlatVariable, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: FlatVariable, context: RuleContext
+    ) -> VerbalizationFragment:
         """:return: The child's rendering, unwrapped from the transparent SetOf wrapper."""
-        return context.child(node._child_, number=context.number)
+        return context.child(node=node._child_, number=context.number)

@@ -10,27 +10,14 @@ import numpy.typing as npt
 from scipy.spatial import ConvexHull
 from trimesh import Trimesh
 from trimesh.util import concatenate
-from typing_extensions import (
-    Dict,
-    Any,
-    Self,
-    Optional,
-    List,
-    Iterable,
-    Iterator,
-    Generic,
-    Type,
-    TypeVar,
-)
+from typing_extensions import Any, Self, Iterable, Iterator, Generic, TypeVar
 from typing_extensions import TYPE_CHECKING
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.product_algebra import Event, SimpleEvent
-from semantic_digital_twin.exceptions import MismatchingWorld, NoShapesToProject
-from semantic_digital_twin.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-)
+from semantic_digital_twin.exceptions import MismatchingWorld
+from semantic_digital_twin.world_description.exceptions import NoShapesToProject
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     AxisAlignedBox,
@@ -62,18 +49,18 @@ class ShapeCollection(SubclassJSONSerializer):
     A collection of shapes.
     """
 
-    shapes: List[Shape] = field(default_factory=list)
+    shapes: list[Shape] = field(default_factory=list)
     """
     The shapes contained in this collection.
     """
 
-    reference_frame: Optional[KinematicStructureEntity] = None
+    reference_frame: KinematicStructureEntity | None = None
     """
     Backreference to the kinematic structure entity this collection belongs to.
     """
 
     @property
-    def world(self) -> Optional[World]:
+    def world(self) -> World | None:
         """
         The world this collection belongs to.
         """
@@ -212,7 +199,7 @@ class ShapeCollection(SubclassJSONSerializer):
         )
 
     def convex_footprint_in_frame(
-        self, reference_frame: KinematicStructureEntity
+        self, *, reference_frame: KinematicStructureEntity
     ) -> Polygon2D:
         """
         The convex outline this collection's shapes cover on the x-y plane of a frame,
@@ -226,26 +213,26 @@ class ShapeCollection(SubclassJSONSerializer):
         :return: The outline, in that frame's x-y coordinates.
         """
         if not self.shapes:
-            raise NoShapesToProject(self.reference_frame)
+            raise NoShapesToProject(reference_frame=self.reference_frame)
         points = np.vstack(
             [
                 shape.mesh_in_frame(reference_frame).vertices[:, :2]
                 for shape in self.shapes
             ]
         )
-        return Polygon2D(points[ConvexHull(points).vertices])
+        return Polygon2D(vertices=points[ConvexHull(points).vertices])
 
-    def to_json(self, **kwargs) -> Dict[str, Any]:
+    def to_json(self, **kwargs) -> dict[str, Any]:
         return {
             **super().to_json(**kwargs),
             "shapes": [to_json(shape, **kwargs) for shape in self.shapes],
         }
 
     @classmethod
-    def _from_json(cls, data: Dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         """
-        The collection belongs to the frame all its shapes are expressed in, which is the
-        entity it was written from, such as a body whose shapes are replaced.
+        The collection belongs to the frame all its shapes are expressed in, which is
+        the entity it was written from, such as a body whose shapes are replaced.
         """
         shapes = [from_json(d, **kwargs) for d in data["shapes"]]
         frames = {
@@ -306,21 +293,21 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     first, but Python cannot derive one type parameter from another, so both are spelled.
     """
 
-    shapes: List[BoxT] = field(default_factory=list)
+    shapes: list[BoxT] = field(default_factory=list)
 
     def __post_init__(self):
         if not self.reference_frame:
             raise ValueError("BoundingBoxCollection must have a reference frame.")
         for box in self.bounding_boxes:
-            assert (
-                box.origin.reference_frame == self.reference_frame
-            ), "All bounding boxes must have the same reference frame."
+            assert box.origin.reference_frame == self.reference_frame, (
+                "All bounding boxes must have the same reference frame."
+            )
 
     def __iter__(self) -> Iterator[BoxT]:
         return iter(self.bounding_boxes)
 
     @property
-    def bounding_boxes(self) -> List[BoxT]:
+    def bounding_boxes(self) -> list[BoxT]:
         return self.shapes
 
     @property
@@ -348,9 +335,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         :param other: The other bounding box collection.
         :return: The merged bounding box collection.
         """
-        assert (
-            self.reference_frame == other.reference_frame
-        ), "The reference frames of the bounding box collections must be the same."
+        assert self.reference_frame == other.reference_frame, (
+            "The reference frames of the bounding box collections must be the same."
+        )
         return type(self)(
             reference_frame=self.reference_frame,
             shapes=self.bounding_boxes + other.bounding_boxes,
@@ -378,7 +365,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     @classmethod
     def from_simple_event(
         cls,
-        box_type: Type[BoxT],
+        box_type: type[BoxT],
         reference_frame: KinematicStructureEntity,
         simple_event: SimpleEvent,
         keep_surface: bool = False,
@@ -424,7 +411,7 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
     @classmethod
     def from_event(
         cls,
-        box_type: Type[BoxT],
+        box_type: type[BoxT],
         reference_frame: KinematicStructureEntity,
         event: Event,
     ) -> Self:
@@ -458,9 +445,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         if len(shapes) == 0:
             return cls(shapes=[])
         for shape in shapes:
-            assert (
-                shape.origin.reference_frame == shapes[0].origin.reference_frame
-            ), "All shapes must have the same reference frame."
+            assert shape.origin.reference_frame == shapes[0].origin.reference_frame, (
+                "All shapes must have the same reference frame."
+            )
 
         local_bbs = [shape.local_frame_bounding_box for shape in shapes]
         return cls(

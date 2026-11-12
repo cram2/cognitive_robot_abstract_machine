@@ -16,7 +16,6 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from typing_extensions import List, Set
 
 import krrood.entity_query_language.verbalization as verbalization_package
 
@@ -40,7 +39,7 @@ MODULE_MUTABLE_STATE_BASELINE = 0
 _VERBALIZATION_ROOT = Path(verbalization_package.__file__).parent
 
 
-def _verbalization_modules() -> List[Path]:
+def _verbalization_modules() -> list[Path]:
     """:return: Every Python source file in the verbalization package, sorted for stable reporting."""
     return sorted(_VERBALIZATION_ROOT.rglob("*.py"))
 
@@ -68,7 +67,7 @@ def _attribute_except_handlers(tree: ast.Module) -> int:
     for node in ast.walk(tree):
         if not isinstance(node, ast.ExceptHandler) or node.type is None:
             continue
-        caught: Set[str] = set()
+        caught: set[str] = set()
         if isinstance(node.type, ast.Name):
             caught = {node.type.id}
         elif isinstance(node.type, ast.Tuple):

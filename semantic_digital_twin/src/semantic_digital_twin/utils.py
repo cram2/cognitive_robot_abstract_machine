@@ -7,18 +7,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache, wraps
 from pathlib import Path
-from typing import List
+from typing_extensions import Any, ClassVar
 
 from krrood.class_diagrams.mocking import MockedModule, MockedClass
 from platformdirs import user_cache_dir
 
-try:
-    from ament_index_python import PackageNotFoundError
-except ModuleNotFoundError:
-    PackageNotFoundError = None
 from xml.etree import ElementTree as ET
-
-from typing_extensions import Any, Tuple, ClassVar, Type
 
 
 def create_cache_dir(folder_name: str) -> Path:
@@ -34,6 +28,7 @@ def create_cache_dir(folder_name: str) -> Path:
     cache_dir = Path(user_cache_dir(package_name)) / folder_name
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
+
 
 class suppress_stdout_stderr(object):
     """
@@ -70,7 +65,7 @@ class suppress_stdout_stderr(object):
 
 
 def hacky_urdf_parser_fix(
-    urdf: str, blacklist: Tuple[str] = ("transmission", "gazebo")
+    urdf: str, blacklist: tuple[str] = ("transmission", "gazebo")
 ) -> str:
     # Parse input string
     root = ET.fromstring(urdf)
@@ -114,45 +109,6 @@ def rclpy_installed() -> bool:
         return False
 
 
-def tracy_installed() -> bool:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "iai_tracy_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, PackageNotFoundError, ValueError):
-        return False
-
-
-def daisy_installed() -> bool:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "iai_daisy_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, PackageNotFoundError, ValueError):
-        return False
-
-
-def hsrb_installed() -> bool:
-    try:
-        from ament_index_python.packages import get_package_share_directory
-
-        pkg_name = "hsr_description"
-
-        if get_package_share_directory(pkg_name):
-            return True
-        return False
-    except (ImportError, PackageNotFoundError, ValueError):
-        return False
-
-
 def type_string_to_type(type_string: str) -> type:
     """
     Convert a string representation of a type to the actual type.
@@ -165,7 +121,7 @@ def type_string_to_type(type_string: str) -> type:
     return getattr(module, class_name)
 
 
-def camel_case_split(word: str) -> List[str]:
+def camel_case_split(word: str) -> list[str]:
     """
     :param word: The word to split
     :return: A set of strings where each string is a camel case split of the original word
@@ -195,7 +151,7 @@ class MockedNodeModule(MockedModule):
     Mocked module for rclpy.node.
     """
 
-    Node: Type[MockedNodeClass] = MockedNodeClass
+    Node: type[MockedNodeClass] = MockedNodeClass
     """
     A mocked Node class.
     """

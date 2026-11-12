@@ -13,15 +13,7 @@ from random_events.variable import Variable
 from scipy.optimize import lsq_linear
 from scipy.special import ndtr
 from scipy.stats import multivariate_normal, norm, truncnorm
-from typing_extensions import (
-    Any,
-    Dict,
-    Iterable,
-    Optional,
-    Self,
-    Tuple,
-    TYPE_CHECKING,
-)
+from typing_extensions import Any, Iterable, Self, TYPE_CHECKING
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.exceptions import (
@@ -146,7 +138,7 @@ class TruncatedMultivariateGaussianDistribution(
     """
 
     @property
-    def variables(self) -> Tuple[Variable, ...]:
+    def variables(self) -> tuple[Variable, ...]:
         return self.untruncated.variables
 
     @property
@@ -305,7 +297,7 @@ class TruncatedMultivariateGaussianDistribution(
             math.log(probability),
         )
 
-    def log_conditional(self, point: Dict[Variable, Any]) -> LogConditioning[Self]:
+    def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         """
         Fix some of the variables at the values given and answer with the distribution
         over the rest, which is the Gaussian conditional confined to the slice the box
@@ -348,7 +340,7 @@ class TruncatedMultivariateGaussianDistribution(
 
     # %% marginals and moments
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal(self, variables: Iterable[Variable]) -> Self | None:
         """
         :param variables: The variables to keep.
         :return: A copy of this distribution if all of its variables are kept, or

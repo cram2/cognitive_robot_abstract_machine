@@ -50,7 +50,7 @@ import random
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List
+from typing_extensions import Callable
 from urllib.parse import urlparse
 
 import tqdm
@@ -75,7 +75,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -289,7 +289,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             )
 
         return cls(
-            world_loader=lambda: URDFParser.from_file(str(urdf_path)).parse(),
+            world_loader=lambda: URDFParser.from_file(str(urdf_path)).create_world(),
             search_space_factory=_search_space_factory,
             environment_name=Path(urdf_path).stem,
         )
@@ -492,9 +492,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             true_free_volume_bound=true_free_volume_bound,
             graph_of_convex_polygons_construction_duration=MeanAndStandardDeviation.from_measurements(
                 polygon_construction_elapsed, unit=Unit.SECONDS
-            ).to(
-                Unit.MILLISECONDS
-            ),
+            ).to(Unit.MILLISECONDS),
             graph_of_convex_polygons_region_count=graph_of_convex_polygons.region_count,
             graph_of_convex_polygons_region_volume_sum=round(region_volume_sum, 4),
             graph_of_convex_polygons_coverage_bound=coverage_bound,
@@ -520,7 +518,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
             list of wall-clock durations in seconds, one per repetition.
         :rtype: tuple[Any, list[float]]
         """
-        elapsed_times: List[float] = []
+        elapsed_times: list[float] = []
         result = None
         for _ in range(repetitions):
             start = time.perf_counter()
@@ -529,7 +527,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         return result, elapsed_times
 
     @staticmethod
-    def _collect_obstacles(world: World) -> List[VolumetricBoundingBox]:
+    def _collect_obstacles(world: World) -> list[VolumetricBoundingBox]:
         """
         Return all obstacle bounding boxes from world expressed at the world root frame.
 
@@ -541,7 +539,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         return list(annotation.as_bounding_box_collection_at_origin(origin))
 
     @staticmethod
-    def _collect_obstacle_shapes(world: World) -> List[Shape]:
+    def _collect_obstacle_shapes(world: World) -> list[Shape]:
         """
         Return every collision shape of every obstacle body in world.
 
@@ -592,7 +590,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
 
     @staticmethod
     def _compute_minimal_search_space(
-        obstacle_bounding_boxes: List[VolumetricBoundingBox],
+        obstacle_bounding_boxes: list[VolumetricBoundingBox],
         world,
         xy_widen: float = 1.0,
     ) -> BoundingBoxCollection:

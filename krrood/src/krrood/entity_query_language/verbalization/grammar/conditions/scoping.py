@@ -22,7 +22,7 @@ import operator
 import uuid
 from dataclasses import dataclass
 
-from typing_extensions import Dict, List, Optional, Set, Tuple, Union
+from typing_extensions import Union
 
 from krrood.entity_query_language.core.expression_structure import walk_chain
 from krrood.entity_query_language.core.mapped_variable import Attribute, MappedVariable
@@ -42,7 +42,7 @@ from krrood.entity_query_language.verbalization.relational_attributes import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalBindingFold:
     """
     A subject→entity relational binding collapsed with the entity's own restrictions.
@@ -52,17 +52,21 @@ class RelationalBindingFold:
     """
 
     relation_hop: Attribute
-    """The subject's single relational-attribute hop (``robot.assigned_to``) whose verb names the
-    clause."""
+    """
+    The subject's single relational-attribute hop (``robot.assigned_to``) whose verb
+    names the clause.
+    """
 
     entity: Variable
     """
     The secondary variable the relation introduces (the clause's object).
     """
 
-    nested: List[FoldNode]
-    """The entity's own conjuncts, transitively (removed from the subject's list); empty for a bare
-    binding that only names the entity."""
+    nested: list[FoldNode]
+    """
+    The entity's own conjuncts, transitively (removed from the subject's list); empty
+    for a bare binding that only names the entity.
+    """
 
 
 BoundConjunct = Union[FoldNode, RelationalBindingFold]
@@ -74,7 +78,7 @@ binding.
 
 def bind_relational_entities(
     items: ConjunctList, subject: Variable
-) -> List[BoundConjunct]:
+) -> list[BoundConjunct]:
     """:return: *items* with each relational binding between *subject* and another entity replaced by
     a :class:`RelationalBindingFold` that also absorbs that entity's own (transitively reachable)
     conjuncts; order preserved, everything else untouched. A no-op when no such binding folds.
@@ -85,7 +89,7 @@ def bind_relational_entities(
     actually carries a restriction to nest; a bare one keeps its existing *"it is <participle> …"*
     rendering.
     """
-    candidates: Dict[int, Tuple[Attribute, Variable, bool]] = {}
+    candidates: dict[int, tuple[Attribute, Variable, bool]] = {}
     for index, item in enumerate(items):
         binding = _relational_binding(item)
         if binding is None:
@@ -97,8 +101,8 @@ def bind_relational_entities(
             candidates[index] = (relation_hop, owner, True)
     if not candidates:
         return list(items)
-    claimed: Set[int] = set(candidates)
-    folds: Dict[int, RelationalBindingFold] = {}
+    claimed: set[int] = set(candidates)
+    folds: dict[int, RelationalBindingFold] = {}
     for index, (relation_hop, entity, is_reverse) in candidates.items():
         nested_indices = _subtree_indices(items, entity, subject, claimed)
         if is_reverse and not nested_indices:
@@ -120,14 +124,14 @@ def bind_relational_entities(
 
 
 def _subtree_indices(
-    items: ConjunctList, entity: Variable, subject: Variable, claimed: Set[int]
-) -> Set[int]:
+    items: ConjunctList, entity: Variable, subject: Variable, claimed: set[int]
+) -> set[int]:
     """:return: the indices of *items* that restrict *entity* or an entity bound within its subtree —
     the transitive closure over relational bindings — excluding already-*claimed* indices and any
     conjunct whose value side references the outer *subject* (a cross-correlation stays in the subject
     residual rather than being mis-attributed to the entity noun)."""
-    reachable: Set[uuid.UUID] = {entity._id_}
-    collected: Set[int] = set()
+    reachable: set[uuid.UUID] = {entity._id_}
+    collected: set[int] = set()
     changed = True
     while changed:
         changed = False
@@ -147,7 +151,7 @@ def _subtree_indices(
 
 def _relational_binding(
     item: BoundConjunct,
-) -> Optional[Tuple[Attribute, Variable, Variable]]:
+) -> tuple[Attribute, Variable, Variable] | None:
     """:return: ``(relation_hop, owner, entity)`` when *item* is ``owner.<relational_attr> == entity``
     (either operand order, *entity* a bare variable distinct from *owner*), else ``None``. A
     plain-attribute equality or an ``== None`` absence is not a binding."""
@@ -169,7 +173,7 @@ def _relational_binding(
     return None
 
 
-def _single_relational_hop(expression: object) -> Optional[Attribute]:
+def _single_relational_hop(expression: object) -> Attribute | None:
     """:return: the single relational-attribute hop when *expression* is ``<variable>.<relational_attr>``
     (one hop whose name is a relation verb), else ``None``."""
     if not isinstance(expression, MappedVariable):
@@ -182,7 +186,7 @@ def _single_relational_hop(expression: object) -> Optional[Attribute]:
     return chain[0]
 
 
-def _item_root(item: BoundConjunct) -> Optional[uuid.UUID]:
+def _item_root(item: BoundConjunct) -> uuid.UUID | None:
     """:return: the id of the variable *item* restricts — the owner of a binding, else the root of a
     comparator's/range-fold's chain, else ``None``."""
     binding = _relational_binding(item)

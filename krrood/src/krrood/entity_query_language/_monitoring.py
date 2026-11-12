@@ -11,13 +11,13 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import wraps
-from typing_extensions import Any, Optional, Type, Callable, Union
+from typing_extensions import Any, Callable
 
 from krrood.entity_query_language._stack import CallStack
 from krrood.singleton import SingletonMeta
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MonitoredRegistry(metaclass=SingletonMeta):
     """
     Registry for monitoring EQL object creation stacks.
@@ -35,7 +35,7 @@ class MonitoredRegistry(metaclass=SingletonMeta):
     When True, stack capture is skipped for all monitored classes.
     """
 
-    def __call__(self, cls: Type) -> Type:
+    def __call__(self, cls: type) -> type:
         """
         Decorate a class to automatically record its creation stack as a
         :class:`CallStack`.
@@ -56,15 +56,15 @@ class MonitoredRegistry(metaclass=SingletonMeta):
         cls.__post_init__ = new_post_init
         return cls
 
-    def get_stack(self, instance: Any) -> Optional[CallStack]:
+    def get_stack(self, *, instance: Any) -> CallStack | None:
         """
         Retrieve the creation stack for a monitored instance.
         """
-        if not self.is_monitored(type(instance)):
+        if not self.is_monitored(target=type(instance)):
             return None
         return instance._creation_stack
 
-    def is_monitored(self, target: Union[Type, Callable]) -> bool:
+    def is_monitored(self, *, target: type | Callable) -> bool:
         """
         Check whether a class or callable is monitored.
         """
@@ -72,7 +72,7 @@ class MonitoredRegistry(metaclass=SingletonMeta):
             getattr(target, "_is_monitored_", False)
         )
 
-    def unregister(self, cls: Type) -> None:
+    def unregister(self, *, cls: type) -> None:
         """
         Remove a class from monitoring.
         """

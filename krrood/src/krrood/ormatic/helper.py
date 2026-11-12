@@ -3,40 +3,39 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from inspect import isclass
 from types import ModuleType
-from typing import List, Type, Dict
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import DataAccessObject
 from krrood.ormatic.utils import classes_of_module
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OrmaticInterfaceInformation:
     """
     Classes, alternative mappings, type mappings, and externally-mapped classes read
     from an existing ormatic interface.
     """
 
-    classes: List[Type] = field(default_factory=list)
+    classes: list[type] = field(default_factory=list)
     """
     The domain classes mapped in the interface.
     """
 
-    alternative_mappings: List[Type[AlternativeMapping]] = field(default_factory=list)
+    alternative_mappings: list[type[AlternativeMapping]] = field(default_factory=list)
     """
     The alternative mappings used in the interface.
     """
 
-    type_mappings: Dict = field(default_factory=dict)
+    type_mappings: dict = field(default_factory=dict)
     """
     The type mappings used in the interface.
     """
 
-    externally_mapped_classes: Dict[Type, Type] = field(default_factory=dict)
+    externally_mapped_classes: dict[type, type] = field(default_factory=dict)
     """
-    Maps every domain class already mapped anywhere in this interface's dependency
-    chain to the :class:`DataAccessObject` subclass that maps it, so a dependent
-    interface can import and reuse that DAO instead of regenerating it.
+    Maps every domain class already mapped anywhere in this interface's dependency chain
+    to the :class:`DataAccessObject` subclass that maps it, so a dependent interface can
+    import and reuse that DAO instead of regenerating it.
     """
 
 
@@ -73,7 +72,8 @@ def get_classes_of_ormatic_interface(
         dao_class = mapper.class_
         if issubclass(dao_class, DataAccessObject):
             ORMatic.register_externally_mapped_class(
-                dao_class, information.externally_mapped_classes
+                dao_class=dao_class,
+                externally_mapped_classes=information.externally_mapped_classes,
             )
 
     # every interface shares one Base, so its type_mappings already include everything upstream

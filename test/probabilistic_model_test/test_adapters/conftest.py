@@ -82,7 +82,7 @@ def classification_circuit(w, x, y, z) -> ClassificationCircuit:
             SortedSet([w, x, y, z]), partitions=2, depth=1, repetitions=2, classes=2
         )
         .create_random_region_graph()
-        .as_probabilistic_circuit()
+        .to_probabilistic_circuit()
     )
 
 

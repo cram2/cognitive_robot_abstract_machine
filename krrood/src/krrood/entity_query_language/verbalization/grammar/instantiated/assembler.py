@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 
-from typing_extensions import Dict, List, Tuple
 
 from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
@@ -56,7 +55,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
     planner = InstantiatedPlanner
 
     def realize(
-        self, node: InstantiatedVariable, plan: InstantiatedPlan
+        self, *, node: InstantiatedVariable, plan: InstantiatedPlan
     ) -> VerbalizationFragment:
         """
         :param node: The instantiated variable.
@@ -74,22 +73,27 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
         self.context.scope.push_constraint_frame()
-        binding_fragments, overrides = self._bindings(plan, node._type_)
+        binding_fragments, overrides = self._bindings(
+            plan=plan, instantiated_type=node._factory_
+        )
         self.context.scope.binding_overrides.update(overrides)
         deferred = self.context.scope.pop_constraint_frame()
         constraint_fragments = [
-            self.context.child(expression) for expression in deferred
+            self.context.child(node=expression) for expression in deferred
         ]
 
         return self._phrase(
-            node, plan.type_name, binding_fragments, constraint_fragments
+            node=node,
+            type_name=plan.type_name,
+            binding_fragments=binding_fragments,
+            constraint_fragments=constraint_fragments,
         )
 
     # %% bindings
 
     def _bindings(
-        self, plan: InstantiatedPlan, instantiated_type: type
-    ) -> Tuple[List[VerbalizationFragment], Dict[uuid.UUID, VerbalizationFragment]]:
+        self, *, plan: InstantiatedPlan, instantiated_type: type
+    ) -> tuple[list[VerbalizationFragment], dict[uuid.UUID, VerbalizationFragment]]:
         """:return: Every binding fragment and the field-reference overrides.
 
         Its contribution is the *"where"* clause body: it builds each *"the container of the Drawer is
@@ -101,22 +105,28 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         >>> verbalize_expression(inference(Drawer)(container=connection.parent, handle=connection.child))
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
-        binding_fragments: List[VerbalizationFragment] = []
-        overrides: Dict[uuid.UUID, VerbalizationFragment] = {}
+        binding_fragments: list[VerbalizationFragment] = []
+        overrides: dict[uuid.UUID, VerbalizationFragment] = {}
         for binding in plan.bindings:
             field_reference = self._field_reference(
-                binding.field_name, plan.type_name, instantiated_type
+                field_name=binding.field_name,
+                type_name=plan.type_name,
+                instantiated_type=instantiated_type,
             )
             binding_fragments.append(
                 PhraseFragment(
-                    parts=[field_reference, self._copula(binding), self._value(binding)]
+                    parts=[
+                        field_reference,
+                        self._copula(binding=binding),
+                        self._value(binding=binding),
+                    ]
                 )
             )
             overrides[binding.value._id_] = field_reference
         return binding_fragments, overrides
 
     def _field_reference(
-        self, field_name: str, type_name: str, instantiated_type: type
+        self, *, field_name: str, type_name: str, instantiated_type: type
     ) -> VerbalizationFragment:
         """:return: *"the <field> of the <Type>"* — a single-hop possessive (*"the container of the
         Drawer"*).
@@ -132,21 +142,25 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         type_root = PhraseFragment(
             parts=[
                 Articles.THE.as_fragment(),
-                RoleFragment.for_type(instantiated_type, text=type_name),
+                RoleFragment.for_type(type_=instantiated_type, text=type_name),
             ]
         )
-        return possessive_path([PathStep(field_name, None)], type_root)
+        return possessive_path(
+            [PathStep(name=field_name, source_reference=None)], type_root
+        )
 
-    def _copula(self, binding: BindingPlan) -> VerbalizationFragment:
+    def _copula(self, *, binding: BindingPlan) -> VerbalizationFragment:
         """:return: *"is"* / *"are"* agreeing with the binding's plurality (the plural ``drawers``
         field takes *"are"*).
 
         >>> verbalize_expression(inference(Cabinet)(container=variable(Container, []), drawers=variable(Drawer, [])))
         'a Cabinet, where the container of the Cabinet is a Container, and the drawers of the Cabinet are Drawers'
         """
-        return Copulas.for_number(GrammaticalNumber.of(binding.is_plural))
+        return Copulas.for_number(
+            number=GrammaticalNumber.of(is_plural=binding.is_plural)
+        )
 
-    def _value(self, binding: BindingPlan) -> VerbalizationFragment:
+    def _value(self, *, binding: BindingPlan) -> VerbalizationFragment:
         """:return: The binding's value expression, rendered in the binding's number (*"the parent of
         a FixedConnection"*).
 
@@ -159,17 +173,18 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
         return self.context.child(
-            binding.value, number=GrammaticalNumber.of(binding.is_plural)
+            node=binding.value, number=GrammaticalNumber.of(is_plural=binding.is_plural)
         )
 
     # %% phrase assembly
 
     def _phrase(
         self,
+        *,
         node: InstantiatedVariable,
         type_name: str,
-        binding_fragments: List[VerbalizationFragment],
-        constraint_fragments: List[VerbalizationFragment],
+        binding_fragments: list[VerbalizationFragment],
+        constraint_fragments: list[VerbalizationFragment],
     ) -> VerbalizationFragment:
         """:return: *"a <type>, where <bindings>, such that <constraints>"* — the referring noun
         phrase with its appositive clauses as droppable modifiers.
@@ -183,7 +198,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         >>> verbalize_expression(inference(Drawer)(container=connection.parent, handle=connection.child))
         'a Drawer, where the container of the Drawer is the parent of a FixedConnection, and the handle of the Drawer is the child of the FixedConnection'
         """
-        modifiers: List[VerbalizationFragment] = []
+        modifiers: list[VerbalizationFragment] = []
         if binding_fragments:
             # Bindings and constraints are independent clauses → a two-clause pair keeps its comma.
             joined = oxford_comma(
@@ -214,7 +229,7 @@ class InstantiatedAssembler(Assembler[InstantiatedVariable, InstantiatedPlan]):
         # A referring noun phrase: "a <type>" first mention (+ appositive clauses), reduced to
         # "the <type>" on a repeat by the CoreferenceProcessor (which drops the modifiers).
         return NounPhrase(
-            head=RoleFragment.for_variable(type_name, node),
+            head=RoleFragment.for_variable(label=type_name, expression=node),
             modifiers=modifiers,
             modifier_separator=Separator.NONE,
             referent_id=node._id_,

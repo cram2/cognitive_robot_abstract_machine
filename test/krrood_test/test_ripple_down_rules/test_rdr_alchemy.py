@@ -5,7 +5,7 @@ from unittest import TestCase
 import sqlalchemy.orm
 from sqlalchemy import select
 from sqlalchemy.orm import MappedColumn as Column
-from typing_extensions import List, Sequence
+from typing_extensions import Sequence
 import pandas as pd
 
 from .datasets import (
@@ -37,7 +37,7 @@ class TestAlchemyRDR(TestCase):
     )
     cache_file: str = CACHE_FILE
     all_cases: Sequence[MappedAnimal]
-    targets: List[Species]
+    targets: list[Species]
 
     @classmethod
     def setUpClass(cls):
@@ -50,7 +50,7 @@ class TestAlchemyRDR(TestCase):
         names = zoo.ids.values.flatten()
         X.loc[:, "name"] = names
 
-        cls._init_session_and_insert_data(X)
+        cls._init_session_and_insert_data(data=X)
 
         # init cases
         query = select(MappedAnimal)
@@ -70,7 +70,7 @@ class TestAlchemyRDR(TestCase):
         cls.targets = [Species(category_id_to_name[i]) for i in y.values.flatten()]
 
     @classmethod
-    def _init_session_and_insert_data(cls, data: pd.DataFrame):
+    def _init_session_and_insert_data(cls, *, data: pd.DataFrame):
         engine = sqlalchemy.create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
         session = sqlalchemy.orm.Session(engine)
@@ -84,20 +84,29 @@ class TestAlchemyRDR(TestCase):
         filename = os.path.join(self.expert_answers_dir, "scrdr_expert_answers_fit")
         expert = Human(use_loaded_answers=use_loaded_answers)
         if use_loaded_answers:
-            expert.load_answers(filename)
+            expert.load_answers(path=filename)
 
         query = select(MappedAnimal)
         result = self.session.scalars(query).all()
         scrdr = SingleClassRDR()
         case_queries = [
-            CaseQuery(c, "species", (Species,), True, _target=t)
+            CaseQuery(
+                original_case=c,
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+                _target=t,
+            )
             for c, t in zip(self.all_cases, self.targets)
         ]
         scrdr.fit(
-            case_queries, expert=expert, animate_tree=draw_tree, session=self.session
+            case_queries=case_queries,
+            expert=expert,
+            animate_tree=draw_tree,
+            session=self.session,
         )
 
-        cat = scrdr.classify(result[50])
+        cat = scrdr.classify(case=result[50])
         assert cat == self.targets[50]
 
     def test_get_fit_scrdr_does_not_mutate_committed_expert_answers_fixture(self):
@@ -129,30 +138,43 @@ class TestAlchemyRDR(TestCase):
         """
         scrdr = SingleClassRDR()
         case_queries = [
-            CaseQuery(c, "species", (Species,), True, _target=t)
+            CaseQuery(
+                original_case=c,
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+                _target=t,
+            )
             for c, t in zip(self.all_cases, self.targets)
         ]
-        scrdr.fit(case_queries, expert=Oracle(), animate_tree=False)
+        scrdr.fit(case_queries=case_queries, expert=Oracle(), animate_tree=False)
 
         for case, target in zip(self.all_cases, self.targets):
-            assert scrdr.classify(case) == target
+            assert scrdr.classify(case=case) == target
 
     def test_fit_mcrdr_stop_only(self):
         use_loaded_answers = True
         draw_tree = False
         expert, filename = self.get_expert_and_file_name(
-            use_loaded_answers, "mcrdr_expert_answers_stop_only_fit"
+            use_loaded_answers=use_loaded_answers,
+            filename="mcrdr_expert_answers_stop_only_fit",
         )
 
         mcrdr = MultiClassRDR()
         case_queries = [
-            CaseQuery(c, "species", (Species,), True, _target=t)
+            CaseQuery(
+                original_case=c,
+                attribute_name="species",
+                _attribute_types=(Species,),
+                mutually_exclusive=True,
+                _target=t,
+            )
             for c, t in zip(self.all_cases, self.targets)
         ]
-        mcrdr.fit(case_queries, expert=expert, animate_tree=draw_tree)
+        mcrdr.fit(case_queries=case_queries, expert=expert, animate_tree=draw_tree)
 
         for case_query in case_queries:
-            cat = mcrdr.classify(case_query.case)
+            cat = mcrdr.classify(case=case_query.case)
             assert make_set(cat) == make_set(case_query.target_value)
 
     def test_fit_grdr(self):
@@ -162,29 +184,29 @@ class TestAlchemyRDR(TestCase):
         filename = os.path.join(self.expert_answers_dir, "grdr_expert_answers_fit")
         expert = Human(use_loaded_answers=use_loaded_answers)
         if use_loaded_answers:
-            expert.load_answers(filename)
+            expert.load_answers(path=filename)
 
         fit_scrdr, _ = get_fit_scrdr(self.all_cases, self.targets)
 
         grdr = GeneralRDR()
-        grdr.add_rdr(fit_scrdr)
+        grdr.add_rdr(rdr=fit_scrdr)
 
-        def get_habitat(x: MappedAnimal, t: Column) -> List[Column]:
+        def get_habitat(x: MappedAnimal, t: Column) -> list[Column]:
             habitats = set()
             if t == Species.mammal and x.aquatic == 0:
-                habitats = {HabitatTable(Habitat.land)}
+                habitats = {HabitatTable(habitat=Habitat.land)}
             elif t == Species.bird:
-                habitats = {HabitatTable(Habitat.land)}
+                habitats = {HabitatTable(habitat=Habitat.land)}
                 if x.airborne == 1:
-                    habitats.update({HabitatTable(Habitat.air)})
+                    habitats.update({HabitatTable(habitat=Habitat.air)})
                 if x.aquatic == 1:
-                    habitats.update({HabitatTable(Habitat.water)})
+                    habitats.update({HabitatTable(habitat=Habitat.water)})
             elif t == Species.fish:
-                habitats = {HabitatTable(Habitat.water)}
+                habitats = {HabitatTable(habitat=Habitat.water)}
             elif t == Species.molusc:
-                habitats = {HabitatTable(Habitat.land)}
+                habitats = {HabitatTable(habitat=Habitat.land)}
                 if x.aquatic == 1:
-                    habitats.update({HabitatTable(Habitat.water)})
+                    habitats.update({HabitatTable(habitat=Habitat.water)})
             if len(habitats) == 0:
                 return {"species": t}
             else:
@@ -199,33 +221,35 @@ class TestAlchemyRDR(TestCase):
             for attr, target in targets.items():
                 case_queries.append(
                     CaseQuery(
-                        case,
-                        attr,
-                        (Species,) if attr == "species" else (HabitatTable,),
-                        True if attr == "species" else False,
+                        original_case=case,
+                        attribute_name=attr,
+                        _attribute_types=(Species,)
+                        if attr == "species"
+                        else (HabitatTable,),
+                        mutually_exclusive=True if attr == "species" else False,
                         _target=target,
                     )
                 )
-        grdr.fit(case_queries, expert=expert, animate_tree=draw_tree)
+        grdr.fit(case_queries=case_queries, expert=expert, animate_tree=draw_tree)
         # for rule in grdr.start_rules:
         #     render_tree(rule, use_dot_exporter=True,
         #                 filename=self.test_results_dir + f"/grdr_{type(rule.conclusion).__name__}")
 
         for case, case_targets in zip(self.all_cases[:n], habitat_targets):
-            cat = grdr.classify(case)
+            cat = grdr.classify(case=case)
             for cat_name, cat_val in cat.items():
                 assert make_set(cat_val) == make_set(case_targets[cat_name])
 
         if save_answers:
             cwd = os.path.dirname(__file__)
             file = os.path.join(cwd, filename)
-            expert.save_answers(file)
+            expert.save_answers(path=file)
 
-    def get_expert_and_file_name(self, use_loaded_answers: bool, filename: str):
+    def get_expert_and_file_name(self, *, use_loaded_answers: bool, filename: str):
         filename = self.expert_answers_dir + "/" + filename
         expert = Human(use_loaded_answers=use_loaded_answers)
         if use_loaded_answers:
-            expert.load_answers(filename)
+            expert.load_answers(path=filename)
         return expert, filename
 
 

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import List
 
 from krrood.entity_query_language.operators.probabilistic_queries import (
     Distribution,
@@ -42,7 +41,7 @@ from krrood.entity_query_language.verbalization.vocabulary.english import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DistributionRule(PhraseRule):
     """
     Realise ``distribution_of(match)`` as *"The distribution over <match subject>,
@@ -76,17 +75,20 @@ class DistributionRule(PhraseRule):
 
     construct = Distribution
 
-    def build(self, node: Distribution, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: Distribution, context: RuleContext
+    ) -> VerbalizationFragment:
         context.services.performative_override = Directive.DISTRIBUTION_OVER
-        assembler = MatchAssembler(context)
-        plan = assembler.plan(node.match)
+        assembler = MatchAssembler(context=context)
+        plan = assembler.plan(node=node.match)
 
-        subject = context.child(plan.selection)
+        subject = context.child(node=plan.selection)
         if node.marginalize_for:
             variable_list = oxford_comma(
                 [
                     RoleFragment.for_attribute(
-                        attribute._owner_class_, attribute._attribute_name_
+                        owner=attribute._owner_class_,
+                        attribute_name=attribute._attribute_name_,
                     )
                     for attribute in node.marginalize_for
                 ],
@@ -104,11 +106,11 @@ class DistributionRule(PhraseRule):
             parts=[Directive.DISTRIBUTION_OVER.as_fragment(), subject]
         )
 
-        items: List[VerbalizationFragment] = []
-        given = assembler._given_that_block(plan)
+        items: list[VerbalizationFragment] = []
+        given = assembler._given_that_block(plan=plan)
         if given is not None:
             items.append(given)
-        where = assembler._where_block(plan)
+        where = assembler._where_block(plan=plan)
         if where is not None:
             items.append(where)
 
@@ -117,7 +119,7 @@ class DistributionRule(PhraseRule):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProbabilityRule(PhraseRule):
     """
     Realise ``probability_of(condition)`` as *"the probability that <condition>"*, and
@@ -134,11 +136,16 @@ class ProbabilityRule(PhraseRule):
 
     construct = Probability
 
-    def build(self, node: Probability, context: RuleContext) -> VerbalizationFragment:
+    def build(
+        self, *, node: Probability, context: RuleContext
+    ) -> VerbalizationFragment:
         parts = [
             Keywords.THE_PROBABILITY_THAT.as_fragment(),
-            context.child(node.condition),
+            context.child(node=node.condition),
         ]
         if node.evidence is not None:
-            parts += [Keywords.GIVEN_THAT.as_fragment(), context.child(node.evidence)]
+            parts += [
+                Keywords.GIVEN_THAT.as_fragment(),
+                context.child(node=node.evidence),
+            ]
         return PhraseFragment(parts=parts)

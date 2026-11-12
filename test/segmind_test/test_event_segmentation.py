@@ -12,9 +12,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 import pytest
-from giskardpy.motion_statechart.context import MotionStatechartContext
+from cramph.executor import StatechartExecutor
 from krrood.exceptions import DataclassException
-from typing_extensions import List
 
 from segmind.datastructures.events import (
     DetectionEvent,
@@ -32,7 +31,7 @@ from segmind.detectors.coarse_event_detector_nodes import PickUpDetector
 from segmind.event_segmentation import Segmind
 from segmind.exceptions import NoSemanticAnnotationToWatch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Food, Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 from .conftest import RESTING_ON_THE_TABLE
@@ -182,7 +181,7 @@ class DetectorCountingItsTicks(AbstractDetector):
     How often this detector was ticked.
     """
 
-    tick_threads: List[int] = field(default_factory=list, init=False)
+    tick_threads: list[int] = field(default_factory=list, init=False)
     """
     The identifier of the thread each tick ran on, in order.
     """
@@ -194,10 +193,9 @@ class DetectorCountingItsTicks(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         self.ticks += 1
         self.tick_threads.append(threading.get_ident())
         self.ticked.set()
@@ -217,10 +215,9 @@ class DetectorTakingItsTime(AbstractDetector):
 
     def update_context_and_events(
         self,
-        context: MotionStatechartContext,
         segmind_context: SegmindContext,
-        tracked_objects: List[Body],
-    ) -> List[DetectionEvent]:
+        tracked_objects: list[Body],
+    ) -> list[DetectionEvent]:
         time.sleep(self.seconds_per_tick)
         return []
 

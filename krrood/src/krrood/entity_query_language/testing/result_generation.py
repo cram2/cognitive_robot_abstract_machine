@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
 
-from typing_extensions import Any, Dict, Tuple, Type, Union
+from typing_extensions import Any
 
 from krrood.code_generation.formatting import (
     run_ruff_check_on_file,
@@ -32,7 +32,7 @@ from krrood.entity_query_language.testing.result_verification import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VerbalizationResultGenerator:
     """
     Renders the Python source of a ``results`` snapshot module for a
@@ -53,7 +53,7 @@ class VerbalizationResultGenerator:
         templates = importlib.resources.files(__package__) / "templates"
         self.code_generator = CodeGenerator(template_directory=str(templates))
 
-    def covered_callables(self) -> Tuple[Type[SymbolicCallable], ...]:
+    def covered_callables(self) -> tuple[type[SymbolicCallable], ...]:
         """
         The callables this generator emits an entry for.
 
@@ -63,10 +63,10 @@ class VerbalizationResultGenerator:
         return tuple(
             cls
             for cls in self.snapshot.discovered_callables()
-            if self.snapshot.has_fragment(cls)
+            if self.snapshot.has_fragment(cls=cls)
         )
 
-    def covered_results(self) -> Tuple[VerbalizationResult, ...]:
+    def covered_results(self) -> tuple[VerbalizationResult, ...]:
         """
         The data the generated module declares.
 
@@ -74,12 +74,14 @@ class VerbalizationResultGenerator:
             from the snapshot's own rendering.
         """
         return tuple(
-            VerbalizationResult(cls, self.snapshot.rendered_result(cls))
+            VerbalizationResult(
+                callable_class=cls, sentence=self.snapshot.rendered_result(cls=cls)
+            )
             for cls in self.covered_callables()
         )
 
     @staticmethod
-    def _entry(result: VerbalizationResult) -> Dict[str, Any]:
+    def _entry(*, result: VerbalizationResult) -> dict[str, Any]:
         return {
             "class_name": result.callable_class.__qualname__,
             "sentence": value_to_source(result.sentence),
@@ -95,12 +97,14 @@ class VerbalizationResultGenerator:
                 *(result.callable_class for result in results),
             ]
         )
-        entries = [self._entry(result) for result in results]
+        entries = [self._entry(result=result) for result in results]
         return self.code_generator.render(
-            "verbalization_results.py.jinja", imports=imports, entries=entries
+            template_name="verbalization_results.py.jinja",
+            imports=imports,
+            entries=entries,
         )
 
-    def write(self, path: Union[str, Path]) -> None:
+    def write(self, *, path: str | Path) -> None:
         """
         Render :meth:`generate` to *path* and format it with Ruff.
 
@@ -112,7 +116,7 @@ class VerbalizationResultGenerator:
 
 
 def regenerate_verbalization_results(
-    package: ModuleType, destination: Union[str, Path]
+    package: ModuleType, destination: str | Path
 ) -> None:
     """
     Regenerate *package*'s committed ``results`` snapshot module at *destination*.
@@ -133,5 +137,5 @@ def regenerate_verbalization_results(
         "w", dir=destination.parent, suffix=".py.tmp", delete=False
     ) as temporary_file:
         temporary_path = Path(temporary_file.name)
-    generator.write(temporary_path)
+    generator.write(path=temporary_path)
     temporary_path.replace(destination)

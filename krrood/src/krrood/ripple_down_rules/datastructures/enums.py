@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from enum import auto, Enum
 
-from typing_extensions import List
-
 
 class InferMode(Enum):
     """
@@ -58,7 +56,7 @@ class Editor(str, Enum):
     """
 
     @classmethod
-    def from_str(cls, editor: str) -> Editor:
+    def from_str(cls, *, editor: str) -> Editor:
         """
         Convert a string value to an Editor enum.
 
@@ -71,13 +69,12 @@ class Editor(str, Enum):
 
 
 class Category(str, Enum):
-
     @classmethod
-    def from_str(cls, value: str) -> Category:
+    def from_str(cls, *, value: str) -> Category:
         return getattr(cls, value)
 
     @classmethod
-    def from_strs(cls, values: List[str]) -> List[Category]:
+    def from_strs(cls, *, values: list[str]) -> list[Category]:
         return [cls.from_str(value) for value in values]
 
     @property
@@ -163,7 +160,7 @@ class RDREdge(Enum):
     """
 
     @classmethod
-    def from_value(cls, value: str) -> RDREdge:
+    def from_value(cls, *, value: str) -> RDREdge:
         """
         Convert a string value to an RDREdge enum.
 

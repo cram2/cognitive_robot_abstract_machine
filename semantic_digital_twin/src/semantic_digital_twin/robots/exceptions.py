@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING, Type
+from typing_extensions import TYPE_CHECKING
 
+from krrood.exceptions import DataclassException
 from semantic_digital_twin.exceptions import UsageError
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.input_source import InputSource
     from semantic_digital_twin.robots.robot_part_mixins import RobotPartMixin
+    from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 # %% assumptions a robot part makes about what is attached to it
 
@@ -228,7 +230,7 @@ class UnexpectedInputSourceError(RobotPartValidationError):
     The source the part was handed.
     """
 
-    expected_source_family: Type[InputSource]
+    expected_source_family: type[InputSource]
     """
     The kind of source the part can be read from.
     """
@@ -264,12 +266,75 @@ class UndeclaredTopicError(RobotPartValidationError):
 @dataclass
 class MissingDriveConnectionError(RobotPartValidationError):
     """
-    Raised when a mobile base is read from odometry although there is no drive the
-    reported pose could be written into.
+    Raised when the drive of a mobile base is needed, but its robot is not attached to
+    its parent by a drive.
+    """
+
+    def error_message(self) -> str:
+        return f"{type(self.robot_part).__name__} is not moved by a drive."
+
+
+# %% Robot annotation consistency
+@dataclass
+class InvalidRobotAnnotation(UsageError):
+    """
+    A robot annotation violates a world or part ownership constraint.
+    """
+
+    reason: str
+    """
+    Constraint violated by the robot annotation.
+    """
+
+    def error_message(self) -> str:
+        return self.reason
+
+    def suggest_correction(self) -> str:
+        return "Restore consistent world entities, a default camera and robot part ownership."
+
+
+# %% a robot without a description
+
+
+@dataclass
+class RobotDescriptionMissingError(UsageError):
+    """
+    Raised when a robot is read from its description, but its class declares no
+    description file.
+    """
+
+    robot_class: type[AbstractRobot]
+    """
+    The robot class that declares no description file.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.robot_class.__name__} declares no description file."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Give the robot specification a parser of the robot's description, or "
+            "use a robot class that declares its description file."
+        )
+
+
+@dataclass
+class StartPoseWithoutMobileBaseError(UsageError):
+    """
+    Raised when a robot without a mobile base is given a start pose relative to an
+    odometry frame it does not have.
+    """
+
+    robot_class: type[AbstractRobot]
+    """
+    The robot class without a mobile base.
     """
 
     def error_message(self) -> str:
         return (
-            f"{type(self.robot_part).__name__} has no drive connection its pose could "
-            f"be written into."
+            f"{self.robot_class.__name__} has no mobile base, so it has no odometry "
+            f"frame a start pose could be relative to."
         )
+
+    def suggest_correction(self) -> str:
+        return "Place the robot with its localization pose instead."

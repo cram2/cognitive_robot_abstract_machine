@@ -1,9 +1,10 @@
-"""Turn semantic objects into a feature dataframe for confidence-aware evaluation.
+"""
+Turn semantic objects into a feature dataframe for confidence-aware evaluation.
 
-The out-of-distribution check needs the features of an object as a row of a
-dataframe. This module bridges the semantic objects of a world to that
-dataframe: it hands the objects to the :class:`FeatureExtractor` and keeps the
-mass and the object class as the features the confidence model is learned on.
+The out-of-distribution check needs the features of an object as a row of a dataframe.
+This module bridges the semantic objects of a world to that dataframe: it hands the
+objects to the :class:`FeatureExtractor` and keeps the mass and the object class as the
+features the confidence model is learned on.
 """
 
 from __future__ import annotations
@@ -12,11 +13,12 @@ import enum
 
 import pandas as pd
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
-from typing_extensions import Any, List
+from typing_extensions import Any
 
 
 class ObjectClass(enum.StrEnum):
-    """The semantic-annotation classes the confidence model distinguishes.
+    """
+    The semantic-annotation classes the confidence model distinguishes.
 
     A :class:`~enum.StrEnum`, so a member equals and hashes like its string value.
     Enum members carry the class name as their value, so an instance's class is
@@ -28,35 +30,41 @@ class ObjectClass(enum.StrEnum):
 
 
 class Feature(enum.StrEnum):
-    """The columns of the feature dataframe :func:`extract_feature_dataframe` produces.
+    """
+    The columns of the feature dataframe :func:`extract_feature_dataframe` produces.
 
     A :class:`~enum.StrEnum`, so a member equals and hashes like its string value: existing
     code that indexes a column by its plain string name keeps working unchanged.
     """
 
     MASS = "mass"
-    """The object's mass, in kilograms."""
+    """
+    The object's mass, in kilograms.
+    """
 
     CLASS = "class"
-    """The object's semantic-annotation class."""
+    """
+    The object's semantic-annotation class.
+    """
 
 
-def extract_feature_dataframe(objects: List[Any]) -> pd.DataFrame:
-    """Extract the mass and class of each object as a feature dataframe.
+def extract_feature_dataframe(objects: list[Any]) -> pd.DataFrame:
+    """
+    Extract the mass and class of each object as a feature dataframe.
 
     The :class:`FeatureExtractor` reads the mapped attributes of each object, and its
-    own ``preprocess_dataframe`` is run on that extracted dataframe before any column
-    is selected, converting any boolean or enum-typed extracted attribute into a
-    JPT-compatible column. The mass is kept under a stable column name and the
-    object class is added as an :class:`ObjectClass` column, while the remaining
-    extracted attributes are dropped.
+    own ``preprocess_dataframe`` is run on that extracted dataframe before any column is
+    selected, converting any boolean or enum-typed extracted attribute into a JPT-
+    compatible column. The mass is kept under a stable column name and the object class
+    is added as an :class:`ObjectClass` column, while the remaining extracted attributes
+    are dropped.
 
     :param objects: The semantic objects whose features are extracted.
     :return: One row per object with a mass and a class column.
     """
-    extractor = FeatureExtractor.from_instances(objects)
-    extracted = extractor.create_dataframe(objects)
-    extracted = extractor.preprocess_dataframe(extracted)
+    extractor = FeatureExtractor.from_instances(instances=objects)
+    extracted = extractor.create_dataframe(instances=objects)
+    extracted = extractor.preprocess_dataframe(df=extracted)
 
     mass_column = next(name for name in extracted.columns if name.endswith(".mass"))
     dataframe = pd.DataFrame(

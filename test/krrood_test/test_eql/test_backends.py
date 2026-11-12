@@ -15,12 +15,20 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from random_events.variable import Continuous
 
 from ..dataset.derived_attributes import Rectangle
+from ..dataset.identity_hashed_values_created_on_access import (
+    PlacementOnAPoint,
+    PointsCreatedOnEveryAccess,
+)
 from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
     SQLAlchemyBackend,
     EntityQueryLanguageBackend,
     EntityQueryLanguageGenerativeBackend,
     ProbabilisticBackend,
+)
+from krrood.entity_query_language.core.base_expressions import (
+    OperationResult,
+    ProbabilisticOperationResult,
 )
 from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.exceptions import (
@@ -31,11 +39,13 @@ from krrood.entity_query_language.factories import (
     entity,
     a,
     an,
+    flat_variable,
     variable_from,
 )
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.entity_query_language.core.variable import Variable as KRROODVariable
 from krrood.parametrization.model_registries import DictRegistry
+from krrood.patterns.role import Role
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
 from random_events.interval import reals
 from random_events.set import Set
@@ -44,6 +54,7 @@ from ..dataset.example_classes import (
     KRROODPose,
     KRROODPosition,
     KRROODPositions,
+    KRROODPositionsSubclassWithAnotherKRROODPosition,
     KRROODOrientation,
     Atom,
     Element,
@@ -57,7 +68,7 @@ from ..dataset.value_comparisons import IsGreaterThan
 
 def test_nested_action():
 
-    apple = Apple("apple", 7)
+    apple = Apple(name="apple", size=7)
 
     prob_q = a(NestedAction)(
         obj=variable(Apple, domain=[apple]),
@@ -69,7 +80,7 @@ def test_nested_action():
         ),
     )
 
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
     names_of_actual_specified_parameters = [
         match.name_from_variable_access_path
@@ -103,10 +114,12 @@ def test_nested_action():
 def test_selective_query_multiple_backends(session, database):
 
     p1 = KRROODPose(
-        position=KRROODPosition(1, 0, 0), orientation=KRROODOrientation(0, 0, 0, 1)
+        position=KRROODPosition(x=1, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
     )
     p2 = KRROODPose(
-        position=KRROODPosition(0, 1, 0), orientation=KRROODOrientation(0, 0, 0, 1)
+        position=KRROODPosition(x=0, y=1, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
     )
 
     python_domain = [p1, p2]
@@ -127,13 +140,13 @@ def test_selective_query_multiple_backends(session, database):
     result = list(q.evaluate(backend=EntityQueryLanguageBackend()))
     assert len(result) == 1
 
-    result = list(q.evaluate(backend=SQLAlchemyBackend(session_maker)))
+    result = list(q.evaluate(backend=SQLAlchemyBackend(session_maker=session_maker)))
     assert len(result) == 1
 
 
 def test_probabilistic_backend_with_symbolic_expression():
     prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     assert parameters.variables["KRROODPosition.z"] == Symbolic(
         name="KRROODPosition.z", domain=Set.from_iterable([1, 2, 3])
     )
@@ -141,7 +154,7 @@ def test_probabilistic_backend_with_symbolic_expression():
 
 def test_underspecified_parameters_with_partly_symbolic_expression():
     prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
     assert len(variables) == 3
     assert variables["KRROODPosition.x"].domain == reals()
@@ -164,10 +177,10 @@ def test_underspecified_parameters_with_partly_symbolic_expression():
 
 
 def test_underspecified_parameters_with_full_symbolic_expression():
-    prob_q = variable(KRROODPosition, domain=[KRROODPosition(1, 2, 3)])
+    prob_q = variable(KRROODPosition, domain=[KRROODPosition(x=1, y=2, z=3)])
 
     with pytest.raises(TypeError):
-        UnderspecifiedParameters(prob_q)
+        UnderspecifiedParameters(statement=prob_q)
 
 
 def test_underspecified_parameters_with_only_underspecified():
@@ -175,7 +188,7 @@ def test_underspecified_parameters_with_only_underspecified():
         position=a(KRROODPosition)(x=..., y=..., z=...),
         orientation=a(KRROODOrientation)(x=..., y=..., z=..., w=...),
     )
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
 
     assert len(variables) == 7
@@ -183,10 +196,10 @@ def test_underspecified_parameters_with_only_underspecified():
 
 def test_underspecified_parameters_with_only_literals():
     prob_q = a(KRROODPose)(
-        position=KRROODPosition(1, 2, 3),
-        orientation=KRROODOrientation(0, 0, 0, 1),
+        position=KRROODPosition(x=1, y=2, z=3),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
     )
-    parameters = UnderspecifiedParameters(prob_q)
+    parameters = UnderspecifiedParameters(statement=prob_q)
     variables = parameters.variables
 
     assert len(variables) == 7
@@ -197,7 +210,7 @@ def test_underspecified_parameters_with_only_literals():
 def test_enum_value_as_literal():
     prob_q = an(EnumAction)(
         obj=Body(
-            "x",
+            name="x",
         ),
         enum=TestEnum.OPTION_A,
     )
@@ -248,7 +261,7 @@ def test_generative_backend_grounds_a_predicate_over_two_attributes_of_the_match
     position = a(KRROODPosition)(
         x=variable_from(values), y=variable_from(values), z=0.0
     )
-    position.where(IsGreaterThan(position.x, position.y))
+    position.where(IsGreaterThan(value=position.x, bound=position.y))
 
     results = list(position.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
 
@@ -266,7 +279,7 @@ def test_generative_backend_grounds_a_predicate_taking_one_attribute_of_the_matc
     position = a(KRROODPosition)(
         x=variable_from(values), y=variable_from(values), z=0.0
     )
-    position.where(IsGreaterThan(position.x, position.x))
+    position.where(IsGreaterThan(value=position.x, bound=position.x))
 
     results = list(position.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
 
@@ -306,7 +319,7 @@ def test_selective_backend_rejects_match_with_nested_ellipsis_attribute():
 
 def test_selective_backend_rejects_match_with_ellipsis_element_in_plain_list():
     q = a(KRROODPositions)(
-        positions=[KRROODPosition(1, 2, 3)],
+        positions=[KRROODPosition(x=1, y=2, z=3)],
         some_strings=["a", ..., "c"],
     )
     with pytest.raises(SelectiveBackendCannotResolveEllipsisMatch):
@@ -314,8 +327,8 @@ def test_selective_backend_rejects_match_with_ellipsis_element_in_plain_list():
 
 
 def test_selective_backend_accepts_match_without_ellipsis_attribute():
-    apple = Apple("apple", 7)
-    q = an(Apple)(name="apple", size=7).from_([apple])
+    apple = Apple(name="apple", size=7)
+    q = an(Apple)(name="apple", size=7).from_(domain=[apple])
     assert list(q.evaluate(backend=EntityQueryLanguageBackend())) == [apple]
 
 
@@ -367,7 +380,8 @@ def test_probabilistic_backend_rejects_samples_contradicting_a_derived_attribute
     first_width, first_height = RECTANGLE_SIDES[0]
     query = a(Rectangle)(width=..., height=..., area=first_width * first_height)
     backend = ProbabilisticBackend(
-        number_of_samples=20, model_registry=DictRegistry({Rectangle: rectangle_model})
+        number_of_samples=20,
+        model_registry=DictRegistry(models={Rectangle: rectangle_model}),
     )
     rectangles = query.evaluate(backend=backend)
     assert {(rectangle.width, rectangle.height) for rectangle in rectangles} == {
@@ -396,3 +410,224 @@ def test_enumerating_backend_keeps_instances_whose_factory_renames_a_stated_valu
         (3, RECTANGLE_SIDES[0][1]),
         (4, RECTANGLE_SIDES[0][1]),
     }
+
+
+# %% a pattern keyword bound to an expression derived from a variable
+
+
+UPRIGHT = KRROODOrientation(x=0.0, y=0.0, z=0.0, w=1.0)
+"""
+The orientation every generated pose takes, so that only its position varies.
+"""
+
+
+def test_generative_backend_grounds_a_keyword_bound_to_a_flattening_of_a_variable() -> (
+    None
+):
+    """
+    A keyword bound to the flattened values of a variable's attribute takes each of
+    those values in turn, for each value of the variable, in their order.
+    """
+    holders = [
+        KRROODPositions(
+            positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=2, y=0, z=0)],
+            some_strings=[],
+        ),
+        KRROODPositions(positions=[KRROODPosition(x=3, y=0, z=0)], some_strings=[]),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=flat_variable(holder.positions), orientation=UPRIGHT)
+
+    poses = list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert [pose.position for pose in poses] == [
+        position for each_holder in holders for position in each_holder.positions
+    ]
+
+
+def test_generative_backend_grounds_a_keyword_bound_to_an_attribute_of_a_variable() -> (
+    None
+):
+    holders = [
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            positions=[], some_strings=[], positions2=KRROODPosition(x=1, y=0, z=0)
+        ),
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            positions=[], some_strings=[], positions2=KRROODPosition(x=2, y=0, z=0)
+        ),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=holder.positions2, orientation=UPRIGHT)
+
+    poses = list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert [pose.position for pose in poses] == [
+        each_holder.positions2 for each_holder in holders
+    ]
+
+
+def test_probabilistic_backend_grounds_a_keyword_bound_to_a_flattening_of_a_variable() -> (
+    None
+):
+    """
+    A keyword bound to the flattened values of a variable's attribute takes its sampled
+    values only from those flattened values.
+    """
+    holders = [
+        KRROODPositions(
+            positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=2, y=0, z=0)],
+            some_strings=[],
+        ),
+        KRROODPositions(positions=[KRROODPosition(x=3, y=0, z=0)], some_strings=[]),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=flat_variable(holder.positions), orientation=UPRIGHT)
+
+    flattened_positions = [
+        position for each_holder in holders for position in each_holder.positions
+    ]
+
+    poses = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert poses
+    assert {pose.position for pose in poses} <= set(flattened_positions)
+
+
+def test_probabilistic_backend_grounds_a_keyword_bound_to_an_attribute_of_a_variable() -> (
+    None
+):
+    holders = [
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            positions=[], some_strings=[], positions2=KRROODPosition(x=1, y=0, z=0)
+        ),
+        KRROODPositionsSubclassWithAnotherKRROODPosition(
+            positions=[], some_strings=[], positions2=KRROODPosition(x=2, y=0, z=0)
+        ),
+    ]
+    holder = variable_from(holders)
+    query = a(KRROODPose)(position=holder.positions2, orientation=UPRIGHT)
+
+    poses = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert poses
+    assert {pose.position for pose in poses} <= {
+        each_holder.positions2 for each_holder in holders
+    }
+
+
+def test_probabilistic_backend_grounds_a_keyword_bound_to_values_created_on_every_evaluation() -> (
+    None
+):
+    """
+    A keyword bound to an expression whose values are created anew on every evaluation
+    takes values that expression created.
+    """
+    points_holder = PointsCreatedOnEveryAccess(coordinates=[1.0, 2.0])
+    holder = variable_from([points_holder])
+    query = a(PlacementOnAPoint)(point=flat_variable(holder.points))
+
+    placements = list(query.evaluate(backend=ProbabilisticBackend()))
+
+    assert placements
+    assert {placement.point.coordinate for placement in placements} <= set(
+        points_holder.coordinates
+    )
+
+
+# %% generation constructs instances from bindings rather than writing into the pattern
+
+
+def test_enumerating_backend_leaves_the_pattern_unchanged():
+    width = variable(int, [1, 2, 3, 4])
+    height = variable(int, [3, 4, 6])
+    area = 12
+    query = a(Rectangle)(width=width, height=height, area=area)
+    list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+    assert query._kwargs_["width"] is width
+    assert query._kwargs_["height"] is height
+    assert query._kwargs_["area"] == area
+
+
+def test_probabilistic_backend_leaves_the_pattern_unchanged(rectangle_model):
+    first_width, first_height = RECTANGLE_SIDES[0]
+    area = first_width * first_height
+    query = a(Rectangle)(width=..., height=..., area=area)
+    backend = ProbabilisticBackend(
+        number_of_samples=20,
+        model_registry=DictRegistry(models={Rectangle: rectangle_model}),
+    )
+    list(query.evaluate(backend=backend))
+    assert query._kwargs_ == {"width": ..., "height": ..., "area": area}
+    assert [
+        attribute_match.assigned_variable._value_
+        for attribute_match in query._matches_with_variables_
+    ] == [
+        attribute_match.assigned_value
+        for attribute_match in query._matches_with_variables_
+    ]
+
+
+# %% rows of bindings carry their log-likelihood under the model
+
+
+@pytest.fixture
+def rectangle_backend(rectangle_model) -> ProbabilisticBackend:
+    """
+    :return: A backend that samples rectangles from the rectangle model.
+    """
+    return ProbabilisticBackend(
+        number_of_samples=20,
+        model_registry=DictRegistry(models={Rectangle: rectangle_model}),
+    )
+
+
+def test_probabilistic_backend_samples_bindings_with_their_log_likelihood(
+    rectangle_backend,
+):
+    query = a(Rectangle)(width=..., height=...)
+    width = query._find_assigned_variable_(access_path_name="Rectangle.width")
+    height = query._find_assigned_variable_(access_path_name="Rectangle.height")
+    rows = list(rectangle_backend.sample_bindings(expression=query))
+    assert len(rows) == rectangle_backend.number_of_samples
+    assert {
+        (row.bindings[width._id_], row.bindings[height._id_]) for row in rows
+    } <= set(RECTANGLE_SIDES)
+    assert [row.log_likelihood for row in rows] == pytest.approx(
+        [np.log(1 / len(RECTANGLE_SIDES))] * len(rows)
+    )
+
+
+def test_probabilistic_backend_computes_the_log_likelihood_of_given_bindings(
+    rectangle_backend,
+):
+    query = a(Rectangle)(width=..., height=...)
+    width = query._find_assigned_variable_(access_path_name="Rectangle.width")
+    height = query._find_assigned_variable_(access_path_name="Rectangle.height")
+    rectangle_width, rectangle_height = RECTANGLE_SIDES[1]
+    bindings = {width._id_: rectangle_width, height._id_: rectangle_height}
+    row = rectangle_backend.compute_log_likelihood(expression=query, bindings=bindings)
+    assert row.bindings == bindings
+    assert row.log_likelihood == pytest.approx(np.log(1 / len(RECTANGLE_SIDES)))
+
+
+def test_bindings_the_model_cannot_produce_have_no_likelihood(rectangle_backend):
+    query = a(Rectangle)(width=..., height=...)
+    width = query._find_assigned_variable_(access_path_name="Rectangle.width")
+    height = query._find_assigned_variable_(access_path_name="Rectangle.height")
+    first_width, _ = RECTANGLE_SIDES[0]
+    _, second_height = RECTANGLE_SIDES[1]
+    row = rectangle_backend.compute_log_likelihood(
+        expression=query, bindings={width._id_: first_width, height._id_: second_height}
+    )
+    assert row.log_likelihood == -np.inf
+
+
+def test_a_sampled_row_is_a_role_of_the_operation_result_of_its_bindings(
+    rectangle_backend,
+):
+    query = a(Rectangle)(width=..., height=...)
+    row = next(rectangle_backend.sample_bindings(expression=query))
+    assert isinstance(row.role_taker, OperationResult)
+    assert Role.roles_for(
+        role_taker=row.role_taker, role_type=ProbabilisticOperationResult
+    ) == [row]

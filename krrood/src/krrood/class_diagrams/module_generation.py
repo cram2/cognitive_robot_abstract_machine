@@ -2,7 +2,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, fields, field
 from pathlib import Path
-from typing import List, Set, Type, Optional, Tuple
+from typing_extensions import Optional, Tuple
 
 import jinja2
 
@@ -10,7 +10,7 @@ from krrood.code_generation.formatting import run_black_on_file
 from krrood.utils import module_and_class_name, is_dynamic_class
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DataclassRenderer:
     """
     Rendering definition to write dataclasses that have been created in memory into a
@@ -19,7 +19,7 @@ class DataclassRenderer:
     .. note:: Fields are not rendered yet.
     """
 
-    type_: Type
+    type_: type
     """
     The dataclass to render.
     """
@@ -48,19 +48,19 @@ class DataclassRenderer:
                 self.imports.add(base.__module__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModuleRenderer:
     """
     Rendering definition to write dataclasses that have been created in memory into a
     python module.
     """
 
-    classes: List[DataclassRenderer] = field(default_factory=list)
+    classes: list[DataclassRenderer] = field(default_factory=list)
     """
     Classes that should be rendered.
     """
 
-    imports: Set[str] = field(default_factory=set)
+    imports: set[str] = field(default_factory=set)
     """
     Imports collected from all classes.
     """
@@ -70,13 +70,13 @@ class ModuleRenderer:
             self.imports.update(clazz.imports)
 
     @classmethod
-    def from_dataclasses(cls, classes: List[Type]):
-        dataclass_descriptions = [DataclassRenderer(clazz) for clazz in classes]
+    def from_dataclasses(cls, *, classes: list[type]):
+        dataclass_descriptions = [DataclassRenderer(type_=clazz) for clazz in classes]
         result = cls(classes=dataclass_descriptions)
         result._update_imports()
         return result
 
-    def write_to_file(self, path: Path):
+    def write_to_file(self, *, path: Path):
         """
         Write the module to a file.
 

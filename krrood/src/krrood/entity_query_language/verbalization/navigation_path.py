@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, is_dataclass, replace
 
-from typing_extensions import TYPE_CHECKING, Callable, List, Optional
+from typing_extensions import TYPE_CHECKING, Callable
 
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
@@ -23,13 +23,13 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RelationStep:
     """The data a *relational* hop renders from — the related type (the relative clause's head
     noun), the verb split into participle + preposition (so the preposition pied-pipes before
     *"which"*), and the owner class (for the verb's source link)."""
 
-    value_type: Optional[type]
+    value_type: type | None
     """The hop's value type — the head noun of the relative clause (*"the Robot"*)."""
 
     owner_class: type
@@ -41,7 +41,7 @@ class RelationStep:
     preposition: str
     """The trailing preposition (*"to"*) — pied-piped to *"to which …"*."""
 
-    referent_id: Optional[uuid.UUID] = None
+    referent_id: uuid.UUID | None = None
     """The navigated value node's id. The relative clause is a *referring* expression for that
     entity, so a repeat mention of the same navigation reduces to a bare *"the <Type>"* (coreference)
     rather than repeating the whole *"the Robot to which it is assigned"*; ``None`` disables it."""
@@ -56,7 +56,7 @@ class RelationStep:
     unused for a non-agentive relation."""
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PathStep:
     """
     One hop of a navigation chain — a display name and the source reference it links to.
@@ -68,10 +68,10 @@ class PathStep:
     name: str
     """The display text for this hop (e.g. ``"amount"``, ``"handle[0]"``, ``"first"``)."""
 
-    source_reference: Optional[SourceReference] = None
+    source_reference: SourceReference | None = None
     """The attribute's source reference, or ``None`` for composite / index hops."""
 
-    relation: Optional[RelationStep] = None
+    relation: RelationStep | None = None
     """When set, this hop is a *relation* named as a verb (``assigned_to``) and renders as a relative
     clause *"the <Type> which <owner> is <verb-phrase>"* instead of the genitive *"the <attr> of
     <owner>"*; ``None`` for a plain noun hop."""
@@ -81,7 +81,7 @@ class PathStep:
     A scalar leaf possessed by a plural subject distributes (*"their salaries"*); an entity owner of
     further structure does not (*"the begin and end of their period"*)."""
 
-    ordinal: Optional[str] = None
+    ordinal: str | None = None
     """The ordinal phrase (*"first"*, *"last"*) when this attribute hop selects a single indexed
     element of a collection: the collection noun singularizes and takes the ordinal (*"the first
     task"* rather than *"the first of the tasks"*); ``None`` for a whole-collection hop."""
@@ -109,9 +109,9 @@ class PathStep:
 
 
 def build_path_parts(
-    chain: List[MappedVariable],
-    relation_verb: Optional[Callable[[str], Optional["RelationVerb"]]] = None,
-) -> List[PathStep]:
+    chain: list[MappedVariable],
+    relation_verb: Callable[[str], RelationVerb | None] | None = None,
+) -> list[PathStep]:
     """
     Convert a walked chain into :class:`PathStep` hops.
 
@@ -139,7 +139,7 @@ def build_path_parts(
     >>> [step.name for step in build_path_parts(chain)]
     ['amount_details', 'amount']
     """
-    parts: List[PathStep] = []
+    parts: list[PathStep] = []
     for node in chain:
         if isinstance(node, Attribute):
             owner = node._owner_class_
@@ -147,11 +147,11 @@ def build_path_parts(
             verb = relation_verb(name) if relation_verb is not None else None
             relation = (
                 RelationStep(
-                    node._type_,
-                    owner,
-                    verb.participle,
-                    verb.preposition,
-                    node._id_,
+                    value_type=node._type_,
+                    owner_class=owner,
+                    participle=verb.participle,
+                    preposition=verb.preposition,
+                    referent_id=node._id_,
                     is_agentive=verb.is_agentive,
                     active_verb=verb.active_verb,
                 )
@@ -160,8 +160,10 @@ def build_path_parts(
             )
             parts.append(
                 PathStep(
-                    name,
-                    SourceReference.for_attribute(owner, name),
+                    name=name,
+                    source_reference=SourceReference.for_attribute(
+                        owner=owner, attribute_name=name
+                    ),
                     relation=relation,
                     is_scalar_value=_is_scalar_value(node._type_),
                 )
@@ -178,7 +180,7 @@ def build_path_parts(
     return parts
 
 
-def _is_scalar_value(value_type: Optional[type]) -> bool:
+def _is_scalar_value(value_type: type | None) -> bool:
     """:return: ``True`` when *value_type* is an atomic scalar — a primitive value, not an entity
     (an entity is a dataclass and reads as an owner, not a distributable value).
 
@@ -188,7 +190,7 @@ def _is_scalar_value(value_type: Optional[type]) -> bool:
     return value_type is not None and not is_dataclass(value_type)
 
 
-def _append_index(parts: List[PathStep], node: Index) -> None:
+def _append_index(parts: list[PathStep], node: Index) -> None:
     """Fold an integer index into the plain attribute hop it subscripts (*"the first task"*), else
     append it as a standalone hop.
 
@@ -198,7 +200,7 @@ def _append_index(parts: List[PathStep], node: Index) -> None:
     """
     key = node._key_
     if not isinstance(key, int) or isinstance(key, bool):
-        parts.append(PathStep(f"[{repr(key)}]", None))
+        parts.append(PathStep(name=f"[{repr(key)}]", source_reference=None))
         return
     ordinal_phrase = morphology.index_ordinal(key)
     if parts and parts[-1].is_plain_attribute and parts[-1].ordinal is None:
@@ -208,4 +210,4 @@ def _append_index(parts: List[PathStep], node: Index) -> None:
             is_scalar_value=_is_scalar_value(node._type_),
         )
         return
-    parts.append(PathStep(ordinal_phrase, None))
+    parts.append(PathStep(name=ordinal_phrase, source_reference=None))

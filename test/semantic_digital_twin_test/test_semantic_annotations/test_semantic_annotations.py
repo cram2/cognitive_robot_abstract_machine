@@ -1,50 +1,43 @@
 import logging
 
-import numpy as np
-from numpy.ma.testutils import (
-    assert_equal,
-)  # You could replace this with numpy's regular assert for better compatibility
-
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
-from krrood.entity_query_language.verbalization.rendering.renderer import (
-    HierarchicalRenderer,
-)
 from krrood.entity_query_language.verbalization.pipeline import (
     verbalize_expression,
     VerbalizationPipeline,
+)
+from krrood.entity_query_language.verbalization.rendering.renderer import (
+    HierarchicalRenderer,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
+from semantic_digital_twin.predefined_maps.kitchen_environment import (
+    KitchenEnvironment,
+)
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Drawer,
-    Wardrobe,
     Door,
 )
 from semantic_digital_twin.testing import *
-from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
-from semantic_digital_twin.world_description.shape_collection import (
-    BoundingBoxCollection,
-)
-from semantic_digital_twin.predefined_maps.kitchen_environment import (
-    KitchenEnvironment,
-)
 from semantic_digital_twin.world_description.connections import (
     PrismaticConnection,
     RevoluteConnection,
 )
+from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
+from semantic_digital_twin.world_description.shape_collection import (
+    BoundingBoxCollection,
+)
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from typing_extensions import Self
 
 try:
     from krrood.ripple_down_rules.user_interface.gui import RDRCaseViewer
@@ -68,12 +61,12 @@ class TestSemanticAnnotation(SemanticAnnotation):
 
     _private_entity: Optional[KinematicStructureEntity] = None
     public_entity: Optional[KinematicStructureEntity] = None
-    _private_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
-    public_entity_list: List[KinematicStructureEntity] = field(default_factory=list)
+    _private_entity_list: list[KinematicStructureEntity] = field(default_factory=list)
+    public_entity_list: list[KinematicStructureEntity] = field(default_factory=list)
     _private_annotation: Optional[SemanticAnnotation] = None
     public_annotation: Optional[SemanticAnnotation] = None
-    _private_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
-    public_annotation_list: List[SemanticAnnotation] = field(default_factory=list)
+    _private_annotation_list: list[SemanticAnnotation] = field(default_factory=list)
+    public_annotation_list: list[SemanticAnnotation] = field(default_factory=list)
 
 
 def test_aggregate_bodies(kitchen_world):
@@ -320,8 +313,8 @@ def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy
     explanation = explain_inference(drawer)
     verbalization_paragraph = verbalize_expression(explanation.query_root)
     verbalization_hierarchical = VerbalizationPipeline(
-        HierarchicalRenderer()
-    ).verbalize(explanation.query_root)
+        renderer=HierarchicalRenderer()
+    ).verbalize(expression=explanation.query_root)
     assert verbalization_paragraph == (
         "If the child of a PrismaticConnection has collision geometry,"
         " the child of the PrismaticConnection is not part of a robot,"
@@ -361,7 +354,7 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
     tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_copy)
     kwargs = tracker.create_kwargs()
 
-    door_de = Door.from_json(door_se, **kwargs)
+    door_de = Door.from_json(data=door_se, **kwargs)
 
     assert type(door.handle) == type(door_de.handle)
     assert type(door.root) == type(door_de.root)
@@ -369,7 +362,7 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
 def test_minimal_robot_annotation(pr2_world_state_reset):
     urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    world_copy = URDFParser.from_xacro(urdf_path).parse()
+    world_copy = URDFParser.from_xacro(urdf_path).create_world()
     with world_copy.modify_world():
         MinimalRobot.from_world(world_copy)
         pr2_root = world_copy.root
@@ -397,7 +390,7 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
         def setup_hardware_interfaces(self):
             pass
 
-        def setup_joint_states(self) -> List[JointState]:
+        def setup_joint_states(self) -> list[JointState]:
             return []
 
         @classmethod
@@ -639,7 +632,7 @@ def test_combined_mesh_is_empty_without_collision_geometry():
 
 @pytest.fixture
 def kitchen_environment_world() -> World:
-    return KitchenEnvironment().get_world()
+    return KitchenEnvironment().create_world()
 
 
 def test_door_joint_is_the_revolute_connection_it_hangs_from_its_whole_on(

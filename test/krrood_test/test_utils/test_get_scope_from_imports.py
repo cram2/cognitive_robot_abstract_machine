@@ -5,9 +5,8 @@ import math
 from dataclasses import dataclass, fields
 from pathlib import Path
 from collections import defaultdict
-from typing import Any, Dict
+from typing_extensions import Optional, Any, Dict
 import pytest
-from typing_extensions import Optional
 
 from krrood.utils import get_scope_from_imports
 from krrood.exceptions import SourceDataNotProvided

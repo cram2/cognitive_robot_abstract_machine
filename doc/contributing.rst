@@ -29,7 +29,14 @@ are generated from changed. ``--orm-build`` overrides that:
   pytest --orm-build=never    # build nothing, and read whatever the checkout holds
 
 Runs that state no choice on their command line take one from ``CRAM_ORM_BUILD``, which
-is how a shell or a CI job sets the default for every run it starts.
+is how a shell or a CI job sets the default for every run it starts. A run with
+``--confcutdir`` that excludes ``test/conftest.py``, such as a ``krrood``-only run with
+``--confcutdir=test/krrood_test``, rejects ``--orm-build`` because that conftest
+registers it; set ``CRAM_ORM_BUILD`` instead.
+
+The workspace requires Python 3.12 and ``pytest`` comes with the ``dev`` extra, so run
+tests from the environment ``uv sync --extra dev --active`` builds, not from a system
+Python.
 
 If you have any questions or feedback, consider submitting a `GitHub
 Issue <https://github.com/cram2/cognitive_robot_abstract_machine/issues>`__.
@@ -97,8 +104,9 @@ our system to ensure high-quality, maintainable, and robust code.
 
 4. 📐 Adhere to Code Style and Principles
 
-   -  Code Formatting: We use Black, which is fully PEP 8 compliant. All
-      code must be automatically formatted with Black before submission.
+   -  Code Formatting: We use ruff, which is fully PEP 8 compliant, followed
+      by docformatter for docstrings. The ``krrood-format`` pre-commit hook
+      formats every modified file before submission.
 
    -  SOLID Principles: Read and understand the SOLID principles for
       writing robust, maintainable, and scalable software. This article
@@ -184,7 +192,7 @@ PR Checklist Summary
 
    [ ] AI (Copilot/PyCharm) has reviewed the code.
 
-   [ ] Black has formatted the code (PEP 8 compliant).
+   [ ] The pre-commit hooks have formatted the code (PEP 8 compliant).
 
    [ ] New features/logic have tests (Beyoncé Rule).
 

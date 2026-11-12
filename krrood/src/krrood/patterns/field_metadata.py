@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
 
-from typing_extensions import Dict, Optional, Self, TYPE_CHECKING, Type
+from typing_extensions import Self, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from krrood.class_diagrams.wrapped_field import WrappedField
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldMetadata:
     """
     Krrood-specific metadata carried inside a dataclass field's ``metadata`` mapping.
@@ -18,7 +18,7 @@ class FieldMetadata:
     it back with :meth:`of_field`).
     """
 
-    def as_dict(self) -> Dict[type, Self]:
+    def as_dict(self) -> dict[type, Self]:
         """
         :return: a dataclass-field ``metadata`` mapping carrying this metadata under its own
             type, ready to pass to ``field(metadata=...)``.
@@ -26,7 +26,7 @@ class FieldMetadata:
         return {type(self): self}
 
     @classmethod
-    def of_field(cls, clazz: Type, field_name: str) -> Optional[Self]:
+    def of_field(cls, *, clazz: type, field_name: str) -> Self | None:
         """
         :return: the instance of *cls* attached to *field_name* of *clazz*, or ``None`` when
             *clazz* is not a dataclass, has no such field, or the field carries no metadata of
@@ -40,7 +40,7 @@ class FieldMetadata:
         return field_.metadata.get(cls)
 
     @classmethod
-    def of_wrapped_field(cls, wrapped_field: WrappedField) -> Optional[Self]:
+    def of_wrapped_field(cls, *, wrapped_field: WrappedField) -> Self | None:
         """
         :return: the instance of *cls* attached to the dataclass field behind
             *wrapped_field*, or ``None`` when that field carries no metadata of type *cls*.
@@ -48,10 +48,12 @@ class FieldMetadata:
         ..note:: The lookup goes through the dataclass field name, which may differ from
             the public name under which the field is addressed.
         """
-        return cls.of_field(wrapped_field.clazz.clazz, wrapped_field.field.name)
+        return cls.of_field(
+            clazz=wrapped_field.clazz.clazz, field_name=wrapped_field.field.name
+        )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JSONMetadata(FieldMetadata):
     serialize: bool = True
     """

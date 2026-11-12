@@ -1,6 +1,6 @@
 import inspect
 
-from typing_extensions import Type, Any
+from typing_extensions import Any
 
 
 def is_ros2_message(obj: Any) -> bool:
@@ -13,7 +13,7 @@ def is_ros2_message(obj: Any) -> bool:
     return hasattr(inspect.getmodule(obj), "rosidl_parser")
 
 
-def is_ros2_message_class(clazz: Type) -> bool:
+def is_ros2_message_class(clazz: type) -> bool:
     """
     Checks if a class is a ROS2 message based on its slots and field types and hope
     nothing else has the same.

@@ -1,6 +1,9 @@
 import json
 
 import pytest
+from typing_extensions import Iterator
+
+from cramph.executor import RealTimePacer
 
 from experiments.control_loop_experiments.benchmark import (
     ControlLoopBenchmarkResult,
@@ -9,7 +12,9 @@ from experiments.control_loop_experiments.benchmark import (
     PhaseBreakdownResult,
 )
 from experiments.control_loop_experiments.scenarios import (
+    BenchmarkRobot,
     CartesianGoalScenario,
+    DeeplyNestedCascadeScenario,
     LongSequenceScenario,
     PlotterMode,
     ScenarioRunner,
@@ -68,7 +73,9 @@ class TestProfileSerialization:
     def test_phases_survive_the_round_trip(self):
         profile = make_profile([0.02, 0.04], [0.01, 0.03])
 
-        restored = CallTreeProfile.from_json(json.loads(json.dumps(profile.to_json())))
+        restored = CallTreeProfile.from_json(
+            data=json.loads(json.dumps(profile.to_json()))
+        )
 
         assert restored == profile
 
@@ -79,7 +86,9 @@ class TestProfileSerialization:
         """
         profile = make_profile([0.02, 0.04], [0.01, 0.03])
 
-        restored = CallTreeProfile.from_json(json.loads(json.dumps(profile.to_json())))
+        restored = CallTreeProfile.from_json(
+            data=json.loads(json.dumps(profile.to_json()))
+        )
 
         assert set(restored.phases) == {
             ("control_cycle",),
@@ -223,12 +232,12 @@ class TestPhaseBreakdown:
 
 
 @pytest.fixture()
-def cartesian_goal_profile(init_rospy) -> CallTreeProfile:
+def cartesian_goal_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(CartesianGoalScenario())
 
 
 @pytest.fixture()
-def long_sequence_profile(init_rospy) -> CallTreeProfile:
+def long_sequence_profile(init_background_node) -> CallTreeProfile:
     return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(LongSequenceScenario())
 
 
@@ -250,6 +259,35 @@ class TestPhaseAccounting:
         assert accounted == pytest.approx(control_cycle.inclusive_total, rel=1e-9)
 
 
+@pytest.fixture()
+def benchmark_robot(init_background_node) -> Iterator[BenchmarkRobot]:
+    robot = BenchmarkRobot(
+        plotter_mode=PlotterMode.PLAIN,
+        target_frequency=ScenarioRunner.target_frequency,
+    )
+    yield robot
+    robot.close()
+
+
+class TestControlLoopPacing:
+    """
+    The control loop is measured at the pace a robot is commanded at, so cycles share
+    the machine with everything else running in between as they do on a robot.
+    """
+
+    def test_the_control_loop_is_paced_in_real_time(
+        self, benchmark_robot: BenchmarkRobot
+    ) -> None:
+        assert isinstance(benchmark_robot.giskard.executor.pacer, RealTimePacer)
+
+    def test_the_control_loop_is_paced_at_one_cycle_per_control_time_step(
+        self, benchmark_robot: BenchmarkRobot
+    ) -> None:
+        pacer = benchmark_robot.giskard.executor.pacer
+
+        assert pacer.cycle_duration == pytest.approx(benchmark_robot.control_delta_time)
+
+
 @pytest.mark.slow
 class TestControlCycleBudget:
     """
@@ -268,3 +306,32 @@ class TestControlCycleBudget:
         self, long_sequence_profile: CallTreeProfile
     ):
         assert long_sequence_profile.control_cycles >= 100
+
+
+# %% outcomes climbing deep nesting within one tick
+
+
+@pytest.fixture()
+def deeply_nested_cascade_profile(init_background_node) -> CallTreeProfile:
+    return ScenarioRunner(plotter_mode=PlotterMode.PLAIN).run(
+        DeeplyNestedCascadeScenario()
+    )
+
+
+@pytest.mark.slow
+class TestDeeplyNestedCascade:
+    """
+    A tick in which an outcome climbs deep nesting settles in many passes, and even that
+    settling has to fit into one control cycle.
+    """
+
+    def test_slowest_settling_stays_within_the_control_budget(
+        self, deeply_nested_cascade_profile: CallTreeProfile
+    ) -> None:
+        slowest_settling = max(
+            samples.inclusive_maximum
+            for samples in deeply_nested_cascade_profile.phases.values()
+            if samples.path[-1] == "settle"
+        )
+
+        assert slowest_settling < deeply_nested_cascade_profile.control_dt

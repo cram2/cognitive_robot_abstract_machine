@@ -22,7 +22,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing_extensions import Any, Iterator, Tuple, TYPE_CHECKING
+from typing_extensions import Any, Iterator, TYPE_CHECKING
 
 from krrood.entity_query_language.core.base_expressions import (
     HasExpression,
@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from krrood.parametrization.model_registries import ModelRegistry
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class ProbabilisticQuery(Evaluable, HasExpression, ABC):
     """
     Shared base for EQL constructs that query a probabilistic model directly --
@@ -67,10 +67,10 @@ class ProbabilisticQuery(Evaluable, HasExpression, ABC):
     """
 
     def _evaluate_natively_(self) -> Iterator:
-        raise BackendCannotEvaluateProbabilisticQuery(self)
+        raise BackendCannotEvaluateProbabilisticQuery(expression=self)
 
     @abstractmethod
-    def _resolve_(self, model_registry: ModelRegistry) -> Any:
+    def _resolve_(self, *, model_registry: ModelRegistry) -> Any:
         """
         Resolve this query against a model obtained from ``model_registry``.
 
@@ -80,7 +80,7 @@ class ProbabilisticQuery(Evaluable, HasExpression, ABC):
         """
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Probability(ProbabilisticQuery):
     """
     The probability of a condition, optionally given evidence, e.g.
@@ -135,11 +135,13 @@ class Probability(ProbabilisticQuery):
         :raises EvidenceHasZeroProbability: If no row satisfies the evidence.
         """
         referenced_attributes = WhereExpressionToRandomEventTranslator(
-            self.condition_and_evidence
+            conditions_root=self.condition_and_evidence
         ).variables.keys()
         roots = {attribute._chain_root_ for attribute in referenced_attributes}
         if len(roots) != 1:
-            raise JointQueryAcrossClassesNotSupported({root._type_ for root in roots})
+            raise JointQueryAcrossClassesNotSupported(
+                owner_classes={root._type_ for root in roots}
+            )
         [root_variable] = roots
 
         matching_count = (
@@ -150,25 +152,25 @@ class Probability(ProbabilisticQuery):
             evidence_query = evidence_query.where(self.evidence)
         evidence_count = evidence_query.first()
         if evidence_count == 0:
-            raise EvidenceHasZeroProbability(self)
+            raise EvidenceHasZeroProbability(expression=self)
         yield matching_count / evidence_count
 
-    def _resolve_(self, model_registry: ModelRegistry) -> float:
+    def _resolve_(self, *, model_registry: ModelRegistry) -> float:
         """
         :raises EvidenceHasZeroProbability: If the model assigns the evidence zero
             probability.
         """
-        parameters = ConditionParameters(self.condition_and_evidence)
-        model = model_registry.get_model(parameters)
+        parameters = ConditionParameters(condition=self.condition_and_evidence)
+        model = model_registry.get_model(parameters=parameters)
         probability = model.probability(parameters.event)
         if self.evidence is None:
             return probability
 
         evidence_probability = model.probability(
-            ConditionParameters(self.evidence).event
+            ConditionParameters(condition=self.evidence).event
         )
         if evidence_probability == 0:
-            raise EvidenceHasZeroProbability(self)
+            raise EvidenceHasZeroProbability(expression=self)
         return probability / evidence_probability
 
     def _get_expression_(self) -> SymbolicExpression:
@@ -179,7 +181,7 @@ class Probability(ProbabilisticQuery):
         return f"probability_of({self.condition!r}{evidence})"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Distribution(ProbabilisticQuery):
     """
     Requests the distribution a :class:`~krrood.entity_query_language.query.match.Match`'s
@@ -206,7 +208,7 @@ class Distribution(ProbabilisticQuery):
     The match whose conditions describe the distribution.
     """
 
-    marginalize_for: Tuple[Attribute, ...] = field(default_factory=tuple)
+    marginalize_for: tuple[Attribute, ...] = field(default_factory=tuple)
     """
     The match's variables to narrow the result to.
 
@@ -217,25 +219,25 @@ class Distribution(ProbabilisticQuery):
         query = self.match._get_expression_()
         self.marginalize_for = tuple(
             (
-                query._rerooted_on_selection_(attribute)
-                if query._is_attribute_of_self_(attribute)
+                query._rerooted_on_selection_(chain=attribute)
+                if query._is_attribute_of_self_(expression=attribute)
                 else attribute
             )
             for attribute in self.marginalize_for
         )
 
-    def _resolve_(self, model_registry: ModelRegistry) -> Any:
-        parameters = UnderspecifiedParameters(self.match)
-        model = model_registry.get_model(parameters)
-        result = parameters.resolve_conditioned_and_truncated_model(model)
+    def _resolve_(self, *, model_registry: ModelRegistry) -> Any:
+        parameters = UnderspecifiedParameters(statement=self.match)
+        model = model_registry.get_model(parameters=parameters)
+        result = parameters.resolve_conditioned_and_truncated_model(model=model)
         if result is None:
-            raise NoSolutionFound(self)
+            raise NoSolutionFound(expression=self)
 
         if self.marginalize_for:
             selected = [parameters.variables[v._name_] for v in self.marginalize_for]
             result = result.marginal(selected)
             if result is None:
-                raise NoSolutionFound(self)
+                raise NoSolutionFound(expression=self)
 
         return result
 

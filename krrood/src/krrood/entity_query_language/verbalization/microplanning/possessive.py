@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from typing_extensions import List, Optional, TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
@@ -46,19 +46,23 @@ def attribute_fragment(
     (*"beginning"* for ``begin``) applies here just as it does for a standalone attribute leaf.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text
-    >>> flatten_fragment_to_plain_text(attribute_fragment(PathStep("salary")))
+    >>> flatten_fragment_to_plain_text(attribute_fragment(PathStep(name="salary")))
     'salary'
     """
     if step.source_reference is None:
-        return RoleFragment.for_attribute(None, step.name, number)
+        return RoleFragment.for_attribute(
+            owner=None, attribute_name=step.name, number=number
+        )
     return RoleFragment.for_attribute(
-        step.source_reference.owner_type, step.source_reference.attribute, number
+        owner=step.source_reference.owner_type,
+        attribute_name=step.source_reference.attribute,
+        number=number,
     )
 
 
 def indexed_noun(
     step: PathStep, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
-) -> List[VerbalizationFragment]:
+) -> list[VerbalizationFragment]:
     """:return: the ordinal followed by the singularized collection noun for an indexed hop — the
     *"first task"* body of *"the first task of a Worker"*, without its article or owner.
 
@@ -66,7 +70,7 @@ def indexed_noun(
     the ordinal precedes it as a modifier.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, PhraseFragment
-    >>> step = PathStep("tasks", ordinal="first")
+    >>> step = PathStep(name="tasks", ordinal="first")
     >>> flatten_fragment_to_plain_text(PhraseFragment(parts=indexed_noun(step)))
     'first task'
     """
@@ -82,7 +86,7 @@ def _ordinal_genitive_step(
     (*"the first task of a Worker"*).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> step = PathStep("tasks", ordinal="first")
+    >>> step = PathStep(name="tasks", ordinal="first")
     >>> flatten_fragment_to_plain_text(_ordinal_genitive_step(step, WordFragment(text="Worker")))
     'the first task of Worker'
     """
@@ -96,14 +100,14 @@ def _ordinal_genitive_step(
     )
 
 
-def _genitive_article(step: PathStep) -> Optional[VerbalizationFragment]:
+def _genitive_article(step: PathStep) -> VerbalizationFragment | None:
     """:return: the article introducing a genitive hop — none for a mass noun (*"the amount of
     money"*, never *"the amount of the money"*), else the definite *"the"*.
 
     A genitive hop is a fresh, non-anaphoric description of an attribute, so a mass-noun hop reads
     in its bare generic form; only countable hops take *"the"*.
     """
-    if NounCountability().is_uncountable(step.name):
+    if NounCountability().is_uncountable(noun=step.name):
         return None
     return Articles.THE.as_fragment()
 
@@ -119,7 +123,7 @@ def _genitive_step(
     through :func:`_relative_clause`).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(_genitive_step(PathStep("battery"), WordFragment(text="Robot")))
+    >>> flatten_fragment_to_plain_text(_genitive_step(PathStep(name="battery"), WordFragment(text="Robot")))
     'the battery of Robot'
     """
     article = _genitive_article(step)
@@ -156,7 +160,9 @@ def _relative_clause(
         modifiers = [
             Keywords.WHO.as_fragment(),
             RoleFragment.for_attribute(
-                relation.owner_class, step.name, text=relation.active_verb
+                owner=relation.owner_class,
+                attribute_name=step.name,
+                text=relation.active_verb,
             ),
             owner_fragment,
         ]
@@ -165,13 +171,15 @@ def _relative_clause(
             WordFragment(text=relation.preposition),
             Keywords.WHICH.as_fragment(),
             owner_fragment,
-            Copulas.for_number(owner_number),
+            Copulas.for_number(number=owner_number),
             RoleFragment.for_attribute(
-                relation.owner_class, step.name, text=relation.participle
+                owner=relation.owner_class,
+                attribute_name=step.name,
+                text=relation.participle,
             ),
         ]
     return NounPhrase(
-        head=RoleFragment.for_type(relation.value_type),
+        head=RoleFragment.for_type(type_=relation.value_type),
         definiteness=Definiteness.DEFINITE,
         modifiers=modifiers,
         referent_id=relation.referent_id,
@@ -204,9 +212,11 @@ def subject_relative_relation(
     return PhraseFragment(
         parts=[
             Keywords.THAT.as_fragment(),
-            Copulas.for_number(number),
+            Copulas.for_number(number=number),
             RoleFragment.for_attribute(
-                owner_class, attribute_name, text=relation.participle
+                owner=owner_class,
+                attribute_name=attribute_name,
+                text=relation.participle,
             ),
             WordFragment(text=relation.preposition),
             object_fragment,
@@ -215,7 +225,7 @@ def subject_relative_relation(
 
 
 def coordinated_genitive(
-    attribute_fragments: List[VerbalizationFragment],
+    attribute_fragments: list[VerbalizationFragment],
     owner_fragment: VerbalizationFragment,
 ) -> VerbalizationFragment:
     """:return: *"the <a, b, and c> of <owner>"* — several attributes sharing one genitive owner,
@@ -223,7 +233,7 @@ def coordinated_genitive(
     than repeated owner by owner (*"the department of an Employee and its salary"*).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> attributes = [attribute_fragment(PathStep("department")), attribute_fragment(PathStep("salary"))]
+    >>> attributes = [attribute_fragment(PathStep(name="department")), attribute_fragment(PathStep(name="salary"))]
     >>> flatten_fragment_to_plain_text(coordinated_genitive(attributes, WordFragment(text="Employee")))
     'the department and salary of Employee'
     """
@@ -248,7 +258,7 @@ def _extend_hop(
     *assigned_to*) would instead become a *"… to which … is assigned"* relative clause.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(_extend_hop(PathStep("battery"), WordFragment(text="Robot")))
+    >>> flatten_fragment_to_plain_text(_extend_hop(PathStep(name="battery"), WordFragment(text="Robot")))
     'the battery of Robot'
     """
     if step.is_relation:
@@ -259,7 +269,7 @@ def _extend_hop(
 
 
 def possessive_path(
-    parts: List[PathStep], root_fragment: VerbalizationFragment
+    parts: list[PathStep], root_fragment: VerbalizationFragment
 ) -> VerbalizationFragment:
     """:return: the navigation read out from the root, hop by hop (parts innermost-first) — a plain
     hop as the genitive *"the <attribute> of <owner>"*, a relational hop as the relative clause
@@ -278,7 +288,7 @@ def possessive_path(
 
 
 def chain_head_number(
-    parts: List[PathStep], subject_number: GrammaticalNumber
+    parts: list[PathStep], subject_number: GrammaticalNumber
 ) -> GrammaticalNumber:
     """:return: The grammatical number the chain's head noun is realised with once its root is
     pronominalised — *subject_number* only when a single scalar hop distributes over the subject
@@ -290,10 +300,10 @@ def chain_head_number(
     this returns plural.
 
     >>> from krrood.entity_query_language.verbalization.fragments.features import GrammaticalNumber
-    >>> chain_head_number([PathStep("battery", is_scalar_value=True)], GrammaticalNumber.PLURAL)
+    >>> chain_head_number([PathStep(name="battery", is_scalar_value=True)], GrammaticalNumber.PLURAL)
     <GrammaticalNumber.PLURAL: 'plural'>
     >>> chain_head_number(
-    ...     [PathStep("assigned_to"), PathStep("battery", is_scalar_value=True)], GrammaticalNumber.PLURAL
+    ...     [PathStep(name="assigned_to"), PathStep(name="battery", is_scalar_value=True)], GrammaticalNumber.PLURAL
     ... )
     <GrammaticalNumber.SINGULAR: 'singular'>
     """
@@ -322,7 +332,7 @@ def _pronominal_first_hop(
 
 
 def pronominal_path(
-    parts: List[PathStep], subject_number: GrammaticalNumber
+    parts: list[PathStep], subject_number: GrammaticalNumber
 ) -> VerbalizationFragment:
     """:return: the navigation read out with the (elided) root pronominalised — *"its attribute"* /
     *"the attribute of its foo"* for plain hops, and the relative clause *"the <Type> <prep> which
@@ -338,10 +348,10 @@ def pronominal_path(
     >>> flatten_fragment_to_plain_text(pronominal_path([], GrammaticalNumber.SINGULAR))
     'its'
     """
-    possessive_pronoun = Pronouns.possessive(subject_number).as_fragment()
+    possessive_pronoun = Pronouns.possessive(number=subject_number).as_fragment()
     if not parts:
         return possessive_pronoun
-    nominative_pronoun = Pronouns.nominative(subject_number).as_fragment()
+    nominative_pronoun = Pronouns.nominative(number=subject_number).as_fragment()
     # The innermost hop, adjacent to the elided root, takes the pronoun; the rest extend it exactly
     # as :func:`possessive_path` does.
     first, rest = parts[0], parts[1:]

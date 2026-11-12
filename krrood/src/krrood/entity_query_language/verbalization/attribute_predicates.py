@@ -17,9 +17,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING
 
-from typing_extensions import List, Optional, Type
 
 from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.boolean_predicate import (
@@ -66,7 +65,7 @@ class SpelledOutHead(StrEnum):
     ARE = "are"
 
     @classmethod
-    def opening(cls, words: List[str]) -> Optional[SpelledOutHead]:
+    def opening(cls, *, words: list[str]) -> SpelledOutHead | None:
         """:param words: The words of an attribute's name, in order.
 
         :return: The head *words* opens with and also says something about, or ``None`` when it
@@ -76,16 +75,14 @@ class SpelledOutHead(StrEnum):
             return None
         return next((head for head in cls if head == words[0]), None)
 
-    @property
-    def predicate_type(self) -> Type[BooleanPredicate]:
+    def predicate_for(self, *, phrase: str) -> BooleanPredicate:
         """
-        The predicate whose head this word spells.
+        :param phrase: The words of the field name after this head.
+        :return: The predicate whose head this word spells, saying *phrase*.
         """
-        return (
-            PossessivePredicate
-            if self in (SpelledOutHead.HAS, SpelledOutHead.HAVE)
-            else AdjectivalPredicate
-        )
+        if self in (SpelledOutHead.HAS, SpelledOutHead.HAVE):
+            return PossessivePredicate(noun=phrase)
+        return AdjectivalPredicate(adjective=phrase)
 
 
 def default_boolean_predicate(attribute_name: str) -> BooleanPredicate:
@@ -106,9 +103,9 @@ def default_boolean_predicate(attribute_name: str) -> BooleanPredicate:
     metadata.
     """
     words = attribute_name.split("_")
-    spelled_head = SpelledOutHead.opening(words)
+    spelled_head = SpelledOutHead.opening(words=words)
     if spelled_head is not None:
-        return spelled_head.predicate_type(" ".join(words[1:]))
+        return spelled_head.predicate_for(phrase=" ".join(words[1:]))
     if morphology.is_past_participle(words[-1]) or morphology.is_likely_adjective(
         words[-1]
     ):
@@ -125,7 +122,7 @@ def resolve_boolean_predicate(attribute: Attribute) -> BooleanPredicate:
         :func:`default_boolean_predicate` heuristic when the field declares none.
     """
     metadata = GrammarMetadata.of_field(
-        attribute._owner_class_, attribute._attribute_name_
+        clazz=attribute._owner_class_, field_name=attribute._attribute_name_
     )
     if metadata is not None and metadata.boolean_predicate is not None:
         return metadata.boolean_predicate
@@ -148,8 +145,8 @@ def boolean_predicate_clause(
     :return: The subject-led predicate clause (*"the Animal has milk"* / *"is not operational"*).
     """
     head = replace(predicate.head(), negated=negated, number=number)
-    predicate_object = predicate.predicate_object(attribute)
-    constituents: List[ClauseConstituent] = [subject, head]
+    predicate_object = predicate.predicate_object(attribute=attribute)
+    constituents: list[ClauseConstituent] = [subject, head]
     if predicate_object is not None:
         constituents.append(predicate_object)
     return clause(*constituents)
@@ -176,7 +173,7 @@ def boolean_alternative_clause(
     or not"*.
     """
     head = predicate.head()
-    predicate_object = predicate.predicate_object(attribute)
+    predicate_object = predicate.predicate_object(attribute=attribute)
     if _head_negates_in_place(head):
         return clause(
             subject,
@@ -186,7 +183,7 @@ def boolean_alternative_clause(
             Conjunctions.OR,
             Logicals.NOT,
         )
-    constituents: List[ClauseConstituent] = [subject, Logicals.EITHER, head]
+    constituents: list[ClauseConstituent] = [subject, Logicals.EITHER, head]
     if predicate_object is not None:
         constituents.append(predicate_object)
     constituents += [Conjunctions.OR, Logicals.NOT]

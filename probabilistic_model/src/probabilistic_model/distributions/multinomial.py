@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Self, Any, Iterable, List, Optional, Tuple, Dict
+from typing_extensions import Self, Any, Iterable
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.exceptions import ShapeMismatchError
@@ -27,12 +27,12 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
     A multinomial distribution over symbolic random variables.
     """
 
-    distribution_variables: Tuple[Symbolic, ...]
+    distribution_variables: tuple[Symbolic, ...]
     """
     The variables of the distribution.
     """
 
-    probabilities: Optional[npt.NDArray] = field(default=None)
+    probabilities: npt.NDArray | None = field(default=None)
     """
     The probability mass function.
 
@@ -52,7 +52,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
             raise ShapeMismatchError(self.variables, self.probabilities.shape)
 
     @property
-    def variables(self) -> Tuple[Symbolic, ...]:
+    def variables(self) -> tuple[Symbolic, ...]:
         return tuple(self.distribution_variables)
 
     @property
@@ -105,7 +105,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
 
         return LogMode(mode, np.log(likelihood))
 
-    def log_conditional(self, point: Dict[Variable, Any]) -> LogConditioning[Self]:
+    def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         event = SimpleEvent.from_data(point)
         event.fill_missing_variables(self.variables)
         truncation = self.log_truncated(event.as_composite_set())
@@ -130,7 +130,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
             self.probabilities
         )
 
-    def to_tabulate(self) -> List[List[str]]:
+    def to_tabulate(self) -> list[list[str]]:
         """
         :return: a pretty table of the distribution.
         """
@@ -173,7 +173,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
         result.normalize()
         return LogTruncation(result, np.log(sum_of_probabilities))
 
-    def indices_from_simple_event(self, event: SimpleEvent) -> Tuple[List[int], ...]:
+    def indices_from_simple_event(self, event: SimpleEvent) -> tuple[list[int], ...]:
         """
         Calculate the indices that can be used to access the underlying probability
         array from a simple event.
@@ -258,7 +258,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
 
         return result
 
-    def encode_full_evidence_event(self, event: Iterable) -> List[int]:
+    def encode_full_evidence_event(self, event: Iterable) -> list[int]:
         """
         Encode a full evidence event into a list of integers.
 

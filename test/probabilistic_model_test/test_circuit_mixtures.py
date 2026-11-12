@@ -13,7 +13,6 @@ from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent
 from random_events.variable import Continuous
 from sortedcontainers import SortedSet
-from typing_extensions import List, Tuple, Type
 
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
@@ -38,7 +37,7 @@ from .circuit_building import mixture_of_intervals, uniform_leaf
     params=[ProbabilisticCircuit, LayeredProbabilisticCircuit],
     ids=lambda circuit_type: circuit_type.__name__,
 )
-def circuit_type(request) -> Type[ProbabilisticCircuitRepresentation]:
+def circuit_type(request) -> type[ProbabilisticCircuitRepresentation]:
     """
     Every circuit type that reports about its mixtures.
     """
@@ -47,7 +46,7 @@ def circuit_type(request) -> Type[ProbabilisticCircuitRepresentation]:
 
 def as_type(
     circuit: ProbabilisticCircuit,
-    circuit_type: Type[ProbabilisticCircuitRepresentation],
+    circuit_type: type[ProbabilisticCircuitRepresentation],
 ) -> ProbabilisticCircuitRepresentation:
     """
     :param circuit: A circuit built as a graph of units.
@@ -122,7 +121,7 @@ def test_a_circuit_of_one_leaf_has_no_mixture_to_report(circuit_type, x):
 
 def supports_per_variable(
     circuit: ProbabilisticCircuitRepresentation, variables: SortedSet
-) -> List[Tuple[str, List[Event]]]:
+) -> list[tuple[str, list[Event]]]:
     """
     :param circuit: The circuit to read.
     :param variables: The variables to read it through.

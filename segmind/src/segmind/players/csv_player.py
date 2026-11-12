@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from segmind.players.data_player import FilePlayer, FrameData
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Dict, Set
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(eq=False)
 class CSVEpisodePlayer(FilePlayer):
@@ -17,12 +17,16 @@ class CSVEpisodePlayer(FilePlayer):
     Plays the episode from a CSV file.
     """
 
-    data_frames: pd.DataFrame = field(default=None, init=False, hash=False, compare=False)
+    data_frames: pd.DataFrame = field(
+        default=None, init=False, hash=False, compare=False
+    )
     """
     The data frames of the CSV file.
     """
 
-    data_object_names: Set[str] = field(default=None, init=False, hash=False, compare=False)
+    data_object_names: set[str] = field(
+        default=None, init=False, hash=False, compare=False
+    )
     """
     The names of the objects in the CSV file.
     """
@@ -53,14 +57,14 @@ class CSVEpisodePlayer(FilePlayer):
         Resumes the episode player.
         """
 
-    def get_objects_poses(self, frame_data: FrameData) -> Dict[Body, Pose]:
+    def get_objects_poses(self, frame_data: FrameData) -> dict[Body, Pose]:
         """
         Extracts the poses of the objects from the frame data.
 
         :param frame_data: The frame data.
         :return: A dictionary mapping bodies to poses.
         """
-        objects_poses: Dict[Body, Pose] = {}
+        objects_poses: dict[Body, Pose] = {}
         objects_data = frame_data.objects_data
         current_time = frame_data.time
         for obj_name in self.data_object_names:

@@ -1,0 +1,15 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+parts:
+- caption: User Guide
+  chapters:
+    - file: statecharts
+    - file: examples/running_a_statechart
+    - file: examples/plan_language
+
+- caption: References
+  chapters:
+    - file: autoapi/index

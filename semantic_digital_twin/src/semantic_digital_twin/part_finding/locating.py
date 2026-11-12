@@ -18,7 +18,6 @@ import trimesh
 from krrood.entity_query_language.utils import camel_case_to_words
 from numpy.typing import NDArray
 from scipy.spatial import cKDTree
-from typing_extensions import Optional, Type
 
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.part_finding.splitting import PartFinder, MeshSplit
@@ -45,7 +44,7 @@ class PartQuery:
     The mesh's triangles, as rows of three indices into :attr:`vertices`.
     """
 
-    whole_type: Type[PartWholeRelationship]
+    whole_type: type[PartWholeRelationship]
     """
     The type of annotation the mesh belongs to.
     """
@@ -59,7 +58,7 @@ class PartQuery:
     def from_mesh(
         cls,
         mesh: trimesh.Trimesh,
-        whole_type: Type[PartWholeRelationship],
+        whole_type: type[PartWholeRelationship],
         relationship_names: list[str],
     ) -> PartQuery:
         """
@@ -180,6 +179,6 @@ class LocatedFacesFinder(PartFinder):
     the part's faces, in meters.
     """
 
-    def split(self, mesh: trimesh.Trimesh) -> Optional[MeshSplit]:
+    def split(self, mesh: trimesh.Trimesh) -> MeshSplit | None:
         distances, _ = cKDTree(self.face_centers).query(mesh.triangles_center)
         return MeshSplit.from_mesh(mesh, distances <= self.tolerance)

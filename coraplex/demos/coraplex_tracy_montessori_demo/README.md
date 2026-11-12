@@ -2,7 +2,7 @@
 
 Tracy picks the four Montessori pieces (cube, cylinder, rectangular prism, triangular
 prism) off its own table and drops each through its hole in the shape-sorting board. The scene, the poses and the plan are the same however it runs;
-only how the plan is carried out differs, by coraplex's `ExecutionType`: physically
+only how the plan is carried out differs, by the coraplex plan executor it runs in: physically
 simulated in MuJoCo, kinematically simulated in RViz, or on the real robot.
 
 The pieces use the sizes and colours measured off the
@@ -101,8 +101,8 @@ they have not been tuned for margin. Treat them as a starting point.
 
 ## Running under physics
 
-`mujoco_demo.py` performs the plan inside coraplex's `PhysicallySimulatedRobot`
-(`coraplex/src/coraplex/execution_environment.py`).
+`mujoco_demo.py` performs the plan with coraplex's `PhysicallySimulatedPlanExecutor`
+(`coraplex/src/coraplex/plans/executors.py`).
 
 Collision avoidance is off in every run. Parked, Tracy's upper arms already stand right
 at the 3 cm buffer its collision avoidance keeps from the `camera_pole` between them, so

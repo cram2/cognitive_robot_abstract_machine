@@ -3,9 +3,10 @@ from datetime import timedelta
 import numpy as np
 import pytest
 
-from giskardpy.executor import Executor
-from giskardpy.motion_statechart.context import MotionStatechartContext
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
+from cramph.context import StatechartContext
+from cramph.executor import StatechartExecutor
+from cramph.statechart import Statechart
+from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
 from giskardpy.qp.exceptions import (
     BrakingTimeExceedsHorizonError,
@@ -13,7 +14,7 @@ from giskardpy.qp.exceptions import (
 )
 from giskardpy.qp.jerk_limited_braking import JerkLimitedBraking
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.spatial_types.derivatives import Derivatives
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world import World
 
 CONTROL_FREQUENCIES = [20, 50, 100]
@@ -158,19 +159,20 @@ def _peak_acceleration_of_a_joint_goal(
     """
     connection = world.controlled_connections[0]
     connection.position = 0.0
-    statechart = MotionStatechart()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[MotionControl(qp_controller_config=config)],
+    )
+    statechart = Statechart(context=executor.context)
     statechart.add_node(
         JointPositionList(goal_state=JointState.from_mapping({connection: 1.5}))
     )
-    executor = Executor(
-        MotionStatechartContext(world=world, qp_controller_config=config)
-    )
-    executor.compile(motion_statechart=statechart)
+    executor.compile(statechart=statechart)
     accelerations = []
     for _ in range(int(3 * config.target_frequency)):
         executor.tick()
         accelerations.append(world.state[connection.dof.id].acceleration)
-    executor.set_velocity_acceleration_jerk_to_zero()
+    MotionControl.set_velocity_acceleration_jerk_to_zero(world)
     return float(np.max(np.abs(accelerations)))
 
 
@@ -202,3 +204,19 @@ def test_peak_acceleration_follows_the_braking_time_at_every_control_frequency(
         2 * connection.dof.limits.upper.velocity / config.braking_time.total_seconds(),
         rel=COARSEST_GRID_TOLERANCE,
     )
+
+
+# %% front-loading of the executed velocity
+
+
+def test_without_a_weight_ramp_the_executed_velocity_is_the_mean_velocity():
+    config = QPControllerConfig(target_frequency=20, horizon_weight_gain_scalar=1)
+
+    assert config.executed_to_mean_velocity_ratio == pytest.approx(1)
+
+
+def test_a_steeper_weight_ramp_front_loads_the_executed_velocity_more():
+    flat = QPControllerConfig(target_frequency=20, horizon_weight_gain_scalar=0.5)
+    steep = QPControllerConfig(target_frequency=20, horizon_weight_gain_scalar=0.1)
+
+    assert steep.executed_to_mean_velocity_ratio > flat.executed_to_mean_velocity_ratio

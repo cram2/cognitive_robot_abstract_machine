@@ -8,7 +8,7 @@ from functools import cached_property
 from textwrap import indent, dedent
 
 from colorama import Fore, Style
-from typing_extensions import Optional, Type, List, Callable, Tuple, Dict, Any, Union
+from typing_extensions import Optional, List, Callable, Tuple, Dict, Any, Union
 
 from krrood.ripple_down_rules.datastructures.case import Case
 from krrood.ripple_down_rules.datastructures.dataclasses import CaseQuery
@@ -25,7 +25,7 @@ from krrood.code_generation.type_hints import stringify_type_hint
 from krrood.utils import get_scope_from_imports
 
 
-def detect_available_editor() -> Optional[Editor]:
+def detect_available_editor() -> Editor | None:
     """
     Detect the available editor on the system.
 
@@ -69,7 +69,7 @@ class TemplateFileCreator:
     edit it.
     """
 
-    temp_file_path: Optional[str] = None
+    temp_file_path: str | None = None
     """
     The path to the temporary file that is created for the user to edit.
     """
@@ -79,12 +79,12 @@ class TemplateFileCreator:
     The port to use for the code-server.
     """
 
-    process: Optional[subprocess.Popen] = None
+    process: subprocess.Popen | None = None
     """
     The process of the code-server.
     """
 
-    all_code_lines: Optional[List[str]] = None
+    all_code_lines: list[str] | None = None
     """
     The list of all code lines in the function in the temporary file.
     """
@@ -93,7 +93,7 @@ class TemplateFileCreator:
         self,
         case_query: CaseQuery,
         prompt_for: PromptFor,
-        code_to_modify: Optional[str] = None,
+        code_to_modify: str | None = None,
         print_func: Callable[[str], None] = print,
     ):
         self.print_func = print_func
@@ -102,17 +102,19 @@ class TemplateFileCreator:
         self.case_query = case_query
         self.output_type = self.get_output_type()
         self.user_edit_line = 0
-        self.func_name: str = self.get_func_name(self.prompt_for, self.case_query)
+        self.func_name: str = self.get_func_name(
+            prompt_for=self.prompt_for, case_query=self.case_query
+        )
         self.func_doc: str = self.get_func_doc()
         self.function_signature: str = self.get_function_signature()
-        self.editor: Optional[Editor] = detect_available_editor()
-        self.editor_cmd: Optional[str] = os.environ.get("RDR_EDITOR_CMD")
+        self.editor: Editor | None = detect_available_editor()
+        self.editor_cmd: str | None = os.environ.get("RDR_EDITOR_CMD")
         self.workspace: str = os.environ.get(
             "RDR_EDITOR_WORKSPACE", os.path.dirname(self.case_query.scope["__file__"])
         )
         self.temp_file_path: str = os.path.join(self.workspace, "edit_code_here.py")
 
-    def get_output_type(self) -> List[Type]:
+    def get_output_type(self) -> list[type]:
         """
         :return: The output type of the function as a list of types.
         """
@@ -130,11 +132,11 @@ class TemplateFileCreator:
             return
 
         boilerplate_code = self.build_boilerplate_code()
-        self.write_to_file(boilerplate_code)
+        self.write_to_file(code=boilerplate_code)
 
         self.open_file_in_editor()
 
-    def open_file_in_editor(self, file_path: Optional[str] = None):
+    def open_file_in_editor(self, *, file_path: str | None = None):
         """
         Open the file in the available editor.
         """
@@ -187,7 +189,9 @@ class TemplateFileCreator:
 
     def get_function_signature(self) -> str:
         if self.func_name is None:
-            self.func_name = self.get_func_name(self.prompt_for, self.case_query)
+            self.func_name = self.get_func_name(
+                prompt_for=self.prompt_for, case_query=self.case_query
+            )
         output_type_hint = self.get_output_type_hint()
         func_args = self.get_func_args()
         return f"def {self.func_name}({func_args}){output_type_hint}:"
@@ -236,7 +240,7 @@ class TemplateFileCreator:
             func_args = f"case: {self.case_query.case_type.__name__}"
         return func_args
 
-    def write_to_file(self, code: str):
+    def write_to_file(self, *, code: str):
         if self.temp_file_path is None:
             tmp = tempfile.NamedTemporaryFile(
                 mode="w+", delete=False, suffix=".py", dir=self.workspace
@@ -285,7 +289,7 @@ class TemplateFileCreator:
         return "\n".join(imports)
 
     @staticmethod
-    def get_core_attribute_types(case_query: CaseQuery) -> List[Type]:
+    def get_core_attribute_types(*, case_query: CaseQuery) -> list[type]:
         """
         Get the core attribute types of the case query.
 
@@ -298,11 +302,11 @@ class TemplateFileCreator:
         ]
         return attr_types
 
-    def get_func_doc(self) -> Optional[str]:
+    def get_func_doc(self) -> str | None:
         """
         :return: A string containing the function docstring.
         """
-        type_data = f" of type {' or '.join(map(lambda c: c.__name__, self.get_core_attribute_types(self.case_query)))}"
+        type_data = f" of type {' or '.join(map(lambda c: c.__name__, self.get_core_attribute_types(case_query=self.case_query)))}"
         if self.prompt_for == PromptFor.Conditions:
             return (
                 f"Get conditions on whether it's possible to conclude a value"
@@ -312,7 +316,7 @@ class TemplateFileCreator:
             return f"Get possible value(s) for {self.case_query.name} {type_data}."
 
     @staticmethod
-    def get_func_name(prompt_for, case_query) -> Optional[str]:
+    def get_func_name(*, prompt_for, case_query) -> str | None:
         func_name = ""
         if prompt_for == PromptFor.Conditions:
             func_name = f"{prompt_for.value.lower()}_for_"
@@ -321,13 +325,15 @@ class TemplateFileCreator:
             func_name += case_name.replace(f"_{case_query.attribute_name}", "")
         else:
             func_name += case_name
-            attribute_types = TemplateFileCreator.get_core_attribute_types(case_query)
+            attribute_types = TemplateFileCreator.get_core_attribute_types(
+                case_query=case_query
+            )
             attribute_type_names = [t.__name__ for t in attribute_types]
             func_name += f"_of_type_{'_or_'.join(attribute_type_names)}"
         return str_to_snake_case(func_name)
 
     @cached_property
-    def case_type(self) -> Type:
+    def case_type(self) -> type:
         """
         Get the type of the case object in the current scope.
 
@@ -338,7 +344,7 @@ class TemplateFileCreator:
 
     @staticmethod
     def load(
-        file_path: str, func_name: str, print_func: Callable = print
+        *, file_path: str, func_name: str, print_func: Callable = print
     ) -> FunctionData:
         """
         Load the function from the given file path.
@@ -359,10 +365,12 @@ class TemplateFileCreator:
         with open(file_path, "r") as f:
             source = f.read()
 
-        return TemplateFileCreator.load_from_source(source, func_name, print_func)
+        return TemplateFileCreator.load_from_source(
+            source=source, func_name=func_name, print_func=print_func
+        )
 
     @staticmethod
-    def load_from_source(source: str, func_name: str, print_func: Callable = print):
+    def load_from_source(*, source: str, func_name: str, print_func: Callable = print):
         tree = ast.parse(source)
         updates = {}
         for node in tree.body:

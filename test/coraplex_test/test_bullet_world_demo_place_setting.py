@@ -44,9 +44,7 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
     demo = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(demo)
     demonstration = demo.BulletWorldDemonstration(used_robot=PR2)
-    world = WorldSpecification.from_urdf(
-        demo.SceneFile.APARTMENT.path
-    ).to_domain_object()
+    world = WorldSpecification.from_urdf(demo.SceneFile.APARTMENT.path).create_world()
     milk, bowl, spoon = demonstration.milk, demonstration.bowl, demonstration.spoon
     for placed_object in demonstration.place_setting:
         placed_object.spawn(world)
@@ -54,9 +52,11 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
     spoon_drawer = world.get_body_by_name(ApartmentSurface.SPOON_DRAWER)
     table = world.get_body_by_name(ApartmentSurface.TABLE)
 
-    assert SupportedBy(milk.annotation_in(world).root, counter)()
-    assert SupportedBy(bowl.annotation_in(world).root, counter)()
-    assert SupportedBy(spoon.annotation_in(world).root, spoon_drawer)()
+    assert SupportedBy(supported=milk.annotation_in(world).root, supporting=counter)()
+    assert SupportedBy(supported=bowl.annotation_in(world).root, supporting=counter)()
+    assert SupportedBy(
+        supported=spoon.annotation_in(world).root, supporting=spoon_drawer
+    )()
 
     for placed_object in demonstration.place_setting:
         body = placed_object.annotation_in(world).root
@@ -69,6 +69,6 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
                 )
             )
 
-    assert SupportedBy(milk.annotation_in(world).root, table)()
-    assert SupportedBy(bowl.annotation_in(world).root, table)()
-    assert SupportedBy(spoon.annotation_in(world).root, table)()
+    assert SupportedBy(supported=milk.annotation_in(world).root, supporting=table)()
+    assert SupportedBy(supported=bowl.annotation_in(world).root, supporting=table)()
+    assert SupportedBy(supported=spoon.annotation_in(world).root, supporting=table)()

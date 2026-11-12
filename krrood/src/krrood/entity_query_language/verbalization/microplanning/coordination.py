@@ -21,16 +21,7 @@ import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing_extensions import (
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    TypeAlias,
-    TypeVar,
-    Union,
-)
+from typing_extensions import Callable, List, Tuple, TypeAlias, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute, MappedVariable
@@ -58,7 +49,7 @@ ChainKey: TypeAlias = Tuple
 #: The comparison operators a co-indexed group folds over. Equality additionally licenses the
 #: natural *"… have the same …"* surface (see :func:`coindexed_natural_parts`); the others read in
 #: the faithful *"… are <op> those of …"* form. ``ne``/``contains``/temporal never fold.
-COINDEXED_OPERATORS: Tuple[Callable, ...] = (
+COINDEXED_OPERATORS: tuple[Callable, ...] = (
     operator.eq,
     operator.gt,
     operator.lt,
@@ -70,7 +61,7 @@ COINDEXED_OPERATORS: Tuple[Callable, ...] = (
 # %% fold artifacts (the vocabulary the pass produces)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RangeFold:
     """
     A folded lower/upper bound pair on one attribute chain.
@@ -92,7 +83,7 @@ class RangeFold:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CoindexedFold:
     """
     A group of comparators that compare the *same* leaf attributes across two shared
@@ -109,7 +100,7 @@ class CoindexedFold:
     The shared comparison operator (e.g. ``operator.eq``).
     """
 
-    terminals: List[Tuple[str, type]]
+    terminals: list[tuple[str, type]]
     """
     The *distinct* co-indexed terminal attributes ``(name, owner)``, in first-occurrence
     order — the *"month and year"* the comparators range over.
@@ -129,7 +120,7 @@ class CoindexedFold:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SharedSubjectComparisons:
     """
     Two or more value comparators on the *same* subject chain, factored so the subject
@@ -148,14 +139,14 @@ class SharedSubjectComparisons:
     normal recursion.
     """
 
-    comparators: List[Comparator]
+    comparators: list[Comparator]
     """
     The comparators in source order; each contributes its operator-and-value tail
     (*"greater than 50"*), coordinated under the shared subject.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SharedSubjectConjunction:
     """
     The conjunctive analogue of :class:`SharedSubjectComparisons`: two or more value
@@ -173,7 +164,7 @@ class SharedSubjectConjunction:
     The shared bare variable, rendered once via the normal recursion (*"an Integer"*).
     """
 
-    tails: List[Union[Comparator, RangeFold]]
+    tails: list[Comparator | RangeFold]
     """
     The predicate tails in source order — a value :class:`Comparator` (its operator-and-
     value tail, *"not 5"*) or a folded :class:`RangeFold` (a *"between low and high"*
@@ -181,7 +172,7 @@ class SharedSubjectConjunction:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CoindexedNaturalParts:
     """
     The pieces of the natural *"the <a> and <b> of <shared> have the same …"* rendering.
@@ -193,12 +184,12 @@ class CoindexedNaturalParts:
     recursion.
     """
 
-    left_hop: Tuple[str, type]
+    left_hop: tuple[str, type]
     """
     The left prefix's distinguishing final hop ``(name, owner)`` (e.g. ``begin``).
     """
 
-    right_hop: Tuple[str, type]
+    right_hop: tuple[str, type]
     """
     The right prefix's distinguishing final hop ``(name, owner)`` (e.g. ``end``).
     """
@@ -206,7 +197,7 @@ class CoindexedNaturalParts:
 
 # %% the conjunct-reduction pass (high-level entry)
 
-FoldNode: TypeAlias = Union[SymbolicExpression, RangeFold, CoindexedFold]
+FoldNode: TypeAlias = SymbolicExpression | RangeFold | CoindexedFold
 """
 A node the verbalization fold dispatches over: either a real EQL expression or a
 synthetic coordination artifact (:class:`RangeFold` / :class:`CoindexedFold`) produced
@@ -227,7 +218,7 @@ class ConjunctFold(ABC):
     """
 
     @abstractmethod
-    def apply(self, conjuncts: ConjunctList) -> ConjunctList:
+    def apply(self, *, conjuncts: ConjunctList) -> ConjunctList:
         """:param conjuncts: The (possibly already partly-folded) conjunct list.
         :return: The list with every group this fold recognises collapsed to its artifact.
         """
@@ -239,11 +230,11 @@ class RangeBoundFold(ConjunctFold):
     (*"x is between low and high"*).
     """
 
-    def apply(self, conjuncts: ConjunctList) -> ConjunctList:
+    def apply(self, *, conjuncts: ConjunctList) -> ConjunctList:
         """:return: *conjuncts* with each complementary bound pair folded to a :class:`RangeFold`.
 
         >>> robot = variable(Robot, [])
-        >>> isinstance(RangeBoundFold().apply([robot.battery >= 20, robot.battery <= 80])[0], RangeFold)
+        >>> isinstance(RangeBoundFold().apply(conjuncts=[robot.battery >= 20, robot.battery <= 80])[0], RangeFold)
         True
         """
         return fold_range_pairs(conjuncts)
@@ -255,7 +246,7 @@ class CoindexedComparisonFold(ConjunctFold):
     :class:`CoindexedFold` (*"the begin and end … have the same month and year"*).
     """
 
-    def apply(self, conjuncts: ConjunctList) -> ConjunctList:
+    def apply(self, *, conjuncts: ConjunctList) -> ConjunctList:
         """:return: *conjuncts* with each co-indexed comparison group folded to a
         :class:`CoindexedFold`.
 
@@ -263,14 +254,14 @@ class CoindexedComparisonFold(ConjunctFold):
         >>> Span = dataclasses.make_dataclass("Span", [("low", int), ("high", int)])
         >>> Pair = dataclasses.make_dataclass("Pair", [("left", Span), ("right", Span)])
         >>> pair = variable(Pair, [])
-        >>> folded = CoindexedComparisonFold().apply([pair.left.low == pair.right.low, pair.left.high == pair.right.high])
+        >>> folded = CoindexedComparisonFold().apply(conjuncts=[pair.left.low == pair.right.low, pair.left.high == pair.right.high])
         >>> isinstance(folded[0], CoindexedFold)
         True
         """
         return fold_coindexed_groups(conjuncts)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConjunctReducer:
     """
     The single home of WHERE-conjunct simplification: applies its ordered
@@ -280,7 +271,7 @@ class ConjunctReducer:
     disjoint patterns, so the order only fixes a stable result.
     """
 
-    folds: List[ConjunctFold] = field(
+    folds: list[ConjunctFold] = field(
         default_factory=lambda: [RangeBoundFold(), CoindexedComparisonFold()]
     )
     """
@@ -288,21 +279,21 @@ class ConjunctReducer:
     extend).
     """
 
-    def reduce(self, conjuncts: List[SymbolicExpression]) -> ConjunctList:
+    def reduce(self, *, conjuncts: list[SymbolicExpression]) -> ConjunctList:
         """:param conjuncts: A flat conjunct list (e.g. an ``AND``'s operands).
         :return: The list with each fold's recognised groups reduced to artifacts.
 
         >>> robot = variable(Robot, [])
-        >>> len(ConjunctReducer().reduce([robot.battery >= 20, robot.battery <= 80]))
+        >>> len(ConjunctReducer().reduce(conjuncts=[robot.battery >= 20, robot.battery <= 80]))
         1
         """
         items: ConjunctList = list(conjuncts)
         for fold in self.folds:
-            items = fold.apply(items)
+            items = fold.apply(conjuncts=items)
         return items
 
 
-def reduce_conjuncts(conjuncts: List[SymbolicExpression]) -> ConjunctList:
+def reduce_conjuncts(conjuncts: list[SymbolicExpression]) -> ConjunctList:
     """
     Reduce a flat conjunct list by every coordination fold — the single entry every
     conjunct-rendering caller uses, so none has to know a fold exists.
@@ -314,7 +305,7 @@ def reduce_conjuncts(conjuncts: List[SymbolicExpression]) -> ConjunctList:
     >>> [type(item).__name__ for item in reduce_conjuncts([robot.battery >= 20, robot.battery <= 80])]
     ['RangeFold']
     """
-    return ConjunctReducer().reduce(conjuncts)
+    return ConjunctReducer().reduce(conjuncts=conjuncts)
 
 
 # %% range-bound fold
@@ -329,7 +320,7 @@ class _RangeBound(Enum):
     UPPER = auto()
 
 
-def chain_key(expression: SymbolicExpression) -> Optional[ChainKey]:
+def chain_key(expression: SymbolicExpression) -> ChainKey | None:
     """:return: The hashable identity of a pure attribute chain — ``(root_id, ((name, owner),
     …))`` — or ``None``.
 
@@ -352,7 +343,7 @@ def chain_key(expression: SymbolicExpression) -> Optional[ChainKey]:
     return (root._id_, tuple(parts))
 
 
-def subject_key(expression: SymbolicExpression) -> Optional[ChainKey]:
+def subject_key(expression: SymbolicExpression) -> ChainKey | None:
     """:return: The hashable identity of a comparison's subject — :func:`chain_key` for a pure
     attribute chain, or ``(variable_id, ())`` for a bare variable — so a fold can group bounds on a
     bare variable (*"an Integer"*) as readily as on a chain. ``None`` for anything else.
@@ -371,7 +362,7 @@ def subject_key(expression: SymbolicExpression) -> Optional[ChainKey]:
     return None
 
 
-def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _RangeBound]]:
+def _classify(conjunct: SymbolicExpression) -> tuple[ChainKey, _RangeBound] | None:
     """
     :param conjunct: A candidate conjunct.
     :return: ``(chain_key, _RangeBound)`` when *conjunct* is a bound comparison, else ``None``.
@@ -395,8 +386,8 @@ def _classify(conjunct: SymbolicExpression) -> Optional[Tuple[ChainKey, _RangeBo
 
 
 def fold_range_pairs(
-    conjuncts: List[SymbolicExpression],
-) -> List[Union[SymbolicExpression, RangeFold]]:
+    conjuncts: list[SymbolicExpression],
+) -> list[SymbolicExpression | RangeFold]:
     """
     Fold complementary lower/upper bound comparisons on the same chain into range items,
     preserving the order of everything else.
@@ -418,10 +409,10 @@ def fold_range_pairs(
     'Find a BankTransaction whose booking_date is between May 15, 2026 and May 30, 2026'
     """
     classifications = [_classify(conjunct) for conjunct in conjuncts]
-    slots: List[Union[SymbolicExpression, RangeFold]] = list(conjuncts)
+    slots: list[SymbolicExpression | RangeFold] = list(conjuncts)
     dropped = [False] * len(conjuncts)
     # chain_key -> indices of bounds awaiting a complement (always one direction at a time).
-    awaiting: Dict[ChainKey, List[int]] = {}
+    awaiting: dict[ChainKey, list[int]] = {}
     for i, classification in enumerate(classifications):
         if classification is None:
             continue
@@ -446,7 +437,7 @@ def fold_range_pairs(
     return [slot for index, slot in enumerate(slots) if not dropped[index]]
 
 
-def has_pair(conjuncts: List[SymbolicExpression]) -> bool:
+def has_pair(conjuncts: list[SymbolicExpression]) -> bool:
     """
     :param conjuncts: A flat list of conjuncts.
     :return: ``True`` when range folding would produce at least one range fold.
@@ -463,7 +454,7 @@ def has_pair(conjuncts: List[SymbolicExpression]) -> bool:
 # %% co-indexed fold
 
 
-def _attribute_pair(node: SymbolicExpression) -> Optional[Tuple[str, type]]:
+def _attribute_pair(node: SymbolicExpression) -> tuple[str, type] | None:
     """:return: ``(name, owner)`` when *node* is an ``Attribute`` hop, else ``None``.
 
     >>> terminal, _ = walk_chain(variable(LoveBirds, []).bird_1.name)
@@ -475,7 +466,7 @@ def _attribute_pair(node: SymbolicExpression) -> Optional[Tuple[str, type]]:
     return None
 
 
-def _terminal_attribute(expression: SymbolicExpression) -> Optional[Attribute]:
+def _terminal_attribute(expression: SymbolicExpression) -> Attribute | None:
     """:return: The leaf ``Attribute`` of a ``MappedVariable`` chain (e.g. ``month`` of
     ``p.begin.month``), or ``None`` when the chain does not end in an attribute.
 
@@ -490,7 +481,7 @@ def _terminal_attribute(expression: SymbolicExpression) -> Optional[Attribute]:
 
 def coindexed_signature(
     conjunct: SymbolicExpression,
-) -> Optional[Tuple[Tuple, Tuple[str, type]]]:
+) -> tuple[tuple, tuple[str, type]] | None:
     """
     Recognise a co-indexed comparison — a comparator whose two sides compare the *same* leaf
     attribute across two attribute-chain prefixes (``p.begin.month == p.end.month``).
@@ -528,8 +519,8 @@ def coindexed_signature(
 
 
 def fold_coindexed_groups(
-    items: List[Union[SymbolicExpression, RangeFold]],
-) -> List[Union[SymbolicExpression, RangeFold, CoindexedFold]]:
+    items: list[SymbolicExpression | RangeFold],
+) -> list[SymbolicExpression | RangeFold | CoindexedFold]:
     """
     Fold groups of co-indexed comparators (``p.begin.X == p.end.X`` for several ``X``) on the same
     prefixes and operator into one :class:`CoindexedFold`, preserving the order of everything else.
@@ -562,9 +553,9 @@ def fold_coindexed_groups(
         )
         for item in items
     ]
-    slots: List[Union[SymbolicExpression, RangeFold, CoindexedFold]] = list(items)
+    slots: list[SymbolicExpression | RangeFold | CoindexedFold] = list(items)
     dropped = [False] * len(items)
-    groups: Dict[Tuple, List[int]] = {}
+    groups: dict[tuple, list[int]] = {}
     for index, signature in enumerate(signatures):
         if signature is None:
             continue
@@ -594,11 +585,11 @@ _Payload = TypeVar("_Payload")
 #: Classify a sibling item for owner-grouping: ``(owner, payload)`` when the item belongs to an
 #: owner (the owner is identified by its ``_id_``), or ``None`` when it does not group.
 OwnerClassifier: TypeAlias = Callable[
-    [_Item], Optional[Tuple["SymbolicExpression", _Payload]]
+    [_Item], Tuple["SymbolicExpression", _Payload] | None
 ]
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class OwnerGroup:
     """
     A group of sibling items that share one owner — the unit of owner-based aggregation,
@@ -611,15 +602,15 @@ class OwnerGroup:
     The shared owner expression (the position, the selected variable).
     """
 
-    items: List[object]
+    items: list[object]
     """
     The grouped payloads, in source order (attribute assignments, terminal hops, …).
     """
 
 
 def group_by_owner(
-    items: List[_Item], classify: OwnerClassifier
-) -> Tuple[List[OwnerGroup], List[_Item]]:
+    items: list[_Item], classify: OwnerClassifier
+) -> tuple[list[OwnerGroup], list[_Item]]:
     """
     Group *items* by their owner's id — all items of one owner together, owners in first-seen order
     — partitioning out the items that do not classify.
@@ -637,9 +628,9 @@ def group_by_owner(
     >>> groups[0].items, ungrouped
     (['department', 'salary'], [])
     """
-    builders: Dict[object, Tuple[SymbolicExpression, List[object]]] = {}
-    order: List[object] = []
-    ungrouped: List[_Item] = []
+    builders: dict[object, tuple[SymbolicExpression, list[object]]] = {}
+    order: list[object] = []
+    ungrouped: list[_Item] = []
     for item in items:
         decomposed = classify(item)
         if decomposed is None:
@@ -657,8 +648,8 @@ def group_by_owner(
 
 
 def group_consecutive_by_owner(
-    items: List[_Item], classify: OwnerClassifier
-) -> List[Union[OwnerGroup, _Item]]:
+    items: list[_Item], classify: OwnerClassifier
+) -> list[OwnerGroup | _Item]:
     """
     Replace each maximal *consecutive* run of two-or-more items sharing one owner with a single
     :class:`OwnerGroup`, leaving every other item (a lone item, or one that does not classify) in
@@ -678,10 +669,10 @@ def group_consecutive_by_owner(
     >>> folded[0].items
     ['department', 'salary']
     """
-    result: List[Union[OwnerGroup, _Item]] = []
-    run_owner: Optional[SymbolicExpression] = None
-    run_items: List[_Item] = []
-    run_payloads: List[object] = []
+    result: list[OwnerGroup | _Item] = []
+    run_owner: SymbolicExpression | None = None
+    run_items: list[_Item] = []
+    run_payloads: list[object] = []
 
     def flush() -> None:
         if len(run_payloads) > 1:
@@ -710,7 +701,7 @@ def group_consecutive_by_owner(
     return result
 
 
-def coindexed_natural_parts(fold: CoindexedFold) -> Optional[CoindexedNaturalParts]:
+def coindexed_natural_parts(fold: CoindexedFold) -> CoindexedNaturalParts | None:
     """
     The pieces for the natural *"the <a> and <b> of <shared> have the same …"* rendering, or
     ``None`` when the fold should use the faithful *"… are <op> those of …"* form instead.
@@ -776,7 +767,7 @@ def build_between(
     :return: The range phrase fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(build_between(WordFragment("x"), WordFragment("1"), WordFragment("10"), compact=False))
+    >>> flatten_fragment_to_plain_text(build_between(WordFragment(text="x"), WordFragment(text="1"), WordFragment(text="10"), compact=False))
     'x is between 1 and 10'
     """
     # Spread the range phrase's parts so the clause stays flat ([left, operator, bounds]); the
@@ -812,7 +803,7 @@ def between_phrase(
     :return: The range-predicate fragment.
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment("1"), WordFragment("10"), compact=False))
+    >>> flatten_fragment_to_plain_text(between_phrase(WordFragment(text="1"), WordFragment(text="10"), compact=False))
     'is between 1 and 10'
     """
     return PhraseFragment(
@@ -848,7 +839,7 @@ MAX_SET_MEMBERS = 6
 
 
 def disjunctive_phrase(
-    members: List[VerbalizationFragment],
+    members: list[VerbalizationFragment],
 ) -> VerbalizationFragment:
     """
     Join already-rendered *members* as a bare disjunction (*"A, B, or C"*), or return the lone
@@ -865,7 +856,7 @@ def disjunctive_phrase(
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, RoleFragment,
     ... )
-    >>> members = [RoleFragment.for_literal(value) for value in ("a", "b", "c")]
+    >>> members = [RoleFragment.for_literal(value=value) for value in ("a", "b", "c")]
     >>> flatten_fragment_to_plain_text(disjunctive_phrase(members))
     "'a', 'b', or 'c'"
     """
@@ -874,7 +865,7 @@ def disjunctive_phrase(
     return oxford_comma(members, Conjunctions.OR.as_fragment())
 
 
-def one_of(candidates: List[VerbalizationFragment]) -> Optional[VerbalizationFragment]:
+def one_of(candidates: list[VerbalizationFragment]) -> VerbalizationFragment | None:
     """
     Render a small, bounded candidate set as a membership phrase — the shared *"one of A, B, or C"*
     surface used both for a domain-constrained variable's candidate values and for a tuple of
@@ -892,7 +883,7 @@ def one_of(candidates: List[VerbalizationFragment]) -> Optional[VerbalizationFra
     >>> from krrood.entity_query_language.verbalization.fragments.base import (
     ...     flatten_fragment_to_plain_text, RoleFragment,
     ... )
-    >>> options = [RoleFragment.for_literal(value) for value in ("a", "b", "c")]
+    >>> options = [RoleFragment.for_literal(value=value) for value in ("a", "b", "c")]
     >>> flatten_fragment_to_plain_text(one_of(options))
     "one of 'a', 'b', or 'c'"
     >>> one_of([]) is None

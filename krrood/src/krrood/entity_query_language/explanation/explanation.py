@@ -7,16 +7,7 @@ import weakref
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing_extensions import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Self,
-    Type,
-    TYPE_CHECKING,
-)
+from typing_extensions import Any, Callable, Self, TYPE_CHECKING
 
 from ordered_set import OrderedSet
 
@@ -65,7 +56,7 @@ if TYPE_CHECKING:
 
 
 def _build_type_existence_condition(
-    node_variable: SymbolicExpression, type_: Type
+    node_variable: SymbolicExpression, type_: type
 ) -> SymbolicExpression:
     """
     Build an exists-condition that checks whether *node_variable* (or one of its
@@ -75,14 +66,14 @@ def _build_type_existence_condition(
     :param type_: The type to check for subclass membership.
     :return: An :func:`~krrood.entity_query_language.factories.exists` expression encoding the check.
     """
-    node_type_variable = node_type(node_variable)
+    node_type_variable = node_type(node=node_variable)
     return exists(
         node_variable,
         and_(
-            HasType(node_variable, Selectable),
+            HasType(variable=node_variable, types_=Selectable),
             node_type_variable != None,
-            is_class(node_type_variable),
-            issubclass_(node_type_variable, type_),
+            is_class(object=node_type_variable),
+            issubclass_(subclass=node_type_variable, parent_or_parents=type_),
         ),
     )
 
@@ -112,7 +103,7 @@ def _is_krrood_internal_frame(frame: StackFrame) -> bool:
     return False
 
 
-def _get_query_source(frame: StackFrame) -> Optional[str]:
+def _get_query_source(frame: StackFrame) -> str | None:
     """
     Extract the full source statement that contains ``frame.lineno``.
 
@@ -153,8 +144,8 @@ def _get_query_source(frame: StackFrame) -> Optional[str]:
 
 
 def _select_source_frame(
-    filtered_frames: List[StackFrame],
-) -> Optional[StackFrame]:
+    filtered_frames: list[StackFrame],
+) -> StackFrame | None:
     """
     Select the best user-facing frame from *filtered_frames*.
 
@@ -193,7 +184,7 @@ def _format_source_context(source_frame: StackFrame) -> str:
     return f"({source_frame.function_name}, {basename}:{source_frame.lineno})"
 
 
-def _format_indented_source(source_frame: Optional[StackFrame]) -> str:
+def _format_indented_source(source_frame: StackFrame | None) -> str:
     """
     Return the source statement at *source_frame*, indented by two spaces per line.
 
@@ -207,7 +198,7 @@ def _format_indented_source(source_frame: Optional[StackFrame]) -> str:
     return "  (unavailable)"
 
 
-def _format_stack_trace(stack: CallStack, focus_package: Optional[str]) -> str:
+def _format_stack_trace(stack: CallStack, focus_package: str | None) -> str:
     """
     Render up to ten frames of *stack* as a formatted call-stack string.
 
@@ -226,7 +217,7 @@ def _format_stack_trace(stack: CallStack, focus_package: Optional[str]) -> str:
     return "".join(formatted[:10])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConditionAndBindings:
     """
     Represents a condition and its associated bindings in the inference process.
@@ -249,7 +240,7 @@ class ConditionAndBindings:
             return f"{self.condition} ({','.join(str(child) for child in self.condition._children_)})"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InferenceExplanation(Symbol):
     """
     Explanation of how an instance was created through inference.
@@ -281,12 +272,12 @@ class InferenceExplanation(Symbol):
     The root of the query that was used to create the instance.
     """
 
-    satisfied_condition_ids: Optional[OrderedSet[UUID]] = None
+    satisfied_condition_ids: OrderedSet[UUID] | None = None
     """
     An ordered set of UUIDs of condition expressions that were satisfied (truth value = True)
     during the evaluation that produced this instance. None if no condition information is available.
     """
-    operation_result: Optional[OperationResult] = None
+    operation_result: OperationResult | None = None
     """
     The full :class:`OperationResult` from the evaluation iteration that produced this
     instance.
@@ -297,11 +288,11 @@ class InferenceExplanation(Symbol):
 
     # Internal weak reference to the inferred instance.  Not part of the public
     # constructor — populated by __post_init__.
-    _instance_ref: Optional[weakref.ref] = field(
+    _instance_ref: weakref.ref | None = field(
         default=None, init=False, repr=False, compare=False
     )
 
-    def __deepcopy__(self, memo: Dict[int, Any]) -> Self:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
         """
         :return: This explanation itself, so a copy of an inferred instance shares the record
             of the query that inferred the original.
@@ -329,7 +320,7 @@ class InferenceExplanation(Symbol):
             str(c) for c in self.get_satisfied_conditions_and_their_bindings()
         )
 
-    def get_satisfied_conditions_and_their_bindings(self) -> List[ConditionAndBindings]:
+    def get_satisfied_conditions_and_their_bindings(self) -> list[ConditionAndBindings]:
         """
         Retrieve the list of satisfied non-logical condition expressions along with
         their bindings.
@@ -347,15 +338,18 @@ class InferenceExplanation(Symbol):
 
         satisfied_conditions = []
         for condition_id in self.operation_result.satisfied_condition_ids:
-            condition_expr = self.query_root._get_expression_by_id_(condition_id)
+            condition_expr = self.query_root._get_expression_by_id_(id_=condition_id)
             if isinstance(condition_expr, (LogicalOperator,)):
                 continue
             satisfied_conditions.append(
-                ConditionAndBindings(condition_expr, self.operation_result.all_bindings)
+                ConditionAndBindings(
+                    condition=condition_expr,
+                    bindings=self.operation_result.all_bindings,
+                )
             )
         return satisfied_conditions
 
-    def condition_graph(self) -> Optional[QueryGraph]:
+    def condition_graph(self) -> QueryGraph | None:
         """
         Build a QueryGraph of the full query tree with satisfaction data overlaid.
 
@@ -369,12 +363,12 @@ class InferenceExplanation(Symbol):
         if self.query_root is None or not self.satisfied_condition_ids:
             return None
         return QueryGraph(
-            self.query_root,
+            query=self.query_root,
             satisfied_condition_ids=self.satisfied_condition_ids,
         )
 
     def as_string(
-        self, focus_package: Optional[str | ModuleType] = None, show_trace: bool = False
+        self, *, focus_package: str | ModuleType | None = None, show_trace: bool = False
     ) -> str:
         """
         Convert an InferenceExplanation into a human-readable string.
@@ -429,7 +423,7 @@ class InferenceExplanation(Symbol):
         """
         return self.stack.is_from_method()
 
-    def triggering_classes(self) -> List[type]:
+    def triggering_classes(self) -> list[type]:
         """
         Retrieve the distinct class objects that appear in the call stack, in order of
         first occurrence (innermost first).
@@ -441,7 +435,7 @@ class InferenceExplanation(Symbol):
         """
         return self.stack.classes()
 
-    def triggering_functions(self) -> List[Callable]:
+    def triggering_functions(self) -> list[Callable]:
         """
         Retrieve the distinct function objects that appear in the call stack, in order
         of first occurrence (innermost first).
@@ -454,7 +448,7 @@ class InferenceExplanation(Symbol):
         """
         return self.stack.functions()
 
-    def root_frame_in(self, package: str) -> Optional[StackFrame]:
+    def root_frame_in(self, *, package: str) -> StackFrame | None:
         """
         Find the outermost :class:`~krrood.entity_query_language._stack.StackFrame`
         whose ``module_name`` contains *package*.
@@ -466,7 +460,7 @@ class InferenceExplanation(Symbol):
         :param package: Substring matched against ``StackFrame.module_name``.
         :return: The outermost matching frame, or ``None`` if no frame matches.
         """
-        return self.stack.root_frame_in(package)
+        return self.stack.root_frame_in(package=package)
 
     def get_satisfied_condition_expressions_for_the_instance(
         self,
@@ -475,18 +469,18 @@ class InferenceExplanation(Symbol):
         :return: An entity containing condition expressions that were satisfied during the inference of the instance.
         """
         explanation = self.create_explanation_variable()
-        node = self.create_query_node_variable(explanation)
+        node = self.create_query_node_variable(explanation_variable=explanation)
         return (
             entity(node)
             .where(
                 explanation.satisfied_condition_ids != None,
-                contains(explanation.satisfied_condition_ids, node_id(node)),
+                contains(explanation.satisfied_condition_ids, node_id(node=node)),
             )
             .distinct()
         )
 
     def get_values_of_variable_nodes_of_given_type(
-        self, type_: Type
+        self, *, type_: type
     ) -> Entity[SymbolicExpression]:
         """
         :param type_: The type of the variable nodes to retrieve.
@@ -494,10 +488,13 @@ class InferenceExplanation(Symbol):
         """
         explanation = self.create_explanation_variable()
         node = self.get_variable_nodes_of_given_type(
-            type_, self.create_query_node_variable(explanation)
+            type_=type_,
+            node_variable=self.create_query_node_variable(
+                explanation_variable=explanation
+            ),
         )
         operation_result = explanation.operation_result
-        node_identifier = node_id(node)
+        node_identifier = node_id(node=node)
         return (
             entity(operation_result.all_bindings[node_identifier])
             .where(contains(operation_result.all_bindings, node_identifier))
@@ -505,22 +502,22 @@ class InferenceExplanation(Symbol):
         )
 
     def get_variable_nodes_of_given_type(
-        self, type_: Type, node_variable: Optional[SymbolicExpression] = None
+        self, *, type_: type, node_variable: SymbolicExpression | None = None
     ) -> Entity[SymbolicExpression] | SymbolicExpression:
         """
         :return: An entity containing instances that participated in the inference of this instance.
         """
         if node_variable is None:
             node_variable = self.create_query_node_variable(
-                self.create_explanation_variable()
+                explanation_variable=self.create_explanation_variable()
             )
         return (
             entity(node_variable)
             .where(
-                HasType(node_variable, Selectable),
-                (node_type_ := node_type(node_variable)) != None,
-                is_class(node_type_),
-                issubclass_(node_type_, type_),
+                HasType(variable=node_variable, types_=Selectable),
+                (node_type_ := node_type(node=node_variable)) != None,
+                is_class(object=node_type_),
+                issubclass_(subclass=node_type_, parent_or_parents=type_),
             )
             .distinct(node_variable)
         )
@@ -532,7 +529,9 @@ class InferenceExplanation(Symbol):
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
         return (
-            entity(condition_node).where(HasType(condition_node, Comparator)).distinct()
+            entity(condition_node)
+            .where(HasType(variable=condition_node, types_=Comparator))
+            .distinct()
         )
 
     def get_satisfied_comparator_conditions_between_attributes(
@@ -546,39 +545,41 @@ class InferenceExplanation(Symbol):
         return (
             entity(condition_node)
             .where(
-                HasType(condition_node, Comparator),
-                HasType(condition_node.left, Attribute),
-                HasType(condition_node.right, Attribute),
+                HasType(variable=condition_node, types_=Comparator),
+                HasType(variable=condition_node.left, types_=Attribute),
+                HasType(variable=condition_node.right, types_=Attribute),
             )
             .distinct()
         )
 
     def get_conditions_that_relate_the_variables_of_type(
-        self, type_: Type
+        self, *, type_: type
     ) -> Entity[SymbolicExpression]:
         """
         :return: An entity containing condition expressions that relate the participating instances in the inference of this instance.
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
-        child1 = flat_variable(node_children(condition_node))
-        child2 = flat_variable(node_children(condition_node))
+        child1 = flat_variable(node_children(node=condition_node))
+        child2 = flat_variable(node_children(node=condition_node))
 
         # Use exists(node, conditions) directly — avoids the _expression_/An-quantifier
         # problem that arises when passing a built entity to exists().  When .build() is
         # called on an entity, _expression_ is set to an An quantifier; _update_children_
         # then passes that An to Exists.left, and An._evaluate__ ignores sources entirely.
         child1_with_descendants = concatenation(
-            child1, flat_variable(node_descendants(child1))
+            child1, flat_variable(node_descendants(node=child1))
         )
         child2_with_descendants = concatenation(
-            child2, flat_variable(node_descendants(child2))
+            child2, flat_variable(node_descendants(node=child2))
         )
 
         return (
             entity(condition_node)
             .where(
-                HasType(condition_node, (Comparator, InstantiatedVariable)),
-                node_id(child1) != node_id(child2),
+                HasType(
+                    variable=condition_node, types_=(Comparator, InstantiatedVariable)
+                ),
+                node_id(node=child1) != node_id(node=child2),
                 _build_type_existence_condition(child1_with_descendants, type_),
                 _build_type_existence_condition(child2_with_descendants, type_),
             )
@@ -586,7 +587,7 @@ class InferenceExplanation(Symbol):
         )
 
     def get_conditions_that_relate_variables_of_types(
-        self, type_a: Type, type_b: Type
+        self, *, type_a: type, type_b: type
     ) -> Entity[SymbolicExpression]:
         """
         Generalisation of :meth:`get_conditions_that_relate_the_variables_of_type` for
@@ -603,22 +604,25 @@ class InferenceExplanation(Symbol):
         :return: An entity containing the matching condition expressions.
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
-        desc_a = flat_variable(node_descendants(condition_node))
-        desc_b = flat_variable(node_descendants(condition_node))
+        desc_a = flat_variable(node_descendants(node=condition_node))
+        desc_b = flat_variable(node_descendants(node=condition_node))
 
         return (
             entity(condition_node)
             .where(
-                HasType(condition_node, (Comparator, InstantiatedVariable)),
-                node_id(desc_a) != node_id(desc_b),
+                HasType(
+                    variable=condition_node, types_=(Comparator, InstantiatedVariable)
+                ),
+                node_id(node=desc_a) != node_id(node=desc_b),
                 _build_type_existence_condition(desc_a, type_a),
                 _build_type_existence_condition(desc_b, type_b),
             )
-            .distinct(node_id(condition_node))
+            .distinct(node_id(node=condition_node))
         )
 
     @staticmethod
     def create_query_node_variable(
+        *,
         explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
     ) -> FlatVariable[SymbolicExpression] | SymbolicExpression:
         """
@@ -630,7 +634,7 @@ class InferenceExplanation(Symbol):
         :return: A :class:`~krrood.entity_query_language.core.mapped_variable.FlatVariable` iterating
             over all descendant symbolic expressions of the query root.
         """
-        return flat_variable(node_descendants(explanation_variable.query_root))
+        return flat_variable(node_descendants(node=explanation_variable.query_root))
 
     def create_explanation_variable(
         self,
@@ -644,7 +648,7 @@ class InferenceExplanation(Symbol):
 def register_inference(
     instance: Any,
     variable_node: SymbolicExpression,
-    result: Optional[OperationResult] = None,
+    result: OperationResult | None = None,
 ) -> None:
     """
     Register an instance created via inference by attaching an
@@ -665,13 +669,13 @@ def register_inference(
     """
     if not isinstance(instance, Symbol):
         return
-    if not monitored.is_monitored(type(variable_node)):
+    if not monitored.is_monitored(target=type(variable_node)):
         return
 
     satisfied_ids = result.satisfied_condition_ids if result else None
     explanation = InferenceExplanation(
         query_node=variable_node,
-        stack=monitored.get_stack(variable_node) or CallStack([]),
+        stack=monitored.get_stack(instance=variable_node) or CallStack(frames=[]),
         query_root=variable_node._evaluation_root_query_,
         satisfied_condition_ids=satisfied_ids,
         operation_result=result,
@@ -683,7 +687,7 @@ def register_inference(
     instance._inference_explanation_ = explanation
 
 
-def explain_inference(instance: Any) -> Optional[InferenceExplanation]:
+def explain_inference(instance: Any) -> InferenceExplanation | None:
     """
     Retrieve the explanation of how the given instance was created through inference.
 

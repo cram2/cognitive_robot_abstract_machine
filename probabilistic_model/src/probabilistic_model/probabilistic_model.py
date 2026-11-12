@@ -3,17 +3,7 @@ from __future__ import annotations
 import itertools
 import math
 import plotly.graph_objects as go
-from typing import (
-    TYPE_CHECKING,
-    Union,
-    Tuple,
-    Iterable,
-    Optional,
-    Self,
-    Dict,
-    Any,
-    List,
-)
+from typing_extensions import TYPE_CHECKING, Union, Iterable, Self, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -52,7 +42,7 @@ from random_events.variable import Integer, Continuous, Variable, Symbolic
 # Type definitions
 FullEvidenceType = np.array  # [Union[float, int, SetElement]]
 
-PartialPointType = Dict[Variable, Any]
+PartialPointType = dict[Variable, Any]
 """
 A partial point: one value for each of some variables of a model.
 """
@@ -85,7 +75,7 @@ class ProbabilisticModel(ABC):
         neither raises ``AttributeError`` on first access.
     """
 
-    variables: Tuple[Variable, ...]
+    variables: tuple[Variable, ...]
     """
     The variables of the model.
     """
@@ -208,7 +198,7 @@ class ProbabilisticModel(ABC):
         :return: The mode and its log-likelihood.
         """
 
-    def marginal(self, variables: Iterable[Variable]) -> Optional[Self]:
+    def marginal(self, variables: Iterable[Variable]) -> Self | None:
         """
         Calculate the marginal distribution of a set of variables.
 
@@ -303,7 +293,7 @@ class ProbabilisticModel(ABC):
         """
         raise NotImplementedError
 
-    def expectation(self, variables: Optional[Iterable[Variable]] = None) -> MomentType:
+    def expectation(self, variables: Iterable[Variable] | None = None) -> MomentType:
         """
         Calculate the expectation of the numeric variables in `variables`.
 
@@ -321,7 +311,7 @@ class ProbabilisticModel(ABC):
         center = VariableMap({variable: 0 for variable in variables})
         return self.moment(order, center)
 
-    def variance(self, variables: Optional[Iterable[Variable]] = None) -> MomentType:
+    def variance(self, variables: Iterable[Variable] | None = None) -> MomentType:
         """
         Calculate the variance of the numeric variables in `variables`.
 
@@ -347,7 +337,7 @@ class ProbabilisticModel(ABC):
             {variable: variable.domain for variable in self.variables}
         )
 
-    def apply_translation(self, translation: Dict[Variable, float]):
+    def apply_translation(self, translation: dict[Variable, float]):
         """
         Translate the model in-place.
 
@@ -359,7 +349,7 @@ class ProbabilisticModel(ABC):
         """
         raise NotImplementedError
 
-    def apply_scaling(self, scaling: Dict[Variable, float]):
+    def apply_scaling(self, scaling: dict[Variable, float]):
         """
         Scale the model in-place.
 
@@ -371,7 +361,7 @@ class ProbabilisticModel(ABC):
         """
         raise NotImplementedError
 
-    def plotly_layout(self) -> Dict[str, Any]:
+    def plotly_layout(self) -> dict[str, Any]:
         """
         Create a layout for the plotly plot.
 
@@ -388,7 +378,7 @@ class ProbabilisticModel(ABC):
                 "Plotting is only supported for models with up to three variables."
             )
 
-    def plotly_layout_1d(self) -> Dict[str, Any]:
+    def plotly_layout_1d(self) -> dict[str, Any]:
         """
         :return: The layout argument for plotly figures as dict
         """
@@ -397,7 +387,7 @@ class ProbabilisticModel(ABC):
             "xaxis": {"title": self.variables[0].name},
         }
 
-    def plotly_layout_2d(self) -> Dict[str, Any]:
+    def plotly_layout_2d(self) -> dict[str, Any]:
         """
         :return: The layout argument for plotly figures as dict
         """
@@ -407,7 +397,7 @@ class ProbabilisticModel(ABC):
             "yaxis": {"title": self.variables[1].name},
         }
 
-    def plotly_layout_3d(self) -> Dict[str, Any]:
+    def plotly_layout_3d(self) -> dict[str, Any]:
         """
         :return: The layout argument for plotly figures as dict
         """
@@ -420,7 +410,7 @@ class ProbabilisticModel(ABC):
             },
         }
 
-    def plot(self, number_of_samples: int = 1000, surface=False, mode=False) -> List:
+    def plot(self, number_of_samples: int = 1000, surface=False, mode=False) -> list:
         """
         Generate traces that can be plotted with plotly.
 
@@ -446,7 +436,7 @@ class ProbabilisticModel(ABC):
                 "Plotting is only supported for models with up to three variables."
             )
 
-    def plot_1d_symbolic(self) -> List:
+    def plot_1d_symbolic(self) -> list:
         variable: Symbolic = self.variables[0]
 
         # calculate probabilities of every element in the domain
@@ -474,7 +464,7 @@ class ProbabilisticModel(ABC):
             )
         ]
 
-    def plot_1d_numeric(self, number_of_samples: int, mode=False) -> List:
+    def plot_1d_numeric(self, number_of_samples: int, mode=False) -> list:
         """
         Plot a one-dimensional model using samples.
 
@@ -573,7 +563,7 @@ class ProbabilisticModel(ABC):
         )
         return mean_trace
 
-    def univariate_mode_traces(self, mode: Optional[Event], height: float):
+    def univariate_mode_traces(self, mode: Event | None, height: float):
         if mode is None:
             return []
 
@@ -603,7 +593,7 @@ class ProbabilisticModel(ABC):
 
     def univariate_complement_of_support_trace(
         self, min_of_samples: float, max_of_samples: float
-    ) -> List:
+    ) -> list:
         """
         Create a trace for the complement of the support of the model in 1d.
 
@@ -625,7 +615,7 @@ class ProbabilisticModel(ABC):
             trace.update(name=PDF_TRACE_NAME, marker=dict(color=PDF_TRACE_COLOR))
         return traces
 
-    def plot_2d(self, number_of_samples: int, mode=False) -> List:
+    def plot_2d(self, number_of_samples: int, mode=False) -> list:
         """
         Plot a two-dimensional model.
 
@@ -658,7 +648,7 @@ class ProbabilisticModel(ABC):
 
         return [likelihood_trace, expectation_trace] + mode_traces
 
-    def plot_2d_surface(self, number_of_samples: int) -> List:
+    def plot_2d_surface(self, number_of_samples: int) -> list:
         """
         Plot a two-dimensional model as a surface plot.
 
@@ -804,7 +794,7 @@ class ProbabilisticModel(ABC):
         trace = go.Surface(z=likelihood, x=x, y=y)
         return trace
 
-    def plot_3d(self, number_of_samples: int, mode=False) -> List:
+    def plot_3d(self, number_of_samples: int, mode=False) -> list:
         """
         Plot a three-dimensional model using samples.
 

@@ -5,7 +5,7 @@ import threading
 import webbrowser
 from dataclasses import dataclass
 
-from typing_extensions import Any, ClassVar, Dict, List, TYPE_CHECKING, Tuple
+from typing_extensions import Any, ClassVar, Dict, TYPE_CHECKING
 
 from krrood.rustworkx_utils.graph_visualizer_base import (
     GraphLayout,
@@ -23,7 +23,7 @@ ThreeLink = Dict[str, Any]
 """A single 3d-force-graph link."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ThreeGraphVisualizer(GraphVisualizerBase):
     """Render a live rustworkx graph as an interactive Flask application backed by 3d-force-graph
     (Three.js + d3-force-3d), with a real orbitable WebGL 3D camera over the whole graph.
@@ -46,7 +46,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
         content delivery network, so viewing the page needs internet access.
     """
 
-    required_modules: ClassVar[Tuple[str, ...]] = ("flask",)
+    required_modules: ClassVar[tuple[str, ...]] = ("flask",)
     """The libraries needed to serve the application."""
 
     layout_options: ClassVar[GraphLayoutOptions] = GraphLayoutOptions(
@@ -62,7 +62,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
     )
     """The 3d-force-graph layout options for each :class:`GraphLayout`."""
 
-    def node_extra_data(self, node_index: int) -> Dict[str, Any]:
+    def node_extra_data(self, *, node_index: int) -> dict[str, Any]:
         """
         :param node_index: The rustworkx index of the node.
         :return: Extra fields merged into the node's JSON payload, letting subclasses attach data
@@ -70,7 +70,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
         """
         return {}
 
-    def graph_nodes(self) -> List[ThreeNode]:
+    def graph_nodes(self) -> list[ThreeNode]:
         """
         :return: The 3d-force-graph nodes for the current graph.
         """
@@ -78,15 +78,15 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
         for index in self.graph.node_indices():
             node: ThreeNode = {
                 "id": str(index),
-                "label": self.node_label(index),
-                "color": self.node_color(index),
+                "label": self.node_label(node_index=index),
+                "color": self.node_color(node_index=index),
             }
-            node.update(self.node_extra_data(index))
-            node.update(self._fixed_position_fields(index))
+            node.update(self.node_extra_data(node_index=index))
+            node.update(self._fixed_position_fields(node_index=index))
             nodes.append(node)
         return nodes
 
-    def _fixed_position_fields(self, node_index: int) -> Dict[str, float]:
+    def _fixed_position_fields(self, *, node_index: int) -> dict[str, float]:
         """
         :param node_index: The rustworkx index of the node.
         :return: ``fx``/``fy``/(``fz``) fields pinning the node at :meth:`node_position`'s result,
@@ -96,7 +96,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
         """
         if self.layout is not GraphLayout.FIXED:
             return {}
-        position = self.node_position(node_index)
+        position = self.node_position(node_index=node_index)
         if position is None:
             return {}
         fields = {"fx": float(position[0]), "fy": float(position[1])}
@@ -104,7 +104,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             fields["fz"] = float(position[2])
         return fields
 
-    def graph_links(self) -> List[ThreeLink]:
+    def graph_links(self) -> list[ThreeLink]:
         """
         :return: The 3d-force-graph links for the current graph.
         """
@@ -113,7 +113,7 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             for source, target in self.graph.edge_list()
         ]
 
-    def register_additional_routes(self, application: Flask) -> None:
+    def register_additional_routes(self, *, application: Flask) -> None:
         """
         Register extra Flask routes on ``application``, called once from :meth:`build_application`.
 
@@ -158,7 +158,9 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
             return render_template(
                 "three_graph_visualizer.jinja",
                 title=self.title,
-                layout_options_json=json.dumps(self.layout_options.get_options(self.layout)),
+                layout_options_json=json.dumps(
+                    self.layout_options.get_options(layout=self.layout)
+                ),
                 interval_ms=int(self.refresh_interval_seconds * 1000),
                 extra_head=self.extra_head(),
                 extra_script=self.extra_script(),
@@ -170,9 +172,9 @@ class ThreeGraphVisualizer(GraphVisualizerBase):
 
         @application.route("/node/<int:node_index>")
         def node(node_index: int):
-            return jsonify(details=self.node_details(node_index))
+            return jsonify(details=self.node_details(node_index=node_index))
 
-        self.register_additional_routes(application)
+        self.register_additional_routes(application=application)
         return application
 
     def run(self) -> None:

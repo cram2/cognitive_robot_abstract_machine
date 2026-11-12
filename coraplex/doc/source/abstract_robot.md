@@ -1,8 +1,8 @@
 # Abstract Robot Overview
 
 To define and manage semantic information about robots CoraPlex uses the `AbstractRobot` class of the semantic
-digital twin. Specific instances of the `AbstractRobot` class are part of the Context that is passed to the Plan on
-creation.
+digital twin. The robot performing a plan is given to the executor running it, in the plan's `RobotAccess` context
+extension.
 
 The `AbstractRobot` class defines a semantic, high-level model of a robot as it appears in a world description. Rather
 than focusing on actuation details or low-level control, it organizes the robot's physical and functional structure into
@@ -59,6 +59,9 @@ allowing higher-level code to discover how to command base motion without hard-c
 For safety and performance tuning, the robot provides `tighten_dof_velocity_limits_of_1dof_connections` and
 `tighten_dof_velocity_limits_proportionally` to constrain the velocity limits of its one-degree-of-freedom active
 connections.
+A mobile base declares how fast the drive of the real robot may move it in `drive_velocity_limits`, and
+the name of the frame the real robot reports its odometry relative to in `odometry_body_name`; a
+`RobotSpecification` creates the odometry body and the drive from them.
 
 ## Construction and Extensibility
 

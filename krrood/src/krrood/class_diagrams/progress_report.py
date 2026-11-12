@@ -14,7 +14,6 @@ import os
 from dataclasses import dataclass
 from enum import StrEnum
 
-from typing_extensions import Optional
 
 LINE_PREFIX = "krrood-class-diagram-progress "
 """
@@ -49,7 +48,7 @@ class ProgressField(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassDiagramProgress:
     """
     One class of a diagram, finished.
@@ -66,7 +65,7 @@ class ClassDiagramProgress:
     """
 
     @classmethod
-    def from_line(cls, line: str) -> Optional[ClassDiagramProgress]:
+    def from_line(cls, *, line: str) -> ClassDiagramProgress | None:
         """
         Read a report back from a line of a process's output.
 
@@ -77,7 +76,8 @@ class ClassDiagramProgress:
             return None
         payload = json.loads(line[len(LINE_PREFIX) :])
         return cls(
-            payload[ProgressField.CLASS_NAME], payload[ProgressField.TOTAL_CLASSES]
+            class_name=payload[ProgressField.CLASS_NAME],
+            total_classes=payload[ProgressField.TOTAL_CLASSES],
         )
 
     def to_line(self) -> str:
@@ -109,4 +109,9 @@ def report_progress(class_name: str, total_classes: int) -> None:
     :param class_name: Name of the class that is done.
     :param total_classes: How many classes the diagram holds.
     """
-    print(ClassDiagramProgress(class_name, total_classes).to_line(), flush=True)
+    print(
+        ClassDiagramProgress(
+            class_name=class_name, total_classes=total_classes
+        ).to_line(),
+        flush=True,
+    )

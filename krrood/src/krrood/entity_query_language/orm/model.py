@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from typing_extensions import List, Optional
 
 from krrood.symbol_graph.symbol_graph import (
     SymbolGraph,
@@ -14,7 +13,7 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     """
     Mapping specific for SymbolGraph.
@@ -22,12 +21,12 @@ class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     Import this class when you want to persist SymbolGraph.
     """
 
-    instances: List[WrappedInstance]
+    instances: list[WrappedInstance]
 
-    predicate_relations: List[PredicateClassRelation]
+    predicate_relations: list[PredicateClassRelation]
 
     @classmethod
-    def from_domain_object(cls, obj: SymbolGraph):
+    def from_domain_object(cls, *, obj: SymbolGraph):
         return cls(
             instances=obj.instances,
             predicate_relations=obj.predicate_relations,
@@ -36,19 +35,19 @@ class SymbolGraphMapping(AlternativeMapping[SymbolGraph]):
     def to_domain_object(self) -> T:
         result = SymbolGraph()
         for instance in self.instances:
-            result.add_instance(instance)
+            result.add_instance(wrapped_instance=instance)
         for relation in self.predicate_relations:
-            result.add_relation(relation)
+            result.add_relation(relation=relation)
         return result
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class WrappedInstanceMapping(AlternativeMapping[WrappedInstance]):
-    instance: Optional[Symbol]
+    instance: Symbol | None
 
     @classmethod
-    def from_domain_object(cls, obj: WrappedInstance):
-        return cls(obj.instance)
+    def from_domain_object(cls, *, obj: WrappedInstance):
+        return cls(instance=obj.instance)
 
     def to_domain_object(self) -> T:
-        return WrappedInstance(self.instance)
+        return WrappedInstance(instance=self.instance)

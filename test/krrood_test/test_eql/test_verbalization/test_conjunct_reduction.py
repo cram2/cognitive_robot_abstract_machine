@@ -116,7 +116,7 @@ def test_lone_coindexed_comparison_is_not_folded():
     itself.
     """
     reduced = CoindexedComparisonFold().apply(
-        reduce_conjuncts([])  # empty → empty, exercises the empty path too
+        conjuncts=reduce_conjuncts([])  # empty → empty, exercises the empty path too
     )
     assert reduced == []
 
