@@ -707,7 +707,6 @@ def test_thread_payload_monitor_surfaces_compute_exception() -> None:
 
 
 class TestStatechartLogic:
-
     def test_transition_triggers(self, tmp_path) -> None:
         kin_sim = StatechartExecutor(StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
@@ -1557,7 +1556,6 @@ class TestEndStatechart:
 
 
 class TestTemplates:
-
     def test_sequence_goal(self, tmp_path) -> None:
         """
         Every step but the first starts on the tick its predecessor succeeds.

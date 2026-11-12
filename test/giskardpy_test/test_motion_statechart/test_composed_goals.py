@@ -205,9 +205,7 @@ def test_differential_drive_goal_is_a_step_without_an_attempt(
                 goal := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                         MobileBase
-                    )[
-                        0
-                    ],
+                    )[0],
                     goal_pose=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_diff_world.root
                     ),

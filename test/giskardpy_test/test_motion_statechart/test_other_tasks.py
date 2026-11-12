@@ -143,9 +143,9 @@ class TestFeatureFunctions:
         )
         height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
 
-        assert (
-            lower_limit <= height_diff <= upper_limit
-        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= height_diff <= upper_limit, (
+            f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_height_goal_negative_bounds(self, pr2_world_state_reset: World):
         """
@@ -194,9 +194,9 @@ class TestFeatureFunctions:
         )
         height_diff = (root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3])[2]
 
-        assert (
-            lower_limit <= height_diff <= upper_limit
-        ), f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= height_diff <= upper_limit, (
+            f"Height {height_diff:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_reach_point_drives_offset_point_onto_reference(
         self, pr2_world_state_reset: World
@@ -296,9 +296,9 @@ class TestFeatureFunctions:
         # Distance in x-y plane only (ignore z)
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            lower_limit <= horizontal_distance <= upper_limit
-        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= horizontal_distance <= upper_limit, (
+            f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_distance_goal_zero_distance(self, pr2_world_state_reset: World):
         """
@@ -350,9 +350,9 @@ class TestFeatureFunctions:
         diff = root_P_tip.to_np()[:3] - root_P_ref.to_np()[:3]
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            lower_limit <= horizontal_distance <= upper_limit
-        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= horizontal_distance <= upper_limit, (
+            f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_distance_goal_ignores_z_axis(self, pr2_world_state_reset: World):
         """
@@ -406,9 +406,9 @@ class TestFeatureFunctions:
 
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            lower_limit <= horizontal_distance <= upper_limit
-        ), f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        assert lower_limit <= horizontal_distance <= upper_limit, (
+            f"Distance {horizontal_distance:.4f} not in [{lower_limit}, {upper_limit}]"
+        )
 
     def test_height_and_distance_combined(self, pr2_world_state_reset: World):
         """
@@ -476,12 +476,12 @@ class TestFeatureFunctions:
         height_diff = diff[2]
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            height_lower <= height_diff <= height_upper
-        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
-        assert (
-            distance_lower <= horizontal_distance <= distance_upper
-        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        assert height_lower <= height_diff <= height_upper, (
+            f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        )
+        assert distance_lower <= horizontal_distance <= distance_upper, (
+            f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        )
 
     def test_distance_height_angle_perpendicular_combined(
         self, pr2_world_state_reset: World
@@ -566,12 +566,12 @@ class TestFeatureFunctions:
         height_diff = diff[2]
         horizontal_distance = np.sqrt(diff[0] ** 2 + diff[1] ** 2)
 
-        assert (
-            height_lower <= height_diff <= height_upper
-        ), f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
-        assert (
-            distance_lower <= horizontal_distance <= distance_upper
-        ), f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        assert height_lower <= height_diff <= height_upper, (
+            f"Height {height_diff:.4f} not in [{height_lower}, {height_upper}]"
+        )
+        assert distance_lower <= horizontal_distance <= distance_upper, (
+            f"Distance {horizontal_distance:.4f} not in [{distance_lower}, {distance_upper}]"
+        )
 
         root_V_tip_normal = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=tip_normal
@@ -793,9 +793,9 @@ def test_pointing_cone(pr2_world_state_reset: World):
 
     angle = angle_between_vector(v_pointing, v_goal)
 
-    assert (
-        angle <= cone_theta + pointing_cone.threshold
-    ), f"PointingCone failed: final angle {angle:.6f} rad > cone_theta {cone_theta:.6f} rad"
+    assert angle <= cone_theta + pointing_cone.threshold, (
+        f"PointingCone failed: final angle {angle:.6f} rad > cone_theta {cone_theta:.6f} rad"
+    )
 
 
 def test_align_planes(pr2_world_state_reset: World):
@@ -843,9 +843,9 @@ def test_align_planes(pr2_world_state_reset: World):
 
     angle = angle_between_vector(v_tip, v_goal)
 
-    assert (
-        angle <= align_planes.threshold
-    ), f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+    assert angle <= align_planes.threshold, (
+        f"AlignPlanes failed: final angle {angle:.6f} rad > threshold {align_planes.threshold:.6f} rad"
+    )
 
 
 def test_align_perpendicular(pr2_world_state_reset: World):
@@ -959,9 +959,9 @@ def test_angle_goal(pr2_world_state_reset: World):
 
     angle = angle_between_vector(v_tip, v_ref)
 
-    assert (
-        lower_angle <= angle <= upper_angle
-    ), f"AngleGoal failed: final angle {angle:.6f} rad not in [{lower_angle:.6f}, {upper_angle:.6f}]"
+    assert lower_angle <= angle <= upper_angle, (
+        f"AngleGoal failed: final angle {angle:.6f} rad not in [{lower_angle:.6f}, {upper_angle:.6f}]"
+    )
 
 
 class TestArticulateGraspedMechanism:

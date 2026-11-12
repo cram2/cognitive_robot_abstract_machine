@@ -135,8 +135,9 @@ class TestReactionTimeAcrossNesting:
         goal_reached_tick, started_tick = _first_ticks(
             executor,
             [
-                lambda: statechart.observation_state[task]
-                == ObservationStateValues.TRUE,
+                lambda: (
+                    statechart.observation_state[task] == ObservationStateValues.TRUE
+                ),
                 lambda: waiting.life_cycle_state == LifeCycleValues.RUNNING,
             ],
         )
@@ -164,8 +165,9 @@ class TestReactionTimeAcrossNesting:
         goal_reached_tick, end_tick = _first_ticks(
             executor,
             [
-                lambda: statechart.observation_state[task]
-                == ObservationStateValues.TRUE,
+                lambda: (
+                    statechart.observation_state[task] == ObservationStateValues.TRUE
+                ),
                 statechart.is_ended,
             ],
         )
