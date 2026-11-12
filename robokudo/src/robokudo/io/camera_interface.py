@@ -41,6 +41,7 @@ from tf2_ros import Buffer
 from typing_extensions import Any, TYPE_CHECKING
 
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.called_positionally import called_positionally
 from robokudo.cas import CASViews, CAS
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import (
@@ -342,12 +343,13 @@ class CameraInterface(object):
             runtime_world.add_semantic_annotation(camera)
         init_world_entity_tracker_from_world(runtime_world)
 
-    def set_data(self, cas: CAS) -> None:
+    @called_positionally
+    def set_data(self, cas: CAS) -> bool | None:
         """
-        This method is supposed to read in, convert (if needed) and put the data into
-        the CAS. If you are running a CameraInterface which is getting data via callback
-        methods, please make sure to keep callbacks light and do the main conversion
-        work here! Callbacks should be short.
+        Populate the CAS with one available sensor acquisition.
+
+        Return ``False`` when an acquisition is discarded; ``None`` or ``True``
+        indicates successful delivery.
 
         :param cas: The CAS where the data should be placed in
         """

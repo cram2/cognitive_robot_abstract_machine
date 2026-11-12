@@ -71,6 +71,17 @@ def test_collection_reader_descriptor_uses_configured_camera_interface(
 # %% Acquisition lifecycle
 
 
+def test_collection_reader_waits_after_dropped_frame(
+    reader_pipeline: ReaderPipeline,
+) -> None:
+    """
+    A rejected acquisition cannot advance downstream annotators.
+    """
+    reader_pipeline.camera_interface.has_new_data.return_value = True
+    reader_pipeline.camera_interface.set_data.return_value = False
+    assert reader_pipeline.reader.update() == Status.RUNNING
+
+
 def test_collection_reader_waits_without_replacing_cas(
     reader_pipeline: ReaderPipeline,
 ) -> None:
