@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 import rustworkx as rx
 from typing_extensions import (
@@ -22,7 +23,6 @@ from krrood.rustworkx_utils.graph_visualizer_base import (
 )
 from cramph.context import ContextExtension, StatechartContext
 from cramph.data_types import (
-    StatechartJSONKey,
     TransitionKind,
     ObservationStateValues,
 )
@@ -174,6 +174,32 @@ class StatechartModification:
         if not compiler.changed_since_compile:
             return
         compiler.compile()
+
+
+# %% serialization keys
+
+
+class StatechartJSONKey(StrEnum):
+    """
+    Keys a serialized statechart carries.
+    """
+
+    NODES = "nodes"
+    """
+    The nodes of the statechart, in the order of their index.
+    """
+
+    CONDITIONS = "conditions"
+    """
+    Every transition condition of every node the document holds, including the children
+    of goals that join the statechart only when it is compiled.
+    """
+
+    CHILDREN = "children"
+    """
+    The indices of the children of every node that is the parent of a node the document
+    holds, in the order the parent holds them, by the index of the parent.
+    """
 
 
 # %% the statechart

@@ -15,7 +15,7 @@ published before.
 
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -72,7 +72,7 @@ def child_choices_topic(giskard_node_name: str) -> str:
 class ChildChoicePayloadKey(StrEnum):
     """
     The keys of a child choice sent to Giskard on top of
-    :attr:`~cramph.data_types.StatechartPayloadKey.GOAL_ID`.
+    :attr:`~cramph.reported_statechart.StatechartPayloadKey.GOAL_ID`.
     """
 
     NODE_INDEX = "node_index"

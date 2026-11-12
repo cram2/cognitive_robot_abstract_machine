@@ -8,7 +8,7 @@ whatever observes the copy sees the goal progress.
 
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 from dataclasses import dataclass
 
 from typing_extensions import Any, Self

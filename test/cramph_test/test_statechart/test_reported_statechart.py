@@ -15,11 +15,10 @@ from cramph.composites import (
     Sequence,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.nodes_for_testing import ConstTrueNode
-from cramph.reported_statechart import ReportedStatechart
 from cramph.statechart import Statechart
 
 from .test_composite_node_choosing_its_child import ChooserAnsweringInTurn

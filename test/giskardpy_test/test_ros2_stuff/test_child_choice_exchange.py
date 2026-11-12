@@ -5,7 +5,7 @@ copy of it, see :mod:`giskardpy.middleware.ros2.child_choices`, without a ROS gr
 
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 
@@ -23,7 +23,6 @@ from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.node import StatechartNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
-from cramph.reported_statechart import ReportedStatechart
 from cramph.statechart import Statechart
 from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceClient,

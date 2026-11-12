@@ -1,115 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import IntEnum, Enum, StrEnum, auto
+from enum import IntEnum, Enum, auto
 
 from cramph.exceptions import TransitionHasNoOutcomeError
 from krrood.patterns.float_enumeration import FloatEnum
 from krrood.symbolic_math.symbolic_math import Scalar, logic_or
 from semantic_digital_twin.world_description.geometry import Color
-
-# %% serialization
-
-
-class NodeJSONKey(StrEnum):
-    """
-    Keys a serialized node carries on top of its dataclass fields.
-    """
-
-    NODE_ID = "node_id"
-    """
-    Tells apart the nodes of one JSON document, so every place referring to the same node
-    deserializes to the same instance.
-    """
-
-
-class TransitionConditionJSONKey(StrEnum):
-    """
-    Keys a serialized transition condition carries.
-    """
-
-    KIND = "kind"
-    """
-    The kind of transition the condition controls.
-    """
-
-    EXPRESSION = "expression"
-    """
-    The rendered condition, naming every variable by the id of its node.
-    """
-
-    OWNER = "owner"
-    """
-    The id of the node the condition belongs to.
-    """
-
-
-class StatechartJSONKey(StrEnum):
-    """
-    Keys a serialized statechart carries.
-    """
-
-    NODES = "nodes"
-    """
-    The nodes of the statechart, in the order of their index.
-    """
-
-    CONDITIONS = "conditions"
-    """
-    Every transition condition of every node the document holds, including the children
-    of goals that join the statechart only when it is compiled.
-    """
-
-    CHILDREN = "children"
-    """
-    The indices of the children of every node that is the parent of a node the document
-    holds, in the order the parent holds them, by the index of the parent.
-    """
-
-
-class StatechartPayloadKey(StrEnum):
-    """
-    The keys of the payloads that report on a statechart a server runs for a goal, and
-    of the messages a client answers them with.
-    """
-
-    GOAL_ID = "goal_id"
-    """
-    The goal of the server the payload belongs to.
-    """
-
-    STATECHART = "statechart"
-    """
-    The structure of the statechart, sent once per goal.
-    """
-
-    JOINED_NODES = "joined_nodes"
-    """
-    The structure of the nodes that joined the statechart since the structure of the
-    nodes before them was sent, as
-    :meth:`~cramph.statechart.Statechart.nodes_from_to_json` writes them.
-    """
-
-    LIFE_CYCLE_STATE = "life_cycle_state"
-    """
-    The life cycle state of every node.
-    """
-
-    OBSERVATION_STATE = "observation_state"
-    """
-    The observation state of every node.
-    """
-
-    LAST_OBSERVATION_STATE = "last_observation_state"
-    """
-    The observation every node took most recently.
-    """
-
-    TICK_COUNT = "tick_count"
-    """
-    The tick the states were taken at.
-    """
-
 
 # %% life cycle states
 
