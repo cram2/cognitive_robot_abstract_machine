@@ -24,7 +24,7 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from semantic_digital_twin.world import World
-from typing_extensions import Any, List, Optional
+from typing_extensions import Any
 
 import robokudo.annotators.core
 import robokudo.annotators.outputs
@@ -45,7 +45,7 @@ class Pipeline(Sequence):
     def __init__(
         self,
         name: str = "Sequence",
-        children: Optional[List[Behaviour]] = None,
+        children: list[Behaviour] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -137,7 +137,7 @@ class Pipeline(Sequence):
         """
         return self.cas
 
-    def get_annotators(self) -> List[robokudo.annotators.core.BaseAnnotator]:
+    def get_annotators(self) -> list[robokudo.annotators.core.BaseAnnotator]:
         """
         Get all annotators in this pipeline.
 
@@ -152,7 +152,7 @@ class Pipeline(Sequence):
             if isinstance(child, robokudo.annotators.core.BaseAnnotator)
         ]
 
-    def pipeline_children(self) -> List[Behaviour]:
+    def pipeline_children(self) -> list[Behaviour]:
         """
         Get all children of this pipeline.
 

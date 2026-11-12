@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import open3d as o3d
-from typing_extensions import TYPE_CHECKING, Any, List, TypeVar
+from typing_extensions import TYPE_CHECKING, Any, TypeVar
 
 from robokudo.types.annotation import Classification
 from robokudo.types.core import Annotation, IdentifiableAnnotation, Nameable
@@ -40,7 +40,7 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
     Analyzables can get their own Annotations, might have 3D/6D points and their own ROI.
     """
 
-    annotations: List = field(default_factory=list)
+    annotations: list = field(default_factory=list)
     """
     List of associated annotations
     """
@@ -50,7 +50,7 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
     Point cloud data
     """
 
-    point_indices: List = field(default_factory=list)
+    point_indices: list = field(default_factory=list)
     """
     Indices into point cloud
     """
