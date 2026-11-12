@@ -89,6 +89,8 @@ class MotionGoal(SubclassJSONSerializer):
     def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         """
         Rebuild a goal from what a client sent.
+
+        A client that sends no :attr:`publishes_debug_expressions` gets its default.
         """
         required_position = data.get("required_position")
         return cls(
@@ -97,7 +99,9 @@ class MotionGoal(SubclassJSONSerializer):
             required_position=(
                 None if required_position is None else from_json(required_position)
             ),
-            publishes_debug_expressions=data["publishes_debug_expressions"],
+            publishes_debug_expressions=data.get(
+                "publishes_debug_expressions", cls.publishes_debug_expressions
+            ),
         )
 
     def parse_motion_statechart(self, **kwargs: Any) -> Statechart:

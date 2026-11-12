@@ -101,3 +101,16 @@ class TestMotionGoalPayload:
         )
 
         assert goal.publishes_debug_expressions is False
+
+    def test_a_client_that_does_not_send_the_debug_expression_flag_gets_no_markers(
+        self,
+    ):
+        goal = MotionGoal.for_motion_statechart(
+            motion_statechart=create_motion_statechart(), client=create_client()
+        )
+        payload = json.loads(json.dumps(goal.to_json()))
+        del payload["publishes_debug_expressions"]
+
+        restored = MotionGoal.from_json(data=payload)
+
+        assert restored.publishes_debug_expressions is False
