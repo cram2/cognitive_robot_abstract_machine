@@ -66,7 +66,7 @@ class StepFailingItsFirstRuns(
         return ObservationStateValues.TRUE
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspFailingItsFirstRuns(SequentialInsertion[GraspingAction]):
     """
     Lets a grasp fail its first runs, right after closing and before the object is moved
@@ -137,7 +137,7 @@ class GripperIsOpen(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNo
         return ObservationStateValues.TRUE if is_open else ObservationStateValues.FALSE
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
     """
     Opens the gripper a :class:`GripperIsOpen` reads before that step runs.
@@ -178,7 +178,7 @@ class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
         return [action]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationOnADifferentType(SequentialInsertion[ParkArmsAction]):
     """
     A transformation that never matches a :class:`GripperIsOpen`.
@@ -198,7 +198,7 @@ class TransformationOnADifferentType(SequentialInsertion[ParkArmsAction]):
         return []
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationRecordingGripperActions(PlanTransformation[SetGripperAction]):
     """
     Records every gripper action of a plan it is offered, and changes nothing.
@@ -216,7 +216,7 @@ class TransformationRecordingGripperActions(PlanTransformation[SetGripperAction]
         self.offered_actions.append(plan_node)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CloseGripperBeforeAFailingStep(SequentialInsertion[StepFailingItsFirstRuns]):
     """
     Inserts a gripper action before a :class:`StepFailingItsFirstRuns`.

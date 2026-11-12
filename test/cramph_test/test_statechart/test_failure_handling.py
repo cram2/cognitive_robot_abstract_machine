@@ -88,7 +88,7 @@ class NodeFailingItsFirstRuns(
         return ObservationStateValues.TRUE
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StrategyGivingUp(FailureHandlingStrategy):
     """
     A failure handling strategy that leaves the failed node as it is and records it.
@@ -103,7 +103,7 @@ class StrategyGivingUp(FailureHandlingStrategy):
         self.failed_nodes.append(failed_node)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StrategyRetrying(StrategyGivingUp):
     """
     A failure handling strategy that records the failed node and runs it again.
@@ -111,10 +111,10 @@ class StrategyRetrying(StrategyGivingUp):
 
     def handle_failure(self, failed_node: StatechartNode) -> None:
         super().handle_failure(failed_node)
-        failed_node.statechart.request_reset(failed_node)
+        failed_node.statechart.request_reset(node=failed_node)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StrategyInsertingBeforeTheFailedStep(FailureHandlingStrategy):
     """
     A failure handling strategy that runs a new step before the step holding the failed
@@ -129,10 +129,10 @@ class StrategyInsertingBeforeTheFailedStep(FailureHandlingStrategy):
     def handle_failure(self, failed_node: StatechartNode) -> None:
         step = ControlStructureNode.step_holding(failed_node)
         step.parent_node.insert_before(step, self.inserted_step)
-        failed_node.statechart.request_reset(step)
+        failed_node.statechart.request_reset(node=step)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CallbackHoldingBackRecompiles(RecompileCallback):
     """
     A recompile callback that answers it is at rest only once told to.
@@ -210,7 +210,7 @@ def test_a_requested_reset_keeps_the_failure_in_the_history(
     statechart_executor.tick()
     assert node.life_cycle_state == LifeCycleValues.FAILED
 
-    statechart.request_reset(node)
+    statechart.request_reset(node=node)
     assert node.life_cycle_state == LifeCycleValues.FAILED
     _tick_times(statechart_executor, 2)
 
@@ -230,7 +230,7 @@ def test_a_node_stays_not_started_on_the_tick_its_requested_reset_lands(
     statechart = _compile_with_nodes(statechart_executor, [node])
     statechart_executor.tick()
 
-    statechart.request_reset(node)
+    statechart.request_reset(node=node)
     statechart_executor.tick()
 
     assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
@@ -244,8 +244,8 @@ def test_a_requested_reset_runs_on_reset_once(
     statechart = _compile_with_nodes(statechart_executor, [node])
     statechart_executor.tick()
 
-    statechart.request_reset(node)
-    statechart.request_reset(node)
+    statechart.request_reset(node=node)
+    statechart.request_reset(node=node)
     _tick_times(statechart_executor, 3)
 
     assert node.resets == 1
@@ -260,7 +260,7 @@ def test_a_requested_reset_of_a_composite_node_resets_its_children(
     statechart_executor.tick()
     assert sequence.life_cycle_state == LifeCycleValues.FAILED
 
-    statechart.request_reset(sequence)
+    statechart.request_reset(node=sequence)
     statechart_executor.tick()
 
     assert sequence.life_cycle_state == LifeCycleValues.NOT_STARTED
@@ -275,7 +275,7 @@ def test_a_requested_reset_of_a_running_node_ends_its_run(
     statechart = _compile_with_nodes(statechart_executor, [node])
     assert node.take_callbacks() == [LifeCycleCallback.START]
 
-    statechart.request_reset(node)
+    statechart.request_reset(node=node)
     _tick_times(statechart_executor, 2)
 
     assert node.take_callbacks() == [LifeCycleCallback.RESET, LifeCycleCallback.START]
@@ -288,7 +288,7 @@ def test_a_requested_reset_of_a_node_not_started_changes_nothing(
     node.start_condition = sm.Scalar.const_false()
     statechart = _compile_with_nodes(statechart_executor, [node])
 
-    statechart.request_reset(node)
+    statechart.request_reset(node=node)
     statechart_executor.tick()
 
     assert node.take_callbacks() == []
@@ -301,7 +301,7 @@ def test_a_reset_cannot_be_requested_for_a_node_of_another_statechart(
     statechart = _compile_with_nodes(statechart_executor, [ConstTrueNode()])
 
     with pytest.raises(NotInStatechartError):
-        statechart.request_reset(ConstTrueNode())
+        statechart.request_reset(node=ConstTrueNode())
 
 
 def test_a_requested_reset_waits_while_a_recompile_is_held_back(
@@ -314,7 +314,7 @@ def test_a_requested_reset_waits_while_a_recompile_is_held_back(
     statechart.compiler.add_recompile_callback(holding_back)
     statechart.add_node(_node_arriving_at_once("joined"))
 
-    statechart.request_reset(node)
+    statechart.request_reset(node=node)
     statechart_executor.tick()
     assert node.life_cycle_state == LifeCycleValues.FAILED
 
@@ -332,7 +332,7 @@ def test_an_abandoned_modification_drops_the_resets_requested_in_it(
 
     with pytest.raises(ModificationDeliberatelyFailed):
         with statechart.modify():
-            statechart.request_reset(node)
+            statechart.request_reset(node=node)
             raise ModificationDeliberatelyFailed()
     statechart_executor.tick()
 
@@ -611,7 +611,7 @@ def test_the_attempts_are_not_counted_anew_when_the_handled_node_is_reset(
     assert handled.life_cycle_state == LifeCycleValues.FAILED
     runs_before = node.runs
 
-    statechart.request_reset(handled)
+    statechart.request_reset(node=handled)
     _tick_times(statechart_executor, 10)
 
     assert node.runs == runs_before + 1
@@ -683,7 +683,9 @@ def test_a_strategy_may_insert_into_a_compiled_sequence(
     inserted = _node_arriving_at_once("inserted")
     handled = HandledOnFailure(
         handled_node=node,
-        failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(inserted),
+        failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(
+            inserted_step=inserted
+        ),
     )
     sequence = Sequence(nodes=[handled])
     _compile_with_nodes(statechart_executor, [sequence])
@@ -700,7 +702,9 @@ def test_the_failed_step_runs_again_only_after_the_inserted_one(
     inserted = _node_arriving_at_once("inserted")
     handled = HandledOnFailure(
         handled_node=node,
-        failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(inserted),
+        failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(
+            inserted_step=inserted
+        ),
     )
     sequence = Sequence(nodes=[handled])
     _compile_with_nodes(statechart_executor, [sequence])
@@ -723,7 +727,9 @@ def test_an_inserted_step_failing_fails_the_compiled_sequence(
     inserted = NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE)
     handled = HandledOnFailure(
         handled_node=NodeFailingItsFirstRuns(failing_runs=1),
-        failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(inserted),
+        failure_handling_strategy=StrategyInsertingBeforeTheFailedStep(
+            inserted_step=inserted
+        ),
     )
     sequence = Sequence(nodes=[handled])
     _compile_with_nodes(statechart_executor, [sequence])

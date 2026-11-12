@@ -307,7 +307,7 @@ class PlanRewriting(ContextExtension):
 # %% recovering from a failure
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecoveryByInsertion(LimitedRecovery):
     """
     Recovers by rewriting the plan with :attr:`transformation`, and then running the
@@ -342,4 +342,4 @@ class RecoveryByInsertion(LimitedRecovery):
         rewriting = failed_node.context.get_extension(PlanRewriting)
         if rewriting is not None:
             rewriting.rewrite(step.parent_node)
-        failed_node.statechart.request_reset(step)
+        failed_node.statechart.request_reset(node=step)

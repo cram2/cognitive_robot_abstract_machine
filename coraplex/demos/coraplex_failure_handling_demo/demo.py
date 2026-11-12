@@ -12,10 +12,10 @@ Lower :attr:`FailureHandlingDemonstration.maximum_attempts` below
 :attr:`FailureHandlingDemonstration.lost_readings` to see the plan give up.
 """
 
-import os
 from dataclasses import dataclass, field
 from enum import StrEnum
 from itertools import groupby
+from pathlib import Path
 
 from coraplex.datastructures.enums import InsertionPosition
 from coraplex.demonstrations import RobotDemonstration
@@ -43,8 +43,8 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood.patterns.path_enumeration import PathEnumeration
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
 )
@@ -58,22 +58,22 @@ from semantic_digital_twin.world import World
 # %% what the scene is built from
 
 
-class SceneFile(StrEnum):
+class SceneFile(PathEnumeration):
     """
     The files the demonstration builds its scene from, under the coraplex resources.
     """
 
-    APARTMENT = os.path.join("worlds", "apartment.urdf")
-    MILK = os.path.join("objects", "milk.stl")
+    APARTMENT = (
+        Path(__file__).resolve().parents[2] / "resources" / "worlds" / "apartment.urdf"
+    )
+    """
+    The apartment the PR2 works in.
+    """
 
-    @property
-    def path(self) -> str:
-        """
-        :return: Where the file is read from.
-        """
-        return os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", self.value
-        )
+    MILK = Path(__file__).resolve().parents[2] / "resources" / "objects" / "milk.stl"
+    """
+    The mesh of the milk carton.
+    """
 
 
 class ApartmentBody(StrEnum):
@@ -148,7 +148,7 @@ class UnreliableJointReading(JointReading):
 # %% plan transformations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConfirmGraspAfterClosing(SequentialInsertion[GraspingAction]):
     """
     Reads the closed gripper right after a grasp closed it, unreliably.
@@ -184,7 +184,7 @@ class ConfirmGraspAfterClosing(SequentialInsertion[GraspingAction]):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenGripperBeforeReading(SequentialInsertion[JointReading]):
     """
     Opens a gripper before the reading that expects it to be open.
@@ -219,7 +219,7 @@ class OpenGripperBeforeReading(SequentialInsertion[JointReading]):
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FailureHandlingDemonstration(RobotDemonstration):
     """
     The PR2 walks up to the counter and picks up the milk, recovering from the failures it
@@ -258,14 +258,11 @@ class FailureHandlingDemonstration(RobotDemonstration):
     Where the milk stands on the counter.
     """
 
-    counter_stand_x: float = 1.5
+    counter_stand: Pose2D = field(
+        default_factory=lambda: Pose2D.from_xy_yaw(x=1.5, y=2.4)
+    )
     """
-    Where along the x-axis of the world the PR2 stands to pick up the milk.
-    """
-
-    counter_stand_y: float = 2.4
-    """
-    Where along the y-axis of the world the PR2 stands to pick up the milk.
+    Where the PR2 stands to pick up the milk, on the floor of the world.
     """
 
     plan: Sequence | None = field(default=None, init=False)
@@ -282,7 +279,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         """
         :return: The apartment.
         """
-        return WorldSpecification.from_urdf(SceneFile.APARTMENT.path)
+        return WorldSpecification.from_urdf(str(SceneFile.APARTMENT))
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -303,7 +300,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         SemanticAnnotationWithRootSpecification(
             name=name,
             semantic_annotation_type=Milk,
-            root_specification=BodySpecification.mesh(name, SceneFile.MILK.path),
+            root_specification=BodySpecification.mesh(name, str(SceneFile.MILK)),
         ).spawn(world, parent=None, parent_T_self=self.milk_start)
 
     def build_context_extensions(self, world: World) -> list[ContextExtension]:
@@ -332,12 +329,11 @@ class FailureHandlingDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
-                        self.counter_stand_x,
-                        self.counter_stand_y,
-                        0.0,
+                    target_location=Pose2D(
+                        position=self.counter_stand.position,
+                        yaw=self.counter_stand.yaw,
                         reference_frame=world.root,
-                    )
+                    ).pose
                 ),
                 SetGripperAction(
                     name="close gripper",

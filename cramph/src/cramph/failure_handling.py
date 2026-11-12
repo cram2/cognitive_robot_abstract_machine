@@ -1,3 +1,8 @@
+"""
+Recovering a plan from the failure of one of its nodes while it runs: the strategies
+that change the plan, and the nodes that run them once a node failed.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -19,7 +24,7 @@ from krrood.symbolic_math.symbolic_math import (
 # %% failure handling strategies
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FailureHandlingStrategy(ABC):
     """
     Changes a plan so that it recovers from the failure of one of its nodes.
@@ -158,7 +163,7 @@ class HandledOnFailure(CompositeNodeEndingItsChildren):
 # %% recovering
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LimitedRecovery(FailureHandlingStrategy, ABC):
     """
     A failure handling strategy that tries to recover at most :attr:`maximum_attempts`
@@ -193,11 +198,11 @@ class LimitedRecovery(FailureHandlingStrategy, ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RetryFailedNode(LimitedRecovery):
     """
     Recovers by running the failed node again.
     """
 
     def recover(self, failed_node: StatechartNode) -> None:
-        failed_node.statechart.request_reset(failed_node)
+        failed_node.statechart.request_reset(node=failed_node)
