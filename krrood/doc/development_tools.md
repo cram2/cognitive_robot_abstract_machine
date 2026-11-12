@@ -96,52 +96,20 @@ pip install "krrood[development-tools]"
 
 ## Use with pre-commit
 
-pre-commit installs krrood into the hook's own environment:
+The hooks are published in
+[`.pre-commit-hooks.yaml`](https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/.pre-commit-hooks.yaml)
+at the root of cognitive_robot_abstract_machine: `krrood-format`, `krrood-agents-md`,
+`krrood-skills` and `krrood-check`. Add that repository to your
+`.pre-commit-config.yaml` and list the hook ids you want.
 
-```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: krrood-format
-        name: Format Python (ruff, then docformatter)
-        entry: krrood format
-        language: python
-        additional_dependencies: ["krrood[development-tools]==<version>"]
-        types: [python]
-      - id: krrood-agents-md
-        name: Update the rules in AGENTS.md
-        entry: krrood agents-md
-        language: python
-        additional_dependencies: ["krrood[development-tools]==<version>"]
-        pass_filenames: false
-        always_run: true
-      - id: krrood-check
-        name: Check the staged code against the rules that have a checker
-        entry: krrood check
-        language: system
-        types: [python]
-      - id: krrood-skills
-        name: Update the generated skills
-        entry: krrood skills
-        language: python
-        additional_dependencies: ["krrood[development-tools]==<version>"]
-        pass_filenames: false
-        always_run: true
-```
-
-`krrood-check` runs with `language: system`, in the environment that has the
-distribution and its extras installed, because the core boundary check reads the
-installed packages.
-
-To use rules that are not released yet, replace the requirement with a commit of
-cognitive_robot_abstract_machine:
-`krrood[development-tools] @ git+https://github.com/cram2/cognitive_robot_abstract_machine@<commit>#subdirectory=krrood`.
-
-The same hooks are published in the `.pre-commit-hooks.yaml` at the root of
-[cognitive_robot_abstract_machine](https://github.com/cram2/cognitive_robot_abstract_machine).
-They run the `krrood` command already installed in your development environment
+The hooks run the `krrood` command already installed in your development environment
 (`language: system`), because pre-commit would otherwise install that whole repository
-rather than krrood.
+rather than krrood. `krrood-check` needs that environment anyway: the core boundary check
+reads the installed packages.
+
+To use rules that are not released yet, install krrood from a commit of
+cognitive_robot_abstract_machine:
+`pip install "krrood[development-tools] @ git+https://github.com/cram2/cognitive_robot_abstract_machine@<commit>#subdirectory=krrood"`.
 
 ## Project rules
 
