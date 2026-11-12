@@ -11,24 +11,15 @@ from robokudo.types.image import ImageRotation
 from semantic_digital_twin.datastructures.camera_model import CameraDistortionModel
 
 
-# %% Image rotation
+# %% Stereo configuration
 @dataclass(kw_only=True)
 class InvalidStereoCameraConfiguration(RoboKudoError, ValueError):
     """
-    Stereo buffering, timing or transform settings contradict the input contract.
+    Base for stereo settings that contradict the camera input contract.
     """
 
-    def error_message(self) -> str:
-        return "Invalid stereo camera configuration."
 
-    def suggest_correction(self) -> str:
-        return (
-            "Use positive queue sizes, finite positive frame age and depth limits, "
-            "nonnegative calibration tolerance, a nonempty optical frame, and "
-            "either static pose or TF lookup."
-        )
-
-
+# %% Image rotation
 @dataclass
 class UnsupportedImageRotation(RoboKudoError, ValueError):
     """

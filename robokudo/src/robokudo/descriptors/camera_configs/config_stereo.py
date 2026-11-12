@@ -18,7 +18,15 @@ from robokudo.descriptors.camera_configs.components import (
     StaticCameraTransformComponent,
     TfComponent,
 )
-from robokudo.io.exceptions import InvalidStereoCameraConfiguration
+from robokudo.descriptors.camera_configs.exceptions import (
+    InvalidStereoCalibrationTolerance,
+    InvalidStereoFrameAge,
+    InvalidStereoHistoryDepth,
+    InvalidStereoMaximumDepth,
+    InvalidStereoSynchronizationQueueSize,
+    StereoOpticalFrameMissing,
+    StereoPoseSourcesConflict,
+)
 
 # %% source identity
 
@@ -127,16 +135,21 @@ class StereoCameraConfig(BaseCameraConfig, TfComponent, StaticCameraTransformCom
         """
         Reject unbounded buffering and contradictory transform settings.
         """
-        if self.history_depth <= 0 or self.synchronization_queue_size <= 0:
-            raise InvalidStereoCameraConfiguration()
-        if any(
-            not isfinite(value) or value <= 0
-            for value in (self.max_frame_age, self.max_depth)
-        ):
-            raise InvalidStereoCameraConfiguration()
+        if self.history_depth <= 0:
+            raise InvalidStereoHistoryDepth(history_depth=self.history_depth)
+        if self.synchronization_queue_size <= 0:
+            raise InvalidStereoSynchronizationQueueSize(
+                synchronization_queue_size=self.synchronization_queue_size
+            )
+        if not isfinite(self.max_frame_age) or self.max_frame_age <= 0:
+            raise InvalidStereoFrameAge(max_frame_age=self.max_frame_age)
+        if not isfinite(self.max_depth) or self.max_depth <= 0:
+            raise InvalidStereoMaximumDepth(max_depth=self.max_depth)
         if not isfinite(self.calibration_tolerance) or self.calibration_tolerance < 0:
-            raise InvalidStereoCameraConfiguration()
-        if not self.tf_from or (
-            self.lookup_viewpoint and self.static_camera_transform_enabled
-        ):
-            raise InvalidStereoCameraConfiguration()
+            raise InvalidStereoCalibrationTolerance(
+                calibration_tolerance=self.calibration_tolerance
+            )
+        if not self.tf_from:
+            raise StereoOpticalFrameMissing()
+        if self.lookup_viewpoint and self.static_camera_transform_enabled:
+            raise StereoPoseSourcesConflict()
