@@ -154,7 +154,6 @@ class LocationAnnotator(ThreadedAnnotator):
         object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
 
         for region_name, region in active_regions.items():
-
             if len(self.descriptor.parameters.desired_regions) == 0:
                 self.add_location_in_object_hypotheses(
                     region,

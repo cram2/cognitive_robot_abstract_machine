@@ -118,7 +118,7 @@ def find_world_fetcher_service(
     node: Node,
     service_suffix: str = "fetch_world",
     timeout_seconds: float = 10.0,
-) -> Optional[str]:
+) -> str | None:
     """
     Find a WorldFetcher service in the ROS2 network.
 
