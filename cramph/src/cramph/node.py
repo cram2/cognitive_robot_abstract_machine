@@ -1429,7 +1429,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         created with, so that another owner can wire it.
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
-            self.set_condition(transition_kind, transition_kind.unwired_condition)
+            self.set_condition(transition_kind, transition_kind.default_condition)
 
     def _get_transition(self, transition_kind: TransitionKind) -> TransitionCondition:
         """
@@ -2424,7 +2424,7 @@ class CompositeNode(StatechartNode):
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
             condition = node.get_condition(transition_kind)
-            if str(condition) != str(transition_kind.unwired_condition):
+            if str(condition) != str(transition_kind.default_condition):
                 raise ChildTransitionAlreadyWiredError(
                     node=self, child=node, transition_kind=transition_kind
                 )

@@ -198,7 +198,7 @@ class TransitionKind(Enum):
                 return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
 
     @property
-    def unwired_condition(self) -> Scalar:
+    def default_condition(self) -> Scalar:
         """
         :return: The condition a node is created with for this transition, before
             anything wires it.
