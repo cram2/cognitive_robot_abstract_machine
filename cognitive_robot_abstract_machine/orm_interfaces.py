@@ -179,18 +179,15 @@ class OrmInterface:
     def dependencies(self) -> tuple[str, ...]:
         """
         Names of the packages whose generated interface this interface's generator
-        imports at module level, and so builds on.
+        imports with a module-level ``import`` statement, and so builds on.
         """
         tree = ast.parse(self.generator.read_text(encoding="utf-8"))
-        imported_modules = []
-        for statement in module_level_imports(tree):
-            if isinstance(statement, ast.Import):
-                imported_modules.extend(alias.name for alias in statement.names)
-            elif statement.module is not None:
-                imported_modules.append(statement.module)
-                imported_modules.extend(
-                    f"{statement.module}.{alias.name}" for alias in statement.names
-                )
+        imported_modules = [
+            alias.name
+            for statement in module_level_imports(tree)
+            if isinstance(statement, ast.Import)
+            for alias in statement.names
+        ]
         interface_module_suffix = f".orm.{Path(INTERFACE_FILE_NAME).stem}"
         imported_interface_packages = [
             module.removesuffix(interface_module_suffix)
