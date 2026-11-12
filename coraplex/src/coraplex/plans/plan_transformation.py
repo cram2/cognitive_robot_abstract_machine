@@ -10,6 +10,7 @@ from coraplex.datastructures.enums import InsertionPosition
 from coraplex.exceptions import CannotMatchOnType
 from cramph.composites import ControlStructureNode, Parallel, Sequence
 from cramph.context import ContextExtension
+from cramph.failure_handling import LimitedRecovery
 from cramph.node import StatechartNode
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -301,3 +302,44 @@ class PlanRewriting(ContextExtension):
             )
         for transformation in transformations:
             transformation.apply(node)
+
+
+# %% recovering from a failure
+
+
+@dataclass
+class RecoveryByInsertion(LimitedRecovery):
+    """
+    Recovers by rewriting the plan with :attr:`transformation`, and then running the
+    step holding the failed node again, which waits for inserted nodes that run before
+    it.
+
+    It gives up on a node :attr:`transformation` does not match or apply to. The inserted
+    nodes are offered to the :class:`PlanRewriting` of the context of the failed node, if
+    any, like every other part of the plan.
+
+    .. warning:: The step has to be held by a control structure node of the kind
+        :attr:`transformation` inserts into, since a compiled node cannot be put below a
+        new one: :meth:`InsertionTransformation.apply` raises
+        :class:`~cramph.exceptions.StatechartAlreadyCompiledError` otherwise.
+
+    .. warning:: It only works in a locally ticked statechart, since a remote executor
+        does not send the nodes it inserts back.
+    """
+
+    transformation: InsertionTransformation
+    """
+    The transformation inserting the nodes that recover the plan.
+    """
+
+    def recover(self, failed_node: StatechartNode) -> None:
+        if not self.transformation.matches_node(
+            failed_node
+        ) or not self.transformation.is_applicable(failed_node):
+            return
+        step = ControlStructureNode.step_holding(failed_node)
+        self.transformation.apply(failed_node)
+        rewriting = failed_node.context.get_extension(PlanRewriting)
+        if rewriting is not None:
+            rewriting.rewrite(step.parent_node)
+        failed_node.statechart.request_reset(step)

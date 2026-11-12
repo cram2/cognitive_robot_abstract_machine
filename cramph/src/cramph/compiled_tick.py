@@ -468,21 +468,28 @@ class CompiledTick:
 
     def settle(self) -> list[LifeCycleChange]:
         """
-        Runs passes until neither a life cycle state nor an observation changes, writing
-        the result of every pass into the statechart.
+        Puts every node a reset was requested for back to not started, see
+        :meth:`~cramph.statechart.Statechart.request_reset`, then runs passes until
+        neither a life cycle state nor an observation changes, writing the result of
+        every pass into the statechart.
+
+        A node reset this way counts as having taken its own transition, so it starts on
+        the next tick at the earliest.
 
         :return: Every life cycle change, in the order it happened.
         :raises TickDoesNotSettleError: If a pass returns the statechart
             to a state it already had in this tick, which it would then never
             leave, or if more passes than :attr:`_pass_budget` change it.
         """
+        nodes_to_reset = self.statechart.take_requested_resets()
+        changes = self._reset_nodes(nodes_to_reset)
         np.copyto(
             self._life_cycle_at_cycle_start.data,
             self.statechart.life_cycle_state.data,
         )
         self._own_transition_taken.data.fill(0)
+        self._own_transition_taken.data[[node.index for node in nodes_to_reset]] = 1
         self._collect_tick_observations()
-        changes: list[LifeCycleChange] = []
         visited_states = set()
         self._compiled_pass.evaluate()
         for passes_taken in range(self._pass_budget):
@@ -495,6 +502,27 @@ class CompiledTick:
             self._take_over_latest_pass()
             self._compiled_pass.evaluate()
         self._raise_does_not_settle(self._pass_budget)
+
+    def _reset_nodes(self, nodes: list[StatechartNode]) -> list[LifeCycleChange]:
+        """
+        Writes not started as the life cycle state of `nodes`.
+
+        :param nodes: The nodes to reset.
+        :return: The change of every node of `nodes` that had started.
+        """
+        life_cycle_state = self.statechart.life_cycle_state
+        changes = [
+            LifeCycleChange(
+                node=node,
+                previous_state=life_cycle_state[node],
+                new_state=LifeCycleValues.NOT_STARTED,
+            )
+            for node in nodes
+            if life_cycle_state[node] != LifeCycleValues.NOT_STARTED
+        ]
+        for node in nodes:
+            life_cycle_state[node] = LifeCycleValues.NOT_STARTED
+        return changes
 
     def _raise_does_not_settle(self, passes_taken: int) -> None:
         """

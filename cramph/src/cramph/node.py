@@ -2356,10 +2356,14 @@ class CompositeNode(StatechartNode):
     def _check_accepts_children(self) -> None:
         """
         :raises StatechartAlreadyCompiledError: If the latest compile covered this
-            node, which fixed its wiring over its children, and it accepts no children
-            after that.
+            node, which fixed its wiring over its children, it accepts no children
+            after that, and no block of :meth:`~cramph.statechart.Statechart.modify`
+            rewriting compiled nodes is open.
         """
-        if self.accepts_children_after_compile:
+        if (
+            self.accepts_children_after_compile
+            or self.statechart.may_rewrite_compiled_nodes
+        ):
             return
         if self.statechart.compiler.latest_compile_covers(self):
             raise StatechartAlreadyCompiledError()

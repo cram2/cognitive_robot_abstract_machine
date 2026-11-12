@@ -27,6 +27,11 @@ from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValues
 from cramph.exceptions import NodeNotFoundError
 from cramph.executor import StatechartExecutor
+from cramph.failure_handling import (
+    FailureHandlingNode,
+    HandledOnFailure,
+    RetryFailedNode,
+)
 from cramph.monitors import (
     CheckTickCount,
     CountNodeResets,
@@ -86,6 +91,17 @@ def _context(world: World) -> StatechartContext:
 def _watched_node_and_its_reset_counter(world: World) -> list[StatechartNode]:
     watched = ConstTrueNode()
     return [watched, CountNodeResets(node=watched, target=2)]
+
+
+def _failing_node_and_its_failure_handler(world: World) -> list[StatechartNode]:
+    failing = _node_that_can_fail()
+    return [
+        failing,
+        FailureHandlingNode(
+            observed_node=failing,
+            failure_handling_strategy=RetryFailedNode(maximum_attempts=2),
+        ),
+    ]
 
 
 def _cases() -> list[NodeRoundTripCase]:
@@ -202,6 +218,16 @@ def _cases() -> list[NodeRoundTripCase]:
                 )
             ],
         ),
+        NodeRoundTripCase(FailureHandlingNode, _failing_node_and_its_failure_handler),
+        NodeRoundTripCase(
+            HandledOnFailure,
+            lambda world: [
+                HandledOnFailure(
+                    handled_node=_node_that_can_fail(),
+                    failure_handling_strategy=RetryFailedNode(maximum_attempts=2),
+                )
+            ],
+        ),
     ]
 
 
@@ -222,7 +248,7 @@ def cases() -> list[NodeRoundTripCase]:
 def node_types_needing_a_case() -> set[type[StatechartNode]]:
     """
     :return: The node classes of cramph, apart from those it gives tests to build on
-        and those holding a Python callable, which cannot be sent.
+        and the one holding a Python callable, which cannot be sent.
     """
     return (
         concrete_node_types(cramph)
