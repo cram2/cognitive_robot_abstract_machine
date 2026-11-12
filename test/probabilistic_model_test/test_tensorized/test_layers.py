@@ -90,6 +90,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparseArray,
     RowGroupedSparsity,
+    RowReduction,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -124,16 +125,6 @@ def event_bounds(request) -> tuple[Bound, Bound]:
 # %% reduction of the entries of every row of a sparse array
 
 
-@pytest.fixture
-def uneven_rows() -> RowGroupedSparsity:
-    """
-    Four rows holding two, one, three and no stored entries, stored out of row order.
-    """
-    return RowGroupedSparseArray.from_entries(
-        SparseEntries(np.zeros(6), [2, 0, 2, 1, 2, 0], [0, 1, 2, 3, 4, 5]), (4, 6)
-    ).sparsity
-
-
 def test_entry_positions_by_rank_list_the_kth_entry_of_every_row(uneven_rows):
     np.testing.assert_array_equal(uneven_rows.rows_by_entry_count, [2, 0, 1, 3])
     assert [
@@ -156,7 +147,7 @@ def test_reduce_by_row_with_logaddexp_is_the_logsumexp_of_every_row(uneven_rows)
         axis=-1,
     )
     np.testing.assert_allclose(
-        uneven_rows.reduce_by_row(values, np.logaddexp), expected
+        uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP), expected
     )
 
 
@@ -169,7 +160,9 @@ def test_reduce_by_row_with_add_is_the_sum_of_every_row(uneven_rows):
         ],
         axis=-1,
     )
-    np.testing.assert_allclose(uneven_rows.reduce_by_row(values, np.add), expected)
+    np.testing.assert_allclose(
+        uneven_rows.reduce_by_row(values, RowReduction.SUM), expected
+    )
 
 
 def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
@@ -177,17 +170,17 @@ def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
 ):
     values = np.full((3, uneven_rows.number_of_stored_entries), -np.inf)
     with np.errstate(all="raise"):
-        result = uneven_rows.reduce_by_row(values, np.logaddexp)
+        result = uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP)
     np.testing.assert_array_equal(result, np.full((3, uneven_rows.shape[0]), -np.inf))
 
 
-@pytest.mark.parametrize("operation", [np.add, np.logaddexp])
-def test_reduce_by_row_gives_a_row_without_entries_the_identity(uneven_rows, operation):
+@pytest.mark.parametrize("reduction", [RowReduction.SUM, RowReduction.LOG_SUM_EXP])
+def test_reduce_by_row_gives_a_row_without_entries_the_identity(uneven_rows, reduction):
     values = np.random.normal(size=(3, uneven_rows.number_of_stored_entries))
     row_without_entries = 3
     np.testing.assert_array_equal(
-        uneven_rows.reduce_by_row(values, operation)[:, row_without_entries],
-        operation.identity,
+        uneven_rows.reduce_by_row(values, reduction)[:, row_without_entries],
+        reduction.identity,
     )
 
 

@@ -1,11 +1,79 @@
+"""
+Sparse two dimensional arrays whose stored entries are reduced row by row, the way the
+sum and product layers of a layered circuit combine the results of their children.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
+from types import ModuleType
 
 import numpy as np
 import numpy.typing as npt
+from array_api_compat import array_namespace
 from scipy.sparse import coo_array
 from typing_extensions import Any, Self
+
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
+)
+
+# %% reductions
+
+
+class RowReduction(Enum):
+    """
+    An associative and commutative operation that combines the entries of a row.
+    """
+
+    SUM = "sum"
+    """
+    Add the entries.
+    """
+
+    PRODUCT = "product"
+    """
+    Multiply the entries.
+    """
+
+    LOG_SUM_EXP = "log sum exp"
+    """
+    The logarithm of the sum of the exponentials of the entries.
+    """
+
+    @property
+    def identity(self) -> float:
+        """
+        :return: The result of combining no entries.
+        """
+        match self:
+            case RowReduction.SUM:
+                return 0.0
+            case RowReduction.PRODUCT:
+                return 1.0
+            case RowReduction.LOG_SUM_EXP:
+                return -np.inf
+
+    def combine(
+        self, namespace: ModuleType, first: BackendArray, second: BackendArray
+    ) -> BackendArray:
+        """
+        :param namespace: The array namespace of both arrays.
+        :param first: Values to combine element by element.
+        :param second: Values of the same shape as ``first``.
+        :return: Both values combined element by element.
+        """
+        match self:
+            case RowReduction.SUM:
+                return namespace.add(first, second)
+            case RowReduction.PRODUCT:
+                return namespace.multiply(first, second)
+            case RowReduction.LOG_SUM_EXP:
+                return namespace.logaddexp(first, second)
+
+
+# %% sparse entries
 
 
 @dataclass
@@ -58,6 +126,9 @@ class SparseEntries:
             ),
             shape=shape,
         )
+
+
+# %% sparsity
 
 
 @dataclass(eq=False)
@@ -171,17 +242,18 @@ class RowGroupedSparsity:
         """
         return len(self.rows)
 
-    def values_of_entries(self, values: npt.NDArray) -> npt.NDArray:
+    def values_of_entries(self, values: BackendArray) -> BackendArray:
         """
         :param values: One value per column, the columns in the last axis.
         :return: The value of the column of every stored entry, the entries in the last
-            axis.
+            axis, an array of the backend of ``values``.
         """
         # usually every column is stored once and in order, in which case the gather
         # would copy an array with one entry per event per column for nothing
         if self.stores_every_column_once_in_order:
             return values
-        return values[..., self.columns]
+        namespace = array_namespace(values)
+        return namespace.take(values, namespace.asarray(self.columns), axis=-1)
 
     def pad(self, values: npt.NDArray, padding: float) -> npt.NDArray:
         """
@@ -196,34 +268,47 @@ class RowGroupedSparsity:
             [values, np.full(values.shape[:-1] + (1,), padding)], axis=-1
         )
 
-    def reduce_by_row(self, values: npt.NDArray, operation: np.ufunc) -> npt.NDArray:
+    def reduce_by_row(
+        self, values: BackendArray, reduction: RowReduction
+    ) -> BackendArray:
         """
-        Combine the entries of every row with ``operation``, giving its identity for a
-        row without entries, without padding any row to the fullest one.
+        Combine the entries of every row, giving the identity of the reduction for a row
+        without entries, without padding any row to the fullest one.
 
         :param values: Per-entry values with the entries in the last axis.
-        :param operation: An associative and commutative numpy universal function of two
-            arrays, applied element by element, that has an identity.
-        :return: The values with shape ``(..., #rows)``.
+        :param reduction: How the entries of a row are combined.
+        :return: The values with shape ``(..., #rows)``, an array of the backend of
+            ``values``.
         """
-        result = np.full(values.shape[:-1] + (0,), operation.identity, dtype=float)
+        namespace = array_namespace(values)
+        batch_shape = tuple(values.shape[:-1])
+        result = namespace.full(
+            batch_shape + (0,), reduction.identity, dtype=namespace.float64
+        )
         for positions in reversed(self.entry_positions_by_rank):
-            entries = values[..., positions]
+            entries = namespace.take(values, namespace.asarray(positions), axis=-1)
             number_of_reduced_rows = result.shape[-1]
-            result = np.concatenate(
+            result = namespace.concat(
                 [
-                    operation(entries[..., :number_of_reduced_rows], result),
+                    reduction.combine(
+                        namespace, entries[..., :number_of_reduced_rows], result
+                    ),
                     entries[..., number_of_reduced_rows:],
                 ],
                 axis=-1,
             )
-        rows_without_entries = np.full(
-            values.shape[:-1] + (self.shape[0] - result.shape[-1],),
-            operation.identity,
-            dtype=float,
+        rows_without_entries = namespace.full(
+            batch_shape + (self.shape[0] - result.shape[-1],),
+            reduction.identity,
+            dtype=namespace.float64,
         )
-        result = np.concatenate([result, rows_without_entries], axis=-1)
-        return result[..., self.entry_count_ranks]
+        result = namespace.concat([result, rows_without_entries], axis=-1)
+        return namespace.take(
+            result, namespace.asarray(self.entry_count_ranks), axis=-1
+        )
+
+
+# %% sparse array
 
 
 @dataclass(eq=False)
@@ -235,9 +320,9 @@ class RowGroupedSparseArray:
     are stored is fixed by :attr:`sparsity`.
     """
 
-    data: npt.NDArray
+    data: BackendArray
     """
-    The value of every stored entry.
+    The value of every stored entry, the only array an array backend may replace.
     """
 
     sparsity: RowGroupedSparsity

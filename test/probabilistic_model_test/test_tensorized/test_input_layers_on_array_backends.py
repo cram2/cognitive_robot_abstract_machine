@@ -14,7 +14,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from array_api_compat import array_namespace
 from random_events.interval import Bound, closed, open
 from random_events.product_algebra import SimpleEvent
 from random_events.set import Set
@@ -53,6 +52,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
 )
 from probabilistic_model.utils import MissingDict
 
+from .array_backend_comparison import assert_result_of_backend_equals
 from .test_layered_probabilistic_circuit import Letter
 
 # %% layers of every type, built with the arrays of a backend
@@ -291,28 +291,6 @@ def ordered_input_layer_case(request) -> InputLayerQueryCase:
     cumulative distribution function and a moment in closed form.
     """
     return request.getfixturevalue(request.param)
-
-
-@pytest.fixture(params=[np, jnp], ids=["numpy", "jax"])
-def array_backend(request) -> ModuleType:
-    """
-    The array namespace of every supported backend, with jax computing in double
-    precision.
-    """
-    with jax.enable_x64(True):
-        yield request.param
-
-
-def assert_result_of_backend_equals(
-    result: Any, expected: np.ndarray, namespace: ModuleType
-):
-    """
-    :param result: The result of a query of a layer with parameters of a backend.
-    :param expected: The result of the same query of the layer with numpy parameters.
-    :param namespace: The array namespace of the backend.
-    """
-    assert array_namespace(result) is array_namespace(namespace.asarray(0.0))
-    np.testing.assert_allclose(np.asarray(result), expected, rtol=1e-12)
 
 
 # %% numeric queries agree with numpy on every backend

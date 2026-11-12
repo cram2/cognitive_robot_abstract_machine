@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
+from array_api_compat import array_namespace
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Iterable, Self
@@ -12,6 +13,7 @@ from typing_extensions import Iterable, Self
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     EdgeMask,
     EdgeValues,
     NodeMask,
@@ -26,6 +28,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.exceptions import NumberOfWeightsMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,
@@ -46,6 +51,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparseArray,
+    RowReduction,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -59,7 +65,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.utils import (
 
 
 @dataclass(eq=False, repr=False)
-class SumLayer(InnerLayer):
+class SumLayer(HasParameterArrays, InnerLayer):
     """
     A layer of sum units.
 
@@ -205,6 +211,10 @@ class SumLayer(InnerLayer):
     def number_of_own_parameters(self) -> int:
         return self.log_weights.sparsity.number_of_stored_entries
 
+    @property
+    def parameters(self) -> list[BackendArray]:
+        return [self.log_weights.data]
+
     def validate_own(self):
         expected_shape = (self.number_of_nodes, int(self.column_offsets[-1]))
         if self.log_weights.sparsity.shape != expected_shape:
@@ -258,15 +268,17 @@ class SumLayer(InnerLayer):
             )
         ]
 
-    def values_of_edges(self, child_results: list[npt.NDArray]) -> npt.NDArray:
+    def values_of_edges(self, child_results: list[BackendArray]) -> BackendArray:
         """
         Take the value of the child node of every edge.
 
-        :param child_results: The result per child layer, child nodes last.
-        :return: One value per edge, the edges last.
+        :param child_results: The result per child layer, child nodes last, arrays of
+            one backend.
+        :return: One value per edge, the edges last, an array of that backend.
         """
+        namespace = array_namespace(*child_results)
         return self.log_weights.sparsity.values_of_entries(
-            np.concatenate(child_results, axis=-1)
+            namespace.concat(child_results, axis=-1)
         )
 
     def has_equal_edges(self, other: Self) -> bool:
@@ -292,7 +304,7 @@ class SumLayer(InnerLayer):
         :return: ``log(sum(exp(w)))`` over the weights of each node, shape (#nodes,).
         """
         return self.log_weights.sparsity.reduce_by_row(
-            self.log_weights.data, np.logaddexp
+            self.log_weights.data, RowReduction.LOG_SUM_EXP
         )
 
     @property
@@ -300,9 +312,9 @@ class SumLayer(InnerLayer):
         """
         :return: The logarithmic weight of every edge, normalized per node.
         """
-        return (
-            self.log_weights.data
-            - self.log_normalization_constants[self.log_weights.sparsity.rows]
+        return self.log_weights.data - self.namespace.take(
+            self.log_normalization_constants,
+            self.namespace.asarray(self.log_weights.sparsity.rows),
         )
 
     @property
@@ -313,7 +325,9 @@ class SumLayer(InnerLayer):
         shifted = self.normalized_edge_log_weights
         # a node whose weights are all -inf normalizes to nan; it is impossible, and the
         # prune pass removes it, so its weights are simply zero here
-        return np.where(np.isfinite(shifted), np.exp(shifted), 0.0)
+        return self.namespace.where(
+            self.namespace.isfinite(shifted), self.namespace.exp(shifted), 0.0
+        )
 
     def normalize_own(self):
         self.log_weights.data = self.normalized_edge_log_weights
@@ -331,7 +345,7 @@ class SumLayer(InnerLayer):
         :return: The result for the nodes of this layer, shape (..., #nodes).
         """
         values = self.values_of_edges(child_results) * self.normalized_edge_weights
-        return self.log_weights.sparsity.reduce_by_row(values, np.add)
+        return self.log_weights.sparsity.reduce_by_row(values, RowReduction.SUM)
 
     def _weighted_forward_over_nodes(
         self, child_results: list[NodeVariableValues]
@@ -345,7 +359,7 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges([result.T for result in child_results])
         values = values * self.normalized_edge_weights
-        return self.log_weights.sparsity.reduce_by_row(values, np.add).T
+        return self.log_weights.sparsity.reduce_by_row(values, RowReduction.SUM).T
 
     def log_weighted_sum(
         self, child_results: list[SampleNodeValues]
@@ -359,7 +373,7 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges(child_results) + self.log_weights.data
         return (
-            self.log_weights.sparsity.reduce_by_row(values, np.logaddexp)
+            self.log_weights.sparsity.reduce_by_row(values, RowReduction.LOG_SUM_EXP)
             - self.log_normalization_constants
         )
 
@@ -391,12 +405,15 @@ class SumLayer(InnerLayer):
         cache: QueryCache | None = None,
     ) -> NodeValues:
         child_results = [
-            child_layer.probability_of_simple_event_of_nodes(
-                event, variables, cache=cache
-            ).reshape(1, -1)
+            self.namespace.reshape(
+                child_layer.probability_of_simple_event_of_nodes(
+                    event, variables, cache=cache
+                ),
+                (1, -1),
+            )
             for child_layer in self.child_layers
         ]
-        return self._weighted_forward(child_results).reshape(-1)
+        return self.namespace.reshape(self._weighted_forward(child_results), (-1,))
 
     @memoized
     def support_of_nodes(

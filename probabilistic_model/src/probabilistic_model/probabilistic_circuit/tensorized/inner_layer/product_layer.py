@@ -4,6 +4,7 @@ import functools
 from dataclasses import dataclass, field
 
 import numpy as np
+from array_api_compat import array_namespace
 from random_events.product_algebra import Event, SimpleEvent
 from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
@@ -12,6 +13,7 @@ from typing_extensions import Self
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
@@ -40,6 +42,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
     RowGroupedSparsity,
+    RowReduction,
     SparseEntries,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.structural_query import (
@@ -250,19 +253,23 @@ class ProductLayer(InnerLayer):
         )
 
     def combine_factors(
-        self, child_results: list[SampleNodeValues], operation: np.ufunc
-    ) -> SampleNodeValues:
+        self, child_results: list[BackendArray], reduction: RowReduction
+    ) -> BackendArray:
         """
         Combine, per node, the results of the child nodes it multiplies.
 
-        :param child_results: The result per child layer with the child nodes last.
-        :param operation: An associative and commutative numpy universal function of two
-            arrays, applied element by element, whose identity a node without factors
-            gets.
-        :return: The combined result with the nodes of this layer last.
+        :param child_results: The result per child layer with the child nodes last,
+            arrays of one backend.
+        :param reduction: How the results of the factors are combined; a node without
+            factors gets its identity.
+        :return: The combined result with the nodes of this layer last, an array of that
+            backend.
         """
-        values = self.factors.values_of_entries(np.concatenate(child_results, axis=-1))
-        return self.factors.reduce_by_row(values, operation)
+        namespace = array_namespace(*child_results)
+        values = self.factors.values_of_entries(
+            namespace.concat(child_results, axis=-1)
+        )
+        return self.factors.reduce_by_row(values, reduction)
 
     @memoized
     def log_likelihood_of_nodes(
@@ -272,7 +279,7 @@ class ProductLayer(InnerLayer):
             child_layer.log_likelihood_of_nodes(events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self.combine_factors(child_results, np.add)
+        return self.combine_factors(child_results, RowReduction.SUM)
 
     @memoized
     def cumulative_distribution_of_nodes(
@@ -282,7 +289,7 @@ class ProductLayer(InnerLayer):
             child_layer.cumulative_distribution_of_nodes(events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self.combine_factors(child_results, np.multiply)
+        return self.combine_factors(child_results, RowReduction.PRODUCT)
 
     @memoized
     def probability_of_simple_event_of_nodes(
@@ -294,10 +301,15 @@ class ProductLayer(InnerLayer):
         child_results = [
             child_layer.probability_of_simple_event_of_nodes(
                 event, variables, cache=cache
-            ).reshape(1, -1)
+            )
             for child_layer in self.child_layers
         ]
-        return self.combine_factors(child_results, np.multiply).reshape(-1)
+        namespace = array_namespace(*child_results)
+        combined = self.combine_factors(
+            [namespace.reshape(result, (1, -1)) for result in child_results],
+            RowReduction.PRODUCT,
+        )
+        return namespace.reshape(combined, (-1,))
 
     @memoized
     def support_of_nodes(
@@ -359,7 +371,7 @@ class ProductLayer(InnerLayer):
         # the moments of a decomposable product are the moments of the factor that owns
         # the variable, so summing the (zero padded) child moments is the right reduction
         return self.combine_factors(
-            [child_result.T for child_result in child_results], np.add
+            [child_result.T for child_result in child_results], RowReduction.SUM
         ).T
 
     def sample_forward(
@@ -412,7 +424,8 @@ class ProductLayer(InnerLayer):
         :return: The log-probability of every node, the sum over its factors.
         """
         return self.combine_factors(
-            [child_result.log_probabilities for child_result in child_results], np.add
+            [child_result.log_probabilities for child_result in child_results],
+            RowReduction.SUM,
         )
 
     @memoized
