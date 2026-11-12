@@ -31,16 +31,16 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.robots.tracy import Tracy
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
+    ShapeSortingBoard,
+    ShapeSortingHole,
     ShapeSortingPiece,
 )
-from semantic_digital_twin.shape_sorting_toy.board import HoleFootprint
 from semantic_digital_twin.shape_sorting_toy.pieces import PieceSet
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    FixedConnection,
 )
 from semantic_digital_twin.world_description.contact import (
     ContactFriction,
@@ -203,19 +203,17 @@ class MontessoriScene:
 
     board_model: ShapeSortingBoardModel = field(default_factory=ShapeSortingBoardModel)
     """
-    The board, as read off its mesh, and the body it becomes.
+    The board, as read off its mesh, and the board it becomes.
     """
 
-    board: Body = field(init=False)
+    board: ShapeSortingBoard = field(init=False)
     """
-    The board's body, once :meth:`populate` has stood it on the table.
+    The board with its holes, once :meth:`populate` has stood it on the table.
     """
 
-    holes_of_pieces: dict[ShapeSortingPiece, HoleFootprint] = field(
-        init=False, default_factory=dict
-    )
+    pieces: list[ShapeSortingPiece] = field(init=False, default_factory=list)
     """
-    The hole each loose piece is sorted into, in the order the pieces are sorted.
+    The loose pieces, in the order they are sorted.
     """
 
     @staticmethod
@@ -265,16 +263,13 @@ class MontessoriScene:
         with world.modify_world():
             self._stand_the_board(world)
             for index, measured_piece in enumerate(self.piece_set.pieces):
-                hole = self.board_model.mesh.matching_hole_footprint(
-                    piece_kind=type(measured_piece)
-                )
                 piece = self._stand_piece(
                     world=world,
                     measured_piece=measured_piece,
-                    hole=hole,
+                    hole=self.board.hole_for(piece=measured_piece),
                     row_y=self.piece_row_start_y + index * self.piece_row_spacing,
                 )
-                self.holes_of_pieces[piece] = hole
+                self.pieces.append(piece)
 
     def _stand_the_board(self, world: World) -> None:
         """
@@ -282,29 +277,23 @@ class MontessoriScene:
 
         :param world: The world being built, already open for modification.
         """
-        self.board = self.board_model.body(name=PrefixedName("shape_sorting_board"))
-        self.solid_contact.with_friction(ContactFriction()).apply_to([self.board])
-        world.add_kinematic_structure_entity(self.board)
-        world.add_connection(
-            FixedConnection.create_with_dofs(
-                world=world,
-                parent=world.root,
-                child=self.board,
-                name=PrefixedName("shape_sorting_board_connection"),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
-                    self.board_x,
-                    self.board_y,
-                    self.table_top_z - self.board_model.mesh.bottom,
-                ),
-            )
+        self.board = self.board_model.specification(name="shape_sorting_board").spawn(
+            world,
+            parent=world.root,
+            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                self.board_x,
+                self.board_y,
+                self.table_top_z - self.board_model.mesh.bottom,
+            ),
         )
+        self.solid_contact.with_friction(ContactFriction()).apply_to([self.board.root])
 
     def _stand_piece(
         self,
         *,
         world: World,
         measured_piece: ShapeSortingPiece,
-        hole: HoleFootprint,
+        hole: ShapeSortingHole,
         row_y: float,
     ) -> ShapeSortingPiece:
         """
@@ -348,7 +337,7 @@ class MontessoriScene:
                     self.table_top_z
                     + self.resting_clearance
                     + measured_piece.height / 2,
-                    yaw=measured_piece.footprint.turn_onto(other=hole.boundary),
+                    yaw=measured_piece.turn_onto(hole=hole),
                 ),
             )
         )
@@ -393,14 +382,16 @@ class ShapeSortingPlan:
         """
         robot = context.require_extension(RobotAccess).robot
         actions = [ParkArmsAction(arms=robot.all_arms)]
-        for piece, hole in self.scene.holes_of_pieces.items():
+        for piece in self.scene.pieces:
             [grasp] = piece.grasp_candidates()
             actions.append(PickUpAction(grasp=grasp, arm=self.scene.sorting_arm(robot)))
             actions.append(
                 PlaceAction(
                     object_designator=piece,
                     target_location=self.release_pose_over(
-                        piece=piece, hole=hole, world=context.world
+                        piece=piece,
+                        hole=self.scene.board.hole_for(piece=piece),
+                        world=context.world,
                     ),
                 )
             )
@@ -410,7 +401,7 @@ class ShapeSortingPlan:
         return statechart
 
     def release_pose_over(
-        self, *, piece: ShapeSortingPiece, hole: HoleFootprint, world: World
+        self, *, piece: ShapeSortingPiece, hole: ShapeSortingHole, world: World
     ) -> Pose:
         """
         :param piece: The piece being sorted.
@@ -420,15 +411,13 @@ class ShapeSortingPlan:
             :attr:`release_height` above the lid. The piece keeps the orientation it
             stood in, which follows the hole.
         """
-        board_T_release = Pose.from_xyz_rpy(
-            hole.center.x,
-            hole.center.y,
-            self.scene.board_model.mesh.lid_top
-            + self.release_height
-            + piece.height / 2,
-            reference_frame=self.scene.board,
+        hole_T_release = Pose.from_xyz_rpy(
+            0.0,
+            0.0,
+            self.release_height + piece.height / 2,
+            reference_frame=hole.root,
         )
-        return world.transform(board_T_release, world.root)
+        return world.transform(hole_T_release, world.root)
 
 
 # %% running it

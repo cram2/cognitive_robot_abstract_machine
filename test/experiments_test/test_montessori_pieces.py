@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from experiments.montessori.pieces import PieceColorMatcher
-from semantic_digital_twin.semantic_annotations.semantic_annotations import CubePiece
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import CubePiece
 from semantic_digital_twin.shape_sorting_toy.pieces import PieceColor, PieceSet
 from semantic_digital_twin.world_description.geometry import Color
 

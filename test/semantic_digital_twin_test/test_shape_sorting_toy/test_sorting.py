@@ -11,12 +11,12 @@ import pytest
 
 from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import NoMatchingHoleError
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
+from semantic_digital_twin.shape_sorting_toy.exceptions import NoMatchingHoleError
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
     CubePiece,
     CylinderPiece,
     DiskPiece,
-    Drawer,
     RectangularPrismPiece,
     ShapeSortingBoard,
     ShapeSortingHole,
@@ -35,6 +35,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @pytest.fixture
 def world() -> World:
+    """
+    An empty world with only a root body.
+    """
     world = World()
     with world.modify_world():
         world.add_body(Body(name=PrefixedName("root")))
@@ -76,6 +79,9 @@ def _hole(
 
 
 def _board(world: World) -> ShapeSortingBoard:
+    """
+    A board whose body is a box, added to a world already open for modification.
+    """
     return ShapeSortingBoard.create_with_new_body_in_world(
         name=PrefixedName("board"), world=world, scale=Scale(0.3, 0.3, 0.1)
     )
@@ -96,6 +102,9 @@ def _board(world: World) -> ShapeSortingBoard:
     ],
 )
 def test_each_kind_of_piece_is_found_as_a_shape_sorting_piece(world, kind):
+    """
+    Every kind of piece is found when the world is asked for shape-sorting pieces.
+    """
     with world.modify_world():
         piece = _piece(world, name="piece", kind=kind)
 
@@ -103,6 +112,9 @@ def test_each_kind_of_piece_is_found_as_a_shape_sorting_piece(world, kind):
 
 
 def test_a_piece_reads_its_footprint_and_height_off_its_body(world):
+    """
+    A piece's footprint and height are those of its collision geometry.
+    """
     with world.modify_world():
         piece = _piece(
             world,
@@ -119,6 +131,9 @@ def test_a_piece_reads_its_footprint_and_height_off_its_body(world):
 
 
 def test_a_piece_hovers_over_its_hole_at_the_given_offset(world):
+    """
+    A piece is let go of at the given offset and height in its hole's frame.
+    """
     with world.modify_world():
         piece = _piece(world, name="cube", kind=CubePiece)
         hole = _hole(
@@ -138,6 +153,9 @@ def test_a_piece_hovers_over_its_hole_at_the_given_offset(world):
     [(Scale(0.042, 0.022, 0.001), math.pi / 2), (Scale(0.022, 0.042, 0.001), 0.0)],
 )
 def test_a_piece_is_turned_onto_its_hole_when_inserted(world, hole_scale, expected_yaw):
+    """
+    A piece is turned about the vertical so that its footprint follows its hole's.
+    """
     with world.modify_world():
         piece = _piece(
             world,
@@ -158,6 +176,9 @@ def test_a_piece_is_turned_onto_its_hole_when_inserted(world, hole_scale, expect
 
 
 def test_a_disk_tips_onto_its_edge_to_pass_through_its_slot(world):
+    """
+    A disk is tipped a quarter turn so that its edge enters the slot.
+    """
     with world.modify_world():
         disk = _piece(world, name="disk", kind=DiskPiece)
         slot = _hole(
@@ -177,6 +198,9 @@ def test_a_disk_tips_onto_its_edge_to_pass_through_its_slot(world):
 
 
 def test_a_piece_too_large_for_a_hole_of_its_kind_does_not_fit_through_it(world):
+    """
+    A piece wider than a hole cut for its kind does not pass through it.
+    """
     with world.modify_world():
         small_hole = _hole(
             world, name="small", kind=CylinderPiece, scale=Scale(0.032, 0.032, 0.001)
@@ -193,6 +217,9 @@ def test_a_piece_too_large_for_a_hole_of_its_kind_does_not_fit_through_it(world)
 
 
 def test_a_piece_does_not_fit_through_a_hole_cut_for_another_kind(world):
+    """
+    A piece does not pass through a hole cut for another kind of piece.
+    """
     with world.modify_world():
         hole = _hole(
             world, name="round", kind=CylinderPiece, scale=Scale(0.04, 0.04, 0.001)
@@ -203,6 +230,9 @@ def test_a_piece_does_not_fit_through_a_hole_cut_for_another_kind(world):
 
 
 def test_hole_for_returns_the_smallest_hole_a_piece_fits_through(world):
+    """
+    Of the holes a piece fits through, the board picks the smallest.
+    """
     with world.modify_world():
         board = _board(world)
         small_hole = _hole(
@@ -231,6 +261,9 @@ def test_hole_for_returns_the_smallest_hole_a_piece_fits_through(world):
 
 
 def test_hole_for_raises_when_no_hole_fits_the_piece(world):
+    """
+    A board without a hole the piece fits through refuses to name one.
+    """
     with world.modify_world():
         board = _board(world)
         board.add(
@@ -248,6 +281,9 @@ def test_hole_for_raises_when_no_hole_fits_the_piece(world):
 
 
 def test_a_board_collects_its_drawers_and_holes(world):
+    """
+    Drawers and holes added to a board are found among its parts.
+    """
     with world.modify_world():
         board = _board(world)
         drawer = Drawer.create_with_new_body_in_world(
@@ -267,6 +303,9 @@ def test_a_board_collects_its_drawers_and_holes(world):
 
 
 def test_mounting_a_hole_leaves_the_boards_geometry_uncut(world):
+    """
+    Mounting a hole on a board leaves the board's collision geometry as it was.
+    """
     with world.modify_world():
         board = _board(world)
     volume_before = board.root.collision.combined_mesh.volume

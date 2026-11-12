@@ -1,6 +1,6 @@
 """
-The shape-sorting board: its mesh, and the holes read off it by slicing through its lid,
-so the holes a piece is sorted into are the holes the board actually has.
+The shape-sorting board's mesh, and the holes read off it by slicing through its
+lid, so the holes a piece is sorted into are the holes the board actually has.
 """
 
 from __future__ import annotations
@@ -13,20 +13,28 @@ import numpy as np
 import trimesh
 from random_events.interval import Bound, SimpleInterval
 
-from krrood.ormatic.utils import classproperty
 from krrood.patterns.path_enumeration import PathEnumeration
-from krrood_spatial_math.spatial_types import Point2
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from krrood.patterns.role import Role
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.shape_sorting_toy.exceptions import NoPerforatedPart
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
     CubePiece,
     CylinderPiece,
     DiskPiece,
     RectangularPrismPiece,
+    ShapeSortingHole,
     ShapeSortingPiece,
     SpherePiece,
     TriangularPrismPiece,
 )
-from semantic_digital_twin.shape_sorting_toy.exceptions import NoPerforatedPart
-from semantic_digital_twin.world_description.geometry import Polygon2D, Scale
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    RegionSpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    SemanticAnnotationWithRootSpecification,
+)
+from semantic_digital_twin.world_description.geometry import Mesh, Polygon2D, Scale
+from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 
 # %% the board's files
 
@@ -99,79 +107,14 @@ class HoleShapeClassifier:
         return CubePiece
 
 
-# %% a hole
-
-
-@dataclass(frozen=True, eq=False, kw_only=True)
-class HoleFootprint:
-    """
-    One hole cut through the board's lid, in the board's own frame.
-    """
-
-    piece_kind: type[ShapeSortingPiece]
-    """
-    The kind of piece the hole is cut for.
-    """
-
-    center: Point2
-    """
-    Where the hole's area balances, which for the triangle is not the middle of its
-    bounding box.
-    """
-
-    boundary: Polygon2D
-    """
-    The hole's true outline, relative to :attr:`center`.
-    """
-
-    @classproperty
-    def marker_thickness(cls) -> float:
-        """
-        Thickness along the board's z-axis of the thin solid that marks a hole's
-        footprint.
-        """
-        return 0.005
-
-    @property
-    def outline_on_board(self) -> Polygon2D:
-        """
-        The hole's true outline in the board's own frame.
-        """
-        return self.boundary.translated(offset=self.center)
-
-    def marker(self) -> trimesh.Trimesh:
-        """
-        :return: The thin solid, :attr:`marker_thickness` thick, that marks this hole's
-            footprint, centred on its own origin.
-        """
-        return self.boundary.extrude(thickness=self.marker_thickness)
-
-    def cut_through(self, *, solid: trimesh.Trimesh) -> trimesh.Trimesh:
-        """
-        Cut this hole all the way through a solid, in its true outline rather than its
-        bounding box.
-
-        :param solid: The solid to cut, in the board's own frame.
-        :return: The solid with this hole cut clean through it.
-        """
-        cutter = self.boundary.extrude(thickness=float(solid.extents[2]) * 2)
-        cutter.apply_translation([*self.center.to_np(), 0.0])
-        return solid.difference(cutter, engine=None)
-
-
 # %% the board's mesh
 
 
-@dataclass(frozen=True, kw_only=True)
-class ShapeSortingBoardMesh:
+@dataclass(eq=False, kw_only=True)
+class ShapeSortingBoardMesh(Role[Mesh]):
     """
-    Everything the board's mesh says about the board: its lid and the holes through it,
-    and the solid parts under the lid.
-    """
-
-    path: Path = BoardResource.MESH
-    """
-    The mesh file.
+    A mesh in its role as a shape-sorting board's: what it says about the board's lid,
+    the holes through the lid and the solid parts under it.
     """
 
     hole_classifier: HoleShapeClassifier = field(default_factory=HoleShapeClassifier)
@@ -185,12 +128,17 @@ class ShapeSortingBoardMesh:
     compartments only when it is taller than this.
     """
 
+    hole_marker_thickness: float = 0.005
+    """
+    Thickness along the board's z-axis of the region that marks a hole's outline.
+    """
+
     @cached_property
     def parts(self) -> list[trimesh.Trimesh]:
         """
         Every connected part of the mesh.
         """
-        return trimesh.load(str(self.path)).split(only_watertight=False)
+        return self.mesh.split(only_watertight=False)
 
     @cached_property
     def lid(self) -> trimesh.Trimesh:
@@ -202,7 +150,7 @@ class ShapeSortingBoardMesh:
         for part in self.parts:
             if part.is_watertight and part.euler_number < 2:
                 return part
-        raise NoPerforatedPart(mesh_path=self.path)
+        raise NoPerforatedPart(mesh_filename=self.filename)
 
     @property
     def solid_parts(self) -> list[trimesh.Trimesh]:
@@ -213,10 +161,10 @@ class ShapeSortingBoardMesh:
         return [part for part in self.parts if part is not self.lid]
 
     @cached_property
-    def hole_footprints(self) -> list[HoleFootprint]:
+    def hole_outlines(self) -> list[Polygon2D]:
         """
-        The holes through the lid, read as the inner outlines of a slice half way
-        through its thickness, from -y to +y.
+        The outlines of the holes through the lid in the board's own frame, from -y to
+        +y: the inner outlines of a slice half way through the lid's thickness.
         """
         middle = (self.lid.bounds[0][2] + self.lid.bounds[1][2]) / 2
         section = self.lid.section(
@@ -226,29 +174,46 @@ class ShapeSortingBoardMesh:
             Polygon2D(vertices=np.asarray(loop)[:, :2]) for loop in section.discrete
         ]
         rim = max(outlines, key=lambda outline: outline.bounding_box.area)
-        footprints = [
-            HoleFootprint(
-                piece_kind=self.hole_classifier.classify(outline=outline),
-                center=outline.centroid,
-                boundary=outline.centered(),
-            )
-            for outline in outlines
-            if outline is not rim
-        ]
-        return sorted(footprints, key=lambda footprint: float(footprint.center.y))
+        holes = [outline for outline in outlines if outline is not rim]
+        return sorted(holes, key=lambda outline: float(outline.centroid.y))
 
-    def matching_hole_footprint(
-        self, *, piece_kind: type[ShapeSortingPiece]
-    ) -> HoleFootprint:
+    def hole_specifications(
+        self,
+    ) -> list[SemanticAnnotationWithRootSpecification[ShapeSortingHole]]:
         """
-        :param piece_kind: A kind of piece.
-        :return: The first hole cut for that kind of piece, from -y to +y.
+        :return: A hole for each of :attr:`hole_outlines`, in the same order and named
+            after its kind of piece and its place in that order: a region of the hole's
+            outline, :attr:`hole_marker_thickness` thick, centred where the lid's top
+            surface crosses the hole's centroid.
         """
-        return next(
-            footprint
-            for footprint in self.hole_footprints
-            if footprint.piece_kind is piece_kind
-        )
+        specifications = []
+        for index, outline in enumerate(self.hole_outlines):
+            piece_kind = self.hole_classifier.classify(outline=outline)
+            name = f"{piece_kind.__name__}_hole_{index}"
+            region = RegionSpecification(
+                name=name,
+                shapes=ShapeCollection(
+                    [
+                        Mesh.from_trimesh(
+                            mesh=outline.centered().extrude(
+                                thickness=self.hole_marker_thickness
+                            )
+                        )
+                    ]
+                ),
+                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    float(outline.centroid.x), float(outline.centroid.y), self.lid_top
+                ),
+            )
+            specifications.append(
+                SemanticAnnotationWithRootSpecification(
+                    name=name,
+                    semantic_annotation_type=ShapeSortingHole,
+                    root_specification=region,
+                    annotation_kwargs={"piece_kind": piece_kind},
+                )
+            )
+        return specifications
 
     @property
     def lid_top(self) -> float:
@@ -313,12 +278,14 @@ class ShapeSortingBoardMesh:
     def cut_blank(self, *, blank_scale: Scale) -> trimesh.Trimesh:
         """
         :param blank_scale: Size of the uncut board blank.
-        :return: A solid board blank with every one of :attr:`hole_footprints` cut all
+        :return: A solid board blank with every one of :attr:`hole_outlines` cut all
             the way through it.
         """
         board = trimesh.creation.box(
             extents=(blank_scale.x, blank_scale.y, blank_scale.z)
         )
-        for footprint in self.hole_footprints:
-            board = footprint.cut_through(solid=board)
+        for outline in self.hole_outlines:
+            board = board.difference(
+                outline.extrude(thickness=blank_scale.z * 2), engine=None
+            )
         return board

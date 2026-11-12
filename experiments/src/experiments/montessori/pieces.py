@@ -9,7 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
     ShapeSortingPiece,
 )
 from semantic_digital_twin.shape_sorting_toy.pieces import PieceSet

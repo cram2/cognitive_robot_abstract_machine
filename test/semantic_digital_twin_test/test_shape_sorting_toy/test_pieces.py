@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
     CubePiece,
     CylinderPiece,
     DiskPiece,
@@ -67,7 +67,7 @@ def test_a_cube_covers_a_square_as_wide_as_it_stands_tall(full_size):
     )
 
 
-def test_a_piece_wears_the_colour_it_was_printed_in(full_size):
+def test_a_piece_wears_the_colour_it_was_given(full_size):
     assert full_size.find_piece(kind=CubePiece).color == PieceColor.CYAN.value
 
 

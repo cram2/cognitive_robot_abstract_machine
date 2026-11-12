@@ -1,5 +1,5 @@
 """
-The Montessori shape-sorting board as a body to stand in the demo's world, built from
+The Montessori shape-sorting board as a board to stand in the demo's world, built from
 the board's mesh and the holes read off it.
 """
 
@@ -10,10 +10,19 @@ from dataclasses import dataclass, field
 import trimesh
 
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.shape_sorting_toy.board import (
     BoardResource,
     ShapeSortingBoardMesh,
+)
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
+    ShapeSortingBoard,
+)
+from semantic_digital_twin.specifications.kinematic_structure_entities import (
+    BodySpecification,
+)
+from semantic_digital_twin.specifications.semantic_annotations import (
+    PartSpecificationBinding,
+    SemanticAnnotationWithRootSpecification,
 )
 from semantic_digital_twin.world_description.geometry import (
     Box,
@@ -23,15 +32,15 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
-from semantic_digital_twin.world_description.world_entity import Body
 
-# %% the board as a body
+# %% the board
 
 
 @dataclass(kw_only=True)
 class ShapeSortingBoardModel:
     """
-    The board as a body: its mesh to look at, and boxes to collide with.
+    The board as a :class:`ShapeSortingBoard` with its holes: its mesh to look at, and
+    boxes to collide with.
 
     MuJoCo collides with the convex hull of a mesh, which would close every hole, so the
     collision geometry is built from boxes instead: every solid part of the mesh is a box
@@ -39,7 +48,11 @@ class ShapeSortingBoardModel:
     closed towards the robot by a drawer front each, with a handle.
     """
 
-    mesh: ShapeSortingBoardMesh = field(default_factory=ShapeSortingBoardMesh)
+    mesh: ShapeSortingBoardMesh = field(
+        default_factory=lambda: ShapeSortingBoardMesh(
+            role_taker=Mesh.from_file(str(BoardResource.MESH))
+        )
+    )
     """
     The board, as read off its mesh.
     """
@@ -83,24 +96,36 @@ class ShapeSortingBoardModel:
     two hole edges almost coincide.
     """
 
-    def body(self, *, name: PrefixedName) -> Body:
+    def specification(
+        self, *, name: str
+    ) -> SemanticAnnotationWithRootSpecification[ShapeSortingBoard]:
         """
-        :param name: What the body is called.
-        :return: The board's body.
+        :param name: What the board and its body are called.
+        :return: The board, with a hole for each one read off its mesh.
         """
         drawer_fronts = self.drawer_fronts()
-        return Body(
+        return SemanticAnnotationWithRootSpecification(
             name=name,
-            visual=ShapeCollection(
-                [Mesh.from_file(str(BoardResource.MESH), color=self.color)]
-                + drawer_fronts
-                + self.handles()
+            semantic_annotation_type=ShapeSortingBoard,
+            root_specification=BodySpecification(
+                name=name,
+                visual_shapes=ShapeCollection(
+                    [Mesh.from_file(self.mesh.filename, color=self.color)]
+                    + drawer_fronts
+                    + self.handles()
+                ),
+                shapes=ShapeCollection(
+                    [self.box_around(part=part) for part in self.mesh.solid_parts]
+                    + self.lid_around_its_holes()
+                    + [self.copy_of(box=front) for front in drawer_fronts]
+                ),
             ),
-            collision=ShapeCollection(
-                [self.box_around(part=part) for part in self.mesh.solid_parts]
-                + self.lid_around_its_holes()
-                + [self.copy_of(box=front) for front in drawer_fronts]
-            ),
+            part_bindings=[
+                PartSpecificationBinding(
+                    field_name="apertures",
+                    specifications=self.mesh.hole_specifications(),
+                )
+            ],
         )
 
     def box_around(self, *, part: trimesh.Trimesh) -> Box:
@@ -130,10 +155,7 @@ class ShapeSortingBoardModel:
         (minimum_x, minimum_y, bottom), (maximum_x, maximum_y, top) = (
             self.mesh.lid.bounds
         )
-        holes = [
-            footprint.outline_on_board.bounding_box
-            for footprint in self.mesh.hole_footprints
-        ]
+        holes = [outline.bounding_box for outline in self.mesh.hole_outlines]
         x_edges = sorted(
             {minimum_x, maximum_x}
             | {hole.min_x for hole in holes}

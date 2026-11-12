@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+from semantic_digital_twin.shape_sorting_toy.semantic_annotations import (
     CubePiece,
     CylinderPiece,
     RectangularPrismPiece,
@@ -49,8 +49,9 @@ class PieceColor(Enum):
 
     YELLOW = Color(hue=42 / 360, saturation=1.0, value=1.0)
     """
-    The full-size set's yellow, 42 degrees round the hue wheel. The board's own lid
-    shares it.
+    The full-size set's yellow, 42 degrees round the hue wheel.
+
+    The board's own lid shares it.
     """
 
     SMALLER_SET_BLUE = Color(hue=196 / 360, saturation=1.0, value=1.0)
@@ -83,10 +84,9 @@ class PieceSet:
     def full_size(cls, *, grasp_height: float) -> PieceSet:
         """
         The set the captures of August 2026 hold. It has no disk and no sphere.
-
         :param grasp_height: How far above its bottom face each piece is gripped.
         """
-        return cls.printed(
+        return cls.scaled(
             scale=1.0,
             blue=PieceColor.CYAN.value,
             yellow=PieceColor.YELLOW.value,
@@ -96,12 +96,12 @@ class PieceSet:
     @classmethod
     def smaller(cls, *, grasp_height: float) -> PieceSet:
         """
-        The set on the table since September 2026: the full-size set printed at four
-        fifths of its size, in plastics of its own.
+        The set on the table since September 2026: the full-size set at four fifths of
+        its size, in colours of its own.
 
         :param grasp_height: How far above its bottom face each piece is gripped.
         """
-        return cls.printed(
+        return cls.scaled(
             scale=0.8,
             blue=PieceColor.SMALLER_SET_BLUE.value,
             yellow=PieceColor.SMALLER_SET_YELLOW.value,
@@ -109,16 +109,16 @@ class PieceSet:
         )
 
     @classmethod
-    def printed(
+    def scaled(
         cls, *, scale: float, blue: Color, yellow: Color, grasp_height: float
     ) -> PieceSet:
         """
-        The full-size set's kinds of piece printed at a size and in two colours, every
-        dimension measured off the full-size pieces, in metres.
+        The full-size set's kinds of piece at a size and in two colours, every dimension
+        measured off the full-size pieces, in metres.
 
         :param scale: How large the pieces are against the full-size set's.
-        :param blue: The colour the cube and the cylinder are printed in.
-        :param yellow: The colour the two prisms are printed in.
+        :param blue: The colour of the cube and the cylinder.
+        :param yellow: The colour of the two prisms.
         :param grasp_height: How far above its bottom face each piece is gripped.
         """
         triangular_prism = Mesh.from_trimesh(

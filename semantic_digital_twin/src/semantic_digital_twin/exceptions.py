@@ -23,10 +23,6 @@ if TYPE_CHECKING:
         HasSupportingSurface,
     )
     from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-    from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-        ShapeSortingBoard,
-        ShapeSortingPiece,
-    )
     from semantic_digital_twin.grasping.object_relative_grasp import (
         ObjectRelativeGrasp,
     )
@@ -2396,35 +2392,6 @@ class NoGraspGeometry(UsageError):
         return (
             "give the root body collision geometry, or annotate the object with a type "
             "whose grasps do not depend on its shape."
-        )
-
-
-@dataclass(kw_only=True)
-class NoMatchingHoleError(UsageError):
-    """
-    Raised when a shape-sorting board has no hole that a piece fits through.
-    """
-
-    piece: ShapeSortingPiece
-    """
-    The piece that fits through none of the board's holes.
-    """
-
-    board: ShapeSortingBoard
-    """
-    The board whose holes the piece fits through none of.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{self.board.name.name} has no hole that {self.piece.name.name}, a "
-            f"{type(self.piece).__name__}, fits through."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "add a hole cut for this kind of piece, at least as wide as the piece, to "
-            "the board."
         )
 
 
