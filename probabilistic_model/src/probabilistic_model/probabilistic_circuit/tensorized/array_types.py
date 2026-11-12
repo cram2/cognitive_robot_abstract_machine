@@ -158,6 +158,12 @@ One value per node of a layer and node of one of its child layers, shape (#nodes
 nodes): the edges between the two layers as a dense matrix.
 """
 
+NodeColumnMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per node of an inner layer and node of its child layers, shape (#nodes, total
+number of nodes of the child layers).
+"""
+
 States: TypeAlias = npt.NDArray[np.int64]
 """
 The states of a discrete variable, sorted ascending: the hash of the domain element for

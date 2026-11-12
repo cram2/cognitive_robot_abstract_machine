@@ -66,6 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
 )
 
 from .differentiable_circuits import (
+    child_node_matrix,
     Color,
     Size,
     dense_log_weights,
@@ -167,7 +168,7 @@ def test_product_edges_keep_their_child_nodes(x, y):
     product = DifferentiableProductLayer([gaussian_layer(0), gaussian_layer(1)], edges)
     layer = conversion_over(x, y).convert(product)
     assert isinstance(layer, ProductLayer)
-    np.testing.assert_array_equal(layer.edges.toarray(), np.asarray(edges.todense()))
+    np.testing.assert_array_equal(child_node_matrix(layer), np.asarray(edges.todense()))
 
 
 def test_a_layer_is_converted_once(x):

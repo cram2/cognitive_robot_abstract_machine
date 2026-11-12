@@ -14,10 +14,10 @@ import pytest
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
-    RowGroupedSparsity,
-    SparseEntries,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    DenseEdgeMatrix,
+    EdgeMatrix,
+    SparseEdgeMatrix,
 )
 
 from ..circuit_building import mixture_of_products_of_mixtures, uniform_leaf
@@ -44,13 +44,21 @@ def shared_children_circuit(x, y) -> ProbabilisticCircuit:
 
 
 @pytest.fixture
-def uneven_rows() -> RowGroupedSparsity:
+def uneven_rows() -> SparseEdgeMatrix:
     """
     Four rows holding two, one, three and no stored entries, stored out of row order.
     """
-    return RowGroupedSparseArray.from_entries(
-        SparseEntries(np.zeros(6), [2, 0, 2, 1, 2, 0], [0, 1, 2, 3, 4, 5]), (4, 6)
-    ).sparsity
+    return SparseEdgeMatrix(
+        np.array([2, 0, 2, 1, 2, 0]), np.array([0, 1, 2, 3, 4, 5]), (4, 6)
+    )
+
+
+@pytest.fixture(params=[SparseEdgeMatrix, DenseEdgeMatrix], ids=["sparse", "dense"])
+def edge_matrix_type(request) -> type[EdgeMatrix]:
+    """
+    Every type of edge matrix.
+    """
+    return request.param
 
 
 # %% array backends
