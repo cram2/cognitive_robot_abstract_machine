@@ -45,7 +45,9 @@ def class_extractor(graph: rdflib.Graph) -> ClassExtractor:
     """
     Reads the classes of the ontology.
     """
-    return ClassExtractor(graph, MetadataExtractor(graph))
+    return ClassExtractor(
+        graph=graph, metadata_extractor=MetadataExtractor(graph=graph)
+    )
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +55,9 @@ def property_extractor(graph: rdflib.Graph) -> PropertyExtractor:
     """
     Reads the properties of the ontology.
     """
-    return PropertyExtractor(graph, MetadataExtractor(graph))
+    return PropertyExtractor(
+        graph=graph, metadata_extractor=MetadataExtractor(graph=graph)
+    )
 
 
 # %% classes

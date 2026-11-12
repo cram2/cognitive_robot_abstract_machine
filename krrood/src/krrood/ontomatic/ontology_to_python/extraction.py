@@ -23,18 +23,16 @@ from krrood.ontomatic.ontology_to_python.ontology_info import (
 )
 
 
+@dataclass(kw_only=True)
 class MetadataExtractor:
     """
     Helper for extracting metadata (labels, comments) from an RDF graph.
     """
 
-    def __init__(self, graph: rdflib.Graph):
-        """
-        Initialize the metadata extractor.
-
-        :param graph: The rdflib graph to extract metadata from.
-        """
-        self.graph = graph
+    graph: rdflib.Graph
+    """
+    The graph whose labels and comments are read.
+    """
 
     def get_label(self, *, uri: Any) -> Optional[str]:
         """
@@ -53,20 +51,21 @@ class MetadataExtractor:
         return None
 
 
+@dataclass(kw_only=True)
 class ClassExtractor:
     """
     Extractor for OWL Class information from an RDF graph.
     """
 
-    def __init__(self, graph: rdflib.Graph, metadata_extractor: MetadataExtractor):
-        """
-        Initialize the class extractor.
+    graph: rdflib.Graph
+    """
+    The graph the classes are read from.
+    """
 
-        :param graph: The rdflib graph.
-        :param metadata_extractor: Extractor for labels and comments.
-        """
-        self.graph = graph
-        self.metadata_extractor = metadata_extractor
+    metadata_extractor: MetadataExtractor
+    """
+    Reads the labels and comments of the classes.
+    """
 
     def extract_info(self, *, class_uri: Any) -> ClassInfo:
         """
@@ -236,20 +235,21 @@ class ClassExtractor:
         ]
 
 
+@dataclass(kw_only=True)
 class PropertyExtractor:
     """
     Extractor for OWL Property information from an RDF graph.
     """
 
-    def __init__(self, graph: rdflib.Graph, metadata_extractor: MetadataExtractor):
-        """
-        Initialize the property extractor.
+    graph: rdflib.Graph
+    """
+    The graph the properties are read from.
+    """
 
-        :param graph: The rdflib graph.
-        :param metadata_extractor: Extractor for labels and comments.
-        """
-        self.graph = graph
-        self.metadata_extractor = metadata_extractor
+    metadata_extractor: MetadataExtractor
+    """
+    Reads the labels and comments of the properties.
+    """
 
     def extract_info(self, *, property_uri: Any) -> PropertyInfo:
         """
@@ -411,21 +411,25 @@ class OntologyExtractor:
         """
         Reads the labels and comments of the graph.
         """
-        return MetadataExtractor(self.graph)
+        return MetadataExtractor(graph=self.graph)
 
     @cached_property
     def class_extractor(self) -> ClassExtractor:
         """
         Reads the classes of the graph.
         """
-        return ClassExtractor(self.graph, self.metadata_extractor)
+        return ClassExtractor(
+            graph=self.graph, metadata_extractor=self.metadata_extractor
+        )
 
     @cached_property
     def property_extractor(self) -> PropertyExtractor:
         """
         Reads the properties of the graph.
         """
-        return PropertyExtractor(self.graph, self.metadata_extractor)
+        return PropertyExtractor(
+            graph=self.graph, metadata_extractor=self.metadata_extractor
+        )
 
     def extract(self) -> OntologyInfo:
         """
