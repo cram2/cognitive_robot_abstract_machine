@@ -368,6 +368,46 @@ def test_a_plan_that_violates_collision_avoidance_fails_as_a_plan_failure(
     assert failure.value.violation is violation
 
 
+# %% the outcome of an attempted plan
+
+
+def test_an_attempted_plan_that_succeeds_reports_no_failure(
+    pr2_apartment_context,
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+
+    outcome = executor.attempt()
+
+    assert outcome.succeeded
+    assert outcome.failure is None
+
+
+def test_an_attempted_plan_that_fails_reports_its_failure_instead_of_raising_it(
+    pr2_apartment_context, monkeypatch
+) -> None:
+    world, robot_view, extensions = pr2_apartment_context
+    violation = CollisionViolatedError(violated_collisions=[])
+
+    def violate_collision_avoidance(executor: StatechartExecutor) -> None:
+        raise violation
+
+    executor = simulated_executor(extensions)
+    executor.compile(
+        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+    )
+    monkeypatch.setattr(StatechartExecutor, "tick", violate_collision_avoidance)
+
+    outcome = executor.attempt()
+
+    assert not outcome.succeeded
+    assert isinstance(outcome.failure, MotionViolatedCollisionAvoidance)
+    assert outcome.failure.violation is violation
+
+
 # %% avoiding collisions in a world with several robots
 
 

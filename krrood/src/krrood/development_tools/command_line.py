@@ -15,7 +15,11 @@ from pathlib import Path
 from typing_extensions import Sequence
 
 from krrood.development_tools.agents.checker import CodeRulesCheck, StagedLines
-from krrood.development_tools.agents.instructions import AgentsInstructions
+from krrood.development_tools.agents.instructions import (
+    AgentsInstructions,
+    GeneratedInstructions,
+    RepositorySkills,
+)
 from krrood.development_tools.formatting import DocstringFormatter
 from krrood.development_tools.agents.repository_files import (
     RepositoryInstructionsFile,
@@ -115,6 +119,17 @@ class CommandLine:
         )
         agents_parser.set_defaults(run=self.generate_agents_instructions)
 
+        skills_parser = subparsers.add_parser(
+            Subcommand.SKILLS,
+            help="Generate the SKILL.md of every skill the repository declares.",
+        )
+        skills_parser.add_argument(
+            Option.CHECK,
+            action="store_true",
+            help="Only verify that every SKILL.md is up to date; exit non-zero if one is not.",
+        )
+        skills_parser.set_defaults(run=self.generate_skill_instructions)
+
         check_parser = subparsers.add_parser(
             Subcommand.CHECK,
             help="Report the code that breaks a rule a checker enforces.",
@@ -151,21 +166,58 @@ class CommandLine:
         :return: :attr:`ExitStatus.FAILURE` if the file was rewritten or is stale.
         """
         instructions = AgentsInstructions.from_repository(repository_root=Path.cwd())
-        if arguments.check:
-            if instructions.is_current():
-                return ExitStatus.SUCCESS
-            logger.error(
-                "%s is missing, out of date or edited by hand. Change a rule in the "
-                "module the comment above it names, never in the file; then run `%s %s`.",
-                RepositoryInstructionsFile.AGENTS,
-                self.program_name,
-                Subcommand.AGENTS_MD,
-            )
-            return ExitStatus.FAILURE
-        if instructions.write():
-            logger.info("Wrote %s", RepositoryInstructionsFile.AGENTS)
-            return ExitStatus.FAILURE
-        return ExitStatus.SUCCESS
+        return self.generate_instructions(
+            instructions=[instructions],
+            subcommand=Subcommand.AGENTS_MD,
+            only_check=arguments.check,
+        )
+
+    def generate_skill_instructions(
+        self, *, arguments: argparse.Namespace
+    ) -> ExitStatus:
+        """
+        Generate, or with :attr:`Option.CHECK` verify, the ``SKILL.md`` of every skill
+        the current directory declares.
+
+        :param arguments: The parsed command line.
+        :return: :attr:`ExitStatus.FAILURE` if a file was rewritten or is stale.
+        """
+        return self.generate_instructions(
+            instructions=RepositorySkills(repository_root=Path.cwd()).instructions,
+            subcommand=Subcommand.SKILLS,
+            only_check=arguments.check,
+        )
+
+    def generate_instructions(
+        self,
+        *,
+        instructions: list[GeneratedInstructions],
+        subcommand: Subcommand,
+        only_check: bool,
+    ) -> ExitStatus:
+        """
+        Write generated instruction files, or only verify that they are current.
+
+        :param instructions: The files.
+        :param subcommand: The subcommand that regenerates them, named when one is stale.
+        :param only_check: Whether to verify the files instead of writing them.
+        :return: :attr:`ExitStatus.FAILURE` if a file was rewritten or is stale.
+        """
+        if only_check:
+            stale = [file for file in instructions if not file.is_current()]
+            for file in stale:
+                logger.error(
+                    "%s is missing, out of date or edited by hand. Change the module "
+                    "the comment in it names, never the file; then run `%s %s`.",
+                    file.path,
+                    self.program_name,
+                    subcommand,
+                )
+            return ExitStatus.FAILURE if stale else ExitStatus.SUCCESS
+        written = [file for file in instructions if file.write()]
+        for file in written:
+            logger.info("Wrote %s", file.path)
+        return ExitStatus.FAILURE if written else ExitStatus.SUCCESS
 
     def check_files(self, *, arguments: argparse.Namespace) -> ExitStatus:
         """

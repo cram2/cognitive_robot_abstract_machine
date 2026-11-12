@@ -1,23 +1,16 @@
+"""
+A standalone Giskard with a motion server and a client in one process.
+"""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from time import sleep
 
-import numpy as np
-
-import krrood_spatial_math.spatial_types as cas
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutorNode
-from giskardpy.middleware.ros2.robot_interface_config import (
-    StandAloneRobotInterfaceConfig,
-)
-from giskardpy.middleware.ros2.server_config import GiskardServerConfig
-from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.specifications.worlds import WorldSpecification
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -33,68 +26,7 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
-# %% comparing spatial types
-
-
-def compare_poses(
-    actual_pose: cas.HomogeneousTransformationMatrix,
-    desired_pose: cas.HomogeneousTransformationMatrix,
-    decimal: int = 2,
-) -> None:
-    """
-    Assert that two transformations describe the same position and orientation.
-
-    :param decimal: Number of decimal places the two have to agree on.
-    """
-    compare_points(
-        actual_point=actual_pose.position,
-        desired_point=desired_pose.position,
-        decimal=decimal,
-    )
-    compare_orientations(
-        actual_orientation=actual_pose.quaternion,
-        desired_orientation=desired_pose.quaternion,
-        decimal=decimal,
-    )
-
-
-def compare_points(
-    actual_point: cas.Point3,
-    desired_point: cas.Point3,
-    decimal: int = 2,
-) -> None:
-    """
-    Assert that two points are the same up to an absolute tolerance.
-
-    .. note:: The tolerance is absolute because coordinates near the origin of their
-        reference frame are common, and a relative one degenerates into an exact
-        comparison for them.
-
-    :param decimal: Number of decimal places the two have to agree on.
-    """
-    np.testing.assert_array_almost_equal(actual_point, desired_point, decimal=decimal)
-
-
-def compare_orientations(
-    actual_orientation: cas.Quaternion,
-    desired_orientation: cas.Quaternion,
-    decimal: int = 2,
-) -> None:
-    """
-    Assert that two quaternions describe the same orientation.
-
-    A quaternion and its negation are the same orientation, so the desired one is
-    flipped onto the hemisphere of the actual one before they are compared.
-
-    :param decimal: Number of decimal places the two have to agree on.
-    """
-    actual_quaternion = actual_orientation.to_np()
-    desired_quaternion = desired_orientation.to_np()
-    if np.dot(actual_quaternion, desired_quaternion) < 0:
-        desired_quaternion = -desired_quaternion
-    np.testing.assert_array_almost_equal(
-        actual_quaternion, desired_quaternion, decimal=decimal
-    )
+# %% standalone giskard
 
 
 @dataclass
@@ -212,16 +144,17 @@ class GiskardTester(ABC):
     def add_urdf_to_world(
         self,
         name: str,
-        urdf: str,
+        file_path: str,
         pose: HomogeneousTransformationMatrix,
         parent_link: str | PrefixedName | None = None,
     ) -> None:
         """
-        Merges the bodies described by ``urdf`` into the client's world at ``pose`` and
-        waits for the motion server to pick them up.
+        Merges the bodies described by the URDF or xacro file at ``file_path`` into the
+        client's world at ``pose`` and waits for the motion server to pick them up.
 
         :param name: Prefix of the merged bodies' names.
-        :param urdf: The URDF document.
+        :param file_path: The path to the URDF or xacro file, ``package://`` paths
+            included.
         :param parent_link: Name of the entity the URDF's root is fixed to, the world's
             root if ``None``.
         """
@@ -231,7 +164,7 @@ class GiskardTester(ABC):
             parent_link = self.api.world.get_kinematic_structure_entity_by_name(
                 parent_link
             )
-        urdf_parser = URDFParser(urdf=urdf, prefix=name)
+        urdf_parser = URDFParser.from_file(file_path, prefix=name)
         world_from_urdf = urdf_parser.create_world()
         with self.api.world.modify_world():
             parent_C_urdf_root = FixedConnection(
@@ -244,39 +177,3 @@ class GiskardTester(ABC):
             )
 
         self.wait_for_cycles()
-
-
-@dataclass
-class StretchTester(GiskardTester):
-    """
-    A standalone Giskard driving Stretch through the same configuration the robot's own
-    ``stretch_standalone`` launcher uses.
-
-    Lives here rather than beside one test module because both the controller tests and
-    the demo's integration test drive the same standalone setup.
-    """
-
-    tool_frame: KinematicStructureEntity = field(init=False)
-    """
-    The frame the demo's pick and place actions drive.
-    """
-
-    def __post_init__(self):
-        super().__post_init__()
-        self.tool_frame = self.api.world.get_kinematic_structure_entity_by_name(
-            "link_grasp_center"
-        )
-
-    def setup_giskard(self) -> Giskard:
-        return Giskard(
-            world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(Stretch)]
-            ),
-            robot_interface_config=StandAloneRobotInterfaceConfig(),
-            server_config=GiskardServerConfig(debug_mode=True),
-            qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
-        )
-
-    @property
-    def robot(self) -> AbstractRobot:
-        return self.world.get_semantic_annotations_by_type(Stretch)[0]

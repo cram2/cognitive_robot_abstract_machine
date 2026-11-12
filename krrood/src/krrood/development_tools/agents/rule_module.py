@@ -1,5 +1,5 @@
 """
-The modules that declare sections of ``AGENTS.md``.
+The modules that declare sections of ``AGENTS.md`` or skills.
 """
 
 from __future__ import annotations
@@ -15,12 +15,14 @@ from types import ModuleType
 
 from krrood.development_tools.agents.checker import CodeRuleChecker
 from krrood.development_tools.agents.rule import Section
+from krrood.development_tools.agents.skill import Skill
 
 
 @dataclass(kw_only=True, frozen=True)
 class RuleModule:
     """
-    A module, or a package with all of its modules, declaring sections of ``AGENTS.md``.
+    A module, or a package with all of its modules, declaring sections of ``AGENTS.md``
+    or skills.
     """
 
     module: ModuleType
@@ -95,3 +97,20 @@ class RuleModule:
         return tuple(
             checker for section in self.sections for checker in section.checkers
         )
+
+    @property
+    def skills(self) -> list[type[Skill]]:
+        """
+        The skills defined in :attr:`modules`, in alphabetical order of their names.
+
+        Skills a module only imports are not among them.
+        """
+        skills = [
+            value
+            for module in self.modules
+            for value in vars(module).values()
+            if isinstance(value, type)
+            and issubclass(value, Skill)
+            and value.__module__ == module.__name__
+        ]
+        return sorted(skills, key=lambda skill: skill.name)

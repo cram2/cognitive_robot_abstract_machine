@@ -22,12 +22,14 @@ class Graph(Generic[NodeType], SubClassSafeGeneric):
     A graph whose nodes are the objects it holds, each held once.
     """
 
-    graph: rx.PyDiGraph = field(default_factory=lambda: rx.PyDiGraph(multigraph=False))
+    graph: rx.PyDiGraph = field(
+        default_factory=lambda: rx.PyDiGraph(multigraph=False), kw_only=True
+    )
     """
     The graph, whose node data are the nodes.
     """
 
-    indices: dict[NodeType, int] = field(default_factory=dict, repr=False)
+    indices: dict[NodeType, int] = field(default_factory=dict, repr=False, kw_only=True)
     """
     The index of every node in :attr:`graph`.
     """
