@@ -30,27 +30,31 @@ def test_force_impact_node(rclpy_node):
 
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(
-        parallel := Parallel(
-            nodes=[
-                ForceImpactMonitor(topic_name=topic_name, threshold=10),
-                Sequence(
-                    nodes=[
-                        PublishOnStart(topic_name=topic_name, msg=msg_below),
-                        WaitForMessage(topic_name=topic_name, msg_type=WrenchStamped),
-                        PublishOnStart(topic_name=topic_name, msg=msg_above),
-                    ]
-                ),
-            ]
+        node=(
+            parallel := Parallel(
+                nodes=[
+                    ForceImpactMonitor(topic_name=topic_name, threshold=10),
+                    Sequence(
+                        nodes=[
+                            PublishOnStart(topic_name=topic_name, msg=msg_below),
+                            WaitForMessage(
+                                topic_name=topic_name, msg_type=WrenchStamped
+                            ),
+                            PublishOnStart(topic_name=topic_name, msg=msg_above),
+                        ]
+                    ),
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(parallel))
+    statechart.add_node(node=EndMotion.when_true(node=parallel))
 
     json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
     executor = StatechartExecutor(
         context=StatechartContext(world=World()),
-        extensions=[RosNodeAccess(rclpy_node), MotionControl()],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl()],
     )
     statechart_copy = Statechart.from_json(data=new_json_data, context=executor.context)
     executor.compile(statechart=statechart_copy)
@@ -58,16 +62,16 @@ def test_force_impact_node(rclpy_node):
     ft_node = statechart_copy.nodes[0].nodes[0]
 
     executor.tick_until_end(timeout=5_000)
-    statechart_copy.draw("muh.pdf")
+    statechart_copy.draw(file_name="muh.pdf")
     assert (
-        statechart_copy.state_history.get_observation_history_of_node(ft_node)[0]
+        statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[0]
         == ObservationStateValues.UNKNOWN
     )
     assert (
         ObservationStateValues.FALSE
-        in statechart_copy.state_history.get_observation_history_of_node(ft_node)
+        in statechart_copy.state_history.get_observation_history_of_node(node=ft_node)
     )
     assert (
-        statechart_copy.state_history.get_observation_history_of_node(ft_node)[-1]
+        statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[-1]
         == ObservationStateValues.TRUE
     )

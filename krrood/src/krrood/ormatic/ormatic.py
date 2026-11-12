@@ -401,9 +401,9 @@ class ORMatic:
         # classes already mapped by a dependency are kept in the class diagram but not
         # remapped, so inheritance/association edges to them still resolve
         for ormatic_interface in ormatic_interface_dependencies:
-            interface_info = get_classes_of_ormatic_interface(ormatic_interface)
-            all_classes |= set(interface_info.classes)
-            all_type_mappings.update(interface_info.type_mappings)
+            interface_information = get_classes_of_ormatic_interface(ormatic_interface)
+            all_classes |= set(interface_information.classes)
+            all_type_mappings.update(interface_information.type_mappings)
         all_alternative_mappings |= set(dependency_chain.alternative_mappings)
 
         # externally_mapped_classes is transitive across the whole chain, unlike classes above
@@ -416,33 +416,44 @@ class ORMatic:
 
         mapping_module_names = [package.__name__ for package in [*packages, krrood]]
         all_alternative_mappings |= set(
-            am
-            for am in recursive_subclasses(AlternativeMapping)
+            alternative_mapping
+            for alternative_mapping in recursive_subclasses(AlternativeMapping)
             if any(
-                am.__module__ == name or am.__module__.startswith(f"{name}.")
-                for name in mapping_module_names
+                alternative_mapping.__module__ == module_name
+                or alternative_mapping.__module__.startswith(f"{module_name}.")
+                for module_name in mapping_module_names
             )
             and (
                 not ignore_krrood_test_classes
-                or "krrood_test" not in get_module_of_type(am.original_class())
+                or "krrood_test"
+                not in get_module_of_type(alternative_mapping.original_class())
             )
         )
 
         # keep only dataclasses that are not AlternativeMapping or DataAccessObject subclasses
         all_classes = {
-            c
-            for c in all_classes
-            if is_dataclass(c)
-            and not issubclass(c, (DataAccessObject, AlternativeMapping))
+            domain_class
+            for domain_class in all_classes
+            if is_dataclass(domain_class)
+            and not issubclass(domain_class, (DataAccessObject, AlternativeMapping))
         }
 
-        all_classes |= {am.original_class() for am in all_alternative_mappings}
+        all_classes |= {
+            alternative_mapping.original_class()
+            for alternative_mapping in all_alternative_mappings
+        }
 
         all_type_mappings.update(type_mappings)
 
         # create the new ormatic interface
         class_diagram = ClassDiagram(
-            classes=list(sorted(all_classes, key=lambda c: c.__name__, reverse=True))
+            classes=list(
+                sorted(
+                    all_classes,
+                    key=lambda domain_class: domain_class.__name__,
+                    reverse=True,
+                )
+            )
         )
 
         # Create an ORMatic object with the classes to be mapped

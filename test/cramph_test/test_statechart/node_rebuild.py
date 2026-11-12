@@ -9,7 +9,7 @@ from cramph.node import NodeRebuild, StatechartNode
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RebuildLeavingNodesOut(NodeRebuild):
     """
     Builds every node anew except those it leaves out, and keeps every other value as it
@@ -26,19 +26,21 @@ class RebuildLeavingNodesOut(NodeRebuild):
     The node each node was built anew as, None for one left out.
     """
 
-    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+    def rebuilt(self, *, node: StatechartNode) -> StatechartNode | None:
         if node not in self.built:
-            self.built[node] = None if node in self.left_out else node.rebuilt_by(self)
+            self.built[node] = (
+                None if node in self.left_out else node.rebuilt_by(rebuild=self)
+            )
         return self.built[node]
 
     def rebuilt_children(
-        self, owner: StatechartNode, children: list[StatechartNode]
+        self, *, owner: StatechartNode, children: list[StatechartNode]
     ) -> list[StatechartNode]:
         return [
             rebuilt
             for child in children
-            if (rebuilt := self.rebuilt(child)) is not None
+            if (rebuilt := self.rebuilt(node=child)) is not None
         ]
 
-    def rebound(self, value: Any) -> Any:
+    def rebound(self, *, value: Any) -> Any:
         return value

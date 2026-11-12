@@ -148,8 +148,8 @@ class TestFeatureFunctions:
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
-        statechart.add_node(height_goal)
-        statechart.add_node(EndMotion.when_true(height_goal))
+        statechart.add_node(node=height_goal)
+        statechart.add_node(node=EndMotion.when_true(node=height_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -199,8 +199,8 @@ class TestFeatureFunctions:
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
-        statechart.add_node(height_goal)
-        statechart.add_node(EndMotion.when_true(height_goal))
+        statechart.add_node(node=height_goal)
+        statechart.add_node(node=EndMotion.when_true(node=height_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -252,8 +252,8 @@ class TestFeatureFunctions:
             tip_point=tip_point,
             reference_point=reference_point,
         )
-        statechart.add_node(reach_point)
-        statechart.add_node(EndMotion.when_true(reach_point))
+        statechart.add_node(node=reach_point)
+        statechart.add_node(node=EndMotion.when_true(node=reach_point))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -299,8 +299,8 @@ class TestFeatureFunctions:
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
-        statechart.add_node(distance_goal)
-        statechart.add_node(EndMotion.when_true(distance_goal))
+        statechart.add_node(node=distance_goal)
+        statechart.add_node(node=EndMotion.when_true(node=distance_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -354,8 +354,8 @@ class TestFeatureFunctions:
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
-        statechart.add_node(distance_goal)
-        statechart.add_node(EndMotion.when_true(distance_goal))
+        statechart.add_node(node=distance_goal)
+        statechart.add_node(node=EndMotion.when_true(node=distance_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -409,8 +409,8 @@ class TestFeatureFunctions:
             lower_limit=lower_limit,
             upper_limit=upper_limit,
         )
-        statechart.add_node(distance_goal)
-        statechart.add_node(EndMotion.when_true(distance_goal))
+        statechart.add_node(node=distance_goal)
+        statechart.add_node(node=EndMotion.when_true(node=distance_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -478,8 +478,8 @@ class TestFeatureFunctions:
                 ),
             ]
         )
-        statechart.add_node(combined_goal)
-        statechart.add_node(EndMotion.when_true(combined_goal))
+        statechart.add_node(node=combined_goal)
+        statechart.add_node(node=EndMotion.when_true(node=combined_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -566,8 +566,8 @@ class TestFeatureFunctions:
         combined_goal = Parallel(
             nodes=[height_goal, distance_goal, align_perpendicular]
         )
-        statechart.add_node(combined_goal)
-        statechart.add_node(EndMotion.when_true(combined_goal))
+        statechart.add_node(node=combined_goal)
+        statechart.add_node(node=EndMotion.when_true(node=combined_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -641,9 +641,9 @@ def test_pointing(pr2_world_state_reset: World):
         goal_point=goal_point,
         pointing_axis=pointing_axis,
     )
-    statechart.add_node(pointing)
+    statechart.add_node(node=pointing)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = pointing.observes_true
 
     executor.compile(statechart=statechart)
@@ -689,12 +689,14 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
         goal_point=goal_point,
         pointing_axis=Vector3.X(reference_frame=head),
     )
-    statechart.add_node(pointing)
-    statechart.add_node(still_progressing := StillProgressing(monitored_node=pointing))
-    statechart.add_node(still_progressing.cancel_motion())
+    statechart.add_node(node=pointing)
+    statechart.add_node(
+        node=(still_progressing := StillProgressing(monitored_node=pointing))
+    )
+    statechart.add_node(node=still_progressing.cancel_motion())
     end = EndMotion()
     end.start_condition = pointing.observes_true
-    statechart.add_node(end)
+    statechart.add_node(node=end)
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()
@@ -745,10 +747,10 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     region_goal = JointPositionList(
         goal_state=JointState.from_mapping({region_joint: 0.8})
     )
-    statechart.add_node(both := Parallel(nodes=[pointing, region_goal]))
+    statechart.add_node(node=(both := Parallel(nodes=[pointing, region_goal])))
     end = EndMotion()
     end.start_condition = both.observes_true
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
@@ -784,9 +786,9 @@ def test_pointing_cone(pr2_world_state_reset: World):
         pointing_axis=pointing_axis,
         cone_theta=cone_theta,
     )
-    statechart.add_node(pointing_cone)
+    statechart.add_node(node=pointing_cone)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = pointing_cone.observes_true
 
     executor.compile(statechart=statechart)
@@ -838,10 +840,10 @@ def test_align_planes(pr2_world_state_reset: World):
     align_planes = AlignPlanes(
         root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
     )
-    statechart.add_node(align_planes)
+    statechart.add_node(node=align_planes)
 
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = align_planes.observes_true
 
     executor.compile(statechart=statechart)
@@ -883,9 +885,9 @@ def _run_keep_held_body_upright(world: World) -> KeepHeldBodyUpright:
         root_link=world.root,
         end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
     )
-    statechart.add_node(keep_upright)
+    statechart.add_node(node=keep_upright)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = keep_upright.observes_true
     executor.compile(statechart=statechart)
     executor.tick_until_end()
@@ -969,10 +971,10 @@ def test_align_perpendicular(pr2_world_state_reset: World):
         reference_normal=goal_normal,
         tip_normal=tip_normal,
     )
-    statechart.add_node(align_perp)
+    statechart.add_node(node=align_perp)
 
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = align_perp.observes_true
 
     executor.compile(statechart=statechart)
@@ -1034,9 +1036,9 @@ def test_angle_goal(pr2_world_state_reset: World):
         lower_angle=lower_angle,
         upper_angle=upper_angle,
     )
-    statechart.add_node(angle_goal)
+    statechart.add_node(node=angle_goal)
 
-    statechart.add_node(EndMotion.when_true(angle_goal))
+    statechart.add_node(node=EndMotion.when_true(node=angle_goal))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()
@@ -1078,10 +1080,12 @@ class TestArticulateGraspedMechanism:
         )
         motion_statechart = Statechart(context=executor.context)
         motion_statechart.add_node(
-            open_goal := ArticulateGraspedMechanism(
-                environment_link=prismatic_bot2.get_body_by_name("robot"),
-                tip_link=prismatic_bot2.get_body_by_name("robot2"),
-                goal_joint_state=0.0,
+            node=(
+                open_goal := ArticulateGraspedMechanism(
+                    environment_link=prismatic_bot2.get_body_by_name("robot"),
+                    tip_link=prismatic_bot2.get_body_by_name("robot2"),
+                    goal_joint_state=0.0,
+                )
             )
         )
         executor.compile(statechart=motion_statechart)
@@ -1140,7 +1144,7 @@ class TestArticulateGraspedMechanism:
         )
         statechart = Statechart(context=executor.context)
         statechart.add_nodes(
-            [
+            nodes=[
                 Sequence(
                     nodes=[
                         CartesianPose(
@@ -1182,11 +1186,11 @@ class TestArticulateGraspedMechanism:
                 ),
             ]
         )
-        statechart.add_node(EndMotion.when_true(statechart.nodes[0]))
+        statechart.add_node(node=EndMotion.when_true(node=statechart.nodes[0]))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
-        statechart.draw(str(tmp_path / "muh.pdf"))
+        statechart.draw(file_name=str(tmp_path / "muh.pdf"))
 
         assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
         assert closing.life_cycle_state == LifeCycleValues.SUCCEEDED
@@ -1226,7 +1230,7 @@ class TestArticulateGraspedMechanism:
         )
         statechart = Statechart(context=executor.context)
         statechart.add_node(
-            Sequence(
+            node=Sequence(
                 nodes=[
                     CartesianPose(
                         root_link=world.root,
@@ -1243,7 +1247,7 @@ class TestArticulateGraspedMechanism:
                 ]
             )
         )
-        statechart.add_node(EndMotion.when_true(statechart.nodes[0]))
+        statechart.add_node(node=EndMotion.when_true(node=statechart.nodes[0]))
         executor.compile(statechart=statechart)
 
         handle_P_tip_when_grasped = None
@@ -1313,7 +1317,7 @@ class TestArticulateGraspedMechanism:
         )
         unscrew_statechart = Statechart(context=executor.context)
         unscrew_statechart.add_nodes(
-            [
+            nodes=[
                 sequence := Sequence(
                     nodes=[
                         # Grasp with the roll axis of the gripper collinear with the
@@ -1334,7 +1338,7 @@ class TestArticulateGraspedMechanism:
                 ),
             ]
         )
-        unscrew_statechart.add_node(EndMotion.when_true(sequence))
+        unscrew_statechart.add_node(node=EndMotion.when_true(node=sequence))
 
         executor.compile(statechart=unscrew_statechart)
         executor.tick_until_end()
@@ -1363,7 +1367,7 @@ class TestArticulateGraspedMechanism:
         )
         tighten_statechart = Statechart(context=executor.context)
         tighten_statechart.add_nodes(
-            [
+            nodes=[
                 close := ArticulateGraspedMechanism(
                     tip_link=r_tip,
                     environment_link=cap_body,
@@ -1371,7 +1375,7 @@ class TestArticulateGraspedMechanism:
                 ),
             ]
         )
-        tighten_statechart.add_node(EndMotion.when_true(close))
+        tighten_statechart.add_node(node=EndMotion.when_true(node=close))
 
         executor.compile(statechart=tighten_statechart)
         executor.tick_until_end()
@@ -1391,7 +1395,7 @@ class TestArticulateGraspedMechanism:
         Expands a goal on a statechart of its own and returns the children it built.
         """
         statechart = Statechart(context=create_context_with_motion_control(world))
-        statechart.add_node(goal)
+        statechart.add_node(node=goal)
         goal.expand()
         return goal.nodes
 
@@ -1461,7 +1465,7 @@ class TestArticulateGraspedMechanism:
         )
 
         Statechart(context=create_context_with_motion_control(pr2_world_copy)).add_node(
-            goal
+            node=goal
         )
 
         nodes = goal.nodes
@@ -1483,7 +1487,7 @@ class TestArticulateGraspedMechanism:
         )
 
         Statechart(context=create_context_with_motion_control(prismatic_bot)).add_node(
-            goal
+            node=goal
         )
 
         nodes = goal.nodes

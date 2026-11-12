@@ -70,7 +70,7 @@ class BorderStyle(StrEnum):
 # %% sizes
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class DrawingMetrics:
     """
     The measurements the drawing is laid out with.
@@ -124,7 +124,7 @@ class DrawingMetrics:
     at least, so the node read is drawn a row above the node reading it.
     """
 
-    def minimum_rank_distance(self, transition_kind: TransitionKind) -> int:
+    def minimum_rank_distance(self, *, transition_kind: TransitionKind) -> int:
         """
         :param transition_kind: The kind of the condition a dependency feeds.
         :return: How many rows apart that dependency draws its endpoints at least.
@@ -175,7 +175,7 @@ class ObservationDrawingStyle(Enum):
 
     @classmethod
     def of_observation(
-        cls, observation: ObservationStateValues
+        cls, *, observation: ObservationStateValues
     ) -> ObservationDrawingStyle:
         """
         :param observation: The trinary value to draw.
@@ -183,7 +183,7 @@ class ObservationDrawingStyle(Enum):
         """
         return cls[observation.name]
 
-    def line_width(self, metrics: DrawingMetrics) -> float:
+    def line_width(self, *, metrics: DrawingMetrics) -> float:
         """
         :param metrics: The measurements the drawing is laid out with.
         :return: The width of a line carrying this value.

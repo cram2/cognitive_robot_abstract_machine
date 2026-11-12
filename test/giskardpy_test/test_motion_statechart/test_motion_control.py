@@ -33,7 +33,7 @@ def test_motion_control_ticks_at_the_control_rate() -> None:
     motion_control = MotionControl()
     context = StatechartContext(world=World())
 
-    motion_control.extend_context(context)
+    motion_control.extend_context(context=context)
 
     assert (
         context.require_tick_duration()
@@ -45,10 +45,12 @@ def test_motion_control_hands_its_controller_configuration_to_the_nodes() -> Non
     motion_control = MotionControl()
     context = StatechartContext(world=World())
 
-    motion_control.extend_context(context)
+    motion_control.extend_context(context=context)
 
     assert (
-        context.require_extension(MotionControlContext).qp_controller_config
+        context.require_extension(
+            extension_type=MotionControlContext
+        ).qp_controller_config
         is motion_control.qp_controller_config
     )
 
@@ -62,12 +64,12 @@ def test_motion_control_rejects_a_context_ticking_at_another_rate() -> None:
     )
 
     with pytest.raises(ConflictingTickDurationError):
-        motion_control.extend_context(context)
+        motion_control.extend_context(context=context)
 
 
 def test_a_node_reading_the_controller_configuration_needs_motion_control() -> None:
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(node := LocalMinimumReached())
+    statechart.add_node(node=(node := LocalMinimumReached()))
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
         statechart.compiler.compile()
@@ -78,7 +80,7 @@ def test_a_node_reading_the_controller_configuration_needs_motion_control() -> N
 # %% sharing a statechart with other modules
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionCountingTicks(TickingExecutorExtension):
     """
     An executor extension of another module, counting the ticks it was called after.
@@ -89,7 +91,7 @@ class ExtensionCountingTicks(TickingExecutorExtension):
     How many ticks this extension was called after.
     """
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         self.ticks += 1
 
 
@@ -111,23 +113,26 @@ def test_motion_nodes_and_nodes_of_other_modules_run_in_one_statechart(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [goal, other_node, EndMotion.when_all_true([goal, other_node])]
+        nodes=[goal, other_node, EndMotion.when_all_true(nodes=[goal, other_node])]
     )
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.tick_until_end()
 
     assert statechart.is_ended()
     assert goal.life_cycle_state == LifeCycleValues.RUNNING
     assert other_node.life_cycle_state == LifeCycleValues.RUNNING
     assert tick_counter.ticks == executor.tick_count
-    assert executor.require_extension(MotionControl).qp_controller is not None
+    assert (
+        executor.require_extension(extension_type=MotionControl).qp_controller
+        is not None
+    )
 
 
 # %% degrees of freedom no running node moves
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StateRecordedWhileNodeRuns(TickingExecutorExtension):
     """
     Records the state of a degree of freedom after every tick in which a node runs.
@@ -156,7 +161,7 @@ class StateRecordedWhileNodeRuns(TickingExecutorExtension):
     The velocity after every tick in which :attr:`node` ran.
     """
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         if self.node.life_cycle_state != LifeCycleValues.RUNNING:
             return
         state = executor.context.world.state[self.degree_of_freedom.id]
@@ -187,9 +192,9 @@ def run_one_joint_goal_after_another(
         extensions=[MotionControl(), recording],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(sequence := Sequence(nodes=[first, second]))
-    statechart.add_node(EndMotion.when_true(sequence))
-    executor.compile(statechart)
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
+    statechart.add_node(node=EndMotion.when_true(node=sequence))
+    executor.compile(statechart=statechart)
     executor.tick_until_end()
     return recording
 

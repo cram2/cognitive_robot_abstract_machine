@@ -239,7 +239,7 @@ def test_monitored_subtree_nested_in_a_sequence_compiles(
     )
     statechart = _compile(plan, extensions)
 
-    assert len(statechart.get_nodes_by_type(CancelledWhenTrue)) == 1
+    assert len(statechart.get_nodes_by_type(node_type=CancelledWhenTrue)) == 1
 
 
 # %% running actions
