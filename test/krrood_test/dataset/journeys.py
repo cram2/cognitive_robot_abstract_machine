@@ -14,7 +14,7 @@ from krrood.symbol_graph.symbol_graph import Symbol
 # %% stops
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Stop(Symbol):
     """
     A place a journey passes through.
@@ -26,7 +26,7 @@ class Stop(Symbol):
     """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Route(Symbol):
     """
     One object that can be iterated over its stops.
@@ -47,7 +47,7 @@ class Route(Symbol):
 # %% journeys
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Journey(Symbol):
     """
     A journey along one route, with optional stops on top of it.

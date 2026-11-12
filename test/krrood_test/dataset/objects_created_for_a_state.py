@@ -14,7 +14,7 @@ from .semantic_world_like_classes import FixedConnection
 # %% connections planned but never built
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class PlannedFixedConnection(FixedConnection):
     """
     A fixed connection that exists only in the states that add it, as one an effect

@@ -1,3 +1,7 @@
+"""
+Helpers that read literals and resolve the domain a variable is created with.
+"""
+
 from __future__ import annotations
 
 from typing_extensions import Any

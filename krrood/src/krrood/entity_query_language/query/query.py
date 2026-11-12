@@ -1236,11 +1236,9 @@ class Entity(Query[T]):
 class MatchedEntity(Entity[T]):
     """
     The query a :class:`~krrood.entity_query_language.query.match.Match` stands for.
-
-    A match describes an entity of the query it is part of rather than a scope of its
-    own, so nested in another query it is evaluated under that query's bindings, and
-    passes its own on: a variable that occurs both inside and outside of it takes one
-    value per row.
+    Nested in another query, it is evaluated under that query's bindings and passes its
+    own on, so a variable that occurs both inside and outside of it takes one value per
+    row.
     """
 
     def _evaluate_as_nested_subquery_(

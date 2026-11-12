@@ -1,3 +1,8 @@
+"""
+Translation of EQL queries into SQLAlchemy selections over the ORM's data access
+objects.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

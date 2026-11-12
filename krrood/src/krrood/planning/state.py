@@ -43,16 +43,10 @@ class State(TermReader):
     ...     color: str
     >>> box = Box("red")
     >>> state = State().with_facts(literal(box).color == "blue")
-    >>> a(Box).from_([box]).color.tolist(state=state)
+    >>> a(Box).from_(domain=[box]).color.tolist(state=state)
     ['blue']
     >>> box.color
     'red'
-
-    A state also adds and removes objects, as a difference from the live symbol graph.
-    A variable without a domain ranges over the objects of the state the query is
-    evaluated with. A variable's domain, and a ground term whose value is a collection of
-    elements, read without the objects the state removes; a literal still names its
-    object.
 
     .. note:: An unassigned derived ground term follows the state only where its value comes
         from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
@@ -74,7 +68,7 @@ class State(TermReader):
     added_objects: dict[int, Any] = field(default_factory=dict)
     """
     The objects this state adds to the live symbol graph's instances, keyed by their
-    :func:`id`.
+    :func:`id`. A variable without a domain ranges over them too.
 
     Never mutated; a changed state is a new :class:`State`.
     """
@@ -82,7 +76,8 @@ class State(TermReader):
     removed_objects: dict[int, Any] = field(default_factory=dict)
     """
     The objects this state removes from the live symbol graph's instances, keyed by
-    their :func:`id`.
+    their :func:`id`. Every variable domain, and every ground term whose value is a
+    collection of elements, reads without them; a literal still names its object.
 
     Never mutated; a changed state is a new :class:`State`.
     """

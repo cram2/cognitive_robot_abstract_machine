@@ -34,7 +34,7 @@ from ...dataset.journeys import Journey, Route, Stop
 # %% fixtures
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TwoWorlds:
     """
     Two worlds, each with one fixed and one prismatic connection of its own.
@@ -88,6 +88,10 @@ def two_worlds() -> TwoWorlds:
 
 
 def test_match_ranges_over_the_elements_of_its_domain_expression(two_worlds):
+    """
+    A match whose domain is an expression takes each element of the expression's value,
+    for each binding of the expression, in that order.
+    """
     world = variable(World, two_worlds.worlds)
 
     result = a(Connection).from_(domain=world.connections).tolist()
@@ -96,6 +100,10 @@ def test_match_ranges_over_the_elements_of_its_domain_expression(two_worlds):
 
 
 def test_match_keeps_only_the_elements_of_its_type(two_worlds):
+    """
+    Elements of the domain expression that are not instances of the match's type are
+    left out.
+    """
     world = variable(World, two_worlds.worlds)
 
     result = a(FixedConnection).from_(domain=world.connections).tolist()
@@ -107,6 +115,10 @@ def test_match_keeps_only_the_elements_of_its_type(two_worlds):
 
 
 def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
+    """
+    Selected together with the variable its domain is read from, a match pairs each
+    value of that variable with its own elements only.
+    """
     world = variable(World, two_worlds.worlds)
     connection = a(FixedConnection).from_(domain=world.connections)
 
@@ -119,6 +131,10 @@ def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
 
 
 def test_match_selected_before_its_domain_binds_the_domain_expression(two_worlds):
+    """
+    The pairing holds when the match is selected before the variable its domain is read
+    from.
+    """
     world = variable(World, two_worlds.worlds)
     connection = a(FixedConnection).from_(domain=world.connections)
 
@@ -131,6 +147,9 @@ def test_match_selected_before_its_domain_binds_the_domain_expression(two_worlds
 
 
 def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
+    """
+    A condition on the match's values filters the elements of its domain expression.
+    """
     world = variable(World, two_worlds.worlds)
     body = a(Body).from_(domain=world.bodies)
 
@@ -140,6 +159,10 @@ def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
 
 
 def test_match_with_a_pattern_ranges_over_its_domain_expression(two_worlds):
+    """
+    A domain expression given after a pattern call ranges the match over its elements
+    and keeps the pattern.
+    """
     world = variable(World, two_worlds.worlds)
 
     result = a(Body)(name="handle 2").from_(domain=world.bodies).tolist()
@@ -150,6 +173,10 @@ def test_match_with_a_pattern_ranges_over_its_domain_expression(two_worlds):
 def test_where_condition_before_a_domain_expression_constrains_the_match(
     two_worlds,
 ):
+    """
+    A condition recorded before the domain expression is given still constrains the
+    match.
+    """
     world = variable(World, two_worlds.worlds)
     body = a(Body)
     body.where(body.name == "handle 2")
@@ -163,6 +190,9 @@ def test_where_condition_before_a_domain_expression_constrains_the_match(
 
 
 def test_variable_from_an_expression_ranges_over_its_elements(two_worlds):
+    """
+    An untyped variable over an expression takes each element of the expression's value.
+    """
     world = variable(World, two_worlds.worlds)
 
     result = variable_from(world.bodies).tolist()
@@ -171,6 +201,10 @@ def test_variable_from_an_expression_ranges_over_its_elements(two_worlds):
 
 
 def test_flattening_keeps_values_that_are_not_collections(two_worlds):
+    """
+    A value declared as one object, such as a string, is its only element rather than
+    being iterated.
+    """
     body = variable(Body, two_worlds.first.bodies)
 
     result = flat_variable(body.name).tolist()
@@ -215,7 +249,7 @@ def test_attribute_through_an_untyped_domain_reads_the_element_type(two_worlds):
 # %% values that are absent or not collections
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Journeys:
     """
     Journeys that cover a missing collection, an iterable single object and a value of
@@ -255,13 +289,13 @@ def journeys() -> Journeys:
     """
     :return: Two journeys along one route of one stop.
     """
-    harbour, tower = Stop("harbour"), Stop("tower")
-    route = Route([harbour])
+    harbour, tower = Stop(name="harbour"), Stop(name="tower")
+    route = Route(stops=[harbour])
     return Journeys(
         harbour=harbour,
         tower=tower,
-        planned=Journey("planned", route, [tower]),
-        unplanned=Journey("unplanned", route),
+        planned=Journey(name="planned", route=route, extra_stops=[tower]),
+        unplanned=Journey(name="unplanned", route=route),
     )
 
 
