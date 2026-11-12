@@ -81,9 +81,10 @@ class LifeCycleValues(IntEnum):
     @classmethod
     def terminal_states(cls) -> frozenset[LifeCycleValues]:
         """
-        :return: The states a node can only leave by being reset.
+        :return: The states a node can only leave by being reset, which are the outcomes
+            of the transitions that end a node.
         """
-        return frozenset({cls.SUCCEEDED, cls.FAILED, cls.INTERRUPTED})
+        return frozenset(kind.outcome for kind in TransitionKind.ending_kinds())
 
     @property
     def is_terminal(self) -> bool:
@@ -91,6 +92,9 @@ class LifeCycleValues(IntEnum):
         :return: Whether a node in this state has ended.
         """
         return self in self.terminal_states()
+
+
+# %% observation states
 
 
 class ObservationStateValues(FloatEnum):
@@ -124,6 +128,115 @@ class ObservationStateValues(FloatEnum):
         member.color = color
         member.badge = badge
         return member
+
+
+# %% transitions
+
+
+class TransitionKind(Enum):
+    """
+    The kinds of transitions a node takes through its life cycle, each decided by one
+    of its transition conditions.
+    """
+
+    START = auto()
+    """
+    Transitions nodes from NOT_STARTED to RUNNING, or to PAUSED if their pause condition
+    already holds.
+    """
+
+    PAUSE = auto()
+    """
+    Transitions nodes from RUNNING to PAUSED if True, or back if False.
+    """
+
+    SUCCEED = auto()
+    """
+    Ends a node from RUNNING or PAUSED as SUCCEEDED, and interrupts its descendants.
+    """
+
+    RESET = auto()
+    """
+    Transitions nodes from any state to NOT_STARTED.
+    """
+
+    FAIL = auto()
+    """
+    Ends a node from RUNNING or PAUSED as FAILED, because it cannot continue, and
+    interrupts its descendants.
+    """
+
+    INTERRUPT = auto()
+    """
+    Ends a node from RUNNING or PAUSED as INTERRUPTED, and its descendants with it.
+    """
+
+    @property
+    def source_states(self) -> frozenset[LifeCycleValues]:
+        """
+        :return: The lifecycle states from which this transition kind can trigger.
+        """
+        match self:
+            case TransitionKind.START:
+                return frozenset({LifeCycleValues.NOT_STARTED})
+            case TransitionKind.PAUSE:
+                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+            case TransitionKind.RESET:
+                return frozenset(LifeCycleValues)
+            case (
+                TransitionKind.SUCCEED | TransitionKind.FAIL | TransitionKind.INTERRUPT
+            ):
+                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
+
+    @property
+    def unwired_condition(self) -> Scalar:
+        """
+        :return: The condition a node is created with for this transition, before
+            anything wires it.
+        """
+        if self is TransitionKind.START:
+            return Scalar.const_true()
+        return Scalar.const_false()
+
+    @classmethod
+    def owner_wired_kinds(cls) -> tuple[TransitionKind, ...]:
+        """
+        :return: The transitions the owner of a node wires, which are all but failing:
+            a node declares its own failure.
+        """
+        return cls.START, cls.PAUSE, cls.SUCCEED, cls.INTERRUPT, cls.RESET
+
+    @classmethod
+    def ending_kinds(cls) -> tuple[TransitionKind, ...]:
+        """
+        :return: The transitions that end a node, in the order they take precedence when
+            several hold on the same tick: a node that arrived did what it was
+            asked, and a node that cannot continue says more about itself than being
+            stopped does.
+        """
+        return cls.SUCCEED, cls.FAIL, cls.INTERRUPT
+
+    @property
+    def outcome(self) -> LifeCycleValues:
+        """
+        :return: The terminal state this transition ends a node in.
+        :raises TransitionHasNoOutcomeError: If this transition does not end a node.
+        """
+        match self:
+            case TransitionKind.SUCCEED:
+                return LifeCycleValues.SUCCEEDED
+            case TransitionKind.FAIL:
+                return LifeCycleValues.FAILED
+            case TransitionKind.INTERRUPT:
+                return LifeCycleValues.INTERRUPTED
+        raise TransitionHasNoOutcomeError(transition_kind=self)
+
+    def can_trigger_from(self, life_cycle: LifeCycleValues) -> bool:
+        """
+        :param life_cycle: The lifecycle state to check.
+        :return: Whether this transition can trigger from the given lifecycle state.
+        """
+        return life_cycle in self.source_states
 
 
 # %% life cycle predicates
@@ -261,109 +374,3 @@ class ObservationPredicate(ObservationPredicateDefinition, Enum):
             it inside a condition.
         """
         return self.name.lower()
-
-
-class TransitionKind(Enum):
-    """
-    The kinds of transitions a node takes through its life cycle, each decided by one
-    of its transition conditions.
-    """
-
-    START = 1
-    """
-    Transitions nodes from NOT_STARTED to RUNNING, or to PAUSED if their pause condition
-    already holds.
-    """
-
-    PAUSE = 2
-    """
-    Transitions nodes from RUNNING to PAUSED if True, or back if False.
-    """
-
-    SUCCEED = 3
-    """
-    Ends a node from RUNNING or PAUSED as SUCCEEDED, and interrupts its descendants.
-    """
-
-    RESET = 4
-    """
-    Transitions nodes from any state to NOT_STARTED.
-    """
-
-    FAIL = 5
-    """
-    Ends a node from RUNNING or PAUSED as FAILED, because it cannot continue, and
-    interrupts its descendants.
-    """
-
-    INTERRUPT = 6
-    """
-    Ends a node from RUNNING or PAUSED as INTERRUPTED, and its descendants with it.
-    """
-
-    @property
-    def source_states(self) -> frozenset[LifeCycleValues]:
-        """
-        :return: The lifecycle states from which this transition kind can trigger.
-        """
-        match self:
-            case TransitionKind.START:
-                return frozenset({LifeCycleValues.NOT_STARTED})
-            case TransitionKind.PAUSE:
-                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
-            case TransitionKind.RESET:
-                return frozenset(LifeCycleValues)
-            case (
-                TransitionKind.SUCCEED | TransitionKind.FAIL | TransitionKind.INTERRUPT
-            ):
-                return frozenset({LifeCycleValues.RUNNING, LifeCycleValues.PAUSED})
-
-    @property
-    def unwired_condition(self) -> Scalar:
-        """
-        :return: The condition a node is created with for this transition, before
-            anything wires it.
-        """
-        if self is TransitionKind.START:
-            return Scalar.const_true()
-        return Scalar.const_false()
-
-    @classmethod
-    def owner_wired_kinds(cls) -> tuple[TransitionKind, ...]:
-        """
-        :return: The transitions the owner of a node wires, which are all but failing:
-            a node declares its own failure.
-        """
-        return cls.START, cls.PAUSE, cls.SUCCEED, cls.INTERRUPT, cls.RESET
-
-    @classmethod
-    def ending_kinds(cls) -> tuple[TransitionKind, ...]:
-        """
-        :return: The transitions that end a node, in the order they take precedence when
-            several hold on the same tick: a node that arrived did what it was
-            asked, and a node that cannot continue says more about itself than being
-            stopped does.
-        """
-        return cls.SUCCEED, cls.FAIL, cls.INTERRUPT
-
-    @property
-    def outcome(self) -> LifeCycleValues:
-        """
-        :return: The terminal state this transition ends a node in.
-        :raises TransitionHasNoOutcomeError: If this transition does not end a node.
-        """
-        match self:
-            case TransitionKind.SUCCEED:
-                return LifeCycleValues.SUCCEEDED
-            case TransitionKind.FAIL:
-                return LifeCycleValues.FAILED
-            case TransitionKind.INTERRUPT:
-                return LifeCycleValues.INTERRUPTED
-        raise TransitionHasNoOutcomeError(transition_kind=self)
-
-    def can_trigger_from(self, life_cycle: LifeCycleValues) -> bool:
-        """
-        :param life_cycle: The lifecycle state to check.
-        :return: Whether this transition can trigger from the given lifecycle state.
-        """
-        return life_cycle in self.source_states
