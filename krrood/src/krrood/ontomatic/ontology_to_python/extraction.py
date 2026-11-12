@@ -1,0 +1,550 @@
+"""
+Reading classes and properties, with their labels and comments, out of an RDF graph.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from functools import cached_property
+
+
+import rdflib
+from rdflib.namespace import RDF, RDFS, OWL
+from typing_extensions import Any, Dict, List, Optional
+
+from krrood.ontomatic.naming import NamingRegistry
+from krrood.ontomatic.ontology_to_python.property_type import PropertyType
+from krrood.symbol_graph.symbol_graph import Symbol
+
+from krrood.ontomatic.ontology_to_python.ontology_info import (
+    ClassInfo,
+    OntologyInfo,
+    PropertyInfo,
+)
+
+
+class MetadataExtractor:
+    """
+    Helper for extracting metadata (labels, comments) from an RDF graph.
+    """
+
+    def __init__(self, graph: rdflib.Graph):
+        """
+        Initialize the metadata extractor.
+
+        :param graph: The rdflib graph to extract metadata from.
+        """
+        self.graph = graph
+
+    def get_label(self, *, uri: Any) -> Optional[str]:
+        """
+        Get rdfs:label for a URI.
+        """
+        for label in self.graph.objects(uri, RDFS.label):
+            return str(label)
+        return None
+
+    def get_comment(self, *, uri: Any) -> Optional[str]:
+        """
+        Get rdfs:comment for a URI.
+        """
+        for comment in self.graph.objects(uri, RDFS.comment):
+            return str(comment)
+        return None
+
+
+class ClassExtractor:
+    """
+    Extractor for OWL Class information from an RDF graph.
+    """
+
+    def __init__(self, graph: rdflib.Graph, metadata_extractor: MetadataExtractor):
+        """
+        Initialize the class extractor.
+
+        :param graph: The rdflib graph.
+        :param metadata_extractor: Extractor for labels and comments.
+        """
+        self.graph = graph
+        self.metadata_extractor = metadata_extractor
+
+    def extract_info(self, *, class_uri: Any) -> ClassInfo:
+        """
+        Extract information about a class.
+        """
+        is_b_node = False
+        if isinstance(class_uri, rdflib.BNode):
+            is_b_node = True
+            class_name = NamingRegistry.bnode_to_name(graph=self.graph, bnode=class_uri)
+        else:
+            class_name = NamingRegistry.uri_to_python_name(uri=class_uri)
+
+        # Get superclasses from explicit rdfs:subClassOf
+        superclasses: List[str] = []
+        has_descriptions = []
+        for superclass in self.graph.objects(class_uri, RDFS.subClassOf):
+            if isinstance(superclass, rdflib.URIRef):
+                superclasses.append(NamingRegistry.uri_to_python_name(uri=superclass))
+            elif isinstance(superclass, rdflib.BNode):
+                # Only include BNode superclasses if they are intersections or unions
+                if list(self.graph.objects(superclass, OWL.intersectionOf)) or list(
+                    self.graph.objects(superclass, OWL.unionOf)
+                ):
+                    has_descriptions.append(
+                        NamingRegistry.uri_to_python_name(
+                            uri=superclass, graph=self.graph
+                        )
+                    )
+        if not is_b_node:
+            superclasses.extend(
+                self.named_conjuncts_of_definitions(class_uri=class_uri)
+            )
+
+        # De-duplicate while preserving order
+        seen = set()
+        unique_superclasses: List[str] = []
+        for sc in superclasses:
+            if sc not in seen:
+                unique_superclasses.append(sc)
+                seen.add(sc)
+
+        # disjoint with
+        disjoint_with: List[str] = []
+        for disjoint_class in self.graph.objects(class_uri, OWL.disjointWith):
+            if isinstance(disjoint_class, rdflib.URIRef):
+                disjoint_with.append(
+                    NamingRegistry.uri_to_python_name(uri=disjoint_class)
+                )
+
+        # equivalent classes
+        equivalent_classes: List[str] = []
+        for eq_class in self.graph.objects(class_uri, OWL.equivalentClass):
+            if isinstance(eq_class, rdflib.URIRef):
+                equivalent_classes.append(
+                    NamingRegistry.uri_to_python_name(uri=eq_class)
+                )
+
+        # Get label
+        label = self.metadata_extractor.get_label(uri=class_uri)
+        is_description_for = None
+        if is_b_node and unique_superclasses:
+            if len(unique_superclasses) > 1:
+                raise NotImplemented(
+                    f"BNode class {class_name} has multiple superclasses: {unique_superclasses}"
+                )
+            is_description_for = unique_superclasses[0]
+        elif is_b_node and not unique_superclasses:
+            subclasses = list(self.graph.subjects(RDFS.subClassOf, class_uri))
+            if len(subclasses) > 1:
+                raise NotImplemented(
+                    f"BNode class {class_name} has multiple subclasses: {subclasses}"
+                )
+            if subclasses:
+                is_description_for = NamingRegistry.uri_to_python_name(
+                    uri=subclasses[0]
+                )
+            else:
+                is_description_for = self.defined_class(class_expression=class_uri)
+            if is_description_for is None:
+                unique_superclasses = self.named_conjuncts_of(
+                    class_expression=class_uri
+                )
+
+        return ClassInfo(
+            name=class_name,
+            uri=str(class_uri),
+            superclasses=unique_superclasses or [Symbol.__name__],
+            disjoint_with=disjoint_with,
+            equivalent_classes=equivalent_classes,
+            is_description_for=is_description_for,
+            has_descriptions=has_descriptions,
+            label=label,
+            comment=self.metadata_extractor.get_comment(uri=class_uri),
+            add_role_taker=True,
+        )
+
+    def defined_class(self, *, class_expression: rdflib.BNode) -> Optional[str]:
+        """
+        :param class_expression: An anonymous class expression.
+        :return: The name of the named class the expression is the ``owl:equivalentClass`` of, or None when it is
+            the definition of no named class.
+        """
+        for defined in [
+            *self.graph.subjects(OWL.equivalentClass, class_expression),
+            *self.graph.objects(class_expression, OWL.equivalentClass),
+        ]:
+            if isinstance(defined, rdflib.URIRef):
+                return NamingRegistry.uri_to_python_name(uri=defined)
+        return None
+
+    def is_attached_to_a_named_class(self, *, class_expression: rdflib.BNode) -> bool:
+        """
+        :param class_expression: An anonymous class expression.
+        :return: Whether the expression describes a named class: as its superclass, its subclass or its definition.
+            An expression that only appears inside another one, such as the filler of a restriction, describes none.
+        """
+        return (
+            any(self.graph.objects(class_expression, RDFS.subClassOf))
+            or any(self.graph.subjects(RDFS.subClassOf, class_expression))
+            or self.defined_class(class_expression=class_expression) is not None
+        )
+
+    def named_class_defined_alike(
+        self, *, class_expression: rdflib.BNode
+    ) -> Optional[str]:
+        """
+        :param class_expression: An anonymous intersection.
+        :return: The name of the named class defined by another intersection of the same members, which the expression
+            therefore stands for, or None.
+        """
+        name = NamingRegistry.uri_to_python_name(uri=class_expression, graph=self.graph)
+        for definition in self.graph.subjects(OWL.intersectionOf, None):
+            if (
+                definition != class_expression
+                and NamingRegistry.uri_to_python_name(uri=definition, graph=self.graph)
+                == name
+            ):
+                defined_class = self.defined_class(class_expression=definition)
+                if defined_class is not None:
+                    return defined_class
+        return None
+
+    def named_conjuncts_of(self, *, class_expression: rdflib.BNode) -> List[str]:
+        """
+        :param class_expression: An anonymous intersection.
+        :return: The names of the named classes among its members.
+        """
+        return [
+            NamingRegistry.uri_to_python_name(uri=member)
+            for intersection in self.graph.objects(class_expression, OWL.intersectionOf)
+            for member in NamingRegistry._get_rdf_list(
+                graph=self.graph, head=intersection
+            )
+            if isinstance(member, rdflib.URIRef)
+        ]
+
+    def named_conjuncts_of_definitions(self, *, class_uri: rdflib.URIRef) -> List[str]:
+        """
+        :param class_uri: A named class.
+        :return: The named classes of every intersection the class is defined by (``owl:equivalentClass``), each of
+            which is a superclass of the class.
+        """
+        return [
+            conjunct
+            for definition in self.graph.objects(class_uri, OWL.equivalentClass)
+            for conjunct in self.named_conjuncts_of(class_expression=definition)
+        ]
+
+
+class PropertyExtractor:
+    """
+    Extractor for OWL Property information from an RDF graph.
+    """
+
+    def __init__(self, graph: rdflib.Graph, metadata_extractor: MetadataExtractor):
+        """
+        Initialize the property extractor.
+
+        :param graph: The rdflib graph.
+        :param metadata_extractor: Extractor for labels and comments.
+        """
+        self.graph = graph
+        self.metadata_extractor = metadata_extractor
+
+    def extract_info(self, *, property_uri: Any) -> PropertyInfo:
+        """
+        Extract information about a property.
+        """
+        prop_local = NamingRegistry.uri_to_python_name(uri=property_uri)
+
+        # Get domain and range
+        domains: List[str] = []
+        ranges: List[str] = []
+        superproperties: List[str] = []
+        inverses: List[str] = []
+        is_transitive = False
+        equivalent_properties: List[str] = []
+        disjoint_properties: List[str] = []
+        is_symmetric = False
+        is_asymmetric = False
+        is_reflexive = False
+        is_irreflexive = False
+        is_functional = False
+
+        for domain in self.graph.objects(property_uri, RDFS.domain):
+            domains.append(NamingRegistry.uri_to_python_name(uri=domain))
+
+        range_uris: List[rdflib.term.Identifier] = []
+        for range_val in self.graph.objects(property_uri, RDFS.range):
+            ranges.append(NamingRegistry.uri_to_python_name(uri=range_val))
+            range_uris.append(range_val)
+
+        # Inheritance between properties
+        for super_prop in self.graph.objects(property_uri, RDFS.subPropertyOf):
+            if isinstance(super_prop, rdflib.URIRef):
+                superproperties.append(
+                    NamingRegistry.uri_to_python_name(uri=super_prop)
+                )
+
+        # Inverses
+        for inv in self.graph.objects(property_uri, OWL.inverseOf):
+            if isinstance(inv, rdflib.URIRef):
+                inverses.append(NamingRegistry.uri_to_python_name(uri=inv))
+        # Also collect when current property is the object of inverseOf
+        for inv_subj in self.graph.subjects(OWL.inverseOf, property_uri):
+            if isinstance(inv_subj, rdflib.URIRef):
+                inverses.append(NamingRegistry.uri_to_python_name(uri=inv_subj))
+
+        # Equivalent properties
+        for eq_prop in self.graph.objects(property_uri, OWL.equivalentProperty):
+            if isinstance(eq_prop, rdflib.URIRef):
+                equivalent_properties.append(
+                    NamingRegistry.uri_to_python_name(uri=eq_prop)
+                )
+        for eq_prop_subj in self.graph.subjects(OWL.equivalentProperty, property_uri):
+            if isinstance(eq_prop_subj, rdflib.URIRef):
+                equivalent_properties.append(
+                    NamingRegistry.uri_to_python_name(uri=eq_prop_subj)
+                )
+
+        # Disjoint properties
+        for dis_prop in self.graph.objects(property_uri, OWL.propertyDisjointWith):
+            if isinstance(dis_prop, rdflib.URIRef):
+                disjoint_properties.append(
+                    NamingRegistry.uri_to_python_name(uri=dis_prop)
+                )
+        for dis_prop_subj in self.graph.subjects(
+            OWL.propertyDisjointWith, property_uri
+        ):
+            if isinstance(dis_prop_subj, rdflib.URIRef):
+                disjoint_properties.append(
+                    NamingRegistry.uri_to_python_name(uri=dis_prop_subj)
+                )
+
+        # Determine property type
+        prop_type = PropertyType.OBJECT_PROPERTY
+        for prop_type_uri in self.graph.objects(property_uri, RDF.type):
+            if prop_type_uri == OWL.DatatypeProperty:
+                prop_type = PropertyType.DATA_PROPERTY
+            if prop_type_uri == OWL.TransitiveProperty:
+                is_transitive = True
+            if prop_type_uri == OWL.SymmetricProperty:
+                is_symmetric = True
+            if prop_type_uri == OWL.AsymmetricProperty:
+                is_asymmetric = True
+            if prop_type_uri == OWL.ReflexiveProperty:
+                is_reflexive = True
+            if prop_type_uri == OWL.IrreflexiveProperty:
+                is_irreflexive = True
+            if prop_type == OWL.FunctionalProperty:
+                is_functional = True
+
+        # Choose a single inverse if any (stable order)
+        inverse_of = None
+        if inverses:
+            inverse_of = sorted(set(inverses))[0]
+
+        return PropertyInfo(
+            name=prop_local,
+            uri=str(property_uri),
+            type=prop_type,
+            domains=domains,
+            ranges=ranges,
+            range_uris=range_uris,
+            equivalent_properties=equivalent_properties,
+            disjoint_properties=disjoint_properties,
+            label=self.metadata_extractor.get_label(uri=property_uri),
+            comment=self.metadata_extractor.get_comment(uri=property_uri),
+            field_name=NamingRegistry.to_snake_case(name=prop_local),
+            descriptor_name=NamingRegistry.to_pascal_case(name=prop_local),
+            superproperties=superproperties,
+            inverses=sorted(set(inverses)),
+            inverse_of=inverse_of,
+            is_transitive=is_transitive,
+            is_symmetric=is_symmetric,
+            is_asymmetric=is_asymmetric,
+            is_reflexive=is_reflexive,
+            is_irreflexive=is_irreflexive,
+            is_functional=is_functional,
+            is_specialized=False,
+        )
+
+
+@dataclass(kw_only=True)
+class OntologyExtractor:
+    """
+    Reads the information about a whole ontology out of its RDF graph.
+    """
+
+    graph: rdflib.Graph
+    """
+    The graph of the ontology.
+    """
+
+    predefined_data_types: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    """
+    Manual type overrides for properties.
+    """
+
+    classes: Dict[str, ClassInfo] = field(default_factory=dict, init=False)
+    """
+    The named classes read so far, by name.
+    """
+
+    class_descriptions: Dict[str, ClassInfo] = field(default_factory=dict, init=False)
+    """
+    The anonymous classes that describe a named class, by the name of that class.
+    """
+
+    properties: Dict[str, PropertyInfo] = field(default_factory=dict, init=False)
+    """
+    The properties read so far, by name.
+    """
+
+    ontology_label: Optional[str] = field(default=None, init=False)
+    """
+    The label of the ontology.
+    """
+
+    @cached_property
+    def metadata_extractor(self) -> MetadataExtractor:
+        """
+        Reads the labels and comments of the graph.
+        """
+        return MetadataExtractor(self.graph)
+
+    @cached_property
+    def class_extractor(self) -> ClassExtractor:
+        """
+        Reads the classes of the graph.
+        """
+        return ClassExtractor(self.graph, self.metadata_extractor)
+
+    @cached_property
+    def property_extractor(self) -> PropertyExtractor:
+        """
+        Reads the properties of the graph.
+        """
+        return PropertyExtractor(self.graph, self.metadata_extractor)
+
+    def extract(self) -> OntologyInfo:
+        """
+        :return: The information about the ontology: its classes, its class descriptions and its properties.
+        """
+        for s in self.graph.subjects(RDF.type, OWL.Ontology):
+            self.ontology_label = self.metadata_extractor.get_label(uri=s)
+            if not self.ontology_label:
+                self.ontology_label = NamingRegistry.uri_to_python_name(uri=s)
+            break
+
+        if not self.ontology_label:
+            self.ontology_label = "Thing"
+
+        all_class_subjects = set(self.graph.subjects(RDF.type, OWL.Class))
+
+        for cls_uri in all_class_subjects:
+            # Anonymous unions inside other expressions are checked against their members, and anonymous intersections
+            # with the members of a named class's definition stand for that class; neither is a class of its own.
+            if isinstance(cls_uri, rdflib.BNode):
+                if not (
+                    list(self.graph.objects(cls_uri, OWL.intersectionOf))
+                    or list(self.graph.objects(cls_uri, OWL.unionOf))
+                ):
+                    continue
+                if not self.class_extractor.is_attached_to_a_named_class(
+                    class_expression=cls_uri
+                ) and (
+                    list(self.graph.objects(cls_uri, OWL.unionOf))
+                    or self.class_extractor.named_class_defined_alike(
+                        class_expression=cls_uri
+                    )
+                    is not None
+                ):
+                    continue
+
+            unions = list(self.graph.objects(cls_uri, OWL.unionOf))
+            if unions:
+                # 2. Register the parent class
+                info = self.class_extractor.extract_info(class_uri=cls_uri)
+                super_classes = info.superclasses[:]
+
+                # 3. Process members and make them inherit from the parent union class
+                members = NamingRegistry._get_rdf_list(graph=self.graph, head=unions[0])
+                for member in members:
+                    member_info = self.class_extractor.extract_info(class_uri=member)
+                    # Ensure member inherits from the union parent
+                    for sc in super_classes:
+                        if sc not in member_info.superclasses:
+                            member_info.superclasses.append(sc)
+
+                    # Update/Register member
+                    self._register_class(info=member_info)
+                continue
+
+            # Handle regular classes and other BNodes (Intersections, Restrictions)
+            info = self.class_extractor.extract_info(class_uri=cls_uri)
+            if not info:
+                continue
+            self._register_class(info=info)
+
+        for p_type in [
+            OWL.ObjectProperty,
+            OWL.DatatypeProperty,
+            OWL.TransitiveProperty,
+        ]:
+            for p_uri in self.graph.subjects(RDF.type, p_type):
+                if isinstance(p_uri, rdflib.term.BNode):
+                    continue
+                info = self.property_extractor.extract_info(property_uri=p_uri)
+                if info.name in self.properties:
+                    existing = self.properties[info.name]
+                    if p_type == OWL.TransitiveProperty:
+                        existing.is_transitive = True
+                    existing.domains = sorted(set(existing.domains) | set(info.domains))
+                    existing.ranges = sorted(set(existing.ranges) | set(info.ranges))
+                    if not existing.inverse_of:
+                        existing.inverse_of = info.inverse_of
+                else:
+                    self.properties[info.name] = info
+
+        return OntologyInfo(
+            graph=self.graph,
+            classes=self.classes,
+            class_descriptions=self.class_descriptions,
+            original_properties=self.properties,
+            predefined_data_types=self.predefined_data_types,
+            ontology_label=self.ontology_label,
+        )
+
+    def _register_class(self, *, info: ClassInfo):
+        """
+        Register or update class information.
+        """
+        if info.name in self.classes:
+            existing = self.classes[info.name]
+            # Merge superclasses
+            for sc in info.superclasses:
+                if sc not in existing.superclasses:
+                    existing.superclasses.append(sc)
+
+            # Special handling for "Symbol"
+            if (
+                Symbol.__name__ in existing.superclasses
+                and len(existing.superclasses) > 1
+            ):
+                existing.superclasses.remove(Symbol.__name__)
+
+            # Merge declared properties
+            for dp in info.declared_properties:
+                if dp not in existing.declared_properties:
+                    existing.declared_properties.append(dp)
+
+            # Merge other metadata
+            if not existing.label:
+                existing.label = info.label
+            if not existing.comment:
+                existing.comment = info.comment
+        elif info.is_description_for:
+            self.class_descriptions[info.is_description_for] = info
+        else:
+            self.classes[info.name] = info

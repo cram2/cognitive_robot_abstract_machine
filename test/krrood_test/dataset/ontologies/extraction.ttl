@@ -1,0 +1,25 @@
+@prefix : <http://example.org/extraction#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/extraction> a owl:Ontology .
+
+:Person a owl:Class ;
+    rdfs:label "person" ;
+    rdfs:comment "A human being." .
+:Student a owl:Class ; rdfs:subClassOf :Person .
+:Professor a owl:Class ; rdfs:subClassOf :Person .
+
+:hasAdvisor a owl:ObjectProperty ;
+    rdfs:domain :Student ;
+    rdfs:range :Professor ;
+    owl:inverseOf :advises .
+:advises a owl:ObjectProperty .
+:knows a owl:ObjectProperty, owl:SymmetricProperty, owl:TransitiveProperty ;
+    rdfs:domain :Person ;
+    rdfs:range :Person .
+:hasSupervisor a owl:ObjectProperty ; rdfs:subPropertyOf :knows .
+:age a owl:DatatypeProperty ;
+    rdfs:domain :Person ;
+    rdfs:range xsd:integer .

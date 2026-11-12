@@ -27,7 +27,7 @@ from krrood.entity_query_language.verbalization._example_domain import (
     WorksIn,
 )
 from krrood.inheritance_path_length import InheritancePathLength
-from krrood.patterns.role_predicates import IsSameSemanticEntity
+from krrood.patterns.role_predicates import IsSameSemanticEntity, IsSubClassOrRole
 
 results: tuple[VerbalizationResult, ...] = (
     VerbalizationResult(
@@ -57,4 +57,5 @@ results: tuple[VerbalizationResult, ...] = (
         IsSameSemanticEntity,
         "a first entity is the same semantic entity as a second entity",
     ),
+    VerbalizationResult(IsSubClassOrRole, "a type is a subclass or role of object"),
 )
