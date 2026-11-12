@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 from time import sleep

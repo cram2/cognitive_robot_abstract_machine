@@ -152,6 +152,17 @@ def test_a_transition_that_does_not_end_a_node_has_no_outcome(
         transition_kind.outcome
 
 
+# %% the terminal states are derived once
+
+
+def test_the_terminal_states_are_derived_only_once() -> None:
+    """
+    Every node asks whether its state is terminal, so the terminal states are derived
+    from the ending transitions once and then handed out again.
+    """
+    assert LifeCycleValues.terminal_states() is LifeCycleValues.terminal_states()
+
+
 # %% life cycle predicates read off an expression
 
 
