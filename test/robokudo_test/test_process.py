@@ -21,7 +21,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
     PerceivedObject,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -298,12 +298,14 @@ class TestJoiningSharedWorld:
         )
         expected_pose = perceived_body.global_transform.to_np()
         assert wait_until(
-            lambda: body_id in [body.id for body in shared_world.world.bodies]
-            and np.allclose(
-                shared_world.world.get_kinematic_structure_entity_by_id(
-                    body_id
-                ).global_transform.to_np(),
-                expected_pose,
+            lambda: (
+                body_id in [body.id for body in shared_world.world.bodies]
+                and np.allclose(
+                    shared_world.world.get_kinematic_structure_entity_by_id(
+                        body_id
+                    ).global_transform.to_np(),
+                    expected_pose,
+                )
             )
         )
         shared_body = shared_world.world.get_kinematic_structure_entity_by_id(body_id)
@@ -321,14 +323,16 @@ class TestJoiningSharedWorld:
         [body_id] = joined_robokudo.perceived_objects.apply(cas)
 
         assert wait_until(
-            lambda: [
-                (type(annotation), annotation.class_label)
-                for annotation in shared_world.world.get_semantic_annotations_by_type(
-                    IsPerceivable
-                )
-                if annotation.root.id == body_id
-            ]
-            == [(PerceivedObject, class_label)]
+            lambda: (
+                [
+                    (type(annotation), annotation.class_label)
+                    for annotation in shared_world.world.get_semantic_annotations_by_type(
+                        IsPerceivable
+                    )
+                    if annotation.root.id == body_id
+                ]
+                == [(PerceivedObject, class_label)]
+            )
         )
 
     def test_classified_object_reaches_the_shared_world_as_its_semantic_annotation(
@@ -345,14 +349,16 @@ class TestJoiningSharedWorld:
         )
 
         assert wait_until(
-            lambda: [
-                type(annotation)
-                for annotation in shared_world.world.get_semantic_annotations_by_type(
-                    IsPerceivable
-                )
-                if annotation.root.id == body_id
-            ]
-            == [Cup]
+            lambda: (
+                [
+                    type(annotation)
+                    for annotation in shared_world.world.get_semantic_annotations_by_type(
+                        IsPerceivable
+                    )
+                    if annotation.root.id == body_id
+                ]
+                == [Cup]
+            )
         )
 
     def test_perceiving_adds_no_camera_to_the_shared_world(
@@ -390,10 +396,10 @@ class TestJoiningAWorldWithARobot:
         robokudo_joined_to_a_robot: RoboKudo,
     ) -> None:
         shared = shared_world_with_a_robot.world
-        shared.get_body_by_name(FrameName.HEAD).parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=0.5, z=1.2, yaw=0.3, reference_frame=shared.root
-            )
+        shared.get_body_by_name(
+            FrameName.HEAD
+        ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.5, z=1.2, yaw=0.3, reference_frame=shared.root
         )
         moved_camera_pose = shared.get_body_by_name(
             FrameName.CAMERA
@@ -407,7 +413,9 @@ class TestJoiningAWorldWithARobot:
 
         cas = cas_seen_from(robokudo_joined_to_a_robot.world, camera_pose(x=4.0))
 
-        assert np.allclose(cas.camera_to_world_transform.to_np(), moved_camera_pose)
+        assert np.allclose(
+            cas.camera_observation.world_T_camera.to_np(), moved_camera_pose
+        )
 
     def test_perceived_object_reaches_the_shared_world_where_the_robot_saw_it(
         self,
@@ -429,12 +437,14 @@ class TestJoiningAWorldWithARobot:
         )
 
         assert wait_until(
-            lambda: body_id in [body.id for body in shared.bodies]
-            and np.allclose(
-                shared.get_kinematic_structure_entity_by_id(
-                    body_id
-                ).global_transform.to_np(),
-                expected_pose,
+            lambda: (
+                body_id in [body.id for body in shared.bodies]
+                and np.allclose(
+                    shared.get_kinematic_structure_entity_by_id(
+                        body_id
+                    ).global_transform.to_np(),
+                    expected_pose,
+                )
             )
         )
 
