@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Iterable, Self
+from typing_extensions import Iterable, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
@@ -199,31 +199,16 @@ class SumLayer(InnerLayer):
 
     @property
     def number_of_nodes(self) -> int:
-        return self.log_weights.shape[0]
+        return self.log_weights.sparsity.shape[0]
 
     @property
     def number_of_own_parameters(self) -> int:
-        return self.log_weights.number_of_stored_entries
-
-    @property
-    def column_offsets(self) -> npt.NDArray[np.int64]:
-        """
-        :return: The first column of every child layer, followed by the number of
-            columns.
-        """
-        return np.concatenate(
-            [
-                [0],
-                np.cumsum(
-                    [child_layer.number_of_nodes for child_layer in self.child_layers]
-                ),
-            ]
-        ).astype(np.int64)
+        return self.log_weights.sparsity.number_of_stored_entries
 
     def validate_own(self):
         expected_shape = (self.number_of_nodes, int(self.column_offsets[-1]))
-        if self.log_weights.shape != expected_shape:
-            raise ShapeMismatchError(expected_shape, self.log_weights.shape)
+        if self.log_weights.sparsity.shape != expected_shape:
+            raise ShapeMismatchError(expected_shape, self.log_weights.sparsity.shape)
 
     # %% edges
 
@@ -233,17 +218,17 @@ class SumLayer(InnerLayer):
         :return: The edges in the order of the stored weights.
         """
         offsets = self.column_offsets
-        columns = self.log_weights.columns
+        columns = self.log_weights.sparsity.columns
         child_layer_indices = np.searchsorted(offsets, columns, side="right") - 1
         return InnerLayerEdges(
-            self.log_weights.rows.astype(np.int64),
+            self.log_weights.sparsity.rows,
             child_layer_indices,
             columns - offsets[child_layer_indices],
         )
 
     def nodes_with_components(self) -> NodeMask:
         result = np.zeros(self.number_of_nodes, dtype=bool)
-        result[self.log_weights.rows] = True
+        result[self.log_weights.sparsity.rows] = True
         return result
 
     def component_supports(
@@ -280,16 +265,9 @@ class SumLayer(InnerLayer):
         :param child_results: The result per child layer, child nodes last.
         :return: One value per edge, the edges last.
         """
-        values = np.concatenate(child_results, axis=-1)
-        columns = self.log_weights.columns
-        # a sum layer usually points at every node of its child layers exactly once and
-        # in order, in which case the gather is an identity copy of an array that has one
-        # entry per event per node, and skipping it is worth the comparison
-        if len(columns) == values.shape[-1] and np.array_equal(
-            columns, np.arange(len(columns))
-        ):
-            return values
-        return values[..., columns]
+        return self.log_weights.sparsity.values_of_entries(
+            np.concatenate(child_results, axis=-1)
+        )
 
     def has_equal_edges(self, other: Self) -> bool:
         return super().has_equal_edges(other) and np.array_equal(
@@ -313,7 +291,9 @@ class SumLayer(InnerLayer):
         """
         :return: ``log(sum(exp(w)))`` over the weights of each node, shape (#nodes,).
         """
-        return self.log_weights.reduce_by_row(self.log_weights.data, np.logaddexp)
+        return self.log_weights.sparsity.reduce_by_row(
+            self.log_weights.data, np.logaddexp
+        )
 
     @property
     def normalized_edge_log_weights(self) -> EdgeValues:
@@ -322,7 +302,7 @@ class SumLayer(InnerLayer):
         """
         return (
             self.log_weights.data
-            - self.log_normalization_constants[self.log_weights.rows]
+            - self.log_normalization_constants[self.log_weights.sparsity.rows]
         )
 
     @property
@@ -351,7 +331,7 @@ class SumLayer(InnerLayer):
         :return: The result for the nodes of this layer, shape (..., #nodes).
         """
         values = self.values_of_edges(child_results) * self.normalized_edge_weights
-        return self.log_weights.reduce_by_row(values, np.add)
+        return self.log_weights.sparsity.reduce_by_row(values, np.add)
 
     def _weighted_forward_over_nodes(
         self, child_results: list[NodeVariableValues]
@@ -365,7 +345,7 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges([result.T for result in child_results])
         values = values * self.normalized_edge_weights
-        return self.log_weights.reduce_by_row(values, np.add).T
+        return self.log_weights.sparsity.reduce_by_row(values, np.add).T
 
     def log_weighted_sum(
         self, child_results: list[SampleNodeValues]
@@ -379,7 +359,7 @@ class SumLayer(InnerLayer):
         """
         values = self.values_of_edges(child_results) + self.log_weights.data
         return (
-            self.log_weights.reduce_by_row(values, np.logaddexp)
+            self.log_weights.sparsity.reduce_by_row(values, np.logaddexp)
             - self.log_normalization_constants
         )
 
@@ -493,7 +473,7 @@ class SumLayer(InnerLayer):
         variables: SortedSet,
     ):
         # the padding slot gets a weight of zero, so it is never drawn
-        weights = self.log_weights.pad(self.normalized_edge_weights, 0.0)
+        weights = self.log_weights.sparsity.pad(self.normalized_edge_weights, 0.0)
         for node, rows_of_node in enumerate(assignment.rows_of(self)):
             if not rows_of_node.is_empty:
                 self.route_rows_of_node(node, rows_of_node.rows, weights, assignment)
@@ -515,7 +495,7 @@ class SumLayer(InnerLayer):
             of the padding slot.
         :param assignment: The assignment to route the rows into.
         """
-        positions = self.log_weights.gather[node]
+        positions = self.log_weights.sparsity.gather[node]
         probabilities = weights[positions]
 
         # guard against the accumulated floating point error of the normalization
@@ -634,12 +614,12 @@ class SumLayer(InnerLayer):
         # original sparsity pattern shifted into its own rows and into the k-th block
         # of every child layer
         number_of_events = len(events)
-        number_of_entries = self.log_weights.number_of_stored_entries
+        number_of_entries = self.log_weights.sparsity.number_of_stored_entries
         edges = self.inner_layer_edges
         child_node_counts = np.diff(self.column_offsets)
         blocks = np.repeat(np.arange(number_of_events), number_of_entries)
 
-        rows = np.tile(self.log_weights.rows, number_of_events) + (
+        rows = np.tile(self.log_weights.sparsity.rows, number_of_events) + (
             blocks * self.number_of_nodes
         )
         # the child layer i now starts at number_of_events * column_offsets[i], and its
@@ -701,7 +681,7 @@ class SumLayer(InnerLayer):
             for child_layer in self.child_layers
         ]
         return (
-            alive[self.log_weights.rows]
+            alive[self.log_weights.sparsity.rows]
             & (self.log_weights.data > -np.inf)
             & self.values_of_edges(child_alive)
         )
@@ -732,10 +712,10 @@ class SumLayer(InnerLayer):
             return None
 
         edges = self.inner_layer_edges
-        kept = alive[self.log_weights.rows] & (self.log_weights.data > -np.inf)
+        kept = alive[self.log_weights.sparsity.rows] & (self.log_weights.data > -np.inf)
 
         new_child_layers = []
-        new_columns = np.full(self.log_weights.number_of_stored_entries, -1)
+        new_columns = np.full(self.log_weights.sparsity.number_of_stored_entries, -1)
         for child_layer_index, child_layer in enumerate(self.child_layers):
             pruned_child = rebuilt.get(id(child_layer))
             if pruned_child is None:
@@ -760,7 +740,7 @@ class SumLayer(InnerLayer):
             RowGroupedSparseArray.from_entries(
                 SparseEntries(
                     self.log_weights.data[kept],
-                    node_remap[self.log_weights.rows[kept]],
+                    node_remap[self.log_weights.sparsity.rows[kept]],
                     new_columns[kept],
                 ),
                 (
@@ -777,8 +757,10 @@ class SumLayer(InnerLayer):
         edges = self.inner_layer_edges
 
         new_child_layers = []
-        kept_edges = np.zeros(self.log_weights.number_of_stored_entries, dtype=bool)
-        new_columns = np.full(self.log_weights.number_of_stored_entries, -1)
+        kept_edges = np.zeros(
+            self.log_weights.sparsity.number_of_stored_entries, dtype=bool
+        )
+        new_columns = np.full(self.log_weights.sparsity.number_of_stored_entries, -1)
         for child_layer_index, child_layer in enumerate(self.child_layers):
             marginal_child = child_layer.marginal(kept, cache=cache)
             if marginal_child is None:
@@ -796,7 +778,7 @@ class SumLayer(InnerLayer):
             RowGroupedSparseArray.from_entries(
                 SparseEntries(
                     self.log_weights.data[kept_edges],
-                    self.log_weights.rows[kept_edges],
+                    self.log_weights.sparsity.rows[kept_edges],
                     new_columns[kept_edges],
                 ),
                 (
@@ -824,13 +806,13 @@ class SumLayer(InnerLayer):
         """
         if len(self.child_layers) != 1:
             return False
-        log_weights = self.log_weights
-        if log_weights.shape[0] != log_weights.shape[1]:
+        sparsity = self.log_weights.sparsity
+        if sparsity.shape[0] != sparsity.shape[1]:
             return False
-        if log_weights.number_of_stored_entries != self.number_of_nodes:
+        if sparsity.number_of_stored_entries != self.number_of_nodes:
             return False
         # every node points at the node with its own index, and at nothing else
         return bool(
-            np.array_equal(log_weights.rows, log_weights.columns)
-            and len(np.unique(log_weights.rows)) == self.number_of_nodes
+            np.array_equal(sparsity.rows, sparsity.columns)
+            and len(np.unique(sparsity.rows)) == self.number_of_nodes
         )
