@@ -111,7 +111,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         :return: The states as floats in an array of the backend of the parameters, the
             way the layer reads the values of events.
         """
-        return self.namespace.asarray(self.states, dtype=self.dtype)
+        return self.namespace.asarray(self.states, dtype=self.dtype, device=self.device)
 
     def validate_own(self):
         if self.table.number_of_states != self.number_of_states:

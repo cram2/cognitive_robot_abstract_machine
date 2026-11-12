@@ -342,6 +342,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
                     (self.number_of_nodes, 1),
                     -np.inf,
                     dtype=self.log_probabilities.dtype,
+                    device=self.device,
                 ),
             ],
             axis=1,
@@ -350,7 +351,7 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return self.namespace.take(padded, columns, axis=1).T
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
-        columns = self.namespace.asarray(np.flatnonzero(selected))
+        columns = self.namespace.asarray(np.flatnonzero(selected), device=self.device)
         return self.namespace.sum(
             self.namespace.exp(
                 self.namespace.take(self.log_probabilities, columns, axis=1)
@@ -360,7 +361,8 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
 
     def dot(self, values: StateValues) -> NodeValues:
         return self.namespace.matmul(
-            self.namespace.exp(self.log_probabilities), self.namespace.asarray(values)
+            self.namespace.exp(self.log_probabilities),
+            self.namespace.asarray(values, device=self.device),
         )
 
     def probabilities_of_node(self, node: int) -> tuple[StateIndices, TableEntryValues]:

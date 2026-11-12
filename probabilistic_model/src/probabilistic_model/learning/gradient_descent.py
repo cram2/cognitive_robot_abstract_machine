@@ -14,6 +14,8 @@ import jax
 import jax.numpy as jnp
 import optax
 import tqdm
+import array_api_compat
+from array_api_compat import array_namespace
 from typing_extensions import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -141,23 +143,45 @@ class GradientDescent(ABC):
 # %% losses
 
 
-@dataclass
-class LikelihoodMaximization(GradientDescent):
+class LikelihoodLoss(ABC):
     """
-    Maximizes the average log-likelihood of the data under the nodes of the root.
-    """
-
-    def loss(self, layer: Any, data: jax.Array) -> jax.Array:
-        return -jnp.mean(layer.log_likelihood_of_nodes(data))
-
-
-@dataclass
-class ClassConditionalLikelihoodMaximization(GradientDescent):
-    """
-    Maximizes the average log-likelihood of each row under the node of its class.
+    The negative average log-likelihood of the data under the nodes of the root, on any
+    array backend.
     """
 
-    def loss(self, layer: Any, data: jax.Array, labels: jax.Array) -> jax.Array:
-        return -jnp.mean(
-            layer.log_likelihood_of_nodes(data)[jnp.arange(len(labels)), labels]
+    def loss(self, layer: Any, data: Any) -> Any:
+        log_likelihoods = layer.log_likelihood_of_nodes(data)
+        return -array_namespace(log_likelihoods).mean(log_likelihoods)
+
+
+class ClassConditionalLikelihoodLoss(ABC):
+    """
+    The negative average log-likelihood of each row under the node of its class, on any
+    array backend.
+    """
+
+    def loss(self, layer: Any, data: Any, labels: Any) -> Any:
+        log_likelihoods = layer.log_likelihood_of_nodes(data)
+        namespace = array_namespace(log_likelihoods)
+        rows = namespace.arange(
+            labels.shape[0], device=array_api_compat.device(log_likelihoods)
         )
+        return -namespace.mean(log_likelihoods[rows, labels])
+
+
+@dataclass
+class LikelihoodMaximization(LikelihoodLoss, GradientDescent):
+    """
+    Maximizes the average log-likelihood of the data under the nodes of the root with
+    jax.
+    """
+
+
+@dataclass
+class ClassConditionalLikelihoodMaximization(
+    ClassConditionalLikelihoodLoss, GradientDescent
+):
+    """
+    Maximizes the average log-likelihood of each row under the node of its class with
+    jax.
+    """

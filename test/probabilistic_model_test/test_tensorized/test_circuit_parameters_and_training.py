@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import pytest
+from array_api_compat import array_namespace
 from scipy.special import logsumexp
 
 from probabilistic_model.learning.gradient_descent import LikelihoodMaximization
@@ -228,3 +229,38 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
             jnp.mean(trained_root.log_likelihood_of_nodes(jnp.asarray(data))[:, 0])
         )
     assert after > before + 0.1
+
+
+def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
+    mixture_of_products_case,
+):
+    """
+    Maximizing the likelihood of data sampled from a circuit with torch, starting from a
+    circuit with moved locations, raises the average log-likelihood of the data and
+    keeps every Gaussian scale at least the minimum scale.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+
+    case = mixture_of_products_case
+    np.random.seed(0)
+    data = case.circuit(np).sample(500)
+    start = case.circuit(np)
+    namespace = array_namespace(torch.zeros(0))
+    circuit = start.copy_with_parameters(
+        parameters_shifted(start, GaussianLayer, 1.5)
+    ).to_namespace(namespace)
+    events = namespace.asarray(data)
+    before = float(circuit.log_likelihood(events).mean())
+    trained_root = torch_gradient_descent.TorchLikelihoodMaximization(
+        circuit.root, learning_rate=5e-2
+    ).minimize(200, events)
+    after = float(trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
+    assert after > before + 0.1
+    assert all(
+        float(layer.scale.min()) >= GaussianLayer.minimum_scale
+        for layer in trained_root.all_layers()
+        if isinstance(layer, GaussianLayer)
+    )

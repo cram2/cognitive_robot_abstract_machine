@@ -10,6 +10,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from array_api_compat import array_namespace
 
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -64,11 +65,23 @@ def edge_matrix_type(request) -> type[EdgeMatrix]:
 # %% array backends
 
 
-@pytest.fixture(params=[np, jnp], ids=["numpy", "jax"])
+@pytest.fixture(params=["numpy", "jax", "torch"])
 def array_backend(request) -> ModuleType:
     """
     The array namespace of every supported backend, with jax computing in double
-    precision.
+    precision and torch defaulting to double precision.
+
+    Torch is an optional dependency, so its tests are skipped without it.
     """
-    with jax.enable_x64(True):
-        yield request.param
+    match request.param:
+        case "numpy":
+            yield np
+        case "jax":
+            with jax.enable_x64(True):
+                yield jnp
+        case "torch":
+            torch = pytest.importorskip("torch")
+            default_dtype = torch.get_default_dtype()
+            torch.set_default_dtype(torch.float64)
+            yield array_namespace(torch.zeros(0))
+            torch.set_default_dtype(default_dtype)

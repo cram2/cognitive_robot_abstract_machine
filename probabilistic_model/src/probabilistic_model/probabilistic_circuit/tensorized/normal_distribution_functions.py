@@ -12,11 +12,19 @@ from types import ModuleType
 import jax.scipy.special
 import numpy as np
 import scipy.special
-from array_api_compat import array_namespace, is_jax_namespace, is_numpy_namespace
+from array_api_compat import (
+    array_namespace,
+    is_jax_namespace,
+    is_numpy_namespace,
+    is_torch_namespace,
+)
 from krrood.ormatic.utils import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from typing_extensions import Generic, TypeVar
 
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     UnsupportedArrayBackendError,
 )
@@ -142,3 +150,18 @@ class JaxNormalDistributionFunctions(NormalDistributionFunctions[jax.Array]):
 
     def standard_cumulative_distribution(self, values: jax.Array) -> jax.Array:
         return jax.scipy.special.ndtr(values)
+
+
+@dataclass
+class TorchNormalDistributionFunctions(NormalDistributionFunctions[BackendArray]):
+    """
+    The normal distribution functions of torch tensors, computed by :mod:`torch.special`
+    through the namespace, so that torch stays an optional dependency.
+    """
+
+    @classmethod
+    def supports(cls, namespace: ModuleType) -> bool:
+        return is_torch_namespace(namespace)
+
+    def standard_cumulative_distribution(self, values: BackendArray) -> BackendArray:
+        return self.namespace.special.ndtr(values)

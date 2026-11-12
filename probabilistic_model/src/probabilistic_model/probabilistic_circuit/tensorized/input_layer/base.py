@@ -88,7 +88,8 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             shape (#events, 1).
         """
         return self.namespace.reshape(
-            self.namespace.asarray(values, dtype=self.dtype), (-1, 1)
+            self.namespace.asarray(values, dtype=self.dtype, device=self.device),
+            (-1, 1),
         )
 
     # %% per node view
@@ -175,6 +176,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             return self.namespace.zeros(
                 (self.number_of_nodes, query.number_of_variables),
                 dtype=self.dtype,
+                device=self.device,
             )
         own_moments = self.moment_of_nodes_own(
             int(query.order[self.variable]),
@@ -182,7 +184,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             variables[self.variable],
         )
         is_own_variable = self.namespace.asarray(
-            np.arange(query.number_of_variables) == self.variable
+            np.arange(query.number_of_variables) == self.variable, device=self.device
         )
         return self.namespace.where(is_own_variable, own_moments[:, None], 0.0)
 
@@ -203,13 +205,14 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         """
         order_map = VariableMap({variable: order})
         center_map = VariableMap({variable: center})
-        return np.array(
+        moments = np.array(
             [
                 distribution.moment(order_map, center_map)[variable]
                 for distribution in self.node_distributions(variable)
             ],
             dtype=float,
         )
+        return self.namespace.asarray(moments, dtype=self.dtype, device=self.device)
 
     def sample_forward(
         self,
@@ -416,12 +419,15 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
         cache: QueryCache | None = None,
     ) -> NodeValues:
         interval: Interval = event[variables[self.variable]]
-        result = self.namespace.zeros(self.number_of_nodes, dtype=self.dtype)
+        result = self.namespace.zeros(
+            self.number_of_nodes, dtype=self.dtype, device=self.device
+        )
         for simple_interval in interval.simple_sets:
             values = self.cumulative_distribution_of_nodes_from_column(
                 self.namespace.asarray(
                     [simple_interval.lower, simple_interval.upper],
                     dtype=self.dtype,
+                    device=self.device,
                 )
             )
             result = result + (values[1] - values[0])
