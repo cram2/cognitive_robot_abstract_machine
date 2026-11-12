@@ -78,7 +78,6 @@ class CameraUnit(IntEnum):
     """
 
     MILLIMETERS_PER_METER = 1000
-    NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 @dataclass(kw_only=True)
@@ -209,10 +208,6 @@ class DepthCameraStatistics:
     matched_frames: int = 0
     """
     Image pairs associated with calibration.
-    """
-    stale_frames: int = 0
-    """
-    Frames outside the permitted acquisition age.
     """
     replaced_frames: int = 0
     """
@@ -355,9 +350,6 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         timestamp = Time.from_msg(images.header.stamp).nanoseconds
         with self.lock:
             self.statistics.matched_frames += 1
-            if not self.is_current(timestamp=timestamp):
-                self.statistics.stale_frames += 1
-                return
             if timestamp <= self.last_timestamp:
                 self.statistics.obsolete_frames += 1
                 return
@@ -368,15 +360,6 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
             )
             self.last_timestamp = timestamp
             self._has_new_data = True
-
-    def is_current(self, *, timestamp: int) -> bool:
-        """
-        Whether an acquisition is within the configured age window.
-        """
-        age = (
-            self.node.get_clock().now().nanoseconds - timestamp
-        ) / CameraUnit.NANOSECONDS_PER_SECOND
-        return 0 <= age <= self.camera_config.max_frame_age
 
     @called_positionally
     def set_data(self, cas: CAS) -> bool:
@@ -390,9 +373,6 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         if frame is None:
             return False
         timestamp = Time.from_msg(frame.images.header.stamp)
-        if not self.is_current(timestamp=timestamp.nanoseconds):
-            self.statistics.stale_frames += 1
-            return False
         frame.validate(optical_frame=self.camera_config.tf_from)
         if (
             not self.camera_config.static_camera_transform_enabled

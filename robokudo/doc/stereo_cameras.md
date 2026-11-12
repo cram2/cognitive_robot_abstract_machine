@@ -21,7 +21,7 @@ stereo inference. This separation also permits other stereo processors.
 | Work in callback | Image decoding and TF lookup | Retain latest matched acquisition |
 | TF | Latest available transform | Transform at image acquisition time |
 | Buffering | Existing synchronizer | Bounded synchronizers and one pending frame |
-| Frame validity | Existing conversion behavior | Geometry, age, duplicate and ordering checks |
+| Frame validity | Existing conversion behavior | Geometry, duplicate and ordering checks |
 | Delivered data | Color/depth CAS views and camera observation | Same downstream representation |
 
 The branch repeated image bridging, transform handling and CAS calibration setup.
@@ -137,9 +137,9 @@ Each stream has configurable reliability; defaults are reliable. If a publisher
 uses best effort, set the corresponding `color_reliability`, `depth_reliability`
 or `calibration_reliability` to `ReliabilityPolicy.BEST_EFFORT`.
 
-`max_frame_age` defaults to 10 seconds and is checked at reception and
-consumption. It must cover inference/transport latency. Repeated and out-of-order
-acquisitions cannot replace newer frames. Use the same clock and ROS domain
+Frames are accepted regardless of their age at reception or consumption.
+Repeated and out-of-order acquisitions cannot replace newer frames.
+Use the same clock and ROS domain
 throughout; enable ROS simulated time for bag playback. Restart the reader after
 a backward clock jump or a looping bag, since acquisition ordering is monotonic.
 
@@ -150,7 +150,7 @@ lookup and enable `static_camera_transform_enabled`, supplying
 `static_world_frame` and `static_world_T_camera`. With both disabled, observations
 have no world pose and support camera-frame processing.
 
-`statistics` exposes matched, stale, replaced, obsolete and missing-transform
+`statistics` exposes matched, replaced, obsolete and missing-transform
 counts. Filter-queue evictions are not included. When no frames match, check
 topic types, QoS, exact acquisition stamps, calibration publication and buffering.
 

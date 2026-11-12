@@ -135,7 +135,7 @@ def test_rectified_depth_records_configured_static_pose(
     )
 
 
-# %% Synchronization and expiry
+# %% Synchronization and delayed consumption
 
 
 def test_rectified_depth_matches_delayed_depth_exactly(
@@ -158,11 +158,33 @@ def test_rectified_depth_matches_delayed_depth_exactly(
     assert interface.pending_frame.images.depth is stereo_frame.images.depth
 
 
-def test_rectified_depth_expires_before_consumption(
+def test_rectified_depth_accepts_old_acquisition(
+    node: Node, stereo_frame: RectifiedDepthFrame
+) -> None:
+    """
+    A historical acquisition retains its original timestamp when delivered.
+    """
+    for message in (
+        stereo_frame.images.color,
+        stereo_frame.images.depth,
+        stereo_frame.calibration,
+    ):
+        message.header.stamp = Time().to_msg()
+    interface = RectifiedDepthCameraInterface(
+        camera_config=StereoCameraConfig(lookup_viewpoint=False), node=node
+    )
+    interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
+    assert interface.has_new_data() is True
+    cas = CAS()
+    assert interface.set_data(cas) is True
+    assert cas.camera_observation.timestamp_nanoseconds == Time().nanoseconds
+
+
+def test_rectified_depth_accepts_delayed_consumption(
     node: Node, stereo_frame: RectifiedDepthFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """
-    Data that expires while pending never populates a CAS.
+    Waiting before consumption preserves a valid pending acquisition.
     """
     interface = RectifiedDepthCameraInterface(
         camera_config=StereoCameraConfig(lookup_viewpoint=False), node=node
@@ -171,11 +193,12 @@ def test_rectified_depth_expires_before_consumption(
     clock = Mock()
     clock.now.return_value = Time(
         nanoseconds=interface.last_timestamp,
-        seconds=interface.camera_config.max_frame_age + 1,
+        seconds=60,
     )
     monkeypatch.setattr(node, "get_clock", lambda: clock)
-    assert interface.set_data(CAS()) is False
-    assert interface.statistics.stale_frames == 1
+    cas = CAS()
+    assert interface.set_data(cas) is True
+    assert cas.camera_observation.timestamp_nanoseconds == interface.last_timestamp
     assert interface.pending_frame is None
 
 
@@ -214,15 +237,6 @@ def test_stereo_sources_share_interface(
     )
     assert type(descriptor.parameters.camera_interface) is RectifiedDepthCameraInterface
     assert type(descriptor.parameters.camera_config) is configuration_type
-
-
-@pytest.mark.parametrize("maximum_age", [0, -1, np.nan, np.inf])
-def test_stereo_configuration_rejects_invalid_age(maximum_age: float) -> None:
-    """
-    Frame expiration requires a finite positive time window.
-    """
-    with pytest.raises(InvalidStereoCameraConfiguration):
-        StereoCameraConfig(max_frame_age=maximum_age)
 
 
 def test_stereo_configuration_rejects_conflicting_pose_sources() -> None:

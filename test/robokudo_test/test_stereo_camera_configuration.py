@@ -12,7 +12,6 @@ import pytest
 from robokudo.descriptors.camera_configs.config_stereo import StereoCameraConfig
 from robokudo.descriptors.camera_configs.exceptions import (
     InvalidStereoCalibrationTolerance,
-    InvalidStereoFrameAge,
     InvalidStereoHistoryDepth,
     InvalidStereoMaximumDepth,
     InvalidStereoSynchronizationQueueSize,
@@ -52,15 +51,6 @@ def invalid_positive_limit(request: pytest.FixtureRequest) -> float:
     Provide nonpositive or nonfinite limits rejected by the input contract.
     """
     return request.param
-
-
-def test_stereo_frame_age_has_specific_error(invalid_positive_limit: float) -> None:
-    """
-    Age errors retain the rejected acquisition lifetime in seconds.
-    """
-    with pytest.raises(InvalidStereoFrameAge) as error:
-        StereoCameraConfig(max_frame_age=invalid_positive_limit)
-    np.testing.assert_equal(error.value.max_frame_age, invalid_positive_limit)
 
 
 def test_stereo_maximum_depth_has_specific_error(invalid_positive_limit: float) -> None:

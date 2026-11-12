@@ -58,27 +58,6 @@ class InvalidStereoSynchronizationQueueSize(InvalidStereoCameraConfiguration):
 
 
 @dataclass(kw_only=True)
-class InvalidStereoFrameAge(InvalidStereoCameraConfiguration):
-    """
-    The permitted acquisition lifetime is nonpositive or nonfinite.
-    """
-
-    max_frame_age: float
-    """
-    Rejected maximum acquisition age in seconds.
-    """
-
-    def error_message(self) -> str:
-        return (
-            "Stereo max_frame_age must be finite and positive; "
-            f"received {self.max_frame_age!r} seconds."
-        )
-
-    def suggest_correction(self) -> str:
-        return "Set max_frame_age to a finite number of seconds greater than zero."
-
-
-@dataclass(kw_only=True)
 class InvalidStereoMaximumDepth(InvalidStereoCameraConfiguration):
     """
     The distance cutoff is nonpositive or nonfinite.

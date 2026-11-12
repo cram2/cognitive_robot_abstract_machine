@@ -20,7 +20,6 @@ from robokudo.descriptors.camera_configs.components import (
 )
 from robokudo.descriptors.camera_configs.exceptions import (
     InvalidStereoCalibrationTolerance,
-    InvalidStereoFrameAge,
     InvalidStereoHistoryDepth,
     InvalidStereoMaximumDepth,
     InvalidStereoSynchronizationQueueSize,
@@ -114,11 +113,6 @@ class StereoCameraConfig(BaseCameraConfig, TfComponent, StaticCameraTransformCom
     Maximum calibration timestamp difference in seconds.
     """
 
-    max_frame_age: float = 10.0
-    """
-    Maximum acquisition age in seconds at receipt and consumption.
-    """
-
     max_depth: float = 10.0
     """
     Maximum valid depth in meters.
@@ -141,8 +135,6 @@ class StereoCameraConfig(BaseCameraConfig, TfComponent, StaticCameraTransformCom
             raise InvalidStereoSynchronizationQueueSize(
                 synchronization_queue_size=self.synchronization_queue_size
             )
-        if not isfinite(self.max_frame_age) or self.max_frame_age <= 0:
-            raise InvalidStereoFrameAge(max_frame_age=self.max_frame_age)
         if not isfinite(self.max_depth) or self.max_depth <= 0:
             raise InvalidStereoMaximumDepth(max_depth=self.max_depth)
         if not isfinite(self.calibration_tolerance) or self.calibration_tolerance < 0:
