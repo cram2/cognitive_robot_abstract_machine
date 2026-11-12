@@ -336,7 +336,7 @@ class PropertyExtractor:
                 is_reflexive = True
             if prop_type_uri == OWL.IrreflexiveProperty:
                 is_irreflexive = True
-            if prop_type == OWL.FunctionalProperty:
+            if prop_type_uri == OWL.FunctionalProperty:
                 is_functional = True
 
         # Choose a single inverse if any (stable order)

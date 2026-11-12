@@ -16,6 +16,9 @@
     rdfs:range :Professor ;
     owl:inverseOf :advises .
 :advises a owl:ObjectProperty .
+:hasMentor a owl:ObjectProperty, owl:FunctionalProperty ;
+    rdfs:domain :Student ;
+    rdfs:range :Professor .
 :knows a owl:ObjectProperty, owl:SymmetricProperty, owl:TransitiveProperty ;
     rdfs:domain :Person ;
     rdfs:range :Person .

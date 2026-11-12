@@ -116,6 +116,21 @@ def test_a_property_records_its_characteristics(property_extractor):
     assert (knows.is_symmetric, knows.is_transitive) == (True, True)
 
 
+def test_a_functional_property_is_recorded_as_functional(property_extractor):
+    """
+    A property declared ``owl:FunctionalProperty`` is recorded as functional; one
+    that is not stays not functional.
+    """
+    assert (
+        property_extractor.extract_info(
+            property_uri=EXTRACTION.hasMentor
+        ).is_functional,
+        property_extractor.extract_info(
+            property_uri=EXTRACTION.hasAdvisor
+        ).is_functional,
+    ) == (True, False)
+
+
 def test_a_subproperty_records_its_superproperty(property_extractor):
     """
     A subproperty records the property it is declared a subproperty of.
@@ -154,5 +169,5 @@ def test_the_ontology_holds_its_named_classes_and_its_properties(graph):
     ontology = OntologyExtractor(graph=graph).extract()
     assert (sorted(ontology.classes), sorted(ontology.properties)) == (
         ["Person", "Professor", "Student"],
-        ["advises", "age", "hasAdvisor", "hasSupervisor", "knows"],
+        ["advises", "age", "hasAdvisor", "hasMentor", "hasSupervisor", "knows"],
     )
