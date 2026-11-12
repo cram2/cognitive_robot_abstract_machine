@@ -18,7 +18,6 @@ from probabilistic_model.distributions.distributions import (
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
-    BackendArray,
     DenseEdgeValues,
     NodeMask,
     SampleArray,
@@ -209,7 +208,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             if isinstance(variable, Symbolic)
         }
 
-    def encoded(self, events: BackendArray) -> BackendArray:
+    def encoded(self, events: SampleArray) -> SampleArray:
         """
         :param events: Events whose symbolic values are hashes of domain elements.
         :return: The events with every symbolic value replaced by the position of its

@@ -15,13 +15,13 @@ from types import ModuleType
 import numpy as np
 import numpy.typing as npt
 from array_api_compat import array_namespace
-from scipy.sparse import coo_array
 from typing_extensions import Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     EdgeValues,
     NodeColumnMask,
+    NodeValues,
 )
 
 # %% reductions
@@ -117,7 +117,7 @@ class SparseEntries:
     The ``k``-th entry of every array belongs to the ``k``-th entry.
     """
 
-    data: npt.NDArray
+    data: BackendArray
     """
     The value of every entry.
     """
@@ -142,22 +142,6 @@ class SparseEntries:
             np.concatenate([part.data for part in parts]),
             np.concatenate([part.rows for part in parts]),
             np.concatenate([part.columns for part in parts]),
-        )
-
-    def to_coo_array(self, shape: tuple[int, int]) -> coo_array:
-        """
-        :param shape: The shape of the dense array.
-        :return: The sparse array that stores these entries.
-        """
-        return coo_array(
-            (
-                np.asarray(self.data),
-                (
-                    np.asarray(self.rows, dtype=np.int64),
-                    np.asarray(self.columns, dtype=np.int64),
-                ),
-            ),
-            shape=shape,
         )
 
 
@@ -238,7 +222,7 @@ class EdgeMatrix(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def edge_values(self, stored: BackendArray) -> BackendArray:
+    def edge_values(self, stored: BackendArray) -> EdgeValues:
         """
         :param stored: Values as this matrix stores them.
         :return: The value of every edge, in the order of this matrix.
@@ -254,7 +238,7 @@ class EdgeMatrix(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def values_of_rows(self, values: BackendArray) -> BackendArray:
+    def values_of_rows(self, values: NodeValues) -> BackendArray:
         """
         :param values: One value per node of a layer.
         :return: The value of the node of every edge, as this matrix stores values.
@@ -420,7 +404,7 @@ class SparseEdgeMatrix(EdgeMatrix):
     def stored_values(self, entries: SparseEntries, padding: float) -> BackendArray:
         return entries.data
 
-    def edge_values(self, stored: BackendArray) -> BackendArray:
+    def edge_values(self, stored: BackendArray) -> EdgeValues:
         return stored
 
     def values_of_columns(self, values: BackendArray) -> BackendArray:
@@ -430,7 +414,7 @@ class SparseEdgeMatrix(EdgeMatrix):
             return values
         return values[..., self.edge_columns]
 
-    def values_of_rows(self, values: BackendArray) -> BackendArray:
+    def values_of_rows(self, values: NodeValues) -> BackendArray:
         return values[..., self.edge_rows]
 
     def reduce_by_row(
@@ -521,13 +505,13 @@ class DenseEdgeMatrix(EdgeMatrix):
         ] = np.asarray(entries.data)
         return array_namespace(entries.data).asarray(result)
 
-    def edge_values(self, stored: BackendArray) -> BackendArray:
+    def edge_values(self, stored: BackendArray) -> EdgeValues:
         return stored[self.rows, self.columns]
 
     def values_of_columns(self, values: BackendArray) -> BackendArray:
         return array_namespace(values).expand_dims(values, axis=-2)
 
-    def values_of_rows(self, values: BackendArray) -> BackendArray:
+    def values_of_rows(self, values: NodeValues) -> BackendArray:
         return array_namespace(values).expand_dims(values, axis=-1)
 
     def reduce_by_row(

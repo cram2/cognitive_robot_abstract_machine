@@ -833,8 +833,10 @@ def test_sparse_entries_concatenate_into_one_array():
     entries = SparseEntries.concatenate(
         [SparseEntries([1.0], [0], [1]), SparseEntries([2.0], [1], [0])]
     )
-    np.testing.assert_array_equal(
-        entries.to_coo_array((2, 2)).toarray(), np.array([[0.0, 1.0], [2.0, 0.0]])
+    assert (entries.data.tolist(), entries.rows.tolist(), entries.columns.tolist()) == (
+        [1.0, 2.0],
+        [0, 1],
+        [1, 0],
     )
 
 
