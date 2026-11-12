@@ -19,22 +19,24 @@ from packaging.utils import canonicalize_name
 from typing_extensions import Any, Iterator, override
 
 from krrood.development_tools.agents.checker import CodeRuleChecker, CodeRuleViolation
+from krrood.patterns.path_enumeration import PathEnumeration
 from krrood.source_analysis.import_graph import ModuleGraph
 
 # %% file and key names
 
 
-class DeclarationFile(StrEnum):
+class DeclarationFile(PathEnumeration):
     """
-    The files that declare a distribution and its packages.
+    The files that declare a distribution and its packages, relative to the
+    distribution's directory.
     """
 
-    PYPROJECT = "pyproject.toml"
+    PYPROJECT = Path("pyproject.toml")
     """
     The distribution's project declaration.
     """
 
-    SOURCE_DIRECTORY = "src"
+    SOURCE_DIRECTORY = Path("src")
     """
     The directory of a src layout, which holds the distribution's packages.
     """
@@ -81,7 +83,8 @@ class PyprojectKey(StrEnum):
 
     DEPENDENCIES = "dependencies"
     """
-    The key in ``[tool.krrood.core-boundary]`` listing the distributions core may load.
+    The optional key in ``[tool.krrood.core-boundary]`` listing the distributions core
+    may load.
     """
 
 
@@ -109,7 +112,8 @@ class CoreBoundary:
 
     dependencies: list[str]
     """
-    The distributions core may load, without what they require in turn.
+    The distributions core may load, without what they require in turn; empty when the
+    declaration lists none.
     """
 
     extras_by_distribution: dict[str, list[str]]
@@ -123,7 +127,7 @@ class CoreBoundary:
     """
 
     @classmethod
-    def from_json(
+    def from_pyproject_json_data(
         cls, *, pyproject: dict[str, Any], directory: Path
     ) -> CoreBoundary | None:
         """
@@ -157,7 +161,7 @@ class CoreBoundary:
         return cls(
             distribution=canonicalize_name(project[PyprojectKey.NAME]),
             core=declaration[PyprojectKey.CORE],
-            dependencies=declaration[PyprojectKey.DEPENDENCIES],
+            dependencies=declaration.get(PyprojectKey.DEPENDENCIES, []),
             extras_by_distribution=extras_by_distribution,
             graph=ModuleGraph.from_packages(
                 package_directories=[
@@ -173,7 +177,7 @@ class CoreBoundary:
         :param path: A ``pyproject.toml``.
         :return: The boundary it declares, or none if it declares no core.
         """
-        return CoreBoundary.from_json(
+        return CoreBoundary.from_pyproject_json_data(
             pyproject=tomllib.loads(path.read_text()), directory=path.parent
         )
 

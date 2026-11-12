@@ -68,7 +68,8 @@ in its `pyproject.toml`:
 [tool.krrood.core-boundary]
 # The packages and modules of core; every other module of the distribution is not core.
 core = ["my_package.core"]
-# The distributions core may load, with everything they require.
+# The distributions core may load, with everything they require; without it, core may
+# load only the standard library.
 dependencies = ["typing-extensions"]
 ```
 

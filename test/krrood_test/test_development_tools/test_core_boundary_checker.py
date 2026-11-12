@@ -1,3 +1,7 @@
+"""
+Tests of the checker that reports imports crossing a distribution's core boundary.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,8 +27,18 @@ from .dataset_files import (
 # %% imports a core module runs when it is loaded
 
 
-def test_every_import_crossing_the_boundary_is_reported() -> None:
-    path = CoreBoundarySnippet.CROSSING_THE_BOUNDARY
+@pytest.mark.parametrize(
+    "path",
+    [
+        CoreBoundarySnippet.CROSSING_THE_BOUNDARY,
+        CoreBoundarySnippet.CORE_WITHOUT_DEPENDENCIES,
+    ],
+)
+def test_every_import_crossing_the_boundary_is_reported(path: Path) -> None:
+    """
+    Each import a core module runs when it is loaded that loads a module outside core or
+    an undeclared distribution is reported, at the line marked for it.
+    """
     marked_lines = [
         line_number
         for line_number, line in enumerate(path.read_text().splitlines(), start=1)

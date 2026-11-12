@@ -200,6 +200,19 @@ class CoreBoundarySnippet(PathEnumeration):
     A module loading matplotlib in a distribution declaring no core.
     """
 
+    CORE_WITHOUT_DEPENDENCIES = (
+        Path(__file__).parent
+        / "dataset"
+        / "dependency_free_core_distribution"
+        / "src"
+        / "dependency_free_package"
+        / "__init__.py"
+    )
+    """
+    A core package in a distribution declaring no core dependencies, each import of a
+    distribution marked with :attr:`DatasetMarker.CROSSING_IMPORT`.
+    """
+
 
 class DatasetMarker(StrEnum):
     """
