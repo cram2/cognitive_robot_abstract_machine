@@ -621,6 +621,7 @@ def test_place_multi(multiple_robot_apartment_context):
                 arm=left_or_only_arm(view),
             ),
             PlaceAction(
+                arm=left_or_only_arm(view),
                 object_designator=world.get_semantic_annotations_by_type(Milk)[0],
                 target_location=Pose(
                     Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root
@@ -1731,6 +1732,7 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
                 grasp=milk.grasp_candidates()[0], arm=right_or_only_arm(robot)
             ),
             PlaceAction(
+                arm=right_or_only_arm(robot),
                 object_designator=milk,
                 target_location=Pose.from_xyz_rpy(
                     1, 1, 0.8, reference_frame=world.root
@@ -2091,7 +2093,9 @@ def test_a_placing_carries_its_object_to_where_it_stands(
         face_and_look_at=FaceAndLookAtAction(
             face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
         ),
-        place=PlaceAction(object_designator=cup, target_location=target),
+        place=PlaceAction(
+            arm=left_or_only_arm(robot), object_designator=cup, target_location=target
+        ),
     )
 
     expand(move_and_place, extensions)
@@ -2143,6 +2147,7 @@ class CupForEachArm:
         """
         return [
             PlaceAction(
+                arm=pick_up.arm,
                 object_designator=pick_up.grasp.graspable,
                 target_location=self.world.transform(
                     Pose.from_xyz_rpy(

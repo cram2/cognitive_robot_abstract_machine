@@ -314,6 +314,7 @@ def test_place_multi(stationary_block_context, place_position):
                 grasp=top_down_grasp(world, box_body), arm=left_or_only_arm(view)
             ),
             PlaceAction(
+                arm=left_or_only_arm(view),
                 object_designator=graspable_annotation(world, box_body),
                 target_location=Pose(place_position, reference_frame=world.root),
             ),
@@ -484,6 +485,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(grasp=grasp_near_the_top(world, box), arm=arm),
             PlaceAction(
+                arm=arm,
                 object_designator=graspable_annotation(world, box),
                 target_location=Pose(target, reference_frame=world.root),
             ),

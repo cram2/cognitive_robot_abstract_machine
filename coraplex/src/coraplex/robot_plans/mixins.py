@@ -344,6 +344,13 @@ class GraspPoseSequence:
     Where the gripper rises to when it leaves the grasp.
     """
 
+    @property
+    def poses(self) -> list[Pose]:
+        """
+        :return: :attr:`pre_grasp`, :attr:`grasp` and :attr:`retreat`, in this order.
+        """
+        return [self.pre_grasp, self.grasp, self.retreat]
+
 
 @dataclass(kw_only=True, eq=False)
 class HasApproachesGraspPoses:
