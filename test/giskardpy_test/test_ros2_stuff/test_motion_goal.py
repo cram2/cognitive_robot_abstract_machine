@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from giskardpy.middleware.ros2.motion_goal import MotionGoal
+from giskardpy.middleware.ros2.motion_goal import MotionGoal, MotionGoalPayloadKey
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.context import StatechartContext
 from cramph.monitors import CountSimulationTimeSeconds
@@ -109,7 +109,7 @@ class TestMotionGoalPayload:
             motion_statechart=create_motion_statechart(), client=create_client()
         )
         payload = json.loads(json.dumps(goal.to_json()))
-        del payload["publishes_debug_expressions"]
+        del payload[MotionGoalPayloadKey.PUBLISHES_DEBUG_EXPRESSIONS]
 
         restored = MotionGoal.from_json(data=payload)
 
