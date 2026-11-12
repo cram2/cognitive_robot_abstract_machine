@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import IntEnum, Enum, StrEnum, auto
 
 from cramph.exceptions import TransitionHasNoOutcomeError
+from krrood.patterns.float_enumeration import FloatEnum
 from krrood.symbolic_math.symbolic_math import Scalar, logic_or
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -193,12 +194,6 @@ class LifeCycleValues(IntEnum):
         :return: Whether a node in this state has ended.
         """
         return self in self.terminal_states()
-
-
-class FloatEnum(float, Enum):
-    """
-    Enum where members are also (and must be) floats.
-    """
 
 
 class ObservationStateValues(FloatEnum):

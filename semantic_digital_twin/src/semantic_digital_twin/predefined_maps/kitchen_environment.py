@@ -1,5 +1,6 @@
 import numpy as np
-from enum import Enum
+
+from krrood.patterns.float_enumeration import FloatEnum
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Room, Floor
@@ -48,7 +49,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-class MaximumSpeed(float, Enum):
+class MaximumSpeed(FloatEnum):
     """
     The speed limits of the kitchen's movable parts.
     """
