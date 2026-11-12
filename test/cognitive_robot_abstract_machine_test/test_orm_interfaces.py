@@ -19,6 +19,7 @@ from cognitive_robot_abstract_machine.exceptions import (
     MissingORMGeneratorError,
     OrmGenerationFailedError,
     UnknownOrmPackageError,
+    UnorderableOrmInterfacesError,
 )
 from cognitive_robot_abstract_machine.orm_interfaces import (
     INTERFACE_FILE_NAME,
@@ -276,24 +277,52 @@ class BranchingPackage(StrEnum):
     """
 
 
-@pytest.fixture
-def branching_workspace() -> WorkspaceOrmInterfaces:
+def branching_interfaces(*package_names: BranchingPackage) -> WorkspaceOrmInterfaces:
     """
-    The interfaces of :class:`BranchingPackage`, in an order that follows their
-    dependencies, whose generators are in the test dataset.
+    :return: The interfaces of the packages, in the order given, whose generators are
+        in the test dataset.
     """
     workspace_root = Path(dataset.__file__).parent / "branching_workspace"
     return WorkspaceOrmInterfaces(
         tuple(
-            OrmInterface(package_name, workspace_root)
-            for package_name in (
-                BranchingPackage.BASE,
-                BranchingPackage.MIDDLE,
-                BranchingPackage.SIDE,
-                BranchingPackage.TOP,
-            )
+            OrmInterface(package_name, workspace_root) for package_name in package_names
         )
     )
+
+
+@pytest.fixture
+def branching_workspace() -> WorkspaceOrmInterfaces:
+    """
+    The interfaces of every :class:`BranchingPackage`.
+    """
+    return branching_interfaces(*BranchingPackage)
+
+
+def test_interfaces_are_built_after_the_interfaces_they_build_on():
+    """
+    The build order follows the dependencies, whatever order the interfaces are given
+    in.
+    """
+    workspace = branching_interfaces(
+        BranchingPackage.TOP, BranchingPackage.MIDDLE, BranchingPackage.BASE
+    )
+
+    assert package_names_of_workspace(workspace) == [
+        BranchingPackage.BASE,
+        BranchingPackage.MIDDLE,
+        BranchingPackage.TOP,
+    ]
+
+
+def test_interfaces_building_on_an_interface_outside_the_workspace_cannot_be_ordered():
+    """
+    An interface whose generator imports an interface the workspace lacks has no place
+    in the build order.
+    """
+    workspace = branching_interfaces(BranchingPackage.TOP, BranchingPackage.MIDDLE)
+
+    with pytest.raises(UnorderableOrmInterfacesError):
+        workspace.interfaces_in_build_order
 
 
 def test_an_interface_builds_on_the_interfaces_its_generator_imports(
@@ -321,7 +350,7 @@ def package_names_of_workspace(workspace: WorkspaceOrmInterfaces) -> list[str]:
     :return: The names of the packages whose interfaces the workspace holds, in build
         order.
     """
-    return [interface.package_name for interface in workspace.interfaces]
+    return [interface.package_name for interface in workspace.interfaces_in_build_order]
 
 
 def test_a_package_needs_its_interface_and_every_one_it_builds_on(

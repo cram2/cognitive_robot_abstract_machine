@@ -144,3 +144,28 @@ class UnknownOrmPackageError(DataclassException, KeyError):
 
     def suggest_correction(self) -> str:
         return f"Name one of {', '.join(self.known_package_names)}."
+
+
+@dataclass
+class UnorderableOrmInterfacesError(DataclassException):
+    """
+    Raised when ORM interfaces build on each other in a cycle, or on an interface their
+    workspace lacks, so no order builds each after the ones it builds on.
+    """
+
+    package_names: tuple[str, ...]
+    """
+    Names of the packages whose interfaces could not be placed in the build order.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The ORM interfaces of {', '.join(self.package_names)} build on each other "
+            f"in a cycle, or on an interface outside the workspace."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Make each generator import only the interfaces of packages in the "
+            "workspace, and none that builds on it."
+        )

@@ -25,6 +25,7 @@ from cognitive_robot_abstract_machine.exceptions import (
     OrmGenerationFailedError,
     MissingORMGeneratorError,
     UnknownOrmPackageError,
+    UnorderableOrmInterfacesError,
 )
 from krrood.utils import module_level_imports
 from krrood.class_diagrams.progress_report import (
@@ -361,14 +362,42 @@ class WorkspaceOrmInterfaces:
 
     interfaces: Sequence[OrmInterface]
     """
-    The interfaces in the order they are built, which follows their dependencies.
+    The interfaces, in any order.
     """
+
+    @cached_property
+    def interfaces_in_build_order(self) -> tuple[OrmInterface, ...]:
+        """
+        The interfaces, each after every interface it builds on, and otherwise in the
+        order of :attr:`interfaces`.
+
+        :raises UnorderableOrmInterfacesError: If no such order exists.
+        """
+        ordered: list[OrmInterface] = []
+        placed_package_names: set[str] = set()
+        remaining = list(self.interfaces)
+        while remaining:
+            buildable = next(
+                (
+                    interface
+                    for interface in remaining
+                    if set(interface.dependencies) <= placed_package_names
+                ),
+                None,
+            )
+            if buildable is None:
+                raise UnorderableOrmInterfacesError(
+                    tuple(interface.package_name for interface in remaining)
+                )
+            ordered.append(buildable)
+            placed_package_names.add(buildable.package_name)
+            remaining.remove(buildable)
+        return tuple(ordered)
 
     def interfaces_needed_by_package(self, package_name: str) -> WorkspaceOrmInterfaces:
         """
         :param package_name: The package whose ORM model is read.
-        :return: The package's interface and every interface it builds on, in build
-            order.
+        :return: The package's interface and every interface it builds on.
         :raises UnknownOrmPackageError: If no interface belongs to the package.
         """
         interfaces_by_package = {
@@ -437,7 +466,7 @@ class WorkspaceOrmInterfaces:
             "-P",
             "-m",
             orm_generation.__name__,
-            *(str(interface.generator) for interface in self.interfaces),
+            *(str(interface.generator) for interface in self.interfaces_in_build_order),
         ]
 
     def run_writing_to_the_terminal(self) -> None:
@@ -490,10 +519,10 @@ class WorkspaceOrmInterfaces:
         A generator writes its interface last, so the first one missing is the one that
         gave up.
         """
-        for interface in self.interfaces:
+        for interface in self.interfaces_in_build_order:
             if not interface.path.exists():
                 return interface.package_name
-        return self.interfaces[-1].package_name
+        return self.interfaces_in_build_order[-1].package_name
 
 
 # %% the packages of this repository that generate an ORM interface
@@ -535,7 +564,6 @@ class OrmPackage(StrEnum):
     """
 
 
-# One interpreter runs every generator, so a package follows those it builds on.
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
         OrmInterface(OrmPackage.SEMANTIC_DIGITAL_TWIN, REPOSITORY_ROOT),
