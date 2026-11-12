@@ -83,7 +83,7 @@ ranges, for each value of that variable, over the instances of its type in the a
 
 ```python
 world = variable(ExampleWorld, worlds)
-connection = a(FixedConnection).from_(world.connections)
+connection = a(FixedConnection).from_(domain=world.connections)
 
 # One row per world and each of its own fixed connections
 rows = set_of(world, connection).tolist()

@@ -17,7 +17,7 @@ from krrood.utils import T
 # %% the abstract class and the generic mixin
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AbstractGoal(ABC):
     """
     A goal that leaves how it is reached to its subclasses.
@@ -30,7 +30,7 @@ class AbstractGoal(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HasTarget(Generic[T], SubClassSafeGeneric):
     """
     Something that carries a target of a type its subclasses bind.
@@ -45,7 +45,7 @@ class HasTarget(Generic[T], SubClassSafeGeneric):
 # %% the subclass inheriting both
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class GoalWithNumericTarget(AbstractGoal, HasTarget[int]):
     """
     A goal aiming for a number.

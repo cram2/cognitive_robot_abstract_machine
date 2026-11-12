@@ -300,7 +300,7 @@ def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
     :return: Comparator expression for membership.
     :rtype: Comparator
     """
-    return Comparator(container, item, operator.contains)
+    return Comparator(left=container, right=item, operation=operator.contains)
 
 
 @deprecated("Use variable_from, which ranges over the elements of a collection.")
@@ -367,7 +367,7 @@ def for_all(
     :return: A SymbolicExpression that can be evaluated producing every set that
         satisfies the condition.
     """
-    return ForAll(universal_variable, condition)
+    return ForAll(left=universal_variable, right=condition)
 
 
 def exists(
@@ -385,7 +385,7 @@ def exists(
     :return: A SymbolicExpression that can be evaluated producing every set that
         satisfies the condition.
     """
-    return Exists(universal_variable, condition)
+    return Exists(left=universal_variable, right=condition)
 
 
 # %% Result Quantifiers
@@ -428,10 +428,12 @@ def _quantify_or_build_match(
     :return: A quantified query, or a ``Match`` builder.
     """
     if isinstance(arg, (SymbolicExpression, HasSymbolicOperations)):
-        arg = SymbolicExpression._as_operand_(arg)
+        arg = SymbolicExpression._as_operand_(value=arg)
         if not isinstance(arg, Query):
             arg = entity(arg)
-        return arg._quantify_(quantifier_type, quantification_constraint=quantification)
+        return arg._quantify_(
+            quantifier_type=quantifier_type, quantification_constraint=quantification
+        )
 
     match_ = Match(_factory_=arg, _declared_type_=target_type)
     match_._quantifier_type_ = quantifier_type
@@ -634,7 +636,7 @@ def add(variable: Any, value: Any) -> None:
     :param value: The value to be added to the variable.
     :return: None
     """
-    Add(variable, value)
+    Add(left=variable, right=value)
 
 
 def inference(
@@ -717,7 +719,7 @@ def case_when(
     :param else_value: The value if condition is false
     :return: A CaseWhen expression
     """
-    return CaseWhen(condition, then_value, else_value)
+    return CaseWhen(condition=condition, then_value=then_value, else_value=else_value)
 
 
 # %% Aggregators
@@ -739,7 +741,10 @@ def max(
     :return: A Max object that can be evaluated to find the maximum value.
     """
     return Max(
-        variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -760,7 +765,7 @@ def mode(
     :param default: The value returned when the iterable is empty.
     :return: A Max object that can be evaluated to find the mode value.
     """
-    return Mode(variable, _default_value_=default)
+    return Mode(_child_=variable, _default_value_=default)
 
 
 def multimode(
@@ -776,7 +781,7 @@ def multimode(
     :param default: The value returned when the iterable is empty.
     :return: A Max object that can be evaluated to find the mode value.
     """
-    return MultiMode(variable, _default_value_=default)
+    return MultiMode(_child_=variable, _default_value_=default)
 
 
 def min(
@@ -795,7 +800,10 @@ def min(
     :return: A Min object that can be evaluated to find the minimum value.
     """
     return Min(
-        variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -815,7 +823,10 @@ def sum(
     :return: A Sum object that can be evaluated to find the sum of values.
     """
     return Sum(
-        variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -841,7 +852,10 @@ def average(
     :return: An Average object that can be evaluated to find the average of values.
     """
     return Average(
-        variable, _key_function_=key, _default_value_=default, _distinct_=distinct
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
     )
 
 
@@ -853,7 +867,7 @@ def count(variable: Selectable[T], distinct: bool = False) -> Union[T, Count[T]]
     :param distinct: Whether to only consider distinct values.
     :return: A Count object that can be evaluated to count the number of values.
     """
-    return Count(variable, _distinct_=distinct)
+    return Count(_child_=variable, _distinct_=distinct)
 
 
 def count_all(distinct: bool = False) -> Union[T, Count[T]]:
@@ -881,7 +895,7 @@ def count_range(
     :return: A CountRange that evaluates to a SimpleInterval ``[concrete_count,
         concrete_count + ellipsis_count]``.
     """
-    return CountRange(variable, _distinct_=distinct)
+    return CountRange(_child_=variable, _distinct_=distinct)
 
 
 def distinct(
@@ -897,7 +911,9 @@ def distinct(
         case Selectable():
             return entity(expression).distinct(*on)
         case _:
-            raise UnsupportedExpressionTypeForDistinct(type(expression))
+            raise UnsupportedExpressionTypeForDistinct(
+                unsupported_expression_type=type(expression)
+            )
 
 
 def get_false_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
@@ -943,7 +959,7 @@ def evaluate_condition(condition: ConditionType) -> bool:
     return any(condition.evaluate())
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NodeId(SymbolicFunction):
     """
     The stable identity of an EQL node, as a value operation.
@@ -958,18 +974,20 @@ class NodeId(SymbolicFunction):
         return self.node._id_
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 node_id = symbolic_callable_to_function(NodeId)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NodeDescendants(SymbolicFunction):
     """
     The descendants of an EQL node, as a value operation.
@@ -984,18 +1002,20 @@ class NodeDescendants(SymbolicFunction):
         return self.node._descendants_
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 node_descendants = symbolic_callable_to_function(NodeDescendants)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NodeType(SymbolicFunction):
     """
     The selectable type of an EQL node, as a value operation.
@@ -1010,18 +1030,20 @@ class NodeType(SymbolicFunction):
         return getattr(self.node, "_type_", None)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 node_type = symbolic_callable_to_function(NodeType)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NodeChildren(SymbolicFunction):
     """
     The children of an EQL node, as a value operation.
@@ -1036,18 +1058,20 @@ class NodeChildren(SymbolicFunction):
         return self.node._children_
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 node_children = symbolic_callable_to_function(NodeChildren)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AttributeOwnerClass(SymbolicFunction):
     """
     The class that owns an attribute, as a value operation.
@@ -1062,18 +1086,20 @@ class AttributeOwnerClass(SymbolicFunction):
         return self.node._owner_class_
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 attribute_owner_class = symbolic_callable_to_function(AttributeOwnerClass)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NodeParents(SymbolicFunction):
     """
     The parents of an EQL node, as a value operation.
@@ -1088,18 +1114,20 @@ class NodeParents(SymbolicFunction):
         return self.node._parents_
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 node_parents = symbolic_callable_to_function(NodeParents)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsSubclass(Predicate):
     """
     Whether one class is a subclass of another class (or tuple of classes).
@@ -1119,7 +1147,9 @@ class IsSubclass(Predicate):
         return issubclass(self.subclass, self.parent_or_parents)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<subclass> is a subclass of <parent>"* — a custom fragment because
         the name-based reading lacks the article and preposition (*"subclass holds for …"*).
         """
@@ -1134,18 +1164,18 @@ class IsSubclass(Predicate):
         )
 
         return clause(
-            Noun(fields["subclass"]),
+            Noun(content=fields["subclass"]),
             Copula(),
-            Noun("subclass"),
+            Noun(content="subclass"),
             Prepositions.OF,
-            Noun(fields["parent_or_parents"]),
+            Noun(content=fields["parent_or_parents"]),
         )
 
 
 issubclass_ = symbolic_callable_to_function(IsSubclass)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class IsClass(Predicate):
     """
     Whether an object is a class.
@@ -1160,7 +1190,9 @@ class IsClass(Predicate):
         return isclass(self.object)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<object> is a class"* — a custom fragment because the name-based
         reading drops the complement's article (*"… is class"*)."""
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
@@ -1170,13 +1202,13 @@ class IsClass(Predicate):
             Noun,
         )
 
-        return clause(Noun(fields["object"]), Copula(), Noun("class"))
+        return clause(Noun(content=fields["object"]), Copula(), Noun(content="class"))
 
 
 is_class = symbolic_callable_to_function(IsClass)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RuntimeType(SymbolicFunction):
     """
     The runtime class of an object, as a value operation.
@@ -1191,12 +1223,14 @@ class RuntimeType(SymbolicFunction):
         return self.object.__class__
 
     @classmethod
-    def _verbalization_fragment_(cls, fields):
+    def _verbalization_fragment_(cls, *, fields):
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 type_ = symbolic_callable_to_function(RuntimeType)

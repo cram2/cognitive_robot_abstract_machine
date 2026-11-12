@@ -18,15 +18,17 @@ from giskardpy.motion_statechart.weights import (
 )
 from giskardpy.motion_statechart.exceptions import CollisionViolatedError
 from giskardpy.motion_statechart.context import MotionControlContext
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.monitors.collision_monitors import (
+    ExternalCollisionDistanceMonitor,
+    SelfCollisionDistanceMonitor,
+)
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     _CancelBecauseExternalCollisionViolated,
     _CancelBecauseSelfCollisionViolated,
     _ExternalCollisionAvoidanceTask,
     _SelfCollisionAvoidanceTask,
     ExternalCollisionAvoidance,
     SelfCollisionAvoidance,
-    ExternalCollisionDistanceMonitor,
-    SelfCollisionDistanceMonitor,
     UpdateTemporaryCollisionRules,
 )
 from cramph.composites import Sequence, Parallel

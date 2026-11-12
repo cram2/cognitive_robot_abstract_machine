@@ -24,7 +24,7 @@ from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import NoGriplinkEndpoint
-from giskardpy.motion_statechart.goals.gripper import MoveFingers
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.ros2_nodes.griplink import (
     GriplinkActionServerTask,

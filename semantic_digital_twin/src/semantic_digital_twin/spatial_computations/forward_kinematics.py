@@ -111,7 +111,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
         Compiles forward kinematics expressions for fast evaluation.
         """
         all_fks = Matrix.vstack(
-            [
+            list_of_matrices=[
                 self.root_T_kse_expression_cache[body.id]
                 for body in self._world.kinematic_structure_entities
             ]
@@ -122,7 +122,9 @@ class ForwardKinematicsManager(ModelChangeCallback):
                 self._world.state.position_float_variables
             )
         )
-        self.compiled_all_fks.bind_args_to_memory_view(0, self._world.state.positions)
+        self.compiled_all_fks.bind_args_to_memory_view(
+            arg_idx=0, numpy_array=self._world.state.positions
+        )
         self.body_id_to_all_fk_index = {
             body.id: i * 4
             for i, body in enumerate(self._world.kinematic_structure_entities)

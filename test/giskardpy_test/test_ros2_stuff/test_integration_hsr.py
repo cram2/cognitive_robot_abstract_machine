@@ -6,8 +6,7 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
@@ -23,6 +22,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
+from ...pytest_environment import runs_in_continuous_integration
 
 
 @pytest.fixture()
@@ -43,14 +43,13 @@ class HSRTester(GiskardTester):
         self.map = self.api.world.root
 
     def setup_giskard(self) -> Giskard:
-        robot_desc = load_xacro("package://hsr_description/robots/hsrb4s.urdf.xacro")
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(HSRB, urdf=robot_desc)]
+                robots=[RobotSpecification.specify_real_robot(HSRB)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
-                debug_mode=True,
+                debug_mode=not runs_in_continuous_integration(),
                 plot_gantt_chart=True,
                 plot_trajectory=True,
             ),

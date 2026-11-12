@@ -13,7 +13,7 @@ from rclpy.qos import QoSDurabilityPolicy, QoSProfile
 from std_msgs.msg import String
 from typing_extensions import Iterator
 
-from giskardpy.middleware.ros2.ros2_interface import get_robot_description
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.scripts.iai_robots.daisy import (
     daisy_standalone,
     daisy_velocity,
@@ -31,7 +31,7 @@ from giskardpy.middleware.ros2.scripts.iai_robots.tracy import (
     tracy_standalone,
     tracy_velocity,
 )
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.hsrb import HSRB
@@ -67,7 +67,7 @@ def robot_classes_of(specification: WorldSpecification) -> list[type[AbstractRob
 
 
 @pytest.fixture()
-def published_robot_description(init_rospy) -> Iterator[str]:
+def published_robot_description(init_background_node) -> Iterator[str]:
     """
     Publishes a robot description the way a robot does and yields it.
 
@@ -79,15 +79,15 @@ def published_robot_description(init_rospy) -> Iterator[str]:
         .parent.parent.joinpath("resources", "urdf", "simple_two_arm_robot.urdf")
         .read_text()
     )
-    topic = inspect.signature(get_robot_description).parameters["topic"].default
-    publisher = rospy.get_node().create_publisher(
+    topic = inspect.signature(RosGraph.robot_description).parameters["topic"].default
+    publisher = background_node.get_node().create_publisher(
         String,
         topic,
         QoSProfile(depth=1, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL),
     )
     publisher.publish(String(data=description))
     yield description
-    rospy.get_node().destroy_publisher(publisher)
+    background_node.get_node().destroy_publisher(publisher)
 
 
 @pytest.mark.parametrize(
@@ -96,7 +96,7 @@ def published_robot_description(init_rospy) -> Iterator[str]:
 def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
     launcher: ModuleType, published_robot_description: str
 ) -> None:
-    giskard = launcher.create_giskard()
+    giskard = launcher.create_giskard(background_node.get_node())
 
     assert urdfs_read_by(giskard.world_source) == [
         URDFParser(urdf=published_robot_description).urdf
@@ -129,9 +129,9 @@ def test_a_velocity_launcher_uses_the_description_the_robot_publishes(
     ],
 )
 def test_a_standalone_launcher_uses_the_description_its_robot_class_declares(
-    launcher: ModuleType, robot_class: type[AbstractRobot]
+    launcher: ModuleType, robot_class: type[AbstractRobot], init_background_node
 ) -> None:
-    giskard = launcher.create_giskard()
+    giskard = launcher.create_giskard(background_node.get_node())
 
     assert urdfs_read_by(giskard.world_source) == [
         URDFParser.from_file(robot_class.get_ros_file_path()).urdf

@@ -59,7 +59,7 @@ def _is_faded_gate(node, satisfied_condition_ids: OrderedSet[UUID]) -> bool:
     return expression._id_ not in satisfied_condition_ids
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QueryGraph:
     """
     Represents a query graph for visualizing and introspecting query structures.
@@ -147,6 +147,7 @@ class QueryGraph:
 
     def visualize(
         self,
+        *,
         figure_size=(35, 30),
         node_size=7000,
         font_size=25,
@@ -184,7 +185,7 @@ class QueryGraph:
         return visualizer.render()
 
     @staticmethod
-    def get_expression_name(expression: Any) -> str:
+    def get_expression_name(*, expression: Any) -> str:
         """
         Retrieves the name of a symbolic expression for visualization purposes.
 
@@ -200,7 +201,7 @@ class QueryGraph:
             case Call():
                 expression: Call
                 positional_labels = [
-                    QueryGraph.get_expression_name(argument)
+                    QueryGraph.get_expression_name(expression=argument)
                     for argument in expression._arguments_.positional
                 ]
                 keyword_labels = [
@@ -209,7 +210,7 @@ class QueryGraph:
                 ]
                 return f"({','.join(positional_labels + keyword_labels)})"
             case Query():
-                return f"({','.join(QueryGraph.get_expression_name(v) for v in expression._selected_variables_)})"
+                return f"({','.join(QueryGraph.get_expression_name(expression=v) for v in expression._selected_variables_)})"
             case SymbolicExpression():
                 return expression._name_
             case _:
@@ -217,6 +218,7 @@ class QueryGraph:
 
     def construct_graph(
         self,
+        *,
         expression: SymbolicExpression | None = None,
     ) -> QueryNode:
         """
@@ -235,9 +237,12 @@ class QueryGraph:
             and expression._id_ in self.satisfied_condition_ids
         )
         node = QueryNode(
-            self.get_expression_name(expression),
-            self.graph,
-            color=ColorLegend.from_expression(expression, self.satisfied_condition_ids),
+            name=self.get_expression_name(expression=expression),
+            graph=self.graph,
+            color=ColorLegend.from_expression(
+                expression=expression,
+                satisfied_condition_ids=self.satisfied_condition_ids,
+            ),
             data=expression,
             is_satisfied=is_satisfied,
         )
@@ -246,12 +251,13 @@ class QueryGraph:
         if isinstance(expression, Query):
             node.wrap_subtree = True
 
-        self._add_children_to_graph(node)
+        self._add_children_to_graph(parent_node=node)
 
         return node
 
     def _add_children_to_graph(
         self,
+        *,
         parent_node: QueryNode,
     ):
         """
@@ -266,13 +272,13 @@ class QueryGraph:
             else []
         )
         for child in parent_expression._children_:
-            child_node = self.construct_graph(child)
+            child_node = self.construct_graph(expression=child)
             if child._id_ in selected_var_ids:
                 child_node.enclosed = True
             child_node.parent = parent_node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorLegend(RXUtilsColorLegend):
     """
     Represents a color legend entry for visualizing query graph nodes.
@@ -283,6 +289,7 @@ class ColorLegend(RXUtilsColorLegend):
     @classmethod
     def from_expression(
         cls,
+        *,
         expression: SymbolicExpression,
         satisfied_condition_ids: OrderedSet[UUID] | None = None,
     ) -> ColorLegend:
@@ -322,7 +329,7 @@ class ColorLegend(RXUtilsColorLegend):
         return cls(name=name, color=color)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QueryNode(RXUtilsNode):
     """
     A node in the query graph.

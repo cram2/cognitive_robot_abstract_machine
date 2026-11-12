@@ -13,19 +13,17 @@ from cramph.executor import StatechartExecutor
 from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
-from giskardpy.motion_statechart.goals.base_pose_goals import (
+from giskardpy.motion_statechart.tasks.drive_tasks import (
     MobileBasePoseGoal,
     DifferentialDriveBaseGoal,
     HolonomicBaseGoal,
-)
-from giskardpy.motion_statechart.exceptions import RobotWithoutMobileBaseError
-from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
-from giskardpy.motion_statechart.tasks.drive_tasks import (
     BaseOrientation,
     BasePosition,
     DrivenBaseRotation,
 )
+from giskardpy.motion_statechart.exceptions import RobotWithoutMobileBaseError
+from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import MobileBase

@@ -165,7 +165,7 @@ class State(MutableMapping[StatechartNode, float], SubclassJSONSerializer, ABC):
         return {**super().to_json(**kwargs), "data": self.data.tolist()}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Reconstruct a state from its JSON representation.
 

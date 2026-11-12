@@ -7,7 +7,7 @@ from krrood.patterns.exceptions import RoleAttributeNotDeclaredError
 from krrood.patterns.role import Role
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PersistentEntityWithName(Symbol):
     name: str
 
@@ -15,7 +15,7 @@ class PersistentEntityWithName(Symbol):
         return hash(self.name)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RoleWithOwnField(Role[PersistentEntityWithName]):
     own_field: str = ""
 

@@ -51,8 +51,8 @@ that expression, with `variable_from(...)`, `variable(Type, ...)` or `a(Type).fr
 ```python
 from krrood.entity_query_language.factories import a, variable_from
 
-part = variable_from(robot.parts)          # each part of each robot
-arm = a(ExamplePart).from_(robot.parts)    # each part of each robot that is an ExamplePart
+part = variable_from(robot.parts)                 # each part of each robot
+arm = a(ExamplePart).from_(domain=robot.parts)   # each part of each robot that is an ExamplePart
 ```
 
 The variable takes, for each value of `robot`, each element of that robot's parts, and keeps the binding of `robot`,

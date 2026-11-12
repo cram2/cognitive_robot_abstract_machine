@@ -64,8 +64,8 @@ def world_with_connections(identifier: int) -> World:
     :return: A world with a fixed and a prismatic connection between a container and a
         handle.
     """
-    container = Container(f"container {identifier}")
-    handle = Handle(f"handle {identifier}")
+    container = Container(name=f"container {identifier}")
+    handle = Handle(name=f"handle {identifier}")
     return World(
         id=identifier,
         bodies=[container, handle],
@@ -90,7 +90,7 @@ def two_worlds() -> TwoWorlds:
 def test_match_ranges_over_the_elements_of_its_domain_expression(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = a(Connection).from_(world.connections).tolist()
+    result = a(Connection).from_(domain=world.connections).tolist()
 
     assert result == [*two_worlds.first.connections, *two_worlds.second.connections]
 
@@ -98,7 +98,7 @@ def test_match_ranges_over_the_elements_of_its_domain_expression(two_worlds):
 def test_match_keeps_only_the_elements_of_its_type(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = a(FixedConnection).from_(world.connections).tolist()
+    result = a(FixedConnection).from_(domain=world.connections).tolist()
 
     assert result == [
         two_worlds.first.connections[0],
@@ -108,7 +108,7 @@ def test_match_keeps_only_the_elements_of_its_type(two_worlds):
 
 def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
     world = variable(World, two_worlds.worlds)
-    connection = a(FixedConnection).from_(world.connections)
+    connection = a(FixedConnection).from_(domain=world.connections)
 
     result = set_of(world, connection).tolist()
 
@@ -120,7 +120,7 @@ def test_each_element_is_bound_with_the_binding_it_came_from(two_worlds):
 
 def test_match_selected_before_its_domain_binds_the_domain_expression(two_worlds):
     world = variable(World, two_worlds.worlds)
-    connection = a(FixedConnection).from_(world.connections)
+    connection = a(FixedConnection).from_(domain=world.connections)
 
     result = set_of(connection, world).tolist()
 
@@ -132,7 +132,7 @@ def test_match_selected_before_its_domain_binds_the_domain_expression(two_worlds
 
 def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
     world = variable(World, two_worlds.worlds)
-    body = a(Body).from_(world.bodies)
+    body = a(Body).from_(domain=world.bodies)
 
     result = body.where(body.name == "handle 2").tolist()
 
@@ -142,7 +142,7 @@ def test_domain_expression_can_be_filtered_by_its_elements(two_worlds):
 def test_match_with_a_pattern_ranges_over_its_domain_expression(two_worlds):
     world = variable(World, two_worlds.worlds)
 
-    result = a(Body)(name="handle 2").from_(world.bodies).tolist()
+    result = a(Body)(name="handle 2").from_(domain=world.bodies).tolist()
 
     assert result == [two_worlds.second.bodies[1]]
 
@@ -154,7 +154,7 @@ def test_where_condition_before_a_domain_expression_constrains_the_match(
     body = a(Body)
     body.where(body.name == "handle 2")
 
-    result = body.from_(world.bodies).tolist()
+    result = body.from_(domain=world.bodies).tolist()
 
     assert result == [two_worlds.second.bodies[1]]
 
@@ -308,8 +308,8 @@ def test_existential_quantifier_over_a_match_ranges_over_its_domain(journeys):
     """
     Some extra stop of a journey is the tower, for the journey whose stops are its own.
     """
-    journey = a(Journey).from_(journeys.journeys)
-    stop = a(Stop).from_(journey.extra_stops)
+    journey = a(Journey).from_(domain=journeys.journeys)
+    stop = a(Stop).from_(domain=journey.extra_stops)
 
     result = journey.where(exists(stop, stop.name == journeys.tower.name)).tolist()
 
@@ -321,8 +321,8 @@ def test_universal_quantifier_over_a_match_ranges_over_its_domain(journeys):
     Every extra stop of a journey is the harbour, vacuously so for a journey without
     extra stops.
     """
-    journey = a(Journey).from_(journeys.journeys)
-    stop = a(Stop).from_(journey.extra_stops)
+    journey = a(Journey).from_(domain=journeys.journeys)
+    stop = a(Stop).from_(domain=journey.extra_stops)
 
     result = journey.where(for_all(stop, stop.name == journeys.harbour.name)).tolist()
 
@@ -333,8 +333,8 @@ def test_quantifier_over_a_match_states_its_pattern(journeys):
     """
     A quantifier over a match with a pattern states the pattern of each value.
     """
-    journey = a(Journey).from_(journeys.journeys)
-    tower = a(Stop)(name=journeys.tower.name).from_(journey.extra_stops)
+    journey = a(Journey).from_(domain=journeys.journeys)
+    tower = a(Stop)(name=journeys.tower.name).from_(domain=journey.extra_stops)
 
     result = journey.where(exists(tower, True)).tolist()
 

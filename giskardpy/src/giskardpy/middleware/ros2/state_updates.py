@@ -63,15 +63,15 @@ class StatechartStateUpdate:
             statechart=statechart,
             tick_count=payload[StatechartPayloadKey.TICK_COUNT],
             life_cycle_state=LifeCycleState.from_json(
-                payload[StatechartPayloadKey.LIFE_CYCLE_STATE],
+                data=payload[StatechartPayloadKey.LIFE_CYCLE_STATE],
                 statechart=statechart,
             ),
             observation_state=ObservationState.from_json(
-                payload[StatechartPayloadKey.OBSERVATION_STATE],
+                data=payload[StatechartPayloadKey.OBSERVATION_STATE],
                 statechart=statechart,
             ),
             last_observation_state=LastObservationState.from_json(
-                payload[StatechartPayloadKey.LAST_OBSERVATION_STATE],
+                data=payload[StatechartPayloadKey.LAST_OBSERVATION_STATE],
                 statechart=statechart,
             ),
         )

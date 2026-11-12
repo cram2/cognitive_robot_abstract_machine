@@ -70,7 +70,7 @@ for each of its bindings, holds them.
 # %% domains
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DomainValue(Generic[T]):
     """
     A value a variable takes, with the result it was found under.
@@ -93,7 +93,9 @@ class VariableDomain(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
+    def values_with_sources(
+        self, *, sources: OperationResult
+    ) -> Iterator[DomainValue[T]]:
         """
         :param sources: The bindings the variable is evaluated under.
         :return: Every value the variable takes under ``sources``.
@@ -108,21 +110,23 @@ class VariableDomain(ABC, Generic[T]):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ListedValues(ReEnterableLazyIterable[T], VariableDomain[T]):
     """
     A domain of given values, each read as it is in every evaluation.
     """
 
-    def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
-        return (DomainValue(value, sources) for value in self)
+    def values_with_sources(
+        self, *, sources: OperationResult
+    ) -> Iterator[DomainValue[T]]:
+        return (DomainValue(value=value, sources=sources) for value in self)
 
     @property
     def listed_values(self) -> Iterable[T]:
         return self
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExistingValues(ListedValues[T]):
     """
     A domain whose values are read, in every evaluation that iterates it, through the
@@ -133,11 +137,11 @@ class ExistingValues(ListedValues[T]):
 
     def __iter__(self) -> Iterator[T]:
         return EvaluationContext.current_term_reader().existing_values(
-            super().__iter__()
+            values=super().__iter__()
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InstancesOfType(ExistingValues[T]):
     """
     The domain of every instance of a type in the evaluation that iterates it: the
@@ -145,13 +149,15 @@ class InstancesOfType(ExistingValues[T]):
     exist in the evaluation, then those the evaluation adds.
     """
 
-    type_: type[T] = field(kw_only=True)
+    type_: type[T]
     """
     The type whose instances make up the domain.
     """
 
     def __post_init__(self):
-        self.set_iterable(SymbolGraph().get_instances_of_type(self.type_))
+        self.set_iterable(
+            iterable=SymbolGraph().get_instances_of_type(type_=self.type_)
+        )
 
     def __iter__(self) -> Iterator[T]:
         existing_ids = set()
@@ -161,13 +167,13 @@ class InstancesOfType(ExistingValues[T]):
         yield from (
             added
             for added in EvaluationContext.current_term_reader().added_instances_of(
-                self.type_
+                type_=self.type_
             )
             if id(added) not in existing_ids
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExpressionDomain(VariableDomain[T]):
     """
     The domain of the elements, for each binding of an expression, of the value it
@@ -187,14 +193,20 @@ class ExpressionDomain(VariableDomain[T]):
     The type the values are instances of, or no type filter when it is not a class.
     """
 
-    def values_with_sources(self, sources: OperationResult) -> Iterator[DomainValue[T]]:
-        for result in self.expression._evaluate_(sources):
-            elements = self._elements_in_value_(result.value)
+    def values_with_sources(
+        self, *, sources: OperationResult
+    ) -> Iterator[DomainValue[T]]:
+        for result in self.expression._evaluate_(sources=sources):
+            elements = self._elements_in_value_(value=result.value)
             if isclass(self.element_type):
-                elements = InstanceFilteredDomain(self.element_type, elements)
-            yield from (DomainValue(element, result) for element in elements)
+                elements = InstanceFilteredDomain(
+                    type_=self.element_type, domain=elements
+                )
+            yield from (
+                DomainValue(value=element, sources=result) for element in elements
+            )
 
-    def _elements_in_value_(self, value: Any) -> Iterable[T]:
+    def _elements_in_value_(self, *, value: Any) -> Iterable[T]:
         """
         :param value: A value the expression evaluated to.
         :return: The elements of the value: the value's own when the expression is
@@ -215,14 +227,14 @@ class ExpressionDomain(VariableDomain[T]):
         """
         The type the expression is declared to hold its elements as.
         """
-        return CollectionKind.declared_element_type(self.expression._type_)
+        return CollectionKind.declared_element_type(annotation=self.expression._type_)
 
     @property
     def listed_values(self) -> Iterable[T]:
         return ()
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
     """
     A superclass for variables that can have a domain source.
@@ -246,7 +258,7 @@ class CanHaveDomainSource(CanBehaveLikeAVariable[T], ABC):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Variable(CanHaveDomainSource[T]):
     """
     An atomic expression of EQL that has a domain of possible values.
@@ -276,7 +288,7 @@ class Variable(CanHaveDomainSource[T]):
     def __post_init__(self):
         super().__post_init__()
 
-        self._update_domain_(self._domain_)
+        self._update_domain_(domain=self._domain_)
 
     @classproperty
     def _listed_values_type_(cls) -> type[ListedValues]:
@@ -285,39 +297,42 @@ class Variable(CanHaveDomainSource[T]):
         """
         return ExistingValues
 
-    def _update_domain_(self, domain: DomainType | VariableDomain[T]) -> None:
+    def _update_domain_(self, *, domain: DomainType | VariableDomain[T]) -> None:
         """
         Range the variable over ``domain`` instead of its current domain.
 
         A value that is not a collection is the only value of the domain.
         """
         for domain_expression in tuple(self._children_):
-            domain_expression._remove_parent_(self)
+            domain_expression._remove_parent_(parent=self)
         self._domain_ = domain
         if isinstance(domain, VariableDomain):
             self._values_domain_ = domain
         elif isinstance(domain, HasSymbolicOperations):
             self._values_domain_ = ExpressionDomain(
-                self._update_children_(domain)[0], self._type_
+                expression=self._update_children_(domain)[0], element_type=self._type_
             )
             if self._type_ is None:
                 self._type_ = self._values_domain_.declared_element_type
         else:
             self._values_domain_ = self._listed_values_type_()
             self._values_domain_.set_iterable(
-                domain if is_iterable(domain) else [domain]
+                iterable=domain if is_iterable(domain) else [domain]
             )
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
         """
         Yield an OperationResult for each value of the domain.
         """
-        for domain_value in self._values_domain_.values_with_sources(sources):
+        for domain_value in self._values_domain_.values_with_sources(sources=sources):
             bindings = domain_value.sources.bindings | {self._id_: domain_value.value}
-            yield self._build_operation_result_(bindings, domain_value.sources)
+            yield self._build_operation_result_(
+                bindings=bindings, child_result=domain_value.sources
+            )
 
     @property
     def _expression_read_from_(self) -> CanBehaveLikeAVariable | None:
@@ -330,11 +345,11 @@ class Variable(CanHaveDomainSource[T]):
         return None
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         self._domain_ = new_child
         self._values_domain_ = ExpressionDomain(
-            new_child, self._values_domain_.element_type
+            expression=new_child, element_type=self._values_domain_.element_type
         )
 
     @cached_property
@@ -348,7 +363,7 @@ class Variable(CanHaveDomainSource[T]):
             return f"{self.__class__.__name__}()"
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class Literal(Variable[T]):
     """
     Literals are variables that do not necessarily have a type but they must have a
@@ -394,7 +409,7 @@ class Literal(Variable[T]):
 
 
 @monitored
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct,
     CanHaveDomainSource[T],
@@ -453,11 +468,11 @@ class InstantiatedVariable(
         if self._declared_factory_ is None:
             self._declared_factory_ = self._factory_
         if self._type_ is None:
-            self._type_ = self._type_built_by_(self._factory_)
+            self._type_ = self._type_built_by_(factory=self._factory_)
         if self._type_ is None:
-            raise ResultTypeCannotBeDetermined(self._factory_)
+            raise ResultTypeCannotBeDetermined(factory=self._factory_)
         if not isinstance(self._type_, type):
-            raise ResultTypeIsNotAType(self._type_)
+            raise ResultTypeIsNotAType(result_type=self._type_)
         self._update_child_variables_from_kwargs_()
         self._operation_children_ = tuple(self._child_variables_.values())
         # This is done here as it uses `_operation_children_`
@@ -468,32 +483,39 @@ class InstantiatedVariable(
         Set the child variables from the kwargs dictionary.
         """
         for name, value in self._kwargs_.items():
-            self._child_variables_[name] = SymbolicExpression._as_operand_(value, name)
+            self._child_variables_[name] = SymbolicExpression._as_operand_(
+                value=value, name=name
+            )
 
     @property
     def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
         return tuple(self._child_variables_.values())
 
-    def _ground_term_(self, *operand_values: Any) -> CallTerm:
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
         return CallTerm.from_call(
-            self._factory_,
-            CallArguments(keyword=dict(zip(self._child_variables_, operand_values))),
+            callee=self._factory_,
+            arguments=CallArguments(
+                keyword=dict(zip(self._child_variables_, operand_values))
+            ),
         )
 
     def _evaluate__(
         self,
+        *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
-        yield from self._instantiate_using_child_variables_and_yield_results_(sources)
+        yield from self._instantiate_using_child_variables_and_yield_results_(
+            sources=sources
+        )
 
     def _instantiate_using_child_variables_and_yield_results_(
-        self, sources: OperationResult
+        self, *, sources: OperationResult
     ) -> Iterator[OperationResult]:
         """
         Create new instances of the variable type and using as keyword arguments the
         child variables values.
         """
-        for child_result in self._evaluate_product_(sources):
+        for child_result in self._evaluate_product_(sources=sources):
             # An argument without a binding is left out, so its default applies.
             arguments = {
                 name: child_result.bindings[child._id_]
@@ -501,19 +523,23 @@ class InstantiatedVariable(
                 if child._id_ in child_result.bindings
             }
             instance = EvaluationContext.current_value_of_term(
-                CallTerm.from_call(self._factory_, CallArguments(keyword=arguments))
+                term=CallTerm.from_call(
+                    callee=self._factory_, arguments=CallArguments(keyword=arguments)
+                )
             ).value
 
             bindings = {self._id_: instance} | child_result.bindings
-            result = self._build_operation_result_(bindings, child_result)
+            result = self._build_operation_result_(
+                bindings=bindings, child_result=child_result
+            )
             result.previous_operation_result = child_result
             yield result
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         MultiArityExpressionThatPerformsACartesianProduct._replace_child_field_(
-            self, old_child, new_child
+            self, old_child=old_child, new_child=new_child
         )
         for name, child in self._child_variables_.items():
             if child._id_ == old_child._id_:
@@ -534,7 +560,7 @@ class InstantiatedVariable(
         return self._factory_(*args, **kwargs)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(kw_only=True, eq=False, repr=False)
 class ExternallySetVariable(CanHaveDomainSource[T]):
     """
     A variable that is externally set by another expression or another part of the
@@ -542,11 +568,11 @@ class ExternallySetVariable(CanHaveDomainSource[T]):
     """
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ):
         raise ValueError(f"class {self.__class__} does not have children")
 
-    def _evaluate__(self, sources: OperationResult) -> Iterable[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterable[OperationResult]:
         """
         As this variable is externally set, it does not produce any results on its own,
         it just yields from an empty list to indicate that it has no results.

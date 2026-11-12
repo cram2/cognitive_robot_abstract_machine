@@ -24,7 +24,7 @@ from krrood.planning.fact import Fact
 # %% states
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class State(TermReader):
     """
     A valuation of ground terms that differs from the live objects only where it assigns a
@@ -114,7 +114,7 @@ class State(TermReader):
         """
         assignments = dict(self.assignments)
         for fact in facts:
-            assignments |= Fact.from_condition(fact).assignments()
+            assignments |= Fact.from_condition(condition=fact).assignments()
         return State(
             assignments=assignments,
             added_objects=self.added_objects,
@@ -156,15 +156,19 @@ class State(TermReader):
             | {id(removed): removed for removed in objects},
         )
 
-    def value_of_term(self, term: GroundTerm) -> TermValue | None:
+    def value_of_term(self, *, term: GroundTerm) -> TermValue | None:
         if term.function_key in self.assigned_functions and term in self.assignments:
-            return TermValue(self.without_removed_objects(self.assignments[term]))
+            return TermValue(
+                value=self.without_removed_objects(value=self.assignments[term])
+            )
         live_term_value = term.live_term_value()
         if live_term_value is None:
             return None
-        return TermValue(self.without_removed_objects(live_term_value.value))
+        return TermValue(
+            value=self.without_removed_objects(value=live_term_value.value)
+        )
 
-    def without_removed_objects(self, value: Any) -> Any:
+    def without_removed_objects(self, *, value: Any) -> Any:
         """
         :param value: The value of a ground term.
         :return: *value* without the objects this state removes when it is a collection
@@ -179,10 +183,10 @@ class State(TermReader):
             element for element in value if id(element) not in self.removed_objects
         )
 
-    def existing_values(self, values: Iterable[T]) -> Iterator[T]:
+    def existing_values(self, *, values: Iterable[T]) -> Iterator[T]:
         return (value for value in values if id(value) not in self.removed_objects)
 
-    def added_instances_of(self, type_: type[T]) -> Iterator[T]:
+    def added_instances_of(self, *, type_: type[T]) -> Iterator[T]:
         return (
             added for added in self.added_objects.values() if isinstance(added, type_)
         )

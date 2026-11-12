@@ -34,7 +34,7 @@ from PyQt5.QtWidgets import (
     QScrollArea,
 )
 
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
     ShapeSource,
@@ -119,7 +119,7 @@ class SelfCollisionMatrixInterface:
         self.robot = MinimalRobot.from_world(self.world)
         VizMarkerPublisher(
             _world=self.world,
-            node=rospy.get_node(),
+            node=background_node.get_node(),
             shape_source=ShapeSource.COLLISION_ONLY,
         )
 
@@ -907,9 +907,9 @@ Set when SIGINT arrives, so a signal that lands before the event loop starts is 
 def handle_sigint(sig, frame):
     """Handler for the SIGINT signal.
 
-    Only records the request and asks the event loop to quit -- rospy.shutdown() joins
+    Only records the request and asks the event loop to quit -- background_node.shutdown() joins
     the spinner thread and destroys the rclpy node, which is unsafe to run from a signal
-    handler interrupting Qt's event loop. The single rospy.shutdown() call after
+    handler interrupting Qt's event loop. The single background_node.shutdown() call after
     app.exec_() returns handles it instead, whether the loop ended via this signal or a
     normal window close.
 
@@ -939,7 +939,7 @@ def quit_when_requested():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    rospy.init_node("self_collision_matrix_updater")
+    background_node.init_node("self_collision_matrix_updater")
     signal.signal(signal.SIGINT, handle_sigint)
 
     app = QApplication(sys.argv)
@@ -954,5 +954,5 @@ if __name__ == "__main__":
     # Fires on the first iteration of the running event loop.
     QTimer.singleShot(0, announce_ready)
     exit_code = app.exec_()
-    rospy.shutdown()
+    background_node.shutdown()
     sys.exit(exit_code)

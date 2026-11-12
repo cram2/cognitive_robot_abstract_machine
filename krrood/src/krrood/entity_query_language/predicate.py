@@ -74,11 +74,13 @@ def symbolic_function(
     :return: The decorated function.
     """
 
-    signature = CallSignature.from_callable(function)
+    signature = CallSignature.from_callable(callee=function)
 
     @wraps(function)
     def wrapper(*args, **kwargs) -> Any | None:
-        all_kwargs = signature.bind_by_name(CallArguments(args, kwargs))
+        all_kwargs = signature.bind_by_name(
+            arguments=CallArguments(positional=args, keyword=kwargs)
+        )
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
                 _factory_=function,
@@ -102,14 +104,14 @@ def symbolic_callable_to_function(
     unchanged -- the logic moves into the class's :meth:`__call__` and the name just constructs it.
     """
 
-    def call(*args: Any, **kwargs: Any) -> Any:
-        result = symbolic_callable(*args, **kwargs)
+    def call(**kwargs: Any) -> Any:
+        result = symbolic_callable(**kwargs)
         return result() if isinstance(result, symbolic_callable) else result
 
     return call
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class VerbalizationField:
     """
     One predicate field as ``_verbalization_fragment_`` sees it.
@@ -139,7 +141,7 @@ class VerbalizationField:
         return self.fragment
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class RenderedFields(Mapping):
     """
     The arguments passed to :meth:`Verbalizable._verbalization_fragment_`.
@@ -172,7 +174,7 @@ class RenderedFields(Mapping):
         return len(self.fragments)
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Verbalizable(ABC):
     """
     A mixin for classes that want to add custom verbalization, such that when a query
@@ -182,7 +184,9 @@ class Verbalizable(ABC):
 
     @classmethod
     @abstractmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         Structured verbalization for this predicate — a required clause (no string
         fallback).
@@ -215,7 +219,7 @@ class Verbalizable(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     """
     A user-defined, self-verbalizing symbolic operation.
@@ -233,9 +237,9 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
     Instances are not cached -- they do not persist.
     """
 
-    def __new__(cls, *args, **kwargs):
-        all_kwargs = CallSignature.from_callable(cls).bind_by_name(
-            CallArguments(args, kwargs)
+    def __new__(cls, **kwargs: Any) -> SymbolicCallable | InstantiatedVariable:
+        all_kwargs = CallSignature.from_callable(callee=cls).bind_by_name(
+            arguments=CallArguments(keyword=kwargs)
         )
         if _any_argument_is_an_operand(all_kwargs):
             return InstantiatedVariable(
@@ -307,7 +311,7 @@ class SymbolicCallable(Symbol, Verbalizable, HasBoundValue, ABC):
         return {}
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Predicate(SymbolicCallable, ABC):
     """
     The super predicate class that represents a filtration operation or asserts a
@@ -327,7 +331,7 @@ class Predicate(SymbolicCallable, ABC):
         return bool(self.__call__())
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SymbolicFunction(SymbolicCallable, ABC):
     """
     A user-defined operation that computes a value, with its own verbalization.
@@ -354,9 +358,9 @@ class SymbolicFunction(SymbolicCallable, ABC):
         :raises ResultTypeCannotBeDetermined: If :meth:`__call__`'s return annotation
             names no type.
         """
-        return_type = InstantiatedVariable._type_built_by_(cls.__call__)
+        return_type = InstantiatedVariable._type_built_by_(factory=cls.__call__)
         if return_type is None:
-            raise ResultTypeCannotBeDetermined(cls.__call__)
+            raise ResultTypeCannotBeDetermined(factory=cls.__call__)
         return return_type
 
     @abstractmethod
@@ -377,7 +381,7 @@ The type of what a :class:`Triple` relates its subject to.
 """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
     """
     A Triple is a type predicate that represents a relation between two entities.
@@ -404,7 +408,7 @@ class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
         """
 
     @classmethod
-    def from_subject_object(cls, subject: SubjectType, object_: ObjectType) -> Self:
+    def from_subject_object(cls, *, subject: SubjectType, object_: ObjectType) -> Self:
         """
         Build this relation between a subject and an object, whatever order its fields
         are declared in.
@@ -440,7 +444,7 @@ class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
         """
         Verbalization of a Triple is a subject - verb-phrase - object, where the verb phrase is read
@@ -462,14 +466,14 @@ class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
         words = camel_case_to_words(cls.__name__).split()
         particles = [WordFragment(text=word) for word in words[1:]]
         return clause(
-            Noun(fields[cls.subject_field_name()]),
-            Verb(morphology.verb_lemma(words[0])),
+            Noun(content=fields[cls.subject_field_name()]),
+            Verb(lemma=morphology.verb_lemma(words[0])),
             *particles,
-            Noun(fields[cls.object_field_name()]),
+            Noun(content=fields[cls.object_field_name()]),
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HasType(Triple[Any, Type]):
     """
     Represents a predicate to check if a given variable is an instance of a specified
@@ -503,7 +507,7 @@ class HasType(Triple[Any, Type]):
 
     @classmethod
     def _verbalization_fragment_(
-        cls, fields: Mapping[str, VerbalizationFragment]
+        cls, *, fields: Mapping[str, VerbalizationFragment]
     ) -> VerbalizationFragment:
         # Imported locally to avoid the core → verbalization import cycle (see :class:`Triple`).
         from krrood.entity_query_language.verbalization.vocabulary.english import (
@@ -521,11 +525,11 @@ class HasType(Triple[Any, Type]):
         # conjunction). The listing is the vocabulary's :class:`DisjunctivePhrase` element, not a
         # bespoke tail; "type" is a bare noun ("of type", not "of a type").
         return clause(
-            Noun(fields["variable"]),
+            Noun(content=fields["variable"]),
             Copula(),
             Prepositions.OF,
-            Noun.bare("type"),
-            DisjunctivePhrase(fields["types_"]),
+            Noun.bare(head="type"),
+            DisjunctivePhrase(members=fields["types_"]),
         )
 
     @classmethod
@@ -533,7 +537,7 @@ class HasType(Triple[Any, Type]):
         return {"types_": int}
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HasTypes(HasType):
     """
     Represents a specialized data structure holding multiple types.
@@ -555,7 +559,7 @@ class HasTypes(HasType):
         return {"types_": (int, str)}
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Length(SymbolicFunction):
     """
     The number of items in an iterable, as a value operation.
@@ -572,13 +576,17 @@ class Length(SymbolicFunction):
         return len(self.iterable)
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             FunctionVerbalizationTemplates,
         )
 
-        return FunctionVerbalizationTemplates.possessive(cls, *fields.values())
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
 
 
 length = symbolic_callable_to_function(Length)
@@ -597,7 +605,7 @@ def _any_argument_is_an_operand(arguments: dict[str, Any]) -> bool:
     return any(isinstance(argument, Operand) for argument in arguments.values())
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Is(Predicate):
     """
     Predicate asserting that two operands refer to the same object in memory.
@@ -617,7 +625,9 @@ class Is(Predicate):
         return self.first_entity is self.second_entity
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """:return: the clause *"<first_entity> is the same object as <second_entity>"* — the two
         operands hold when they are the same object in memory."""
         # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
@@ -631,9 +641,9 @@ class Is(Predicate):
         )
 
         return clause(
-            Noun(fields["first_entity"]),
+            Noun(content=fields["first_entity"]),
             Copula(),
-            Noun.the("same object"),
+            Noun.the(head="same object"),
             Prepositions.AS,
-            Noun(fields["second_entity"]),
+            Noun(content=fields["second_entity"]),
         )

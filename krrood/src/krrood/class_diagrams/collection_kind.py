@@ -36,7 +36,7 @@ class CollectionKind(Enum):
     """
 
     @staticmethod
-    def declared_element_type(annotation: Any) -> Any:
+    def declared_element_type(*, annotation: Any) -> Any:
         """
         :param annotation: The annotation of a value whose elements are read.
         :return: The type of the elements of a parameterized collection: the key type of
@@ -99,7 +99,7 @@ class DeclaredValueKind(Enum):
     """
 
     @classmethod
-    def from_annotation(cls, annotation: Any) -> DeclaredValueKind:
+    def from_annotation(cls, *, annotation: Any) -> DeclaredValueKind:
         """
         :param annotation: An annotation that is not a union.
         :return: The kind of value the annotation declares: a collection for the classes

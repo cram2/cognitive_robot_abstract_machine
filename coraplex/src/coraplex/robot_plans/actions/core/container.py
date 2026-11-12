@@ -24,7 +24,7 @@ from coraplex.robot_plans.mixins import (
     OperatesGripper,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
@@ -78,7 +78,11 @@ class MovesContainerByItsHandle(
         )
         return a(cls)(
             grasp=variable_from(
-                GraspsByCloseness(handle, where_the_robot_stands, number_of_grasps=None)
+                GraspsByCloseness(
+                    graspable=handle,
+                    standing_position=where_the_robot_stands,
+                    number_of_grasps=None,
+                )
             ),
             arm=arm,
         )

@@ -1,6 +1,5 @@
 """
-The composite actions that move an object from one place to another, picking it up and
-placing it.
+Actions that take an object or open a container from where the robot stands.
 """
 
 from __future__ import annotations
@@ -96,7 +95,8 @@ class TransportAction(SequentialAction):
                                 context=context,
                             ),
                         )
-                    )
+                    ),
+                    holding_arms=[arm],
                 ),
                 face_and_look_at=a(FaceAndLookAtAction)(
                     face_at=a(FaceAtAction)(target=target_location),
@@ -170,16 +170,19 @@ class MoveAndPlaceAction(SequentialAction):
         standing_position: Pose,
         target_location: Pose,
         object_designator: HasGraspCandidates,
+        arm: Arm,
     ) -> Self:
         """
         :param standing_position: Where the robot stands while placing.
         :param target_location: Where to put the object down.
         :param object_designator: The object to put down.
+        :param arm: The arm holding the object.
         :return: The step placing the object from `standing_position`.
         """
         return cls(
             carry=CarryAction(
-                navigate=NavigateAction(target_location=standing_position)
+                navigate=NavigateAction(target_location=standing_position),
+                holding_arms=[arm],
             ),
             face_and_look_at=FaceAndLookAtAction(
                 face_at=FaceAtAction(target=target_location),
@@ -286,7 +289,11 @@ class MoveAndPickUpAction(SequentialAction):
             ),
             pick_up=a(PickUpAction)(
                 grasp=variable_from(
-                    GraspsByCloseness(graspable, standing_position, number_of_grasps)
+                    GraspsByCloseness(
+                        graspable=graspable,
+                        standing_position=standing_position,
+                        number_of_grasps=number_of_grasps,
+                    )
                 ),
                 arm=arm,
             ),
@@ -380,7 +387,11 @@ class MoveAndOpenAction(SequentialAction):
             ),
             open_container=a(OpenAction)(
                 grasp=variable_from(
-                    GraspsByCloseness(handle, standing_position, number_of_grasps)
+                    GraspsByCloseness(
+                        graspable=handle,
+                        standing_position=standing_position,
+                        number_of_grasps=number_of_grasps,
+                    )
                 ),
                 arm=arm,
             ),

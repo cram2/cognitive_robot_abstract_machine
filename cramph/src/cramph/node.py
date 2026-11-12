@@ -368,7 +368,7 @@ class TransitionCondition(SubclassJSONSerializer):
         )
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Resolves the nodes the condition names through the
         :class:`DeserializedNodeTracker` in `kwargs`.
@@ -378,7 +378,7 @@ class TransitionCondition(SubclassJSONSerializer):
         :raises UnsupportedConditionSyntaxError: If the condition contains syntax that
             has no meaning as a condition.
         """
-        nodes = DeserializedNodeTracker.from_kwargs(kwargs)
+        nodes = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         tree = ast.parse(data[TransitionConditionJSONKey.EXPRESSION], mode="eval")
         return cls(
             kind=TransitionKind[data[TransitionConditionJSONKey.KIND]],
@@ -388,7 +388,7 @@ class TransitionCondition(SubclassJSONSerializer):
                     variable_name
                 ).resolve(nodes),
             ),
-            owner=nodes.get(data[TransitionConditionJSONKey.OWNER]),
+            owner=nodes.get(key=data[TransitionConditionJSONKey.OWNER]),
         )
 
 
@@ -559,7 +559,8 @@ class DerivedConditionVariable(ConditionVariable, ABC):
             # A node may hand back one of these unwrapped, which cannot be substituted into.
             expression = Scalar(expression)
         return expression.substitute(
-            variables, [variable.expression() for variable in variables]
+            old_variables=variables,
+            new_variables=[variable.expression() for variable in variables],
         )
 
     @classmethod
@@ -586,7 +587,9 @@ class DerivedConditionVariable(ConditionVariable, ABC):
                 if counterpart is None
                 else variable.for_node(counterpart)
             )
-        return Scalar(condition).substitute(variables, replacements)
+        return Scalar(condition).substitute(
+            old_variables=variables, new_variables=replacements
+        )
 
 
 @dataclass(repr=False, eq=False, init=False)
@@ -716,7 +719,7 @@ class ConditionVariableReference:
         :return: The variable this reference names.
         :raises UnknownConditionVariableError: If the node offers no variable of that name.
         """
-        node = nodes.get(self.node_id)
+        node = nodes.get(key=self.node_id)
         for variable in node.condition_variables:
             if variable.predicate.attribute_name == self.attribute_name:
                 return variable
@@ -1116,23 +1119,23 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         return {
-            **DataclassJSONSerializer.to_json(self, **kwargs),
+            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
             NodeJSONKey.NODE_ID: self._node_id,
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Deserializes the node, or returns the instance already deserialized for the same
         node of the document, so that nodes referring to it share it.
         """
-        tracker = DeserializedNodeTracker.from_kwargs(kwargs)
+        tracker = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         node_id = data[NodeJSONKey.NODE_ID]
-        if tracker.has(node_id):
-            return tracker.get(node_id)
-        node = DataclassJSONSerializer.from_json(data, clazz=cls, **kwargs)
+        if tracker.has(key=node_id):
+            return tracker.get(key=node_id)
+        node = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
         node._take_over_node_id(node_id)
-        tracker.add(node_id, node)
+        tracker.add(key=node_id, tracked_object=node)
         return node
 
     def _take_over_node_id(self, node_id: str) -> None:
@@ -2212,10 +2215,10 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
         tracker._statechart = statechart
         return tracker
 
-    def _has_untracked(self, key: str) -> bool:
+    def _has_untracked(self, *, key: str) -> bool:
         return self._find_node_of_statechart(key) is not None
 
-    def _get_untracked(self, key: str, name: Any = None) -> StatechartNode:
+    def _get_untracked(self, *, key: str, name: Any = None) -> StatechartNode:
         node = self._find_node_of_statechart(key)
         if node is None:
             raise UntrackedObjectError(key=key, name=name)

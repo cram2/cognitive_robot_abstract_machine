@@ -102,7 +102,7 @@ def dense_log_weights(layer: SumLayer) -> np.ndarray:
         where the layer has no edge.
     """
     result = np.full((layer.number_of_nodes, layer.column_offsets[-1]), -np.inf)
-    result[layer.log_weights.rows, layer.log_weights.columns] = (
+    result[layer.log_weights.sparsity.rows, layer.log_weights.sparsity.columns] = (
         layer.normalized_edge_log_weights
     )
     return result
@@ -119,7 +119,7 @@ def region_graph_circuit(variables: SortedSet) -> DifferentiableLayeredCircuit:
         region graph builds it for training.
     """
     region_graph = RegionGraph(variables, partitions=2, depth=1, repetitions=2)
-    return region_graph.create_random_region_graph().as_probabilistic_circuit(
+    return region_graph.create_random_region_graph().to_probabilistic_circuit(
         input_units=3, sum_units=3
     )
 

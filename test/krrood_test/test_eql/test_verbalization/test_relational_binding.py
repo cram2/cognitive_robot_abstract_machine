@@ -30,7 +30,7 @@ from krrood.entity_query_language.verbalization.microplanning.coordination impor
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Mission:
     """
     A mission with a scalar priority — the bound secondary entity in these tests.
@@ -39,7 +39,7 @@ class Mission:
     priority: int
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Base:
     """
     A base named for nesting-depth tests.
@@ -48,7 +48,7 @@ class Base:
     name: str
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Robot:
     """
     A robot related to a mission (agentive-free ``assigned_to``) — the query subject.
@@ -57,7 +57,7 @@ class Robot:
     assigned_to: Mission
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Book:
     """
     A book with an agentive ``owned_by`` relation, to check the passive subject-relative

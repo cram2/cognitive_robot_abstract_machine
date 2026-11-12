@@ -156,7 +156,7 @@ def test_removed_object_leaves_the_collections_that_hold_it(
 
     result = (
         a(FixedConnection)
-        .from_(literal(planned_connection_world.world).connections)
+        .from_(domain=literal(planned_connection_world.world).connections)
         .tolist(state=state)
     )
 
@@ -176,7 +176,9 @@ def test_removed_object_leaves_the_collections_the_state_assigns(
         .with_objects_removed(removed)
     )
 
-    result = a(FixedConnection).from_(literal(world).connections).tolist(state=state)
+    result = (
+        a(FixedConnection).from_(domain=literal(world).connections).tolist(state=state)
+    )
 
     assert result == [*kept, planned]
 
@@ -187,7 +189,7 @@ def test_removed_object_leaves_a_captured_list(planned_connection_world):
 
     result = (
         a(FixedConnection)
-        .from_(planned_connection_world.fixed_connections)
+        .from_(domain=planned_connection_world.fixed_connections)
         .tolist(state=state)
     )
 
@@ -227,7 +229,7 @@ def test_world_collection_reads_the_collection_the_state_assigns(
 
     result = (
         a(FixedConnection)
-        .from_(variable(World, [world]).connections)
+        .from_(domain=variable(World, [world]).connections)
         .tolist(state=state)
     )
 

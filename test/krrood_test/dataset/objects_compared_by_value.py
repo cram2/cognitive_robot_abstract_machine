@@ -9,7 +9,7 @@ from dataclasses import dataclass
 # %% objects compared by value
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PointComparedByValue:
     """
     A point on a line, equal to every other point at the same coordinate.
@@ -20,7 +20,7 @@ class PointComparedByValue:
     Where the point lies on the line.
     """
 
-    def shifted_by(self, distance: float) -> float:
+    def shifted_by(self, *, distance: float) -> float:
         """
         :param distance: How far to move along the line.
         :return: The coordinate *distance* away from this point.

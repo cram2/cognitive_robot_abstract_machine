@@ -103,7 +103,7 @@ class PredicateTransform(SpecificityRule):
 
     @classmethod
     @abstractmethod
-    def applies(cls, comparator: Comparator, negated: bool) -> bool:
+    def applies(cls, *, comparator: Comparator, negated: bool) -> bool:
         """
         :param comparator: The comparator being said as a predicate.
         :param negated: Whether an outer negation applies.
@@ -117,7 +117,7 @@ class PredicateTransform(SpecificityRule):
     @classmethod
     @abstractmethod
     def render(
-        cls, comparator: Comparator, context: RuleContext, negated: bool
+        cls, *, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
         """
         :param comparator: The comparator to render.
@@ -140,7 +140,7 @@ class GenericComparator(PredicateTransform):
     """
 
     @classmethod
-    def applies(cls, comparator: Comparator, negated: bool) -> bool:
+    def applies(cls, *, comparator: Comparator, negated: bool) -> bool:
         """
         The unguarded base applies to every comparator.
 
@@ -153,7 +153,7 @@ class GenericComparator(PredicateTransform):
 
     @classmethod
     def render(
-        cls, comparator: Comparator, context: RuleContext, negated: bool
+        cls, *, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
         """
         Render *"<left> <operator> <right>"* with the right side in value position.
@@ -163,9 +163,9 @@ class GenericComparator(PredicateTransform):
         """
         return PhraseFragment(
             parts=[
-                context.child(comparator.left),
+                context.child(node=comparator.left),
                 comparator_operator(comparator, context.services, negated=negated),
-                context.child(comparator.right, as_value=True),
+                context.child(node=comparator.right, as_value=True),
             ]
         )
 
@@ -180,7 +180,7 @@ class AbsenceTransform(GenericComparator):
     """
 
     @classmethod
-    def applies(cls, comparator: Comparator, negated: bool) -> bool:
+    def applies(cls, *, comparator: Comparator, negated: bool) -> bool:
         """
         Fires on a non-negated ``<chain> == None`` comparison.
 
@@ -196,7 +196,7 @@ class AbsenceTransform(GenericComparator):
 
     @classmethod
     def render(
-        cls, comparator: Comparator, context: RuleContext, negated: bool
+        cls, *, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
         """
         Render the absence predicate instead of a value comparison.
@@ -240,7 +240,7 @@ class CoindexedEqualityTransform(GenericComparator):
     """
 
     @classmethod
-    def applies(cls, comparator: Comparator, negated: bool) -> bool:
+    def applies(cls, *, comparator: Comparator, negated: bool) -> bool:
         """
         Fires on a non-negated co-indexed equality whose sibling prefixes the natural
         form covers.
@@ -257,13 +257,13 @@ class CoindexedEqualityTransform(GenericComparator):
 
     @classmethod
     def render(
-        cls, comparator: Comparator, context: RuleContext, negated: bool
+        cls, *, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
         """
         Render the lone equality through the one-terminal co-indexed fold so the *have
         the same* phrasing has a single home, rather than re-emitting it here.
         """
-        return context.child(_lone_coindexed_fold(comparator))
+        return context.child(node=_lone_coindexed_fold(comparator))
 
 
 class BooleanPolarityTransform(GenericComparator):
@@ -279,7 +279,7 @@ class BooleanPolarityTransform(GenericComparator):
     """
 
     @classmethod
-    def applies(cls, comparator: Comparator, negated: bool) -> bool:
+    def applies(cls, *, comparator: Comparator, negated: bool) -> bool:
         """
         Fires on a boolean attribute compared to a boolean value/domain.
 
@@ -295,7 +295,7 @@ class BooleanPolarityTransform(GenericComparator):
 
     @classmethod
     def render(
-        cls, comparator: Comparator, context: RuleContext, negated: bool
+        cls, *, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
         """
         Fold the boolean value into the verb's polarity, never *"is completed is True"*.
@@ -304,16 +304,16 @@ class BooleanPolarityTransform(GenericComparator):
         the predicative copula rather than appending the value as a separate term.
         """
         constraint = _boolean_constraint(comparator.right)
-        plan = context.microplan.plan_for(comparator.left, ChainPlanner)
-        chain = ChainAssembler(context)
+        plan = context.microplan.plan_for(node=comparator.left, planner=ChainPlanner)
+        chain = ChainAssembler(context=context)
         if constraint == {True, False}:
-            return chain.boolean_alternative(plan)
+            return chain.boolean_alternative(plan=plan)
         positive = True in constraint
         if comparator.operation is operator.ne:
             positive = not positive
         if negated:
             positive = not positive
-        return chain.boolean_predicative(plan, negated=not positive)
+        return chain.boolean_predicative(plan=plan, negated=not positive)
 
 
 class RelationalIdentityTransform(GenericComparator):
@@ -332,7 +332,7 @@ class RelationalIdentityTransform(GenericComparator):
     """
 
     @classmethod
-    def applies(cls, comparator: Comparator, negated: bool) -> bool:
+    def applies(cls, *, comparator: Comparator, negated: bool) -> bool:
         """
         Fires on a non-negated equality whose one side is a relational hop and the other
         a variable — the identity shape the active predicate collapses.
@@ -340,33 +340,34 @@ class RelationalIdentityTransform(GenericComparator):
         return (
             not negated
             and comparator.operation is operator.eq
-            and cls._relational_identity(comparator) is not None
+            and cls._relational_identity(comparator=comparator) is not None
         )
 
     @classmethod
     def render(
-        cls, comparator: Comparator, context: RuleContext, negated: bool
+        cls, *, comparator: Comparator, context: RuleContext, negated: bool
     ) -> VerbalizationFragment:
         """
         Render *"<subject> is <participle> <preposition> <owner>"*, the relation's verb
         supplying the participle and preposition and the recursion supplying subject and
         owner phrases.
         """
-        relation_hop, subject = cls._relational_identity(comparator)
+        relation_hop, subject = cls._relational_identity(comparator=comparator)
         verb = relational_verb(relation_hop._attribute_name_)
         return clause(
-            Noun(context.child(subject)),
+            Noun(content=context.child(node=subject)),
             Copula(),
             RoleFragment.for_attribute(
-                relation_hop._owner_class_,
-                relation_hop._attribute_name_,
+                owner=relation_hop._owner_class_,
+                attribute_name=relation_hop._attribute_name_,
                 text=verb.phrase,
             ),
-            Noun(context.child(relation_hop._child_)),
+            Noun(content=context.child(node=relation_hop._child_)),
         )
 
     @staticmethod
     def _relational_identity(
+        *,
         comparator: Comparator,
     ) -> tuple | None:
         """:return: ``(relational_hop, subject_variable)`` when one operand is a relational attribute
@@ -441,11 +442,11 @@ def comparator_operator(
         return _operator_fragment(word, number, compact=compact, copula=copula)
 
     temporal = is_temporal(comparator.left) or is_temporal(comparator.right)
-    operator_member = Operators.for_callable(operation)
+    operator_member = Operators.for_callable(function=operation)
     if operator_member is None:
         name = comparator._name_
         return RoleFragment.for_operator(
-            f"{Logicals.NOT.text} {name}" if negated else name
+            label=f"{Logicals.NOT.text} {name}" if negated else name
         )
     word = operator_member.select(negated=negated, compact=compact, temporal=temporal)
     return _operator_fragment(word, number, compact=compact, copula=copula)
@@ -460,7 +461,7 @@ def _operator_fragment(
     if compact:
         return word.as_fragment()
     if not copula:
-        return RoleFragment.for_operator(predicative_core(word.text))
+        return RoleFragment.for_operator(label=predicative_core(word.text))
     return predicative_operator(word.text, number)
 
 
@@ -492,7 +493,7 @@ def negate_clause(fragment: VerbalizationFragment) -> VerbalizationFragment | No
     ...     PhraseFragment, WordFragment,
     ... )
     >>> from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import Verb
-    >>> clause = PhraseFragment(parts=[WordFragment(text="an Employee"), Verb("work").as_fragment()])
+    >>> clause = PhraseFragment(parts=[WordFragment(text="an Employee"), Verb(lemma="work").as_fragment()])
     >>> negate_clause(clause).parts[1].negated
     True
     >>> negate_clause(WordFragment(text="a Robot")) is None
@@ -528,7 +529,7 @@ def coindexed_operator(operation) -> VerbalizationFragment:
     ...     MorphologyProcessor,
     ... )
     >>> realise = lambda fragment: flatten_fragment_to_plain_text(
-    ...     MorphologyProcessor().process(fragment)
+    ...     MorphologyProcessor().process(fragment=fragment)
     ... )
     >>> realise(coindexed_operator(operator.eq))
     'are equal to'
@@ -538,7 +539,7 @@ def coindexed_operator(operation) -> VerbalizationFragment:
     phrase = (
         Operators.CALC_EQ
         if operation is operator.eq
-        else Operators.from_callable(operation)
+        else Operators.from_callable(function=operation)
     )
     return predicative_operator(phrase.value.standard, GrammaticalNumber.PLURAL)
 
@@ -576,25 +577,32 @@ def render_absence(
     left = comparator.left
     if not isinstance(left, Attribute):
         return PhraseFragment(
-            parts=[context.child(left), NonExistence.for_number(number).as_fragment()]
+            parts=[
+                context.child(node=left),
+                NonExistence.for_number(number=number).as_fragment(),
+            ]
         )
     verb_phrase = relational_verb_phrase(left._attribute_name_)
     if verb_phrase is not None:
         return PhraseFragment(
             parts=[
-                context.child(left._child_),
-                PassiveAbsence.for_number(number).as_fragment(),
+                context.child(node=left._child_),
+                PassiveAbsence.for_number(number=number).as_fragment(),
                 RoleFragment.for_attribute(
-                    left._owner_class_, left._attribute_name_, text=verb_phrase
+                    owner=left._owner_class_,
+                    attribute_name=left._attribute_name_,
+                    text=verb_phrase,
                 ),
                 *_relation_target(left),
             ]
         )
     return PhraseFragment(
         parts=[
-            context.child(left._child_),
-            Absence.for_number(number).as_fragment(),
-            RoleFragment.for_attribute(left._owner_class_, left._attribute_name_),
+            context.child(node=left._child_),
+            Absence.for_number(number=number).as_fragment(),
+            RoleFragment.for_attribute(
+                owner=left._owner_class_, attribute_name=left._attribute_name_
+            ),
         ]
     )
 
@@ -613,7 +621,10 @@ def _relation_target(attribute: Attribute) -> list[VerbalizationFragment]:
     """
     related_type = attribute._type_
     if isinstance(related_type, type) and related_type.__module__ != "builtins":
-        return [Quantifiers.ANY.as_fragment(), RoleFragment.for_type(related_type)]
+        return [
+            Quantifiers.ANY.as_fragment(),
+            RoleFragment.for_type(type_=related_type),
+        ]
     return [Quantifiers.ANYTHING.as_fragment()]
 
 

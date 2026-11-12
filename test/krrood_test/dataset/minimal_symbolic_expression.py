@@ -9,7 +9,7 @@ from krrood.entity_query_language.core.base_expressions import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class MinimalSymbolicExpression(SymbolicExpression):
     """
     A real :class:`SymbolicExpression` with no children, carrying the inherited
@@ -20,14 +20,14 @@ class MinimalSymbolicExpression(SymbolicExpression):
     model's scope keys), without pulling in a concrete grammar construct.
     """
 
-    def _evaluate__(self, sources: OperationResult) -> Iterator[OperationResult]:
+    def _evaluate__(self, *, sources: OperationResult) -> Iterator[OperationResult]:
         """
         Never evaluated by identity-only tests.
         """
         return iter(())
 
     def _replace_child_field_(
-        self, old_child: SymbolicExpression, new_child: SymbolicExpression
+        self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
     ) -> None:
         """
         No child fields to rewire on a leaf stand-in.

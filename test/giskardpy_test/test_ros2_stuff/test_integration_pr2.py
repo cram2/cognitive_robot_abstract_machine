@@ -12,12 +12,8 @@ from giskardpy.middleware.ros2.robot_interface_config import (
 )
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from giskardpy.middleware.ros2.giskard import Giskard
-from semantic_digital_twin.adapters.ros.rospy import wait_for_future_to_complete
-from giskardpy.middleware.ros2.utils.utils import load_xacro
-from giskardpy.middleware.ros2.utils.utils_for_tests import (
-    GiskardTester,
-    compare_points,
-)
+from semantic_digital_twin.adapters.ros.ros_graph import wait_for_future_to_complete
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from cramph.exceptions import EmptyStatechartError
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.monitors import CountSeconds
@@ -50,6 +46,8 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
 
+from ...pytest_environment import runs_in_continuous_integration
+
 
 @dataclass
 class PR2Tester(GiskardTester):
@@ -78,16 +76,13 @@ class PR2Tester(GiskardTester):
         self.map = self.api.world.get_kinematic_structure_entity_by_name("map")
 
     def setup_giskard(self) -> Giskard:
-        robot_desc = load_xacro(
-            "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-        )
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(PR2, urdf=robot_desc)]
+                robots=[RobotSpecification.specify_real_robot(PR2)]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(
-                debug_mode=True,
+                debug_mode=not runs_in_continuous_integration(),
                 plot_trajectory=True,
             ),
             qp_controller_config=QPControllerConfig(
@@ -232,13 +227,8 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
     )
     for name, pose in poses_relative_to_r_tip.items():
         body = server_world.get_kinematic_structure_entity_by_name(name)
-        compare_points(
-            actual_point=server_world.compute_forward_kinematics(
-                server_r_tip, body
-            ).position,
-            desired_point=pose.position,
-            decimal=4,
-        )
+        r_tip_T_body = server_world.compute_forward_kinematics(server_r_tip, body)
+        assert np.allclose(r_tip_T_body.position, pose.position, atol=1e-4)
 
 
 # %% action server events
