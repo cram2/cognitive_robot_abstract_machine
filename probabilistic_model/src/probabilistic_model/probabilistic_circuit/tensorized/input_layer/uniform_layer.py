@@ -51,7 +51,9 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
         result = (self.float_column(values=values) - self.lower) / (
             self.upper - self.lower
         )
-        return self.namespace.clip(result, 0.0, 1.0)
+        xp = self.namespace
+        # the clip of array_api_compat costs several times that of numpy
+        return xp.minimum(xp.maximum(result, 0.0), 1.0)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable

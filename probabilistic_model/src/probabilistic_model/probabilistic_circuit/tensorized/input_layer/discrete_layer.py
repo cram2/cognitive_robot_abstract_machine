@@ -129,8 +129,8 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         xp = self.namespace
         values = self.float_column(values=values)[:, 0]
         states = self.float_states
-        positions = xp.clip(
-            xp.searchsorted(states, values), 0, max(self.number_of_states - 1, 0)
+        positions = xp.minimum(
+            xp.searchsorted(states, values), max(self.number_of_states - 1, 0)
         )
         found = xp.take(states, positions) == values
         return xp.where(found, positions, -1)
