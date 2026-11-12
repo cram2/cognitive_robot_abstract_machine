@@ -20,7 +20,7 @@ from coraplex.robot_plans.mixins import (
     OperatesGripper,
 )
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.goals.grasped_mechanism import (
+from giskardpy.motion_statechart.tasks.grasped_mechanism import (
     ArticulateGraspedMechanism,
 )
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
@@ -32,7 +32,7 @@ from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 # %% taking a container by its handle
@@ -74,7 +74,11 @@ class MovesContainerByItsHandle(
         )
         return a(cls)(
             grasp=flat_variable(
-                GraspsByCloseness(handle, where_the_robot_stands, number_of_grasps=None)
+                GraspsByCloseness(
+                    graspable=handle,
+                    standing_position=where_the_robot_stands,
+                    number_of_grasps=None,
+                )
             ),
             arm=arm,
         )

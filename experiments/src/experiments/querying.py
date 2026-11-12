@@ -52,10 +52,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_modification import (
@@ -159,8 +156,8 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     """
     world = setup_world()
 
-    spoon = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "spoon.stl")).parse()
-    bowl = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "bowl.stl")).parse()
+    spoon = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "spoon.stl")).create_world()
+    bowl = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "bowl.stl")).create_world()
 
     with world.modify_world():
         world.merge_world_at_pose(
@@ -286,7 +283,7 @@ def _q_what_did_you_do(plan: StatechartNode) -> BehaviourQuery:
         query=eql.an(
             eql.entity(n).where(n.life_cycle_state == LifeCycleValues.SUCCEEDED)
         ).ordered_by(
-            n.start_time,
+            variable=n.start_time,
             descending=False,
         ),
     )
@@ -301,7 +298,7 @@ def _q_walk_through_in_order(plan: StatechartNode) -> BehaviourQuery:
         question="Walk me through what you did in order.",
         query=eql.an(
             eql.entity(n).where(n.life_cycle_state == LifeCycleValues.SUCCEEDED)
-        ).ordered_by(n.start_time),
+        ).ordered_by(variable=n.start_time),
     )
 
 
@@ -327,7 +324,7 @@ def _q_duration_per_step(plan: StatechartNode) -> BehaviourQuery:
     return BehaviourQuery(
         question="How long did each step take?",
         query=eql.an(eql.entity(n).where(n.end_time != None)).ordered_by(  # noqa: E711
-            n.start_time
+            variable=n.start_time
         ),
     )
 
@@ -395,8 +392,8 @@ def _q_longest_step(plan: StatechartNode) -> BehaviourQuery:
     return BehaviourQuery(
         question="Which step took the longest?",
         query=eql.an(eql.entity(n).where(n.end_time != None))  # noqa: E711
-        .ordered_by(n.end_time, descending=True)
-        .limit(1),
+        .ordered_by(variable=n.end_time, descending=True)
+        .limit(n=1),
     )
 
 
@@ -410,7 +407,7 @@ def _q_status_breakdown(plan: StatechartNode) -> BehaviourQuery:
         query=(
             eql.set_of(status := n.life_cycle_state, c := eql.count(n))
             .grouped_by(status)
-            .ordered_by(c, descending=True)
+            .ordered_by(variable=c, descending=True)
         ),
     )
 

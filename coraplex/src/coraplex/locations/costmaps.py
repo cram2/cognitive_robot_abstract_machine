@@ -18,12 +18,12 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Quaternion,
     RotationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point3, Vector3
+from krrood_spatial_math.spatial_types import Pose, Point3, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -185,7 +185,7 @@ class Costmap(Location):
         :raises NonPositiveLimitValue: If asked for fewer than one candidate.
         """
         if number_of_samples < 1:
-            raise NonPositiveLimitValue(number_of_samples)
+            raise NonPositiveLimitValue(wrong_limit_value=number_of_samples)
 
         # An entry is only ever offered once, so the whole map is all there is to
         # sample.

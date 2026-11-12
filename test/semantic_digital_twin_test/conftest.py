@@ -29,7 +29,7 @@ def pytest_configure(config):
     # Build the symbol graph
     SymbolGraph.clear()
     class_diagram = ClassDiagram(
-        recursive_subclasses(Symbol) + [World],
+        classes=recursive_subclasses(Symbol) + [World],
         introspector=DescriptorAwareIntrospector(),
     )
     SymbolGraph(_class_diagram=class_diagram)
@@ -68,4 +68,4 @@ def table_world():
     )
     table_path = os.path.join(urdf_dir, "table.urdf")
 
-    return URDFParser.from_file(file_path=table_path).parse()
+    return URDFParser.from_file(file_path=table_path).create_world()

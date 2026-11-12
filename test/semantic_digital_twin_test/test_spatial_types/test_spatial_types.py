@@ -11,10 +11,8 @@ from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import (
-    SpatialTypesError,
-)
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.exceptions import SpatialTypesError
+from krrood_spatial_math.spatial_types import (
     AxisAngle,
     RotationMatrix,
     Quaternion,
@@ -22,8 +20,8 @@ from semantic_digital_twin.spatial_types import (
     Point3,
     HomogeneousTransformationMatrix,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Point2, Pose2D
-from semantic_digital_twin.spatial_types.spatial_types import Pose, SpatialType
+from krrood_spatial_math.spatial_types import Pose, Point2, Pose2D
+from krrood_spatial_math.spatial_types import Pose, SpatialType
 from semantic_digital_twin.world_description.world_entity import Body
 from .reference_implementations import (
     rotation_matrix_from_quaternion,
@@ -61,7 +59,7 @@ class TestRotationMatrix:
         )
         rotation_json = rotation.to_json()
 
-        assert RotationMatrix.from_json(rotation_json).to_json() == rotation_json
+        assert RotationMatrix.from_json(data=rotation_json).to_json() == rotation_json
 
     @pytest.mark.parametrize("q1", quaternions)
     @pytest.mark.parametrize("q2", quaternions)
@@ -83,6 +81,96 @@ class TestRotationMatrix:
                 shortest_angular_distance(actual_angle.to_np()[0], -expected_angle),
                 0,
             )
+
+    @pytest.mark.parametrize("turned", [-1.2, -0.5, -0.1, 0.1, 0.5, 1.2])
+    def test_rotational_distance_is_the_shorter_way_round(self, turned):
+        """
+        Turning by ``turned`` towards an orientation half a turn away leaves the rest of
+        the half turn to go, whichever way the turn goes.
+        """
+        start_yaw = 1.47
+        goal = RotationMatrix.from_rpy(0, 0, start_yaw + np.pi)
+        current = RotationMatrix.from_rpy(0, 0, start_yaw + turned)
+
+        distance = current.rotational_distance(goal)
+
+        assert distance.to_np()[0] == pytest.approx(np.pi - abs(turned))
+
+    @pytest.mark.parametrize(
+        "angle", [0.3, np.pi / 2 - 0.01, np.pi / 2 + 0.01, 2.5, np.pi - 1e-4]
+    )
+    @pytest.mark.parametrize(
+        "axis",
+        [
+            Vector3.Z(),
+            Vector3.unit_vector(1, 1, 1),
+            Vector3.unit_vector(0.2, -0.9, 0.3),
+        ],
+    )
+    def test_axis_angle_is_the_rotation_the_matrix_was_built_from(self, axis, angle):
+        """
+        A rotation by less than half a turn reads back as the axis and angle it was
+        built from.
+        """
+        axis_angle = RotationMatrix.from_axis_angle(AxisAngle(axis, angle)).axis_angle
+
+        assert axis_angle.angle.to_np()[0] == pytest.approx(angle)
+        assert np.allclose(axis_angle.axis.to_np(), axis.to_np())
+
+    @pytest.mark.parametrize("angle", [np.pi + 0.1, 1.5 * np.pi, 2 * np.pi - 0.3])
+    def test_axis_angle_of_more_than_half_a_turn_is_the_shorter_way_round(self, angle):
+        """
+        A rotation by more than half a turn reads back as the rest of the full turn
+        around the opposite axis.
+        """
+        axis = Vector3.unit_vector(0.2, -0.9, 0.3)
+
+        axis_angle = RotationMatrix.from_axis_angle(AxisAngle(axis, angle)).axis_angle
+
+        assert axis_angle.angle.to_np()[0] == pytest.approx(2 * np.pi - angle)
+        assert np.allclose(axis_angle.axis.to_np(), (-axis).to_np())
+
+    def test_axis_angle_of_half_a_turn_describes_the_matrix(self):
+        """
+        Half a turn reads back as an angle of pi around an axis that rebuilds the
+        matrix, as both directions of the axis describe the same rotation.
+        """
+        rotation = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.unit_vector(0.2, -0.9, 0.3), np.pi)
+        )
+
+        axis_angle = rotation.axis_angle
+
+        assert axis_angle.angle.to_np()[0] == pytest.approx(np.pi)
+        assert np.allclose(axis_angle.rotation_matrix.to_np(), rotation.to_np())
+
+    def test_axis_angle_of_the_identity_turns_by_zero_around_z(self):
+        """
+        The identity has no axis of its own and reads back as no turn around z.
+        """
+        axis_angle = RotationMatrix().axis_angle
+
+        assert axis_angle.angle.to_np()[0] == 0
+        assert np.allclose(axis_angle.axis.to_np(), Vector3.Z().to_np())
+
+    @pytest.mark.parametrize("angle", [0, np.pi])
+    def test_axis_angle_has_a_finite_derivative_where_its_angle_is_extreme(self, angle):
+        """
+        The angle keeps a finite derivative at no turn and at half a turn, where its
+        cosine reaches the ends of its range.
+        """
+        variable = sm.FloatVariable("angle")
+        rotation = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3.unit_vector(0.2, -0.9, 0.3), variable)
+        )
+
+        derivative = rotation.axis_angle.angle.jacobian(variables=[variable])
+
+        assert np.isfinite(
+            derivative.substitute(
+                old_variables=[variable], new_variables=[angle]
+            ).to_np()
+        ).all()
 
     def test_reference_frames(self):
         reference_frame = Body(name=PrefixedName("muh"))
@@ -571,9 +659,9 @@ class TestRotationMatrix:
         for r in operations_to_test:
             rotation_part = r[:3, :3]
             det = rotation_part.det()
-            assert np.allclose(
-                det, 1.0, atol=1e-10
-            ), f"Determinant {det} != 1.0 for operation"
+            assert np.allclose(det, 1.0, atol=1e-10), (
+                f"Determinant {det} != 1.0 for operation"
+            )
 
     def test_deepcopy_of_default_constructed_matrix(self):
         """
@@ -947,9 +1035,6 @@ class TestPoint3:
         assert np.allclose(distance, 5.0)
         assert np.allclose(point, np.array([0, 0, 0, 1]))
 
-    def test_distance_to_line_segment(self):
-        pass
-
     def test_project_to_plane(self):
         p = Point3(x=0, y=0, z=1)
         actual, distance = p.project_to_plane(
@@ -1087,7 +1172,9 @@ class TestVector3:
         nominator_expr = Vector3.from_iterable(nominator)
         denominator_expr = sm.Scalar(data=denominator)
         if_nan_expr = Vector3.from_iterable(if_nan)
-        result = nominator_expr.safe_division(denominator_expr, if_nan_expr)
+        result = nominator_expr.safe_division(
+            other=denominator_expr, if_nan=if_nan_expr
+        )
         if denominator == 0:
             assert np.allclose(result[:3], if_nan)
         else:
@@ -1360,7 +1447,7 @@ class TestTransformationMatrix:
         """
         t = HomogeneousTransformationMatrix()
         t_json = t.to_json()
-        t_copy = HomogeneousTransformationMatrix.from_json(t_json)
+        t_copy = HomogeneousTransformationMatrix.from_json(data=t_json)
         assert np.allclose(t.to_np(), t_copy.to_np())
 
     def test_reference_frames(self):
@@ -1546,14 +1633,14 @@ class TestTransformationMatrix:
         assert np.allclose(r1, r2)
 
     def test_dot(self):
-        s = sm.FloatVariable(name="x")
-        m1 = HomogeneousTransformationMatrix()
-        m2 = HomogeneousTransformationMatrix.from_xyz_rpy(x=s)
-        m1.dot(m2)
-
-    def test_TransformationMatrix(self):
-        f = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3)
-        assert isinstance(f, HomogeneousTransformationMatrix)
+        x = sm.FloatVariable(name="x")
+        m1 = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 0.1, 0.2, 0.3)
+        m2 = HomogeneousTransformationMatrix.from_xyz_rpy(x=x)
+        actual = m1.dot(m2).substitute(old_variables=[x], new_variables=[0.5])
+        expected = (
+            m1.to_np() @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5).to_np()
+        )
+        assert np.allclose(actual.to_np(), expected)
 
     def test_wrong_dimensions(self):
         data = np.eye(2)
@@ -2134,7 +2221,6 @@ class TestTransformationMatrix:
 
 
 class TestQuaternion:
-
     def test_from_iterable_copies_a_symbolic_math_type_input(self):
         """
         `from_iterable` must not alias a SymbolicMathType input's casadi_sx: the result
@@ -2306,18 +2392,20 @@ class TestConstantEntriesAreNormalised:
         np.testing.assert_array_equal(matrix.to_np()[:3, 3], [5.0, 5.0, 5.0])
 
     def test_pose_repairs_its_bottom_row(self):
-        pose = Pose.from_casadi_sx(sm.to_sx(self._matrix_with_wrong_constant_entries()))
+        pose = Pose.from_casadi_sx(
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
+        )
         np.testing.assert_array_equal(pose.to_np()[3, :], [0.0, 0.0, 0.0, 1.0])
 
     def test_rotation_matrix_repairs_its_bottom_row(self):
         rotation = RotationMatrix.from_casadi_sx(
-            sm.to_sx(self._matrix_with_wrong_constant_entries())
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
         )
         np.testing.assert_array_equal(rotation.to_np()[3, :], [0.0, 0.0, 0.0, 1.0])
 
     def test_rotation_matrix_drops_any_translation(self):
         rotation = RotationMatrix.from_casadi_sx(
-            sm.to_sx(self._matrix_with_wrong_constant_entries())
+            casadi_sx=sm.to_sx(self._matrix_with_wrong_constant_entries())
         )
         np.testing.assert_array_equal(rotation.to_np()[:3, 3], [0.0, 0.0, 0.0])
 

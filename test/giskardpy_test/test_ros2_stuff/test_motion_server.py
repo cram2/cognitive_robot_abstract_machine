@@ -6,7 +6,7 @@ from typing_extensions import Any
 import pytest
 
 from cramph.executor import NoPacing
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.action_server import GoalOutcome
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
@@ -640,7 +640,7 @@ class MotionServerFixture:
 
 
 @pytest.fixture()
-def motion_server(init_rospy) -> MotionServerFixture:
+def motion_server(init_background_node) -> MotionServerFixture:
     executor = create_executor()
     world = executor.context.world
     action_server = GoalQueueMimic()
@@ -658,7 +658,9 @@ def motion_server(init_rospy) -> MotionServerFixture:
     control_input = RecordingInputSynchronizer(world=world, executor=executor)
     cycle_counter = CycleCounter()
     client = MetaData(node_name="watched_client", process_id=1)
-    client_presence = HeartbeatPresence(node=rospy.get_node(), clock=SteppingClock())
+    client_presence = HeartbeatPresence(
+        node=background_node.get_node(), clock=SteppingClock()
+    )
     client_presence.receive_heartbeat(heartbeat_of(client))
     client_watchdog = ClientWatchdog(presence=client_presence)
     control_loop = ControlLoop(
@@ -879,7 +881,7 @@ class TestGoalResult:
         motion_statechart = motion_server.executor.statechart
         assert (
             LastObservationState.from_json(
-                result[StatechartPayloadKey.LAST_OBSERVATION_STATE],
+                data=result[StatechartPayloadKey.LAST_OBSERVATION_STATE],
                 statechart=motion_statechart,
             )
             == motion_statechart.last_observation_state
@@ -1079,7 +1081,7 @@ class TestStateChangeAnnouncement:
     observer of the world, so it is only worth doing when an input wrote something.
     """
 
-    def test_nothing_is_announced_when_no_input_wrote(self, init_rospy):
+    def test_nothing_is_announced_when_no_input_wrote(self, init_background_node):
         world = World()
         inputs = WorldStateInputs(world=world, synchronizers=[])
         recorder = StateChangeRecorder(_world=world)
@@ -1088,7 +1090,7 @@ class TestStateChangeAnnouncement:
 
         assert recorder.announced_changes == 0
 
-    def test_the_change_is_announced_when_an_input_wrote(self, init_rospy):
+    def test_the_change_is_announced_when_an_input_wrote(self, init_background_node):
         world = World()
         inputs = WorldStateInputs(
             world=world, synchronizers=[WritingInputSynchronizer(world=world)]
@@ -1100,7 +1102,7 @@ class TestStateChangeAnnouncement:
         assert recorder.announced_changes == 1
 
     def test_the_state_is_announced_on_request_even_when_no_input_wrote(
-        self, init_rospy
+        self, init_background_node
     ):
         """
         The idle loop needs this: nothing else announces while no goal is running, so

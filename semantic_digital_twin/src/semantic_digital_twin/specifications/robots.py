@@ -5,19 +5,27 @@ Specifications of robots placed into a world.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing_extensions import TYPE_CHECKING, cast
-from uuid import uuid4
 
+from typing_extensions import TYPE_CHECKING, Self, cast
+
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import DriveVelocityLimitsOnUndrivenRobot
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.robots.exceptions import (
+    RobotDescriptionMissingError,
+    StartPoseWithoutMobileBaseError,
+)
+from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    ActiveConnection,
+    Connection6DoF,
     FixedConnection,
-    WheeledDrive,
 )
-from semantic_digital_twin.world_description.world_entity import Body, Connection
+from semantic_digital_twin.specifications.exceptions import (
+    VisualCollisionBackupDisabledError,
+)
+from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_source import WorldModelParser
 
 if TYPE_CHECKING:
     from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -28,153 +36,253 @@ if TYPE_CHECKING:
 @dataclass
 class RobotSpecification:
     """
-    World-independent description of a robot placed into a world: which robot, where its
-    localization frame sits, and where the robot starts within it.
+    World-independent description of a robot placed into a world.
 
-    Materialized via :meth:`spawn`, which merges the robot as ``world.root -> odom ->
-    drive -> robot``. The ``odom`` is fixed to the world root; whether the robot can
-    move is a matter of its drive alone, which is a fixed connection for a robot without
-    a mobile base.
+    :meth:`spawn` merges a robot with a mobile base as ``world.root -> localization ->
+    odometry -> drive -> robot`` and any other robot as ``world.root -> localization ->
+    robot``.
     """
 
     semantic_annotation_type: type[AbstractRobot]
     """
-    The robot to merge into the world.
+    The robot to create.
     """
 
-    world_T_odom: HomogeneousTransformationMatrix | None = None
+    description_parser: WorldModelParser | None = None
     """
-    The localization pose of the robot's ``odom`` in the ``world.root`` frame.
+    The parser reading the robot's description, whose settings, such as the prefix of
+    the names it reads, the robot keeps.
+
+    If None, the robot is read from its own description with
+    :meth:`~semantic_digital_twin.robots.robot_parts.AbstractRobot.from_description`.
+    """
+
+    localization_pose: HomogeneousTransformationMatrix | None = None
+    """
+    The pose, in the ``world.root`` frame, of the body the localization attaches: the
+    odometry body of a robot with a mobile base, and the root of the robot's description
+    otherwise.
 
     If None, identity is used.
     """
 
-    odom_T_robot_start: HomogeneousTransformationMatrix | None = None
+    odometry_T_robot_start: HomogeneousTransformationMatrix | None = None
     """
-    The start pose of the robot in its ``odom`` frame.
+    The start pose of a robot with a mobile base in the frame of its odometry body.
 
     If None, identity is used.
     """
 
-    drive_translation_velocity_limits: float | None = None
+    localization_connection_type: type[FixedConnection | Connection6DoF] = (
+        FixedConnection
+    )
     """
-    Velocity limit of the drive's translational degrees of freedom, in meter per second.
+    The connection attaching the localized body to the ``world.root``.
+    """
 
-    If None, the drive connection's own default is kept.
-    """
+    def __post_init__(self) -> None:
+        """
+        :raises StartPoseWithoutMobileBaseError: If a start pose is given for a robot
+            without a mobile base.
+        :raises VisualCollisionBackupDisabledError: If the robot needs its visual
+            geometry as collision backup and the :attr:`description_parser` does not use
+            it.
+        """
+        if self.odometry_T_robot_start is not None and not issubclass(
+            self.semantic_annotation_type, HasMobileBase
+        ):
+            raise StartPoseWithoutMobileBaseError(
+                robot_class=self.semantic_annotation_type
+            )
+        if (
+            self.description_parser is not None
+            and self.semantic_annotation_type.uses_visual_as_collision_backup
+            and not self.description_parser.use_visual_as_collision_backup
+        ):
+            raise VisualCollisionBackupDisabledError(
+                robot_class=self.semantic_annotation_type
+            )
 
-    drive_rotation_velocity_limits: float | None = None
-    """
-    Velocity limit of the drive's rotational degrees of freedom, in radian per second.
-
-    If None, the drive connection's own default is kept.
-    """
+    @classmethod
+    def specify_real_robot(
+        cls, semantic_annotation_type: type[AbstractRobot], urdf: str | None = None
+    ) -> Self:
+        """
+        :param semantic_annotation_type: The robot to create.
+        :param urdf: The description the real robot publishes. If None, the robot is
+            read from the description file its class declares.
+        :return: The robot with exactly the names of its description, which its tf
+            frames and joint states carry, localized by a movable connection if it has
+            a mobile base and by a fixed one otherwise.
+        :raises RobotDescriptionMissingError: If no ``urdf`` is given and the robot
+            class declares no description file.
+        """
+        description_file_path = semantic_annotation_type.get_ros_file_path()
+        if urdf is None and not description_file_path:
+            raise RobotDescriptionMissingError(robot_class=semantic_annotation_type)
+        uses_backup = semantic_annotation_type.uses_visual_as_collision_backup
+        parser = (
+            URDFParser.from_file(
+                description_file_path,
+                prefix="",
+                use_visual_as_collision_backup=uses_backup,
+            )
+            if urdf is None
+            else URDFParser(
+                urdf=urdf, prefix="", use_visual_as_collision_backup=uses_backup
+            )
+        )
+        return cls(
+            semantic_annotation_type=semantic_annotation_type,
+            description_parser=parser,
+            localization_connection_type=(
+                Connection6DoF
+                if issubclass(semantic_annotation_type, HasMobileBase)
+                else FixedConnection
+            ),
+        )
 
     def spawn(self, world: World) -> AbstractRobot:
         """
-        Parse the robot from its own description, as the robot reads it, and merge it
-        into ``world`` as ``world.root -> odom -> connection -> robot``.
+        Read the robot and merge it into ``world``.
 
-        The ``odom`` is fixed to the world root at the localization pose. The connection
-        attaching the robot to it is the drive declared by the robot's mobile base, or a
-        fixed connection when the robot has no mobile base. An active drive is marked as
-        controlled, driven by the servos its mobile base declares, and its start pose is
-        applied afterwards, that of a fixed one at creation.
-
-        The robot is annotated while it still owns the world it was parsed into, so that
+        The robot is annotated while it still owns the world it was read into, so that
         the annotation's name-based lookups cannot be confused by an equally named joint
         of a robot already present in ``world``.
 
         :param world: The world the robot is merged into.
         :return: The semantic annotation of the merged robot.
-        :raises DriveVelocityLimitsOnUndrivenRobot: If a drive velocity limit is given
-            for a robot that has no drive.
+        :raises RobotDescriptionMissingError: If no :attr:`description_parser` is given
+            and the robot class declares no description file.
         """
-        connection_type = self.semantic_annotation_type.get_drive_connection_type()
-        is_active = issubclass(connection_type, ActiveConnection)
-        drive_velocity_limits = self._drive_velocity_limits(connection_type)
-
-        described_robot = self.semantic_annotation_type.from_description()
-        robot_world = described_robot._world
+        described_robot = self._create_described_robot()
         robot_id = described_robot.id
+        if isinstance(described_robot, HasMobileBase):
+            self._merge_behind_its_odometry(world, described_robot)
+        else:
+            self._merge_at_its_localization(world, described_robot)
+        return cast("AbstractRobot", world.get_semantic_annotation_by_id(robot_id))
 
+    def _create_described_robot(self) -> AbstractRobot:
+        """
+        :return: The robot, in a world holding nothing but it, read by the
+            :attr:`description_parser` if given and from its own description otherwise.
+        """
+        if self.description_parser is None:
+            return self.semantic_annotation_type.from_description()
+        return self.semantic_annotation_type.from_world(
+            self.description_parser.create_world()
+        )
+
+    def _merge_at_its_localization(
+        self, world: World, described_robot: AbstractRobot
+    ) -> None:
+        """
+        Merge a robot without a mobile base as ``world.root -> localization -> robot``.
+
+        :param world: The world the robot is merged into.
+        :param described_robot: The robot, in the world it was read into.
+        """
+        robot_world = described_robot._world
         with world.modify_world():
-            odom_body = self._create_odom_body()
-            world.add_connection(
-                FixedConnection(
-                    parent=cast(Body, world.root),
-                    child=odom_body,
-                    parent_T_connection_expression=(
-                        None
-                        if self.world_T_odom is None
-                        else self.world_T_odom.copy_with_new_reference_frames(
-                            new_reference_frame=world.root, new_child_frame=odom_body
-                        )
-                    ),
-                )
+            localization = self._create_localization(
+                world, cast(Body, robot_world.root)
             )
+            world.merge_world(robot_world, root_connection=localization)
+        self._move_localization_to_its_pose(world, localization)
 
-            # A fixed connection has no DoFs, so its start pose must be set at creation;
-            # an active drive carries it as DoF state applied after the block.
-            odom_C_robot = connection_type.create_with_dofs(
-                world=world,
-                parent=odom_body,
-                child=cast(Body, robot_world.root),
-                parent_T_connection_expression=(
-                    None if is_active else self.odom_T_robot_start
-                ),
-                **drive_velocity_limits,
-            )
-            world.merge_world(robot_world, root_connection=odom_C_robot)
-            robot = cast("AbstractRobot", world.get_semantic_annotation_by_id(robot_id))
-            if is_active:
-                odom_C_robot.has_hardware_interface = True
-                robot.mobile_base.declare_drive_servos(odom_C_robot)
-
-        # The start pose touches DoF state, so it is set after the modification block.
-        if is_active and self.odom_T_robot_start is not None:
-            odom_C_robot.origin = self.odom_T_robot_start
-
-        return robot
-
-    def _drive_velocity_limits(
-        self, connection_type: type[Connection]
-    ) -> dict[str, float]:
+    def _merge_behind_its_odometry(
+        self, world: World, described_robot: HasMobileBase
+    ) -> None:
         """
-        Collect the velocity limits to create the drive connection with.
+        Merge a robot with a mobile base as ``world.root -> localization -> odometry ->
+        drive -> robot``, where the drive is the one its mobile base creates, controlled
+        by the servos the base declares.
 
-        :param connection_type: The connection the robot attaches to its ``odom`` with.
-        :return: The limits that were set, keyed by the keyword ``create_with_dofs``
-            takes them under.
-        :raises DriveVelocityLimitsOnUndrivenRobot: If a limit is set but the connection
-            carries no velocity limits.
+        :param world: The world the robot is merged into.
+        :param described_robot: The robot, in the world it was read into.
         """
-        limits = {
-            "translation_velocity_limits": self.drive_translation_velocity_limits,
-            "rotation_velocity_limits": self.drive_rotation_velocity_limits,
-        }
-        given_limits = {
-            keyword: limit for keyword, limit in limits.items() if limit is not None
-        }
-        if given_limits and not issubclass(connection_type, WheeledDrive):
-            raise DriveVelocityLimitsOnUndrivenRobot(
-                robot_type_name=self.semantic_annotation_type.__name__,
-                connection_type_name=connection_type.__name__,
+        robot_world = described_robot._world
+        with world.modify_world():
+            odometry_body = Body(name=self._odometry_body_name(described_robot))
+            localization = self._create_localization(world, odometry_body)
+            world.add_connection(localization)
+            drive = described_robot.mobile_base.create_drive(
+                world=world, parent=odometry_body, child=cast(Body, robot_world.root)
             )
-        return given_limits
+            world.merge_world(robot_world, root_connection=drive)
+            drive.has_hardware_interface = True
+            merged_robot = cast(
+                HasMobileBase, world.get_semantic_annotation_by_id(described_robot.id)
+            )
+            merged_robot.mobile_base.declare_drive_servos(drive)
+
+        # The drive's pose is degree of freedom state, set after the modification block.
+        self._move_localization_to_its_pose(world, localization)
+        if self.odometry_T_robot_start is not None:
+            drive.origin = self.odometry_T_robot_start
 
     @staticmethod
-    def _create_odom_body() -> Body:
+    def _odometry_body_name(robot: HasMobileBase) -> PrefixedName:
         """
-        Create the localization body of a single robot.
-
-        Body names are not unique across a world, so the body's own identifier prefixes
-        its name. Identifiers are unique even across processes, which keeps the odom
-        bodies of several robots distinguishable.
-
-        :return: The created odom body.
+        :param robot: The robot whose odometry body is named.
+        :return: The name its mobile base declares, with the prefix of the robot's own
+            names.
         """
-        identifier = uuid4()
-        return Body(
-            name=PrefixedName(name="odom", prefix=str(identifier)), id=identifier
+        return PrefixedName(
+            name=robot.mobile_base.odometry_body_name, prefix=robot.root.name.prefix
+        )
+
+    def _create_localization(
+        self, world: World, localized_body: Body
+    ) -> FixedConnection | Connection6DoF:
+        """
+        :param world: The world the connection is created in.
+        :param localized_body: The body the localization attaches to the world root.
+        :return: The connection between the world root and ``localized_body``, holding
+            the localization pose only if it is fixed.
+        """
+        is_fixed = issubclass(self.localization_connection_type, FixedConnection)
+        return self.localization_connection_type.create_with_dofs(
+            world=world,
+            parent=cast(Body, world.root),
+            child=localized_body,
+            parent_T_connection_expression=(
+                self._reframe_localization_pose(world, localized_body)
+                if is_fixed
+                else None
+            ),
+        )
+
+    def _move_localization_to_its_pose(
+        self, world: World, localization: FixedConnection | Connection6DoF
+    ) -> None:
+        """
+        Set the localization pose on a movable localization, whose pose is degree of
+        freedom state and so cannot be given at creation.
+
+        :param world: The world holding the localization.
+        :param localization: The connection between the world root and the localized
+            body.
+        """
+        if (
+            not isinstance(localization, Connection6DoF)
+            or self.localization_pose is None
+        ):
+            return
+        localization.origin = self._reframe_localization_pose(world, localization.child)
+
+    def _reframe_localization_pose(
+        self, world: World, localized_body: Body
+    ) -> HomogeneousTransformationMatrix | None:
+        """
+        :param world: The world whose root is the reference frame.
+        :param localized_body: The body the localization attaches, which is the child
+            frame.
+        :return: The localization pose between these frames, if one is given.
+        """
+        if self.localization_pose is None:
+            return None
+        return self.localization_pose.copy_with_new_reference_frames(
+            new_reference_frame=world.root, new_child_frame=localized_body
         )

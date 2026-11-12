@@ -33,7 +33,7 @@ from typing_extensions import Any
 
 from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
 from cramph.plotters.graphviz import StatechartGraphviz
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 
 # %% the window
 
@@ -95,7 +95,7 @@ class DotGraphViewer(QWidget):
         self.new_message_signal.connect(self.handle_new_message)
 
         # Initialize the ROS node
-        rospy.init_node("statechart_inspector")
+        background_node.init_node("statechart_inspector")
 
         self.setup_qt()
 
@@ -219,7 +219,7 @@ class DotGraphViewer(QWidget):
     def refresh_topics(self) -> None:
         if self.topic_selector.currentText() == "":
             # Find all topics of type ExecutionState
-            topics = rospy.get_node().get_topic_names_and_types()
+            topics = background_node.get_node().get_topic_names_and_types()
             target_type = "json_msgs/action/JsonAction_FeedbackMessage"
             execution_state_topics = [
                 name for name, types in topics if target_type in types
@@ -239,7 +239,7 @@ class DotGraphViewer(QWidget):
     def on_topic_selected(self, index: int) -> None:
         topic_name = self.topic_selector.currentText()
         if topic_name:
-            rospy.get_node().create_subscription(
+            background_node.get_node().create_subscription(
                 msg_type=JsonAction_FeedbackMessage,
                 topic=topic_name,
                 callback=self.on_new_message_received,

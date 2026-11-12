@@ -4,12 +4,28 @@ The rules on code style and naming.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 from enum import Enum
 
 
+from krrood.patterns.called_positionally import called_positionally
+from krrood.development_tools.agents.positional_parameters import (
+    PositionalFieldsChecker,
+    PositionalParametersChecker,
+)
+from krrood.development_tools.agents.field_accessor_definition import (
+    HandWrittenFieldAccessorChecker,
+)
+from krrood.development_tools.agents.leading_preposition import (
+    LeadingPrepositionChecker,
+)
 from krrood.development_tools.agents.rule import CodeReference, Section
 from krrood.ormatic.utils import classproperty
+from krrood.patterns.dataclass_field_descriptor import (
+    DataclassFieldDescriptor,
+    DataclassFieldDescriptorOwner,
+)
 
 
 class CodeStyleRules(Section):
@@ -36,12 +52,51 @@ class CodeStyleRules(Section):
     )
 
     ACCESS_ATTRIBUTES_DIRECTLY = (
-        f"Access attributes with `.`, never with {CodeReference(getattr).name}, and "
+        f"Access attributes with `.`, never with {CodeReference(target=getattr).name}, and "
         "never wrap "
         "attribute access in try-except"
     )
 
     NO_MUTABLE_DEFAULT_ARGUMENTS = "Never use mutable objects as default arguments"
+
+    KEYWORD_ONLY_DATACLASS_FIELDS = (
+        "Every dataclass is declared with `kw_only=True`, so its fields are passed "
+        f"by keyword. A dataclass an {CodeReference(target=Enum).name} mixes in is exempt, "
+        "since the enum passes its member values positionally",
+        (),
+        PositionalFieldsChecker(),
+    )
+
+    KEYWORD_ONLY_METHOD_PARAMETERS = (
+        "Every parameter of a method after `self` or `cls` is keyword-only: a `*` "
+        "comes before them, as in `def move_to(self, *, target: Pose)`. Dunder "
+        "methods, property setters and deleters, and methods that a standard "
+        "library or third-party base class defines or dispatches to by name, such "
+        f"as the `visit_` methods of {CodeReference(target=ast.NodeVisitor).path}, are "
+        "exempt, since Python or that library passes their arguments positionally. "
+        "Mark any other method a caller outside our control calls positionally, "
+        "such as a method applied as a decorator, with "
+        f"{CodeReference(target=called_positionally).path}",
+        (),
+        PositionalParametersChecker(),
+    )
+
+    BUILD_FIELD_DESCRIPTORS_ON_THE_BASE_CLASS = (
+        "A descriptor that manages a dataclass field subclasses "
+        f"{CodeReference(target=DataclassFieldDescriptor).path}, implementing "
+        f"{CodeReference(target=DataclassFieldDescriptor.read).name} and "
+        f"{CodeReference(target=DataclassFieldDescriptor.write).name}, and the owning class "
+        f"inherits {CodeReference(target=DataclassFieldDescriptorOwner).name} so its "
+        "subclasses keep the descriptor"
+    )
+
+    NO_HAND_WRITTEN_FIELD_ACCESSORS = (
+        f"Never define `__set__` in a class other than "
+        f"{CodeReference(target=DataclassFieldDescriptor).name}, and never manage a "
+        "dataclass field `value` or `_value` with a property setter `value`",
+        (),
+        HandWrittenFieldAccessorChecker(),
+    )
 
     NEVER_REIMPLEMENT = (
         "Never reimplement what the codebase or an existing dependency already "
@@ -66,12 +121,36 @@ class NamingRules(Section):
     )
 
     NAMES_READ_ON_THEIR_OWN = (
-        "A name stays correct and understandable when read on its own, without its "
-        "class or a keyword argument next to it - after `value = "
-        "instance.attribute`, in a log line, in a traceback, or when passed on "
-        "positionally. A `Pipe` field `size` says nothing once it leaves the "
-        "class; `inner_diameter` does. A generic word that would fit anything "
-        "never passes this test"
+        "The name of a field, method or function stays correct and understandable "
+        "when read on its own, without its class or a keyword argument next to it "
+        "- after `value = instance.attribute`, in a log line, in a traceback, or "
+        "when passed on positionally. A `Pipe` field `size` says nothing once it "
+        "leaves the class; `inner_diameter` does. A `Pipe` method `check` says "
+        "nothing in a traceback, which never shows `Pipe.check`; `check_for_leaks` "
+        "does. A generic word that would fit anything never passes this test"
+    )
+
+    NO_LEADING_PREPOSITIONS = (
+        "Never begin a function or method name with one of the prepositions "
+        + ", ".join(
+            f"`{preposition.text}_`"
+            for preposition in LeadingPrepositionChecker.leading_prepositions
+        )
+        + ": the phrase it starts is only finished by the class name in front of it",
+        (),
+        LeadingPrepositionChecker(),
+    )
+
+    NO_TRAILING_PREPOSITIONS = (
+        "Never end a function or method name with a preposition that only its first "
+        "argument finishes, such as `bottom_of(body)`: name what it returns or does, "
+        "such as `bottom_height(body)`. A preposition that belongs to the verb, as "
+        "in `look_for` or `is_contained_in`, is part of the name"
+    )
+
+    RESERVE_FROM_AND_TO_FOR_CONVERSIONS = (
+        "Begin a function or method name with `from_` or `to_` only for an "
+        "alternative constructor or a conversion, such as `from_json` or `to_json`"
     )
 
     USE_PLAIN_WORDS = (
@@ -122,8 +201,8 @@ class NamingRules(Section):
 
     NEVER_SHADOW_BOUND_NAMES = (
         "Never take an identifier the language or something in scope already "
-        f"binds: {CodeReference(Enum).name} reserves `name`, a parameter `field` "
-        f"shadows {CodeReference(dataclasses.field).path}, a field shadows a method of the same name. These "
+        f"binds: {CodeReference(target=Enum).name} reserves `name`, a parameter `field` "
+        f"shadows {CodeReference(target=dataclasses.field).path}, a field shadows a method of the same name. These "
         "fail at runtime or silently, not at import"
     )
 

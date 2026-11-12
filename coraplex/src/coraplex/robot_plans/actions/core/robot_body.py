@@ -11,7 +11,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.robot_plans.actions.base import (
@@ -36,7 +36,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointVelocityLimit,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
-from giskardpy.motion_statechart.goals.gripper import MoveGripper
+from giskardpy.motion_statechart.tasks.gripper import MoveGripper
 from semantic_digital_twin.datastructures.definitions import (
     TorsoState,
     StaticJointState,
@@ -105,7 +105,8 @@ class MoveFingersToWidthAction(GoalAction):
     squeeze: float = 0.0
     """
     How far past that width each fingertip is sent, in metres, so the fingers press into
-    an object rather than merely touching it.
+    an object rather than merely touching it. The object stops them short of that, so
+    fingers squeezing it count as done once they stopped approaching it.
 
     Keep it small, since it is commanded penetration into a body that does not yield.
     """
@@ -127,6 +128,7 @@ class MoveFingersToWidthAction(GoalAction):
             gripper=self.gripper,
             width=max(0.0, self.width - 2 * self.squeeze),
             threshold=self.threshold,
+            tolerate_stall=self.squeeze > 0.0,
             name="MoveFingersToWidth",
         )
 

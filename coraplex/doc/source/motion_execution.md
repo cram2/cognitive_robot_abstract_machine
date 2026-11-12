@@ -10,7 +10,7 @@ and with every executor.
 A motion is a giskard goal or task. When an action expands, it creates the motions it needs from
 {mod}`giskardpy.motion_statechart` and puts them below itself in the statechart, for example a
 {class}`~giskardpy.motion_statechart.tasks.joint_tasks.JointPositionList` to move a joint, or a
-{class}`~giskardpy.motion_statechart.goals.gripper.MoveGripper` to open a gripper to a width.
+{class}`~giskardpy.motion_statechart.tasks.gripper.MoveGripper` to open a gripper to a width.
 
 Before an action creates a goal, it looks up the values that come from coraplex rather than from its own parameters:
 an arm's tool frame comes from its
@@ -139,7 +139,7 @@ action is expanded, and that applies only to its robot type. Every executor appl
 
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.DriveWithTheDifferentialDrive` drives the base of
   every robot on a differential drive with a
-  {class}`~giskardpy.motion_statechart.goals.base_pose_goals.DifferentialDriveBaseGoal`, which arrives within the
+  {class}`~giskardpy.motion_statechart.tasks.drive_tasks.DifferentialDriveBaseGoal`, which arrives within the
   {attr}`~coraplex.robot_plans.actions.core.navigation.DrivesBase.base_pose_threshold` of the action.
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.MoveStretchToolCenterPointInAStraightLine` moves
   the tool center point of a Stretch to each of its targets along a straight line.

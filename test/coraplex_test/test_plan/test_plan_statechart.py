@@ -53,7 +53,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from ...plan_running import robot_executor, run_plan, simulated_executor, statechart_of
 from ...statechart_json_round_trip import StatechartSentThroughJSON
@@ -557,7 +557,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
@@ -583,7 +583,7 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )

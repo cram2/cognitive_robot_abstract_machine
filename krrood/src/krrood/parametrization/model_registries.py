@@ -37,7 +37,7 @@ from probabilistic_model.exceptions import UnboundedEventError
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModelRegistry(ABC):
     """
     A registry that selects probabilistic models for given underspecified parameters of
@@ -45,24 +45,24 @@ class ModelRegistry(ABC):
     """
 
     @abstractmethod
-    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
+    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticModel:
         """
         :param parameters: The parameters to get a model for.
         :return: A probabilistic model that can be used to generate answers for the given expression.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FullyFactorizedRegistry(ModelRegistry):
     """
     A registry that always returns a fully factorized model.
     """
 
-    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
+    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticModel:
         return fully_factorized(parameters.variables.values())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UniformPriorRegistry(ModelRegistry):
     """
     A registry that knows nothing but what a statement allows: every parameter is drawn
@@ -73,7 +73,7 @@ class UniformPriorRegistry(ModelRegistry):
     """
 
     def get_model(
-        self, parameters: ModelQueryParameters
+        self, *, parameters: ModelQueryParameters
     ) -> LayeredProbabilisticCircuit:
         """
         :param parameters: The parameters of the statement. Only a ``Match`` brings
@@ -100,7 +100,7 @@ class UniformPriorRegistry(ModelRegistry):
             raise UnboundedParameterError(parameter_name=error.variable.name) from error
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DictRegistry(ModelRegistry):
     """
     A registry that uses a dictionary to keep all models.
@@ -111,11 +111,11 @@ class DictRegistry(ModelRegistry):
     A dictionary that maps classes to probabilistic models.
     """
 
-    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
+    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticModel:
         return self.models[parameters.queried_class]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RelationalCircuitRegistry(ModelRegistry):
     """
     A registry that grounds a RelationalProbabilisticCircuit for the queried statement
@@ -155,16 +155,16 @@ class RelationalCircuitRegistry(ModelRegistry):
     :class:`~probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit.GroundingMode`.
     """
 
-    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
+    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticModel:
         if not isinstance(parameters, UnderspecifiedParameters):
-            raise RelationalCircuitRegistryRequiresMatch(parameters)
-        grounded = self._ground_and_rename(parameters)
+            raise RelationalCircuitRegistryRequiresMatch(parameters=parameters)
+        grounded = self._ground_and_rename(parameters=parameters)
         if not parameters.search_cause_variables:
             return grounded
-        return self._as_causal_circuit(grounded, parameters)
+        return self._as_causal_circuit(grounded=grounded, parameters=parameters)
 
     def _ground_and_rename(
-        self, parameters: UnderspecifiedParameters
+        self, *, parameters: UnderspecifiedParameters
     ) -> GroundableCircuit:
         """
         Ground the relational circuit for ``parameters.statement`` and align its
@@ -189,7 +189,7 @@ class RelationalCircuitRegistry(ModelRegistry):
 
     @staticmethod
     def _as_causal_circuit(
-        grounded: RepresentationType, parameters: UnderspecifiedParameters
+        *, grounded: RepresentationType, parameters: UnderspecifiedParameters
     ) -> CausalCircuit[RepresentationType]:
         """
         Wrap an already-grounded, already-renamed circuit as a verified
@@ -200,8 +200,9 @@ class RelationalCircuitRegistry(ModelRegistry):
         ``RelationalCausalCircuit.from_grounded_circuit``): a class circuit fitted
         over many unrelated scalar and exchangeable variables otherwise makes
         ``verify_support_determinism`` compute over all of them, not just the ones
-        this query actually declared. Confounders are trimmed in alongside the cause
-        and effect, not just registered later, so a caller's own
+        this query actually declared. The variables adjusted for, marked ``confounder``
+        or chosen by a learned causal structure, are trimmed in alongside the cause and
+        effect, not just registered later, so a caller's own
         ``backdoor_adjustment(..., adjustment_variables=...)`` call still finds them
         on the returned circuit.
 
@@ -214,12 +215,12 @@ class RelationalCircuitRegistry(ModelRegistry):
             grounded,
             parameters.search_cause_variables,
             list(parameters.effect_variables_from_causes_effect),
-            adjustment_variables=parameters.search_confounder_variables,
+            adjustment_variables=parameters.adjustment_variables,
             trim_to_registered_variables=True,
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CausalCircuitRegistry(ModelRegistry):
     """
     A registry that maps target classes directly to pre-built causal circuits, so a
@@ -235,5 +236,5 @@ class CausalCircuitRegistry(ModelRegistry):
     A dictionary that maps classes to pre-built causal circuits.
     """
 
-    def get_model(self, parameters: ModelQueryParameters) -> ProbabilisticModel:
+    def get_model(self, *, parameters: ModelQueryParameters) -> ProbabilisticModel:
         return self.circuits[parameters.queried_class]

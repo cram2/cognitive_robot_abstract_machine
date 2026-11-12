@@ -6,10 +6,9 @@ from cramph.data_types import ObservationStateValues
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.graph_node import EndMotion
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianOrientation,
     CartesianPose,
     CartesianPosition,
@@ -18,11 +17,12 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianRotationVelocityLimit,
     CartesianVelocityLimit,
 )
+from giskardpy.motion_statechart.graph_node import EndMotion
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from ..motion_control_context import create_context_with_motion_control
 
@@ -155,7 +155,7 @@ def test_velocity_limit_has_its_two_limits_after_a_json_round_trip(
     tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
     executor = _create_executor(cylinder_bot_world)
     statechart_copy = Statechart.from_json(
-        json_data, context=executor.context, **tracker.create_kwargs()
+        data=json_data, context=executor.context, **tracker.create_kwargs()
     )
     (limit_copy,) = statechart_copy.top_level_nodes
     executor.compile(statechart=statechart_copy)

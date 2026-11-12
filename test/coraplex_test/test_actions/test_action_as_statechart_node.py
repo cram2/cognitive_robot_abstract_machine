@@ -17,6 +17,7 @@ from coraplex.robot_plans.actions.base import (
 )
 from coraplex.robot_plans.actions.core.container import OpenAction
 from coraplex.robot_plans.actions.core.pick_up import (
+    FixateObjectAction,
     GraspingAction,
     PickUpAction,
     ReachAction,
@@ -41,7 +42,8 @@ from cramph.nodes_for_testing import (
 )
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
-from giskardpy.motion_statechart.goals.collision_avoidance import (
+from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
     UpdateTemporaryCollisionRules,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -57,7 +59,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from ..conftest import nodes_of_type
 from ..test_designator.test_multi_robot_action_designator import _handle_annotation
 from ...plan_running import (
@@ -661,7 +663,7 @@ def test_an_action_is_sent_with_its_collision_allowances(simple_pr2_context) -> 
     )
 
     received = Statechart.from_json(
-        json.loads(json.dumps(sent.to_json())),
+        data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
@@ -722,6 +724,39 @@ def test_opening_lets_the_gripper_on_the_handle_touch(pr2_apartment_context) -> 
     [rule] = action.temporary_collision_rules
     assert rule.end_effector is robot.right_arm.end_effector
     assert nodes_of_type(action, UpdateTemporaryCollisionRules) == []
+
+
+def test_fixating_an_object_keeps_the_gripper_where_it_is(simple_pr2_context) -> None:
+    """
+    The gripper is held at the pose its tool frame has when the action starts, so
+    whatever it holds stays where it is.
+    """
+    world, robot, extensions = simple_pr2_context
+    end_effector = robot.left_arm.end_effector
+    tool_frame = end_effector.tool_frame
+    action = FixateObjectAction(end_effector=end_effector)
+
+    _expanded(action, extensions)
+
+    [holding] = action.nodes
+    assert type(holding) is CartesianPose
+    assert holding.root_link is world.root
+    assert holding.tip_link is tool_frame
+    assert holding.goal_pose.reference_frame is tool_frame
+    [rule] = action.temporary_collision_rules
+    assert rule.end_effector is end_effector
+
+
+def test_fixating_an_object_holds_the_gripper_against_collision_avoidance(
+    simple_pr2_context,
+) -> None:
+    world, robot, extensions = simple_pr2_context
+    action = FixateObjectAction(end_effector=robot.left_arm.end_effector)
+
+    _expanded(action, extensions)
+
+    [holding] = action.nodes
+    assert holding.weight == DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
 
 
 def test_an_action_lets_nothing_touch_unless_it_says_so(simple_pr2_context) -> None:

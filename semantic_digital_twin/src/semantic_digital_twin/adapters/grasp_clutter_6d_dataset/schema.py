@@ -20,7 +20,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageDescription,
 )
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     RotationMatrix,
@@ -316,9 +316,7 @@ class GraspClutter6DScene:
         :param camera_body: The already-added camera body.
         :return: The new `map` body.
         """
-        map_body = Body(
-            name=PrefixedName(name="map", prefix=camera_body.name.prefix)
-        )
+        map_body = Body(name=PrefixedName(name="map", prefix=camera_body.name.prefix))
 
         # `camera_T_world` rotates/translates a point from the dataset's world frame
         # into the camera frame; the camera's pose in the map frame is its inverse.

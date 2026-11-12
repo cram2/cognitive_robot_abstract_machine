@@ -26,7 +26,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -271,7 +271,7 @@ def test_decoded_observation_rejects_invalid_pose_frames(
         timestamp_nanoseconds=observation.timestamp_nanoseconds,
     )
     invalid_payload = replace(
-        payload, payload=DataclassJSONSerializer.to_json(recorded)
+        payload, payload=DataclassJSONSerializer.to_json(instance=recorded)
     )
     with pytest.raises(InvalidCameraObservation):
         codec.decode_with_tracker(invalid_payload, tracker)

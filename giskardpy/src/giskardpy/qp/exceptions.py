@@ -17,7 +17,7 @@ from giskardpy.data_types.exceptions import (
 if TYPE_CHECKING:
     from giskardpy.qp.constraint import GiskardConstraint
     from giskardpy.qp.qp_data import QPData
-    from semantic_digital_twin.spatial_types.derivatives import Derivatives
+    from semantic_digital_twin.world_description.derivatives import Derivatives
 
 
 @dataclass
@@ -231,6 +231,28 @@ class MismatchedLimitLengthsError(GiskardException):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class MissingCruiseVelocityError(QPSolverException):
+    """
+    Raised when a constraint on the position of its expression has no cruise velocity to
+    derive the change it may demand within the control horizon from.
+    """
+
+    constraint_name: str
+    """
+    The name of the constraint without a cruise velocity.
+    """
+
+    def error_message(self) -> str:
+        return f"Constraint {self.constraint_name!r} has no cruise velocity."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Set the cruise velocity of every constraint on the position of its "
+            "expression."
+        )
 
 
 @dataclass

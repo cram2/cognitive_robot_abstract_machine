@@ -21,8 +21,12 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
 )
 from krrood.entity_query_language.operators.causal import (
+    AdjustmentCandidates,
+    CandidateAdjustment,
     Cause,
     CauseEffectVariables,
+    InterventionalRange,
+    RegionRange,
     ScoredIntervention,
 )
 from krrood.entity_query_language.operators.probabilistic_queries import (
@@ -31,6 +35,9 @@ from krrood.entity_query_language.operators.probabilistic_queries import (
 from krrood.entity_query_language.operators.aggregators import Average
 from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
+    EffectNotIdentified,
+    NoLearnedCausalStructure,
+    VariableNotInCausalGraph,
     BackendCannotEvaluateCause,
     NoCauseVariablesForRanking,
     NoCausesEffectConditionForCause,
@@ -43,6 +50,7 @@ from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
 from krrood.entity_query_language.query.query import Entity, Query
 from krrood.ormatic.eql_interface import eql_to_sql
+from krrood.ormatic.utils import classproperty
 
 try:
     from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
@@ -61,6 +69,19 @@ try:
         SelectedAttributesParameters,
     )
     from probabilistic_model.probabilistic_model import ProbabilisticModel
+    from probabilistic_model.causal_structure.graph import (
+        CausalGraph,
+        GraphNode,
+        NodeLevel,
+        NodeReference,
+    )
+    from probabilistic_model.causal_structure.identification import (
+        AdjustmentSelector,
+        AdjustmentSet,
+        DeclaredAdjustmentPolicy,
+        InvalidDeclaredAdjustmentRefusal,
+    )
+    from probabilistic_model.causal_structure.learning import LearnedCausalStructure
 except ImportError as e:
     logger.debug(f"Couldn't import probabilistic model needed classes: {e}")
     CausalCircuit = NoneType
@@ -71,11 +92,20 @@ except ImportError as e:
     SelectedAttributesParameters = NoneType
     UnderspecifiedParameters = NoneType
     ProbabilisticModel = NoneType
+    CausalGraph = NoneType
+    GraphNode = NoneType
+    AdjustmentSet = NoneType
+    NodeReference = NoneType
+    NodeLevel = NoneType
+    AdjustmentSelector = NoneType
+    DeclaredAdjustmentPolicy = NoneType
+    InvalidDeclaredAdjustmentRefusal = NoneType
+    LearnedCausalStructure = NoneType
 
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QueryBackend(ABC):
     """
     Base class for all query backends.
@@ -105,8 +135,16 @@ class QueryBackend(ABC):
     raises when it cannot resolve a causal model, regardless of this flag.
     """
 
+    @classproperty
+    def reads_state(cls) -> bool:
+        """
+        Whether this backend's evaluations read the values of ground terms from the
+        state they are given.
+        """
+        return False
+
     @abstractmethod
-    def evaluate(self, expression: Evaluable) -> Iterable[T]:
+    def evaluate(self, *, expression: Evaluable) -> Iterable[T]:
         """
         Generate answers that match the expression.
 
@@ -114,7 +152,7 @@ class QueryBackend(ABC):
         :return: An iterable of answers.
         """
 
-    def _warn_or_raise_on_unresolved_cause_(self, expression: Evaluable) -> None:
+    def _warn_or_raise_on_unresolved_cause_(self, *, expression: Evaluable) -> None:
         """
         Warn (or, if :attr:`raise_on_unresolvable_cause` is set, raise) when
         *expression* is a :class:`~krrood.entity_query_language.query.match.Match`
@@ -125,11 +163,13 @@ class QueryBackend(ABC):
         if not (isinstance(expression, Match) and expression._has_cause_attributes_):
             return
         if self.raise_on_unresolvable_cause:
-            raise BackendCannotEvaluateCause(expression, backend_type=type(self))
-        logger.warning(BackendCannotEvaluateCause(expression, backend_type=type(self)))
+            raise BackendCannotEvaluateCause(match=expression, backend_type=type(self))
+        logger.warning(
+            BackendCannotEvaluateCause(match=expression, backend_type=type(self))
+        )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SelectiveBackend(QueryBackend, ABC):
     """
     Selective backends are backends that select elements from existing data.
@@ -142,17 +182,17 @@ class SelectiveBackend(QueryBackend, ABC):
     Selecting from existing data reads as *"Find …"*.
     """
 
-    def evaluate(self, expression: Evaluable) -> Iterable[T]:
+    def evaluate(self, *, expression: Evaluable) -> Iterable[T]:
         if isinstance(expression, Match) and expression._has_ellipsis_attributes_:
-            raise SelectiveBackendCannotResolveEllipsisMatch(expression)
-        self._warn_or_raise_on_unresolved_cause_(expression)
-        yield from self._evaluate(expression)
+            raise SelectiveBackendCannotResolveEllipsisMatch(match=expression)
+        self._warn_or_raise_on_unresolved_cause_(expression=expression)
+        yield from self._evaluate(expression=expression)
 
     @abstractmethod
-    def _evaluate(self, expression: Evaluable) -> Iterable[T]: ...
+    def _evaluate(self, *, expression: Evaluable) -> Iterable[T]: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GenerativeBackend(QueryBackend, ABC):
     """
     Generative backends are backends that generate new elements.
@@ -166,16 +206,18 @@ class GenerativeBackend(QueryBackend, ABC):
     Generating new elements reads as *"Generate …"*.
     """
 
-    def evaluate(self, expression: Evaluable) -> Iterable[T]:
+    def evaluate(self, *, expression: Evaluable) -> Iterable[T]:
         if not isinstance(expression, Match):
-            raise GenerativeBackendQueryIsNotUnderspecifiedVariable(expression)
-        yield from self._evaluate(expression)
+            raise GenerativeBackendQueryIsNotUnderspecifiedVariable(
+                expression=expression
+            )
+        yield from self._evaluate(expression=expression)
 
     @abstractmethod
-    def _evaluate(self, expression: Match[T]) -> Iterable[T]: ...
+    def _evaluate(self, *, expression: Match[T]) -> Iterable[T]: ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SQLAlchemyBackend(SelectiveBackend):
     """
     A backend that selects elements from a database that is available via SQLAlchemy.
@@ -186,13 +228,13 @@ class SQLAlchemyBackend(SelectiveBackend):
     The session maker used for the database interactions.
     """
 
-    def _evaluate(self, expression: Query) -> Iterable:
+    def _evaluate(self, *, expression: Query) -> Iterable:
         session = self.session_maker()
         translator = eql_to_sql(expression, session)
         yield from translator.evaluate()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityQueryLanguageBackend(SelectiveBackend):
     """
     A backend that selects elements in this python process.
@@ -201,11 +243,18 @@ class EntityQueryLanguageBackend(SelectiveBackend):
     Constructing new instances is the job of a :class:`GenerativeBackend`.
     """
 
-    def _evaluate(self, expression: Evaluable) -> Iterable:
+    @classproperty
+    def reads_state(cls) -> bool:
+        """
+        Unlike :meth:`QueryBackend.reads_state`, holds: evaluation runs in this process.
+        """
+        return True
+
+    def _evaluate(self, *, expression: Evaluable) -> Iterable:
         yield from expression._evaluate_natively_()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     """
     A generative backend that constructs new instances deterministically: it treats a
@@ -215,26 +264,41 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     and its ``where`` conditions.
     """
 
-    def _evaluate(self, expression: Match[T]) -> Iterable[T]:
-        self._warn_or_raise_on_unresolved_cause_(expression)
+    @classproperty
+    def reads_state(cls) -> bool:
+        """
+        Unlike :meth:`QueryBackend.reads_state`, holds: generation selects in this
+        process.
+        """
+        return True
+
+    def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
+        self._warn_or_raise_on_unresolved_cause_(expression=expression)
         enumerated_variables: dict[uuid.UUID, Selectable] = {}
         for attribute_match in expression._matches_with_variables_:
-            self._check_attribute_match_is_suitable_for_generation(attribute_match)
+            self._check_attribute_match_is_suitable_for_generation(
+                attribute_match=attribute_match
+            )
             enumerated_variables[attribute_match.assigned_variable._id_] = (
-                self._convert_attribute_match_to_variable(attribute_match)
+                self._convert_attribute_match_to_variable(
+                    attribute_match=attribute_match
+                )
             )
 
         instances = (
-            expression._construct_instance_from_bindings_(bindings)
-            for bindings in self._enumerate_bindings(enumerated_variables)
+            expression._construct_instance_from_bindings_(bindings=bindings)
+            for bindings in self._enumerate_bindings(
+                enumerated_variables=enumerated_variables
+            )
         )
-        satisfying = expression._select_satisfying_(instances)
+        satisfying = expression._select_satisfying_(instances=instances)
         yield from satisfying._quantify_(
-            expression._quantifier_type_
+            quantifier_type=expression._quantifier_type_
         )._evaluate_natively_()
 
     @staticmethod
     def _check_attribute_match_is_suitable_for_generation(
+        *,
         attribute_match: AttributeMatch,
     ) -> None:
         """
@@ -250,11 +314,12 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
             attribute_match.assigned_value, (type(Ellipsis), Cause)
         ) and not issubclass(attribute_match.assigned_variable._type_, enum.Enum):
             raise UnderspecifiedStatementInfeasibleForEntityQueryLanguageGeneration(
-                attribute_match
+                attribute_match=attribute_match
             )
 
     @staticmethod
     def _convert_attribute_match_to_variable(
+        *,
         attribute_match: AttributeMatch,
     ) -> Selectable:
         """
@@ -280,6 +345,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
 
     @staticmethod
     def _enumerate_bindings(
+        *,
         enumerated_variables: dict[uuid.UUID, Selectable],
     ) -> Iterator[Bindings]:
         """
@@ -295,7 +361,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
             }
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProbabilisticBackend(GenerativeBackend):
     """
     A backend that generates elements from a tractable probabilistic model using a model
@@ -319,18 +385,38 @@ class ProbabilisticBackend(GenerativeBackend):
     This is only used if the query does not specify a limit.
     """
 
-    def evaluate(self, expression: Evaluable) -> Iterable[T]:
+    causal_structures: dict[type, LearnedCausalStructure] = field(
+        kw_only=True, default_factory=dict
+    )
+    """
+    The causal structure learned for each class, which chooses the variables each cause
+    of a causal query about the class adjusts for, or checks those marked
+    ``confounder``.
+
+    A query about a class without one adjusts for the variables marked ``confounder``
+    alone, unchecked.
+    """
+
+    declared_adjustment_policy: DeclaredAdjustmentPolicy = field(
+        kw_only=True, default_factory=InvalidDeclaredAdjustmentRefusal
+    )
+    """
+    What a causal query about a class in :attr:`causal_structures` does with the
+    variables marked ``confounder`` when the learned structure finds them invalid.
+    """
+
+    def evaluate(self, *, expression: Evaluable) -> Iterable[T]:
         if isinstance(expression, ProbabilisticQuery):
-            yield expression._resolve_(self.model_registry)
+            yield expression._resolve_(model_registry=self.model_registry)
             return
-        bare_average = self._bare_average_selection(expression)
+        bare_average = self._bare_average_selection(expression=expression)
         if bare_average is not None:
-            yield self._resolve_average(bare_average)
+            yield self._resolve_average(average=bare_average)
             return
-        yield from super().evaluate(expression)
+        yield from super().evaluate(expression=expression)
 
     @staticmethod
-    def _bare_average_selection(expression: Evaluable) -> Average | None:
+    def _bare_average_selection(*, expression: Evaluable) -> Average | None:
         """
         :param expression: The expression being evaluated.
         :return: The :class:`~krrood.entity_query_language.operators.aggregators.Average`
@@ -365,7 +451,7 @@ class ProbabilisticBackend(GenerativeBackend):
             return None
         return aggregator
 
-    def _resolve_average(self, average: Average) -> float:
+    def _resolve_average(self, *, average: Average) -> float:
         """
         Resolve a bare ``average(...)`` selection to the exact expectation of its
         attribute, via ``ProbabilisticModel.expectation``, instead of sampling and
@@ -375,22 +461,24 @@ class ProbabilisticBackend(GenerativeBackend):
         :return: The expectation of the averaged attribute.
         """
         attribute = average._leaf_attribute_
-        parameters = SelectedAttributesParameters((attribute,))
-        model = self.model_registry.get_model(parameters)
+        parameters = SelectedAttributesParameters(attributes=(attribute,))
+        model = self.model_registry.get_model(parameters=parameters)
         [random_event_variable] = parameters.variables.values()
         return model.expectation((random_event_variable,))[random_event_variable]
 
-    def _evaluate(self, expression: Match[T]) -> Iterable[T]:
+    def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
         # create new objects with the values from the samples, and reject those
         # contradicting a value the model does not cover, such as a property's
         instances = (
-            expression._construct_instance_from_bindings_(row.bindings)
-            for row in self.sample_bindings(expression)
+            expression._construct_instance_from_bindings_(bindings=row.bindings)
+            for row in self.sample_bindings(expression=expression)
         )
-        yield from expression._select_satisfying_(instances)._evaluate_natively_()
+        yield from expression._select_satisfying_(
+            instances=instances
+        )._evaluate_natively_()
 
     def sample_bindings(
-        self, expression: Match[T]
+        self, *, expression: Match[T]
     ) -> Iterator[ProbabilisticOperationResult]:
         """
         Sample values for the variables of a match's pattern from the model the match
@@ -401,8 +489,10 @@ class ProbabilisticBackend(GenerativeBackend):
             its log-likelihood under the model, most likely first.
         :raises NoSolutionFound: If the match's conditions leave the model no solution.
         """
-        parameters = UnderspecifiedParameters(expression)
-        model = self._resolve_model_to_sample(parameters, expression)
+        parameters = UnderspecifiedParameters(statement=expression)
+        model = self._resolve_model_to_sample(
+            parameters=parameters, expression=expression
+        )
         number_of_samples = (
             expression._get_expression_()._limit_ or self.number_of_samples
         )
@@ -412,17 +502,17 @@ class ProbabilisticBackend(GenerativeBackend):
         most_likely_first = log_likelihoods.argsort()[::-1]
         for bindings, log_likelihood in zip(
             parameters.bindings_from_model_samples(
-                model.variables, samples[most_likely_first]
+                variables=model.variables, samples=samples[most_likely_first]
             ),
             log_likelihoods[most_likely_first],
         ):
             yield ProbabilisticOperationResult(
-                role_taker=OperationResult(bindings),
+                role_taker=OperationResult(bindings=bindings),
                 log_likelihood=float(log_likelihood),
             )
 
     def compute_log_likelihood(
-        self, expression: Match[T], bindings: Bindings
+        self, *, expression: Match[T], bindings: Bindings
     ) -> ProbabilisticOperationResult:
         """
         Compute the log-likelihood of values for the variables of a match's pattern
@@ -436,18 +526,22 @@ class ProbabilisticBackend(GenerativeBackend):
         :raises ValueOutsideVariableDomain: If a value the bindings give is outside the
             domain of a variable of the model.
         """
-        parameters = UnderspecifiedParameters(expression)
-        model = self._resolve_model_to_sample(parameters, expression)
+        parameters = UnderspecifiedParameters(statement=expression)
+        model = self._resolve_model_to_sample(
+            parameters=parameters, expression=expression
+        )
         [log_likelihood] = model.log_likelihood(
-            parameters.model_sample_from_bindings(model.variables, bindings)
+            parameters.model_sample_from_bindings(
+                variables=model.variables, bindings=bindings
+            )
         )
         return ProbabilisticOperationResult(
-            role_taker=OperationResult(bindings),
+            role_taker=OperationResult(bindings=bindings),
             log_likelihood=float(log_likelihood),
         )
 
     def _resolve_model_to_sample(
-        self, parameters: UnderspecifiedParameters, expression: Match[T]
+        self, *, parameters: UnderspecifiedParameters, expression: Match[T]
     ) -> ProbabilisticModel:
         """
         :param parameters: The parameters extracted from *expression*.
@@ -456,27 +550,28 @@ class ProbabilisticBackend(GenerativeBackend):
             match, and narrowed to the region of its primary cause if it searches one.
         :raises NoSolutionFound: If the match's conditions leave the model no solution.
         """
-        model = self.model_registry.get_model(parameters)
+        self.choose_adjustment_sets(parameters=parameters, expression=expression)
+        model = self.model_registry.get_model(parameters=parameters)
 
         if parameters.search_cause_variables:
             cause_effect = self._resolve_cause_and_effect_variables(
-                parameters, expression
+                parameters=parameters, expression=expression
             )
             if not isinstance(model, CausalCircuit):
-                raise DoRequiresCausalCircuitModel(model)
+                raise DoRequiresCausalCircuitModel(resolved_model=model)
             # search every candidate cause independently and keep the primary one's
             # already effect-truncated, already region-narrowed circuit -- see
             # _resolve_primary_intervention for why this needs no joint intervention
             primary = self._resolve_primary_intervention(
-                model,
-                cause_effect.cause_variables,
-                cause_effect.effect_variable,
-                parameters.truncation_assignments_from_where_conditions,
-                expression,
-                cause_effect.confounder_variables,
+                model=model,
+                cause_variables=cause_effect.cause_variables,
+                effect_variable=cause_effect.effect_variable,
+                effect_truncation_event=parameters.truncation_assignments_from_where_conditions,
+                expression=expression,
+                adjustment_variables_by_cause=cause_effect.adjustment_variables_by_cause,
             )
             truncated = parameters.apply_krrood_variable_truncation(
-                primary.narrowed_circuit
+                model=primary.narrowed_circuit
             )
         else:
             # apply literal-assignment conditions, then where-conditions, then
@@ -484,15 +579,15 @@ class ProbabilisticBackend(GenerativeBackend):
             # UnderspecifiedParameters.resolve_conditioned_and_truncated_model, which
             # Distribution._resolve_ also reuses to answer a distribution(...) query
             # with exactly this same sequence, without the sampling step.
-            truncated = parameters.resolve_conditioned_and_truncated_model(model)
+            truncated = parameters.resolve_conditioned_and_truncated_model(model=model)
 
         if truncated is None:
-            raise NoSolutionFound(expression._get_expression_())
+            raise NoSolutionFound(expression=expression._get_expression_())
         return truncated
 
     @staticmethod
     def _resolve_cause_and_effect_variables(
-        parameters: UnderspecifiedParameters, expression: Match[T]
+        *, parameters: UnderspecifiedParameters, expression: Match[T]
     ) -> CauseEffectVariables:
         """
         Resolve the cause candidates and the single effect variable a ``cause`` search
@@ -512,27 +607,359 @@ class ProbabilisticBackend(GenerativeBackend):
         :return: The resolved cause candidates and effect variable.
         """
         if not parameters.effect_variables_from_causes_effect:
-            raise NoCausesEffectConditionForCause(expression._get_expression_())
+            raise NoCausesEffectConditionForCause(
+                expression=expression._get_expression_()
+            )
         if len(parameters.effect_variables_from_causes_effect) > 1:
             raise MultipleEffectVariablesNotSupported(
-                parameters.effect_variables_from_causes_effect
+                variables=parameters.effect_variables_from_causes_effect
             )
         [effect_variable] = parameters.effect_variables_from_causes_effect
         return CauseEffectVariables(
-            parameters.search_cause_variables,
-            effect_variable,
-            parameters.search_confounder_variables,
+            cause_variables=parameters.search_cause_variables,
+            effect_variable=effect_variable,
+            adjustment_variables_by_cause={
+                cause_variable: parameters.adjustment_variables_of(
+                    cause_variable=cause_variable
+                )
+                for cause_variable in parameters.search_cause_variables
+            },
         )
+
+    def choose_adjustment_sets(
+        self, *, parameters: UnderspecifiedParameters, expression: Match[T]
+    ) -> None:
+        """
+        Let the causal structure learned for the queried class choose, for every cause
+        candidate, the variables its intervention adjusts for, or settle the variables
+        marked ``confounder`` (see :meth:`adjustment_candidates`). Does nothing for a
+        class without a structure in :attr:`causal_structures`, or a query without a
+        ``cause``.
+
+        :param parameters: The parameters extracted from *expression*, which record the
+            chosen variables.
+        :param expression: The match being evaluated.
+        :raises VariableNotInCausalGraph: If the cause or the effect has no node in the
+            learned graph.
+        :raises InvalidAdjustmentSet: If the variables marked ``confounder`` fail the
+            adjustment criterion in the learned graph and
+            :attr:`declared_adjustment_policy` refuses them.
+        :raises EffectNotIdentified: If the learned graph identifies the effect by no
+            set of the variables the query names; :meth:`interventional_range` answers
+            an effect it identifies up to a few candidate sets.
+        """
+        structure = self.causal_structures.get(parameters.queried_class)
+        if structure is None or not parameters.search_cause_variables:
+            return
+        cause_effect = self._resolve_cause_and_effect_variables(
+            parameters=parameters, expression=expression
+        )
+        selector = structure.selector
+        for cause_variable in cause_effect.cause_variables:
+            candidates = self.adjustment_candidates(
+                parameters=parameters,
+                structure=structure,
+                selector=selector,
+                cause_variable=cause_variable,
+                effect_variable=cause_effect.effect_variable,
+            )
+            if not candidates.identification.is_identified:
+                raise EffectNotIdentified(
+                    cause=cause_variable,
+                    effect=cause_effect.effect_variable,
+                    identification=candidates.identification,
+                )
+            parameters.derived_adjustment_variables[cause_variable] = (
+                candidates.adjustments[0].variables
+            )
+
+    def possible_causes(
+        self, *, parameters: UnderspecifiedParameters, expression: Match[T]
+    ) -> list[random_events.variable.Variable]:
+        """
+        :param parameters: The parameters of a query about a class with a learned
+            structure, with a ``causes_effect(...)`` condition and no ``cause``.
+        :param expression: The query.
+        :return: The variables the query names whose node is a possible ancestor of the
+            effect's in the structure learned for the queried class, as the cause
+            candidates to rank.
+        """
+        effect_variable = self._resolve_cause_and_effect_variables(
+            parameters=parameters, expression=expression
+        ).effect_variable
+        graph = self.causal_structures[parameters.queried_class].selector.graph
+        effect = self._reference_in(graph=graph, variable=effect_variable)
+        ancestors = graph.possible_ancestors(effect.node)
+        return [
+            variable
+            for name, variable in parameters.variables.items()
+            if (reference := graph.reference_of(name)) is not None
+            and reference.node in ancestors
+            and reference.part_index in (None, effect.part_index)
+        ]
+
+    def adjustment_candidates(
+        self,
+        *,
+        parameters: UnderspecifiedParameters,
+        structure: LearnedCausalStructure,
+        selector: AdjustmentSelector,
+        cause_variable: random_events.variable.Variable,
+        effect_variable: random_events.variable.Variable,
+    ) -> AdjustmentCandidates:
+        """
+        Ask the learned structure what intervening on one cause adjusts for, among the
+        variables the query names and the aggregation statistics a relational grounding
+        keeps; the variables marked ``confounder`` are settled by
+        :attr:`declared_adjustment_policy`. A chosen statistic the query does not name
+        is added to its parameters' variables. A part attribute's node stands for the
+        copy on the part the cause, or else the effect, sits on.
+
+        :param parameters: The query's parameters.
+        :param structure: The structure learned for the queried class.
+        :param selector: The structure's selector, built from its causal relations as
+            they are now.
+        :param cause_variable: The cause.
+        :param effect_variable: The effect.
+        :return: What the structure says, with the variables of every candidate set.
+        :raises VariableNotInCausalGraph: If the cause, the effect or a variable marked
+            ``confounder`` has no node in the learned graph.
+        """
+        cause = self._reference_in(graph=selector.graph, variable=cause_variable)
+        effect = self._reference_in(graph=selector.graph, variable=effect_variable)
+        eligible = self._eligible_references(
+            graph=selector.graph,
+            parameters=parameters,
+            part_index=cause.part_index
+            if cause.part_index is not None
+            else effect.part_index,
+        )
+        declared = AdjustmentSet(
+            nodes=frozenset(
+                self._reference_in(graph=selector.graph, variable=variable).node
+                for variable in parameters.search_confounder_variables
+            )
+        )
+        identification = (
+            self.declared_adjustment_policy.identify(
+                selector,
+                cause.node,
+                effect.node,
+                declared,
+                set(eligible),
+                structure.training_rows,
+            )
+            if declared.nodes
+            else selector.identify(
+                cause.node, effect.node, set(eligible), structure.training_rows
+            )
+        )
+        return AdjustmentCandidates(
+            cause_variable=cause_variable,
+            identification=identification,
+            adjustments=[
+                CandidateAdjustment(
+                    variables=[
+                        parameters.variables.setdefault(
+                            eligible[node].variable.name, eligible[node].variable
+                        )
+                        for node in sorted(adjustment.nodes)
+                    ]
+                )
+                for adjustment in identification.candidate_adjustments
+            ],
+        )
+
+    def interventional_range(
+        self, *, expression: Match[T]
+    ) -> list[InterventionalRange]:
+        """
+        Answer a causal query whose effect the learned causal structure identifies only
+        up to a few candidate adjustment sets: for every cause, the lowest and highest
+        probability of the effect per region of the cause, across the candidates
+        (Maathuis, Kalisch and Bühlmann, 2009). An identified effect has one candidate,
+        so its range is a single value per region.
+
+        :param expression: A match with ``cause`` fields and a ``causes_effect(...)``
+            condition.
+        :return: The range of every cause.
+        :raises NoLearnedCausalStructure: If :attr:`causal_structures` has no structure
+            for the queried class.
+        :raises EffectNotIdentified: If the structure leaves the effect of a cause
+            unidentified, with no candidate sets.
+        """
+        parameters = UnderspecifiedParameters(statement=expression)
+        structure = self.causal_structures.get(parameters.queried_class)
+        if structure is None:
+            raise NoLearnedCausalStructure(
+                expression=expression._get_expression_(),
+                queried_class=parameters.queried_class,
+            )
+        cause_effect = self._resolve_cause_and_effect_variables(
+            parameters=parameters, expression=expression
+        )
+        selector = structure.selector
+        candidates_by_cause = []
+        for cause_variable in cause_effect.cause_variables:
+            candidates = self.adjustment_candidates(
+                parameters=parameters,
+                structure=structure,
+                selector=selector,
+                cause_variable=cause_variable,
+                effect_variable=cause_effect.effect_variable,
+            )
+            if not candidates.adjustments:
+                raise EffectNotIdentified(
+                    cause=cause_variable,
+                    effect=cause_effect.effect_variable,
+                    identification=candidates.identification,
+                )
+            parameters.derived_adjustment_variables[cause_variable] = (
+                candidates.variables
+            )
+            candidates_by_cause.append(candidates)
+        model = self.model_registry.get_model(parameters=parameters)
+        if not isinstance(model, CausalCircuit):
+            raise DoRequiresCausalCircuitModel(resolved_model=model)
+        effect_event = parameters.truncation_assignments_from_where_conditions
+        return [
+            self._range_of(
+                model=model,
+                candidates=candidates,
+                effect_variable=cause_effect.effect_variable,
+                effect_event=effect_event,
+            )
+            for candidates in candidates_by_cause
+        ]
+
+    @classmethod
+    def _range_of(
+        cls,
+        *,
+        model: CausalCircuit,
+        candidates: AdjustmentCandidates,
+        effect_variable: random_events.variable.Variable,
+        effect_event: Event,
+    ) -> InterventionalRange:
+        """
+        :param model: The causal circuit.
+        :param candidates: One cause and its candidate adjustment sets.
+        :param effect_variable: The effect.
+        :param effect_event: The effect's condition.
+        :return: The cause's range per region.
+        """
+        includes_no_effect = candidates.identification.includes_no_effect
+        interventional_circuits = [
+            model.backdoor_adjustment(
+                candidates.cause_variable, effect_variable, adjustment.variables
+            )
+            for adjustment in candidates.adjustments
+        ]
+        observational = cls._probability_within(
+            circuit=model.probabilistic_circuit, region=None, effect_event=effect_event
+        )
+        regions = []
+        for region in model._extract_disjoint_regions_for_variable(
+            candidates.cause_variable
+        ):
+            probabilities = [
+                cls._probability_within(
+                    circuit=interventional,
+                    region=region.event,
+                    effect_event=effect_event,
+                )
+                for interventional in interventional_circuits
+            ] + ([observational] if includes_no_effect else [])
+            regions.append(
+                RegionRange(
+                    cause_region=region.event,
+                    lowest_effect_probability=min(probabilities),
+                    highest_effect_probability=max(probabilities),
+                )
+            )
+        return InterventionalRange(
+            cause_variable=candidates.cause_variable,
+            candidate_adjustments=candidates.adjustments,
+            includes_no_effect=includes_no_effect,
+            regions=regions,
+        )
+
+    @staticmethod
+    def _probability_within(
+        *, circuit: ProbabilisticModel, region: Event | None, effect_event: Event
+    ) -> float:
+        """
+        :param circuit: A joint circuit over the cause and the effect.
+        :param region: The cause region to restrict to, or ``None`` for none.
+        :param effect_event: The effect's condition.
+        :return: The effect condition's probability within the region.
+        """
+        if region is not None:
+            circuit = circuit.truncated(
+                region.fill_missing_variables_pure(circuit.variables)
+            ).distribution
+            if circuit is None:
+                return 0.0
+        return float(
+            circuit.probability(
+                effect_event.fill_missing_variables_pure(circuit.variables)
+            )
+        )
+
+    @staticmethod
+    def _eligible_references(
+        *,
+        graph: CausalGraph,
+        parameters: UnderspecifiedParameters,
+        part_index: int | None,
+    ) -> dict[GraphNode, NodeReference]:
+        """
+        :param graph: A learned causal graph.
+        :param parameters: The parameters of a causal query.
+        :param part_index: The position of the part the cause, or else the effect, sits
+            on; ``None`` if neither is a part attribute.
+        :return: Per node a cause may adjust for, what it stands for: the variables the
+            query names, of no part or of that part, and every aggregation statistic.
+        """
+        named = (graph.reference_of(name) for name in parameters.variables)
+        eligible = {
+            reference.node: reference
+            for reference in named
+            if reference is not None and reference.part_index in (None, part_index)
+        }
+        for node in graph.nodes():
+            if node.level is NodeLevel.AGGREGATION_STATISTIC:
+                eligible.setdefault(node, NodeReference(node=node))
+        return eligible
+
+    @staticmethod
+    def _reference_in(
+        *, graph: CausalGraph, variable: random_events.variable.Variable
+    ) -> NodeReference:
+        """
+        :param graph: A learned causal graph.
+        :param variable: A query variable.
+        :return: The node it stands for.
+        :raises VariableNotInCausalGraph: If the graph has no node for it.
+        """
+        reference = graph.reference_of(variable.name)
+        if reference is None:
+            raise VariableNotInCausalGraph(variable=variable)
+        return reference
 
     @classmethod
     def _resolve_primary_intervention(
         cls,
+        *,
         model: CausalCircuit,
         cause_variables: list[random_events.variable.Variable],
         effect_variable: random_events.variable.Variable,
         effect_truncation_event: Event | None,
         expression: Match[T],
-        confounder_variables: Iterable[random_events.variable.Variable] = (),
+        adjustment_variables_by_cause: (
+            dict[random_events.variable.Variable, list[random_events.variable.Variable]]
+            | None
+        ) = None,
     ) -> ScoredIntervention:
         """
         Search every candidate cause variable independently for the region whose
@@ -553,30 +980,34 @@ class ProbabilisticBackend(GenerativeBackend):
             translates to, used to narrow each candidate's interventional joint to the
             effect before ranking its regions.
         :param expression: The match being evaluated, for error reporting.
-        :param confounder_variables: Variables marked ``confounder`` in the query,
-            passed through to ``backdoor_adjustment`` as its adjustment set.
+        :param adjustment_variables_by_cause: Per candidate, the variables passed to
+            ``backdoor_adjustment`` as its adjustment set; none if not given.
         :raises NoSolutionFound: If no candidate has a region with positive probability.
         :return: The highest-scoring candidate.
         """
         scored_interventions = cls._score_all_interventions(
-            model,
-            cause_variables,
-            effect_variable,
-            effect_truncation_event,
-            confounder_variables,
+            model=model,
+            cause_variables=cause_variables,
+            effect_variable=effect_variable,
+            effect_truncation_event=effect_truncation_event,
+            adjustment_variables_by_cause=adjustment_variables_by_cause,
         )
         if not scored_interventions:
-            raise NoSolutionFound(expression._get_expression_())
+            raise NoSolutionFound(expression=expression._get_expression_())
         return scored_interventions[0]
 
     @classmethod
     def _score_all_interventions(
         cls,
+        *,
         model: CausalCircuit,
         cause_variables: list[random_events.variable.Variable],
         effect_variable: random_events.variable.Variable,
         effect_truncation_event: Event | None,
-        confounder_variables: Iterable[random_events.variable.Variable] = (),
+        adjustment_variables_by_cause: (
+            dict[random_events.variable.Variable, list[random_events.variable.Variable]]
+            | None
+        ) = None,
     ) -> list[ScoredIntervention]:
         """
         Score every candidate cause variable independently for the region whose
@@ -593,9 +1024,8 @@ class ProbabilisticBackend(GenerativeBackend):
         :param effect_truncation_event: The event the declared effect condition
             translates to, used to narrow each candidate's interventional joint to the
             effect before ranking its regions.
-        :param confounder_variables: Variables marked ``confounder`` in the query,
-            passed through to ``backdoor_adjustment`` as its adjustment set for every
-            candidate.
+        :param adjustment_variables_by_cause: Per candidate, the variables passed to
+            ``backdoor_adjustment`` as its adjustment set; none if not given.
         :return: Every candidate with a region of positive probability and a positive
             effect probability within it, highest-scoring first.
         """
@@ -604,11 +1034,13 @@ class ProbabilisticBackend(GenerativeBackend):
             for cause_variable in cause_variables
             if (
                 scored_intervention := cls._score_intervention(
-                    model,
-                    cause_variable,
-                    effect_variable,
-                    effect_truncation_event,
-                    confounder_variables,
+                    model=model,
+                    cause_variable=cause_variable,
+                    effect_variable=effect_variable,
+                    effect_truncation_event=effect_truncation_event,
+                    adjustment_variables=(adjustment_variables_by_cause or {}).get(
+                        cause_variable, []
+                    ),
                 )
             )
             is not None
@@ -619,7 +1051,7 @@ class ProbabilisticBackend(GenerativeBackend):
         )
         return scored_interventions
 
-    def rank_causes(self, expression: Match[T]) -> list[ScoredIntervention]:
+    def rank_causes(self, *, expression: Match[T]) -> list[ScoredIntervention]:
         """
         Rank every ``cause`` candidate in *expression* by how well its intervention
         explains the declared effect.
@@ -632,9 +1064,10 @@ class ProbabilisticBackend(GenerativeBackend):
         :meth:`_evaluate` and the primary-cause search it uses entirely unchanged; this
         is an additional, independent read of the same candidates.
 
-        Any field marked ``confounder`` is passed to every candidate's search as
-        ``backdoor_adjustment``'s adjustment set, so a variable that drives both a
-        candidate and the effect does not inflate that candidate's score with mere
+        Each candidate's search adjusts for its own set: the fields marked
+        ``confounder``, or, with a structure in :attr:`causal_structures`, the set the learned
+        structure chooses (see :meth:`choose_adjustment_sets`), so a variable that drives
+        both a candidate and the effect does not inflate that candidate's score with mere
         correlation.
 
         :param expression: A match with one or more ``cause`` fields and a
@@ -648,28 +1081,39 @@ class ProbabilisticBackend(GenerativeBackend):
             :class:`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`.
         :return: Every scoreable candidate, ranked highest-scoring first.
         """
-        parameters = UnderspecifiedParameters(expression)
+        parameters = UnderspecifiedParameters(statement=expression)
+        if (
+            not parameters.search_cause_variables
+            and parameters.queried_class in self.causal_structures
+        ):
+            parameters.search_cause_variables.extend(
+                self.possible_causes(parameters=parameters, expression=expression)
+            )
         if not parameters.search_cause_variables:
-            raise NoCauseVariablesForRanking(expression._get_expression_())
-        model = self.model_registry.get_model(parameters)
+            raise NoCauseVariablesForRanking(expression=expression._get_expression_())
+        self.choose_adjustment_sets(parameters=parameters, expression=expression)
+        model = self.model_registry.get_model(parameters=parameters)
         if not isinstance(model, CausalCircuit):
-            raise DoRequiresCausalCircuitModel(model)
-        cause_effect = self._resolve_cause_and_effect_variables(parameters, expression)
+            raise DoRequiresCausalCircuitModel(resolved_model=model)
+        cause_effect = self._resolve_cause_and_effect_variables(
+            parameters=parameters, expression=expression
+        )
         return self._score_all_interventions(
-            model,
-            cause_effect.cause_variables,
-            cause_effect.effect_variable,
-            parameters.truncation_assignments_from_where_conditions,
-            cause_effect.confounder_variables,
+            model=model,
+            cause_variables=cause_effect.cause_variables,
+            effect_variable=cause_effect.effect_variable,
+            effect_truncation_event=parameters.truncation_assignments_from_where_conditions,
+            adjustment_variables_by_cause=cause_effect.adjustment_variables_by_cause,
         )
 
     @staticmethod
     def _score_intervention(
+        *,
         model: CausalCircuit,
         cause_variable: random_events.variable.Variable,
         effect_variable: random_events.variable.Variable,
         effect_truncation_event: Event | None,
-        confounder_variables: Iterable[random_events.variable.Variable] = (),
+        adjustment_variables: Iterable[random_events.variable.Variable] = (),
     ) -> ScoredIntervention | None:
         """
         Compute ``cause_variable``'s best-region search result and score it by how
@@ -701,13 +1145,13 @@ class ProbabilisticBackend(GenerativeBackend):
         :param effect_variable: The declared effect variable.
         :param effect_truncation_event: The event the declared effect condition
             translates to.
-        :param confounder_variables: Variables marked ``confounder`` in the query,
-            passed through to ``backdoor_adjustment`` as its adjustment set.
+        :param adjustment_variables: The variables passed to ``backdoor_adjustment`` as
+            its adjustment set.
         :return: The scored candidate, or ``None`` if it has no region with positive
             probability, or the effect has zero probability within that region.
         """
         interventional = model.backdoor_adjustment(
-            cause_variable, effect_variable, list(confounder_variables)
+            cause_variable, effect_variable, list(adjustment_variables)
         )
 
         # `.truncated()` fills in missing variables *in place* on the event it is
@@ -734,12 +1178,17 @@ class ProbabilisticBackend(GenerativeBackend):
             return None
 
         if not effect_truncation_event:
-            return ScoredIntervention(cause_variable, 1.0, region.distribution)
+            return ScoredIntervention(
+                cause_variable=cause_variable,
+                effect_probability_given_region=1.0,
+                narrowed_circuit=region.distribution,
+            )
 
         narrowed = region.distribution.truncated(copy.deepcopy(effect_truncation_event))
         if narrowed.distribution is None or narrowed.probability <= 0.0:
-
             return None
         return ScoredIntervention(
-            cause_variable, float(narrowed.probability), narrowed.distribution
+            cause_variable=cause_variable,
+            effect_probability_given_region=float(narrowed.probability),
+            narrowed_circuit=narrowed.distribution,
         )

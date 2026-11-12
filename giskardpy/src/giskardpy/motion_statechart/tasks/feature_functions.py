@@ -4,12 +4,13 @@ from abc import ABC, abstractmethod
 from dataclasses import field, dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.graph_node import (
     ConvergingTask,
     MotionNodeArtifacts,
@@ -139,9 +140,9 @@ class AlignPerpendicular(FeatureFunctionGoal):
     """
     Priority weight for the alignment constraint in the optimization problem.
     """
-    maximum_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Maximum allowed angular velocity for the alignment motion in radians per second.
+    Sets how fast the alignment goal is approached, in rad/s; not strictly enforced.
     """
     threshold: float = 0.01
     """
@@ -162,7 +163,8 @@ class AlignPerpendicular(FeatureFunctionGoal):
         expr = self.root_V_reference_feature @ self.root_V_controlled_feature
 
         artifacts.constraints.add_equality_constraint(
-            reference_velocity=self.maximum_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.ROTATION,
             equality_bound=0 - expr,
             quadratic_weight=self.weight,
             task_expression=expr,
@@ -199,9 +201,9 @@ class HeightGoal(FeatureFunctionGoal):
     """
     Priority weight for the height constraint in the optimization problem.
     """
-    maximum_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Maximum allowed velocity for the height motion in meters per second.
+    Sets how fast the height goal is approached, in m/s; not strictly enforced.
     """
     threshold: float = 0.0
     """
@@ -223,7 +225,8 @@ class HeightGoal(FeatureFunctionGoal):
         ) @ Vector3.Z()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.maximum_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -262,9 +265,9 @@ class DistanceGoal(FeatureFunctionGoal):
     """
     Priority weight for the distance constraint in the optimization problem.
     """
-    maximum_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Maximum allowed velocity for the distance motion in meters per second.
+    Sets how fast the distance goal is approached, in m/s; not strictly enforced.
     """
     threshold: float = 0.0
     """
@@ -286,7 +289,8 @@ class DistanceGoal(FeatureFunctionGoal):
         expr = root_V_diff.norm()
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.maximum_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.TRANSLATION,
             upper_error=self.upper_limit - expr,
             lower_error=self.lower_limit - expr,
             quadratic_weight=self.weight,
@@ -297,7 +301,8 @@ class DistanceGoal(FeatureFunctionGoal):
         # An extra constraint that makes the execution more stable
         for i, axis_name in enumerate(["x", "y", "z"]):
             artifacts.constraints.add_inequality_constraint(
-                reference_velocity=self.maximum_velocity,
+                cruise_velocity=self.cruise_velocity,
+                velocity_scale=VelocityScale.TRANSLATION,
                 lower_error=0,
                 upper_error=0,
                 quadratic_weight=self.weight,
@@ -327,9 +332,9 @@ class ReachPoint(FeatureFunctionGoal):
     """
     Priority weight for the reach constraint in the optimization problem.
     """
-    maximum_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Maximum allowed velocity for the reaching motion in meters per second.
+    Sets how fast the reaching goal is approached, in m/s; not strictly enforced.
     """
     threshold: float = 0.01
     """
@@ -349,7 +354,7 @@ class ReachPoint(FeatureFunctionGoal):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=self.root_P_controlled_feature,
             frame_P_goal=self.root_P_reference_feature,
-            reference_velocity=self.maximum_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
         )
         artifacts.error = self.root_P_controlled_feature.euclidean_distance(
@@ -385,9 +390,9 @@ class AngleGoal(FeatureFunctionGoal):
     """
     Priority weight for the angle constraint in the optimization problem.
     """
-    maximum_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Maximum allowed angular velocity for the angle motion in radians per second.
+    Sets how fast the angle goal is approached, in rad/s; not strictly enforced.
     """
     threshold: float = 0.0
     """
@@ -409,7 +414,8 @@ class AngleGoal(FeatureFunctionGoal):
         )
 
         artifacts.constraints.add_inequality_constraint(
-            reference_velocity=self.maximum_velocity,
+            cruise_velocity=self.cruise_velocity,
+            velocity_scale=VelocityScale.ROTATION,
             upper_error=self.upper_angle - expr,
             lower_error=self.lower_angle - expr,
             quadratic_weight=self.weight,

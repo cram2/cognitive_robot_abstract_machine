@@ -49,6 +49,7 @@ from coraplex.robot_plans.actions.core.navigation import (
     PathPlanningNavigateAction,
 )
 from coraplex.robot_plans.actions.core.pick_up import (
+    FixateObjectAction,
     GraspingAction,
     PickUpAction,
     ReachAction,
@@ -80,12 +81,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Tool,
     Whisk,
 )
-from semantic_digital_twin.spatial_types.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -93,7 +94,7 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..test_designator.test_multi_robot_action_designator import _handle_annotation
@@ -210,8 +211,11 @@ def _move_and_pick_up(world: World) -> MoveAndPickUpAction:
 
 
 def _move_and_place(world: World) -> MoveAndPlaceAction:
+    """
+    :return: A placing whose carry names the arm that picked the object up.
+    """
     return MoveAndPlaceAction(
-        carry=CarryAction(navigate=_navigate(world)),
+        carry=CarryAction(navigate=_navigate(world), holding_arms=[_arm(world)]),
         face_and_look_at=_face_and_look_at(world),
         place=_place(world),
     )
@@ -308,10 +312,16 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
 
 
 def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
+    """
+    :return: The cases of the actions that drive, look and perceive.
+    """
     return [
         ActionRoundTripCase(NavigateAction, lambda world: [_navigate(world)]),
         ActionRoundTripCase(
-            CarryAction, lambda world: [CarryAction(navigate=_navigate(world))]
+            CarryAction,
+            lambda world: [
+                CarryAction(navigate=_navigate(world), holding_arms=[_arm(world)])
+            ],
         ),
         ActionRoundTripCase(
             PathPlanningNavigateAction,
@@ -380,6 +390,10 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             lambda world: [
                 CloseAction(grasp=_handle(world).grasp_candidates()[0], arm=_arm(world))
             ],
+        ),
+        ActionRoundTripCase(
+            FixateObjectAction,
+            lambda world: [FixateObjectAction(end_effector=_arm(world).end_effector)],
         ),
         ActionRoundTripCase(
             MoveAndPickUpAction, lambda world: [_move_and_pick_up(world)]

@@ -362,10 +362,10 @@ the list). When there is more than one, the wording matches it: the verb becomes
 salaries are …"*) and a per-item value spreads to each (*"their salaries"*):
 
 ```{code-cell} ipython3
-print(verbalize_expression(an(entity(employee).ordered_by(employee.salary))))
+print(verbalize_expression(an(entity(employee).ordered_by(variable=employee.salary))))
 
 print(verbalize_expression(
-    an(entity(employee).where(employee.salary > 5).ordered_by(employee.salary))
+    an(entity(employee).where(employee.salary > 5).ordered_by(variable=employee.salary))
 ))
 ```
 
@@ -514,10 +514,10 @@ from krrood.entity_query_language.verbalization._example_domain import (
 
 loc = variable(Location, domain=None)
 robot = variable(Robot, domain=None)
-print(verbalize_expression(IsReachable(loc, robot)))
+print(verbalize_expression(IsReachable(location=loc, body=robot)))
 ```
 
-Predicates with multiple fields receive their arguments in positional order:
+Predicates with multiple fields receive their arguments as keywords:
 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization._example_domain import (
@@ -528,7 +528,7 @@ from krrood.entity_query_language.verbalization._example_domain import (
 
 dept = variable(Department, domain=None)
 emp = variable(StaffMember, domain=None)
-print(verbalize_expression(WorksIn(emp, dept)))
+print(verbalize_expression(WorksIn(employee=emp, department=dept)))
 ```
 
 When a predicate does not define `_verbalization_template_`, the verbalizer falls

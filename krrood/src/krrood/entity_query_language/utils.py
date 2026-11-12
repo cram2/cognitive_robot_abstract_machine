@@ -4,10 +4,8 @@ Utilities for hashing, rendering, and general helpers used by the symbolic query
 
 from __future__ import annotations
 
-import inspect
 import itertools
 import re
-from functools import lru_cache
 
 from typing_extensions import (
     Any,
@@ -137,9 +135,9 @@ def cartesian_product_while_passing_the_bindings_around(
             Evaluate the inner expression and combine its bindings with the previous
             stage's bindings.
             """
-            for result in inner_expression._evaluate_(prev):
+            for result in inner_expression._evaluate_(sources=prev):
                 if prev is not None:
-                    result.update(prev)
+                    result.update(other=prev)
                 yield result
 
         return stage
@@ -189,75 +187,6 @@ def chain_stages(
             yield from evaluate_next_stage_or_yield(stage_index + 1, next_result)
 
     yield from evaluate_next_stage_or_yield(0, initial)
-
-
-@lru_cache
-def get_function_argument_names(function: Callable) -> list[str]:
-    """
-    :param function: A function to inspect
-    :return: The argument names of the function
-    """
-    return list(inspect.signature(function).parameters.keys())
-
-
-def merge_args_and_kwargs(
-    function_or_class: Callable,
-    args: tuple[Any, ...],
-    kwargs: dict[str, Any],
-    ignore_first: bool = False,
-) -> dict[str, Any]:
-    """
-    Merge the arguments and keyword-arguments of a function/class into a dict of
-    keyword-arguments. If a class is passed, the arguments are assumed to be the
-    `__init__` arguments.
-
-    :param function_or_class: The function/class to get the argument names from
-    :param args: The arguments passed to the function
-    :param kwargs: The keyword arguments passed to the function
-    :param ignore_first: Whether to ignore the first argument or not. Use this when
-        `function_or_class` contains something like `self`
-    :return: The dict of assigned keyword-arguments.
-    """
-    starting_index = 1 if ignore_first else 0
-    function_or_class = (
-        function_or_class.__init__
-        if inspect.isclass(function_or_class)
-        else function_or_class
-    )
-    all_kwargs = {
-        name: arg
-        for name, arg in zip(
-            get_function_argument_names(function_or_class)[starting_index:],
-            args,
-        )
-    }
-    all_kwargs.update(kwargs)
-    return all_kwargs
-
-
-def convert_args_and_kwargs_into_hashable_key(
-    dictionary: dict[str, Any],
-) -> tuple[Any, ...]:
-    """
-    Generates a hashable key from the dictionary.
-
-    The key is a tuple of sorted (key, value) pairs. If a value is a dictionary or a
-    set, it is converted to a frozenset of its items. If a value is a list, it is
-    converted to a tuple.
-
-    :param dictionary: The keyword arguments to generate the key from.
-    :return: The generated key as a tuple.
-    """
-    key = []
-    for k, v in dictionary.items():
-        if isinstance(v, dict):
-            v = frozenset(v.items())
-        elif isinstance(v, set):
-            v = frozenset(v)
-        elif isinstance(v, list):
-            v = tuple(v)
-        key.append((k, v))
-    return tuple(sorted(key))
 
 
 def camel_case_to_words(name: str) -> str:

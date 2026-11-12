@@ -28,7 +28,7 @@ def test_load_environment_returns_world():
     Tests that loading the environment returns a World object with the correct root
     name.
     """
-    world = KitchenEnvironment().get_world()
+    world = KitchenEnvironment().create_world()
     assert isinstance(world, World)
     assert world.root.name == PrefixedName("root")
 
@@ -41,7 +41,7 @@ def test_load_environment_names_are_stringifiable():
     into a :class:`PrefixedName` themselves. Handing them a ``PrefixedName`` nests it
     inside another one, which breaks every consumer that stringifies the name.
     """
-    world = KitchenEnvironment().get_world()
+    world = KitchenEnvironment().create_world()
     for entity in world.kinematic_structure_entities:
         assert isinstance(entity.name.name, str)
         str(entity.name)
@@ -59,7 +59,7 @@ def test_world_reasoner_reason_returns_dicts():
     )
     world = URDFParser.from_file(
         file_path=os.path.join(urdf_dir, "kitchen-small.urdf")
-    ).parse()
+    ).create_world()
     reasoner = WorldReasoner(world)
 
     result = reasoner.reason()
@@ -278,7 +278,7 @@ def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
     )
     world = URDFParser.from_file(
         file_path=os.path.join(coraplex_worlds_directory, "kitchen-small.urdf")
-    ).parse()
+    ).create_world()
     connections_before_reasoning = set(world.connections)
     reasoner = WorldReasoner(world)
 

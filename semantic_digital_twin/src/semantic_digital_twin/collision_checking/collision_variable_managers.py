@@ -18,8 +18,7 @@ from semantic_digital_twin.collision_checking.collision_groups import (
     CollisionGroup,
     CollisionGroupCombination,
 )
-from semantic_digital_twin.spatial_types import Vector3, Point3
-from semantic_digital_twin.spatial_types.math import inverse_frame
+from krrood_spatial_math.spatial_types import Vector3, Point3
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% avoided contacts
@@ -161,7 +160,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         cache_key = (method_name, *identifier)
         if cache_key not in self._symbol_cache:
             symbol = creator_func()
-            self.float_variable_data.register_expression(symbol)
+            self.float_variable_data.register_expression(expression=symbol)
             self._symbol_cache[cache_key] = symbol
         return self._symbol_cache[cache_key]
 

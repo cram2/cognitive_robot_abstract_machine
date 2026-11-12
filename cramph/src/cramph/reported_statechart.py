@@ -88,7 +88,7 @@ class ReportedStatechart:
         """
         if StatechartPayloadKey.STATECHART in payload:
             self.statechart = Statechart.from_json(
-                payload[StatechartPayloadKey.STATECHART],
+                data=payload[StatechartPayloadKey.STATECHART],
                 context=StatechartContext(world=World()),
             )
         if self.statechart is None:
@@ -99,12 +99,14 @@ class ReportedStatechart:
             )
         self.statechart.compiler.add_transitions()
         self.statechart.life_cycle_state.data = LifeCycleState.from_json(
-            payload[StatechartPayloadKey.LIFE_CYCLE_STATE], statechart=self.statechart
+            data=payload[StatechartPayloadKey.LIFE_CYCLE_STATE],
+            statechart=self.statechart,
         ).data
         self.statechart.observation_state.data = ObservationState.from_json(
-            payload[StatechartPayloadKey.OBSERVATION_STATE], statechart=self.statechart
+            data=payload[StatechartPayloadKey.OBSERVATION_STATE],
+            statechart=self.statechart,
         ).data
         self.statechart.last_observation_state.data = LastObservationState.from_json(
-            payload[StatechartPayloadKey.LAST_OBSERVATION_STATE],
+            data=payload[StatechartPayloadKey.LAST_OBSERVATION_STATE],
             statechart=self.statechart,
         ).data

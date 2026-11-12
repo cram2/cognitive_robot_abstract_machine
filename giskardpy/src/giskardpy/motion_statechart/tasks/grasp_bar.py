@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import MotionNodeArtifacts, ConvergingTask
-from semantic_digital_twin.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -52,14 +53,14 @@ class GraspBar(ConvergingTask):
     Distance threshold to the bar for goal achievement in meters.
     """
 
-    reference_linear_velocity: float = 0.1
+    cruise_linear_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Reference linear velocity for normalization in m/s.
+    Sets how fast the goal position is approached, in m/s; not strictly enforced.
     """
 
-    reference_angular_velocity: float = 0.5
+    cruise_angular_velocity: float = DefaultCruiseVelocity.ROTATION
     """
-    Reference angular velocity for normalization in rad/s.
+    Sets how fast the goal orientation is approached, in rad/s; not strictly enforced.
     """
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
@@ -97,7 +98,7 @@ class GraspBar(ConvergingTask):
         artifacts.geometry.add_vector_goal_constraints(
             frame_V_current=root_V_tip_normal,
             frame_V_goal=root_V_bar_axis,
-            reference_velocity=self.reference_angular_velocity,
+            cruise_velocity=self.cruise_angular_velocity,
             quadratic_weight=self.weight,
         )
 
@@ -113,7 +114,7 @@ class GraspBar(ConvergingTask):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_tip,
             frame_P_goal=nearest,
-            reference_velocity=self.reference_linear_velocity,
+            cruise_velocity=self.cruise_linear_velocity,
             quadratic_weight=self.weight,
         )
 

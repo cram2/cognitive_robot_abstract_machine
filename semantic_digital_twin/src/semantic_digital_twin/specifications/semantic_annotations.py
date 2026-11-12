@@ -18,7 +18,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.specifications.base import SpawnSpecification
 from semantic_digital_twin.specifications.connections import (
     FixedConnectionSpecification,
@@ -231,8 +231,8 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         return {
             wrapped_field.name: wrapped_field
             for wrapped_field in WrappedClass(
-                self.semantic_annotation_type
-            ).fields_with_metadata(IsPartWholeRelationship)
+                clazz=self.semantic_annotation_type
+            ).fields_with_metadata(metadata_type=IsPartWholeRelationship)
         }
 
     def _mount_part_specifications(

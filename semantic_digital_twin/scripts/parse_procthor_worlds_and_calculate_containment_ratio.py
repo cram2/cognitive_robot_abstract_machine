@@ -44,7 +44,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
             continue
         try:
             parser = ProcTHORParser(f"house_{index}", house, semantic_world_session)
-            world = parser.parse()
+            world = parser.create_world()
         except Exception as e:
             logging.error(f"Error parsing house {index}: {e}")
             continue
@@ -76,7 +76,7 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
             world.kinematic_structure_entities, world.kinematic_structure_entities
         ):
             if kse != other:
-                is_inside = InsideOf(kse, other)
+                is_inside = InsideOf(body=kse, other=other)
                 if is_inside.compute_containment_ratio() > 0.0:
                     dao = to_dao(is_inside, state=state)
                     daos.append(dao)

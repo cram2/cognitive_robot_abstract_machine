@@ -15,7 +15,7 @@ ext_modules = [
         include_dirs=[
             "src/random_events_lib/random_events_lib/include"
         ],  # Include directory for C++ headers
-        extra_compile_args=["-std=c++17", "-fPIC"],
+        cxx_std=17,
     ),
 ]
 
@@ -42,7 +42,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.12",
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
 )

@@ -38,8 +38,8 @@ from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -55,7 +55,7 @@ _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.
 
 def _build_hsrb_world() -> World:
     urdf_parser = URDFParser.from_file(file_path=HSRB.get_ros_file_path())
-    world = urdf_parser.parse()
+    world = urdf_parser.create_world()
     HSRB.from_world(world)
 
     with world.modify_world():
@@ -77,7 +77,7 @@ def build_cram_world():
     extensions being what its plans read from their context.
     """
     hsrb_world = _build_hsrb_world()
-    apartment = URDFParser.from_file(str(_APARTMENT_URDF)).parse()
+    apartment = URDFParser.from_file(str(_APARTMENT_URDF)).create_world()
     hsrb_world.merge_world(apartment)
     hsrb_world.get_body_by_name(
         "base_footprint"
@@ -105,7 +105,7 @@ def _random_navigate_action(world: World):
             reference_frame=world.root,
         ),
     )
-    action.limit(10)
+    action.limit(n=10)
     return action
 
 

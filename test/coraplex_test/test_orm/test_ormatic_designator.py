@@ -1,3 +1,7 @@
+"""
+Persisting plans and the actions they are made of through the ORM.
+"""
+
 import pytest
 
 from krrood.ormatic.data_access_objects.helper import (
@@ -18,7 +22,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import context_of, simulated_executor, statechart_of
 from cramph.context import ContextExtension
@@ -123,6 +127,7 @@ def complex_plan(pr2_apartment_context):
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             object_designator=milk,
+            arm=robot_view.left_arm,
         ),
     )
 

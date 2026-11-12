@@ -2,7 +2,7 @@ import json
 import time
 
 from giskardpy.motion_statechart.weights import DefaultWeights
-from giskardpy.motion_statechart.goals.collision_avoidance import SelfCollisionAvoidance
+from giskardpy.motion_statechart.tasks.collision_avoidance import SelfCollisionAvoidance
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
@@ -20,7 +20,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
@@ -40,7 +40,7 @@ def to_and_from_json(
     tracker = WorldEntityWithIDKwargsTracker.from_world(target_executor.context.world)
     kwargs = tracker.create_kwargs()
     return Statechart.from_json(
-        new_json_data, context=target_executor.context, **kwargs
+        data=new_json_data, context=target_executor.context, **kwargs
     )
 
 

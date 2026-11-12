@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 # %% what asks for an order
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ConversionOrderConstraint(ABC):
     """
     One reason why an alternative mapping type is converted before another.
@@ -45,7 +45,7 @@ class ConversionOrderConstraint(ABC):
         """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class DeclaredOrder(ConversionOrderConstraint):
     """
     An order the later mapping asks for in its
@@ -66,7 +66,7 @@ class DeclaredOrder(ConversionOrderConstraint):
         )
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class HoldingOrder(ConversionOrderConstraint):
     """
     An order that holding one mapping inside another asks for.
@@ -90,7 +90,7 @@ class HoldingOrder(ConversionOrderConstraint):
 # %% the order of one conversion
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConversionOrder:
     """
     The order the alternative mappings of a single conversion are converted in.
@@ -120,7 +120,9 @@ class ConversionOrder:
             self.graph[index]: index for index in self.graph.node_indices()
         }
         for held, holder in self._held_and_holder_types():
-            self._order_held_before_holder(held, holder, index_of_type)
+            self._order_held_before_holder(
+                held=held, holder=holder, index_of_type=index_of_type
+            )
 
     def _held_and_holder_types(self) -> set[tuple[type, type]]:
         """
@@ -140,6 +142,7 @@ class ConversionOrder:
 
     def _order_held_before_holder(
         self,
+        *,
         held: type[AlternativeMapping],
         holder: type,
         index_of_type: dict[type, int],
@@ -166,7 +169,9 @@ class ConversionOrder:
             return
         if self.graph.has_edge(held_index, holder_index):
             return
-        self.graph.add_edge(held_index, holder_index, HoldingOrder(held, holder))
+        self.graph.add_edge(
+            held_index, holder_index, HoldingOrder(earlier=held, later=holder)
+        )
 
     def sort_types(self) -> list[type[AlternativeMapping]]:
         """
@@ -178,6 +183,8 @@ class ConversionOrder:
         cycle = rustworkx.digraph_find_cycle(self.graph)
         if cycle:
             raise ConversionOrderCycle(
-                [self.graph.get_edge_data(source, target) for source, target in cycle]
+                cycle=[
+                    self.graph.get_edge_data(source, target) for source, target in cycle
+                ]
             )
         return [self.graph[index] for index in rustworkx.topological_sort(self.graph)]

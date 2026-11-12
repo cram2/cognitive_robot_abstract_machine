@@ -10,7 +10,7 @@ from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.grammar.framework.planner import Planner
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class BindingPlan:
     """
     One field binding of an InstantiatedVariable (number decided up front).
@@ -32,7 +32,7 @@ class BindingPlan:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class InstantiatedPlan:
     """
     Complete decomposition of an InstantiatedVariable (the plan).
@@ -49,7 +49,7 @@ class InstantiatedPlan:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
     """
     Decompose an instantiated variable (a *"a TypeName where the field of the TypeName is …"*
@@ -61,7 +61,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
     Reference: :cite:t:`reiter2000building` — content/structure determination (microplanning).
 
     >>> connection = variable(FixedConnection, [])
-    >>> InstantiatedPlanner(inference(Drawer)(container=connection.parent, handle=connection.child)).plan().type_name
+    >>> InstantiatedPlanner(node=inference(Drawer)(container=connection.parent, handle=connection.child)).plan().type_name
     'Drawer'
     """
 
@@ -70,7 +70,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
 
         >>> connection = variable(FixedConnection, [])
         >>> drawer = inference(Drawer)(container=connection.parent, handle=connection.child)
-        >>> InstantiatedPlanner(drawer).plan().type_name
+        >>> InstantiatedPlanner(node=drawer).plan().type_name
         'Drawer'
         """
         return InstantiatedPlan(type_name=self._type_name(), bindings=self._bindings())
@@ -79,7 +79,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         """:return: The display name of the instantiated type (*"Drawer"*).
 
         >>> connection = variable(FixedConnection, [])
-        >>> InstantiatedPlanner(inference(Drawer)(container=connection.parent, handle=connection.child))._type_name()
+        >>> InstantiatedPlanner(node=inference(Drawer)(container=connection.parent, handle=connection.child))._type_name()
         'Drawer'
         """
         return getattr(self.node._type_, "__name__", str(self.node._type_))
@@ -88,7 +88,7 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         """:return: One :class:`BindingPlan` per field binding, in construction order.
 
         >>> connection = variable(FixedConnection, [])
-        >>> bindings = InstantiatedPlanner(inference(Drawer)(container=connection.parent, handle=connection.child))._bindings()
+        >>> bindings = InstantiatedPlanner(node=inference(Drawer)(container=connection.parent, handle=connection.child))._bindings()
         >>> [binding.field_name for binding in bindings]
         ['container', 'handle']
         """
@@ -102,20 +102,20 @@ class InstantiatedPlanner(Planner[InstantiatedVariable, InstantiatedPlan]):
         ]
 
     @staticmethod
-    def has_fragment(node: InstantiatedVariable) -> bool:
+    def has_fragment(*, node: InstantiatedVariable) -> bool:
         """
         :param node: The instantiated variable.
         :return: ``True`` when *node*'s type implements ``Verbalizable`` and overrides
             ``_verbalization_fragment_`` with its own structured surface.
 
         >>> connection = variable(FixedConnection, [])
-        >>> InstantiatedPlanner.has_fragment(inference(Drawer)(container=connection.parent, handle=connection.child))
+        >>> InstantiatedPlanner.has_fragment(node=inference(Drawer)(container=connection.parent, handle=connection.child))
         False
         """
-        type_ = node._type_
+        factory = node._factory_
         return (
-            isinstance(type_, type)
-            and issubclass(type_, Verbalizable)
-            and type_._verbalization_fragment_.__func__
+            isinstance(factory, type)
+            and issubclass(factory, Verbalizable)
+            and factory._verbalization_fragment_.__func__
             is not Verbalizable._verbalization_fragment_.__func__
         )

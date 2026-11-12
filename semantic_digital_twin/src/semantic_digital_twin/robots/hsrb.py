@@ -50,7 +50,7 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
     ServoedRobotPart,
 )
-from semantic_digital_twin.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
     JointDrive,
@@ -157,6 +157,15 @@ class HSRBRightFinger(Finger):
 class HSRBGripper(
     EndEffector, HasTwoFingers[HSRBLeftFinger, HSRBRightFinger], ServoedRobotPart
 ):
+    @classproperty
+    def squeeze(cls) -> float:
+        """
+        Half the hand's widest opening of 13.7 cm, so the fingers are sent shut: the hand
+        grips with as much force as its motor builds up from how far it is sent past
+        what it holds, and its finger springs give way on top of that.
+        """
+        return 0.07
+
     @property
     def drive_of_each_joint(self) -> dict[JointName, JointDrive]:
         """

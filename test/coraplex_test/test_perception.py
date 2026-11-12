@@ -62,8 +62,8 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Milk
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from .conftest import motion_nodes_in_physics_of, motion_nodes_of
 from ..plan_running import robot_executor, statechart_of
@@ -1017,7 +1017,7 @@ def test_perception_task_survives_a_chart_round_trip(
     chart.add_node(EndMotion.when_true(task))
 
     restored_chart = Statechart.from_json(
-        json.loads(json.dumps(chart.to_json())),
+        data=json.loads(json.dumps(chart.to_json())),
         context=StatechartContext(world=receiving_world),
         **receiving_world_kwargs(receiving_world),
     )

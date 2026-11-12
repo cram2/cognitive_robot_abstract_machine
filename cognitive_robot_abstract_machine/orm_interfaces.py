@@ -294,7 +294,7 @@ class GenerationOutput:
         if started is not None:
             self.start(started.package_name)
             return
-        report = ClassDiagramProgress.from_line(line)
+        report = ClassDiagramProgress.from_line(line=line)
         if report is None:
             self.written.append(line)
             return
@@ -448,9 +448,9 @@ class WorkspaceOrmInterfaces:
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
         OrmInterface("semantic_digital_twin", REPOSITORY_ROOT),
+        OrmInterface("segmind", REPOSITORY_ROOT, ("semantic_digital_twin",)),
         OrmInterface("cramph", REPOSITORY_ROOT, ("semantic_digital_twin",)),
         OrmInterface("giskardpy", REPOSITORY_ROOT, ("cramph",)),
-        OrmInterface("segmind", REPOSITORY_ROOT, ("semantic_digital_twin",)),
         OrmInterface("coraplex", REPOSITORY_ROOT, ("giskardpy",)),
         OrmInterface("experiments", REPOSITORY_ROOT, ("coraplex",)),
     )

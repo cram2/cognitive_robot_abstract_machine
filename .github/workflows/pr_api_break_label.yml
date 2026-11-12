@@ -1,0 +1,41 @@
+name: Label pull requests that break the API
+
+# workflow_run gets a token that can label pull requests from forks. It never checks out or
+# runs the pull request's code. A fork runs its own copy of the check workflow, so the
+# artifact only says whether a break was found; the pull request is looked up from the
+# commit the check ran on, so a fork can only ever label its own pull request.
+on:
+  workflow_run:
+    workflows: ["Find API breaks in pull requests"]
+    types: [completed]
+
+permissions:
+  actions: read
+  pull-requests: write
+
+jobs:
+  label:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: api-break
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # like the labeler, this only adds the label, never removes it
+      - name: Add the api-break label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ ! -f api-break-found ]; then exit 0; fi
+          pull_request_number="$(gh pr list --repo "${{ github.repository }}" --state open \
+            --search "$HEAD_SHA" --json number --jq '.[0].number')"
+          if [ -z "$pull_request_number" ]; then
+            echo "No open pull request has head commit $HEAD_SHA"
+            exit 0
+          fi
+          gh pr edit "$pull_request_number" --repo "${{ github.repository }}" --add-label api-break

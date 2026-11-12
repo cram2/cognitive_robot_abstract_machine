@@ -5,21 +5,38 @@ from numpy.typing import NDArray
 import pytest
 import trimesh
 
+from krrood.bounds import Bounds
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.ormatic.utils import classproperty
 
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
-    MissingReferenceFrameError,
+    GraspNotOnObjectError,
     NoGraspGeometry,
     ObjectHasNoWidthWithoutCollision,
+)
+from krrood_spatial_math.exceptions import (
+    MissingReferenceFrameError,
     ReferenceFrameMismatchError,
 )
-from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.mixins import (
+    HasGraspCandidates,
+    HasRootBody,
+    HasDrawnGraspsByDefault,
+)
+from semantic_digital_twin.grasping.axial_grasp import AxialGrasp
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.grasping.grasp_strategies import (
+    GraspABar,
+    GraspAcrossTheLength,
+    GraspFromAnySide,
+    GraspStrategy,
+    PinchARim,
+    PinchTheTopOfAWall,
+)
 from semantic_digital_twin.semantic_annotations.natural_language import (
     NaturalLanguageWithTypeDescription,
 )
@@ -38,8 +55,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    LineSegment3,
+    Point3,
     Pose,
     RotationMatrix,
     Vector3,
@@ -209,7 +228,7 @@ class FixedlyGraspedHandle(Handle):
     A handle that offers one grasp at its origin, whatever its shape.
     """
 
-    def grasp_candidates(self, model_registry=None, require_lifting=False):
+    def grasp_candidates(self, model_registry=None, result_pattern=None):
         return [GraspCandidate.from_body_origin(self)]
 
 
@@ -229,9 +248,9 @@ class MilkGraspedLow(Milk):
     A carton that may be grasped only at its lower half.
     """
 
-    def surface_grasp_statement(self, require_lifting=False):
-        statement = super().surface_grasp_statement(require_lifting)
-        return statement.where(statement.height < 0.5)
+    @classproperty
+    def grasp_strategy(cls) -> GraspStrategy:
+        return GraspFromAnySide(height=Bounds(lower=0.05, upper=0.5))
 
 
 def test_an_annotation_can_state_where_it_may_be_grasped(milk):
@@ -247,14 +266,11 @@ def test_an_annotation_can_state_where_it_may_be_grasped(milk):
 
 
 @dataclass(eq=False)
-class MilkDrawnUniformly(Milk):
+class MilkDrawnUniformly(HasDrawnGraspsByDefault, Milk):
     """
     A carton that offers grasps drawn uniformly from its statement while no model is
     given.
     """
-
-    def default_grasp_candidates(self):
-        return self.drawn_grasp_candidates()
 
 
 def test_an_annotation_can_offer_other_grasps_while_no_model_is_given(milk):
@@ -292,7 +308,7 @@ def test_bowl_grasps_sit_in_the_middle_of_the_rims_height(bowl):
 
 
 def test_bowl_grasps_approach_from_above(bowl):
-    allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
+    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
     for grasp in bowl.grasp_candidates():
         approach = axes_of(grasp.grasp_pose)[:, 0]
         assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
@@ -303,7 +319,7 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
     The finger axis must be close to radial, so the fingers straddle the wall rather
     than pinching along it.
     """
-    allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
+    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
     for grasp in bowl.grasp_candidates():
         position = grasp.grasp_pose.to_np()[:3, 3]
         radial = position / np.linalg.norm(position[:2])
@@ -315,10 +331,12 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
 
 
 def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
-    allowed = allowed_intervals(bowl.rim.surface_grasp_statement())
+    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
-    assert bowl.rim.wall_thickness() == pytest.approx(wall_thickness, rel=0.02)
+    assert PinchARim().depth_unit(bowl.rim, bowl.rim.grasp_surface()) == pytest.approx(
+        wall_thickness, rel=0.02
+    )
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
         0.25 * wall_thickness, rel=0.02
     )
@@ -328,75 +346,53 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
 
 
 def test_a_wall_is_pinched_as_deep_as_asked(bowl):
-    shallowest_depth, deepest_depth = 0.1, 0.9
-    allowed = allowed_intervals(
-        bowl.rim.wall_grasp_statement(
-            0.25,
-            0.75,
-            False,
-            shallowest_depth=shallowest_depth,
-            deepest_depth=deepest_depth,
-        )
-    )
-    wall_thickness = bowl.rim.wall_thickness()
+    strategy = PinchARim(depth=Bounds(lower=0.1, upper=0.9))
+    allowed = allowed_intervals(strategy.statement(bowl.rim))
+    wall_thickness = strategy.depth_unit(bowl.rim, bowl.rim.grasp_surface())
 
     assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        shallowest_depth * wall_thickness
+        strategy.depth.lower * wall_thickness
     )
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        deepest_depth * wall_thickness
+        strategy.depth.upper * wall_thickness
     )
 
 
 def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
-    largest_pitch, largest_roll = 0.3, 0.2
-    allowed = allowed_intervals(
-        bowl.rim.wall_grasp_statement(
-            0.25,
-            0.75,
-            False,
-            largest_pitch=largest_pitch,
-            largest_roll=largest_roll,
-        )
-    )
+    pitch, roll = Bounds(lower=0.0, upper=0.3), Bounds(lower=-0.2, upper=0.2)
+    allowed = allowed_intervals(PinchARim(pitch=pitch, roll=roll).statement(bowl.rim))
 
-    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
-    assert allowed["roll"].simple_sets[0].lower == pytest.approx(-largest_roll)
-    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(largest_roll)
+    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(pitch.upper)
+    assert allowed["roll"].simple_sets[0].lower == pytest.approx(roll.lower)
+    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(roll.upper)
 
 
 def test_a_rim_is_pinched_between_the_heights_asked(bowl):
-    lowest_height, highest_height = 0.1, 0.9
-    allowed = allowed_intervals(
-        bowl.rim.surface_grasp_statement(
-            lowest_height=lowest_height, highest_height=highest_height
-        )
-    )
+    height = Bounds(lower=0.1, upper=0.9)
+    allowed = allowed_intervals(PinchARim(height=height).statement(bowl.rim))
 
-    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
-    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
+    assert allowed["height"].simple_sets[0].lower == pytest.approx(height.lower)
+    assert allowed["height"].simple_sets[-1].upper == pytest.approx(height.upper)
 
 
 def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked(
     bowl,
 ):
     bowl.rim = None
-    rim_depth, shallowest_rim_fraction, deepest_rim_fraction = 0.02, 0.1, 0.9
+    rim_depth, rim_fraction = 0.02, Bounds(lower=0.1, upper=0.9)
     allowed = allowed_intervals(
-        bowl.surface_grasp_statement(
-            rim_depth=rim_depth,
-            shallowest_rim_fraction=shallowest_rim_fraction,
-            deepest_rim_fraction=deepest_rim_fraction,
+        PinchTheTopOfAWall(rim_depth=rim_depth, rim_fraction=rim_fraction).statement(
+            bowl
         )
     )
     lowest, highest = bowl.grasp_surface().bounds
-    rim_fraction = rim_depth / float(highest[2] - lowest[2])
+    rim_depth_fraction = rim_depth / float(highest[2] - lowest[2])
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(
-        1 - deepest_rim_fraction * rim_fraction
+        1 - rim_fraction.upper * rim_depth_fraction
     )
     assert allowed["height"].simple_sets[-1].upper == pytest.approx(
-        1 - shallowest_rim_fraction * rim_fraction
+        1 - rim_fraction.lower * rim_depth_fraction
     )
 
 
@@ -446,13 +442,10 @@ def test_cutlery_is_grasped_from_above_across_its_length(length_axis):
 @pytest.mark.parametrize("length_axis", [0, 1], ids=["along-x", "along-y"])
 def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
     """
-    Grasps drawn from the statement come down onto the piece within its allowed tilt
-    and close across it within its allowed turn.
+    Grasps drawn for a piece of cutlery come straight down onto its length, close
+    across it, and keep the gripper on its length.
     """
     spoon = _spoon_lying_along(length_axis)
-    allowed = allowed_intervals(spoon.surface_grasp_statement())
-    first_end = allowed["azimuth"].simple_sets[0]
-    azimuth_spread = (first_end.upper - first_end.lower) / 2
     length_direction = np.eye(3)[length_axis]
 
     grasps = spoon.drawn_grasp_candidates()
@@ -463,50 +456,25 @@ def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
             axes_of(grasp.grasp_pose)[:, 0],
             axes_of(grasp.grasp_pose)[:, 1],
         )
-        assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
-        assert abs(float(np.dot(closing, length_direction))) <= np.sin(
-            allowed["roll"].simple_sets[-1].upper - np.pi / 2 + azimuth_spread
-        )
+        across_length = np.delete(grasp.grasp_pose.to_np()[:3, 3], length_axis)
+        np.testing.assert_allclose(approach, [0, 0, -1], atol=1e-9)
+        assert float(np.dot(closing, length_direction)) == pytest.approx(0, abs=1e-9)
+        np.testing.assert_allclose(across_length, [0, 0], atol=1e-9)
 
 
-def test_cutlery_is_grasped_within_the_bounds_asked():
+def test_cutlery_is_grasped_along_its_length_as_far_as_asked():
     spoon = _spoon_lying_along(0)
-    lowest_height, highest_height = 0.3, 0.7
-    shallowest_depth, deepest_depth = 0.1, 0.4
-    azimuth_tolerance, largest_pitch, largest_roll = 0.05, 0.3, 0.2
-    allowed = allowed_intervals(
-        spoon.surface_grasp_statement(
-            lowest_height=lowest_height,
-            highest_height=highest_height,
-            shallowest_depth=shallowest_depth,
-            deepest_depth=deepest_depth,
-            azimuth_tolerance=azimuth_tolerance,
-            largest_pitch=largest_pitch,
-            largest_roll=largest_roll,
-        )
-    )
-    lowest, highest = spoon.grasp_surface().bounds
-    length = float(highest[0] - lowest[0])
-    first_end = allowed["azimuth"].simple_sets[0]
+    strategy = GraspAcrossTheLength(position=Bounds(lower=0.3, upper=0.7))
+    allowed = allowed_intervals(strategy.statement(spoon))
 
-    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
-    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
-    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        shallowest_depth * length
+    assert allowed["position"].simple_sets[0].lower == pytest.approx(
+        strategy.position.lower
     )
-    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        deepest_depth * length
+    assert allowed["position"].simple_sets[-1].upper == pytest.approx(
+        strategy.position.upper
     )
-    assert first_end.upper - first_end.lower == pytest.approx(
-        2 * azimuth_tolerance, rel=1e-5
-    )
-    assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(largest_pitch)
-    assert allowed["roll"].simple_sets[0].lower == pytest.approx(
-        np.pi / 2 - largest_roll
-    )
-    assert allowed["roll"].simple_sets[-1].upper == pytest.approx(
-        np.pi / 2 + largest_roll
-    )
+    assert allowed["angle"].simple_sets[0].lower == pytest.approx(strategy.angle.lower)
+    assert allowed["angle"].simple_sets[-1].upper == pytest.approx(strategy.angle.upper)
 
 
 def test_cutlery_without_a_shape_offers_no_grasp():
@@ -590,28 +558,21 @@ def test_an_object_without_its_handle_is_grasped_as_it_offers_otherwise():
     assert mug.grasped_part() is mug
 
 
-def test_a_handle_is_grasped_between_the_heights_and_depths_asked():
+def test_a_handle_is_grasped_along_its_bar_and_around_it_as_far_as_asked():
     handle = _mug(with_handle=True).handle
-    lowest_height, highest_height = 0.3, 0.7
-    shallowest_depth, deepest_depth = 0.1, 0.4
-    allowed = allowed_intervals(
-        handle.surface_grasp_statement(
-            lowest_height=lowest_height,
-            highest_height=highest_height,
-            shallowest_depth=shallowest_depth,
-            deepest_depth=deepest_depth,
-        )
+    strategy = GraspABar(
+        position=Bounds(lower=0.3, upper=0.7), angle=Bounds(lower=0.5, upper=1.5)
     )
-    thinnest_extent = float(min(handle.grasp_surface().extents))
+    allowed = allowed_intervals(strategy.statement(handle))
 
-    assert allowed["height"].simple_sets[0].lower == pytest.approx(lowest_height)
-    assert allowed["height"].simple_sets[-1].upper == pytest.approx(highest_height)
-    assert allowed["depth"].simple_sets[0].lower == pytest.approx(
-        shallowest_depth * thinnest_extent
+    assert allowed["position"].simple_sets[0].lower == pytest.approx(
+        strategy.position.lower
     )
-    assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
-        deepest_depth * thinnest_extent
+    assert allowed["position"].simple_sets[-1].upper == pytest.approx(
+        strategy.position.upper
     )
+    assert allowed["angle"].simple_sets[0].lower == pytest.approx(strategy.angle.lower)
+    assert allowed["angle"].simple_sets[-1].upper == pytest.approx(strategy.angle.upper)
 
 
 def test_a_handle_split_off_a_shape_is_fixed_to_its_whole():
@@ -830,6 +791,132 @@ def test_a_handle_without_a_shape_offers_no_grasp() -> None:
 
     with pytest.raises(NoGraspGeometry):
         handle.grasp_candidates()
+
+
+@pytest.mark.parametrize("bar_axis", [0, 1, 2], ids=["along-x", "along-y", "along-z"])
+def test_drawn_handle_grasps_hold_the_bar_on_its_axis_and_close_across_it(bar_axis):
+    """
+    The gripper's tool centre point stays on the bar, only further along it or not, and
+    neither the approach nor the closing runs along the bar.
+    """
+    bar_center = np.array([0.04, 0.0, -0.01])
+    handle = _handle_with_bar_along(bar_axis, tuple(bar_center))
+    bar_direction = np.eye(3)[bar_axis]
+    half_length = float(max(handle.grasp_surface().extents)) / 2
+    position = GraspABar().position
+
+    grasps = handle.drawn_grasp_candidates()
+
+    assert grasps
+    for grasp in grasps:
+        offset = grasp.grasp_pose.to_np()[:3, 3] - bar_center
+        along_bar = float(np.dot(offset, bar_direction))
+        np.testing.assert_allclose(offset - along_bar * bar_direction, 0, atol=1e-9)
+        assert (2 * position.lower - 1) * half_length - 1e-9 <= along_bar
+        assert along_bar <= (2 * position.upper - 1) * half_length + 1e-9
+        for axis in axes_of(grasp.grasp_pose)[:, :2].T:
+            assert float(np.dot(axis, bar_direction)) == pytest.approx(0, abs=1e-9)
+
+
+@pytest.mark.parametrize("position", [0.0, 0.5, 1.0])
+def test_an_axial_grasp_closes_where_along_the_axis_it_names(position):
+    handle = _handle_with_bar_along(1)
+    lowest, highest = handle.grasp_surface().bounds
+
+    grasp = AxialGrasp(position=position, angle=0.0).grasp_candidate(handle)
+
+    np.testing.assert_allclose(
+        grasp.grasp_pose.to_np()[:3, 3],
+        [0.0, lowest[1] + position * (highest[1] - lowest[1]), 0.0],
+        atol=1e-9,
+    )
+
+
+@pytest.mark.parametrize(
+    "bar_axis, approach_without_turn",
+    [(0, [0, 0, -1]), (1, [0, 0, -1]), (2, [0, -1, 0])],
+    ids=["along-x", "along-y", "along-z"],
+)
+def test_an_axial_grasp_turns_its_approach_about_the_axis(
+    bar_axis, approach_without_turn
+):
+    """
+    Without a turn a horizontal bar is approached from above and a vertical one along
+    the negative y-axis; a quarter turn follows the right hand about the bar.
+    """
+    handle = _handle_with_bar_along(bar_axis)
+    bar_direction = np.eye(3)[bar_axis]
+
+    unturned, quarter_turned = (
+        AxialGrasp(position=0.5, angle=angle).grasp_candidate(handle)
+        for angle in (0.0, np.pi / 2)
+    )
+
+    np.testing.assert_allclose(
+        axes_of(unturned.grasp_pose)[:, 0], approach_without_turn, atol=1e-9
+    )
+    np.testing.assert_allclose(
+        axes_of(quarter_turned.grasp_pose)[:, 0],
+        np.cross(bar_direction, approach_without_turn),
+        atol=1e-9,
+    )
+
+
+@pytest.mark.parametrize("bar_axis", [0, 1, 2], ids=["along-x", "along-y", "along-z"])
+def test_the_grasp_axis_of_a_bar_runs_through_its_centre_along_its_length(bar_axis):
+    bar_center = np.array([0.04, 0.0, -0.01])
+    handle = _handle_with_bar_along(bar_axis, tuple(bar_center))
+    half_length = float(max(handle.grasp_surface().extents)) / 2
+    bar_direction = np.eye(3)[bar_axis]
+
+    axis = handle.grasp_axis()
+
+    np.testing.assert_allclose(
+        axis.start.to_np()[:3], bar_center - half_length * bar_direction, atol=1e-9
+    )
+    np.testing.assert_allclose(
+        axis.end.to_np()[:3], bar_center + half_length * bar_direction, atol=1e-9
+    )
+
+
+@dataclass(eq=False)
+class HandleWithDiagonalBar(Handle):
+    """
+    A handle that states its grasp axis instead of leaving it to its bounding box.
+    """
+
+    def grasp_axis(self) -> LineSegment3:
+        return LineSegment3(
+            start=Point3(0.0, 0.0, 0.0, reference_frame=self.root),
+            end=Point3(0.1, 0.1, 0.1, reference_frame=self.root),
+        )
+
+
+def test_an_axial_grasp_follows_the_axis_its_object_states():
+    handle = _handle_with_bar_along(0)
+    diagonal = HandleWithDiagonalBar(root=handle.root)
+    with handle._world.modify_world():
+        handle._world.add_semantic_annotation(diagonal)
+    axis = diagonal.grasp_axis()
+    start, end = axis.start.to_np()[:3], axis.end.to_np()[:3]
+    axis_direction = axis.direction.to_np()[:3]
+
+    grasp = AxialGrasp(position=0.25, angle=1.0).grasp_candidate(diagonal)
+
+    np.testing.assert_allclose(
+        grasp.grasp_pose.to_np()[:3, 3], start + 0.25 * (end - start), atol=1e-9
+    )
+    for gripper_axis in axes_of(grasp.grasp_pose)[:, :2].T:
+        assert float(np.dot(gripper_axis, axis_direction)) == pytest.approx(0, abs=1e-9)
+
+
+def test_an_axial_grasp_beyond_the_ends_of_the_axis_does_not_lie_on_the_object():
+    handle = _handle_with_bar_along(1)
+    beyond = AxialGrasp(position=1.5, angle=0.0)
+
+    assert not beyond.reaches_surface_of(handle)
+    with pytest.raises(GraspNotOnObjectError):
+        beyond.grasp_candidate(handle)
 
 
 # %% the frame a grasp is expressed in

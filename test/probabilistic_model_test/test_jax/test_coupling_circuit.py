@@ -142,7 +142,7 @@ def test_training_lowers_the_negative_log_likelihood():
     number_of_variables = 4
     half = number_of_variables // 2
     dataframe = correlated_gaussian_samples(number_of_variables)
-    tree = fit_joint_probability_tree(dataframe, min_samples_per_quantile=30)
+    tree = fit_joint_probability_tree(dataframe, minimum_samples_per_quantile=30)
     marginal = tree.marginal(tree.variables[half:])
     layered = CircuitRepresentations().convert(marginal, DifferentiableLayeredCircuit)
     model = CouplingCircuit(

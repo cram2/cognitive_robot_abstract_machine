@@ -12,11 +12,11 @@ from visualization_msgs.msg import InteractiveMarkerFeedback
 from cramph.monitors import CountSeconds
 from cramph.statechart import Statechart
 from giskardpy.data_types.exceptions import UnpairedKinematicChainParametersError
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -139,7 +139,7 @@ class InteractiveMarkerNode:
             found.
         """
         self.giskard = GiskardClientExecutor(
-            node_handle=rospy.get_node(), giskard_node_name="giskard"
+            node_handle=background_node.get_node(), giskard_node_name="giskard"
         )
         self.markers = {}
         self.server = None
@@ -213,7 +213,9 @@ class InteractiveMarkerNode:
         Creates the server, configures each marker with controls, and registers feedback
         callbacks.
         """
-        self.server = InteractiveMarkerServer(rospy.get_node(), "cartesian_goals")
+        self.server = InteractiveMarkerServer(
+            background_node.get_node(), "cartesian_goals"
+        )
 
         for marker in self.markers.values():
             marker.create_marker()
@@ -481,10 +483,10 @@ def main(args: None = None) -> None:
 
     :param args: Optional command-line arguments (currently unused)
     """
-    rospy.init_node("interactive_marker")
+    background_node.init_node("interactive_marker")
     node = InteractiveMarkerNode()
     node.giskard.node_handle.get_logger().info("interactive marker server running")
-    rospy.spinner_thread.join()
+    background_node.spinner_thread.join()
     rclpy.shutdown()
 
 

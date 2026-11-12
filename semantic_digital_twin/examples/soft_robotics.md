@@ -17,17 +17,17 @@ kernelspec:
 This notebook demonstrates how to build and control continuum soft robot models using Piecewise Constant Curvature (PCC) and Cosserat Rod Theory. We utilize Giskardpy's Motion Statecharts for high-level Cartesian control.
 
 ## 0. Setup and ROS 2 Initialization
-We initialize the ROS 2 node using Giskardpy's `rospy` middleware wrapper, which automatically manages the node's lifecycle.
+We initialize the ROS 2 node with semantic digital twin's `background_node`, which creates, spins and shuts down the node for us.
 
 ```{code-cell} ipython3
 import numpy as np
 import time
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.soft_trunk import SoftTrunk, SoftTrunkSection
 
-# Initialize Giskardpy ROS 2 wrapper
-rospy.init_node("soft_robotics_examples")
+# Start the ROS 2 node of this process
+background_node.init_node("soft_robotics_examples")
 ```
 
 ## 1. Piecewise Constant Curvature (PCC)
@@ -46,7 +46,7 @@ sections = [SoftTrunkSection(0.3, 0.02, 10)] * 3
 trunk_pcc = SoftTrunk.build_piecewise_constant_curvature(world_pcc, sections)
 
 # Set up visualizer with automatic TF publishing
-viz_pcc = VizMarkerPublisher(_world=world_pcc, node=rospy.get_node())
+viz_pcc = VizMarkerPublisher(_world=world_pcc, node=background_node.get_node())
 world_pcc.notify_state_change()
 
 print("PCC Robot Ready. Set fixed frame to 'piecewise_constant_curvature/base' in RViz.")
@@ -63,7 +63,7 @@ from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 
 executor_pcc = StatechartExecutor(
     context=StatechartContext(world=world_pcc),
@@ -112,7 +112,7 @@ sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
 trunk_cos = SoftTrunk.build_cosserat(world_cosserat, sections)
 
 # Set up visualizer
-viz_cos = VizMarkerPublisher(_world=world_cosserat, node=rospy.get_node())
+viz_cos = VizMarkerPublisher(_world=world_cosserat, node=background_node.get_node())
 world_cosserat.notify_state_change()
 
 print("Cosserat Robot Ready. Set fixed frame to 'cosserat/base' in RViz.")
@@ -159,6 +159,6 @@ executor_cos.tick_until_end()
 ## Cleanup
 
 ```{code-cell} ipython3
-rospy.shutdown()
+background_node.shutdown()
 print("ROS Node shut down.")
 ```

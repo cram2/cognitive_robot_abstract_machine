@@ -1,3 +1,7 @@
+"""
+Fixing forward kinematics to the values they have at one moment of a motion.
+"""
+
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -6,7 +10,7 @@ from numpy.typing import NDArray
 
 from krrood.symbolic_math.float_variable_data import FloatVariableData
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -76,7 +80,7 @@ class ForwardKinematicsBinding:
             )
         self.root_T_tip.reference_frame = self.root
         self.root_T_tip.child_frame = self.tip
-        self.float_variable_data.register_expression(self.root_T_tip)
+        self.float_variable_data.register_expression(expression=self.root_T_tip)
 
     def change_root(self, root: KinematicStructureEntity, world: World) -> None:
         """
@@ -90,6 +94,18 @@ class ForwardKinematicsBinding:
         self.root = root
         self.root_T_tip.reference_frame = root
         self._set_root_T_tip(new_root_T_root @ self._bound_root_T_tip)
+
+    def change_tip(self, tip: KinematicStructureEntity, world: World) -> None:
+        """
+        Measure the chain up to `tip`, such as once a task knows only when it starts which
+        entity ends the chain.
+
+        :param tip: The new tip of the chain.
+        :param world: The world used for computing the forward kinematics.
+        """
+        self.tip = tip
+        self.root_T_tip.child_frame = tip
+        self.bind(world)
 
     def bind(self, world: World) -> None:
         """
@@ -107,5 +123,5 @@ class ForwardKinematicsBinding:
         """
         self._bound_root_T_tip = root_T_tip
         self.float_variable_data.set_value(
-            self.root_T_tip, root_T_tip[:3, :4].T.flatten()
+            expression=self.root_T_tip, value=root_T_tip[:3, :4].T.flatten()
         )

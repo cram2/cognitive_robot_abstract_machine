@@ -46,13 +46,13 @@ def test_render_rx_graph_as_igraph_simple(handles_and_containers_world):
         entity(
             inference(Drawer)(handle=handle, container=container, world=world)
         ).where(
-            HasType(handle, Handle),
+            HasType(variable=handle, types_=Handle),
         )
     )
     drawers = list(rule.evaluate())
     if os.path.exists("pdf_graph.pdf"):
         os.remove("pdf_graph.pdf")
-    QueryGraph(rule).visualize(filename="pdf_graph.pdf")
+    QueryGraph(query=rule).visualize(filename="pdf_graph.pdf")
     assert os.path.exists("pdf_graph.pdf")
     os.remove("pdf_graph.pdf")
 
@@ -80,11 +80,16 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
     )
 
     with rule:
-        Add(views, inference(Drawer)(handle=handle, container=body, world=world))
+        Add(
+            left=views,
+            right=inference(Drawer)(handle=handle, container=body, world=world),
+        )
         with alternative(
             revolute_connection.parent == body, revolute_connection.child == handle
         ):
-            Add(views, inference(Door)(handle=handle, body=body, world=world))
+            Add(
+                left=views, right=inference(Door)(handle=handle, body=body, world=world)
+            )
         with alternative(
             fixed_connection_condition,
             body == revolute_connection.child,
@@ -92,14 +97,14 @@ def test_render_rx_graph_as_igraph_complex(doors_and_drawers_world):
             revolute_connection.world == world,
         ):
             Add(
-                views,
-                inference(Wardrobe)(
+                left=views,
+                right=inference(Wardrobe)(
                     handle=handle, body=body, container=container, world=world
                 ),
             )
     results = list(rule.evaluate())
     if os.path.exists("pdf_graph.pdf"):
         os.remove("pdf_graph.pdf")
-    QueryGraph(rule).visualize(filename="pdf_graph.pdf")
+    QueryGraph(query=rule).visualize(filename="pdf_graph.pdf")
     assert os.path.exists("pdf_graph.pdf")
     os.remove("pdf_graph.pdf")

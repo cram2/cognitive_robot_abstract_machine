@@ -14,7 +14,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 # %% how close a grasp is to where the robot stands
 
@@ -104,12 +104,14 @@ class GraspsByCloseness(SymbolicFunction):
         return grasps_by_closeness[: self.number_of_grasps]
 
     @classmethod
-    def _verbalization_fragment_(cls, fields: RenderedFields) -> VerbalizationFragment:
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
         """
         :param fields: The rendered fragment for each field.
         :return: The noun phrase *"the grasps by closeness of <graspable> and <standing
             position>"*.
         """
         return FunctionVerbalizationTemplates.possessive(
-            cls, fields["graspable"], fields["standing_position"]
+            fields["graspable"], fields["standing_position"], function_class=cls
         )

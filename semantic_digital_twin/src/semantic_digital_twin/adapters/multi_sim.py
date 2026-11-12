@@ -17,6 +17,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import IntEnum, IntFlag, StrEnum
 from types import NoneType
+from uuid import UUID
 
 import numpy
 import mujoco
@@ -46,15 +47,15 @@ from semantic_digital_twin.exceptions import (
     MujocoEntityNotFoundError,
     SimulationAlreadyRunningError,
     SimulationNotStartedError,
+    SnapshotDoesNotFitSimulationError,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Quaternion,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.math import inverse_frame
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -67,6 +68,7 @@ from semantic_digital_twin.world_description.connections import (
     WheeledDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Cylinder,
@@ -1759,7 +1761,7 @@ class MujocoConnectionJoints(Generic[ConnectionType], SubClassSafeGeneric, ABC):
         for realisation in recursive_subclasses(cls) + [cls]:
             try:
                 realised_type = realisation.get_type_of_generic_parameter(
-                    ConnectionType
+                    parameter=ConnectionType
                 )
             except UnboundGenericParameter:
                 continue
@@ -2035,7 +2037,7 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         if not axes:
             return
         child_body_spec = builder.body_spec_of(self.connection.child)
-        child_T_connection = inverse_frame(
+        child_T_connection = HomogeneousTransformationMatrix.invert_numeric_matrix(
             self.connection.connection_T_child_expression.to_np()
         )
         for axis in axes:
@@ -3955,6 +3957,23 @@ class JointBackedConnection:
     """
 
 
+@dataclass(kw_only=True)
+class MujocoServoCommands:
+    """
+    What a :class:`MujocoSynchronizer` has commanded its actuators to at one moment.
+    """
+
+    position_set_points: dict[UUID, float]
+    """
+    The position each position servo is commanded to, by the id of its degree of freedom.
+    """
+
+    sent_controls: dict[str, float]
+    """
+    The control input last handed to each actuator, by the actuator's name.
+    """
+
+
 @dataclass(eq=False)
 class MujocoSynchronizer(MultiSimSynchronizer):
     simulator: MujocoSimulator
@@ -3994,6 +4013,15 @@ class MujocoSynchronizer(MultiSimSynchronizer):
     """
     The control input last handed to each actuator, by the actuator's name, so that
     only a changed one is handed over again.
+    """
+
+    _position_set_points: dict[UUID, float] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    """
+    The position each position servo is commanded to, by the id of its degree of
+    freedom. The world holds the position the physics measures instead, so the two
+    drift apart while an obstacle holds the joint back.
     """
 
     def __post_init__(self):
@@ -4085,8 +4113,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         :return: Whether any connection was read.
         """
         changed = False
-        actuator_name_by_dof_id = self._actuator_names_by_degree_of_freedom()
         with self.simulator._model_lock:
+            mimic_qpos_addresses = self._mimic_qpos_addresses()
             for joint_backed in self._joint_backed_connections():
                 connection = joint_backed.connection
                 match connection:
@@ -4094,10 +4122,7 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                         self._read_6dof_from_qpos(connection, joint_backed.qpos_address)
                         changed = True
                     case ActiveConnection1DOF():
-                        # An actuated joint's world position is the set point it was
-                        # commanded to, which the position it has reached so far must
-                        # not overwrite.
-                        if connection.raw_dof.id in actuator_name_by_dof_id:
+                        if joint_backed.qpos_address in mimic_qpos_addresses:
                             continue
                         self._read_1dof_from_qpos(connection, joint_backed.qpos_address)
                         changed = True
@@ -4105,6 +4130,37 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                         self._warn_unsupported_connection("sim→world", connection)
             changed = self._read_measured_positions() or changed
         return changed
+
+    def _mimic_qpos_addresses(self) -> set[int]:
+        """
+        :return: The qpos address of every joint that a MuJoCo equality couples to
+            another joint of the same degree of freedom. Such a joint only follows the
+            other one, which measures the degree of freedom's position.
+        """
+        model = self.simulator._mj_model
+        degree_of_freedom_id_by_qpos_address = {
+            joint_backed.qpos_address: joint_backed.connection.raw_dof.id
+            for joint_backed in self._joint_backed_connections()
+            if isinstance(joint_backed.connection, ActiveConnection1DOF)
+        }
+        mimic_qpos_addresses = set()
+        for equality in range(model.neq):
+            if (
+                model.eq_type[equality] != mujoco.mjtEq.mjEQ_JOINT
+                or model.eq_obj2id[equality] == -1
+            ):
+                continue
+            mimic_address = model.jnt_qposadr[model.eq_obj1id[equality]]
+            followed_address = model.jnt_qposadr[model.eq_obj2id[equality]]
+            mimic_degree_of_freedom = degree_of_freedom_id_by_qpos_address.get(
+                mimic_address
+            )
+            if mimic_degree_of_freedom is not None and (
+                mimic_degree_of_freedom
+                == degree_of_freedom_id_by_qpos_address.get(followed_address)
+            ):
+                mimic_qpos_addresses.add(int(mimic_address))
+        return mimic_qpos_addresses
 
     def _read_measured_positions(self) -> bool:
         """
@@ -4125,7 +4181,9 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         return changed
 
     def _write_connections_to_qpos(
-        self, positions: numpy.ndarray, previous_positions: numpy.ndarray
+        self,
+        positions: NDArray[numpy.float64],
+        previous_positions: NDArray[numpy.float64],
     ) -> None:
         """
         Push ``world.state`` into ``_mj_data.qpos`` for every joint-backed
@@ -4172,7 +4230,33 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                         )
                     case _:
                         self._warn_unsupported_connection("world→sim", connection)
+            self._move_position_set_points(positions, previous_positions)
             self._command_actuators()
+
+    def _move_position_set_points(
+        self,
+        positions: NDArray[numpy.float64],
+        previous_positions: NDArray[numpy.float64],
+    ) -> None:
+        """
+        Move the set point of every position servo by as much as the world's position of
+        its degree of freedom was commanded to move since the last notification.
+
+        :param positions: The current ``world.state`` positions.
+        :param previous_positions: The positions as of the last notification.
+        """
+        state_index = self._world.state._index
+        for actuator in self._world.actuators:
+            if not isinstance(actuator, PositionServo):
+                continue
+            [degree_of_freedom] = actuator.dofs
+            index = state_index[degree_of_freedom.id]
+            set_point = self._position_set_points.get(
+                degree_of_freedom.id, previous_positions[index]
+            )
+            self._position_set_points[degree_of_freedom.id] = float(
+                set_point + positions[index] - previous_positions[index]
+            )
 
     def _actuator_names_by_degree_of_freedom(self) -> dict[Any, str]:
         """
@@ -4189,7 +4273,8 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         """
         :return: The control input of every actuator, by its name, as the realisation
             of the connection moving its degree of freedom works it out from the
-            actuator's set point, and of every actuator a realisation builds itself.
+            actuator's set point, and of every actuator a realisation builds itself. A
+            position servo is controlled by :meth:`_position_servo_control`.
         """
         connection_by_dof_id = {
             degree_of_freedom.id: connection
@@ -4199,6 +4284,11 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         controls = {}
         for actuator in self._world.actuators:
             [degree_of_freedom] = actuator.dofs
+            if isinstance(actuator, PositionServo):
+                controls[self.element_names.of(actuator)] = (
+                    self._position_servo_control(actuator)
+                )
+                continue
             connection = connection_by_dof_id.get(degree_of_freedom.id)
             controls[self.element_names.of(actuator)] = (
                 actuator.set_point
@@ -4214,6 +4304,23 @@ class MujocoSynchronizer(MultiSimSynchronizer):
                 ).own_actuator_controls()
             )
         return controls
+
+    def _position_servo_control(self, servo: PositionServo) -> float:
+        """
+        :param servo: A position servo of the world.
+        :return: The control input that makes `servo` push its joint towards its entry
+            in :attr:`_position_set_points` and, by the damping of its gains, towards the
+            velocity the world commands, so the joint follows a moving set point without
+            trailing behind it.
+        """
+        [degree_of_freedom] = servo.dofs
+        set_point = self._position_set_points.setdefault(
+            degree_of_freedom.id, servo.set_point
+        )
+        commanded_velocity = self._world.state[degree_of_freedom.id].velocity
+        return float(
+            set_point + servo.gains.damping / servo.gains.stiffness * commanded_velocity
+        )
 
     def _command_actuators(self) -> None:
         """
@@ -4237,10 +4344,48 @@ class MujocoSynchronizer(MultiSimSynchronizer):
 
         A freshly reset simulation leaves every control input at zero, which would
         send a position servo's joint rushing towards the origin the moment the
-        physics starts.
+        physics starts. Every position servo's set point restarts at the position the
+        world holds for its joint.
         """
         self._sent_controls.clear()
+        self._position_set_points.clear()
         self._command_actuators()
+
+    @property
+    def servo_commands(self) -> MujocoServoCommands:
+        """
+        A copy of what the actuators are commanded to now.
+        """
+        return MujocoServoCommands(
+            position_set_points=dict(self._position_set_points),
+            sent_controls=dict(self._sent_controls),
+        )
+
+    def restore_world_state(
+        self,
+        *,
+        world_state: NDArray[numpy.float64],
+        servo_commands: MujocoServoCommands,
+    ) -> None:
+        """
+        Put the world back to an earlier state and the actuators back to what they were
+        commanded to then, without pushing that state into the simulator.
+
+        :param world_state: The world's state, one row per member of
+            :class:`Derivatives`, one column per degree of freedom.
+        :param servo_commands: What the actuators were commanded to at that state.
+        """
+        with self._world._world_lock:
+            self._state_callback.pause()
+            try:
+                for row in Derivatives:
+                    self._world.state.set_derivative(row, world_state[row])
+                self._world.notify_state_change()
+                self._state_callback.update_previous_world_state()
+            finally:
+                self._state_callback.resume()
+            self._position_set_points = dict(servo_commands.position_set_points)
+            self._sent_controls = dict(servo_commands.sent_controls)
 
     def _read_6dof_from_qpos(
         self, connection: Connection6DoF, qpos_address: int
@@ -4263,7 +4408,10 @@ class MujocoSynchronizer(MultiSimSynchronizer):
             Rotation.from_quat(qwxyz.tolist(), scalar_first=True).as_matrix(),
         )
         parent_T_conn = connection.parent_T_connection_expression.to_np()
-        conn_T_child = inverse_frame(parent_T_conn) @ mj_T_world
+        conn_T_child = (
+            HomogeneousTransformationMatrix.invert_numeric_matrix(parent_T_conn)
+            @ mj_T_world
+        )
         dof_xyz, dof_quat_xyzw = self._decompose_pose_matrix(conn_T_child)
 
         state[connection.x.id].position = float(dof_xyz[0])
@@ -4569,6 +4717,32 @@ class MultiSim(ABC):
         return self.simulator.state == SimulatorState.RUNNING
 
 
+@dataclass(kw_only=True)
+class MujocoSimulationSnapshot:
+    """
+    One moment of a MuJoCo simulation and of the world it simulates, from which
+    :meth:`MujocoSim.restore_snapshot` lets the simulation continue again.
+    """
+
+    physics_state: NDArray[numpy.float64]
+    """
+    The simulator's integration state: positions, velocities, controls, simulated time
+    and every other quantity the integrator carries from one step to the next, laid out
+    as MuJoCo's ``mjSTATE_INTEGRATION``.
+    """
+
+    world_state: NDArray[numpy.float64]
+    """
+    The world's state at that moment: one row per member of :class:`Derivatives`, one
+    column per degree of freedom.
+    """
+
+    servo_commands: MujocoServoCommands
+    """
+    What the actuators were commanded to at that moment.
+    """
+
+
 class MujocoSim(MultiSim):
     simulator_class: ClassVar[type[BaseSimulator]] = MujocoSimulator
     synchronizer_class: ClassVar[type[MultiSimSynchronizer]] = MujocoSynchronizer
@@ -4607,3 +4781,62 @@ class MujocoSim(MultiSim):
         for _ in range(round(duration.total_seconds() / self.simulator.step_size)):
             self.simulator.step()
         self.simulator.render()
+
+    def take_snapshot(self) -> MujocoSimulationSnapshot:
+        """
+        :return: The current moment of the simulation and its world, for
+            :meth:`restore_snapshot` to continue from later.
+        """
+        with self.world._world_lock, self.simulator._model_lock:
+            physics_state = numpy.empty(self._physics_state_size)
+            mujoco.mj_getState(
+                self.simulator._mj_model,
+                self.simulator._mj_data,
+                physics_state,
+                mujoco.mjtState.mjSTATE_INTEGRATION,
+            )
+            return MujocoSimulationSnapshot(
+                physics_state=physics_state,
+                world_state=numpy.stack(
+                    [self.world.state.get_derivative(row) for row in Derivatives]
+                ),
+                servo_commands=self.synchronizer.servo_commands,
+            )
+
+    def restore_snapshot(self, *, snapshot: MujocoSimulationSnapshot) -> None:
+        """
+        Put the simulation and its world back to the moment of a snapshot, so that the
+        physics continues from there exactly as it did after the snapshot was taken.
+
+        :param snapshot: A snapshot taken of this simulation by :meth:`take_snapshot`.
+        :raises SnapshotDoesNotFitSimulationError: If the snapshot was taken of a
+            simulation built from a different world.
+        """
+        if snapshot.physics_state.shape != (
+            self._physics_state_size,
+        ) or snapshot.world_state.shape != (len(Derivatives), len(self.world.state)):
+            raise SnapshotDoesNotFitSimulationError(
+                world_name=self.world.root.name.name
+            )
+        with self.world._world_lock:
+            self.synchronizer.restore_world_state(
+                world_state=snapshot.world_state,
+                servo_commands=snapshot.servo_commands,
+            )
+            with self.simulator._model_lock:
+                mujoco.mj_setState(
+                    self.simulator._mj_model,
+                    self.simulator._mj_data,
+                    snapshot.physics_state,
+                    mujoco.mjtState.mjSTATE_INTEGRATION,
+                )
+                mujoco.mj_forward(self.simulator._mj_model, self.simulator._mj_data)
+
+    @property
+    def _physics_state_size(self) -> int:
+        """
+        The number of values in the simulator's integration state.
+        """
+        return mujoco.mj_stateSize(
+            self.simulator._mj_model, mujoco.mjtState.mjSTATE_INTEGRATION
+        )

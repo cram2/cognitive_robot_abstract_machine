@@ -9,6 +9,7 @@ import krrood.symbolic_math.symbolic_math as symbolic_math
 from giskardpy.motion_statechart.context import MotionControlContext
 from krrood.ormatic.utils import classproperty
 from cramph.context import ContextExtension
+from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.data_types import ObservationStateValues
 from giskardpy.motion_statechart.graph_node import (
@@ -16,12 +17,7 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
     MotionNodeArtifacts,
 )
-from semantic_digital_twin.spatial_types import (
-    AxisAngle,
-    Point3,
-    Vector3,
-    RotationMatrix,
-)
+from krrood_spatial_math.spatial_types import AxisAngle, Point3, Vector3, RotationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 
 
@@ -64,9 +60,10 @@ class WiggleInsert(ConvergingTask):
     Default is an untuned preset, not a calibrated value.
     """
 
-    down_velocity: float = 0.2
+    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
     """
-    Reference velocity for pressing down in m/s.
+    Sets how fast the tip is pressed into the hole, in m/s, and wiggled, in rad/s; not
+    strictly enforced.
 
     Default is an untuned preset, not a calibrated value.
     """
@@ -185,10 +182,14 @@ class WiggleInsert(ConvergingTask):
             f"{self.name}_rand_translation"
         )
         self._random_translation.reference_frame = self.root_link
-        self.context.float_variable_data.register_expression(self._random_translation)
+        self.context.float_variable_data.register_expression(
+            expression=self._random_translation
+        )
 
         self._random_angle = symbolic_math.FloatVariable(f"{self.name}_rand_angle")
-        self.context.float_variable_data.register_expression(self._random_angle)
+        self.context.float_variable_data.register_expression(
+            expression=self._random_angle
+        )
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -224,7 +225,7 @@ class WiggleInsert(ConvergingTask):
         artifacts.geometry.add_point_goal_constraints(
             frame_P_current=root_P_current,
             frame_P_goal=root_P_hole_wiggled,
-            reference_velocity=self.down_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight,
             name=f"{self.name}_point_goal",
         )
@@ -243,7 +244,7 @@ class WiggleInsert(ConvergingTask):
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,
             frame_R_goal=root_R_goal,
-            reference_velocity=self.down_velocity,
+            cruise_velocity=self.cruise_velocity,
             quadratic_weight=self.weight + 1,
         )
 
@@ -265,9 +266,11 @@ class WiggleInsert(ConvergingTask):
             translation = self._random_sample_translation()
             angle = self._random_sample_angle()
         self.context.float_variable_data.set_value(
-            self._random_translation, translation
+            expression=self._random_translation, value=translation
         )
-        self.context.float_variable_data.set_value(self._random_angle, angle)
+        self.context.float_variable_data.set_value(
+            expression=self._random_angle, value=angle
+        )
         return None
 
     def _random_sample_angle(self) -> float:

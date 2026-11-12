@@ -3,11 +3,9 @@ from __future__ import annotations
 from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
-from threading import Thread
 from time import sleep
 from typing_extensions import Any
 
-import rclpy
 from json_msgs.action import JsonAction
 from json_msgs.action._json_action import (
     JsonAction_FeedbackMessage,
@@ -18,7 +16,7 @@ from cramph.composites import ChildChooserAccess
 from cramph.context import ContextExtension, StatechartContext
 from cramph.executor import Executor, ExecutorExtension
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceClient,
     child_choices_topic,
@@ -29,14 +27,13 @@ from giskardpy.middleware.ros2.exceptions import (
     StatechartNotEndedByResultError,
 )
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
-from giskardpy.middleware.ros2.ros2_interface import MyActionClient
+from giskardpy.middleware.ros2.action_client import GiskardActionClient
 from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_control import MotionControl
 from rclpy import Context, Parameter, Future
 from action_msgs.msg import GoalStatus
 from rclpy.action.client import ClientGoalHandle
-from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.messages import MetaData
 from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
@@ -81,7 +78,7 @@ class GiskardClientExecutor(Executor):
     _goal_result: JsonAction_Result | None = None
     _result_future: Future | None = None
     world: World = None
-    _client: MyActionClient = None
+    _client: GiskardActionClient = None
 
     world_updates: ClientWorldUpdates = field(init=False, default=None)
     """
@@ -122,7 +119,7 @@ class GiskardClientExecutor(Executor):
         if self.announces_presence:
             self.announce_presence()
         giskard_topic = f"{self.giskard_node_name}/command"
-        self._client = MyActionClient(self.node_handle, JsonAction, giskard_topic)
+        self._client = GiskardActionClient(self.node_handle, JsonAction, giskard_topic)
         sleep(0.3)
 
     def default_context_extensions(self) -> list[ContextExtension]:
@@ -261,7 +258,7 @@ class GiskardClientExecutor(Executor):
 
         :param result: result of a goal that succeeded or was aborted
         :raises Exception: The exception that made Giskard abort the goal, see
-            :meth:`MyActionClient.create_abort_exception`.
+            :meth:`GiskardActionClient.create_abort_exception`.
         :raises StatechartNotEndedByResultError: If a goal that succeeded leaves the
             statechart not ended.
         """
@@ -325,11 +322,13 @@ class GiskardClientExecutor(Executor):
 
     def close(self) -> None:
         """
-        Stop announcing this client's heartbeat to Giskard, if it announces one.
+        Withdraw the action client from the ROS graph and stop announcing this client's
+        heartbeat to Giskard, if it announces one.
 
         Does not touch :attr:`node_handle`: it was given to this executor by its caller,
         who owns its lifecycle.
         """
+        self._client.close()
         if self.heartbeat_publisher is None:
             return
         self.heartbeat_publisher.stop()
@@ -339,11 +338,6 @@ class GiskardClientExecutor(Executor):
 class GiskardClientExecutorNode(GiskardClientExecutor):
     """
     A :class:`GiskardClientExecutor` that creates and owns its own ros node.
-    """
-
-    is_spinning: bool = False
-    """
-    Whether the background spinner currently spins the node.
     """
 
     node_name: str = "giskard_client"
@@ -427,23 +421,8 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
             automatically_declare_parameters_from_overrides=self.automatically_declare_parameters_from_overrides,
             enable_logger_service=self.enable_logger_service,
         )
-        rospy.executor.add_node(self.node_handle)
-        self.is_spinning = False
+        background_node.executor.add_node(self.node_handle)
         super().__post_init__()
-
-    def __spin(self):
-        self.my_executor = MultiThreadedExecutor()
-        self.my_executor.add_node(self.node_handle)
-        self.is_spinning = True
-        while rclpy.ok():
-            self.my_executor.spin_once(timeout_sec=1)
-        self.is_spinning = False
-
-    def spin_in_background(self):
-        self.spinner = Thread(
-            target=self.__spin, daemon=False, name="background giskard wrapper spinner"
-        )
-        self.spinner.start()
 
     def close(self) -> None:
         """
@@ -453,5 +432,5 @@ class GiskardClientExecutorNode(GiskardClientExecutor):
         destroyed node left registered there would break the next spin.
         """
         super().close()
-        rospy.executor.remove_node(self.node_handle)
+        background_node.executor.remove_node(self.node_handle)
         self.node_handle.destroy_node()

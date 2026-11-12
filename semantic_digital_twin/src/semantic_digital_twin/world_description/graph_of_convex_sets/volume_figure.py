@@ -29,7 +29,7 @@ from random_events.plotting import EventPlotter
 from random_events.product_algebra import Event
 from typing_extensions import Sequence
 
-from semantic_digital_twin.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world_description.geometry import CoordinateBounds
 from semantic_digital_twin.world_description.graph_of_convex_sets.plotting import (
     FigurePalette,
@@ -539,8 +539,7 @@ class GraphOfConvexSetsVolumeFigure:
         figure.update_layout(
             title=dict(
                 text=(
-                    "Graph of convex sets navigation in "
-                    f"{self.scene.environment_name}"
+                    f"Graph of convex sets navigation in {self.scene.environment_name}"
                 ),
                 x=0.01,
                 font=dict(size=20, color=palette.text_primary),

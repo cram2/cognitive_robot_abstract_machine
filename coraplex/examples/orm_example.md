@@ -55,7 +55,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from cramph.composites import Sequence
 
 world = setup_world()
@@ -99,6 +99,7 @@ description = TransportAction(
             2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root
         ),
         object_designator=milk,
+        arm=pr2_view.left_arm,
     ),
 )
 plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])

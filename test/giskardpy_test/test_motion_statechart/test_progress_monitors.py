@@ -1,3 +1,7 @@
+"""
+Tests of detecting that the tasks of a motion stopped approaching their goals.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -14,7 +18,7 @@ from giskardpy.motion_statechart.error_signals import (
 )
 from cramph.exceptions import CyclicNodeDependencyError, PrerequisiteNotExpandedError
 from giskardpy.motion_statechart.exceptions import NoProgressError
-from giskardpy.motion_statechart.goals.base_pose_goals import DifferentialDriveBaseGoal
+from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
 from cramph.node import NodeArtifacts
@@ -36,8 +40,8 @@ from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from semantic_digital_twin.spatial_types import Point3
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
@@ -132,6 +136,11 @@ class NodeWithDeclaredDependencies(EndedByOwner, MotionStatechartNode):
 
 
 class TestStallDetection:
+    """
+    A motion whose tasks stop approaching their goals is cancelled, naming the stuck
+    tasks.
+    """
+
     def test_stall_cancels_the_motion(self, pr2_world_state_reset: World):
         """
         An arm that has extended as far as it can stops closing on its goal, so the
@@ -319,7 +328,7 @@ class TestStallDetection:
         with pytest.raises(NoProgressError) as exception_info:
             executor.tick_until_end(2000)
 
-        assert progressing.stalled_tasks == [unreachable]
+        assert exception_info.value.stalled_tasks == [unreachable]
         assert unreachable.unique_name in str(exception_info.value)
         assert reachable.unique_name not in str(exception_info.value)
 
@@ -370,7 +379,7 @@ class TestStallDetection:
         with pytest.raises(NoProgressError) as exception_info:
             executor.tick_until_end(2000)
 
-        assert progressing.stalled_tasks == [unreachable]
+        assert exception_info.value.stalled_tasks == [unreachable]
         assert holding.unique_name not in str(exception_info.value)
 
     def test_a_motion_whose_running_tasks_all_reached_their_goals_is_not_stalled(

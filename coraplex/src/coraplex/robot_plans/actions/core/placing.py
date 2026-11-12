@@ -33,7 +33,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.reasoning.robot_predicates import is_body_gripped
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -146,7 +146,7 @@ class PlaceAction(
         object_body = self.object_designator.root
         for arm in self.robot.all_arms:
             end_effector = arm.end_effector
-            if GripperHolds(end_effector, object_body)():
+            if GripperHolds(end_effector=end_effector, body=object_body)():
                 return arm, GraspCandidate(
                     self.object_designator, end_effector.held_body_T_grasp
                 )

@@ -59,12 +59,12 @@ from cramph.composites import (
 )
 from cramph.context import ContextExtension
 from cramph.node import StatechartNode
-from giskardpy.motion_statechart.goals.cartesian_goals import CartesianPoseStraight
-from giskardpy.motion_statechart.goals.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianPoseStraight,
     CartesianPose,
     CartesianPositionStraight,
 )
+from giskardpy.motion_statechart.tasks.gripper import MoveFingers, MoveGripper
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
 from krrood.entity_query_language.factories import a, variable
@@ -72,6 +72,7 @@ from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import UnboundGenericParameter
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
+from semantic_digital_twin.robots.hsrb import HSRBGripper
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -81,7 +82,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.spatial_types.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -766,7 +767,7 @@ def handle_opened_by(opening: Match) -> Handle:
     :return: The handle its first candidate opens the drawer by.
     """
     first_candidate = next(
-        iter(EntityQueryLanguageGenerativeBackend().evaluate(opening))
+        iter(EntityQueryLanguageGenerativeBackend().evaluate(expression=opening))
     )
     return first_candidate.open_container.grasp.graspable
 
@@ -1681,6 +1682,46 @@ def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
     )
 
     assert [action.squeeze for action in width_actions_of(plan)] == [squeeze]
+
+
+def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_context):
+    world, view, extensions = hsr_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+
+    plan = rewritten(
+        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        extensions,
+        executor_for=physically_simulated_executor,
+    )
+
+    assert [action.squeeze for action in width_actions_of(plan)] == [
+        HSRBGripper.squeeze
+    ]
+
+
+def test_the_real_hsr_hand_is_squeezed_as_its_executor_says(hsr_apartment_context):
+    world, view, extensions = hsr_apartment_context
+    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    executors = []
+
+    def kept_robot_executor(extensions):
+        executors.append(robot_executor(extensions))
+        return executors[-1]
+
+    plan = rewritten(
+        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        extensions,
+        executor_for=kept_robot_executor,
+    )
+
+    [width_close] = [
+        adaptation
+        for adaptation in executors[0].plan_adaptations
+        if isinstance(adaptation, CloseFingersToObjectWidth)
+    ]
+    assert [action.squeeze for action in width_actions_of(plan)] == [
+        width_close.squeeze
+    ]
 
 
 def test_an_object_without_collision_is_still_held_by_shutting_the_gripper(

@@ -21,7 +21,6 @@ from krrood.ripple_down_rules.utils import (
 
 @magics_class
 class MyMagics(Magics):
-
     def __init__(
         self,
         shell,
@@ -39,7 +38,7 @@ class MyMagics(Magics):
         self.loaded: bool = False
 
     @line_magic
-    def edit(self, line):
+    def edit(self, *, line):
         if self.edited:
             self.rule_editor.open_file_in_editor()
         else:
@@ -47,18 +46,18 @@ class MyMagics(Magics):
             self.edited = True
 
     @line_magic
-    def load(self, line):
+    def load(self, *, line):
         self.all_code_lines, updates = self.rule_editor.load(
-            self.rule_editor.temp_file_path,
-            self.rule_editor.func_name,
-            self.rule_editor.print_func,
+            file_path=self.rule_editor.temp_file_path,
+            func_name=self.rule_editor.func_name,
+            print_func=self.rule_editor.print_func,
         )
         self.shell.user_ns.update(updates)
         self.case_query.scope.update(updates)
         self.loaded = True
 
     @line_magic
-    def current_value(self, line):
+    def current_value(self, *, line):
         """
         Display the current value of the attribute of the case.
         """
@@ -68,7 +67,7 @@ class MyMagics(Magics):
         print(self.case_query.current_value_str)
 
     @line_magic
-    def show_rule_tree(self, line):
+    def show_rule_tree(self, *, line):
         """
         Display the rule tree for the current case query.
         """
@@ -83,7 +82,7 @@ class MyMagics(Magics):
         self.case_query.render_rule_tree(view=True)
 
     @line_magic
-    def help(self, line):
+    def help(self, *, line):
         """
         Display help information for the Ipython shell.
         """

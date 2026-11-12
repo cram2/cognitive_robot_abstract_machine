@@ -41,6 +41,7 @@ from probabilistic_model.probabilistic_circuit.groundable_circuit import (
     GroundableCircuit,
 )
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
+    CircuitNotFittedError,
     InstanceNotOfClassError,
     MixedCircuitTypesError,
     NoCommonSuperclassError,
@@ -59,6 +60,51 @@ from probabilistic_model.probabilistic_circuit.relational.template import (
     RelationalDistributionTemplate,
 )
 from random_events.variable import Variable
+
+
+@dataclass
+class PartTrainingTable:
+    """
+    The rows the template of one exchangeable part is fitted on.
+    """
+
+    part_instances: list[Any]
+    """
+    The parts of every training instance, in row order.
+    """
+
+    rows: pd.DataFrame
+    """
+    One row per part: its instance's aggregation statistics, then its own attributes.
+    """
+
+    aggregation_names: list[str]
+    """
+    The names of the aggregation statistic columns.
+    """
+
+    example_positions: list[int]
+    """
+    Per row, the position among the training instances of the instance the part belongs
+    to.
+    """
+
+
+@dataclass
+class RelationalTrainingTables:
+    """
+    The tables a relational circuit is fitted on.
+    """
+
+    example_rows: pd.DataFrame
+    """
+    One row per training instance: its attributes and aggregation statistics.
+    """
+
+    part_tables: dict[str, PartTrainingTable]
+    """
+    The table of each exchangeable part.
+    """
 
 
 @dataclass
@@ -203,8 +249,8 @@ class RelationalProbabilisticCircuit:
         """
         if dataframe_from_parent is not None:
             return dataframe_from_parent
-        dataframe = feature_extractor.create_dataframe(instances)
-        dataframe = feature_extractor.preprocess_dataframe(dataframe)
+        dataframe = feature_extractor.create_dataframe(instances=instances)
+        dataframe = feature_extractor.preprocess_dataframe(df=dataframe)
         return dataframe.sort_index(axis=1)
 
     def _build_child_joint_dataframe(
@@ -237,10 +283,10 @@ class RelationalProbabilisticCircuit:
         """
         rows = []
         for instance in instances:
-            feature_vector = self.feature_extractor.apply_mapping(instance)
+            feature_vector = self.feature_extractor.apply_mapping(instance=instance)
             aggregation_row = [feature_vector[index] for index in aggregation_indices]
             for child in getattr(instance, exchangeable_part):
-                child_features = child_feature_extractor.apply_mapping(child)
+                child_features = child_feature_extractor.apply_mapping(instance=child)
                 rows.append(aggregation_row + child_features)
         child_aggregation_features = child_feature_extractor.aggregation_features
         child_column_names = [
@@ -252,6 +298,71 @@ class RelationalProbabilisticCircuit:
             for feature in child_feature_extractor.features
         ]
         return pd.DataFrame(columns=aggregation_names + child_column_names, data=rows)
+
+    def _part_training_table(
+        self, exchangeable_part: str, instances: list[Any]
+    ) -> PartTrainingTable:
+        """
+        :param exchangeable_part: Field name of the one-to-many relation on each
+            instance.
+        :param instances: Training instances.
+        :return: The parts of every instance, one row each, paired with their instance's
+            aggregation statistics, as the part's template is fitted on them.
+        """
+        aggregation_functions = self.feature_extractor.exchangeable_features[
+            exchangeable_part
+        ]
+        aggregation_indices = [
+            next(
+                index
+                for index, feature in enumerate(self.feature_extractor.features)
+                if feature is aggregation_function
+            )
+            for aggregation_function in aggregation_functions
+        ]
+        aggregation_names = [function._name_ for function in aggregation_functions]
+        parts_of_instances = [
+            getattr(instance, exchangeable_part) for instance in instances
+        ]
+        part_instances = list(itertools.chain.from_iterable(parts_of_instances))
+        rows = self._build_child_joint_dataframe(
+            exchangeable_part,
+            instances,
+            aggregation_indices,
+            aggregation_names,
+            FeatureExtractor.from_instances(instances=part_instances),
+        )
+        return PartTrainingTable(
+            part_instances=part_instances,
+            rows=rows,
+            aggregation_names=aggregation_names,
+            example_positions=[
+                position
+                for position, parts in enumerate(parts_of_instances)
+                for _ in parts
+            ],
+        )
+
+    def training_tables(self, instances: list[Any]) -> RelationalTrainingTables:
+        """
+        :param instances: The instances the circuit was fitted on.
+        :return: The tables the circuit is fitted on: one row per instance for the class
+            circuit, and one row per part for each part's template.
+        :raises CircuitNotFittedError: If the circuit has not been fitted.
+        """
+        if self.feature_extractor is None:
+            raise CircuitNotFittedError()
+        return RelationalTrainingTables(
+            example_rows=self._build_class_dataframe(
+                self.feature_extractor, instances, None
+            ),
+            part_tables={
+                exchangeable_part: self._part_training_table(
+                    exchangeable_part, instances
+                )
+                for exchangeable_part in self.exchangeable_distribution_templates
+            },
+        )
 
     def _fit_exchangeable_part(
         self,
@@ -272,36 +383,13 @@ class RelationalProbabilisticCircuit:
             template.
         :return: A fitted ``ExchangeableDistributionTemplate`` for the given part.
         """
-        aggregation_functions = self.feature_extractor.exchangeable_features[
-            exchangeable_part
-        ]
-        aggregation_indices = [
-            next(
-                index
-                for index, feature in enumerate(self.feature_extractor.features)
-                if feature is aggregation_function
-            )
-            for aggregation_function in aggregation_functions
-        ]
-        aggregation_names = [function._name_ for function in aggregation_functions]
-
-        child_instances = list(
-            itertools.chain.from_iterable(
-                getattr(instance, exchangeable_part) for instance in instances
-            )
-        )
-        child_feature_extractor = FeatureExtractor.from_instances(child_instances)
-        child_dataframe = self._build_child_joint_dataframe(
-            exchangeable_part,
-            instances,
-            aggregation_indices,
-            aggregation_names,
-            child_feature_extractor,
-        )
+        part_table = self._part_training_table(exchangeable_part, instances)
+        child_instances = part_table.part_instances
+        child_dataframe = part_table.rows
         latent_variables = [
             inferred.variable
             for inferred in infer_variables_from_dataframe(child_dataframe)
-            if inferred.variable.name in aggregation_names
+            if inferred.variable.name in part_table.aggregation_names
         ]
         template = ExchangeableDistributionTemplate(
             RelationalProbabilisticCircuit(
@@ -374,7 +462,7 @@ class RelationalProbabilisticCircuit:
         :raises InstanceNotOfClassError: If an instance is not of ``class_``.
         """
         self.class_ = self._class_of(instances, class_)
-        self.feature_extractor = FeatureExtractor.from_instances(instances)
+        self.feature_extractor = FeatureExtractor.from_instances(instances=instances)
         class_dataframe = self._build_class_dataframe(
             self.feature_extractor, instances, dataframe_from_parent
         )

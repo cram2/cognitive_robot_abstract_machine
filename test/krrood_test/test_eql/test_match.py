@@ -17,7 +17,15 @@ from krrood.entity_query_language.exceptions import (
     MatchTypeCannotBeDetermined,
     SymbolicDunderAccessError,
 )
-from krrood.entity_query_language.predicate import HasType
+from krrood.entity_query_language.predicate import (
+    HasType,
+    Is,
+    SymbolicFunction,
+    symbolic_function,
+)
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    FunctionVerbalizationTemplates,
+)
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
     HasSymbolicOperations,
@@ -36,13 +44,13 @@ from ..dataset.semantic_world_like_classes import (
 
 
 def test_doc_match():
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class Robot:
         name: str
         battery: int
 
-    robots = [Robot("R2D2", 100), Robot("C3PO", 0)]
-    query = a(Robot)(name="R2D2", battery=100).from_(robots)
+    robots = [Robot(name="R2D2", battery=100), Robot(name="C3PO", battery=0)]
+    query = a(Robot)(name="R2D2", battery=100).from_(domain=robots)
     assert query.tolist()[0].name == "R2D2"
 
 
@@ -52,14 +60,14 @@ def test_match(handles_and_containers_world):
     fixed_connection = a(FixedConnection)(
         parent=a(Container)(name="Container1"),
         child=a(Handle)(name="Handle1"),
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     fixed_connection_query = the(fixed_connection)
 
     fc = variable(FixedConnection, domain=None)
     fixed_connection_query_manual = the(
         entity(fc).where(
-            HasType(fc.parent, Container),
-            HasType(fc.child, Handle),
+            HasType(variable=fc.parent, types_=Container),
+            HasType(variable=fc.child, types_=Handle),
             fc.parent.name == "Container1",
             fc.child.name == "Handle1",
         )
@@ -81,7 +89,7 @@ def test_select(handles_and_containers_world):
     # Method 1
     fixed_connection = a(FixedConnection)(
         parent=a(Container)(name="Container1"), child=a(Handle)(name="Handle1")
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     container_and_handle = the(
         set_of(
             container := fixed_connection.parent,
@@ -96,8 +104,8 @@ def test_select(handles_and_containers_world):
             container_2 := fixed_connection_2.parent,
             handle_2 := fixed_connection_2.child,
         ).where(
-            HasType(container_2, Container),
-            HasType(handle_2, Handle),
+            HasType(variable=container_2, types_=Container),
+            HasType(variable=handle_2, types_=Handle),
             container_2.name == "Container1",
             handle_2.name == "Handle1",
         )
@@ -120,7 +128,7 @@ def test_select_where(handles_and_containers_world):
     fixed_connection = a(FixedConnection)(
         parent=a(Container),
         child=a(Handle),
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     container_and_handle = a(
         set_of(
             container := fixed_connection.parent,
@@ -134,8 +142,8 @@ def test_select_where(handles_and_containers_world):
             container_2 := fixed_connection_2.parent,
             handle_2 := fixed_connection_2.child,
         ).where(
-            HasType(container_2, Container),
-            HasType(handle_2, Handle),
+            HasType(variable=container_2, types_=Container),
+            HasType(variable=handle_2, types_=Handle),
             container_2.size > 1,
         )
     )
@@ -152,15 +160,15 @@ def test_select_where(handles_and_containers_world):
 
 
 def test_domain_carrying_an_is_a_select():
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class Robot:
         name: str
         battery: int
 
-    robots = [Robot("R2D2", 100), Robot("C3PO", 0)]
+    robots = [Robot(name="R2D2", battery=100), Robot(name="C3PO", battery=0)]
     # an(...)(kwargs).from_(domain) stays one Match carrying the domain; the backend decides
     # whether to select over it or generate from it, so from_ does not collapse it to an Entity.
-    query = a(Robot)(name="R2D2", battery=100).from_(robots)
+    query = a(Robot)(name="R2D2", battery=100).from_(domain=robots)
     assert isinstance(query, Match)
     assert query._domain_ is robots
     assert query.tolist()[0].name == "R2D2"
@@ -182,7 +190,7 @@ def test_attribute_access_works_for_names_previously_shadowed_by_match_internals
     world = handles_and_containers_world
     fixed_connection = a(FixedConnection)(
         parent=a(Container)(name="Container1"), child=a(Handle)(name="Handle1")
-    ).from_(world.connections)
+    ).from_(domain=world.connections)
     container_and_handle = the(
         set_of(
             container := fixed_connection.parent,
@@ -218,14 +226,32 @@ def test_underscore_attribute_access_is_not_symbolic():
         _ = match._missing_internal_
 
 
+def test_a_pattern_evaluated_before_it_is_nested_still_restricts_the_parent(
+    handles_and_containers_world,
+):
+    world = handles_and_containers_world
+    handle = a(Handle)(name="Handle1").from_(domain=world.bodies)
+    handle.tolist()
+
+    connections = a(FixedConnection)(child=handle).from_(domain=world.connections)
+
+    assert connections.tolist() == [
+        connection
+        for connection in world.connections
+        if isinstance(connection, FixedConnection)
+        and isinstance(connection.child, Handle)
+        and connection.child.name == "Handle1"
+    ]
+
+
 def test_from_restricts_the_search():
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class Robot:
         name: str
 
-    subset = [Robot("R2D2"), Robot("C3PO")]
+    subset = [Robot(name="R2D2"), Robot(name="C3PO")]
     # from_ selects only over the given domain.
-    selected = a(Robot).from_(subset).tolist()
+    selected = a(Robot).from_(domain=subset).tolist()
     assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
 
 
@@ -237,15 +263,15 @@ def test_from_after_where_still_restricts_the_search():
     eagerly created.
     """
 
-    @dataclass(unsafe_hash=True)
+    @dataclass(kw_only=True, unsafe_hash=True)
     class Robot:
         name: str
         battery: int
 
-    subset = [Robot("R2D2", 100), Robot("C3PO", 0)]
+    subset = [Robot(name="R2D2", battery=100), Robot(name="C3PO", battery=0)]
     query = a(Robot)()
     query.where(query.battery >= 0)
-    query.from_(subset)
+    query.from_(domain=subset)
     selected = query.tolist()
     assert {robot.name for robot in selected} == {"R2D2", "C3PO"}
 
@@ -253,7 +279,7 @@ def test_from_after_where_still_restricts_the_search():
 def test_from_without_kwargs_selects_all(handles_and_containers_world):
     world = handles_and_containers_world
     # a(Type).from_(X) with no kwargs is a valid "any Type in X" select.
-    selected = a(FixedConnection).from_(world.connections).tolist()
+    selected = a(FixedConnection).from_(domain=world.connections).tolist()
     assert selected
     assert all(isinstance(connection, FixedConnection) for connection in selected)
 
@@ -266,7 +292,7 @@ def test_match_without_domain_selects_from_symbol_graph():
 
     Generation requires an explicit generative backend.
     """
-    existing = KRROODPosition(1.0, 2.0, 3.0)
+    existing = KRROODPosition(x=1.0, y=2.0, z=3.0)
     result = a(KRROODPosition)(x=1.0, y=2.0, z=3.0).tolist()
     # the existing object itself is returned (selection), not a freshly-built equal one
     assert any(r is existing for r in result)
@@ -275,8 +301,11 @@ def test_match_without_domain_selects_from_symbol_graph():
 
 def test_match_with_list():
     domain = [
-        KRROODPositions([KRROODPosition(1, 2, 3), KRROODPosition(1, 2, 3)], ["a", "b"]),
-        KRROODPositions([KRROODPosition(1, 2, 3)], ["a"]),
+        KRROODPositions(
+            positions=[KRROODPosition(x=1, y=2, z=3), KRROODPosition(x=1, y=2, z=3)],
+            some_strings=["a", "b"],
+        ),
+        KRROODPositions(positions=[KRROODPosition(x=1, y=2, z=3)], some_strings=["a"]),
     ]
 
     q = a(KRROODPositions)(
@@ -285,10 +314,10 @@ def test_match_with_list():
                 x=1,
                 y=2,
             ),
-            KRROODPosition(1, 2, 3),
+            KRROODPosition(x=1, y=2, z=3),
         ],
         some_strings=["a", "b"],
-    ).from_(domain)
+    ).from_(domain=domain)
 
     r = q.tolist()
     assert r == [domain[0]]
@@ -299,7 +328,7 @@ def test_match_with_list():
 
 def test_an_infers_target_type_from_annotated_callable():
     def make_position(x: float = 1.0, y: float = 2.0, z: float = 3.0) -> KRROODPosition:
-        return KRROODPosition(x, y, z)
+        return KRROODPosition(x=x, y=y, z=z)
 
     match = a(make_position)
     assert match._type_ is KRROODPosition
@@ -307,7 +336,7 @@ def test_an_infers_target_type_from_annotated_callable():
 
 def test_the_infers_target_type_from_annotated_callable():
     def make_position(x: float = 1.0, y: float = 2.0, z: float = 3.0) -> KRROODPosition:
-        return KRROODPosition(x, y, z)
+        return KRROODPosition(x=x, y=y, z=z)
 
     match = the(make_position)
     assert match._type_ is KRROODPosition
@@ -315,7 +344,7 @@ def test_the_infers_target_type_from_annotated_callable():
 
 def test_an_uses_explicit_target_type_for_unannotated_callable():
     def make_position(x, y, z):
-        return KRROODPosition(x, y, z)
+        return KRROODPosition(x=x, y=y, z=z)
 
     match = a(make_position, target_type=KRROODPosition)
     assert match._type_ is KRROODPosition
@@ -323,7 +352,7 @@ def test_an_uses_explicit_target_type_for_unannotated_callable():
 
 def test_an_raises_when_callable_type_cannot_be_determined():
     def make_position(x, y, z):
-        return KRROODPosition(x, y, z)
+        return KRROODPosition(x=x, y=y, z=z)
 
     with pytest.raises(MatchTypeCannotBeDetermined):
         a(make_position)
@@ -331,7 +360,7 @@ def test_an_raises_when_callable_type_cannot_be_determined():
 
 def test_a_infers_target_type_from_annotated_callable():
     def make_position(x: float = 1.0, y: float = 2.0, z: float = 3.0) -> KRROODPosition:
-        return KRROODPosition(x, y, z)
+        return KRROODPosition(x=x, y=y, z=z)
 
     match = a(make_position)
     assert match._type_ is KRROODPosition
@@ -339,7 +368,7 @@ def test_a_infers_target_type_from_annotated_callable():
 
 def test_a_uses_explicit_target_type_for_unannotated_callable():
     def make_position(x, y, z):
-        return KRROODPosition(x, y, z)
+        return KRROODPosition(x=x, y=y, z=z)
 
     match = a(make_position, target_type=KRROODPosition)
     assert match._type_ is KRROODPosition
@@ -373,7 +402,7 @@ def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_list():
     underspecified as a direct ``x=...`` assignment.
     """
     match = a(KRROODPositions)(
-        positions=[KRROODPosition(1, 2, 3)],
+        positions=[KRROODPosition(x=1, y=2, z=3)],
         some_strings=["a", ..., "c"],
     )
     assert match._has_ellipsis_attributes_ is True
@@ -389,16 +418,44 @@ def test_has_ellipsis_attributes_true_for_ellipsis_mixed_with_nested_match_in_li
 
 def test_has_ellipsis_attributes_true_for_ellipsis_element_in_plain_set():
     match = a(KRROODPositions)(
-        positions=[KRROODPosition(1, 2, 3)],
+        positions=[KRROODPosition(x=1, y=2, z=3)],
         some_strings={"a", ..., "c"},
     )
     assert match._has_ellipsis_attributes_ is True
 
 
+# %% AttributeMatch.is_assigned_to_ellipsis
+
+
+def test_is_assigned_to_ellipsis_only_for_the_attribute_assigned_an_ellipsis():
+    match = a(KRROODPosition)(x=..., y=2, z=3)
+    match.resolve()
+
+    unspecified_attribute_names = [
+        attribute_match.attribute_name
+        for attribute_match in match._matches_with_variables_
+        if attribute_match.is_assigned_to_ellipsis
+    ]
+    assert unspecified_attribute_names == ["x"]
+
+
+def test_is_assigned_to_ellipsis_false_for_an_ellipsis_element_in_a_plain_list():
+    match = a(KRROODPositions)(
+        positions=[KRROODPosition(x=1, y=2, z=3)],
+        some_strings=["a", ..., "c"],
+    )
+    match.resolve()
+
+    assert not any(
+        attribute_match.is_assigned_to_ellipsis
+        for attribute_match in match._matches_with_variables_
+    )
+
+
 # %% a match reads like a query
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class FieldNamedLikeAQueryMethod:
     """
     A matched class with a field whose name a :class:`Query` member also uses.
@@ -413,36 +470,45 @@ def test_where_through_a_forwarded_attribute_filters():
     The condition the forwarding makes natural must actually filter, which it only does
     once a condition rooted at the query correlates with that query's own bindings.
     """
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    match = a(KRROODPosition).from_(positions)
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
     assert [position.x for position in match.where(match.x >= 5).tolist()] == [5.0]
 
 
 def test_limit_bounds_the_results_and_keeps_the_chain_on_the_match():
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    match = a(KRROODPosition).from_(positions)
-    assert match.limit(1) is match
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
+    assert match.limit(n=1) is match
     assert len(match.tolist()) == 1
 
 
 def test_a_match_reports_the_limit_it_was_given():
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    match = a(KRROODPosition).from_(positions)
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
     assert match._limit_ is None
 
-    match.limit(1)
+    match.limit(n=1)
 
     assert match._limit_ == 1
 
 
 def test_ordered_by_a_forwarded_attribute_orders_the_results():
     positions = [
-        KRROODPosition(1.0, 0.0, 0.0),
-        KRROODPosition(5.0, 0.0, 0.0),
-        KRROODPosition(3.0, 0.0, 0.0),
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+        KRROODPosition(x=3.0, y=0.0, z=0.0),
     ]
-    match = a(KRROODPosition).from_(positions)
-    ordered = match.ordered_by(match.x, descending=True)
+    match = a(KRROODPosition).from_(domain=positions)
+    ordered = match.ordered_by(variable=match.x, descending=True)
     assert [position.x for position in ordered.tolist()] == [5.0, 3.0, 1.0]
 
 
@@ -453,13 +519,21 @@ def test_every_query_modifier_returns_the_match():
     Each modifier gets its own match: the modifiers compose only in the combinations the
     lowered query itself supports, which is not what this test is about.
     """
-    positions = [KRROODPosition(1.0, 0.0, 0.0)]
-    assert (match := a(KRROODPosition).from_(positions)).where(match.x >= 0) is match
-    assert (match := a(KRROODPosition).from_(positions)).having(match.x >= 0) is match
-    assert (match := a(KRROODPosition).from_(positions)).ordered_by(match.x) is match
-    assert (match := a(KRROODPosition).from_(positions)).grouped_by(match.y) is match
-    assert (match := a(KRROODPosition).from_(positions)).distinct() is match
-    assert (match := a(KRROODPosition).from_(positions)).limit(1) is match
+    positions = [KRROODPosition(x=1.0, y=0.0, z=0.0)]
+    assert (match := a(KRROODPosition).from_(domain=positions)).where(
+        match.x >= 0
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).having(
+        match.x >= 0
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).ordered_by(
+        variable=match.x
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).grouped_by(
+        match.y
+    ) is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).distinct() is match
+    assert (match := a(KRROODPosition).from_(domain=positions)).limit(n=1) is match
 
 
 def test_a_matched_class_field_is_not_shadowed_by_a_query_method():
@@ -468,10 +542,10 @@ def test_a_matched_class_field_is_not_shadowed_by_a_query_method():
     namespace, so a matched class may name a field after any :class:`Query` member.
     """
     releases = [
-        FieldNamedLikeAQueryMethod("stable", 7),
-        FieldNamedLikeAQueryMethod("nightly", 9),
+        FieldNamedLikeAQueryMethod(name="stable", build=7),
+        FieldNamedLikeAQueryMethod(name="nightly", build=9),
     ]
-    match = a(FieldNamedLikeAQueryMethod).from_(releases)
+    match = a(FieldNamedLikeAQueryMethod).from_(domain=releases)
     # Reading the same name off the lowered query gives Query.build, which is what
     # forwarding by name would have returned.
     assert isinstance(match.build, Attribute)
@@ -493,18 +567,33 @@ def test_the_quantifies_a_match_itself():
     Quantifying a match reads the query it stands for, so the match needs no handle of
     its own to be quantified through.
     """
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    assert the(a(KRROODPosition)(x=5.0).from_(positions)).tolist() == [positions[1]]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    assert the(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [
+        positions[1]
+    ]
 
 
 def test_an_quantifies_a_match_itself():
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    assert a(a(KRROODPosition)(x=5.0).from_(positions)).tolist() == [positions[1]]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    assert a(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [
+        positions[1]
+    ]
 
 
 def test_entity_selects_a_match():
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    assert entity(a(KRROODPosition)(x=5.0).from_(positions)).tolist() == [positions[1]]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    assert entity(a(KRROODPosition)(x=5.0).from_(domain=positions)).tolist() == [
+        positions[1]
+    ]
 
 
 def test_set_of_selects_a_match_beside_one_of_its_attributes():
@@ -512,8 +601,11 @@ def test_set_of_selects_a_match_beside_one_of_its_attributes():
     A match selected beside one of its own attributes must bind to the same row, which
     it only does once the selection reads the query the match stands for.
     """
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    match = a(KRROODPosition)(x=5.0).from_(positions)
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition)(x=5.0).from_(domain=positions)
     (row,) = set_of(match, match.y).tolist()
     assert row[match] == positions[1]
     assert row[match.y] == 0.0
@@ -524,8 +616,11 @@ def test_selecting_a_match_carries_its_pattern():
     The match's own conditions travel with it, which selecting the bare variable it
     created would drop.
     """
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    match = a(KRROODPosition)(x=5.0).from_(positions)
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition)(x=5.0).from_(domain=positions)
     assert entity(match).tolist() == [positions[1]]
 
 
@@ -575,7 +670,7 @@ def test_names_that_became_match_internals_are_symbolic_attributes():
 # %% a match reads like an instance in every symbolic operation
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class SubscriptableRow:
     """
     A matched class whose instances support indexing, for ``match[key]``.
@@ -588,7 +683,7 @@ class SubscriptableRow:
         return self.cells[index]
 
 
-@dataclass(unsafe_hash=True)
+@dataclass(kw_only=True, unsafe_hash=True)
 class CallableAdder:
     """
     A matched class whose instances are callable, for the second parentheses.
@@ -602,15 +697,21 @@ class CallableAdder:
 
 
 def test_indexing_a_match_indexes_the_matched_instance():
-    rows = [SubscriptableRow("first", (7, 8)), SubscriptableRow("second", (9, 10))]
-    match = a(SubscriptableRow).from_(rows)
+    rows = [
+        SubscriptableRow(name="first", cells=(7, 8)),
+        SubscriptableRow(name="second", cells=(9, 10)),
+    ]
+    match = a(SubscriptableRow).from_(domain=rows)
     assert match[0] is match._symbolic_expression_[0]
     assert [row.name for row in match.where(match[0] == 7).tolist()] == ["first"]
 
 
 def test_comparing_a_match_builds_a_condition_rather_than_answering_identity():
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
-    match = a(KRROODPosition).from_(positions)
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
     assert isinstance(match == positions[1], Comparator)
     assert [position.x for position in match.where(match == positions[1]).tolist()] == [
         5.0
@@ -623,9 +724,12 @@ def test_a_match_on_the_other_side_of_a_comparison_also_filters():
     contributes the expression it stands for - otherwise it would be read as a literal
     value, and the condition would pass every row.
     """
-    positions = [KRROODPosition(1.0, 0.0, 0.0), KRROODPosition(5.0, 0.0, 0.0)]
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
     subject = variable(KRROODPosition, positions)
-    match = a(KRROODPosition)(x=5.0).from_(positions)
+    match = a(KRROODPosition)(x=5.0).from_(domain=positions)
     found = entity(subject).where(subject == match).tolist()
     assert [position.x for position in found] == [5.0]
 
@@ -652,8 +756,8 @@ def test_a_match_cannot_be_iterated():
 
 
 def test_the_second_parentheses_call_the_matched_instance():
-    adders = [CallableAdder("one", 1), CallableAdder("two", 2)]
-    match = a(CallableAdder)().from_(adders)
+    adders = [CallableAdder(name="one", offset=1), CallableAdder(name="two", offset=2)]
+    match = a(CallableAdder)().from_(domain=adders)
     assert [adder.name for adder in match.where(match(10) == 12).tolist()] == ["two"]
 
 
@@ -662,8 +766,8 @@ def test_an_empty_pattern_still_takes_its_own_parentheses():
     The first parentheses are the pattern even when it is empty, so a match over every
     instance of a callable class is called through a second pair.
     """
-    adders = [CallableAdder("one", 1), CallableAdder("two", 2)]
-    match = a(CallableAdder)().from_(adders)
+    adders = [CallableAdder(name="one", offset=1), CallableAdder(name="two", offset=2)]
+    match = a(CallableAdder)().from_(domain=adders)
     assert [adder.name for adder in match.where(match(10) == 11).tolist()] == ["one"]
 
 
@@ -685,3 +789,65 @@ def test_a_second_pattern_still_raises_when_the_matched_class_is_not_callable():
     match = a(KRROODPosition)(x=1.0)
     with pytest.raises(CalledMatchMultipleTimes):
         match(y=2.0)
+
+
+# %% a match given as the argument of a predicate or symbolic function
+
+
+@symbolic_function
+def rounded_x_coordinate_of(position: KRROODPosition) -> float:
+    """
+    :param position: The position to read.
+    :return: The x coordinate of *position*, rounded to a whole number.
+    """
+    return round(position.x)
+
+
+@dataclass(kw_only=True, eq=False)
+class XCoordinate(SymbolicFunction):
+    """
+    The x coordinate of a position.
+    """
+
+    position: KRROODPosition
+    """
+    The position whose x coordinate is read.
+    """
+
+    def __call__(self) -> float:
+        return self.position.x
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+def test_predicate_applied_to_a_match_filters_its_matches():
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
+    assert match.where(Is(first_entity=match, second_entity=positions[1])).tolist() == [
+        positions[1]
+    ]
+
+
+def test_symbolic_function_applied_to_a_match_filters_its_matches():
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
+    assert match.where(rounded_x_coordinate_of(match) == 5).tolist() == [positions[1]]
+
+
+def test_symbolic_function_class_applied_to_a_match_filters_its_matches():
+    positions = [
+        KRROODPosition(x=1.0, y=0.0, z=0.0),
+        KRROODPosition(x=5.0, y=0.0, z=0.0),
+    ]
+    match = a(KRROODPosition).from_(domain=positions)
+    assert match.where(XCoordinate(position=match) == 5.0).tolist() == [positions[1]]

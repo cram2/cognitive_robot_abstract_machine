@@ -6,7 +6,9 @@ from uuid import UUID
 from typing_extensions import Any, TYPE_CHECKING, Self
 
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
-from krrood.adapters.json_serializer import from_json, to_json
+from krrood.adapters.json_serializer import from_json
+from krrood.adapters.object_reference import ObjectReference
+from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3DResolver
 from semantic_digital_twin.exceptions import (
     MissingWorldError,
     WorldEntityWithIDNotInKwargs,
@@ -19,61 +21,26 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class WorldEntityReference:
+class WorldEntityReference(ObjectReference):
     """
-    How a serialized object points at a world entity: by the id that identifies it, and
-    by the name it went by, which says which entity was meant where it cannot be found.
-
-    The name is never looked up with, so two entities sharing one name stay apart.
+    How a serialized object points at a world entity.
     """
 
-    subject: str
-    """
-    What the referring object calls the entity, for example ``parent`` or ``dof``.
-    """
-
-    @property
-    def id_key(self) -> str:
+    def resolve(self, *, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
         """
-        Where the id of the entity sits in the serialized object.
-        """
-        return f"{self.subject}_id"
-
-    @property
-    def name_key(self) -> str:
-        """
-        Where the name of the entity sits in the serialized object.
-        """
-        return f"{self.subject}_name"
-
-    def write(self, data: dict[str, Any], entity: WorldEntityWithID) -> None:
-        """
-        Put the reference to an entity into a serialized object.
-
-        :param data: The json of the object that refers to it.
-        :param entity: The entity it refers to.
-        """
-        data[self.id_key] = to_json(entity.id)
-        data[self.name_key] = to_json(entity.name)
-
-    def resolve(self, data: dict[str, Any], **kwargs) -> WorldEntityWithID:
-        """
-        The entity a serialized object refers to.
-
-        :param data: The json of the object that refers to it.
-        :param kwargs: The kwargs of the ``_from_json`` that is reading it.
         :raises WorldEntityWithIDNotInKwargs: If nothing known carries that id.
         """
-        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(kwargs)
+        tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return tracker.get(
-            from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
+            key=from_json(data[self.id_key]), name=from_json(data.get(self.name_key))
         )
 
 
 @dataclass
 class WorldEntityWithIDKwargsTracker(
     # A string, because world_entity imports this module and cannot be imported back.
-    DeserializedObjectTracker[UUID, "WorldEntityWithID"]
+    DeserializedObjectTracker[UUID, "WorldEntityWithID"],
+    CartesianFrame3DResolver,
 ):
     """
     The world entities deserialized from one JSON document, by their id.
@@ -101,26 +68,15 @@ class WorldEntityWithIDKwargsTracker(
         tracker._world = world
         return tracker
 
-    def get(self, key: UUID, name: PrefixedName | None = None) -> WorldEntityWithID:
-        """
-        :param name: The name the reference to the entity went by, which says which
-            entity was meant when it cannot be found.
-        """
-        if key in self.tracked_objects:
-            return self.tracked_objects[key]
-        return self._get_untracked(key, name)
-
-    def _has_untracked(self, key: UUID) -> bool:
+    def _has_untracked(self, *, key: UUID) -> bool:
         if self._world is None:
             return False
         return self._world.find_world_entity_with_id(key) is not None
 
     def _get_untracked(
-        self, key: UUID, name: PrefixedName | None = None
+        self, *, key: UUID, name: PrefixedName | None = None
     ) -> WorldEntityWithID:
         """
-        :param name: The name the reference to the entity went by, which says which
-            entity was meant when it cannot be found.
         :raises MissingWorldError: If the tracker has no world to look the entity up in.
         :raises WorldEntityWithIDNotInKwargs: If the world holds no entity with the id.
         """

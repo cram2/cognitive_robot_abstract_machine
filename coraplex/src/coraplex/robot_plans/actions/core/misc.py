@@ -16,16 +16,12 @@ from coraplex.robot_plans.actions.core.exceptions import DetectionTargetMissing
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from coraplex.robot_plans.mixins import HasApproachesGraspPoses, MovesToolCenterPoint
-from semantic_digital_twin.spatial_types import (
+from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     RotationMatrix,
     Vector3,
 )
-from semantic_digital_twin.spatial_types.spatial_types import (
-    Pose,
-    Point3,
-    Pose2D,
-)
+from krrood_spatial_math.spatial_types import Pose, Point3, Pose2D
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
