@@ -19,6 +19,7 @@ from probabilistic_model.distributions.distributions import (
 )
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
@@ -89,6 +90,18 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     def number_of_own_parameters(self) -> int:
         return self.table.number_of_stored_entries
 
+    @property
+    def parameters(self) -> list[BackendArray]:
+        return self.table.parameters
+
+    @property
+    def float_states(self) -> BackendArray:
+        """
+        :return: The states as floats in an array of the backend of the parameters, the
+            way the layer reads the values of events.
+        """
+        return self.namespace.asarray(self.states, dtype=self.namespace.float64)
+
     def validate_own(self):
         if self.table.number_of_states != self.number_of_states:
             raise ShapeMismatchError(
@@ -113,12 +126,14 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
             symbolic variable, see :class:`SymbolicEncoding`.
         :return: The index of every value, or ``-1`` for values that are not a state.
         """
-        values = np.asarray(values, dtype=float).reshape(-1)
-        states = self.states.astype(float)
-        positions = np.searchsorted(states, values)
-        positions = np.clip(positions, 0, max(self.number_of_states - 1, 0))
-        found = states[positions] == values
-        return np.where(found, positions, -1)
+        xp = self.namespace
+        values = self.float_column(values=values)[:, 0]
+        states = self.float_states
+        positions = xp.clip(
+            xp.searchsorted(states, values), 0, max(self.number_of_states - 1, 0)
+        )
+        found = xp.take(states, positions) == values
+        return xp.where(found, positions, -1)
 
     @memoized
     def log_likelihood_of_nodes(
@@ -403,12 +418,20 @@ class IntegerLayer(DiscreteLayer):
     def cumulative_distribution_of_nodes(
         self, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
-        column = np.asarray(self.column_of(events), dtype=float).reshape(-1, 1)
-        reached = column >= self.states.reshape(1, -1)
-        return self.table.dot(reached.astype(float).T).T
+        """
+        Unlike :meth:`DiscreteLayer.cumulative_distribution_of_nodes`, integers are
+        ordered: the result is the probability of the states up to every value.
+        """
+        xp = self.namespace
+        reached = self.float_column(values=self.column_of(events)) >= self.float_states
+        return self.table.dot(xp.astype(reached, xp.float64).T).T
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
     ) -> NodeValues:
-        deviations = (self.states.astype(float) - center) ** order
-        return self.table.dot(deviations)
+        """
+        Like :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.ba
+        se.UnivariateInputLayer.moment_of_nodes_own`, as the expectation of the centered
+        states under the table of every node.
+        """
+        return self.table.dot((self.float_states - center) ** order)

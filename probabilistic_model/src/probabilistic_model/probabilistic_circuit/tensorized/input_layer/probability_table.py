@@ -9,6 +9,7 @@ from scipy.sparse import csc_array, csr_array, vstack
 from typing_extensions import Generic, Self, TypeVar
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeStateValues,
@@ -19,6 +20,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     StateValues,
     TableEntryValues,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
+)
 
 StoredLogProbabilities = TypeVar("StoredLogProbabilities")
 """
@@ -26,7 +30,7 @@ The representation a probability table stores its log-probabilities in.
 """
 
 
-class ProbabilityTable(ABC, Generic[StoredLogProbabilities]):
+class ProbabilityTable(HasParameterArrays, ABC, Generic[StoredLogProbabilities]):
     """
     The probability of every state for every node of a discrete layer, a table of shape
     (#nodes, #states).
@@ -274,6 +278,10 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     The log-probability of every state for every node, ``-inf`` for probability zero.
     """
 
+    @property
+    def parameters(self) -> list[BackendArray]:
+        return [self.log_probabilities]
+
     @classmethod
     def from_entries(
         cls,
@@ -304,18 +312,30 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
         return int(self.log_probabilities.size)
 
     def log_probabilities_of_states(self, indices: StateIndices) -> SampleNodeValues:
+        xp = self.namespace
         # an unknown state reads the appended column of probability zero
-        padded = np.concatenate(
-            [self.log_probabilities, np.full((self.number_of_nodes, 1), -np.inf)],
+        padded = xp.concat(
+            [
+                self.log_probabilities,
+                xp.full(
+                    (self.number_of_nodes, 1),
+                    -np.inf,
+                    dtype=self.log_probabilities.dtype,
+                ),
+            ],
             axis=1,
         )
-        return padded[:, np.where(indices >= 0, indices, self.number_of_states)].T
+        columns = xp.where(indices >= 0, indices, self.number_of_states)
+        return xp.take(padded, columns, axis=1).T
 
     def probability_of_states(self, selected: StateMask) -> NodeValues:
-        return np.exp(self.log_probabilities[:, selected]).sum(axis=1)
+        xp = self.namespace
+        columns = xp.asarray(np.flatnonzero(selected))
+        return xp.sum(xp.exp(xp.take(self.log_probabilities, columns, axis=1)), axis=1)
 
     def dot(self, values: StateValues) -> NodeValues:
-        return np.exp(self.log_probabilities) @ values
+        xp = self.namespace
+        return xp.matmul(xp.exp(self.log_probabilities), xp.asarray(values))
 
     def probabilities_of_node(self, node: int) -> tuple[StateIndices, TableEntryValues]:
         [states] = np.nonzero(np.isfinite(self.log_probabilities[node]))
@@ -374,6 +394,14 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
     A state that is not stored has probability zero. A stored zero is the log-
     probability of a state with probability one.
     """
+
+    @property
+    def parameters(self) -> list[BackendArray]:
+        """
+        :return: The stored log-probabilities. They are always numpy arrays, since the
+            table is a scipy sparse array.
+        """
+        return [self.log_probabilities.data]
 
     @classmethod
     def from_entries(

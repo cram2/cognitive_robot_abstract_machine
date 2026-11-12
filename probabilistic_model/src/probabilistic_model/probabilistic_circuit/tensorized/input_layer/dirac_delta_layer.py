@@ -13,6 +13,7 @@ from typing_extensions import Any, Self
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
@@ -62,6 +63,10 @@ class DiracDeltaLayer(AbstractContinuousLayer):
     def number_of_own_parameters(self) -> int:
         return 2 * self.number_of_nodes
 
+    @property
+    def parameters(self) -> list[BackendArray]:
+        return [self.location, self.density_cap]
+
     def validate_own(self):
         if self.location.shape != self.density_cap.shape:
             raise ShapeMismatchError(self.location.shape, self.density_cap.shape)
@@ -109,25 +114,32 @@ class DiracDeltaLayer(AbstractContinuousLayer):
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
-        hit = np.abs(column - self.location) < self.tolerance
+        xp = self.namespace
+        hit = xp.abs(self.float_column(values=values) - self.location) < self.tolerance
         with np.errstate(divide="ignore"):
-            return np.where(hit, np.log(self.density_cap), -np.inf)
+            return xp.where(hit, xp.log(self.density_cap), -np.inf)
 
     def cumulative_distribution_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
-        return (column >= self.location - self.tolerance).astype(float)
+        xp = self.namespace
+        reached = self.float_column(values=values) >= self.location - self.tolerance
+        return xp.astype(reached, xp.float64)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
     ) -> NodeValues:
+        """
+        Like :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.ba
+        se.UnivariateInputLayer.moment_of_nodes_own`, in closed form: all the mass of a
+        node lies at its location.
+        """
+        xp = self.namespace
         if order == 0:
-            return np.ones(self.number_of_nodes)
+            return xp.ones_like(self.location)
         if order == 1:
             return self.location - center
-        return np.zeros(self.number_of_nodes)
+        return xp.zeros_like(self.location)
 
     def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
         return self.location[nodes].astype(float)
@@ -145,7 +157,8 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         """
         lower_of_window = self.location - self.tolerance
         upper_of_window = self.location + self.tolerance
-        inside = np.zeros(self.number_of_nodes, dtype=bool)
+        xp = self.namespace
+        inside = xp.zeros(self.number_of_nodes, dtype=xp.bool)
         for simple_interval in assignment.simple_sets:
             left = (
                 simple_interval.lower <= upper_of_window
@@ -157,7 +170,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
                 if simple_interval.right == Bound.CLOSED
                 else lower_of_window < simple_interval.upper
             )
-            inside |= left & right
+            inside = inside | (left & right)
         return inside
 
     def log_truncated_of_assignment(
@@ -181,7 +194,13 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
-        return self.contains(event[variables[self.variable]]).astype(float)
+        """
+        Like :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.base.AbstractContinuousLayer.probability_of_simple_event_of_nodes`, but a
+        node has probability one if the event reaches its location up to
+        :attr:`tolerance` and zero otherwise.
+        """
+        xp = self.namespace
+        return xp.astype(self.contains(event[variables[self.variable]]), xp.float64)
 
     def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]

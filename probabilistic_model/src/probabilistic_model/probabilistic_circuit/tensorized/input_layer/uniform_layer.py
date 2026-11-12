@@ -34,12 +34,12 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
         :return: The log-density of every node.
         """
         with np.errstate(divide="ignore"):
-            return -np.log(self.upper - self.lower)
+            return -self.namespace.log(self.upper - self.lower)
 
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        return np.where(
+        return self.namespace.where(
             self.included_condition(values),
             self.log_probability_density_function_value(),
             -np.inf,
@@ -48,9 +48,10 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
     def cumulative_distribution_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:
-        column = np.asarray(values, dtype=float).reshape(-1, 1)
-        result = (column - self.lower) / (self.upper - self.lower)
-        return np.clip(result, 0.0, 1.0)
+        result = (self.float_column(values=values) - self.lower) / (
+            self.upper - self.lower
+        )
+        return self.namespace.clip(result, 0.0, 1.0)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -69,7 +70,7 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
         :return: The antiderivative of ``density * (value - center) ** order`` of every
             node at its bound.
         """
-        density = np.exp(self.log_probability_density_function_value())
+        density = self.namespace.exp(self.log_probability_density_function_value())
         return density * (bound - center) ** (order + 1) / (order + 1)
 
     def node_distribution(self, index: int, variable: Variable) -> UniformDistribution:
