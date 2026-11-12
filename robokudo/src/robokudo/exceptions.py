@@ -505,6 +505,76 @@ class ImageContourMissing(AnalysisPreconditionError):
 
 
 @dataclass
+class RoboKudoAlreadyRunningError(RoboKudoError, RuntimeError):
+    """
+    Raised when a RoboKudo starts in a process another RoboKudo already runs in.
+
+    Both would share the one blackboard of the process, so each would read the
+    perception world of the other.
+    """
+
+    def error_message(self) -> str:
+        return "Another RoboKudo is already running in this process."
+
+    def suggest_correction(self) -> str:
+        return "close the running RoboKudo first, or run the second one in its own process."
+
+
+@dataclass
+class EngineRootIsNotAPipelineError(RoboKudoError, TypeError):
+    """
+    Raised when RoboKudo starts an analysis engine whose tree is not rooted at a
+    pipeline.
+    """
+
+    analysis_engine_name: str
+    """
+    The name of the analysis engine.
+    """
+
+    root_type: type
+    """
+    The type of the root of the tree the analysis engine builds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The analysis engine '{self.analysis_engine_name}' builds a tree rooted at "
+            f"a {self.root_type.__name__}, so RoboKudo has no pipeline whose passes it "
+            f"could put into the world."
+        )
+
+    def suggest_correction(self) -> str:
+        return "make a Pipeline the root of the tree the analysis engine builds."
+
+
+@dataclass
+class UnknownWorldFrameError(RoboKudoError, LookupError):
+    """
+    Raised when a camera pose is measured against a frame a world with bodies does not
+    hold.
+    """
+
+    world_frame: str
+    """
+    The name of the frame the camera pose was measured against.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The camera pose was measured against the frame '{self.world_frame}', "
+            f"which the perception world does not hold. Perception adds a world frame "
+            f"only to an empty world, since it cannot tell where the frame belongs."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "measure the camera pose against a frame of the perception world, such as "
+            "its root, or make the camera frame a body of that world."
+        )
+
+
+@dataclass
 class WorldDescriptorError(RoboKudoError, ABC):
     """
     Base class for world descriptor related errors.
@@ -522,8 +592,7 @@ class WorldDescriptorLoadError(WorldDescriptorError, RuntimeError):
 
     def error_message(self) -> str:
         return (
-            f"Failed to load world descriptor "
-            f"'{self.ros_package}.{self.module_name}'."
+            f"Failed to load world descriptor '{self.ros_package}.{self.module_name}'."
         )
 
     def suggest_correction(self) -> str:
