@@ -484,7 +484,7 @@ def rdr_to_python(rdr: EQLSingleClassRDR, case_type_is_local: bool = False) -> s
 
     generator = CodeGenerator(template_directory=_TEMPLATES_DIRECTORY)
     return generator.render(
-        _RDR_MODULE_TEMPLATE_NAME,
+        template_name=_RDR_MODULE_TEMPLATE_NAME,
         factory_import=_FACTORY_IMPORT,
         type_imports=type_imports,
         variable_name=variable_name,
@@ -532,7 +532,7 @@ def save_rdr_with_case(rdr: EQLSingleClassRDR, path: str) -> str:
 
     if isinstance(rdr.case_type, type) and issubclass(rdr.case_type, FunctionCase):
         class_source = FunctionCaseGenerator().generate(
-            rdr.case_type.function,
+            function=rdr.case_type.function,
             class_name=rdr.case_type.__name__,
         )
         rule_source = rdr_to_python(rdr, case_type_is_local=True)

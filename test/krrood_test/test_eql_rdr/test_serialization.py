@@ -21,7 +21,9 @@ import pytest
 from typing_extensions import Any, Optional
 
 from krrood.entity_query_language.factories import add, alternative, entity, refinement, variable
-from krrood.entity_query_language.rdr.backward_inference import what_do_we_know_about
+from krrood.entity_query_language.rdr.backward_inference import (
+    get_conclusion_sufficient_conditions_from_a_rule_tree,
+)
 from krrood.entity_query_language.rdr.corner_case import CornerCaseStore
 from krrood.entity_query_language.rdr.exceptions import EmptyRuleTreeError
 from krrood.entity_query_language.rdr.serialization import (
@@ -113,8 +115,12 @@ def test_generated_tree_has_the_same_backward_inference_knowledge_as_the_origina
 
     original_root = original.query._conditions_root_
     for value in (Species.MAMMAL, Species.BIRD):
-        original_knowledge = what_do_we_know_about(original_root, value)
-        rebuilt_knowledge = what_do_we_know_about(rebuilt_root, value)
+        original_knowledge = get_conclusion_sufficient_conditions_from_a_rule_tree(
+            original_root, value
+        )
+        rebuilt_knowledge = get_conclusion_sufficient_conditions_from_a_rule_tree(
+            rebuilt_root, value
+        )
         assert rebuilt_knowledge.is_satisfiable() == original_knowledge.is_satisfiable()
         assert len(rebuilt_knowledge.sufficient_condition_sets) == len(
             original_knowledge.sufficient_condition_sets
@@ -129,9 +135,11 @@ def test_generated_tree_evaluates_a_bird_case_the_same_as_the_original():
     rebuilt_root = namespace[RDR_QUERY_NAME]._conditions_root_
 
     bat = Animal("bat", has_fur=True, can_fly=True)
-    knowledge = what_do_we_know_about(rebuilt_root, Species.BIRD)
+    knowledge = get_conclusion_sufficient_conditions_from_a_rule_tree(
+        rebuilt_root, Species.BIRD
+    )
     assert knowledge.sufficient_condition_sets[0].evaluate_against(
-        rebuilt_variable, bat
+        shared_variable=rebuilt_variable, case=bat
     )
 
 
@@ -150,8 +158,12 @@ def test_generated_source_rebuilds_an_equivalent_alternative_chain():
 
     original_root = original.query._conditions_root_
     for value in (Species.MAMMAL, Species.BIRD):
-        original_knowledge = what_do_we_know_about(original_root, value)
-        rebuilt_knowledge = what_do_we_know_about(rebuilt_root, value)
+        original_knowledge = get_conclusion_sufficient_conditions_from_a_rule_tree(
+            original_root, value
+        )
+        rebuilt_knowledge = get_conclusion_sufficient_conditions_from_a_rule_tree(
+            rebuilt_root, value
+        )
         assert rebuilt_knowledge.is_satisfiable() == original_knowledge.is_satisfiable()
         assert len(rebuilt_knowledge.sufficient_condition_sets) == len(
             original_knowledge.sufficient_condition_sets
