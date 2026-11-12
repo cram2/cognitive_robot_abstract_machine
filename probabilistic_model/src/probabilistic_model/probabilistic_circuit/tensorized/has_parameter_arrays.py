@@ -26,9 +26,8 @@ class HasParameterArrays(DataclassDeepcopyMixin, ABC):
     Base class for the parts of a layered circuit whose numeric queries compute with the
     array backend of their parameters.
 
-    Everything else such a part stores is structure: numpy arrays on the host, fixed
-    once constructed. A deep copy copies the constructor fields only, so it looks up
-    the backend anew.
+    Everything else it stores is structure, numpy on the host. A deep copy copies only
+    the constructor fields, so it looks up the backend anew.
     """
 
     @property
