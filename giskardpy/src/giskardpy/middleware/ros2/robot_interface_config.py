@@ -7,7 +7,7 @@ from typing_extensions import TYPE_CHECKING
 from nav_msgs.msg import Odometry
 
 from cramph.executor import NoPacing, Pacer, RealTimePacer
-from semantic_digital_twin.adapters.ros import rospy
+from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.command_publishing import (
     DriveVelocityCommandPublisher,
     Float64MultiArrayFormat,
@@ -31,10 +31,7 @@ from semantic_digital_twin.adapters.ros.input_synchronization import (
     TfFrameSynchronizer,
 )
 from giskardpy.middleware.ros2.motion_server import MotionServer
-from giskardpy.middleware.ros2.ros2_interface import (
-    search_for_unique_publisher_of_type,
-    search_for_unique_subscriber_of_type,
-)
+from semantic_digital_twin.adapters.ros.ros_graph import RosGraph
 from giskardpy.middleware.ros2.server_config import GiskardServerConfig
 from semantic_digital_twin.robots.robot_part_mixins import HasInputSource
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -177,11 +174,13 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         Tell Giskard to sync an odometry joint added during by the world config.
         """
         if odometry_topic is None:
-            odometry_topic = search_for_unique_publisher_of_type(Odometry)
+            odometry_topic = RosGraph(
+                background_node.get_node()
+            ).unique_publisher_of_type(Odometry)
         assert isinstance(joint, (OmniDrive, DifferentialDrive))
         synchronizer = OdometrySynchronizer(
             world=self.world,
-            node=rospy.get_node(),
+            node=background_node.get_node(),
             topic_name=odometry_topic,
             connection=joint,
         )
@@ -197,7 +196,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         """
         if self.tf_frame_synchronizer is None:
             self.tf_frame_synchronizer = TfFrameSynchronizer(
-                world=self.world, node=rospy.get_node()
+                world=self.world, node=background_node.get_node()
             )
             self.motion_server.inputs.synchronizers.insert(
                 0, self.tf_frame_synchronizer
@@ -213,7 +212,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         The topics come from the parts, so a part mounted on a different robot is read
         wherever that robot publishes it.
         """
-        self.robot.use_real_sources(rospy.get_node())
+        self.robot.use_real_sources(background_node.get_node())
         self.motion_server.inputs.add_robot_inputs(self.robot)
         self.control_loop.inputs.add_robot_inputs(self.robot)
 
@@ -222,7 +221,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         Tell Giskard to read one part of the robot from the robot itself, on the topic
         that part declares.
         """
-        robot_part.use_real_source(rospy.get_node())
+        robot_part.use_real_source(background_node.get_node())
         self.motion_server.inputs.add_robot_part_input(robot_part)
         self.control_loop.inputs.add_robot_part_input(robot_part)
 
@@ -234,14 +233,14 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             group_name = self.robot.name
         self.motion_server.inputs.synchronizers.append(
             PendingJointStateSynchronizer(
-                world=self.world, node=rospy.get_node(), topic_name=topic_name
+                world=self.world, node=background_node.get_node(), topic_name=topic_name
             )
         )
         if group_name != self.robot.name:
             return
         self.control_loop.inputs.synchronizers.append(
             PendingJointStateSynchronizer(
-                world=self.world, node=rospy.get_node(), topic_name=topic_name
+                world=self.world, node=background_node.get_node(), topic_name=topic_name
             )
         )
 
@@ -278,9 +277,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             [drive] = drives
         command_format = command_format or TwistFormat()
         if command_topic is None:
-            command_topic = search_for_unique_subscriber_of_type(
-                command_format.message_type()
-            )
+            command_topic = RosGraph(
+                background_node.get_node()
+            ).unique_subscriber_of_type(command_format.message_type())
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
                 world=self.world,
@@ -345,7 +344,9 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             namespace it runs in.
         :param whitelist: The names of the controllers to consider, all if ``None``.
         """
-        controller_manager = ControllerManager(controller_manager_name)
+        controller_manager = ControllerManager(
+            controller_manager_name, ros_graph=RosGraph(background_node.get_node())
+        )
         for controller in controller_manager.active_controllers(whitelist):
             match controller.type:
                 case ControllerType.JOINT_STATE_BROADCASTER:

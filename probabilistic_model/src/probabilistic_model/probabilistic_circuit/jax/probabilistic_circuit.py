@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing_extensions import Self, Any
 
 import optax
@@ -80,28 +81,7 @@ class DifferentiableLayeredCircuit(SubclassJSONSerializer):
         :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
             learning rate of 1e-3 is used.
         """
-
-        @eqx.filter_jit
-        def loss(root: DifferentiableLayer, x: jax.Array) -> jax.Array:
-            return -jnp.mean(root.log_likelihood_of_nodes(x))
-
-        if optimizer is None:
-            optimizer = optax.adam(1e-3)
-
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
-
-        progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
-
-        for _ in progress_bar:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(self.root, data)
-
-            updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(self.root, eqx.is_inexact_array)
-            )
-            self.root = eqx.apply_updates(self.root, updates)
-            progress_bar.set_postfix_str(
-                f"Negative average log-likelihood: {loss_value}"
-            )
+        self.root = LikelihoodMaximization(self.root, optimizer).minimize(epochs, data)
 
 
 @dataclass
@@ -200,25 +180,163 @@ class ClassificationCircuit(DifferentiableLayeredCircuit):
         :param optimizer: The optimizer to use. If `None`, the Adam optimizer with a
             learning rate of 1e-3 is used.
         """
+        self.root = ClassConditionalLikelihoodMaximization(
+            self.root, optimizer
+        ).minimize(epochs, data, labels)
 
-        @eqx.filter_jit
-        def loss(root: DifferentiableLayer, x: jax.Array, y: jax.Array) -> jax.Array:
-            return -jnp.mean(root.log_likelihood_of_nodes(x)[y])
 
-        if optimizer is None:
-            optimizer = optax.adam(1e-3)
+# %% gradient descent
 
-        optimizer_state = optimizer.init(eqx.filter(self.root, eqx.is_inexact_array))
 
+class TrainingState(eqx.Module):
+    """
+    The values one compiled training step reads and returns.
+    """
+
+    parameters: list[jax.Array]
+    """
+    The trainable arrays of the layer, flattened by
+    :attr:`GradientDescent.parameter_structure`.
+    """
+
+    optimizer_state: optax.OptState
+    """
+    The state of the optimizer after the last step.
+    """
+
+    loss: jax.Array
+    """
+    The loss of the parameters before the last step.
+    """
+
+
+@dataclass
+class GradientDescent(ABC):
+    """
+    Minimizes a loss of a layer by gradient descent, one compiled step per epoch.
+
+    The optimizer receives the trainable arrays of the layer as a flat list.
+    """
+
+    layer: DifferentiableLayer
+    """
+    The layer to train, which is left unchanged.
+    """
+
+    optimizer: optax.GradientTransformation | None = None
+    """
+    The optimizer to use.
+
+    If `None`, the Adam optimizer with a learning rate of 1e-3 is used.
+    """
+
+    fixed_part: DifferentiableLayer = field(init=False)
+    """
+    The layer without its trainable arrays.
+    """
+
+    parameter_structure: jax.tree_util.PyTreeDef = field(init=False)
+    """
+    The tree structure of the trainable arrays of the layer.
+    """
+
+    initial_parameters: list[jax.Array] = field(init=False)
+    """
+    The trainable arrays of the layer before training.
+    """
+
+    def __post_init__(self) -> None:
+        if self.optimizer is None:
+            self.optimizer = optax.adam(1e-3)
+        # Static fields of the layers hold arrays, which pytree comparisons inside the
+        # optimizer cannot handle, so training works on the flat list of trainable arrays.
+        parameters, self.fixed_part = eqx.partition(self.layer, eqx.is_inexact_array)
+        self.initial_parameters, self.parameter_structure = jax.tree_util.tree_flatten(
+            parameters
+        )
+
+    @abstractmethod
+    def loss(self, layer: DifferentiableLayer, *arguments: jax.Array) -> jax.Array:
+        """
+        :param layer: The layer to evaluate.
+        :param arguments: The arrays passed to :meth:`minimize`.
+        :return: The scalar loss of the layer on the arguments.
+        """
+
+    def layer_from_parameters(self, parameters: list[jax.Array]) -> DifferentiableLayer:
+        """
+        :param parameters: Trainable arrays in the order of :attr:`initial_parameters`.
+        :return: The layer with its trainable arrays replaced by the parameters.
+        """
+        return eqx.combine(
+            jax.tree_util.tree_unflatten(self.parameter_structure, parameters),
+            self.fixed_part,
+        )
+
+    def loss_of_parameters(
+        self, parameters: list[jax.Array], *arguments: jax.Array
+    ) -> jax.Array:
+        """
+        :param parameters: Trainable arrays in the order of :attr:`initial_parameters`.
+        :param arguments: The arrays passed to :meth:`minimize`.
+        :return: The :meth:`loss` of the layer with the given trainable arrays.
+        """
+        return self.loss(self.layer_from_parameters(parameters), *arguments)
+
+    def step(self, state: TrainingState, *arguments: jax.Array) -> TrainingState:
+        """
+        :param state: The state before the step.
+        :param arguments: The arrays passed to :meth:`minimize`.
+        :return: The state after one update of the optimizer.
+        """
+        loss, gradients = jax.value_and_grad(self.loss_of_parameters)(
+            state.parameters, *arguments
+        )
+        updates, optimizer_state = self.optimizer.update(
+            gradients, state.optimizer_state, state.parameters
+        )
+        return TrainingState(
+            optax.apply_updates(state.parameters, updates), optimizer_state, loss
+        )
+
+    def minimize(self, epochs: int, *arguments: jax.Array) -> DifferentiableLayer:
+        """
+        :param epochs: The number of epochs.
+        :param arguments: The arrays :meth:`loss` takes after the layer.
+        :return: The trained layer.
+        """
+        compiled_step = jax.jit(self.step)
+        state = TrainingState(
+            self.initial_parameters,
+            self.optimizer.init(self.initial_parameters),
+            jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
+        )
         progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
-
         for _ in progress_bar:
-            loss_value, gradients = eqx.filter_value_and_grad(loss)(
-                self.root, data, labels
-            )
+            state = compiled_step(state, *arguments)
+            progress_bar.set_postfix_str(f"Loss: {state.loss}")
+        return self.layer_from_parameters(state.parameters)
 
-            updates, optimizer_state = optimizer.update(
-                gradients, optimizer_state, eqx.filter(self.root, eqx.is_inexact_array)
-            )
-            self.root = eqx.apply_updates(self.root, updates)
-            progress_bar.set_postfix_str(f"Cross Entropy: {loss_value}")
+
+@dataclass
+class LikelihoodMaximization(GradientDescent):
+    """
+    Maximizes the average log-likelihood of the data under the nodes of the layer.
+    """
+
+    def loss(self, layer: DifferentiableLayer, data: jax.Array) -> jax.Array:
+        return -jnp.mean(layer.log_likelihood_of_nodes(data))
+
+
+@dataclass
+class ClassConditionalLikelihoodMaximization(GradientDescent):
+    """
+    Maximizes the average log-likelihood of each row under the node of its class.
+    """
+
+    def loss(
+        self, layer: DifferentiableLayer, data: jax.Array, labels: jax.Array
+    ) -> jax.Array:
+        return -jnp.mean(
+            layer.log_likelihood_of_nodes(data)[jnp.arange(len(labels)), labels]
+        )

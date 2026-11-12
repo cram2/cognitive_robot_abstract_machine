@@ -81,6 +81,20 @@ class DatasetFile(PathEnumeration):
     A package declaring a repository's own rules in several modules.
     """
 
+    PROJECT_SKILLS_MODULE = (
+        Path(__file__).parent / "dataset" / "project_skills_module.py"
+    )
+    """
+    A module declaring a repository's skills.
+    """
+
+    SKILL_TEXT = Path(__file__).parent / "dataset" / "skill_text.md"
+    """
+    The ``SKILL.md`` of the deploying skill of :attr:`PROJECT_SKILLS_MODULE`, with
+    ``{generate_command}`` and ``{source_path}`` standing for the command generating it
+    and the path of the module declaring it.
+    """
+
     RULE_SECTIONS_TEXT = Path(__file__).parent / "dataset" / "rule_sections_text.md"
     """
     The ``AGENTS.md`` listing the design principles and verification sections of

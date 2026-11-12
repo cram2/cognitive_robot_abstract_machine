@@ -902,12 +902,16 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         Resolve the attribute assignment by creating the conditions and applying the
         necessary mappings to the attribute.
+
+        A pattern evaluated before it was nested still restricts the attribute.
         """
-        if (
-            not isinstance(self.assigned_value, AbstractMatchExpression)
-            or self.assigned_value._resolved_
-        ):
+        if not isinstance(self.assigned_value, AbstractMatchExpression):
             self._conditions_.append(self.attribute == self.assigned_variable)
+            return
+
+        if self.assigned_value._resolved_:
+            self._conditions_.append(self.attribute == self.assigned_variable)
+            self._conditions_.extend(self.assigned_value._conditions_)
             return
 
         self.assigned_value.resolve(variable=self.attribute, parent=self)

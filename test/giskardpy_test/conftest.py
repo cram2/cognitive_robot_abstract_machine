@@ -12,7 +12,7 @@ regenerate_orm_interfaces(OrmPackage.GISKARDPY)
 
 import pytest
 
-from giskardpy.middleware.ros2.utils.utils_for_tests import GiskardTester
+from giskardpy.middleware.ros2.giskard_tester import GiskardTester
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import (
     SetSeedConfiguration,
@@ -197,7 +197,7 @@ def pr2_with_box(pr2_world_copy) -> World:
 
 
 @pytest.fixture()
-def giskard_factory(init_rospy, robot: GiskardTester):
+def giskard_factory(init_background_node, robot: GiskardTester):
     def _create_giskard(seed_joint_state: dict[str, float]) -> GiskardTester:
         parse_seed_joint_state = {
             robot.api.world.get_connection_by_name(name): target
