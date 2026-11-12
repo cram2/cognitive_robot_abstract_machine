@@ -8,10 +8,8 @@ import math
 import pytest
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.exceptions import NoShapesToProject
-from semantic_digital_twin.spatial_types.spatial_types import (
-    HomogeneousTransformationMatrix,
-)
+from semantic_digital_twin.world_description.exceptions import NoShapesToProject
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -58,7 +56,7 @@ def test_a_box_covers_its_own_base_in_its_own_frame():
         Scale(0.02, 0.04, 0.03), HomogeneousTransformationMatrix(reference_frame=None)
     )
 
-    footprint = body.collision.convex_footprint_in_frame(body)
+    footprint = body.collision.convex_footprint_in_frame(reference_frame=body)
 
     assert footprint.area == pytest.approx(0.02 * 0.04)
     assert footprint.bounding_box.depth == pytest.approx(0.02)
@@ -71,7 +69,7 @@ def test_a_footprint_is_taken_where_the_body_stands_in_the_given_frame():
         HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=-2.0, yaw=math.pi / 2),
     )
 
-    footprint = body.collision.convex_footprint_in_frame(root)
+    footprint = body.collision.convex_footprint_in_frame(reference_frame=root)
 
     assert footprint.centroid.to_np() == pytest.approx([1.0, -2.0])
     assert footprint.bounding_box.depth == pytest.approx(0.04)
@@ -84,7 +82,7 @@ def test_a_box_lying_on_its_side_covers_its_side_from_above():
         HomogeneousTransformationMatrix.from_xyz_rpy(roll=math.pi / 2),
     )
 
-    footprint = body.collision.convex_footprint_in_frame(root)
+    footprint = body.collision.convex_footprint_in_frame(reference_frame=root)
 
     assert footprint.bounding_box.depth == pytest.approx(0.01)
     assert footprint.bounding_box.width == pytest.approx(0.03)
@@ -96,4 +94,6 @@ def test_a_collection_without_shapes_has_no_footprint():
     )
 
     with pytest.raises(NoShapesToProject):
-        ShapeCollection(reference_frame=body).convex_footprint_in_frame(body)
+        ShapeCollection(reference_frame=body).convex_footprint_in_frame(
+            reference_frame=body
+        )

@@ -27,9 +27,8 @@ folder**:
 
 | File | Role |
 |---|---|
-| `demo.py` | What every run shares: `MontessoriScene` — every hardcoded pose and size as a field, with the pieces (`ShapeSortingPieceSet`), how solid the bodies are (`SolidContact`) and how low a piece is gripped (`PieceGrip`) — the plan that sorts the pieces (`ShapeSortingPlan`), and `DemoRunner`, the base of the runners. |
-| `montessori_board.py` | The board: its holes read off the mesh (`BoardGeometry`), and the body with the mesh to look at and boxes to collide with (`ShapeSortingBoard`). |
-| `resources/board.stl` | The board's mesh. |
+| `demo.py` | What every run shares: `MontessoriScene` — every hardcoded pose and size as a field, with the pieces (`semantic_digital_twin`'s `PieceSet`), how solid the bodies are (`SolidContact`) and how low a piece is gripped (`PieceGrip`) — the plan that sorts the pieces (`ShapeSortingPlan`), and `DemoRunner`, the base of the runners. |
+| `montessori_board.py` | The board as a body, with its mesh to look at and boxes to collide with (`ShapeSortingBoardModel`), built from the holes `semantic_digital_twin`'s `ShapeSortingBoardMesh` reads off the mesh. |
 | `mujoco_demo.py` | `MujocoRunner`: physics run, controller and physics stepped in lockstep. |
 | `rviz_demo.py` | `RvizRunner`: kinematic run, published for RViz. |
 | `real_demo.py` | `RealRunner`: real robot, through giskard. |
