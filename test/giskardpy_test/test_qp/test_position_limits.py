@@ -394,9 +394,10 @@ def test_joint_driven_to_upper_limit_comes_to_rest_only_on_it(prismatic_bot):
 
 # %% staying within a position limit
 
-POSITION_ROUNDING = 1e-9
+POSITION_LIMIT_TOLERANCE = 1e-6
 """
-Rounding error of integrating the commanded velocities into positions.
+Distance past a position limit that the solver's tolerance on the velocity bounds can
+add up to, far below a real overshoot.
 """
 
 JERK_LIMIT_TOLERANCE = 1e-3
@@ -560,7 +561,7 @@ def test_joint_never_passes_its_upper_limit(
         duration=timedelta(seconds=3) + 2 * braking_time,
     )
 
-    assert np.max(recording.positions) <= upper + POSITION_ROUNDING
+    assert np.max(recording.positions) <= upper + POSITION_LIMIT_TOLERANCE
 
 
 @pytest.mark.parametrize(

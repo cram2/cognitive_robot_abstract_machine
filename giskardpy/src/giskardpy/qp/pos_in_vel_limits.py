@@ -161,39 +161,33 @@ class BrakingProfile:
         """
         time_step = self.time_step.total_seconds()
         velocity_profile = self.zero_negligible_velocities(self.velocity)
-        velocity_if_cases = []
-        shorter_tail = np.zeros(velocity_profile.shape[0])
-        shorter_tail_distance = 0.0
-        for first_step in reversed(range(velocity_profile.shape[0])):
-            longer_tail = np.concatenate(
-                [velocity_profile[first_step:], np.zeros(first_step)]
-            )
-            longer_tail_distance = time_step * sum(velocity_profile[first_step:])
-            if longer_tail_distance <= shorter_tail_distance:
+        number_of_steps = velocity_profile.shape[0]
+        tails = [np.zeros(number_of_steps)]
+        tail_distances = [0.0]
+        for first_step in reversed(range(number_of_steps)):
+            tail_distance = time_step * sum(velocity_profile[first_step:])
+            if tail_distance <= tail_distances[-1]:
                 continue
-            # Between two neighbouring tails, a blend of both covers exactly the distance.
-            blend = (distance - shorter_tail_distance) / (
-                longer_tail_distance - shorter_tail_distance
+            tails.append(
+                np.concatenate([velocity_profile[first_step:], np.zeros(first_step)])
             )
-            velocity_if_cases.append(
-                (
-                    longer_tail_distance,
-                    sm.Vector(shorter_tail)
-                    + sm.Vector(longer_tail - shorter_tail) * blend,
-                )
+            tail_distances.append(tail_distance)
+        # Interpolating linearly between the tails, which are ordered by the distance
+        # they cover, gives a profile that covers exactly the distance in between.
+        velocity = sm.Vector(tails[0])
+        for index in range(1, len(tails)):
+            gap = tail_distances[index] - tail_distances[index - 1]
+            covered = distance - tail_distances[index - 1]
+            covered = sm.min(covered, gap) if index == 1 else sm.limit(covered, 0, gap)
+            velocity = (
+                velocity + sm.Vector((tails[index] - tails[index - 1]) / gap) * covered
             )
-            shorter_tail, shorter_tail_distance = longer_tail, longer_tail_distance
-        velocity_if_cases.append(
-            (
-                2 * velocity_if_cases[-1][0] - velocity_if_cases[-2][0],
-                sm.Vector(velocity_profile),
-            )
-        )
-        default_velocity_profile = np.full(
-            velocity_profile.shape[0], velocity_profile[0]
-        )
-        return sm.if_less_eq_cases(
-            distance, velocity_if_cases, sm.Vector(default_velocity_profile)
+        full_profile_reach = 2 * tail_distances[-1] - tail_distances[-2]
+        return sm.if_less_eq(
+            distance,
+            full_profile_reach,
+            velocity,
+            sm.Vector(np.full(number_of_steps, velocity_profile[0])),
         )
 
     @staticmethod

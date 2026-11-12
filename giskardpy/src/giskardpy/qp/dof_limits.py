@@ -286,6 +286,7 @@ class DegreeOfFreedomLimitProfiler:
 
     def _directional_velocity_bound(
         self,
+        *,
         braking_profile: BrakingProfile,
         position_error: sm.Scalar,
         jerk_limit: float,
