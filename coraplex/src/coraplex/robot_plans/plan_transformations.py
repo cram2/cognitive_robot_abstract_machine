@@ -1,3 +1,8 @@
+"""
+The transformations that insert steps into a plan or change how its actions are carried
+out, such as opening a drawer before picking up what it holds.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -50,8 +55,11 @@ from giskardpy.motion_statechart.tasks.drive_tasks import HolonomicBaseGoal
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.gripper import MoveFingers
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianTask
-from krrood.entity_query_language.core.mapped_variable import FlatVariable
-from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
+from krrood.entity_query_language.core.variable import (
+    ExpressionDomain,
+    InstantiatedVariable,
+    Variable,
+)
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -329,11 +337,13 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if not isinstance(arm, Arm):
             return None
         if (
-            isinstance(grasp, FlatVariable)
-            and isinstance(grasp._child_, InstantiatedVariable)
-            and grasp._child_._factory_ is GraspsByCloseness
+            isinstance(grasp, Variable)
+            and isinstance(grasp._values_domain_, ExpressionDomain)
+            and isinstance(grasp._values_domain_.expression, InstantiatedVariable)
+            and grasp._values_domain_.expression._factory_ is GraspsByCloseness
         ):
-            return PickUpTarget(graspable=grasp._child_._kwargs_["graspable"], arm=arm)
+            ranked_grasps = grasp._values_domain_.expression
+            return PickUpTarget(graspable=ranked_grasps._kwargs_["graspable"], arm=arm)
         grasps = grasp._domain_ if isinstance(grasp, Variable) else [grasp]
         if not all(isinstance(candidate, GraspCandidate) for candidate in grasps):
             return None

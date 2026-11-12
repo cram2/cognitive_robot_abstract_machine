@@ -18,6 +18,7 @@ from typing_extensions import (
     Type,
     TYPE_CHECKING,
     TypeVar,
+    deprecated,
     overload,
 )
 
@@ -32,7 +33,6 @@ from krrood.entity_query_language.operators.causal import (
 )
 from krrood.entity_query_language.core.helpers import _resolve_domain
 from krrood.entity_query_language.core.mapped_variable import (
-    FlatVariable,
     CanBehaveLikeAVariable,
     HasSymbolicOperations,
     Attribute,
@@ -193,7 +193,7 @@ def probability_of(
 
 def variable(
     type_: type[T],
-    domain: DomainType | None = None,
+    domain: Iterable[T] | None = None,
 ) -> Union[T, Selectable[T], Variable[T]]:
     """
     Declare a symbolic variable that can be used inside queries.
@@ -202,13 +202,16 @@ def variable(
 
     .. warning::
 
-        If no domain is provided, and the type_ is a Symbol type, then the domain will be inferred from the SymbolGraph,
-         which may contain unnecessarily many elements.
+        If no domain is provided, and the type_ is a Symbol type, then the domain is
+        every instance of the type in the evaluation: the SymbolGraph's, which may
+        contain unnecessarily many elements, or a state's objects when the query is
+        evaluated with a state.
 
     :param type_: The type of variable.
-    :param domain: Iterable of potential values for the variable or None.
-     If None, the domain will be inferred from the SymbolGraph for Symbol types, else should not be evaluated by EQL
-      but by another evaluator (e.g., EQL To SQL converter in Ormatic).
+    :param domain: Iterable of potential values for the variable, or None. If None, the
+        domain is every instance of a Symbol type in the evaluation; for other types the
+        variable should not be evaluated by EQL but by another evaluator (e.g., EQL To
+        SQL converter in Ormatic).
     :return: A Variable that can be queried for.
     """
     return Variable(
@@ -240,12 +243,17 @@ def deduced_variable(
 
 
 def variable_from(
-    domain: Union[Iterable[T], Selectable[T], T],
-) -> Union[T, Variable[T]]:
+    domain: DomainType | T,
+) -> T | Variable[T]:
     """
-    Create a variable from a given domain.
+    Create a variable that ranges over the values of a domain.
 
-    :param domain: An iterable or selectable expression to use as the variable's domain.
+    Each call creates a variable of its own, so two variables from one domain range over
+    it independently and a condition can relate one value to another.
+
+    :param domain: The values, or an expression whose value, for each of its bindings,
+        holds them; a value declared as a collection, or a collection of undeclared
+        kind, holds its elements, ``None`` holds none, and any other value itself.
     :return: A variable that can be queried for.
     """
     return Variable(_domain_=domain)
@@ -295,23 +303,17 @@ def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
     return Comparator(left=container, right=item, operation=operator.contains)
 
 
+@deprecated("Use variable_from, which ranges over the elements of a collection.")
 def flat_variable(
     var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
-) -> Union[FlatVariable[T], T]:
+) -> Union[Variable[T], T]:
     """
-    Flatten a nested iterable domain into individual items while preserving the parent
-    bindings.
+    Create a variable that ranges over the elements of a collection.
 
-    This returns a DomainMapping that, when evaluated, yields one solution per inner
-    element (similar to SQL UNNEST), keeping existing variable bindings intact.
-
-    Each call yields a variable of its own, so two flattenings of the same collection
-    range over its elements independently and a condition can relate one element to
-    another.
+    .. deprecated::
+        Use :func:`variable_from`, which this is now the same as.
     """
-    # Constructed directly rather than through `_get_mapped_variable_`, whose cache
-    # would give every flattening of one collection the same identity.
-    return FlatVariable(_child_=var)
+    return variable_from(var)
 
 
 # %% Logical Operators

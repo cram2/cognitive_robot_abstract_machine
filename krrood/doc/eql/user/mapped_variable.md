@@ -43,22 +43,26 @@ first_part = robot.parts[0] # -> returns IndexedVariable(robot.parts, 0)
 config_val = robot.qp_controller_config["battery_limit"] # -> returns IndexedVariable(robot.config, "battery_limit")
 ```
 
-## Flattening Collections
+## A Variable Over a Collection
 
-When an attribute returns a collection (like a list), you might want to treat each element as an individual result. The `flat_variable()` function "unpacks" these collections.
+`robot.parts` is the list of parts itself. To range over the parts one at a time, create a variable whose domain is
+that expression, with `variable_from(...)`, `variable(Type, ...)` or `a(Type).from_(...)`:
 
 ```python
-from krrood.entity_query_language.factories import flat_variable
+from krrood.entity_query_language.factories import a, variable_from
 
-# robot.parts is a List[ExamplePart]. We want to iterate over each part. Since robot itself is a variable, if we just do
-# robot.parts, we will get for each item of this iterable a list of parts, but we want instead to get for each item of
-# the iterable a single part. And that's what flat_variable does.
-part = flat_variable(robot.parts) # -> returns FlatVariable(robot.parts)
+part = variable_from(robot.parts)                 # each part of each robot
+arm = a(ExamplePart).from_(domain=robot.parts)   # each part of each robot that is an ExamplePart
 ```
 
+The variable takes, for each value of `robot`, each element of that robot's parts, and keeps the binding of `robot`,
+like a `JOIN` or `UNNEST` in SQL. Each variable created this way is a new one, so two of them range over the parts
+independently. Whether a value is read as a collection follows its declared type: a field declared as a collection
+gives its elements, `None` gives none, and a field declared as one object gives that object even when it can be
+iterated. A value of undeclared type, such as a method's result, gives its elements when it is a collection.
+
 ```{note}
-`flat_variable` behaves similarly to a `JOIN` or `UNNEST` in SQL, creating a new solution for every element in the 
-collection while keeping the original variable bindings.
+`flat_variable(...)` is deprecated; it is the same as `variable_from(...)`.
 ```
 
 ## Symbolic Method Calls
@@ -83,7 +87,7 @@ and flattening.
 ```{code-cell} ipython3
 from dataclasses import dataclass
 from typing import List
-from krrood.entity_query_language.factories import variable, entity, an, flat_variable, Symbol
+from krrood.entity_query_language.factories import variable, entity, an, variable_from, Symbol
 
 @dataclass
 class ExamplePart(Symbol):
@@ -102,8 +106,8 @@ my_robots = [robot]
 # 1. Define the base variable
 r = variable(ExampleRobot, domain=my_robots)
 
-# 2. Use attribute access and flat_variable to reach the parts
-p = flat_variable(r.parts)
+# 2. Range a variable over the parts of each robot
+p = variable_from(r.parts)
 
 # 3. Build a query to find parts belonging to 'R2D2'
 query = an(entity(p).where(r.name == "R2D2"))
@@ -113,8 +117,8 @@ for part in query.evaluate():
 ```
 
 ## API Reference
-- {py:func}`~krrood.entity_query_language.factories.flat_variable`
+- {py:func}`~krrood.entity_query_language.factories.variable_from`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Attribute`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Index`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Call`
-- {py:class}`~krrood.entity_query_language.core.mapped_variable.FlatVariable`
+- {py:class}`~krrood.entity_query_language.core.variable.ExpressionDomain`
