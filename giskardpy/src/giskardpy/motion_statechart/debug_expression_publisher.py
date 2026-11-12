@@ -47,11 +47,6 @@ class MarkerSubmission:
     The visualizations to show; the markers of all others are deleted.
     """
 
-    root_frame_name: str
-    """
-    The frame used when a spatial type has no reference frame.
-    """
-
 
 @dataclass(eq=False, kw_only=True)
 class BackgroundMarkerPublisher(HasROS2Node):
@@ -161,8 +156,7 @@ class BackgroundMarkerPublisher(HasROS2Node):
         published = False
         try:
             self.marker_publisher.publish(
-                evaluated_visualizations=submission.evaluated_visualizations,
-                root_frame_name=submission.root_frame_name,
+                evaluated_visualizations=submission.evaluated_visualizations
             )
             published = True
         finally:
@@ -213,9 +207,6 @@ class DebugExpressionPublishing(TickingExecutorExtension):
     ] = field(init=False, default_factory=dict)
     """
     The visualizations of the spatial debug expressions of each node that has any.
-
-    They outlive every submission that refers to them, so the publishing thread never
-    frees an expression.
     """
 
     _compiled_visualizations: CompiledSpatialTypeVisualizations | None = field(
@@ -263,7 +254,8 @@ class DebugExpressionPublishing(TickingExecutorExtension):
                 visualization
                 for visualizations in self._visualizations_per_node.values()
                 for visualization in visualizations
-            ]
+            ],
+            root_frame_name=str(world.root.name),
         )
 
     def after_tick(self, executor: StatechartExecutor) -> None:
@@ -301,8 +293,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
                         strict=True,
                     )
                     if node.life_cycle_state == LifeCycleValues.RUNNING
-                ],
-                root_frame_name=str(executor.context.world.root.name),
+                ]
             )
         )
 
@@ -317,19 +308,14 @@ class DebugExpressionPublishing(TickingExecutorExtension):
             and not self._marker_publisher.publishing_stopped
         ):
             self._marker_publisher.submit(
-                submission=MarkerSubmission(
-                    evaluated_visualizations=[],
-                    root_frame_name=str(executor.context.world.root.name),
-                )
+                submission=MarkerSubmission(evaluated_visualizations=[])
             )
         self._release_visualizations()
 
     def _release_visualizations(self) -> None:
         """
-        Forget the visualizations of the previous statechart once the publishing thread
-        no longer refers to them, so their expressions are freed on this thread.
+        Forget the visualizations of the previous statechart.
         """
-        self._marker_publisher.wait_until_published()
         self._visualizations_per_node = {}
         self._compiled_visualizations = None
         self._last_published_tick = None

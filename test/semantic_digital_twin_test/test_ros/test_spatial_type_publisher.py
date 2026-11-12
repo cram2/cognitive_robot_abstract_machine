@@ -9,7 +9,11 @@ import pytest
 from visualization_msgs.msg import Marker, MarkerArray
 
 from krrood.symbolic_math.symbolic_math import FloatVariable, SymbolicMathType
+from semantic_digital_twin.adapters.ros.visualization import (
+    spatial_type_marker_renderer,
+)
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
+    SpatialTypeMarkers,
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
@@ -63,13 +67,15 @@ def test_marker_publisher_draws_markers_from_the_given_values(rclpy_node):
     marker_publisher.publish(
         evaluated_visualizations=[
             EvaluatedSpatialTypeVisualization(
-                visualization=SpatialTypeVisualization(
-                    spatial_type=Point3(x=unresolvable)
+                spatial_type_markers=SpatialTypeMarkers.from_visualization(
+                    visualization=SpatialTypeVisualization(
+                        spatial_type=Point3(x=unresolvable)
+                    ),
+                    root_frame_name="map",
                 ),
                 rendered_value=np.array([4.0, 5.0, 6.0]),
             )
-        ],
-        root_frame_name="map",
+        ]
     )
 
     position = fake.published[-1].markers[0].pose.position
@@ -87,13 +93,15 @@ def test_marker_publisher_deletes_markers_no_longer_published(rclpy_node):
     marker_publisher.publish(
         evaluated_visualizations=[
             EvaluatedSpatialTypeVisualization(
-                visualization=visualization, rendered_value=np.zeros(3)
+                spatial_type_markers=SpatialTypeMarkers.from_visualization(
+                    visualization=visualization, root_frame_name="map"
+                ),
+                rendered_value=np.zeros(3),
             )
-        ],
-        root_frame_name="map",
+        ]
     )
 
-    marker_publisher.publish(evaluated_visualizations=[], root_frame_name="map")
+    marker_publisher.publish(evaluated_visualizations=[])
 
     markers = fake.published[-1].markers
     assert [(marker.action, marker.ns) for marker in markers] == [
@@ -118,7 +126,8 @@ def test_compiled_visualizations_evaluate_the_current_variable_values(
                     x=dof.variables.position, reference_frame=cylinder_bot_world.root
                 )
             )
-        ]
+        ],
+        root_frame_name=str(cylinder_bot_world.root.name),
     )
     monkeypatch.setattr(
         SymbolicMathType, "evaluate", lambda self: pytest.fail("evaluate recompiles")
@@ -145,7 +154,8 @@ def test_compiled_visualizations_return_values_later_evaluations_leave_unchanged
                     x=dof.variables.position, reference_frame=cylinder_bot_world.root
                 )
             )
-        ]
+        ],
+        root_frame_name=str(cylinder_bot_world.root.name),
     )
     cylinder_bot_world.state[dof.id].position = 1.5
     [first] = compiled_visualizations.evaluate()
@@ -336,3 +346,30 @@ def test_state_change_reuses_the_compiled_function(
 
     assert publisher._compiled_visualizations is compiled_function
     assert fake.published[-1].markers[0].pose.position.x == 1.5
+
+
+def test_state_change_builds_no_markers(rclpy_node, cylinder_bot_world, monkeypatch):
+    """
+    A state change writes the new value into the markers built on registration.
+    """
+    dof = first_moving_dof(cylinder_bot_world)
+    point = Point3(x=dof.variables.position, reference_frame=cylinder_bot_world.root)
+    publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
+    fake = capture(publisher)
+    publisher.add(request=SpatialTypeVisualization(spatial_type=point, label="point"))
+
+    def fail_building_markers(**kwargs) -> Marker:
+        """
+        Fail the test instead of building a marker on a state change.
+        """
+        pytest.fail("a state change built markers")
+
+    monkeypatch.setattr(spatial_type_marker_renderer, "Marker", fail_building_markers)
+
+    cylinder_bot_world.state[dof.id].position = 1.5
+    cylinder_bot_world.notify_state_change()
+
+    assert [marker.pose.position.x for marker in fake.published[-1].markers] == [
+        1.5,
+        1.5,
+    ]

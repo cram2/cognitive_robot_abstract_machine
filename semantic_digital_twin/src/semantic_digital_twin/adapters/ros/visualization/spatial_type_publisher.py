@@ -25,7 +25,7 @@ from semantic_digital_twin.adapters.ros.visualization.exceptions import (
     WorldNotResolvableError,
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
-    SpatialTypeMarkerRenderer,
+    SpatialTypeMarkers,
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
@@ -59,18 +59,19 @@ class MarkerIdentity:
 @dataclass(kw_only=True)
 class EvaluatedSpatialTypeVisualization:
     """
-    A visualization request together with the value its markers are drawn from.
+    The markers of a visualization together with the value they are to be drawn from.
     """
 
-    visualization: SpatialTypeVisualization
+    spatial_type_markers: SpatialTypeMarkers
     """
-    The spatial type and its display metadata.
+    The markers of the visualization.
     """
 
     rendered_value: np.ndarray
     """
-    The evaluated :meth:`SpatialTypeMarkerRenderer.rendered_expression` of the spatial
-    type.
+    The evaluated
+    :meth:`~semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer.SpatialTypeMarkerRenderer.rendered_expression`
+    of the spatial type.
     """
 
 
@@ -125,26 +126,23 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
         self,
         *,
         evaluated_visualizations: Iterable[EvaluatedSpatialTypeVisualization],
-        root_frame_name: str,
     ) -> None:
         """
-        Render the visualizations and publish them, deleting markers no longer rendered.
+        Draw the markers of the visualizations from their values and publish them,
+        deleting markers no longer published.
 
         .. warning:: The rendered values must not change during the call; pass copies
             when they are views on a buffer another thread writes to.
 
         :param evaluated_visualizations: The visualizations to show; all others are deleted.
-        :param root_frame_name: The frame used when a spatial type has no reference frame.
         """
         marker_array = MarkerArray()
         for evaluated_visualization in evaluated_visualizations:
-            marker_array.markers.extend(
-                SpatialTypeMarkerRenderer.render(
-                    request=evaluated_visualization.visualization,
-                    rendered_value=evaluated_visualization.rendered_value,
-                    root_frame_name=root_frame_name,
-                )
+            spatial_type_markers = evaluated_visualization.spatial_type_markers
+            spatial_type_markers.update(
+                rendered_value=evaluated_visualization.rendered_value
             )
+            marker_array.markers.extend(spatial_type_markers.markers)
         current_identities = {
             MarkerIdentity(namespace=marker.ns, marker_id=marker.id)
             for marker in marker_array.markers
@@ -173,7 +171,8 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
 class CompiledSpatialTypeVisualizations:
     """
     Visualizations whose rendered expressions are compiled together once, so their
-    values are evaluated in one call of a function of their free variables.
+    values are evaluated in one call of a function of their free variables, and whose
+    markers are built once.
 
     .. warning:: Builds and evaluates CasADi expressions; use it from one thread only.
     """
@@ -181,6 +180,16 @@ class CompiledSpatialTypeVisualizations:
     visualizations: list[SpatialTypeVisualization] = field(default_factory=list)
     """
     The visualizations, in the order :meth:`evaluate` returns their values.
+    """
+
+    root_frame_name: str
+    """
+    The frame used when a spatial type has no reference frame.
+    """
+
+    _spatial_type_markers: list[SpatialTypeMarkers] = field(init=False)
+    """
+    The markers of each visualization, in the order of :attr:`visualizations`.
     """
 
     _variables: list[FloatVariable] = field(init=False)
@@ -196,13 +205,22 @@ class CompiledSpatialTypeVisualizations:
 
     def __post_init__(self):
         """
-        Compile the rendered expressions of :attr:`visualizations`.
+        Build the markers and compile the rendered expressions of
+        :attr:`visualizations`.
         """
-        rendered_expressions = [
-            SpatialTypeMarkerRenderer.find_spatial_type_renderer(
-                spatial_type=visualization.spatial_type
-            ).rendered_expression(spatial_type=visualization.spatial_type)
+        self._spatial_type_markers = [
+            SpatialTypeMarkers.from_visualization(
+                visualization=visualization, root_frame_name=self.root_frame_name
+            )
             for visualization in self.visualizations
+        ]
+        rendered_expressions = [
+            spatial_type_markers.renderer.rendered_expression(
+                spatial_type=visualization.spatial_type
+            )
+            for visualization, spatial_type_markers in zip(
+                self.visualizations, self._spatial_type_markers, strict=True
+            )
         ]
         self._variables = Matrix.vstack(
             list_of_matrices=rendered_expressions
@@ -216,19 +234,22 @@ class CompiledSpatialTypeVisualizations:
         """
         Evaluate every visualization against the current values of its variables.
 
-        :return: The visualizations with copies of their rendered values, which later
-            evaluations leave unchanged.
+        :return: The markers of the visualizations with copies of their rendered values,
+            which later evaluations leave unchanged.
         """
+        if not self.visualizations:
+            return []
         values = np.array(
             [variable.resolve() for variable in self._variables], dtype=np.float64
         )
         rendered_values = self._compiled_rendered_values(values)
         return [
             EvaluatedSpatialTypeVisualization(
-                visualization=visualization, rendered_value=rendered_value.copy()
+                spatial_type_markers=spatial_type_markers,
+                rendered_value=rendered_value.copy(),
             )
-            for visualization, rendered_value in zip(
-                self.visualizations, rendered_values
+            for spatial_type_markers, rendered_value in zip(
+                self._spatial_type_markers, rendered_values, strict=True
             )
         ]
 
@@ -251,9 +272,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     Publishes the evaluated spatial types on :attr:`node`.
     """
 
-    _compiled_visualizations: CompiledSpatialTypeVisualizations = field(
-        init=False, default_factory=CompiledSpatialTypeVisualizations
-    )
+    _compiled_visualizations: CompiledSpatialTypeVisualizations = field(init=False)
     """
     The spatial types that are re-evaluated and republished on every state change.
     """
@@ -261,6 +280,9 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     def __post_init__(self):
         super().__post_init__()
         self.marker_publisher = EvaluatedSpatialTypePublisher(node=self.node)
+        self._compiled_visualizations = CompiledSpatialTypeVisualizations(
+            root_frame_name=str(self._world.root.name)
+        )
 
     def add(self, *, request: SpatialTypeVisualization) -> None:
         """
@@ -281,7 +303,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         Replace all registered spatial types and publish immediately.
         """
         self._compiled_visualizations = CompiledSpatialTypeVisualizations(
-            visualizations=list(requests)
+            visualizations=list(requests), root_frame_name=str(self._world.root.name)
         )
         self.publish()
 
@@ -303,8 +325,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
         publish them, deleting the markers of spatial types no longer registered.
         """
         self.marker_publisher.publish(
-            evaluated_visualizations=self._compiled_visualizations.evaluate(),
-            root_frame_name=str(self._world.root.name),
+            evaluated_visualizations=self._compiled_visualizations.evaluate()
         )
 
     @classmethod

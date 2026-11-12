@@ -42,6 +42,12 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianOrientati
 from giskardpy.motion_statechart.tasks.feature_functions import AlignPerpendicular
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood_spatial_math.spatial_types import Point3, RotationMatrix, Vector3
+from semantic_digital_twin.adapters.ros.visualization import (
+    spatial_type_marker_renderer,
+)
+from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher import (
+    EvaluatedSpatialTypeVisualization,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from ..motion_control_context import add_to_statechart_with_motion_control
@@ -436,6 +442,33 @@ def test_ticking_compiles_no_debug_expressions(
     )
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_publishing_builds_no_markers_after_compiling(
+    publishing, cylinder_bot_world, monkeypatch
+):
+    """
+    The markers are built with the statechart, so publishing only writes new values into
+    them, also for nodes that start running later.
+    """
+    executor = create_executor(cylinder_bot_world, publishing)
+    nodes = NodesStartingInTurn.build(executor.context)
+    executor.compile(nodes.statechart)
+
+    def fail_building_markers(**kwargs) -> Marker:
+        """
+        Stop the publishing thread instead of building a marker after compiling.
+        """
+        raise AssertionError("publishing built markers")
+
+    monkeypatch.setattr(spatial_type_marker_renderer, "Marker", fail_building_markers)
+
+    tick_until_running(executor, nodes.second)
+
+    assert published_namespaces(publishing) == collected_namespaces(
+        publishing, nodes.first, nodes.second
+    )
+
+
 def test_markers_are_published_at_the_publish_frequency(
     publishing, cylinder_bot_world, monkeypatch
 ):
@@ -551,14 +584,10 @@ def test_a_submission_replaced_before_it_is_published_is_dropped(publishing):
 
     with marker_publisher._condition:
         marker_publisher.submit(
-            submission=MarkerSubmission(
-                evaluated_visualizations=[], root_frame_name="dropped"
-            )
+            submission=MarkerSubmission(evaluated_visualizations=[])
         )
         marker_publisher.submit(
-            submission=MarkerSubmission(
-                evaluated_visualizations=[], root_frame_name="published"
-            )
+            submission=MarkerSubmission(evaluated_visualizations=[])
         )
     marker_publisher.wait_until_published()
 
@@ -572,23 +601,21 @@ def test_submitting_after_publishing_raised_raises(publishing, monkeypatch):
     """
     marker_publisher = publishing._marker_publisher
 
-    def raise_error(evaluated_visualizations, root_frame_name) -> None:
+    def raise_error(
+        *, evaluated_visualizations: list[EvaluatedSpatialTypeVisualization]
+    ) -> None:
         """
         Fail like a publisher whose ROS node was destroyed.
         """
         raise RuntimeError("publishing failed")
 
     monkeypatch.setattr(marker_publisher.marker_publisher, "publish", raise_error)
-    marker_publisher.submit(
-        submission=MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
-    )
+    marker_publisher.submit(submission=MarkerSubmission(evaluated_visualizations=[]))
     marker_publisher._thread.join()
 
     with pytest.raises(MarkerPublishingThreadEndedError):
         marker_publisher.submit(
-            submission=MarkerSubmission(
-                evaluated_visualizations=[], root_frame_name="map"
-            )
+            submission=MarkerSubmission(evaluated_visualizations=[])
         )
 
 
@@ -604,7 +631,9 @@ def test_waiting_for_publishes_returns_after_publishing_raised_with_a_submission
     publish_started = threading.Event()
     publish_may_raise = threading.Event()
 
-    def raise_error_once_released(evaluated_visualizations, root_frame_name) -> None:
+    def raise_error_once_released(
+        *, evaluated_visualizations: list[EvaluatedSpatialTypeVisualization]
+    ) -> None:
         """
         Fail like a publisher whose ROS node was destroyed, once the test let it.
         """
@@ -615,13 +644,9 @@ def test_waiting_for_publishes_returns_after_publishing_raised_with_a_submission
     monkeypatch.setattr(
         marker_publisher.marker_publisher, "publish", raise_error_once_released
     )
-    marker_publisher.submit(
-        submission=MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
-    )
+    marker_publisher.submit(submission=MarkerSubmission(evaluated_visualizations=[]))
     publish_started.wait()
-    marker_publisher.submit(
-        submission=MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
-    )
+    marker_publisher.submit(submission=MarkerSubmission(evaluated_visualizations=[]))
     publish_may_raise.set()
     waiting_thread = threading.Thread(
         target=marker_publisher.wait_until_published, daemon=True
@@ -644,7 +669,9 @@ def test_finishing_a_run_after_publishing_raised_releases_the_visualizations(
     executor.compile(NodesStartingInTurn.build(executor.context).statechart)
     marker_publisher = publishing._marker_publisher
 
-    def raise_error(evaluated_visualizations, root_frame_name) -> None:
+    def raise_error(
+        *, evaluated_visualizations: list[EvaluatedSpatialTypeVisualization]
+    ) -> None:
         """
         Fail like a publisher whose ROS node was destroyed.
         """

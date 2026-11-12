@@ -12,6 +12,7 @@ from semantic_digital_twin.adapters.ros.visualization.exceptions import (
 )
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
     SpatialTypeMarkerRenderer,
+    SpatialTypeMarkers,
     SpatialTypeVisualization,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -43,12 +44,12 @@ def render(spatial_type: SpatialType, **kwargs) -> list[Marker]:
     """
     Render a spatial type from its evaluated rendered expression.
     """
-    request = SpatialTypeVisualization(spatial_type=spatial_type, **kwargs)
-    return SpatialTypeMarkerRenderer.render(
-        request=request,
-        rendered_value=rendered_value(spatial_type),
+    spatial_type_markers = SpatialTypeMarkers.from_visualization(
+        visualization=SpatialTypeVisualization(spatial_type=spatial_type, **kwargs),
         root_frame_name=ROOT_FRAME_NAME,
     )
+    spatial_type_markers.update(rendered_value=rendered_value(spatial_type))
+    return spatial_type_markers.markers
 
 
 # %% markers per spatial type
@@ -210,13 +211,41 @@ def test_markers_are_drawn_from_the_given_value():
     """
     unresolvable = FloatVariable(name="unresolvable")
     point = Point3(x=unresolvable)
-    request = SpatialTypeVisualization(spatial_type=point)
-
-    markers = SpatialTypeMarkerRenderer.render(
-        request=request,
-        rendered_value=np.array([7.0, 8.0, 9.0]),
+    spatial_type_markers = SpatialTypeMarkers.from_visualization(
+        visualization=SpatialTypeVisualization(spatial_type=point),
         root_frame_name=ROOT_FRAME_NAME,
     )
 
-    position = markers[0].pose.position
+    spatial_type_markers.update(rendered_value=np.array([7.0, 8.0, 9.0]))
+
+    position = spatial_type_markers.markers[0].pose.position
     assert (position.x, position.y, position.z) == (7, 8, 9)
+
+
+@pytest.mark.parametrize(
+    "spatial_type",
+    [Point3(), Vector3(), HomogeneousTransformationMatrix()],
+    ids=["point", "vector", "transform"],
+)
+def test_markers_updated_again_show_only_the_latest_value(spatial_type):
+    """
+    Updating markers that were updated before leaves nothing of the earlier value.
+    """
+    visualization = SpatialTypeVisualization(
+        spatial_type=spatial_type, label="label", namespace="namespace"
+    )
+    value_count = len(rendered_value(spatial_type))
+    earlier_value = np.arange(value_count) + 1.0
+    latest_value = np.arange(value_count) + 10.0
+    updated_twice = SpatialTypeMarkers.from_visualization(
+        visualization=visualization, root_frame_name=ROOT_FRAME_NAME
+    )
+    updated_once = SpatialTypeMarkers.from_visualization(
+        visualization=visualization, root_frame_name=ROOT_FRAME_NAME
+    )
+
+    updated_twice.update(rendered_value=earlier_value)
+    updated_twice.update(rendered_value=latest_value)
+    updated_once.update(rendered_value=latest_value)
+
+    assert updated_twice.markers == updated_once.markers

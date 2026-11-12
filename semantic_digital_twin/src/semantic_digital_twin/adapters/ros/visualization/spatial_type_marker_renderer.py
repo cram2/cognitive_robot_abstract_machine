@@ -12,8 +12,6 @@ import numpy as np
 from builtin_interfaces.msg import Duration
 from geometry_msgs.msg import (
     Point as RosPoint,
-    Pose as RosPose,
-    Quaternion as RosQuaternion,
     Vector3 as RosVector3,
 )
 from std_msgs.msg import ColorRGBA, Header
@@ -89,8 +87,9 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
     Renders a single category of spatial type into one or more RViz markers.
 
     Each subclass handles one spatial-type category. It declares the column vector it
-    draws from in :meth:`rendered_expression` and builds the markers from that vector's
-    evaluated value in :meth:`render_markers`, so rendering never evaluates anything.
+    draws from in :meth:`rendered_expression`, builds the markers once in
+    :meth:`create_markers` and writes each evaluated value of that vector into them in
+    :meth:`update_markers`, so rendering never evaluates anything.
     """
 
     @classmethod
@@ -123,55 +122,42 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         raise CannotRenderSpatialTypeError(spatial_type_type=type(spatial_type))
 
     @classmethod
-    def render(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        rendered_value: np.ndarray,
-        root_frame_name: str,
-    ) -> list[Marker]:
-        """
-        Render the requested spatial type into markers with the renderer responsible for it.
-
-        :param request: The spatial type and its display metadata.
-        :param rendered_value: The evaluated :meth:`rendered_expression` of the spatial type.
-        :param root_frame_name: The frame used when the spatial type has no reference frame.
-        :return: The markers representing the spatial type.
-        """
-        renderer = cls.find_spatial_type_renderer(spatial_type=request.spatial_type)
-        return renderer.render_markers(
-            request=request,
-            rendered_value=rendered_value,
-            root_frame_name=root_frame_name,
-        )
-
-    @classmethod
     @abstractmethod
     def rendered_expression(cls, *, spatial_type: SpatialTypeInput) -> SymbolicVector:
         """
         The column vector of the spatial type that the markers are drawn from.
 
         :param spatial_type: The spatial type to render.
-        :return: The expression whose evaluated value :meth:`render_markers` takes.
+        :return: The expression whose evaluated value :meth:`update_markers` takes.
         """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
-    def render_markers(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        rendered_value: np.ndarray,
-        root_frame_name: str,
+    def create_markers(
+        cls, *, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
         """
-        Build the markers for the spatial type of the given request.
+        Build the markers for the spatial type of the given request, with every field
+        set that does not depend on the evaluated value.
 
         :param request: The spatial type and its display metadata.
-        :param rendered_value: The evaluated :meth:`rendered_expression` of the spatial type.
         :param root_frame_name: The frame used when the spatial type has no reference frame.
-        :return: The markers representing the spatial type.
+        :return: The markers representing the spatial type, to be passed to
+            :meth:`update_markers` before they are published.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def update_markers(
+        cls, *, markers: list[Marker], rendered_value: np.ndarray
+    ) -> None:
+        """
+        Draw the markers from a new value.
+
+        :param markers: Markers that :meth:`create_markers` of this renderer built.
+        :param rendered_value: The evaluated :meth:`rendered_expression` of the spatial type.
         """
         raise NotImplementedError
 
@@ -213,20 +199,15 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
 
     @classmethod
     def _text_marker(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        marker_id: int,
-        frame_id: str,
-        pose: RosPose,
+        cls, *, request: SpatialTypeVisualization, marker_id: int, frame_id: str
     ) -> Marker:
         """
-        Create the optional label marker shared by the renderers.
+        Create the optional label marker shared by the renderers, at the origin of its
+        frame.
 
         :param request: The spatial type and its display metadata.
         :param marker_id: The marker's local id.
         :param frame_id: The frame the label is expressed in.
-        :param pose: The pose of the label.
         :return: The marker representing the label.
         """
         marker = cls._base_marker(
@@ -234,7 +215,6 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         )
         marker.type = Marker.TEXT_VIEW_FACING
         marker.text = request.label
-        marker.pose = pose
         marker.scale = RosVector3(z=0.1)
         marker.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
         return marker
@@ -249,30 +229,29 @@ class Point3MarkerRenderer(SpatialTypeMarkerRenderer[Point3]):
         return spatial_type[:3]
 
     @classmethod
-    def render_markers(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        rendered_value: np.ndarray,
-        root_frame_name: str,
+    def create_markers(
+        cls, *, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
         frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
         marker = cls._base_marker(request=request, marker_id=0, frame_id=frame_id)
         marker.type = Marker.SPHERE
-        marker.pose.position = RosPoint(
-            x=rendered_value[0], y=rendered_value[1], z=rendered_value[2]
-        )
-        marker.pose.orientation = RosQuaternion(w=1.0)
+        marker.pose.orientation.w = 1.0
         diameter = request.sphere_diameter
         marker.scale = RosVector3(x=diameter, y=diameter, z=diameter)
         markers = [marker]
         if request.label:
             markers.append(
-                cls._text_marker(
-                    request=request, marker_id=1, frame_id=frame_id, pose=marker.pose
-                )
+                cls._text_marker(request=request, marker_id=1, frame_id=frame_id)
             )
         return markers
+
+    @classmethod
+    def update_markers(
+        cls, *, markers: list[Marker], rendered_value: np.ndarray
+    ) -> None:
+        for marker in markers:
+            position = marker.pose.position
+            position.x, position.y, position.z = rendered_value[:3]
 
 
 @dataclass(kw_only=True)
@@ -287,12 +266,8 @@ class Vector3MarkerRenderer(SpatialTypeMarkerRenderer[Vector3]):
         return spatial_type[:3]
 
     @classmethod
-    def render_markers(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        rendered_value: np.ndarray,
-        root_frame_name: str,
+    def create_markers(
+        cls, *, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
         vector = request.spatial_type
         if vector.visualisation_frame is not None:
@@ -301,19 +276,21 @@ class Vector3MarkerRenderer(SpatialTypeMarkerRenderer[Vector3]):
             frame_id = cls._reference_frame_name(vector, root_frame_name)
         marker = cls._base_marker(request=request, marker_id=0, frame_id=frame_id)
         marker.type = Marker.ARROW
-        marker.points = [
-            RosPoint(),
-            RosPoint(x=rendered_value[0], y=rendered_value[1], z=rendered_value[2]),
-        ]
+        marker.points = [RosPoint(), RosPoint()]
         marker.scale = RosVector3(x=0.025, y=0.05, z=0.1)
         markers = [marker]
         if request.label:
             markers.append(
-                cls._text_marker(
-                    request=request, marker_id=1, frame_id=frame_id, pose=RosPose()
-                )
+                cls._text_marker(request=request, marker_id=1, frame_id=frame_id)
             )
         return markers
+
+    @classmethod
+    def update_markers(
+        cls, *, markers: list[Marker], rendered_value: np.ndarray
+    ) -> None:
+        arrow_tip = markers[0].points[1]
+        arrow_tip.x, arrow_tip.y, arrow_tip.z = rendered_value[:3]
 
 
 @dataclass(kw_only=True)
@@ -361,46 +338,34 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
         )
 
     @classmethod
-    def render_markers(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        rendered_value: np.ndarray,
-        root_frame_name: str,
+    def create_markers(
+        cls, *, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
         frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
-        position, orientation = rendered_value[:3], rendered_value[3:]
-        pose = RosPose(
-            position=RosPoint(x=position[0], y=position[1], z=position[2]),
-            orientation=RosQuaternion(
-                x=orientation[0],
-                y=orientation[1],
-                z=orientation[2],
-                w=orientation[3],
-            ),
-        )
         markers = [
-            cls._axis_marker(
-                request=request, axis_index=axis_index, frame_id=frame_id, pose=pose
-            )
+            cls._axis_marker(request=request, axis_index=axis_index, frame_id=frame_id)
             for axis_index in range(3)
         ]
         if request.label:
             markers.append(
-                cls._text_marker(
-                    request=request, marker_id=3, frame_id=frame_id, pose=pose
-                )
+                cls._text_marker(request=request, marker_id=3, frame_id=frame_id)
             )
         return markers
 
     @classmethod
+    def update_markers(
+        cls, *, markers: list[Marker], rendered_value: np.ndarray
+    ) -> None:
+        for marker in markers:
+            position, orientation = marker.pose.position, marker.pose.orientation
+            position.x, position.y, position.z = rendered_value[:3]
+            orientation.x, orientation.y, orientation.z, orientation.w = rendered_value[
+                3:7
+            ]
+
+    @classmethod
     def _axis_marker(
-        cls,
-        *,
-        request: SpatialTypeVisualization,
-        axis_index: int,
-        frame_id: str,
-        pose: RosPose,
+        cls, *, request: SpatialTypeVisualization, axis_index: int, frame_id: str
     ) -> Marker:
         """
         Create one colored arrow for the given axis of the triad.
@@ -408,7 +373,6 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
         :param request: The spatial type and its display metadata.
         :param axis_index: The index of the axis to render.
         :param frame_id: The frame used when the spatial type has no reference frame.
-        :param pose: The pose of the triad.
         """
         end_point = [0.0, 0.0, 0.0]
         end_point[axis_index] = request.arrow_length
@@ -418,7 +382,6 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
             request=request, marker_id=axis_index, frame_id=frame_id
         )
         marker.type = Marker.ARROW
-        marker.pose = pose
         marker.points = [
             RosPoint(),
             RosPoint(x=end_point[0], y=end_point[1], z=end_point[2]),
@@ -428,3 +391,59 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
             r=axis_color[0], g=axis_color[1], b=axis_color[2], a=axis_color[3]
         )
         return marker
+
+
+# %% markers of one visualization
+
+
+@dataclass(kw_only=True)
+class SpatialTypeMarkers:
+    """
+    The markers of one visualization, built once and drawn from each new value of its
+    spatial type.
+
+    It holds no expression, so any thread may update and publish it.
+
+    .. warning:: Update and publish it from one thread at a time.
+    """
+
+    renderer: type[SpatialTypeMarkerRenderer]
+    """
+    The renderer that built :attr:`markers` and updates them.
+    """
+
+    markers: list[Marker]
+    """
+    The markers, drawn from the value of the last :meth:`update`.
+    """
+
+    @classmethod
+    def from_visualization(
+        cls, *, visualization: SpatialTypeVisualization, root_frame_name: str
+    ) -> SpatialTypeMarkers:
+        """
+        :param visualization: The spatial type and its display metadata.
+        :param root_frame_name: The frame used when the spatial type has no reference frame.
+        :return: The markers of `visualization`, built by the renderer responsible for
+            its spatial type and not yet drawn from any value.
+        """
+        renderer = SpatialTypeMarkerRenderer.find_spatial_type_renderer(
+            spatial_type=visualization.spatial_type
+        )
+        return cls(
+            renderer=renderer,
+            markers=renderer.create_markers(
+                request=visualization, root_frame_name=root_frame_name
+            ),
+        )
+
+    def update(self, *, rendered_value: np.ndarray) -> None:
+        """
+        Draw :attr:`markers` from a new value.
+
+        :param rendered_value: The evaluated
+            :meth:`SpatialTypeMarkerRenderer.rendered_expression` of the spatial type.
+        """
+        self.renderer.update_markers(
+            markers=self.markers, rendered_value=rendered_value
+        )
