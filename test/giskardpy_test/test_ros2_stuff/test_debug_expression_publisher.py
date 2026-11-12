@@ -7,6 +7,7 @@ from __future__ import annotations
 import builtins
 import importlib
 import sys
+import threading
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
@@ -24,6 +25,7 @@ from cramph.node import EndedByOwner
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.debug_expression_publisher import (
+    BackgroundMarkerPublisher,
     DebugExpressionPublishing,
     MarkerSubmission,
 )
@@ -540,10 +542,14 @@ def test_a_submission_replaced_before_it_is_published_is_dropped(publishing):
 
     with marker_publisher._condition:
         marker_publisher.submit(
-            MarkerSubmission(evaluated_visualizations=[], root_frame_name="dropped")
+            submission=MarkerSubmission(
+                evaluated_visualizations=[], root_frame_name="dropped"
+            )
         )
         marker_publisher.submit(
-            MarkerSubmission(evaluated_visualizations=[], root_frame_name="published")
+            submission=MarkerSubmission(
+                evaluated_visualizations=[], root_frame_name="published"
+            )
         )
     marker_publisher.wait_until_published()
 
@@ -565,14 +571,83 @@ def test_submitting_after_publishing_raised_raises(publishing, monkeypatch):
 
     monkeypatch.setattr(marker_publisher.marker_publisher, "publish", raise_error)
     marker_publisher.submit(
-        MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
+        submission=MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
     )
     marker_publisher._thread.join()
 
     with pytest.raises(MarkerPublishingThreadEndedError):
         marker_publisher.submit(
-            MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
+            submission=MarkerSubmission(
+                evaluated_visualizations=[], root_frame_name="map"
+            )
         )
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_waiting_for_publishes_returns_after_publishing_raised_with_a_submission_pending(
+    rclpy_node, monkeypatch
+):
+    """
+    A submission that arrives while the publish that ends the thread is in progress does
+    not leave the waiting thread blocked.
+    """
+    marker_publisher = BackgroundMarkerPublisher(node=rclpy_node)
+    publish_started = threading.Event()
+    publish_may_raise = threading.Event()
+
+    def raise_error_once_released(evaluated_visualizations, root_frame_name) -> None:
+        """
+        Fail like a publisher whose ROS node was destroyed, once the test let it.
+        """
+        publish_started.set()
+        publish_may_raise.wait()
+        raise RuntimeError("publishing failed")
+
+    monkeypatch.setattr(
+        marker_publisher.marker_publisher, "publish", raise_error_once_released
+    )
+    marker_publisher.submit(
+        submission=MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
+    )
+    publish_started.wait()
+    marker_publisher.submit(
+        submission=MarkerSubmission(evaluated_visualizations=[], root_frame_name="map")
+    )
+    publish_may_raise.set()
+    waiting_thread = threading.Thread(
+        target=marker_publisher.wait_until_published, daemon=True
+    )
+
+    waiting_thread.start()
+    waiting_thread.join(timeout=5)
+
+    assert not waiting_thread.is_alive()
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_finishing_a_run_after_publishing_raised_releases_the_visualizations(
+    publishing, cylinder_bot_world, monkeypatch
+):
+    """
+    The end of a run forgets the visualizations even when the publishing thread ended.
+    """
+    executor = create_executor(cylinder_bot_world, publishing)
+    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    marker_publisher = publishing._marker_publisher
+
+    def raise_error(evaluated_visualizations, root_frame_name) -> None:
+        """
+        Fail like a publisher whose ROS node was destroyed.
+        """
+        raise RuntimeError("publishing failed")
+
+    monkeypatch.setattr(marker_publisher.marker_publisher, "publish", raise_error)
+    executor.tick()
+    marker_publisher._thread.join()
+
+    executor.finish_run()
+
+    assert publishing._visualizations_per_node == {}
 
 
 # %% enabling the publishing

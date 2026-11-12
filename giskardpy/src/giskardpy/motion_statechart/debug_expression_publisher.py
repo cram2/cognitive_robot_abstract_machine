@@ -53,7 +53,7 @@ class MarkerSubmission:
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BackgroundMarkerPublisher(HasROS2Node):
     """
     Renders and publishes submitted visualizations on a daemon thread of its own, so the
@@ -84,8 +84,14 @@ class BackgroundMarkerPublisher(HasROS2Node):
         init=False, default_factory=threading.Condition
     )
     """
-    Guards :attr:`_submission` and :attr:`_submission_being_published`, and signals
-    their changes.
+    Guards :attr:`_submission`, :attr:`_submission_being_published` and
+    :attr:`publishing_stopped`, and signals their changes.
+    """
+
+    publishing_stopped: bool = field(init=False, default=False)
+    """
+    Whether a publish raised, which ended the thread; nothing submitted is published
+    from then on.
     """
 
     _thread: threading.Thread = field(init=False)
@@ -105,7 +111,7 @@ class BackgroundMarkerPublisher(HasROS2Node):
         )
         self._thread.start()
 
-    def submit(self, submission: MarkerSubmission) -> None:
+    def submit(self, *, submission: MarkerSubmission) -> None:
         """
         Publish `submission` as soon as the thread is free, replacing a submission that
         still waits.
@@ -113,21 +119,25 @@ class BackgroundMarkerPublisher(HasROS2Node):
         :param submission: Visualizations whose rendered values nothing changes anymore.
         :raises MarkerPublishingThreadEndedError: If publishing raised before.
         """
-        if not self._thread.is_alive():
-            raise MarkerPublishingThreadEndedError()
         with self._condition:
+            if self.publishing_stopped:
+                raise MarkerPublishingThreadEndedError()
             self._submission = submission
             self._condition.notify_all()
 
     def wait_until_published(self) -> None:
         """
-        Block until every submission was published or dropped and the thread holds none.
+        Block until every submission was published or dropped and the thread holds none,
+        or until publishing stopped.
         """
         with self._condition:
             self._condition.wait_for(
                 lambda: (
-                    self._submission is None
-                    and self._submission_being_published is None
+                    self.publishing_stopped
+                    or (
+                        self._submission is None
+                        and self._submission_being_published is None
+                    )
                 )
             )
 
@@ -141,20 +151,23 @@ class BackgroundMarkerPublisher(HasROS2Node):
     def _publish_next_submission(self) -> None:
         """
         Wait for a submission and publish it, releasing it afterwards even if publishing
-        raises.
+        raises, in which case publishing stops.
         """
         with self._condition:
             self._condition.wait_for(lambda: self._submission is not None)
             self._submission_being_published = self._submission
             self._submission = None
+        published = False
         try:
             self.marker_publisher.publish(
                 self._submission_being_published.evaluated_visualizations,
                 self._submission_being_published.root_frame_name,
             )
+            published = True
         finally:
             with self._condition:
                 self._submission_being_published = None
+                self.publishing_stopped = not published
                 self._condition.notify_all()
 
 
@@ -281,7 +294,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
                 ]
             )
         self._marker_publisher.submit(
-            MarkerSubmission(
+            submission=MarkerSubmission(
                 evaluated_visualizations=self._compiled_visualizations.evaluate(),
                 root_frame_name=str(executor.context.world.root.name),
             )
@@ -289,11 +302,16 @@ class DebugExpressionPublishing(TickingExecutorExtension):
 
     def after_run(self, executor: StatechartExecutor) -> None:
         """
-        Delete the markers published since compiling.
+        Delete the markers published since compiling, unless publishing stopped.
         """
-        if self._last_published_tick is not None:
+        # Only a publish in progress can stop publishing, so this wait settles it.
+        self._marker_publisher.wait_until_published()
+        if (
+            self._last_published_tick is not None
+            and not self._marker_publisher.publishing_stopped
+        ):
             self._marker_publisher.submit(
-                MarkerSubmission(
+                submission=MarkerSubmission(
                     evaluated_visualizations=[],
                     root_frame_name=str(executor.context.world.root.name),
                 )
