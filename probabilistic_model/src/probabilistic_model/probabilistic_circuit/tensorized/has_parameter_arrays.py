@@ -10,8 +10,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from types import ModuleType
 
-from array_api_compat import array_namespace
+import numpy as np
+from array_api_compat import array_namespace, is_cupy_array, is_torch_array
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
+from typing_extensions import Any, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -38,6 +40,35 @@ class HasParameterArrays(DataclassDeepcopyMixin, ABC):
             of them belong to one backend.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        """
+        :param parameters: Arrays of one backend in the order and with the shapes of
+            :attr:`parameters`.
+        :return: A copy of this part with these parameter arrays, sharing its structure.
+        """
+        raise NotImplementedError
+
+    @functools.cached_property
+    def dtype(self) -> Any:
+        """
+        :return: The floating point type of the parameters, which the numeric queries
+            compute in.
+        """
+        return self.namespace.result_type(*self.parameters)
+
+    @staticmethod
+    def host_copy(array: BackendArray) -> np.ndarray:
+        """
+        :param array: An array of any backend, on any device.
+        :return: The values of the array as a numpy array.
+        """
+        if is_torch_array(array):
+            return array.detach().cpu().numpy()
+        if is_cupy_array(array):
+            return array.get()
+        return np.asarray(array)
 
     @functools.cached_property
     def namespace(self) -> ModuleType:

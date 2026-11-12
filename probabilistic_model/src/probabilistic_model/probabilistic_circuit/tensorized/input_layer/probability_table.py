@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -282,6 +283,27 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     def parameters(self) -> list[BackendArray]:
         return [self.log_probabilities]
 
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        (log_probabilities,) = parameters
+        return dataclasses.replace(self, log_probabilities=log_probabilities)
+
+    def projected_parameters(
+        self, parameters: list[BackendArray]
+    ) -> list[BackendArray]:
+        """
+        :param parameters: Log-probabilities in the shape of :attr:`log_probabilities`.
+        :return: The log-probabilities normalized per node.
+        """
+        (log_probabilities,) = parameters
+        namespace = self.namespace
+        largest = namespace.max(log_probabilities, axis=1, keepdims=True)
+        normalization = namespace.log(
+            namespace.sum(
+                namespace.exp(log_probabilities - largest), axis=1, keepdims=True
+            )
+        )
+        return [log_probabilities - largest - normalization]
+
     @classmethod
     def from_entries(
         cls,
@@ -406,6 +428,16 @@ class SparseProbabilityTable(ProbabilityTable[csr_array]):
             table is a scipy sparse array.
         """
         return [self.log_probabilities.data]
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        """
+        :meth:`HasParameterArrays.copy_with_parameters` that copies the values of the
+        parameters to the host, since the table is a scipy sparse array.
+        """
+        (log_probabilities,) = parameters
+        table = self.log_probabilities.copy()
+        table.data = self.host_copy(log_probabilities)
+        return dataclasses.replace(self, log_probabilities=table)
 
     @classmethod
     def from_entries(

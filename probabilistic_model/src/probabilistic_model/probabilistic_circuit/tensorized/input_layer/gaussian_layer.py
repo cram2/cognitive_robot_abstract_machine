@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import copy
 import math
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 from random_events.interval import SimpleInterval, reals
 from random_events.variable import Variable
+from krrood.ormatic.utils import classproperty
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
 from typing_extensions import Self
@@ -64,6 +66,24 @@ class HasLocationAndScale:
         :return: The location and the scale of every node.
         """
         return [self.location, self.scale]
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        location, scale = parameters
+        return dataclasses.replace(self, location=location, scale=scale)
+
+    @classproperty
+    def minimum_scale(cls) -> float:
+        """
+        The smallest scale :meth:`projected_parameters` keeps, so that no density
+        becomes infinitely narrow.
+        """
+        return 1e-3
+
+    def projected_parameters(
+        self, parameters: list[BackendArray]
+    ) -> list[BackendArray]:
+        *others, scale = parameters
+        return others + [self.namespace.maximum(scale, self.minimum_scale)]
 
     def validate_own(self):
         """
@@ -283,6 +303,12 @@ class TruncatedGaussianLayer(
         :return: The supports, the locations and the scales of the nodes.
         """
         return [self.interval, self.location, self.scale]
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        interval, location, scale = parameters
+        return dataclasses.replace(
+            self, interval=interval, location=location, scale=scale
+        )
 
     def validate_own(self):
         HasLocationAndScale.validate_own(self)

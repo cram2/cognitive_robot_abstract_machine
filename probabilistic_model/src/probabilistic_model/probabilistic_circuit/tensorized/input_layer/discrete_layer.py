@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -94,13 +95,23 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
     def parameters(self) -> list[BackendArray]:
         return self.table.parameters
 
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        return dataclasses.replace(
+            self, table=self.table.copy_with_parameters(parameters)
+        )
+
+    def projected_parameters(
+        self, parameters: list[BackendArray]
+    ) -> list[BackendArray]:
+        return self.table.projected_parameters(parameters)
+
     @property
     def float_states(self) -> BackendArray:
         """
         :return: The states as floats in an array of the backend of the parameters, the
             way the layer reads the values of events.
         """
-        return self.namespace.asarray(self.states, dtype=self.namespace.float64)
+        return self.namespace.asarray(self.states, dtype=self.dtype)
 
     def validate_own(self):
         if self.table.number_of_states != self.number_of_states:
@@ -423,9 +434,7 @@ class IntegerLayer(DiscreteLayer):
         ordered: the result is the probability of the states up to every value.
         """
         reached = self.float_column(values=self.column_of(events)) >= self.float_states
-        return self.table.dot(
-            self.namespace.astype(reached, self.namespace.float64).T
-        ).T
+        return self.table.dot(self.namespace.astype(reached, self.dtype).T).T
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable

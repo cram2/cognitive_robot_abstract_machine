@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import copy
 from dataclasses import dataclass
 
@@ -67,6 +68,10 @@ class DiracDeltaLayer(AbstractContinuousLayer):
     def parameters(self) -> list[BackendArray]:
         return [self.location, self.density_cap]
 
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        location, density_cap = parameters
+        return dataclasses.replace(self, location=location, density_cap=density_cap)
+
     def validate_own(self):
         if self.location.shape != self.density_cap.shape:
             raise ShapeMismatchError(self.location.shape, self.density_cap.shape)
@@ -127,7 +132,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         self, values: SampleColumn
     ) -> SampleNodeValues:
         reached = self.float_column(values=values) >= self.location - self.tolerance
-        return self.namespace.astype(reached, self.namespace.float64)
+        return self.namespace.astype(reached, self.dtype)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -201,7 +206,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         :attr:`tolerance` and zero otherwise.
         """
         return self.namespace.astype(
-            self.contains(event[variables[self.variable]]), self.namespace.float64
+            self.contains(event[variables[self.variable]]), self.dtype
         )
 
     def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
