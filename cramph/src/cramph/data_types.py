@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum, Enum, auto
+from functools import cache
 
 from cramph.exceptions import TransitionHasNoOutcomeError
 from krrood.patterns.float_enumeration import FloatEnum
@@ -86,6 +87,7 @@ class LifeCycleValues(IntEnum):
         return member
 
     @classmethod
+    @cache
     def terminal_states(cls) -> frozenset[LifeCycleValues]:
         """
         :return: The states a node can only leave by being reset, which are the outcomes
