@@ -211,6 +211,19 @@ def test_projected_log_probabilities_are_normalized_per_node():
     np.testing.assert_allclose(np.exp(log_probabilities), [[0.25, 0.75], [0.5, 0.5]])
 
 
+def test_projection_keeps_a_node_without_probability_mass_impossible():
+    """
+    A node whose log-probabilities are all ``-inf`` stays impossible under projection
+    instead of becoming nan, and the other nodes are still normalized.
+    """
+    table = DenseProbabilityTable(np.log(np.array([[0.2, 0.8], [0.5, 0.5]])))
+    with np.errstate(divide="ignore"):
+        log_probabilities = np.log(np.array([[1.0, 3.0], [0.0, 0.0]]))
+    (projected,) = table.projected_parameters([log_probabilities])
+    np.testing.assert_array_equal(projected[1], [-np.inf, -np.inf])
+    np.testing.assert_allclose(np.exp(projected[0]), [0.25, 0.75])
+
+
 # %% training
 
 
