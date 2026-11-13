@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.composites import Parallel
 from coraplex.robot_plans.mixins import (
     GraspPoseSequence,
+    HasVariablePoses,
     ReattachesBranches,
     HasApproachesGraspPoses,
     HasGraspDetectionThreshold,
@@ -23,7 +24,7 @@ from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
 from krrood.patterns.field_metadata import JSONMetadata
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import Pose
 
 
 # %% placing a held object
@@ -34,6 +35,7 @@ class PlaceAction(
     MovesToolCenterPoint,
     OperatesGripper,
     ReattachesBranches,
+    HasVariablePoses,
     SequentialAction,
     HasApproachesGraspPoses,
     PlaceTuningParameters,
@@ -68,16 +70,15 @@ class PlaceAction(
     :func:`~semantic_digital_twin.reasoning.robot_predicates.is_body_gripped`).
     """
 
-    _tool_goals: list[HomogeneousTransformationMatrix] = field(
-        default_factory=list,
+    _tool_goals: GraspPoseSequence | None = field(
+        default=None,
         init=False,
         repr=False,
         metadata=JSONMetadata(serialize=True).as_dict(),
     )
     """
-    The tool frame goals releasing the object, as the transformations of
-    :attr:`~coraplex.robot_plans.mixins.GraspPoseSequence.poses`, over float variables
-    that are set to the release of the grasp measured when this place starts.
+    The tool frame goals releasing the object, set to the release of the grasp measured
+    when this place starts.
 
     Sent along with the place, because a receiver does not expand it again.
     """
@@ -91,11 +92,19 @@ class PlaceAction(
         return [AllowCollisionForEndEffector(end_effector=self.arm.end_effector)]
 
     def create_steps(self) -> list[StatechartNode]:
-        self._tool_goals = [
-            self._variable_tool_goal(index=index)
-            for index in range(len(fields(GraspPoseSequence)))
-        ]
-        pre_grasp, grasp, retreat = (goal.pose for goal in self._tool_goals)
+        reference_frame = self.target_location.reference_frame
+        self._tool_goals = GraspPoseSequence(
+            pre_grasp=self.create_variable_pose(
+                name="pre_grasp", reference_frame=reference_frame
+            ),
+            grasp=self.create_variable_pose(
+                name="grasp", reference_frame=reference_frame
+            ),
+            retreat=self.create_variable_pose(
+                name="retreat", reference_frame=reference_frame
+            ),
+        )
+        pre_grasp, grasp, retreat = self._tool_goals.poses
         # A release runs the grasp backwards: down from above the target, then out
         # along the way the grasp was approached.
         return [
@@ -134,13 +143,9 @@ class PlaceAction(
             ),
         ]
 
-    def set_up(self) -> None:
-        """
-        Registers the float variables of :attr:`_tool_goals`.
-        """
-        super().set_up()
-        for goal in self._tool_goals:
-            self.context.float_variable_data.register_expression(expression=goal)
+    @property
+    def variable_poses(self) -> list[Pose]:
+        return self._tool_goals.poses
 
     def on_start(self) -> None:
         """
@@ -154,26 +159,8 @@ class PlaceAction(
             self.object_designator,
             end_effector.body_T_grasp(body=self.object_designator.root),
         )
-        release = self.grasp_pose_sequence(
+        place_sequence = self.grasp_pose_sequence(
             grasp.moved_to(self.target_location), end_effector, grasp
         )
-        for goal, released in zip(self._tool_goals, release.poses):
-            reference_T_goal = self.world.transform(
-                released, self.target_location.reference_frame
-            )
-            self.context.float_variable_data.set_value(
-                expression=goal, value=reference_T_goal.to_np()[:3, :4].T.flatten()
-            )
-
-    def _variable_tool_goal(self, *, index: int) -> HomogeneousTransformationMatrix:
-        """
-        :param index: Which of the tool goals of this place it is, which names its
-            variables.
-        :return: A new tool frame goal in the frame of :attr:`target_location`, over
-            float variables of its own.
-        """
-        reference_T_goal = HomogeneousTransformationMatrix.create_with_variables(
-            f"{self.name}/tool_goal_{index}"
-        )
-        reference_T_goal.reference_frame = self.target_location.reference_frame
-        return reference_T_goal
+        for variable_pose, pose in zip(self._tool_goals.poses, place_sequence.poses):
+            self.set_variable_pose(variable_pose=variable_pose, value=pose)

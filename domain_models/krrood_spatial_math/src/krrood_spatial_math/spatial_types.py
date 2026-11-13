@@ -644,6 +644,7 @@ class HomogeneousTransformationMatrix(
         """
         result = Pose.from_casadi_sx(casadi_sx=copy(self.casadi_sx))
         result.reference_frame = self.reference_frame
+        result.pinned_free_variables = list(self.pinned_free_variables)
         return result
 
     def _copy_with_data(self, data: ca.SX) -> HomogeneousTransformationMatrix:
