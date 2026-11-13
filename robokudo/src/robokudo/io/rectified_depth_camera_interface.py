@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from enum import IntEnum, StrEnum
+from enum import StrEnum
 from threading import Lock
 
 import numpy as np
@@ -31,6 +31,7 @@ from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortionModel,
     CameraModality,
 )
+from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from krrood.patterns.called_positionally import called_positionally
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
@@ -70,14 +71,6 @@ class CameraEncoding(StrEnum):
 
     METRIC_DEPTH = "32FC1"
     COLOR = "bgr8"
-
-
-class CameraUnit(IntEnum):
-    """
-    Conversions between camera transport and RK units.
-    """
-
-    MILLIMETERS_PER_METER = 1000
 
 
 @dataclass(kw_only=True)
@@ -179,7 +172,7 @@ class RectifiedDepthFrame:
         )
         depth[:] = bridge.imgmsg_to_cv2(self.images.depth, CameraEncoding.METRIC_DEPTH)
         depth[~np.isfinite(depth) | (depth <= 0) | (depth > max_depth)] = 0
-        depth *= CameraUnit.MILLIMETERS_PER_METER
+        depth *= RayTracer.millimeters_per_meter
         return depth
 
     def rectified_calibration(self) -> CameraInfo:
