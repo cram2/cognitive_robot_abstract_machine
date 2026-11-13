@@ -747,7 +747,7 @@ def synchronized_attribute_modification(func):
         current_model_modification_block.append(
             AttributeUpdateModification.from_kwargs(
                 {
-                    "entity_id": object_after_change["id"],
+                    "entity_id": to_json(self.id),
                     "updated_kwargs": to_json(diff),
                     **tracker_kwargs,
                 }

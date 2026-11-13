@@ -1034,6 +1034,20 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         self.parent_T_connection_expression.reference_frame = self.parent
         self.connection_T_child_expression.child_frame = self.child
 
+    @synchronized_attribute_modification
+    def update_parent_T_connection(
+        self, *, parent_T_connection: HomogeneousTransformationMatrix
+    ) -> None:
+        """
+        Replace the constant pose of this connection relative to its parent and record
+        the change in the world's modification history.
+
+        :param parent_T_connection: The new pose of the connection relative to its
+            parent; it must be constant.
+        """
+        self.parent_T_connection_expression = parent_T_connection
+        self.parent_T_connection_expression.reference_frame = self.parent
+
     @classmethod
     def _serialized_fields(cls) -> list[Field]:
         """
