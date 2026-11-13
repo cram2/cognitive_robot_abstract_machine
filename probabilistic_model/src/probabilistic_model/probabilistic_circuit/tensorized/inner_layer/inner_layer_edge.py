@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Iterator
+from typing_extensions import Iterator, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
@@ -58,6 +58,18 @@ class InnerLayerEdges:
     """
     The child node of every edge, see :attr:`InnerLayerEdge.child_node`.
     """
+
+    @classmethod
+    def concatenate(cls, parts: list[InnerLayerEdges]) -> Self:
+        """
+        :param parts: The edges to join, in order.
+        :return: All edges of the parts.
+        """
+        return cls(
+            np.concatenate([part.nodes for part in parts]),
+            np.concatenate([part.child_layer_indices for part in parts]),
+            np.concatenate([part.child_nodes for part in parts]),
+        )
 
     def __len__(self) -> int:
         return len(self.nodes)

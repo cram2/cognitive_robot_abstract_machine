@@ -12,7 +12,6 @@ import numpy as np
 from jax.experimental.sparse import BCOO
 from random_events.interval import Bound
 from random_events.variable import Continuous, Symbolic
-from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 
 from probabilistic_model.learning.region_graph.region_graph import RegionGraph
@@ -51,9 +50,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_la
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     SparseEntries,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
+    InnerLayerEdges,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
     SymbolicEncoding,
@@ -102,9 +103,19 @@ def dense_log_weights(layer: SumLayer) -> np.ndarray:
         where the layer has no edge.
     """
     result = np.full((layer.number_of_nodes, layer.column_offsets[-1]), -np.inf)
-    result[layer.log_weights.sparsity.rows, layer.log_weights.sparsity.columns] = (
-        layer.normalized_edge_log_weights
-    )
+    result[layer.edges.rows, layer.edges.columns] = layer.normalized_edge_log_weights
+    return result
+
+
+def child_node_matrix(layer: ProductLayer) -> np.ndarray:
+    """
+    :param layer: A product layer.
+    :return: The child node every node multiplies in every child layer, as a dense
+        matrix of shape (#child layers, #nodes), zero where a node has no factor.
+    """
+    edges = layer.inner_layer_edges
+    result = np.zeros((len(layer.child_layers), layer.number_of_nodes), dtype=np.int64)
+    result[edges.child_layer_indices, edges.nodes] = edges.child_nodes
     return result
 
 
@@ -182,31 +193,27 @@ def layered_circuit_over(color: Symbolic, x: Continuous) -> LayeredProbabilistic
         np.full((2, 2), int(Bound.OPEN), dtype=np.int64),
     )
     dirac_deltas = DiracDeltaLayer(1, np.array([0.5]), np.array([2.0]))
-    x_mixture = SumLayer(
+    x_mixture = SumLayer.from_entries(
         [gaussians, uniforms, dirac_deltas],
-        RowGroupedSparseArray.from_entries(
-            SparseEntries(
-                np.log(np.array([0.4, 0.4, 0.2, 0.7, 0.3])),
-                np.array([0, 0, 0, 1, 1]),
-                np.array([0, 2, 4, 1, 3]),
-            ),
-            (2, 5),
+        SparseEntries(
+            np.log(np.array([0.4, 0.4, 0.2, 0.7, 0.3])),
+            np.array([0, 0, 0, 1, 1]),
+            np.array([0, 2, 4, 1, 3]),
         ),
+        2,
     )
-    products = ProductLayer(
+    products = ProductLayer.from_edges(
         [colors, x_mixture],
-        coo_array(
-            (np.array([0, 1, 0, 1]), (np.array([0, 0, 1, 1]), np.array([0, 1, 1, 0]))),
-            shape=(2, 2),
+        InnerLayerEdges(
+            np.array([0, 1, 1, 0]), np.array([0, 0, 1, 1]), np.array([0, 1, 0, 1])
         ),
+        2,
     )
-    root = SumLayer(
+    root = SumLayer.from_entries(
         [products],
-        RowGroupedSparseArray.from_entries(
-            SparseEntries(
-                np.log(np.array([0.25, 0.75])), np.array([0, 0]), np.array([0, 1])
-            ),
-            (1, 2),
+        SparseEntries(
+            np.log(np.array([0.25, 0.75])), np.array([0, 0]), np.array([0, 1])
         ),
+        1,
     )
     return LayeredProbabilisticCircuit(SortedSet([color, x]), root)
