@@ -21,7 +21,10 @@ from krrood.entity_query_language.factories import (
     RuntimeType,
 )
 from krrood.entity_query_language.predicate import HasType, HasTypes, Is, Length
-from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
+from krrood.entity_query_language.role_predicates import (
+    IsSameSemanticEntity,
+    IsSubClassOrRole,
+)
 from krrood.entity_query_language.testing.result_verification import VerbalizationResult
 from krrood.entity_query_language.verbalization._example_domain import (
     IsReachable,
@@ -51,6 +54,7 @@ results: tuple[VerbalizationResult, ...] = (
         IsSameSemanticEntity,
         "a first entity is the same semantic entity as a second entity",
     ),
+    VerbalizationResult(IsSubClassOrRole, "a type is a subclass or role of object"),
     VerbalizationResult(IsReachable, "a location is reachable for a body"),
     VerbalizationResult(WorksIn, "an employee works in a department"),
     VerbalizationResult(
