@@ -11,11 +11,19 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 import pytest
+import typing_extensions
 from scipy.special import logsumexp
+from typing_extensions import Any
 
 from probabilistic_model.learning.gradient_descent import LikelihoodMaximization
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Layer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
@@ -143,7 +151,7 @@ def test_a_circuit_in_single_precision_computes_in_single_precision(
     """
     case = mixture_of_products_case
     circuit = case.circuit(np)
-    single = circuit.to_namespace(np, dtype=np.float32)
+    single = circuit.to_namespace(np, floating_point_type=np.float32)
     result = single.log_likelihood(case.events(np))
     assert result.dtype == np.float32
     np.testing.assert_allclose(
@@ -228,3 +236,19 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
             jnp.mean(trained_root.log_likelihood_of_nodes(jnp.asarray(data))[:, 0])
         )
     assert after > before + 0.1
+
+
+# %% typing
+
+
+def test_parameter_arrays_and_gradient_descent_name_their_types():
+    """
+    The parameter arrays of a part are typed by their array type and the trained root by
+    its layer type.
+    """
+    assert typing_extensions.get_args(HasParameterArrays[jax.Array]) == (jax.Array, Any)
+    assert typing_extensions.get_args(HasParameterArrays[np.ndarray, np.dtype]) == (
+        np.ndarray,
+        np.dtype,
+    )
+    assert typing_extensions.get_args(LikelihoodMaximization[Layer]) == (Layer,)

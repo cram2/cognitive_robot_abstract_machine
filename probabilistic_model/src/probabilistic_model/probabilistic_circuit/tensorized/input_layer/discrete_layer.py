@@ -111,7 +111,7 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         :return: The states as floats in an array of the backend of the parameters, the
             way the layer reads the values of events.
         """
-        return self.namespace.asarray(self.states, dtype=self.dtype)
+        return self.namespace.asarray(self.states, dtype=self.floating_point_type)
 
     def validate_own(self):
         if self.table.number_of_states != self.number_of_states:
@@ -434,7 +434,9 @@ class IntegerLayer(DiscreteLayer):
         ordered: the result is the probability of the states up to every value.
         """
         reached = self.float_column(values=self.column_of(events)) >= self.float_states
-        return self.table.dot(self.namespace.astype(reached, self.dtype).T).T
+        return self.table.dot(
+            self.namespace.astype(reached, self.floating_point_type).T
+        ).T
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable

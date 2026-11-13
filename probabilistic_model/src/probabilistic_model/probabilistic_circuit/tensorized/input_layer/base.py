@@ -88,7 +88,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             shape (#events, 1).
         """
         return self.namespace.reshape(
-            self.namespace.asarray(values, dtype=self.dtype), (-1, 1)
+            self.namespace.asarray(values, dtype=self.floating_point_type), (-1, 1)
         )
 
     # %% per node view
@@ -174,7 +174,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         if not query.requested[self.variable]:
             return self.namespace.zeros(
                 (self.number_of_nodes, query.number_of_variables),
-                dtype=self.dtype,
+                dtype=self.floating_point_type,
             )
         own_moments = self.moment_of_nodes_own(
             int(query.order[self.variable]),
@@ -416,12 +416,14 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
         cache: QueryCache | None = None,
     ) -> NodeValues:
         interval: Interval = event[variables[self.variable]]
-        result = self.namespace.zeros(self.number_of_nodes, dtype=self.dtype)
+        result = self.namespace.zeros(
+            self.number_of_nodes, dtype=self.floating_point_type
+        )
         for simple_interval in interval.simple_sets:
             values = self.cumulative_distribution_of_nodes_from_column(
                 self.namespace.asarray(
                     [simple_interval.lower, simple_interval.upper],
-                    dtype=self.dtype,
+                    dtype=self.floating_point_type,
                 )
             )
             result = result + (values[1] - values[0])
