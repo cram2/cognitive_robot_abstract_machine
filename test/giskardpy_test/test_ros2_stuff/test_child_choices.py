@@ -3,7 +3,7 @@ Tests for a running goal whose nodes choose their child on the client, see
 :mod:`giskardpy.middleware.ros2.child_choices`.
 """
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 

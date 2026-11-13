@@ -3,7 +3,10 @@ Statecharts and their nodes survive being stored through cramph's ORM interface.
 """
 
 import pytest
-from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.data_access_objects.helper import (
+    get_data_access_object_class,
+    to_dao,
+)
 from krrood.ormatic.utils import create_engine
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +23,7 @@ from cramph.nodes_for_testing import (
 )
 from cramph.orm.ormatic_interface import Base, CountTicksDAO
 from cramph.statechart import Statechart
+from cramph.visualization import RvizVisualization
 
 # %% fixtures
 
@@ -212,3 +216,14 @@ class TestStatechartSurvivesRoundTrip:
             type(original.node),
             original.node.name,
         )
+
+
+# %% classes the schema leaves out
+
+
+def test_rviz_visualization_has_no_table() -> None:
+    """
+    The RViz visualization wraps a ROS node rather than holding data, so the schema
+    leaves it out, and generating the schema needs no ROS.
+    """
+    assert get_data_access_object_class(RvizVisualization) is None

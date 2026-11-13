@@ -52,13 +52,17 @@ Represents a symbolic method call. It stores the arguments and keyword arguments
 Mapped variables are cached internally to ensure that the same symbolic path (e.g., `robot.name`) always resolves to the same expression object within a query context.
 ```
 
-## Flattening with `FlatVariable`
+## Ranging Over an Expression
 
-The {py:class}`~krrood.entity_query_language.core.mapped_variable.FlatVariable` is a special mapped variable used when an attribute returns an iterable, but you want to treat its elements as individual bindings in the result stream.
+A {py:class}`~krrood.entity_query_language.core.variable.Variable` whose domain is an expression holds it as an
+{py:class}`~krrood.entity_query_language.core.variable.ExpressionDomain`: for each binding of the expression, the
+variable takes each element of its value, and keeps the binding. Whether a value is read as a collection follows
+{py:attr}`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable._declared_value_kind_`, which an
+{py:class}`~krrood.entity_query_language.core.mapped_variable.Attribute` reads from its field's annotation; a value of
+undeclared kind is read as a collection when it is one at runtime.
 
 ```{note}
-Use `flat_variable()` explicitly when you want to iterate over elements of attributes that are iterable.
-Standard attribute access on an iterable valued attribute will return the iterables as values, not their elements.
+Standard attribute access on an iterable valued attribute returns the iterables as values, not their elements.
 ```
 
 ## API Reference
@@ -66,4 +70,4 @@ Standard attribute access on an iterable valued attribute will return the iterab
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.MappedVariable`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Attribute`
-- {py:class}`~krrood.entity_query_language.core.mapped_variable.FlatVariable`
+- {py:class}`~krrood.entity_query_language.core.variable.ExpressionDomain`
