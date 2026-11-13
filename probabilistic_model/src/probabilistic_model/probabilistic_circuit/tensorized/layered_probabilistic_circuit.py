@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from types import ModuleType
+
 import copy
 from dataclasses import dataclass
 
 import numpy as np
+from array_api_compat import array_namespace, is_numpy_array
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
@@ -18,10 +21,17 @@ from probabilistic_model.distributions.distributions import (
 from probabilistic_model.distributions.helper import make_dirac
 from probabilistic_model.exceptions import IntractableError
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     DenseEdgeValues,
     NodeMask,
     SampleArray,
     SampleValues,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
+    HostOnlyQueryError,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
@@ -268,6 +278,64 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
                 layer.table = table_type.of(layer.table)
         return self
 
+    # %% parameters
+
+    @property
+    def parameters(self) -> list[BackendArray]:
+        """
+        :return: The parameter arrays of every layer, the layers in the order of
+            :meth:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base.Layer.all_layers`.
+        """
+        return self.root.circuit_parameters
+
+    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`parameters`, which may be traced by :func:`jax.jit`.
+        :return: A copy of this circuit with these parameter arrays, sharing its
+            structure.
+        """
+        return self.__class__(
+            self.variables, self.root.copy_with_circuit_parameters(parameters)
+        )
+
+    def to_namespace(
+        self,
+        namespace: ModuleType,
+        device: Any = None,
+        floating_point_type: Any = None,
+    ) -> Self:
+        """
+        :param namespace: The Array API namespace to store the parameters in.
+        :param device: The device of that namespace to store them on, its default if
+            ``None``.
+        :param floating_point_type: The floating point type to store them in, which
+            the numeric queries then compute in; float64 if ``None``.
+        :return: A copy of this circuit whose parameters are arrays of that namespace.
+        """
+        return self.copy_with_parameters(
+            [
+                namespace.asarray(
+                    HasParameterArrays.host_copy(parameter),
+                    dtype=(
+                        namespace.float64
+                        if floating_point_type is None
+                        else floating_point_type
+                    ),
+                    device=device,
+                )
+                for parameter in self.parameters
+            ]
+        )
+
+    def raise_if_parameters_are_not_on_host(self):
+        """
+        :raises HostOnlyQueryError: If a parameter of the circuit is not a numpy array.
+        """
+        for parameter in self.parameters:
+            if not is_numpy_array(parameter):
+                raise HostOnlyQueryError(array_namespace(parameter).__name__)
+
     def store_edges_as(self, edge_matrix_type: type[EdgeMatrix]) -> Self:
         """
         Store the edges of every inner layer in a matrix of the given type, in place.
@@ -297,15 +365,18 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     @property
     def support(self) -> Event:
+        self.raise_if_parameters_are_not_on_host()
         return self.root.support_of_nodes(self.variables)[0]
 
     def log_mode(self, check_determinism: bool = True) -> LogMode:
+        self.raise_if_parameters_are_not_on_host()
         if check_determinism and not self.is_deterministic():
             raise IntractableError(self)
         modes, values = self.root.log_mode_of_nodes(self.variables)
         return LogMode(modes[0], float(values[0]))
 
     def sample(self, amount: int) -> SampleArray:
+        self.raise_if_parameters_are_not_on_host()
         order = self.root.all_layers()
         assignment = ForwardSampleAssignment.for_layers(order)
 
@@ -333,6 +404,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :return: Whether every sum node of this circuit has children with pairwise
             disjoint supports.
         """
+        self.raise_if_parameters_are_not_on_host()
         return self.root.is_deterministic(self.variables)
 
     def is_decomposable(self) -> bool:
@@ -364,6 +436,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param singleton_allowed: Whether singletons are allowed in the event.
         :return: This circuit and the log-probability of the event.
         """
+        self.raise_if_parameters_are_not_on_host()
         if event.is_empty():
             return LogTruncation.impossible()
 
@@ -543,6 +616,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param point: The partial point.
         :return: This circuit and the log-density at the point.
         """
+        self.raise_if_parameters_are_not_on_host()
         query = StructuralQuery(self.variables)
         conditioned = self.root.log_conditional_of_point(
             self.encoded_point(point), query, cache=QueryCache()
@@ -649,6 +723,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :param variables: The variables to keep.
         :return: This circuit, or ``None`` if it models none of the variables.
         """
+        self.raise_if_parameters_are_not_on_host()
         requested = set(variables)
         kept_variables = SortedSet(
             variable for variable in self.variables if variable in requested
@@ -678,6 +753,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
         :return: This circuit.
         """
+        self.raise_if_parameters_are_not_on_host()
         self.root = self.root.simplify()
         return self
 

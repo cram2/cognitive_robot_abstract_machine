@@ -423,7 +423,7 @@ class SparseEdgeMatrix(EdgeMatrix):
         namespace = array_namespace(values)
         batch_shape = tuple(values.shape[:-1])
         result = namespace.full(
-            batch_shape + (0,), reduction.identity, dtype=namespace.float64
+            batch_shape + (0,), reduction.identity, dtype=values.dtype
         )
         for positions in reversed(self.entry_positions_by_rank):
             entries = values[..., positions]
@@ -440,7 +440,7 @@ class SparseEdgeMatrix(EdgeMatrix):
         rows_without_edges = namespace.full(
             batch_shape + (self.matrix_shape[0] - result.shape[-1],),
             reduction.identity,
-            dtype=namespace.float64,
+            dtype=values.dtype,
         )
         result = namespace.concat([result, rows_without_edges], axis=-1)
         return result[..., self.entry_count_ranks]
