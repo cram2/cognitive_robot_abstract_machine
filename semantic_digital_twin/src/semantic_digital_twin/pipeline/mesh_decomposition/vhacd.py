@@ -109,7 +109,12 @@ class VHACDMeshDecomposer(MeshDecomposer):
     """
 
     def apply_to_mesh(self, mesh: Mesh) -> list[Mesh]:
-        decomposed = mesh.mesh.convex_decomposition(
+        """
+        :meth:`MeshDecomposer.apply_to_mesh`, where a mesh in which V-HACD finds no convex
+        parts, such as a flat one without volume, has its convex hull as its only part.
+        """
+        trimesh_mesh = mesh.mesh
+        decomposed = trimesh_mesh.convex_decomposition(
             maxConvexHulls=self.max_convex_hulls,
             resolution=self.resolution,
             minimumVolumePercentErrorAllowed=self.minimum_volume_percent_error_allowed,
@@ -120,7 +125,7 @@ class VHACDMeshDecomposer(MeshDecomposer):
             asyncACD=self.asynchronous,
             minEdgeLength=self.min_edge_length,
             findBestPlane=self.find_best_plane,
-        )
+        ) or [trimesh_mesh.convex_hull]
         new_geometry = [
             Mesh.from_trimesh(mesh=decomposed_part, origin=mesh.origin)
             for decomposed_part in decomposed
