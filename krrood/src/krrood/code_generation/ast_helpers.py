@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import ast
 import enum
+import operator
 
-from typing_extensions import Any, List, Type
+from typing_extensions import Any, Callable, List, Type
 
 
 def load_name(identifier: str) -> ast.Name:
@@ -51,6 +52,17 @@ def enum_member(member: enum.Enum) -> ast.Attribute:
     return attribute_access(load_name(type(member).__name__), member.name)
 
 
+def literal(value: Any) -> ast.expr:
+    """Build the expression that reconstructs a literal value or an enum member.
+
+    :param value: The literal value or enum member to embed.
+    :return: The expression that evaluates back to *value*.
+    """
+    if isinstance(value, enum.Enum):
+        return enum_member(value)
+    return constant(value)
+
+
 def call(function_name: str, arguments: List[ast.expr]) -> ast.Call:
     """Build a positional-only call of a named function.
 
@@ -70,6 +82,33 @@ def compare(left: ast.expr, operator_class: Type[ast.cmpop], right: ast.expr) ->
     :return: An :class:`ast.Compare` with one operator and one comparator.
     """
     return ast.Compare(left=left, ops=[operator_class()], comparators=[right])
+
+
+def comparison_operator_class(
+    operation: Callable[[Any, Any], Any],
+) -> Type[ast.cmpop] | None:
+    """Return the comparison-operator class that renders a comparison function.
+
+    :param operation: A comparison function from :mod:`operator`, such as
+        :func:`operator.eq`.
+    :return: The matching class, such as :class:`ast.Eq`, or ``None`` for any other
+        function.
+    """
+    match operation:
+        case operator.eq:
+            return ast.Eq
+        case operator.ne:
+            return ast.NotEq
+        case operator.lt:
+            return ast.Lt
+        case operator.le:
+            return ast.LtE
+        case operator.gt:
+            return ast.Gt
+        case operator.ge:
+            return ast.GtE
+        case _:
+            return None
 
 
 def with_block(context: ast.expr, body: List[ast.stmt]) -> ast.With:

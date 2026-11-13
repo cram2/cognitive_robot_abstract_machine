@@ -13,8 +13,8 @@ with query:
 query.build()
 
 # Stable handles for loading.
-{{ rdr_case_type_name }} = {{ case_type_name }}
-{{ rdr_conclusion_attribute_name }} = {{ conclusion_attribute_name|tojson }}
-{{ rdr_case_variable_name }} = {{ variable_name }}
-{{ rdr_query_name }} = query
-{{ rdr_corner_cases_name }} = {{ corner_cases_dict_src }}
+{{ module_attributes.CASE_TYPE }} = {{ case_type_name }}
+{{ module_attributes.CONCLUSION_ATTRIBUTE }} = {{ conclusion_attribute_name|tojson }}
+{{ module_attributes.CASE_VARIABLE }} = {{ variable_name }}
+{{ module_attributes.QUERY }} = query
+{{ module_attributes.CORNER_CASES }} = {{ corner_cases_dict_src }}
