@@ -762,7 +762,7 @@ class CartesianPose(Parallel):
         if self.root_link is None:
             self.root_link = self.context.world.root
         for position, task in enumerate(self.create_tasks()):
-            self._insert_at(position, task)
+            self._insert_at(position=position, node=task)
 
     def create_tasks(self) -> list[MotionStatechartNode]:
         """
@@ -1156,7 +1156,7 @@ class CartesianVelocityLimit(Parallel):
             ),
         ]
         for position, limit in enumerate(limits):
-            self._insert_at(position, limit)
+            self._insert_at(position=position, node=limit)
 
 
 # %% reaching a Cartesian pose along a straight line

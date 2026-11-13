@@ -94,7 +94,7 @@ class GoalGanttChartPlotter(PostGoalPlotter):
             return
         file_name = self.create_file_name("gantt_charts", goal_id)
         self.executor.statechart.plot_gantt_chart(
-            file_name,
+            path=file_name,
             context=self.executor.context,
             second_length_in_cm=self.second_length_in_cm,
         )
@@ -109,5 +109,5 @@ class MotionStatechartPlotter(PostGoalPlotter):
 
     def plot(self, goal_id: int) -> None:
         file_name = self.create_file_name("motion_statecharts", goal_id)
-        self.executor.statechart.draw(file_name)
+        self.executor.statechart.draw(file_name=file_name)
         background_node.get_node().get_logger().info(f"saved {file_name}")

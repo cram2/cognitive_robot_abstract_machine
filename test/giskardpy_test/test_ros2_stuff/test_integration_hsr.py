@@ -1,3 +1,7 @@
+"""
+Integration tests of Giskard controlling the HSR.
+"""
+
 from dataclasses import dataclass, field
 
 import pytest
@@ -66,32 +70,37 @@ def robot():
 
 
 def test_move_base(giskard: HSRTester) -> None:
+    """
+    The base of the HSR reaches goal poses after its odometry was set.
+    """
     statechart = Statechart(context=giskard.api.context)
     statechart.add_node(
-        node := Sequence(
-            nodes=[
-                SetOdometry(
-                    base_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
-                        x=1.0,
-                        y=1.0,
-                        axis=Vector3.Z(),
-                        angle=pi / 3,
-                        reference_frame=giskard.map,
+        node=(
+            node := Sequence(
+                nodes=[
+                    SetOdometry(
+                        base_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
+                            x=1.0,
+                            y=1.0,
+                            axis=Vector3.Z(),
+                            angle=pi / 3,
+                            reference_frame=giskard.map,
+                        ),
                     ),
-                ),
-                CartesianPose(
-                    root_link=giskard.default_root,
-                    tip_link=giskard.base_footprint,
-                    goal_pose=Pose.from_xyz_axis_angle(
-                        x=1.0,
-                        axis=Vector3.Z(),
-                        angle=pi,
-                        reference_frame=giskard.map,
+                    CartesianPose(
+                        root_link=giskard.default_root,
+                        tip_link=giskard.base_footprint,
+                        goal_pose=Pose.from_xyz_axis_angle(
+                            x=1.0,
+                            axis=Vector3.Z(),
+                            angle=pi,
+                            reference_frame=giskard.map,
+                        ),
                     ),
-                ),
-            ]
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(node))
-    giskard.api.compile(statechart)
+    statechart.add_node(node=EndMotion.when_true(node=node))
+    giskard.api.compile(statechart=statechart)
     giskard.api.execute()

@@ -91,6 +91,7 @@ from krrood.entity_query_language.utils import (
 )
 
 if TYPE_CHECKING:
+    from krrood.entity_query_language.evaluation_context import EvaluationContext
     from krrood.entity_query_language.factories import ConditionType
     from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.ground_term import TermReader
@@ -721,13 +722,28 @@ class Query(
             yield from self._produce_results_(sources=sources)
             return
 
-        cached_stream = evaluation_context.subquery_result_cache.get_or_create(
+        yield from self._evaluate_as_nested_subquery_(
+            sources=sources, evaluation_context=evaluation_context
+        )
+
+    def _evaluate_as_nested_subquery_(
+        self, *, sources: OperationResult, evaluation_context: EvaluationContext
+    ) -> Iterator[OperationResult]:
+        """
+        Evaluate this query nested inside another query's evaluation, as a scope of its
+        own: it ignores *sources*, and its results are computed once per evaluation and
+        replayed to every outer row.
+
+        :param sources: The bindings of the enclosing query.
+        :param evaluation_context: The active evaluation context.
+        :return: This query's results for the enclosing row.
+        """
+        yield from evaluation_context.subquery_result_cache.get_or_create(
             query_id=self._id_,
             factory=lambda: CachedResultStream(
                 _source=self._produce_results_(sources=OperationResult(bindings={}))
             ),
         )
-        yield from cached_stream
 
     def _is_nested_subquery_(self, *, evaluation_context) -> bool:
         """
@@ -1214,3 +1230,33 @@ class Entity(Query[T]):
                 if chain_root(child)._id_ not in group_key_root_ids
             ]
         return super().aggregated_selections(group_key_root_ids=group_key_root_ids)
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class MatchedEntity(Entity[T]):
+    """
+    The query a :class:`~krrood.entity_query_language.query.match.Match` stands for.
+    Nested in another query, it is evaluated under that query's bindings and passes its
+    own on, so a variable that occurs both inside and outside of it takes one value per
+    row.
+    """
+
+    def _evaluate_as_nested_subquery_(
+        self, *, sources: OperationResult, evaluation_context: EvaluationContext
+    ) -> Iterator[OperationResult]:
+        """
+        Evaluate this query under *sources*, unlike
+        :meth:`Query._evaluate_as_nested_subquery_`.
+        """
+        yield from self._produce_results_(sources=sources)
+
+    def _get_operation_result_(
+        self, *, child_result: OperationResult
+    ) -> OperationResult:
+        """
+        Keep every binding of *child_result* besides the one
+        :meth:`Entity._get_operation_result_` gives.
+        """
+        operation_result = super()._get_operation_result_(child_result=child_result)
+        operation_result.bindings = child_result.bindings | operation_result.bindings
+        return operation_result

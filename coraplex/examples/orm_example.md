@@ -65,7 +65,7 @@ from cramph.context import StatechartContext
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from cramph.statechart import Statechart
 
-extensions = [RobotAccess(pr2_view)]
+extensions = [RobotAccess(robot=pr2_view)]
 
 
 def run(plan):
@@ -73,11 +73,11 @@ def run(plan):
     Run `plan` simulated in `world`, with the robot and settings in `extensions`.
     """
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, extensions)
+        context=StatechartContext.with_extensions(world=world, extensions=extensions)
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    executor.compile(statechart=statechart)
     executor.execute()
     return executor
 

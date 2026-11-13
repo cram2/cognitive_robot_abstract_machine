@@ -24,6 +24,11 @@ class Subcommand(StrEnum):
     Generate the repository's ``AGENTS.md``.
     """
 
+    SKILLS = "skills"
+    """
+    Generate the ``SKILL.md`` of every skill the repository declares.
+    """
+
     CHECK = "check"
     """
     Report the code that breaks a rule a checker enforces.

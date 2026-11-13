@@ -236,7 +236,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         """
         self._marker_publisher = BackgroundMarkerPublisher(node=self.ros_node)
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         """
         Collect and compile the spatial debug expressions of every node of the compiled
         statechart, replacing those of the previous one, and start publishing again if a
@@ -248,7 +248,9 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         if not self.publishes_markers:
             return
         world = executor.context.world
-        for node in executor.statechart.get_nodes_by_type(MotionStatechartNode):
+        for node in executor.statechart.get_nodes_by_type(
+            node_type=MotionStatechartNode
+        ):
             visualizations = [
                 self._create_visualization(
                     debug_expression=debug_expression, node=node, world=world
@@ -274,7 +276,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
             root_frame_name=str(world.root.name),
         )
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         """
         Publish the debug expressions of the running nodes, if a publish period passed
         since the last publish.
@@ -308,7 +310,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
             )
         )
 
-    def after_run(self, executor: StatechartExecutor) -> None:
+    def after_run(self, *, executor: StatechartExecutor) -> None:
         """
         Delete the markers published since compiling, unless publishing stopped.
         """

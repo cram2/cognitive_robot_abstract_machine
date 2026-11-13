@@ -1,3 +1,8 @@
+"""
+Explanations of why an inference produced an instance: the conditions that held, the
+bindings they held under and where in the source the query was written.
+"""
+
 from __future__ import annotations
 
 import ast
@@ -20,15 +25,14 @@ _KRROOD_SRC_ROOT: Path = Path(__file__).parents[2].resolve()
 from krrood.entity_query_language.core.base_expressions import Selectable, Bindings
 from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
-    FlatVariable,
 )
-from krrood.entity_query_language.core.variable import InstantiatedVariable
+from krrood.entity_query_language.core.variable import InstantiatedVariable, Variable
 from krrood.entity_query_language.factories import (
     and_,
     contains,
     entity,
     exists,
-    flat_variable,
+    variable_from,
     is_class,
     issubclass_,
     node_children,
@@ -559,18 +563,18 @@ class InferenceExplanation(Symbol):
         :return: An entity containing condition expressions that relate the participating instances in the inference of this instance.
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
-        child1 = flat_variable(node_children(node=condition_node))
-        child2 = flat_variable(node_children(node=condition_node))
+        child1 = variable_from(node_children(node=condition_node))
+        child2 = variable_from(node_children(node=condition_node))
 
         # Use exists(node, conditions) directly — avoids the _expression_/An-quantifier
         # problem that arises when passing a built entity to exists().  When .build() is
         # called on an entity, _expression_ is set to an An quantifier; _update_children_
         # then passes that An to Exists.left, and An._evaluate__ ignores sources entirely.
         child1_with_descendants = concatenation(
-            child1, flat_variable(node_descendants(node=child1))
+            child1, variable_from(node_descendants(node=child1))
         )
         child2_with_descendants = concatenation(
-            child2, flat_variable(node_descendants(node=child2))
+            child2, variable_from(node_descendants(node=child2))
         )
 
         return (
@@ -604,8 +608,8 @@ class InferenceExplanation(Symbol):
         :return: An entity containing the matching condition expressions.
         """
         condition_node = self.get_satisfied_condition_expressions_for_the_instance()
-        desc_a = flat_variable(node_descendants(node=condition_node))
-        desc_b = flat_variable(node_descendants(node=condition_node))
+        desc_a = variable_from(node_descendants(node=condition_node))
+        desc_b = variable_from(node_descendants(node=condition_node))
 
         return (
             entity(condition_node)
@@ -624,17 +628,17 @@ class InferenceExplanation(Symbol):
     def create_query_node_variable(
         *,
         explanation_variable: Selectable[InferenceExplanation] | InferenceExplanation,
-    ) -> FlatVariable[SymbolicExpression] | SymbolicExpression:
+    ) -> Variable[SymbolicExpression] | SymbolicExpression:
         """
-        Build a flat variable ranging over all descendant nodes of the explanation's
-        query root.
+        Build a variable ranging over all descendant nodes of the explanation's query
+        root.
 
         :param explanation_variable: A :class:`~krrood.entity_query_language.core.base_expressions.Selectable`
             wrapping an :class:`InferenceExplanation`, or an explanation instance used as a domain source.
-        :return: A :class:`~krrood.entity_query_language.core.mapped_variable.FlatVariable` iterating
+        :return: A :class:`~krrood.entity_query_language.core.variable.Variable` ranging
             over all descendant symbolic expressions of the query root.
         """
-        return flat_variable(node_descendants(node=explanation_variable.query_root))
+        return variable_from(node_descendants(node=explanation_variable.query_root))
 
     def create_explanation_variable(
         self,

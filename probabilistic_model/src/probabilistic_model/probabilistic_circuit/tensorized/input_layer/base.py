@@ -15,6 +15,7 @@ from typing_extensions import Any, Self
 from probabilistic_model.distributions.distributions import UnivariateDistribution
 from probabilistic_model.probabilistic_model import PartialPointType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeIndices,
     NodeMask,
     NodeValues,
@@ -27,6 +28,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     Layer,
@@ -46,13 +50,13 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 
 
 @dataclass(eq=False, repr=False)
-class UnivariateInputLayer(LeafLayer, ABC):
+class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     """
     Abstract base class for the univariate input layers of a layered circuit.
 
     An input layer holds univariate distributions of one single type over one single
     variable, so that the likelihood of all of its nodes is evaluated without any
-    branching.
+    branching. Its numeric queries compute with the array backend of its parameters.
     """
 
     variable: int
@@ -76,6 +80,16 @@ class UnivariateInputLayer(LeafLayer, ABC):
         :return: The column of this layer's variable.
         """
         return events[:, self.variable]
+
+    def float_column(self, *, values: SampleColumn) -> BackendArray:
+        """
+        :param values: Values of the variable of this layer, shape (#events,).
+        :return: The values as floats in an array of the backend of the parameters,
+            shape (#events, 1).
+        """
+        return self.namespace.reshape(
+            self.namespace.asarray(values, dtype=self.namespace.float64), (-1, 1)
+        )
 
     # %% per node view
 
@@ -157,15 +171,20 @@ class UnivariateInputLayer(LeafLayer, ABC):
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeVariableValues:
-        result = np.zeros((self.number_of_nodes, query.number_of_variables))
         if not query.requested[self.variable]:
-            return result
-        result[:, self.variable] = self.moment_of_nodes_own(
+            return self.namespace.zeros(
+                (self.number_of_nodes, query.number_of_variables),
+                dtype=self.namespace.float64,
+            )
+        own_moments = self.moment_of_nodes_own(
             int(query.order[self.variable]),
             float(query.center[self.variable]),
             variables[self.variable],
         )
-        return result
+        is_own_variable = self.namespace.asarray(
+            np.arange(query.number_of_variables) == self.variable
+        )
+        return self.namespace.where(is_own_variable, own_moments[:, None], 0.0)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -173,9 +192,9 @@ class UnivariateInputLayer(LeafLayer, ABC):
         """
         Calculate the moment of the variable of this layer for every node.
 
-        The fallback evaluates the nodes one by one through their distributions. Layers
-        whose moment has a closed form that numpy can evaluate for all nodes at once
-        override this.
+        The fallback evaluates the nodes one by one through their distributions, on the
+        host only. Layers whose moment has a closed form evaluate it for all nodes at
+        once on the backend of their parameters.
 
         :param order: The order of the moment.
         :param center: The center of the moment.
@@ -397,12 +416,17 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
         cache: QueryCache | None = None,
     ) -> NodeValues:
         interval: Interval = event[variables[self.variable]]
-        result = np.zeros(self.number_of_nodes)
+        result = self.namespace.zeros(
+            self.number_of_nodes, dtype=self.namespace.float64
+        )
         for simple_interval in interval.simple_sets:
             values = self.cumulative_distribution_of_nodes_from_column(
-                np.array([simple_interval.lower, simple_interval.upper], dtype=float)
+                self.namespace.asarray(
+                    [simple_interval.lower, simple_interval.upper],
+                    dtype=self.namespace.float64,
+                )
             )
-            result += values[1] - values[0]
+            result = result + (values[1] - values[0])
         return result
 
     @memoized

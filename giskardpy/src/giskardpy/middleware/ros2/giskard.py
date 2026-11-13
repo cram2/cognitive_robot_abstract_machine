@@ -1,3 +1,7 @@
+"""
+Giskard, the motion server of one robot, assembled from the configs of its setup.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -203,7 +207,7 @@ class Giskard:
                 context=StatechartContext(world=self.world),
                 pacer=self.robot_interface_config.create_pacer(),
                 extensions=[
-                    RosNodeAccess(background_node.get_node()),
+                    RosNodeAccess(ros_node=background_node.get_node()),
                     MotionControl(qp_controller_config=self.qp_controller_config),
                     self.debug_expression_publishing,
                 ],
@@ -275,7 +279,9 @@ class Giskard:
         chooser = ChildSentByClient(
             world_updates=world_updates, action_server=action_server
         )
-        self.executor.context.add_extension(ChildChooserAccess(choosers=[chooser]))
+        self.executor.context.add_extension(
+            extension=ChildChooserAccess(choosers=[chooser])
+        )
         node = background_node.get_node()
         node.create_subscription(
             String,

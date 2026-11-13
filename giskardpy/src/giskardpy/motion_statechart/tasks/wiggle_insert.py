@@ -169,7 +169,7 @@ class WiggleInsert(ConvergingTask):
         """
         super().set_up()
         control_time_step = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).qp_controller_config.control_time_step
         self._control_frequency = 1 / control_time_step.total_seconds()
 

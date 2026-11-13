@@ -1,4 +1,8 @@
-from cramph.data_types import StatechartPayloadKey
+"""
+Tests of the goal life cycle of :class:`MotionServer`.
+"""
+
+from cramph.reported_statechart import StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 from typing_extensions import Any
@@ -344,7 +348,7 @@ def create_error_holding_a_variable() -> SelfInStartConditionError:
         variable of that node and therefore cannot be serialized.
     """
     motion_statechart = Statechart(context=StatechartContext(world=World()))
-    motion_statechart.add_node(node := ConstTrueNode(name="waits for itself"))
+    motion_statechart.add_node(node=(node := ConstTrueNode(name="waits for itself")))
     with pytest.raises(SelfInStartConditionError) as error:
         node.start_condition = node.observes_true
     return error.value
@@ -582,8 +586,10 @@ def create_goal_json(
     every test that is not about a client leaving wants.
     """
     motion_statechart = Statechart(context=StatechartContext(world=World()))
-    motion_statechart.add_node(counter := CountSimulationTimeSeconds(seconds=seconds))
-    motion_statechart.add_node(EndMotion.when_true(counter))
+    motion_statechart.add_node(
+        node=(counter := CountSimulationTimeSeconds(seconds=seconds))
+    )
+    motion_statechart.add_node(node=EndMotion.when_true(node=counter))
     if client is None:
         client = MetaData(node_name="unwatched_client", process_id=0)
     goal = MotionGoal.for_motion_statechart(

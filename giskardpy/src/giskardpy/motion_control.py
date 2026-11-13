@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.world_state_trajectory_plotter impo
 # %% motion control
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MotionControl(TickingExecutorExtension):
     """
     Turns the constraints of the motion statechart nodes into commands and applies them
@@ -68,15 +68,17 @@ class MotionControl(TickingExecutorExtension):
     array for as long as they are in use.
     """
 
-    def extend_context(self, context: StatechartContext) -> None:
+    def extend_context(self, *, context: StatechartContext) -> None:
         context.add_extension(
-            MotionControlContext(qp_controller_config=self.qp_controller_config)
+            extension=MotionControlContext(
+                qp_controller_config=self.qp_controller_config
+            )
         )
         context.set_tick_duration(
-            self.qp_controller_config.control_time_step.total_seconds()
+            tick_duration=self.qp_controller_config.control_time_step.total_seconds()
         )
 
-    def before_recompile(self, executor: StatechartExecutor) -> bool:
+    def before_recompile(self, *, executor: StatechartExecutor) -> bool:
         """
         Stop following the statechart for this tick, so the controller slows the robot
         down within its limits, since no command is computed while the statechart blocks
@@ -93,22 +95,22 @@ class MotionControl(TickingExecutorExtension):
             for degree_of_freedom in self.qp_controller.active_degrees_of_freedom
         )
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self._holding_still = False
         world = executor.context.world
         self._compiled_world_state_data = world.state._data
         self._compile_qp_controller(executor)
         world.collision_manager.update_collision_matrix()
 
-    def before_tick(self, executor: StatechartExecutor) -> None:
+    def before_tick(self, *, executor: StatechartExecutor) -> None:
         self._holding_still = False
         self._raise_if_world_state_array_was_replaced(executor.context.world)
         if executor.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).requires_collision_checking:
             executor.context.world.collision_manager.compute_collisions()
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         if self.qp_controller is None:
             return
         world = executor.context.world
@@ -134,7 +136,7 @@ class MotionControl(TickingExecutorExtension):
             return life_cycle_state
         return np.full_like(life_cycle_state, LifeCycleValues.NOT_STARTED)
 
-    def after_run(self, executor: StatechartExecutor) -> None:
+    def after_run(self, *, executor: StatechartExecutor) -> None:
         self.set_velocity_acceleration_jerk_to_zero(executor.context.world)
 
     @staticmethod
@@ -206,7 +208,9 @@ class MotionControl(TickingExecutorExtension):
             :attr:`~cramph.node.StatechartNode.unique_name`.
         """
         combined_constraint_collection = ConstraintCollection()
-        for node in executor.statechart.get_nodes_by_type(MotionStatechartNode):
+        for node in executor.statechart.get_nodes_by_type(
+            node_type=MotionStatechartNode
+        ):
             combined_constraint_collection.merge(
                 name_prefix=node.unique_name, other=node.constraint_collection
             )
@@ -216,7 +220,7 @@ class MotionControl(TickingExecutorExtension):
 # %% recordings
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateTrajectoryRecording(TickingExecutorExtension):
     """
     Records the world state every tick left behind.
@@ -232,15 +236,15 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
     Holds the recorded trajectory and plots it.
     """
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.plotter.reset(executor.context.world.state, executor.time)
 
-    def after_recompile(self, executor: StatechartExecutor) -> None:
+    def after_recompile(self, *, executor: StatechartExecutor) -> None:
         """
         Keeps the recorded trajectory, unlike :meth:`after_compile`.
         """
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         """
         Appends the world state to the recorded trajectory.
 
@@ -256,7 +260,7 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
         trajectory.append(state, executor.time)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpressionRecording(TickingExecutorExtension):
     """
     Records the value of every debug expression of the statechart after every tick.
@@ -272,11 +276,11 @@ class DebugExpressionRecording(TickingExecutorExtension):
     Holds the recorded values and plots them.
     """
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.plotter.reset(DebugExpression.collect_from(executor.statechart))
         self.plotter.debug_expression_trajectory.append(executor.time)
 
-    def after_recompile(self, executor: StatechartExecutor) -> None:
+    def after_recompile(self, *, executor: StatechartExecutor) -> None:
         """
         Keeps the recorded values, unlike :meth:`after_compile`, and records the debug
         expressions the statechart has now, see :meth:`~giskardpy.motion_statechart.debu
@@ -286,5 +290,5 @@ class DebugExpressionRecording(TickingExecutorExtension):
             DebugExpression.collect_from(executor.statechart)
         )
 
-    def after_tick(self, executor: StatechartExecutor) -> None:
+    def after_tick(self, *, executor: StatechartExecutor) -> None:
         self.plotter.debug_expression_trajectory.append(executor.time)

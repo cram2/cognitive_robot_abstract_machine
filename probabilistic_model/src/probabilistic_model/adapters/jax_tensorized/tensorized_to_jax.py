@@ -66,7 +66,6 @@ LayersToDifferentiable = LayerConversion[Layer, DifferentiableLayer]
 The conversion of the layers of one layered circuit into differentiable layers.
 """
 
-
 # %% inner layers
 
 
@@ -83,8 +82,8 @@ class SumLayerToDifferentiableSparseSumLayerConverter(
         cls, data: SumLayer, conversion: LayersToDifferentiable
     ) -> DifferentiableSparseSumLayer:
         offsets = data.column_offsets
-        rows = data.log_weights.rows
-        columns = data.log_weights.columns
+        rows = data.log_weights.sparsity.rows
+        columns = data.log_weights.sparsity.columns
         log_weights = data.normalized_edge_log_weights
         weights_per_child_layer = []
         for index, child_layer in enumerate(data.child_layers):

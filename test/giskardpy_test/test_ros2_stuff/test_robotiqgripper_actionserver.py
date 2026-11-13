@@ -90,16 +90,16 @@ def run_statechart_until_observed(
     Mounts task into a Statechart and executes it until target_observation is observed.
     """
     statechart = Statechart(context=StatechartContext(world=World()))
-    statechart.add_node(task)
+    statechart.add_node(node=task)
 
     if target_observation == ObservationStateValues.TRUE:
-        statechart.add_node(EndMotion.when_true(task))
+        statechart.add_node(node=EndMotion.when_true(node=task))
     else:
-        statechart.add_node(EndMotion.when_false(task))
+        statechart.add_node(node=EndMotion.when_false(node=task))
 
     executor = StatechartExecutor(
         context=statechart.context,
-        extensions=[RosNodeAccess(rclpy_node), MotionControl()],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl()],
         pacer=RealTimePacer(),
     )
     executor.compile(statechart=statechart)

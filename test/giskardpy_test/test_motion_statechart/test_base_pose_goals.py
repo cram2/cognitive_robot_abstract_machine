@@ -104,8 +104,8 @@ def _compiled(world: World, goal: StatechartNode) -> StatechartExecutor:
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(goal)
-    statechart.add_node(EndMotion.when_true(goal))
+    statechart.add_node(node=goal)
+    statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=statechart)
     return executor
 

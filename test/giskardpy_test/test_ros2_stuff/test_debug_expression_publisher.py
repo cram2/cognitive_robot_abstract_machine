@@ -168,7 +168,7 @@ class NodesStartingInTurn:
                 point_debug_expression("second/point", context.world)
             ],
         )
-        statechart.add_nodes([first, counter, second])
+        statechart.add_nodes(nodes=[first, counter, second])
         second.start_condition = counter.observes_true
         return cls(statechart=statechart, first=first, second=second)
 
@@ -335,9 +335,9 @@ def test_compile_collects_the_spatial_debug_expressions_of_each_node(
             DebugExpression(name="node/scalar", expression=sm.Scalar(1.0)),
         ],
     )
-    statechart.add_node(node)
+    statechart.add_node(node=node)
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     assert {
         collected_node: [visualization.label for visualization in visualizations]
@@ -374,7 +374,7 @@ def test_only_the_debug_expressions_of_running_nodes_are_published(
     """
     executor = create_executor(cylinder_bot_world, publishing)
     nodes = NodesStartingInTurn.build(executor.context)
-    executor.compile(nodes.statechart)
+    executor.compile(statechart=nodes.statechart)
 
     executor.tick()
     assert published_namespaces(publishing) == collected_namespaces(
@@ -397,7 +397,7 @@ def test_running_nodes_whose_debug_expressions_share_a_name_publish_apart(
     executor = create_executor(cylinder_bot_world, publishing)
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             NodeRegisteringDebugExpressions(
                 name="reach",
                 registered_debug_expressions=[
@@ -407,7 +407,7 @@ def test_running_nodes_whose_debug_expressions_share_a_name_publish_apart(
             for _ in range(2)
         ]
     )
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
 
     executor.tick()
 
@@ -423,7 +423,7 @@ def test_ticking_compiles_no_debug_expressions(
     """
     executor = create_executor(cylinder_bot_world, publishing)
     nodes = NodesStartingInTurn.build(executor.context)
-    executor.compile(nodes.statechart)
+    executor.compile(statechart=nodes.statechart)
 
     def fail_compiling(**kwargs) -> None:
         """
@@ -452,7 +452,7 @@ def test_publishing_builds_no_markers_after_compiling(
     """
     executor = create_executor(cylinder_bot_world, publishing)
     nodes = NodesStartingInTurn.build(executor.context)
-    executor.compile(nodes.statechart)
+    executor.compile(statechart=nodes.statechart)
 
     def fail_building_markers(**kwargs) -> Marker:
         """
@@ -477,7 +477,7 @@ def test_markers_are_published_at_the_publish_frequency(
     """
     executor = create_executor(cylinder_bot_world, publishing)
     publishing.publish_frequency = 1 / (3 * executor.context.require_tick_duration())
-    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    executor.compile(statechart=NodesStartingInTurn.build(executor.context).statechart)
     published_ticks = []
     monkeypatch.setattr(
         publishing._marker_publisher,
@@ -499,7 +499,7 @@ def test_markers_show_the_current_values_without_recompiling(
     """
     executor = create_executor(cylinder_bot_world, publishing)
     nodes = NodesStartingInTurn.build(executor.context)
-    executor.compile(nodes.statechart)
+    executor.compile(statechart=nodes.statechart)
     executor.tick()
     fake = FakeMarkerPublisher()
     publishing._marker_publisher.marker_publisher.publisher = fake
@@ -537,7 +537,7 @@ def test_switched_off_publishing_neither_collects_nor_publishes(
         lambda submission: pytest.fail("switched off publishing submitted markers"),
     )
 
-    executor.compile(nodes.statechart)
+    executor.compile(statechart=nodes.statechart)
     tick_until_running(executor, nodes.second)
     executor.finish_run()
 
@@ -549,7 +549,7 @@ def test_the_end_of_a_run_deletes_the_markers(publishing, cylinder_bot_world):
     No marker stays shown once a run stopped.
     """
     executor = create_executor(cylinder_bot_world, publishing)
-    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    executor.compile(statechart=NodesStartingInTurn.build(executor.context).statechart)
     executor.tick()
 
     executor.finish_run()
@@ -565,11 +565,11 @@ def test_compiling_again_forgets_the_nodes_of_the_previous_statechart(
     """
     executor = create_executor(cylinder_bot_world, publishing)
     previous = NodesStartingInTurn.build(executor.context)
-    executor.compile(previous.statechart)
+    executor.compile(statechart=previous.statechart)
     executor.tick()
 
     current = NodesStartingInTurn.build(executor.context)
-    executor.compile(current.statechart)
+    executor.compile(statechart=current.statechart)
 
     assert set(publishing._visualizations_per_node) == {current.first, current.second}
 
@@ -666,7 +666,7 @@ def test_finishing_a_run_after_publishing_raised_releases_the_visualizations(
     The end of a run forgets the visualizations even when the publishing thread ended.
     """
     executor = create_executor(cylinder_bot_world, publishing)
-    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    executor.compile(statechart=NodesStartingInTurn.build(executor.context).statechart)
     marker_publisher = publishing._marker_publisher
 
     def raise_error(
@@ -724,7 +724,7 @@ def test_a_statechart_compiled_after_publishing_raised_publishes_again(
     statecharts compiled after it.
     """
     executor = create_executor(cylinder_bot_world, publishing)
-    executor.compile(NodesStartingInTurn.build(executor.context).statechart)
+    executor.compile(statechart=NodesStartingInTurn.build(executor.context).statechart)
     failed_marker_publisher = publishing._marker_publisher
 
     def raise_error(
@@ -743,7 +743,7 @@ def test_a_statechart_compiled_after_publishing_raised_publishes_again(
     executor.finish_run()
     nodes = NodesStartingInTurn.build(executor.context)
 
-    executor.compile(nodes.statechart)
+    executor.compile(statechart=nodes.statechart)
     executor.tick()
 
     assert published_namespaces(publishing) == collected_namespaces(
@@ -762,12 +762,12 @@ def test_executor_with_motion_control_publishes_the_running_tasks(
     """
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
-        extensions=[RosNodeAccess(rclpy_node), MotionControl(), publishing],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl(), publishing],
     )
     statechart = Statechart(context=executor.context)
     task = align_planes_task(cylinder_bot_world)
-    statechart.add_node(task)
-    executor.compile(statechart)
+    statechart.add_node(node=task)
+    executor.compile(statechart=statechart)
 
     executor.tick()
 
@@ -796,12 +796,12 @@ def test_orientations_and_vectors_of_a_task_are_drawn_at_its_tip(
     cylinder_bot_world.notify_state_change()
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
-        extensions=[RosNodeAccess(rclpy_node), MotionControl(), publishing],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl(), publishing],
     )
     statechart = Statechart(context=executor.context)
     task = create_task(cylinder_bot_world)
-    statechart.add_node(task)
-    executor.compile(statechart)
+    statechart.add_node(node=task)
+    executor.compile(statechart=statechart)
     fake = FakeMarkerPublisher()
     publishing._marker_publisher.marker_publisher.publisher = fake
 
@@ -817,10 +817,13 @@ def test_orientations_and_vectors_of_a_task_are_drawn_at_its_tip(
 
 
 def test_executor_skips_debug_expressions_by_default(rclpy_node, cylinder_bot_world):
+    """
+    An executor without :class:`DebugExpressionPublishing` has no such extension.
+    """
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
-        extensions=[RosNodeAccess(rclpy_node), MotionControl()],
+        extensions=[RosNodeAccess(ros_node=rclpy_node), MotionControl()],
     )
 
     with pytest.raises(MissingExecutorExtensionError):
-        executor.require_extension(DebugExpressionPublishing)
+        executor.require_extension(extension_type=DebugExpressionPublishing)

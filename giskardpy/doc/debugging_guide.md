@@ -75,9 +75,9 @@ from giskardpy.motion_statechart.ros_context import RosNodeAccess
 
 executor = StatechartExecutor(
     context=StatechartContext(world=world),
-    extensions=[RosNodeAccess(node), MotionControl(), DebugExpressionPublishing(node)],
+    extensions=[RosNodeAccess(ros_node=node), MotionControl(), DebugExpressionPublishing(ros_node=node)],
 )
-executor.compile(motion_statechart)
+executor.compile(statechart=motion_statechart)
 ```
 
 On `compile()`, the extension builds the publisher and attaches it to the statechart. Each
@@ -132,9 +132,9 @@ executor = StatechartExecutor(
     context=StatechartContext(world=world),
     extensions=[MotionControl(), DebugExpressionRecording()],
 )
-executor.compile(motion_statechart)
+executor.compile(statechart=motion_statechart)
 executor.tick_until_end()
-executor.require_extension(DebugExpressionRecording).plotter.plot(
+executor.require_extension(extension_type=DebugExpressionRecording).plotter.plot(
     "./debug_expressions.pdf"
 )
 ```

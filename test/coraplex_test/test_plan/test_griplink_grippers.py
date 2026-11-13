@@ -57,7 +57,9 @@ def real_daisy_executor(extensions: list[ContextExtension]) -> RealDAiSyPlanExec
     :return: An executor sending plans to the real DAiSy.
     """
     return RealDAiSyPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions)
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        )
     )
 
 

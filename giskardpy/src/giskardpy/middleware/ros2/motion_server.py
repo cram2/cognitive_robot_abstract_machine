@@ -1,3 +1,8 @@
+"""
+The server that accepts motion goals over ROS, runs them in the control loop of Giskard
+and answers each of them.
+"""
+
 from __future__ import annotations
 
 import json
@@ -281,7 +286,7 @@ class MotionServer:
         self.debug_expression_publishing.publishes_markers = (
             goal.publishes_debug_expressions
         )
-        self.executor.compile(motion_statechart)
+        self.executor.compile(statechart=motion_statechart)
         self.feedback_publisher.publish_structure()
         background_node.get_node().get_logger().info("Done parsing goal message.")
 

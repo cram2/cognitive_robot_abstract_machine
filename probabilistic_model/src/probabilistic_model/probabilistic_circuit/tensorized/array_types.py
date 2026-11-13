@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import TypeAlias
+from typing_extensions import Any, TypeAlias
+
+BackendArray: TypeAlias = Any
+"""
+An array of any backend that implements the Python Array API standard, which defines no
+type to annotate such an array with.
+"""
 
 SampleArray: TypeAlias = npt.NDArray[np.float64]
 """
