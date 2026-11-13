@@ -11,7 +11,6 @@ import pytest
 from random_events.interval import Bound
 from random_events.set import Set
 from random_events.variable import Symbolic, Variable
-from scipy.sparse import coo_array
 from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.exceptions import CannotConvertError
@@ -70,15 +69,17 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.uniform_la
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     SparseEntries,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
+    InnerLayerEdges,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
     SymbolicEncoding,
 )
 
-from .differentiable_circuits import Size, dense_log_weights
+from .differentiable_circuits import Size, child_node_matrix, dense_log_weights
 
 
 def conversion_over(*variables: Variable) -> LayersToDifferentiable:
@@ -119,16 +120,14 @@ def sum_layer() -> SumLayer:
     """
     Two mixtures over two Gaussian layers.
     """
-    return SumLayer(
+    return SumLayer.from_entries(
         [gaussian_layer(0), gaussian_layer(0)],
-        RowGroupedSparseArray.from_entries(
-            SparseEntries(
-                np.log(np.array([1.0, 3.0, 2.0, 2.0])),
-                np.array([0, 0, 1, 1]),
-                np.array([0, 3, 1, 2]),
-            ),
-            (2, 4),
+        SparseEntries(
+            np.log(np.array([1.0, 3.0, 2.0, 2.0])),
+            np.array([0, 0, 1, 1]),
+            np.array([0, 3, 1, 2]),
         ),
+        2,
     )
 
 
@@ -151,17 +150,17 @@ def test_weights_are_normalized(sum_layer, x, single_precision_tolerance):
 
 
 def test_product_edges_keep_their_child_nodes(x, y):
-    product = ProductLayer(
+    product = ProductLayer.from_edges(
         [gaussian_layer(0), gaussian_layer(1)],
-        coo_array(
-            (np.array([0, 1, 1, 0]), (np.array([0, 0, 1, 1]), np.array([0, 1, 0, 1]))),
-            shape=(2, 2),
+        InnerLayerEdges(
+            np.array([0, 1, 0, 1]), np.array([0, 0, 1, 1]), np.array([0, 1, 1, 0])
         ),
+        2,
     )
     layer = conversion_over(x, y).convert(product)
     assert isinstance(layer, DifferentiableProductLayer)
     np.testing.assert_array_equal(
-        np.asarray(layer.edges.todense()), product.edges.toarray()
+        np.asarray(layer.edges.todense()), child_node_matrix(product)
     )
 
 

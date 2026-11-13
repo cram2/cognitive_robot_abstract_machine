@@ -68,9 +68,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_
     LayeredProbabilisticCircuit,
     LayerNode,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.row_grouped_sparse_array import (
-    RowGroupedSparseArray,
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     SparseEntries,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
+    InnerLayerEdges,
 )
 
 
@@ -163,11 +165,12 @@ class SumUnitsToSumLayerConverter(UnitsToLayerConverter[SumUnit, SumLayer]):
             if found:
                 child_layers.append(converted_layer.layer)
 
-        log_weights = RowGroupedSparseArray.from_entries(
+        layer = SumLayer.from_entries(
+            child_layers,
             SparseEntries(np.array(values, dtype=float), rows, columns),
-            (len(data), sum(layer.number_of_nodes for layer in child_layers)),
+            len(data),
         )
-        return ConvertedLayer.of_units(SumLayer(child_layers, log_weights), data)
+        return ConvertedLayer.of_units(layer, data)
 
 
 class ProductUnitsToProductLayerConverter(
@@ -195,11 +198,13 @@ class ProductUnitsToProductLayerConverter(
                     columns.append(unit_index)
                     values.append(converted_layer.node_of_unit[subcircuit_hash])
 
-        edges = SparseEntries(
-            np.array(values, dtype=np.int64), rows, columns
-        ).to_coo_array((len(used_layers), len(data)))
-        layer = ProductLayer(
-            [converted_layer.layer for converted_layer in used_layers], edges
+        edges = InnerLayerEdges(
+            np.array(columns, dtype=np.int64),
+            np.array(rows, dtype=np.int64),
+            np.array(values, dtype=np.int64),
+        )
+        layer = ProductLayer.from_edges(
+            [converted_layer.layer for converted_layer in used_layers], edges, len(data)
         )
         return ConvertedLayer.of_units(layer, data)
 

@@ -80,7 +80,7 @@ class SumLayerToSumUnitsConverter(
         child_units = [
             builder.units_of(child_layer) for child_layer in data.child_layers
         ]
-        for edge, log_weight in zip(data.iterate_edges(), data.log_weights.data):
+        for edge, log_weight in zip(data.iterate_edges(), data.edge_log_weights):
             units[edge.node].add_subcircuit(
                 child_units[edge.child_layer_index][edge.child_node], float(log_weight)
             )

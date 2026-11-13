@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import variable
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
-from krrood.patterns.role_predicates import IsSameSemanticEntity
+from krrood.entity_query_language.role_predicates import IsSameSemanticEntity
 
 
 @dataclass(kw_only=True)
