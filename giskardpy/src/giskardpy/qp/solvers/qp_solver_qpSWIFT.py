@@ -20,6 +20,7 @@ class QPSWIFTExitFlags(IntEnum):
 
 @dataclass(kw_only=True)
 class QPSolverQPSwift(QPSolver[QPDataExplicit]):
+
     big_ball_mode: bool = False
     """
     QpSWIFT does not have infeasible detection and cannot differentiate suboptimal from

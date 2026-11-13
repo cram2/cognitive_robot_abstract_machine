@@ -24,9 +24,7 @@ class RecordedDebugExpression:
     """
 
     debug_expression: DebugExpression
-    """
-    The debug expression whose value is recorded.
-    """
+    """The debug expression whose value is recorded."""
 
     _free_variables: list[FloatVariable] = field(init=False)
     """

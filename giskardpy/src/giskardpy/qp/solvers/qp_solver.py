@@ -12,6 +12,7 @@ T = TypeVar("T", QPDataExplicit, QPDataTwoSidedInequality)
 
 @dataclass(kw_only=True)
 class QPSolver(Generic[T]):
+
     @classmethod
     def qp_data_type(cls) -> type[T]:
         """

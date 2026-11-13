@@ -61,6 +61,7 @@ error_info = {
 
 
 class QPSolverGurobi(QPSolver[QPDataExplicit]):
+
     STATUS_VALUE_DICT = {
         getattr(gurobipy.GRB.status, name): name
         for name in dir(gurobipy.GRB.status)

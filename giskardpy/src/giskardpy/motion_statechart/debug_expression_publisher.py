@@ -30,9 +30,7 @@ class DebugExpressionPublisher:
     """
 
     world: World
-    """
-    The world whose state the debug expressions are evaluated against.
-    """
+    """The world whose state the debug expressions are evaluated against."""
 
     node: Node
     """

@@ -380,13 +380,13 @@ class QPDataExplicit(QPData):
         """
         return (
             f"sp.csc_matrix(\n"
-            f"{' ' * spaces}(\n"
-            f"{' ' * spaces}    {self._np_array_to_str(array=matrix.data)},\n"
-            f"{' ' * spaces}    {self._np_array_to_str(array=matrix.indices, dtype='int')},\n"
-            f"{' ' * spaces}    {self._np_array_to_str(array=matrix.indptr, dtype='int')},\n"
-            f"{' ' * spaces}),\n"
-            f"{' ' * spaces}shape={matrix.shape},\n"
-            f"{' ' * spaces})"
+            f"{' '*spaces}(\n"
+            f"{' '*spaces}    {self._np_array_to_str(array=matrix.data)},\n"
+            f"{' '*spaces}    {self._np_array_to_str(array=matrix.indices, dtype='int')},\n"
+            f"{' '*spaces}    {self._np_array_to_str(array=matrix.indptr, dtype='int')},\n"
+            f"{' '*spaces}),\n"
+            f"{' '*spaces}shape={matrix.shape},\n"
+            f"{' '*spaces})"
         )
 
     def analyze_well_posedness(self):
