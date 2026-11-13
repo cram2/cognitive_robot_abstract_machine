@@ -1,5 +1,8 @@
 import logging
 
+import numpy as np
+
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
@@ -20,6 +23,7 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -689,3 +693,34 @@ def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
     kitchen_environment_world.notify_state_change()
 
     assert [drawer.opening_ratio for drawer in drawers] == [0] * len(drawers)
+
+
+# %% perceived objects
+
+
+def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
+    world = World()
+    body = Body(name=PrefixedName("perceived_object"))
+    with world.modify_world():
+        world.add_body(body)
+        perceived_object = PerceivedObject(root=body, class_label="fork")
+        world.add_semantic_annotation(perceived_object)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+
+    received = from_json(to_json(perceived_object), **tracker.create_kwargs())
+
+    assert type(received) is PerceivedObject
+    assert received.root is body
+    assert received.class_label == perceived_object.class_label
+
+
+def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
+    world = World()
+    body = Body(name=PrefixedName("human"))
+    with world.modify_world():
+        world.add_body(body)
+        human = Human(root=body, class_label="person")
+        world.add_semantic_annotation(human)
+
+    assert world.get_semantic_annotations_by_type(IsPerceivable) == [human]
+    assert human.class_label == "person"

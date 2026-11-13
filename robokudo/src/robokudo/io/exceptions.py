@@ -255,6 +255,22 @@ class RecordedViewMissing(RoboKudoError):
         return "Restore the referenced view or select a complete recording."
 
 
+@dataclass(kw_only=True)
+class ReplayWorldShared(RoboKudoError, RuntimeError):
+    """
+    A recording is replayed into a world other processes share.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A recording can only be replayed into a world of RoboKudo's own, but "
+            "RoboKudo joined a world another process shares."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Stop the process serving the shared world before replaying a recording."
+
+
 @dataclass
 class CASViewCodecMissing(RoboKudoError, TypeError):
     """

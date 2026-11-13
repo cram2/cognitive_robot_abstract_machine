@@ -40,3 +40,6 @@ class BBIdentifier(object):
 
     BLACKBOARD_EXCEPTION_NAME: str = "exception"
     """Name for storing exceptions on the blackboard"""
+
+    ROBOKUDO: str = "robokudo"
+    """The :class:`~robokudo.process.RoboKudo` running in this process"""

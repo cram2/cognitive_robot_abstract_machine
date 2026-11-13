@@ -8,6 +8,7 @@ from krrood.adapters.json_serializer import from_json
 from semantic_digital_twin.adapters.ros.world_fetcher import (
     FetchWorldServer,
     fetch_world_from_service,
+    find_world_fetcher_service,
 )
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -324,3 +325,31 @@ def test_fetched_robot_parts_keep_their_joint_states(rclpy_node, pr2_world_state
     assert [joint_state.name for joint_state in fetched_pr2.torso.joint_states] == [
         joint_state.name for joint_state in pr2.torso.joint_states
     ]
+
+
+# %% finding a world fetcher service
+
+
+def test_finds_the_service_of_a_process_serving_a_world(rclpy_node):
+    service_suffix = "world_served_to_be_found"
+    server = FetchWorldServer(
+        node=rclpy_node,
+        world=create_dummy_world(),
+        service_name=f"/test_find_world_fetcher_service/{service_suffix}",
+    )
+
+    service_name = find_world_fetcher_service(
+        rclpy_node, service_suffix=service_suffix, timeout_seconds=10
+    )
+
+    assert service_name == server.service_name
+    server.close()
+
+
+def test_finds_no_service_when_no_process_serves_a_world(rclpy_node):
+    assert (
+        find_world_fetcher_service(
+            rclpy_node, service_suffix="world_nobody_serves", timeout_seconds=0
+        )
+        is None
+    )

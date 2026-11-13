@@ -23,7 +23,6 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import TYPE_CHECKING
 
-import robokudo.world as rk_world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.exceptions import InvalidAnalysisData
 from robokudo.cas import CASViews
@@ -371,10 +370,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         world_frame_required = False
         camera_T_world = None
         if self.descriptor.parameters.mode == StaticObjectMode.WORLD_DESCRIPTOR:
-            predefined_object_annotations = (
-                rk_world.world_instance().get_semantic_annotations_by_type(
-                    PredefinedObject
-                )
+            predefined_object_annotations = self.world.get_semantic_annotations_by_type(
+                PredefinedObject
             )
             object_bodies = [
                 annotation.body

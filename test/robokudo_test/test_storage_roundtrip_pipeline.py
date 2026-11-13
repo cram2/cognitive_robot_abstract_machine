@@ -13,7 +13,6 @@ from rclpy.node import Node
 
 from robokudo.types.cv import ColorToDepthRatio
 import robokudo.defs
-from robokudo import world as rk_world
 import robokudo.descriptors.camera_configs.config_filereader_playback
 import robokudo.descriptors.camera_configs.config_mongodb_playback
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -90,7 +89,6 @@ class TestStorageRoundtripPipeline:
     def test_store_and_replay_sensor_data_roundtrip(
         self, cup_on_counter_directory: Path
     ) -> None:
-        rk_world.init_world_with_entity_tracker()
         db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
         storage = Storage(db_name)
         writer_node = Node(
@@ -130,10 +128,8 @@ class TestStorageRoundtripPipeline:
                 {"$set": {StorageDocumentField.VIEW_IDS: view_ids}},
             )
 
-            rk_world.init_world_with_entity_tracker()
-            assert rk_world.world_instance().is_empty()
-
             reader_pipeline = _build_reader_pipeline(db_name)
+            assert reader_pipeline.world.is_empty()
             reader_status = robokudo.utils.tree_execution.run_tree_once(
                 reader_pipeline, reader_node
             )
@@ -155,7 +151,7 @@ class TestStorageRoundtripPipeline:
             assert reader_observation.camera is not writer_observation.camera
             assert (
                 reader_observation.camera
-                is rk_world.world_instance().get_semantic_annotation_by_id(
+                is reader_pipeline.world.get_semantic_annotation_by_id(
                     reader_observation.camera.id
                 )
             )
@@ -175,9 +171,9 @@ class TestStorageRoundtripPipeline:
             assert tuple(reader_observation.camera.modalities) == tuple(
                 writer_observation.camera.modalities
             )
-            assert {
-                str(key) for key in rk_world.world_instance().state.keys()
-            }.isdisjoint({str(key) for key in world_snapshot_payload["state"]["ids"]})
+            assert {str(key) for key in reader_pipeline.world.state.keys()}.isdisjoint(
+                {str(key) for key in world_snapshot_payload["state"]["ids"]}
+            )
             assert (
                 writer_observation.effective_camera_model
                 == reader_observation.effective_camera_model

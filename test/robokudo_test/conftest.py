@@ -6,6 +6,7 @@ import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Thread
 
 import py_trees
 import pytest
@@ -13,17 +14,21 @@ import rclpy
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from py_trees.blackboard import Blackboard
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
 import robokudo.defs
-import robokudo.world
 from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
 )
 from robokudo.identifier import BBIdentifier
 
+from ._perception_world import FrameName, SharedWorld, world_with_a_head_camera
 from .dataset.cup_on_counter import CupOnCounterRecording
 
 # %% Mongo storage preservation
@@ -144,6 +149,50 @@ def node(ros_default):
     n.destroy_node()
 
 
+@pytest.fixture
+def other_process_node(ros_default: None) -> Iterator[Node]:
+    """
+    The node of another process, such as the one executing robot motions, which an
+    executor spins in the background so that its services, actions and subscriptions are
+    served while a test blocks on them.
+    """
+    node = Node("other_process")
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
+    thread = Thread(target=executor.spin, daemon=True)
+    thread.start()
+    yield node
+    executor.shutdown()
+    thread.join()
+    node.destroy_node()
+
+
+@pytest.fixture
+def shared_world(other_process_node: Node) -> Iterator[SharedWorld]:
+    """
+    A world another process serves and synchronizes, holding only the world frame.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+    served_world = SharedWorld.served_through(other_process_node, world)
+    yield served_world
+    served_world.close()
+
+
+@pytest.fixture
+def shared_world_with_a_robot(other_process_node: Node) -> Iterator[SharedWorld]:
+    """
+    A world another process serves and synchronizes, holding a robot whose camera hangs
+    below its head, which that process moves.
+    """
+    served_world = SharedWorld.served_through(
+        other_process_node, world_with_a_head_camera()
+    )
+    yield served_world
+    served_world.close()
+
+
 def clear_blackboard() -> None:
     """
     Destroy blackboard-owned ROS nodes before clearing shared state.
@@ -163,21 +212,6 @@ def isolate_blackboard() -> Iterator[None]:
     clear_blackboard()
     yield
     clear_blackboard()
-
-
-# %% semantic world isolation
-
-
-@pytest.fixture(autouse=True)
-def isolate_semantic_world() -> Iterator[None]:
-    """
-    Give each RoboKudo test an empty semantic world, tracker, and belief state.
-    """
-    robokudo.world.get_object_belief_states().clear()
-    robokudo.world.init_world_with_entity_tracker()
-    yield
-    robokudo.world.get_object_belief_states().clear()
-    robokudo.world.init_world_with_entity_tracker()
 
 
 # %% annotator visualization output

@@ -130,7 +130,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
         pipeline.create_new_cas()
         if query is not None:
             pipeline.cas.query = query
-        camera_interface.set_data(pipeline.cas)
+        camera_interface.set_data(cas=pipeline.cas, world=pipeline.world)
 
         self.feedback_message = (
             f"Got sensor data... Waited for {time_difference} seconds"

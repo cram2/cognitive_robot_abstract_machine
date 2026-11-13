@@ -10,19 +10,20 @@ import pymongo
 import numpy as np
 
 import robokudo.cas
-from robokudo import world as rk_world
 from robokudo.cas import CAS, CASViews
 from robokudo.io.storage import Storage
 from robokudo.io.sensor_world import RecordedCameraWorld
 from robokudo.types.camera import CameraObservation
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.world import World
+
+from ._perception_world import camera_interface
 
 # %% Camera behavior
 
@@ -175,14 +176,14 @@ class TestStorage:
 
         retrieved_cas = robokudo.cas.CAS()
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, World())
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in retrieved_cas_record["views"].items():
             retrieved_cas.set(view_name, view_content)
 
         storage_instance.load_annotations_from_mongo_in_cas(
-            retrieved_cas_record, retrieved_cas
+            retrieved_cas_record, retrieved_cas, World()
         )
 
         # Compare the most important views: COLOR and DEPTH Image
@@ -246,7 +247,7 @@ class TestStorage:
         assert len(retrieved_cas_record["view_ids"]) >= 6
 
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, World())
 
         assert retrieved_cas_record["views"]["custom_json"] == {
             "labels": ["cup", "plate"],
@@ -280,7 +281,7 @@ class TestStorage:
         assert retrieved_cas_record is not None
 
         retrieved_cas_record["views"] = {}
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record, World())
 
         restored = retrieved_cas_record["views"]["custom_dataclass"]
         assert isinstance(restored, CustomDataclassView)
@@ -305,11 +306,13 @@ class TestStorage:
         world_frame = f"map_{uuid.uuid4().hex[:8]}"
         camera_frame = f"camera_{uuid.uuid4().hex[:8]}"
 
-        rk_world.init_world_with_entity_tracker()
-        rk_world.setup_world_for_camera_frame(
-            world_frame=world_frame, camera_frame=camera_frame
+        sem_world = World()
+        camera_interface().bind_world_T_camera(
+            world=sem_world,
+            world_frame=world_frame,
+            camera_frame=camera_frame,
+            world_T_camera=HomogeneousTransformationMatrix(),
         )
-        sem_world = rk_world.world_instance()
         camera_body = sem_world.get_body_by_name(camera_frame)
         world_body = sem_world.get_body_by_name(world_frame)
         camera_model = create_camera_model()
@@ -348,10 +351,11 @@ class TestStorage:
         )
         assert retrieved_cas_record is not None
         retrieved_cas_record["views"] = {}
-        rk_world.init_world_with_entity_tracker()
-        RecordedCameraWorld(observation).install(rk_world.world_instance())
-        rk_world.init_world_entity_tracker_from_world(rk_world.world_instance())
-        storage_instance.load_views_from_mongo_in_cas(retrieved_cas_record)
+        replay_world = World()
+        RecordedCameraWorld(observation).install(replay_world)
+        storage_instance.load_views_from_mongo_in_cas(
+            retrieved_cas_record, replay_world
+        )
         restored_observation = retrieved_cas_record["views"][
             CASViews.CAMERA_OBSERVATION
         ]

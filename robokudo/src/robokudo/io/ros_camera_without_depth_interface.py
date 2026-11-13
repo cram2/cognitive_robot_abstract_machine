@@ -20,9 +20,7 @@ from __future__ import annotations
 
 # %% Imports
 from collections.abc import Sequence
-from threading import Lock
 
-import builtin_interfaces.msg
 import cv2
 import message_filters
 import numpy as np
@@ -45,6 +43,7 @@ from semantic_digital_twin.datastructures.camera_model import (
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from semantic_digital_twin.world import World
 
     from robokudo.cas import CAS
 
@@ -104,14 +103,6 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         self.color_to_depth_ratio: ColorToDepthRatio = ColorToDepthRatio()
         """
         Always (1.0, 1.0) since no depth data.
-        """
-        self.timestamp: builtin_interfaces.msg.Time | None = None
-        """
-        Timestamp of latest data.
-        """
-        self.lock: Lock = Lock()
-        """
-        Thread synchronization lock.
         """
         self.bridge: CVBridgeWorkaround = CVBridgeWorkaround()
         """
@@ -262,24 +253,24 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         """
         Process synchronized RGB image and camera info messages.
 
+        .. note:: A frame arriving while the previous frame is read is dropped.
+
         :param color_data: RGB image message
         :param camera_info: Camera calibration info message, defaults to None
         """
-        self.lock.acquire()
+        # Skip the frame instead of waiting, so that the executor delivering it keeps
+        # delivering TF while a frame is read.
+        if not self.lock.acquire(blocking=False):
+            return
         self.color = self.bridge.imgmsg_to_cv2(color_data, desired_encoding="bgr8")
         self.timestamp = color_data.header.stamp
 
         self.camera_info = camera_info
 
-        if not self.lookup_transform():
-            self._has_new_data = False
-            self.lock.release()
-            return
-
         self._has_new_data = True
         self.lock.release()
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, *, cas: CAS, world: World) -> None:
         """
         Update the Common Analysis Structure with latest camera data.
 
@@ -290,77 +281,81 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         * Handles thread synchronization
 
         :param cas: Common Analysis Structure to update
+        :param world: The world perception perceives into
         """
-        if not self.has_new_data():
-            return
+        with self.lock:
+            if not self._has_new_data:
+                return
 
-        self.lock.acquire()
+            width = self.camera_info.width
+            height = self.camera_info.height
 
-        width = self.camera_info.width
-        height = self.camera_info.height
-
-        focal_length_x = self.camera_info.k[0]
-        principal_point_x = self.camera_info.k[2]
-        focal_length_y = self.camera_info.k[4]
-        principal_point_y = self.camera_info.k[5]
-        if self.camera_config.rotate_image is not None:
-            intrinsic_matrix = np.array(
-                [
-                    [focal_length_x, 0, principal_point_x],
-                    [0, focal_length_y, principal_point_y],
-                    [0, 0, 1],
-                ]
-            )
-            rotated_image, rotated_intrinsics, new_size = (
-                self.rotate_image_and_intrinsics(
-                    self.color,
-                    intrinsic_matrix=intrinsic_matrix,
+            focal_length_x = self.camera_info.k[0]
+            principal_point_x = self.camera_info.k[2]
+            focal_length_y = self.camera_info.k[4]
+            principal_point_y = self.camera_info.k[5]
+            if self.camera_config.rotate_image is not None:
+                intrinsic_matrix = np.array(
+                    [
+                        [focal_length_x, 0, principal_point_x],
+                        [0, focal_length_y, principal_point_y],
+                        [0, 0, 1],
+                    ]
+                )
+                rotated_image, rotated_intrinsics, new_size = (
+                    self.rotate_image_and_intrinsics(
+                        self.color,
+                        intrinsic_matrix=intrinsic_matrix,
+                        rotation=self.camera_config.rotate_image,
+                    )
+                )
+                self.color = rotated_image
+                flattened_intrinsics = rotated_intrinsics.flatten()
+                focal_length_x = flattened_intrinsics[0]
+                principal_point_x = flattened_intrinsics[2]
+                focal_length_y = flattened_intrinsics[4]
+                principal_point_y = flattened_intrinsics[5]
+                width, height = new_size
+                self.camera_info.k = (
+                    focal_length_x,
+                    0,
+                    principal_point_x,
+                    0,
+                    focal_length_y,
+                    principal_point_y,
+                    0,
+                    0,
+                    1,
+                )
+                self.camera_info.d = self.rotate_camera_distortion(
+                    coefficients=self.camera_info.d,
+                    distortion_model=self.camera_info.distortion_model,
                     rotation=self.camera_config.rotate_image,
                 )
+
+            self.camera_info.width = width
+            self.camera_info.height = height
+
+            cas.set(CASViews.COLOR_IMAGE, self.color)
+            cas.set(CASViews.DEPTH_IMAGE, None)
+            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+            camera_frame = (
+                self.camera_info.header.frame_id or self.camera_config.tf_from
             )
-            self.color = rotated_image
-            flattened_intrinsics = rotated_intrinsics.flatten()
-            focal_length_x = flattened_intrinsics[0]
-            principal_point_x = flattened_intrinsics[2]
-            focal_length_y = flattened_intrinsics[4]
-            principal_point_y = flattened_intrinsics[5]
-            width, height = new_size
-            self.camera_info.k = (
-                focal_length_x,
-                0,
-                principal_point_x,
-                0,
-                focal_length_y,
-                principal_point_y,
-                0,
-                0,
-                1,
+            self.validate_camera_frame_for_tf(camera_frame)
+            world_T_camera = self.world_T_camera_from_tf(
+                world=world, timestamp=self.timestamp
             )
-            self.camera_info.d = self.rotate_camera_distortion(
-                coefficients=self.camera_info.d,
-                distortion_model=self.camera_info.distortion_model,
-                rotation=self.camera_config.rotate_image,
+            self.store_camera_observation(
+                cas=cas,
+                world=world,
+                camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),
+                camera_frame=camera_frame,
+                timestamp_nanoseconds=(
+                    self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
+                ),
+                modalities=(CameraModality.COLOR,),
+                world_T_camera=world_T_camera,
             )
 
-        self.camera_info.width = width
-        self.camera_info.height = height
-
-        cas.set(CASViews.COLOR_IMAGE, self.color)
-        cas.set(CASViews.DEPTH_IMAGE, None)
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
-        camera_frame = self.camera_info.header.frame_id or self.camera_config.tf_from
-        self.validate_camera_frame_for_tf(camera_frame)
-        world_T_camera = self.world_T_camera_from_tf(self.timestamp)
-        self.store_camera_observation(
-            cas=cas,
-            camera_model=RosCameraModelAdapter.from_camera_info(self.camera_info),
-            camera_frame=camera_frame,
-            timestamp_nanoseconds=(
-                self.timestamp.sec * 1_000_000_000 + self.timestamp.nanosec
-            ),
-            modalities=(CameraModality.COLOR,),
-            world_T_camera=world_T_camera,
-        )
-
-        self._has_new_data = False
-        self.lock.release()
+            self._has_new_data = False

@@ -17,7 +17,6 @@ import robokudo.annotators.core
 import robokudo.utils.annotator_helper
 import robokudo.utils.error_handling
 import robokudo.utils.o3d_helper
-import robokudo.world as rk_world
 from robokudo.cas import CASViews
 from robokudo.utils.region import region_obb_in_camera_coordinates
 from robokudo.world_descriptor import PredefinedObject
@@ -59,7 +58,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
     def compute(self) -> py_trees.common.Status:
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        runtime_world = rk_world.world_instance()
+        runtime_world = self.world
 
         try:
             world_to_camera_transform = (

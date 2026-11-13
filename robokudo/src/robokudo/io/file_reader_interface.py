@@ -26,6 +26,7 @@ from pathlib import Path
 
 import ament_index_python.packages
 import cv2
+from semantic_digital_twin.world import World
 from typing_extensions import Any
 
 from krrood.adapters.json_serializer import from_json
@@ -238,7 +239,7 @@ class RGBDFileReaderInterface(FileReaderInterface):
     Inherits all instance variables from FileReaderInterface.
     """
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, *, cas: CAS, world: World) -> None:
         """
         Set the next RGB-D data frame into the CAS.
 
@@ -249,6 +250,7 @@ class RGBDFileReaderInterface(FileReaderInterface):
         * Updates the CAS with all loaded data
 
         :param cas: Common Analysis Structure to update
+        :param world: The world perception perceives into
         """
         data = self.get_next_data()
         if data is None:
@@ -260,9 +262,12 @@ class RGBDFileReaderInterface(FileReaderInterface):
         recorded_observation = data[CASViews.CAMERA_OBSERVATION]
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
         camera_frame = recorded_observation["camera_frame"]
-        world_T_camera = self.static_world_T_camera_if_configured(camera_frame)
+        world_T_camera = self.static_world_T_camera_if_configured(
+            world=world, camera_frame=camera_frame
+        )
         self.store_camera_observation(
             cas=cas,
+            world=world,
             camera_model=recorded_observation["effective_camera_model"],
             camera_frame=camera_frame,
             timestamp_nanoseconds=recorded_observation["timestamp_nanoseconds"],

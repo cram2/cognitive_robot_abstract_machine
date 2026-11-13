@@ -4,7 +4,6 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-import robokudo.world as rk_world
 from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RuntimeRobotWorldSource,
     RayTracingCameraConfiguration,
@@ -66,19 +65,17 @@ def test_resolver_rejects_world_without_camera_annotation() -> None:
 # %% Runtime robot camera selection
 
 
-def test_resolver_uses_runtime_robots_default_camera(monkeypatch) -> None:
+def test_resolver_uses_runtime_robots_default_camera() -> None:
     world = Mock(spec=World)
     robot = Mock(spec=AbstractRobot)
     camera = Mock(spec=RobotCamera)
     robot.get_default_camera.return_value = camera
     world.get_semantic_annotations_by_type.return_value = [robot]
-    monkeypatch.setattr(rk_world, "world_instance", lambda: world)
-    monkeypatch.setattr(rk_world, "init_world_entity_tracker_from_world", Mock())
     resolver = RayTracingContextResolver(
         RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
     )
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=world)
 
     assert isinstance(context, RayTracingContext)
     assert context.world is world
@@ -86,9 +83,7 @@ def test_resolver_uses_runtime_robots_default_camera(monkeypatch) -> None:
     robot.get_default_camera.assert_called_once_with()
 
 
-def test_resolver_retries_runtime_lookup_after_world_becomes_available(
-    monkeypatch,
-) -> None:
+def test_resolver_retries_runtime_lookup_after_world_becomes_available() -> None:
     unavailable_world = Mock(spec=World)
     unavailable_world.get_semantic_annotations_by_type.return_value = []
     available_world = Mock(spec=World)
@@ -96,17 +91,14 @@ def test_resolver_retries_runtime_lookup_after_world_becomes_available(
     camera = Mock(spec=RobotCamera)
     robot.get_default_camera.return_value = camera
     available_world.get_semantic_annotations_by_type.return_value = [robot]
-    runtime_worlds = iter((unavailable_world, available_world))
-    monkeypatch.setattr(rk_world, "world_instance", lambda: next(runtime_worlds))
-    monkeypatch.setattr(rk_world, "init_world_entity_tracker_from_world", Mock())
     resolver = RayTracingContextResolver(
         RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
     )
 
     with pytest.raises(RobotAnnotationMissing):
-        resolver.resolve()
+        resolver.resolve(perception_world=unavailable_world)
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=available_world)
     assert context.world is available_world
     assert context.camera is camera
 
@@ -166,7 +158,7 @@ def test_resolver_preserves_camera_pose_without_override(
     apply_camera_pose = Mock(wraps=RayTracingContextResolver._apply_camera_pose)
     monkeypatch.setattr(resolver, "_apply_camera_pose", apply_camera_pose)
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=World())
 
     apply_camera_pose.assert_not_called()
     assert context.camera is camera
@@ -194,7 +186,7 @@ def test_resolver_applies_camera_pose_override_once() -> None:
     module_loader.load_world_descriptor.return_value = descriptor
     resolver = RayTracingContextResolver(config, module_loader=module_loader)
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=World())
 
     assert context.camera is camera
     np.testing.assert_allclose(
@@ -211,7 +203,7 @@ def test_resolver_applies_camera_pose_override_once() -> None:
     with world.modify_world():
         camera.root.parent_connection.origin = later_pose
 
-    assert resolver.resolve().camera is camera
+    assert resolver.resolve(perception_world=World()).camera is camera
     np.testing.assert_allclose(
         camera.root.parent_connection.origin.to_np(), later_pose.to_np()
     )

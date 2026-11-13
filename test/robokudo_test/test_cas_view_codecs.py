@@ -1,12 +1,13 @@
 # %% Imports
 import numpy as np
 import pytest
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from std_msgs.msg import String
 
 from robokudo.types.camera import CameraObservation
 
 from robokudo.cas import CASViews
-from robokudo.io.cas_view_codecs import CASViewCodecRegistry
+from robokudo.io.cas_view_codecs import CASViewCodecRegistry, KrroodCodec
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.tf import StampedTransform
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -80,8 +81,8 @@ def test_stamped_transform_codec_roundtrip():
 
 @pytest.mark.parametrize("has_world_pose", [True, False])
 def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
-    monkeypatch, has_world_pose
-):
+    has_world_pose: bool,
+) -> None:
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
@@ -102,10 +103,6 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     with world.modify_world():
         world.add_semantic_annotation(camera)
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    monkeypatch.setattr(
-        "robokudo.io.cas_view_codecs.world.get_world_entity_tracker",
-        lambda: tracker,
-    )
     observation = CameraObservation(
         camera=camera,
         effective_camera_model=camera_model,
@@ -115,7 +112,9 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     registry = CASViewCodecRegistry()
 
     encoded = registry.encode_view("camera_observation", observation)
-    decoded_name, decoded_observation = registry.decode_view(encoded)
+    decoded_name, decoded_observation = registry.decode_view(
+        encoded, **tracker.create_kwargs()
+    )
 
     assert decoded_name == "camera_observation"
     assert decoded_observation.camera is camera
@@ -166,3 +165,24 @@ def test_decode_view_missing_required_field_raises():
                 "metadata": {},
             }
         )
+
+
+# %% world entities
+
+
+def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
+    world = World()
+    world_body = Body(name=PrefixedName("map"))
+    with world.modify_world():
+        world.add_body(world_body)
+    transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=1.0, reference_frame=world_body
+    )
+    codec = KrroodCodec()
+
+    decoded = codec.decode(
+        codec.encode(transform),
+        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+    )
+
+    assert decoded.reference_frame is world_body

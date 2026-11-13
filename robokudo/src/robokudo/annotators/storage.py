@@ -29,7 +29,6 @@ from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from typing_extensions import Any
 
-import robokudo.world
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.storage import Storage, StorageDocumentField
 
@@ -121,7 +120,7 @@ class StorageWriter(BaseAnnotator):
         flat_cas = self.storage.generate_dict_from_real_cas(persist_cas)
         flat_cas["view_ids"] = {}
 
-        world = robokudo.world.world_instance()
+        world = self.world
         snapshot = WorldModelSnapshot(
             modifications=list(
                 world.get_world_model_manager().model_modification_blocks
