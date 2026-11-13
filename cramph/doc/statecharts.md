@@ -592,7 +592,7 @@ The `CancelStatechart` factories also take the `exception` to raise. `when_true`
 
 `Statechart.is_ended()` tells whether an `EndStatechart` observes True.
 `StatechartExecutor.tick_until_end()` ticks until it does; to drive a statechart by hand,
-compile it with `executor.compile(statechart)` and call `executor.tick()` until
+compile it with `executor.compile(statechart=statechart)` and call `executor.tick()` until
 `statechart.is_ended()` is True.
 
 Once `execute()` or `tick_until_end()` returns or raises, because the statechart ended, was
@@ -633,7 +633,7 @@ Data or services that are not part of every statechart reach a node through its
 `required_context_extensions`, and a composite node class those it reads only while expanding
 in `context_extensions_required_to_expand`; a statechart whose context lacks one raises
 `NodesMissingContextExtensionsError`. Every hook reads the context of the node's statechart
-through the node's `context` property, and `self.context.require_extension(type)` returns an
+through the node's `context` property, and `self.context.require_extension(extension_type=type)` returns an
 extension.
 
 cramph ships these nodes besides the templates:
@@ -730,8 +730,8 @@ plan = Sequence(
         CountTicks(name="retreat", ticks=5),
     ]
 )
-statechart.add_node(plan)
-statechart.add_node(EndStatechart.when_true(plan))
+statechart.add_node(node=plan)
+statechart.add_node(node=EndStatechart.when_true(node=plan))
 ```
 
 After running it:

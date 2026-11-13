@@ -19,16 +19,16 @@ class TestStateCoveringNodesThatJoinedLater:
     """
 
     def test_nodes_that_joined_later_hold_the_default_value(
-        self, statechart_context: StatechartContext
+        self, *, statechart_context: StatechartContext
     ) -> None:
         statechart = Statechart(context=statechart_context)
         first_node = CountTicks(name="first", ticks=1)
-        statechart.add_node(first_node)
+        statechart.add_node(node=first_node)
         statechart.life_cycle_state[first_node] = LifeCycleValues.RUNNING
         statechart.observation_state[first_node] = ObservationStateValues.TRUE
         recorded_life_cycle = statechart.life_cycle_state.snapshot()
         recorded_observation = statechart.observation_state.snapshot()
-        statechart.add_node(CountTicks(name="second", ticks=1))
+        statechart.add_node(node=CountTicks(name="second", ticks=1))
 
         assert recorded_life_cycle.copy_covering_every_node().data.tolist() == [
             LifeCycleValues.RUNNING,

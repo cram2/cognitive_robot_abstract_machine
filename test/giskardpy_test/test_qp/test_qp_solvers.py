@@ -63,22 +63,24 @@ def test_joint_goal(solver, pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        sequence := Sequence(
-            nodes=[
-                JointPositionList(
-                    goal_state=JointState.from_str_dict(
-                        {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
-                    )
-                ),
-                JointPositionList(
-                    goal_state=JointState.from_str_dict(
-                        {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
-                    )
-                ),
-            ]
+        node=(
+            sequence := Sequence(
+                nodes=[
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
+                        )
+                    ),
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
+                        )
+                    ),
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(sequence))
+    statechart.add_node(node=EndMotion.when_true(node=sequence))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()

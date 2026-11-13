@@ -257,7 +257,7 @@ class InteractiveMarkerNode:
 
         motion_statechart = Statechart(context=self.giskard.context)
         motion_statechart.add_nodes(
-            [
+            nodes=[
                 goal_transformation := CartesianPose(
                     root_link=kinematic_chain_marker.root_body,
                     tip_link=kinematic_chain_marker.tip_body,
@@ -267,9 +267,9 @@ class InteractiveMarkerNode:
             ]
         )
         motion_statechart.add_node(
-            EndMotion.when_any_true([goal_transformation, motion_timeout])
+            node=EndMotion.when_any_true(nodes=[goal_transformation, motion_timeout])
         )
-        self.giskard.compile(motion_statechart)
+        self.giskard.compile(statechart=motion_statechart)
         self.giskard.execute_async()
 
         # Reset marker pose

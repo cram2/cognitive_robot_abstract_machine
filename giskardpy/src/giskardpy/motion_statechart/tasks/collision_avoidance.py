@@ -216,7 +216,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         reads from then on.
         """
         self.collision_variable_manager = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).get_or_create_external_collision_manager(self.context)
         self.avoided_contacts = []
         for group in self._groups_avoiding_external_collisions():
@@ -330,10 +330,10 @@ class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(task)
+        self._add_child_to_statechart(node=task)
         if self.cancel_if_collision_violated:
             self._add_child_to_statechart(
-                _CancelBecauseExternalCollisionViolated(
+                node=_CancelBecauseExternalCollisionViolated(
                     tasks=[task],
                     name="External Collision Violated",
                 )
@@ -484,7 +484,7 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
         :attr:`context`, which this node reads from then on.
         """
         self.collision_variable_manager = self.context.require_extension(
-            MotionControlContext
+            extension_type=MotionControlContext
         ).get_or_create_self_collision_manager(self.context)
         collision_matrix = self.create_self_collision_matrix()
         kinematic_structure_entities = self.robot.kinematic_structure_entities
@@ -618,10 +618,10 @@ class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(task)
+        self._add_child_to_statechart(node=task)
         if self.cancel_if_collision_violated:
             self._add_child_to_statechart(
-                _CancelBecauseSelfCollisionViolated(
+                node=_CancelBecauseSelfCollisionViolated(
                     name="self collision violated", tasks=[task]
                 )
             )

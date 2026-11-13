@@ -49,5 +49,5 @@ class DetectorStatechartBuilder:
         :return: A statechart holding :attr:`detectors` as its nodes.
         """
         statechart = Statechart(context=context)
-        statechart.add_nodes(self.detectors)
+        statechart.add_nodes(nodes=self.detectors)
         return statechart

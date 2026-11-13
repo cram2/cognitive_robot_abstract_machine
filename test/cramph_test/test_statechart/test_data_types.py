@@ -117,7 +117,7 @@ def test_transition_kind_can_trigger_from(transition_kind, life_cycle_state) -> 
     The triggerability check matches membership in the transition kind's source states.
     """
     expected = life_cycle_state in transition_kind.source_states
-    assert transition_kind.can_trigger_from(life_cycle_state) is expected
+    assert transition_kind.can_trigger_from(life_cycle=life_cycle_state) is expected
 
 
 # %% the outcome an ending transition yields
@@ -152,6 +152,17 @@ def test_a_transition_that_does_not_end_a_node_has_no_outcome(
         transition_kind.outcome
 
 
+# %% the terminal states are derived once
+
+
+def test_the_terminal_states_are_derived_only_once() -> None:
+    """
+    Every node asks whether its state is terminal, so the terminal states are derived
+    from the ending transitions once and then handed out again.
+    """
+    assert LifeCycleValues.terminal_states() is LifeCycleValues.terminal_states()
+
+
 # %% life cycle predicates read off an expression
 
 
@@ -162,8 +173,8 @@ def test_a_life_cycle_predicate_expression_matches_its_truth_table(
 ) -> None:
     life_cycle = FloatVariable(name="life_cycle")
 
-    expression = predicate.expression(life_cycle).substitute(
+    expression = predicate.expression(life_cycle=life_cycle).substitute(
         old_variables=[life_cycle], new_variables=[Scalar(life_cycle_state)]
     )
 
-    assert float(expression) == predicate.truth_value(life_cycle_state)
+    assert float(expression) == predicate.truth_value(life_cycle_value=life_cycle_state)

@@ -1,8 +1,7 @@
 """
 Utilities for extracting source code from Python modules, files, and ASTs.
 
-These functions extract function/class source code and parse import statements. They are
-distinct from the code-generation utilities in :mod:`krrood.code_generation`.
+These functions extract function/class source code and parse import statements.
 """
 
 from __future__ import annotations

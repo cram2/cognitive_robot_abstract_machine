@@ -35,7 +35,7 @@ except ImportError:
 
 
 # %% visualizing the world of an executor
-@dataclass
+@dataclass(kw_only=True)
 class WorldVisualization(ExecutorExtension, ABC):
     """
     Shows the world of the executor it is added to while that executor runs a
@@ -55,7 +55,7 @@ class WorldVisualization(ExecutorExtension, ABC):
         """
 
     @abstractmethod
-    def _start(self, world: World, cleanup: ExitStack) -> None:
+    def _start(self, *, world: World, cleanup: ExitStack) -> None:
         """
         Acquire what showing `world` needs, registering its release on `cleanup` as soon
         as each part is acquired.
@@ -64,7 +64,7 @@ class WorldVisualization(ExecutorExtension, ABC):
         :param cleanup: Releases the acquired parts, also if a later part fails.
         """
 
-    def start(self, world: World) -> Self:
+    def start(self, *, world: World) -> Self:
         """
         Start showing `world`, unless this visualization already shows a world.
 
@@ -76,7 +76,7 @@ class WorldVisualization(ExecutorExtension, ABC):
         if self.is_rendering:
             return self
         with ExitStack() as cleanup:
-            self._start(world, cleanup)
+            self._start(world=world, cleanup=cleanup)
             self._cleanup = cleanup.pop_all()
         return self
 
@@ -86,13 +86,13 @@ class WorldVisualization(ExecutorExtension, ABC):
         """
         self._cleanup.close()
 
-    def after_compile(self, executor: Executor) -> None:
+    def after_compile(self, *, executor: Executor) -> None:
         """
         Start showing the world of `executor`.
         """
-        self.start(executor.context.world)
+        self.start(world=executor.context.world)
 
-    def after_run(self, executor: Executor) -> None:
+    def after_run(self, *, executor: Executor) -> None:
         """
         Stop showing the world of `executor`.
         """
@@ -100,7 +100,7 @@ class WorldVisualization(ExecutorExtension, ABC):
 
 
 # %% native RViz publishing
-@dataclass
+@dataclass(kw_only=True)
 class RvizVisualization(WorldVisualization):
     """
     Publishes the world as ROS markers for RViz.
@@ -144,7 +144,7 @@ class RvizVisualization(WorldVisualization):
     def is_rendering(self) -> bool:
         return self.publisher is not None
 
-    def _start(self, world: World, cleanup: ExitStack) -> None:
+    def _start(self, *, world: World, cleanup: ExitStack) -> None:
         """
         Start publishing markers through :attr:`ros_node`.
 
@@ -152,7 +152,7 @@ class RvizVisualization(WorldVisualization):
         """
         if VizMarkerPublisher is None:
             raise RvizUnavailableError()
-        tf_publisher = self._prefixed_tf_publisher(world, cleanup)
+        tf_publisher = self._prefixed_tf_publisher(world=world, cleanup=cleanup)
         self.publisher = VizMarkerPublisher(
             _world=world,
             node=self.ros_node,
@@ -164,12 +164,12 @@ class RvizVisualization(WorldVisualization):
             ),
             tf_publisher=tf_publisher,
         )
-        cleanup.callback(self._stop_publisher, self.publisher)
+        cleanup.callback(self._stop_publisher, publisher=self.publisher)
         if self.collision_visualization:
             self.publisher.with_collision_visualization()
 
     def _prefixed_tf_publisher(
-        self, world: World, cleanup: ExitStack
+        self, *, world: World, cleanup: ExitStack
     ) -> TFPublisher | None:
         """
         :param world: The world whose frames are published.
@@ -187,7 +187,7 @@ class RvizVisualization(WorldVisualization):
         cleanup.callback(tf_publisher.stop)
         return tf_publisher
 
-    def _stop_publisher(self, publisher: VizMarkerPublisher) -> None:
+    def _stop_publisher(self, *, publisher: VizMarkerPublisher) -> None:
         """
         Stop publishing markers.
 
@@ -200,7 +200,7 @@ class RvizVisualization(WorldVisualization):
 
 
 # %% native Rerun recording
-@dataclass
+@dataclass(kw_only=True)
 class RerunVisualization(WorldVisualization):
     """
     Records the world with the native Rerun adapter.
@@ -225,16 +225,16 @@ class RerunVisualization(WorldVisualization):
     def is_rendering(self) -> bool:
         return self.adapter is not None
 
-    def _start(self, world: World, cleanup: ExitStack) -> None:
+    def _start(self, *, world: World, cleanup: ExitStack) -> None:
         self.adapter = RerunAdapter(
             _world=world,
             mode=self.mode,
             target=self.target,
             state_history=True,
         )
-        cleanup.callback(self._stop_adapter, self.adapter)
+        cleanup.callback(self._stop_adapter, adapter=self.adapter)
 
-    def _stop_adapter(self, adapter: RerunAdapter) -> None:
+    def _stop_adapter(self, *, adapter: RerunAdapter) -> None:
         """
         Stop recording.
 
