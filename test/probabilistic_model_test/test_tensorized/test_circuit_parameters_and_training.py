@@ -16,7 +16,10 @@ from array_api_compat import array_namespace
 from scipy.special import logsumexp
 from typing_extensions import Any
 
-from probabilistic_model.learning.gradient_descent import LikelihoodMaximization
+from probabilistic_model.learning.gradient_descent import (
+    AverageNegativeLogLikelihood,
+    GradientDescent,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )
@@ -243,9 +246,9 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(moved).to_namespace(jnp)
         before = float(jnp.mean(circuit.log_likelihood(jnp.asarray(data))))
-        trained_root = LikelihoodMaximization(circuit.root, optax.adam(5e-2)).minimize(
-            200, jnp.asarray(data)
-        )
+        trained_root = GradientDescent(
+            circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+        ).minimize(200, jnp.asarray(data))
         after = float(
             jnp.mean(trained_root.log_likelihood_of_nodes(jnp.asarray(data))[:, 0])
         )
@@ -275,8 +278,8 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
     ).to_namespace(namespace)
     events = namespace.asarray(data)
     before = float(circuit.log_likelihood(events).mean())
-    trained_root = torch_gradient_descent.TorchLikelihoodMaximization(
-        circuit.root, learning_rate=5e-2
+    trained_root = torch_gradient_descent.TorchGradientDescent(
+        circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize(200, events)
     after = float(trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
     assert after > before + 0.1
@@ -300,4 +303,4 @@ def test_parameter_arrays_and_gradient_descent_name_their_types():
         np.ndarray,
         np.dtype,
     )
-    assert typing_extensions.get_args(LikelihoodMaximization[Layer]) == (Layer,)
+    assert typing_extensions.get_args(GradientDescent[Layer]) == (Layer,)
