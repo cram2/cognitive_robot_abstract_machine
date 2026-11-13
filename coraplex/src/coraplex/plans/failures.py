@@ -10,6 +10,7 @@ from giskardpy.motion_statechart.exceptions import (
     NoProgressError,
 )
 from cramph.exceptions import ExecutionFailure
+from giskardpy.qp.exceptions import InfeasibleException
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
@@ -111,6 +112,29 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
 
     def suggest_correction(self) -> str:
         return self.violation.suggest_correction()
+
+
+@dataclass(kw_only=True)
+class MotionWasInfeasible(PlanFailure):
+    """
+    Raised when the motion controller found no motion that satisfies every constraint at
+    once, such as when a motion starts closer to something than collision avoidance
+    allows.
+
+    Like :class:`MotionMadeNoProgress`, this says the attempt did not work from where it
+    started rather than that the plan cannot go on.
+    """
+
+    infeasibility: InfeasibleException
+    """
+    The infeasibility the solver reported.
+    """
+
+    def error_message(self) -> str:
+        return self.infeasibility.error_message()
+
+    def suggest_correction(self) -> str:
+        return self.infeasibility.suggest_correction()
 
 
 @dataclass(kw_only=True)
