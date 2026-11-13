@@ -581,7 +581,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         milk_in_drawer: Pose,
         storage_drawer: KinematicStructureEntity,
         right_arm: Arm,
-    ) -> list[StatechartNode | Match]:
+    ) -> list[StatechartNode]:
         """
         :param milk: The milk the right hand holds.
         :param milk_grasp: The grasp on the milk, if :attr:`grasp_selection` gives it.
@@ -593,20 +593,17 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         """
         # A place leaves the milk under the world; under the drawer it moves along when
         # the drawer closes.
-        hang_off_the_drawer = MoveBranch(
-            branch_root=milk.root, new_parent=storage_drawer
-        )
+        laying_down = [
+            PlaceAction(
+                arm=right_arm,
+                object_designator=milk,
+                target_location=milk_in_drawer,
+                retreat_distance=HandDistance.MILK_ABOVE_DRAWER_BEFORE_PLACING.value,
+            ),
+            MoveBranch(branch_root=milk.root, new_parent=storage_drawer),
+        ]
         if self.grasp_selection is GraspSelection.BY_CLOSENESS:
-            # Grounded once it starts, when the milk is in hand, since a place reads the
-            # grasp off the gripper holding it.
-            return [
-                a(PlaceAction)(
-                    object_designator=milk,
-                    target_location=milk_in_drawer,
-                    retreat_distance=HandDistance.MILK_ABOVE_DRAWER_BEFORE_PLACING.value,
-                ),
-                hang_off_the_drawer,
-            ]
+            return laying_down
         right_hand = right_arm.end_effector
         tool_at_place = right_hand.tool_frame_goal_for_grasp(
             milk_grasp.moved_to(milk_in_drawer)
@@ -619,12 +616,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             @ tool_at_place.homogeneous_matrix
         ).pose
         return [
-            PlaceAction(
-                object_designator=milk,
-                target_location=milk_in_drawer,
-                retreat_distance=HandDistance.MILK_ABOVE_DRAWER_BEFORE_PLACING.value,
-            ),
-            hang_off_the_drawer,
+            *laying_down,
             MoveManipulatorAction(
                 target_pose=tool_above_place,
                 end_effector=right_hand,
