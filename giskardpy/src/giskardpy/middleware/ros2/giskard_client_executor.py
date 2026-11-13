@@ -185,7 +185,7 @@ class GiskardClientExecutor(Executor):
         """
         self.statechart.sanity_check()
         return self._client.send_goal_async(
-            self._create_goal_message(
+            goal=self._create_goal_message(
                 publishes_debug_expressions=publishes_debug_expressions
             )
         )
@@ -213,7 +213,7 @@ class GiskardClientExecutor(Executor):
         try:
             if child_chooser_access is None:
                 result = self._client.send_goal(
-                    goal_message,
+                    goal=goal_message,
                     feedback_callback=lambda feedback_message: self._follow_states(
                         json.loads(feedback_message.feedback.feedback)
                     ),
@@ -266,7 +266,7 @@ class GiskardClientExecutor(Executor):
                 publisher.publish(String(data=json.dumps(choice.to_json())))
 
         try:
-            return self._client.send_goal(goal_message, feedback_callback=answer)
+            return self._client.send_goal(goal=goal_message, feedback_callback=answer)
         finally:
             self.node_handle.destroy_publisher(publisher)
 

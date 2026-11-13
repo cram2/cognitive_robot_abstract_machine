@@ -134,7 +134,7 @@ class GiskardActionClient:
         self._client = None
 
     def send_goal_async(
-        self, goal: Any, feedback_callback: Callable[[Any], None] | None = None
+        self, *, goal: Any, feedback_callback: Callable[[Any], None] | None = None
     ) -> Future:
         """
         Send `goal` without waiting for it to be accepted.
@@ -180,7 +180,7 @@ class GiskardActionClient:
                 self._goal_handle.cancel_goal_async()
 
     def send_goal(
-        self, goal: Any, feedback_callback: Callable[[Any], None] | None = None
+        self, *, goal: Any, feedback_callback: Callable[[Any], None] | None = None
     ) -> Any:
         """
         Send `goal` and wait for its result.
@@ -194,7 +194,9 @@ class GiskardActionClient:
             within :attr:`goal_response_timeout`. The goal is given up, so a server that
             accepts it later has it canceled.
         """
-        goal_response = self.send_goal_async(goal, feedback_callback=feedback_callback)
+        goal_response = self.send_goal_async(
+            goal=goal, feedback_callback=feedback_callback
+        )
         answered = threading.Event()
         goal_response.add_done_callback(lambda _: answered.set())
         answered.wait(self.goal_response_timeout.total_seconds())

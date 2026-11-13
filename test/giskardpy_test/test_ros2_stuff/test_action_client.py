@@ -1,3 +1,7 @@
+"""
+Tests of sending goals to Giskard through :class:`GiskardActionClient`.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -354,23 +358,29 @@ def server_sending_feedback(giskard_command_server) -> ServerAnsweringOneGoal:
 def test_an_error_of_the_feedback_callback_is_raised_to_the_sender_of_the_goal(
     server_sending_feedback: ServerAnsweringOneGoal,
 ) -> None:
+    """
+    The error a feedback callback raises reaches the caller of :meth:`send_goal`.
+    """
     client = GiskardActionClient(
         background_node.get_node(), JsonAction, "giskard/command"
     )
 
     with pytest.raises(FeedbackDeliberatelyRejected):
-        client.send_goal(JsonAction.Goal(), feedback_callback=reject_feedback)
+        client.send_goal(goal=JsonAction.Goal(), feedback_callback=reject_feedback)
 
 
 def test_a_goal_whose_feedback_callback_failed_is_canceled(
     server_sending_feedback: ServerAnsweringOneGoal,
 ) -> None:
+    """
+    A goal whose feedback callback raised is canceled on the server.
+    """
     client = GiskardActionClient(
         background_node.get_node(), JsonAction, "giskard/command"
     )
 
     with pytest.raises(FeedbackDeliberatelyRejected):
-        client.send_goal(JsonAction.Goal(), feedback_callback=reject_feedback)
+        client.send_goal(goal=JsonAction.Goal(), feedback_callback=reject_feedback)
 
     server_sending_feedback.thread.join()
     assert server_sending_feedback.cancel_was_requested
@@ -382,8 +392,11 @@ def test_a_goal_whose_feedback_callback_failed_is_canceled(
 def test_a_goal_request_nobody_answers_raises_once_the_response_timeout_passed(
     client_of_server_never_answering: GiskardActionClient,
 ) -> None:
+    """
+    Sending a goal no server accepts or rejects raises once the response timeout passed.
+    """
     with pytest.raises(GoalRequestNotAnsweredError):
-        client_of_server_never_answering.send_goal(JsonAction.Goal())
+        client_of_server_never_answering.send_goal(goal=JsonAction.Goal())
 
 
 # %% a goal accepted after its client gave up on it
@@ -393,8 +406,13 @@ def test_a_goal_accepted_after_its_response_timeout_is_canceled(
     server_accepting_late: ServerAcceptingLate,
     client_of_server_accepting_late: GiskardActionClient,
 ) -> None:
+    """
+    A goal the server accepts after the client gave up on it is canceled.
+    """
     with pytest.raises(GoalRequestNotAnsweredError):
-        client_of_server_accepting_late.send_goal(JsonAction.Goal(goal="abandoned"))
+        client_of_server_accepting_late.send_goal(
+            goal=JsonAction.Goal(goal="abandoned")
+        )
 
     server_accepting_late.wait_until_a_goal_was_canceled()
 
@@ -410,8 +428,10 @@ def test_a_late_acceptance_does_not_take_the_place_of_the_goal_sent_after_it(
     accepted, so only the abandoned goal may be canceled.
     """
     with pytest.raises(GoalRequestNotAnsweredError):
-        client_of_server_accepting_late.send_goal(JsonAction.Goal(goal="abandoned"))
-    client_of_server_accepting_late.send_goal_async(JsonAction.Goal(goal="next"))
+        client_of_server_accepting_late.send_goal(
+            goal=JsonAction.Goal(goal="abandoned")
+        )
+    client_of_server_accepting_late.send_goal_async(goal=JsonAction.Goal(goal="next"))
 
     server_accepting_late.wait_until_a_goal_was_canceled()
 
