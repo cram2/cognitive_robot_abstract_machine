@@ -169,7 +169,9 @@ def gripper_goal(end_effector: EndEffector, state: GripperState) -> MoveFingers:
     """
     :return: A new goal moving the gripper of `end_effector` to `state`.
     """
-    return MoveFingers.moving_gripper_to(end_effector.default_configuration(state))
+    return MoveFingers.moving_gripper_to(
+        configuration=end_effector.default_configuration(state)
+    )
 
 
 def joint_goal_of(torso_move: MoveTorsoAction) -> JointPositionList:

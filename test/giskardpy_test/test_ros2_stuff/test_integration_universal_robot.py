@@ -40,7 +40,7 @@ controller_manager_services = pytest.importorskip("controller_manager_msgs.srv")
 # %% the mock robot
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockRobotDriver:
     """
     The Universal Robots driver running a UR5e on mock hardware.
@@ -174,7 +174,7 @@ def test_discovery_commands_the_joints_of_the_active_velocity_controller(
 # %% goal convergence
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ControllerManagerRobotTester(GiskardTester):
     """
     A closed-loop Giskard commanding a robot through its controller manager.

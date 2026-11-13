@@ -30,7 +30,7 @@ def default_joint_state(default_hsr_pose: dict[str, float]) -> dict[str, float]:
     return default_hsr_pose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HSRTester(GiskardTester):
     base_footprint: KinematicStructureEntity = field(init=False)
     map: KinematicStructureEntity = field(init=False)

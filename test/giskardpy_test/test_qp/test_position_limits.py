@@ -526,8 +526,8 @@ def _jerk_limit(world: World, *, config: QPControllerConfig) -> float:
     :return: Jerk limit the controller keeps for the only joint of ``world``.
     """
     return (
-        DegreeOfFreedomLimitProfiler(config)
-        .resolve_limits(_connection(world).dof)
+        DegreeOfFreedomLimitProfiler(qp_controller_config=config)
+        .resolve_limits(degree_of_freedom=_connection(world).dof)
         .upper.jerk
     )
 

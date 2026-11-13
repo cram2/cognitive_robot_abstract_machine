@@ -29,6 +29,7 @@ from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world_description.world_entity import Body
+from krrood.patterns.called_positionally import called_positionally
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ class ActionServerTask(
             extension_type=RosContextExtension
         )
         self._action_client = ros_context_extension.get_or_create_action_client(
-            self.message_type, self.action_topic
+            message_type=self.message_type, action_topic=self.action_topic
         )
         self.build_action_goal()
         logger.info(f"Waiting for action server {self.action_topic}")
@@ -108,6 +109,7 @@ class ActionServerTask(
         future = self._action_client.send_goal_async(self._action_goal)
         future.add_done_callback(self.goal_response_callback)
 
+    @called_positionally
     def goal_response_callback(self, future):
         """
         Handles the server's response to the goal submission.
@@ -125,6 +127,7 @@ class ActionServerTask(
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self.result_callback)
 
+    @called_positionally
     def result_callback(self, future):
         self._result = future.result()
         logger.info(f"Action server {self.action_topic} done.")
@@ -198,12 +201,13 @@ class NavigateActionServerTask(
 
         return artifacts
 
+    @called_positionally
     def result_callback(self, future):
         """
         Stores the navigation result returned by the action server.
         """
         # TODO: Check the ._result.result calls against a running action server because I'm not sure if all of them are correct
-        super().result_callback(future)
+        super().result_callback(future=future)
         logger.info(
             f"Finished navigation with response status: {self._result.result.status} and result code: {self._result.error_code}"
         )
@@ -270,6 +274,7 @@ class RobotiqGripperActionServerTask(
         self._goal_accepted = False
         self._done = False
 
+    @called_positionally
     def goal_response_callback(self, future):
         """
         Handles the server's response to the goal submission.
@@ -287,11 +292,12 @@ class RobotiqGripperActionServerTask(
         result_future = goal_handle.get_result_async()
         result_future.add_done_callback(self.result_callback)
 
+    @called_positionally
     def result_callback(self, future):
         """
         Stores the action result and marks execution as done.
         """
-        super().result_callback(future)
+        super().result_callback(future=future)
         self._done = True
         if self._result and hasattr(self._result, "result"):
             logger.info(

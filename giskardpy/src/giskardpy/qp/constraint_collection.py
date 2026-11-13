@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConstraintCollection:
     """
     Holds the equality and inequality constraints of a motion task and groups them by
@@ -85,7 +85,7 @@ class ConstraintCollection:
             c for c in self._constraints if isinstance(c, GiskardInequalityConstraint)
         ]
 
-    def merge(self, name_prefix: str, other: ConstraintCollection) -> None:
+    def merge(self, *, name_prefix: str, other: ConstraintCollection) -> None:
         """
         Adds the constraints of another collection, prefixing their names to keep them
         unique.
@@ -95,7 +95,7 @@ class ConstraintCollection:
         self._constraints.extend(other._constraints)
         self._are_names_unique()
 
-    def add_constraint(self, constraint: GiskardConstraint) -> None:
+    def add_constraint(self, *, constraint: GiskardConstraint) -> None:
         """
         Appends a constraint, assigning it an index-based name if it has none.
 
@@ -128,7 +128,7 @@ class ConstraintCollection:
             v.name for c in self._constraints for v in c.expression.free_variables()
         }
 
-    def link_to_motion_statechart_node(self, node: MotionStatechartNode) -> None:
+    def link_to_motion_statechart_node(self, *, node: MotionStatechartNode) -> None:
         """
         Scales every constraint weight so it is only active while the given node is
         running.
@@ -144,6 +144,7 @@ class ConstraintCollection:
 
     def add_equality_constraint(
         self,
+        *,
         task_expression: sm.SymbolicScalar,
         equality_bound: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
@@ -200,10 +201,11 @@ class ConstraintCollection:
             linear_weight=0,
             enforcement_strategy=IntegralStrategy,
         )
-        self.add_constraint(constraint)
+        self.add_constraint(constraint=constraint)
 
     def add_inequality_constraint(
         self,
+        *,
         cruise_velocity: sm.ScalarData,
         velocity_scale: sm.ScalarData,
         lower_error: sm.ScalarData,
@@ -261,10 +263,11 @@ class ConstraintCollection:
             lower_bound=lower_error,
             upper_bound=upper_error,
         )
-        self.add_constraint(constraint)
+        self.add_constraint(constraint=constraint)
 
     def add_velocity_constraint(
         self,
+        *,
         lower_velocity_limit: sm.ScalarData,
         upper_velocity_limit: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
@@ -301,10 +304,11 @@ class ConstraintCollection:
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
         )
-        self.add_constraint(constraint)
+        self.add_constraint(constraint=constraint)
 
     def add_velocity_eq_constraint(
         self,
+        *,
         velocity_goal: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         task_expression: sm.SymbolicScalar,
@@ -338,4 +342,4 @@ class ConstraintCollection:
             upper_slack_limit=upper_slack_limit,
             linear_weight=0,
         )
-        self.add_constraint(constraint)
+        self.add_constraint(constraint=constraint)

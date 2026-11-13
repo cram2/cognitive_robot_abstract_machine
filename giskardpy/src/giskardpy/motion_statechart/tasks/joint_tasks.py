@@ -58,7 +58,7 @@ class JointPositionList(ConvergingTask):
         errors = []
         for connection, target in self.goal_state.items():
             current = connection.dof.variables.position
-            target = self.apply_limits_to_target(target, connection)
+            target = self.apply_limits_to_target(target=target, connection=connection)
             if (
                 isinstance(connection, RevoluteConnection)
                 and not connection.dof.has_position_limits()
@@ -81,7 +81,7 @@ class JointPositionList(ConvergingTask):
         return artifacts
 
     def apply_limits_to_target(
-        self, target: float, connection: ActiveConnection1DOF
+        self, *, target: float, connection: ActiveConnection1DOF
     ) -> sm.Scalar:
         ul_pos = connection.dof.limits.upper.position
         ll_pos = connection.dof.limits.lower.position

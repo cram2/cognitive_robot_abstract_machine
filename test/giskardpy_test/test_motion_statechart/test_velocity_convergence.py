@@ -84,7 +84,7 @@ def convergence_of(
 
 class TestVelocityConvergenceExpression:
     def test_a_degree_of_freedom_without_a_velocity_limit_is_skipped(
-        self, world, context
+        self, *, world, context
     ):
         """
         A joint without a velocity limit is excluded rather than failing the expression.
@@ -99,7 +99,7 @@ class TestVelocityConvergenceExpression:
             context, [limited]
         )
 
-    def test_a_limited_degree_of_freedom_is_checked(self, world, context):
+    def test_a_limited_degree_of_freedom_is_checked(self, *, world, context):
         """
         Skipping the unlimited ones must not skip the limited ones too.
         """

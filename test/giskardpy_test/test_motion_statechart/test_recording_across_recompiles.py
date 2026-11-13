@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.world_state import WorldStateTrajec
 # %% helpers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TicksAroundARecompile:
     """
     How long a test ticks a statechart before and after it compiles again.
@@ -53,7 +53,7 @@ class TicksAroundARecompile:
         """
         return 1 + self.before
 
-    def recorded_times(self, executor: StatechartExecutor) -> list[float]:
+    def recorded_times(self, *, executor: StatechartExecutor) -> list[float]:
         """
         :param executor: The executor that ran the ticks.
         :return: The time of every point recorded over the whole run.
@@ -194,7 +194,7 @@ def test_the_world_state_recorded_before_a_node_joined_is_kept(
     _tick(executor, ticks.after)
 
     trajectory = _world_state_trajectory(executor)
-    assert np.allclose(trajectory.times, ticks.recorded_times(executor))
+    assert np.allclose(trajectory.times, ticks.recorded_times(executor=executor))
     assert np.array_equal(trajectory.data[0], state_at_compile)
 
 
@@ -215,7 +215,7 @@ def test_the_debug_expressions_recorded_before_a_node_joined_are_kept(
 
     trajectory = _debug_expression_trajectory(executor)
     current = _recorded(executor, f"{_robot(cylinder_bot_world).name}/current")
-    assert np.allclose(trajectory.times, ticks.recorded_times(executor))
+    assert np.allclose(trajectory.times, ticks.recorded_times(executor=executor))
     assert len(current.values) == len(trajectory.times)
     assert np.array_equal(current.values[0], position_at_compile)
 
@@ -266,7 +266,7 @@ def test_the_world_state_recorded_before_a_branch_moved_is_kept(
     _tick(executor, ticks.after)
 
     trajectory = _world_state_trajectory(executor)
-    assert np.allclose(trajectory.times, ticks.recorded_times(executor))
+    assert np.allclose(trajectory.times, ticks.recorded_times(executor=executor))
     assert np.array_equal(trajectory.data[0], state_at_compile)
 
 

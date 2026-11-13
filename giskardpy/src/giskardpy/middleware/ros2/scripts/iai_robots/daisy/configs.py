@@ -19,7 +19,7 @@ class DAiSyInteractiveMarkerChain(Enum):
     RIGHT_ARM = RootTipPair(root_link="map", tip_link="right_gripper_tool_frame")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DAiSyVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
     Commands both arms of DAiSy through their forward velocity controllers.

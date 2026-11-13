@@ -15,7 +15,7 @@ class TestPointingDebugExpressions:
     green/red debug expressions, named with the task name.
     """
 
-    def test_pointing(self, cylinder_bot_world: World):
+    def test_pointing(self, *, cylinder_bot_world: World):
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = Pointing(
@@ -36,7 +36,7 @@ class TestPointingDebugExpressions:
         assert goal.color == GOAL_COLOR
         assert current.color == CURRENT_COLOR
 
-    def test_pointing_cone(self, cylinder_bot_world: World):
+    def test_pointing_cone(self, *, cylinder_bot_world: World):
         root = cylinder_bot_world.root
         tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         task = PointingCone(

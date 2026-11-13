@@ -34,7 +34,7 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% standalone stretch
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StretchTester(GiskardTester):
     """
     A standalone Giskard driving Stretch through the same configuration the robot's own

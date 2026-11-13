@@ -115,7 +115,7 @@ def test_attach_visualizes_spatial_debug_expressions_only(
     motion_statechart.add_node(node=task)
 
     publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
-    publisher.attach(motion_statechart)
+    publisher.attach(statechart=motion_statechart)
 
     namespaces = {request.namespace for request in publisher._publisher._requests}
     assert namespaces == {"align/current_normal", "align/goal_normal"}
@@ -129,7 +129,9 @@ def test_vector_with_reference_frame_is_transformed_to_visualisation_frame(
     vector = Vector3(x=1, y=0, z=0, reference_frame=root, visualisation_frame=bot)
     publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
 
-    request = publisher._to_request(DebugExpression(name="vector", expression=vector))
+    request = publisher._to_request(
+        debug_expression=DebugExpression(name="vector", expression=vector)
+    )
 
     assert request.spatial_type.reference_frame is bot
 
@@ -142,7 +144,7 @@ def test_stop_clears_previously_published_markers(rclpy_node, cylinder_bot_world
     motion_statechart.add_node(node=task)
 
     publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
-    publisher.attach(motion_statechart)
+    publisher.attach(statechart=motion_statechart)
     assert publisher._publisher._published_marker_identities
 
     publisher.stop()
@@ -158,7 +160,7 @@ def test_attach_publisher_tracks_state_changes(rclpy_node, cylinder_bot_world):
     motion_statechart.add_node(node=task)
 
     publisher = DebugExpressionPublisher(world=cylinder_bot_world, node=rclpy_node)
-    publisher.attach(motion_statechart)
+    publisher.attach(statechart=motion_statechart)
 
     assert publisher._publisher in cylinder_bot_world.state.state_change_callbacks
 

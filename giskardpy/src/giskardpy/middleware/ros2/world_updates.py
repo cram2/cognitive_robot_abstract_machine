@@ -20,7 +20,7 @@ from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayload
 # %% the world of Giskard
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IncomingWorldUpdates:
     """
     The world updates other processes sent to Giskard.
@@ -75,7 +75,7 @@ class IncomingWorldUpdates:
             return
         self.model_reload_synchronizer.apply_pending_reload()
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
         """
         Whether everything the publisher of ``position`` sent up to it was applied to
         the world.
@@ -83,7 +83,7 @@ class IncomingWorldUpdates:
         return self.world_synchronizer.has_applied(position)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OutgoingWorldUpdates:
     """
     The changes of Giskard's world that the running goal published to other processes.
@@ -126,7 +126,7 @@ class OutgoingWorldUpdates:
 # %% the world of a client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientWorldUpdates:
     """
     Keeps the world of a client in step with Giskard around a goal.
@@ -164,7 +164,7 @@ class ClientWorldUpdates:
             return None
         return self.world_synchronizer.latest_published_position
 
-    def wait_for_the_changes_of_a_goal(self, result: dict[str, Any]) -> None:
+    def wait_for_the_changes_of_a_goal(self, *, result: dict[str, Any]) -> None:
         """
         Wait until the changes Giskard made while executing a goal reached this world.
 
@@ -173,11 +173,11 @@ class ClientWorldUpdates:
             ``timeout``.
         """
         catching_up = CatchingUpWithGiskard(world_updates=self)
-        while not catching_up.has_applied_the_changes_reported_in(result):
+        while not catching_up.has_applied_the_changes_reported_in(report=result):
             sleep(self.poll_interval.total_seconds())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CatchingUpWithGiskard:
     """
     The world of a client catching up with the changes Giskard reports to have published
@@ -205,7 +205,7 @@ class CatchingUpWithGiskard:
     was reported.
     """
 
-    def has_applied_the_changes_reported_in(self, report: dict[str, Any]) -> bool:
+    def has_applied_the_changes_reported_in(self, *, report: dict[str, Any]) -> bool:
         """
         :param report: A feedback or the result of a goal.
         :return: Whether the changes Giskard reports to have published while executing

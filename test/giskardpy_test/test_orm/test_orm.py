@@ -50,7 +50,7 @@ class TestNumpyColumnsSurviveRoundTrip:
     its identifier.
     """
 
-    def test_arrays_are_read_back_unchanged(self, session, qp_data):
+    def test_arrays_are_read_back_unchanged(self, *, session, qp_data):
         session.add(to_dao(qp_data))
         session.commit()
         session.expunge_all()
@@ -75,7 +75,7 @@ class TestNumpyColumnsSurviveRoundTrip:
             loaded.inequality_upper_bounds, qp_data.inequality_upper_bounds
         )
 
-    def test_scalar_fields_are_read_back_unchanged(self, session, qp_data):
+    def test_scalar_fields_are_read_back_unchanged(self, *, session, qp_data):
         session.add(to_dao(qp_data))
         session.commit()
         session.expunge_all()

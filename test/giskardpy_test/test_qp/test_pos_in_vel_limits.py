@@ -84,20 +84,24 @@ NEGLIGIBLE_VELOCITY = 1e-4
 
 def test_zero_negligible_velocities_clears_small_positive_velocities():
     cleared = BrakingProfile.zero_negligible_velocities(
-        np.array([NEGLIGIBLE_VELOCITY / 2])
+        velocity_profile=np.array([NEGLIGIBLE_VELOCITY / 2])
     )
 
     np.testing.assert_array_equal(cleared, np.array([0.0]))
 
 
 def test_zero_negligible_velocities_keeps_velocities_at_the_threshold():
-    kept = BrakingProfile.zero_negligible_velocities(np.array([NEGLIGIBLE_VELOCITY]))
+    kept = BrakingProfile.zero_negligible_velocities(
+        velocity_profile=np.array([NEGLIGIBLE_VELOCITY])
+    )
 
     np.testing.assert_array_equal(kept, np.array([NEGLIGIBLE_VELOCITY]))
 
 
 def test_zero_negligible_velocities_clears_negative_velocities():
-    cleared = BrakingProfile.zero_negligible_velocities(np.array([-0.5]))
+    cleared = BrakingProfile.zero_negligible_velocities(
+        velocity_profile=np.array([-0.5])
+    )
 
     np.testing.assert_array_equal(cleared, np.array([0.0]))
 
@@ -109,7 +113,7 @@ def test_zero_negligible_velocities_leaves_the_input_unchanged():
     """
     velocity_profile = np.array([1.0, NEGLIGIBLE_VELOCITY / 2])
 
-    BrakingProfile.zero_negligible_velocities(velocity_profile)
+    BrakingProfile.zero_negligible_velocities(velocity_profile=velocity_profile)
 
     np.testing.assert_array_equal(
         velocity_profile, np.array([1.0, NEGLIGIBLE_VELOCITY / 2])
@@ -135,7 +139,7 @@ def test_fastest_braking_stays_within_the_acceleration_limit_of_its_braking(
     """
     braking = JerkLimitedBraking.from_braking_time(
         velocity_limit=velocity_limit, braking_time=braking_time, time_step=DELTA_TIME
-    ).limited_to_acceleration(acceleration_limit)
+    ).limited_to_acceleration(acceleration_limit=acceleration_limit)
 
     profile = BrakingProfile.fastest(
         braking=braking, prediction_horizon=braking.number_of_steps + 2
