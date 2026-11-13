@@ -244,6 +244,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         """
         self._release_visualizations()
         if self._marker_publisher.publishing_error is not None:
+            self._marker_publisher.marker_publisher.close()
             self._marker_publisher = BackgroundMarkerPublisher(node=self.ros_node)
         if not self.publishes_markers:
             return

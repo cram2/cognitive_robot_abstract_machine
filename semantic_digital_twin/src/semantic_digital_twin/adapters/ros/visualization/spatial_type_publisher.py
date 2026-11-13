@@ -152,6 +152,12 @@ class EvaluatedSpatialTypePublisher(HasROS2Node):
         self.publisher.publish(marker_array)
         self._published_marker_identities = current_identities
 
+    def close(self) -> None:
+        """
+        Remove the publisher from :attr:`node`; nothing can be published afterwards.
+        """
+        self.node.destroy_publisher(self.publisher)
+
     @staticmethod
     def _delete_marker(*, identity: MarkerIdentity) -> Marker:
         """

@@ -751,6 +751,40 @@ def test_a_statechart_compiled_after_publishing_raised_publishes_again(
     )
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_compiling_after_publishing_raised_removes_the_failed_publisher_from_the_node(
+    rclpy_node, publishing, cylinder_bot_world, monkeypatch
+):
+    """
+    The publisher whose publish raised leaves no ROS publisher behind once a statechart
+    is compiled after it.
+    """
+    executor = create_executor(cylinder_bot_world, publishing)
+    executor.compile(statechart=NodesStartingInTurn.build(executor.context).statechart)
+    failed_marker_publisher = publishing._marker_publisher
+
+    def raise_error(
+        *, evaluated_visualizations: list[EvaluatedSpatialTypeVisualization]
+    ) -> None:
+        """
+        Fail like a publisher whose ROS node was destroyed.
+        """
+        raise RuntimeError("publishing failed")
+
+    monkeypatch.setattr(
+        failed_marker_publisher.marker_publisher, "publish", raise_error
+    )
+    executor.tick()
+    failed_marker_publisher._thread.join()
+    executor.finish_run()
+
+    executor.compile(statechart=NodesStartingInTurn.build(executor.context).statechart)
+
+    assert failed_marker_publisher.marker_publisher.publisher not in list(
+        rclpy_node.publishers
+    )
+
+
 # %% enabling the publishing
 
 

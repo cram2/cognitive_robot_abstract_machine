@@ -109,6 +109,17 @@ def test_marker_publisher_deletes_markers_no_longer_published(rclpy_node):
     ]
 
 
+def test_closing_the_marker_publisher_removes_its_publisher_from_the_node(rclpy_node):
+    """
+    A closed marker publisher leaves no publisher behind on its node.
+    """
+    marker_publisher = EvaluatedSpatialTypePublisher(node=rclpy_node)
+
+    marker_publisher.close()
+
+    assert marker_publisher.publisher not in list(rclpy_node.publishers)
+
+
 # %% evaluating spatial types
 
 
