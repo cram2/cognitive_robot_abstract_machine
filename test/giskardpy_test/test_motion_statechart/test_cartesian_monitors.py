@@ -65,8 +65,8 @@ def test_position_reached(pr2_world_state_reset: World):
         goal_point=goal_point,
         binding_policy=GoalBindingPolicy.Bind_at_build,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -104,8 +104,8 @@ def test_position_reached_binding_policies(
         goal_point=goal_point,
         binding_policy=binding_policy,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -133,8 +133,8 @@ def test_orientation_reached(pr2_world_state_reset: World):
         goal_orientation=goal_orientation,
         binding_policy=GoalBindingPolicy.Bind_at_build,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -159,8 +159,8 @@ def test_pose_reached(pr2_world_state_reset: World):
         goal_pose=goal_pose,
         binding_policy=GoalBindingPolicy.Bind_at_build,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -183,8 +183,8 @@ def test_pointing_at(pr2_world_state_reset: World):
     monitor = PointingAt(
         root_link=root, tip_link=tip, goal_point=goal_point, pointing_axis=pointing_axis
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -207,8 +207,8 @@ def test_vectors_aligned(pr2_world_state_reset: World):
     monitor = VectorsAligned(
         root_link=root, tip_link=tip, goal_normal=goal_normal, tip_normal=tip_normal
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 
@@ -233,8 +233,8 @@ def test_distance_to_line(pr2_world_state_reset: World):
         line_axis=line_axis,
         line_length=0.4,
     )
-    statechart.add_nodes([drive, monitor])
-    statechart.add_node(EndMotion.when_true(monitor))
+    statechart.add_nodes(nodes=[drive, monitor])
+    statechart.add_node(node=EndMotion.when_true(node=monitor))
 
     _run(executor, statechart)
 

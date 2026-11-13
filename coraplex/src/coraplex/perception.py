@@ -488,7 +488,7 @@ class PerceptionTask(EndedByOwner, FailsOnObservingFalse, StatechartNode):
         super().set_up()
         self.perception_source = PerceptionInterface.for_source(
             self.answered_by,
-            self.context.require_extension(RosContextExtension).ros_node,
+            self.context.require_extension(extension_type=RosContextExtension).ros_node,
         )
 
     def on_start(self) -> None:

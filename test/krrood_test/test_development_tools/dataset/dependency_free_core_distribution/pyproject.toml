@@ -1,0 +1,8 @@
+# A distribution whose core declares no dependencies, read by the core boundary
+# checker's tests.
+[project]
+name = "dependency-free-core-distribution"
+version = "0.0.0"
+
+[tool.krrood.core-boundary]
+core = ["dependency_free_package"]

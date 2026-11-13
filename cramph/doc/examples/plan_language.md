@@ -54,10 +54,10 @@ def run(plan: StatechartNode) -> None:
     """
     executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    statechart.add_node(EndStatechart.when_true(plan))
-    statechart.add_node(EndStatechart.when_failed(plan))
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    statechart.add_node(node=EndStatechart.when_true(node=plan))
+    statechart.add_node(node=EndStatechart.when_failed(node=plan))
+    executor.compile(statechart=statechart)
     executor.tick_until_end()
     print(
         f"{plan.name}: {plan.life_cycle_state.name}, observes {plan.observation_state.name}"

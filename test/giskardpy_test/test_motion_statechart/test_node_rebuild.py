@@ -36,7 +36,7 @@ def test_a_monitor_watching_tasks_watches_those_built_anew_that_are_not_left_out
     rebuild = RebuildLeavingNodesOut(left_out=[left_out])
 
     rebuilt = rebuild.rebuilt(
-        NoMonitoredTaskApproachingItsGoal(monitored_tasks=[kept, left_out])
+        node=NoMonitoredTaskApproachingItsGoal(monitored_tasks=[kept, left_out])
     )
 
     assert rebuilt.monitored_tasks == [rebuild.built[kept]]
@@ -49,7 +49,7 @@ def test_a_monitor_watching_only_tasks_left_out_is_left_out(
     rebuild = RebuildLeavingNodesOut(left_out=[left_out])
 
     rebuilt = rebuild.rebuilt(
-        NoMonitoredTaskApproachingItsGoal(monitored_tasks=[left_out])
+        node=NoMonitoredTaskApproachingItsGoal(monitored_tasks=[left_out])
     )
 
     assert rebuilt is None

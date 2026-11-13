@@ -50,11 +50,11 @@ from segmind.episode_segmenter import EpisodeSegmentation
 # 1. Setup Context and Executor; EpisodeSegmentation adds the SegmindContext with its event logger
 context = StatechartContext(world=your_simulation_world)
 executor = StatechartExecutor(context=context, extensions=[EpisodeSegmentation()])
-logger = context.require_extension(SegmindContext).logger
+logger = context.require_extension(extension_type=SegmindContext).logger
 
 # 2. Build and compile the Statechart
 statechart = DetectorStatechartBuilder().build(executor.context)
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 
 # 3. Simulation Loop
 while simulation_running:

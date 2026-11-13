@@ -73,6 +73,24 @@ class WorkspaceMember:
         imported.discard(self.name)
         return {canonicalize_name(name) for name in imported}
 
+    def members_depended_on(self, members: list[WorkspaceMember]) -> set[str]:
+        """
+        Canonical names of the workspace members the member depends on, directly or
+        through other members' declared dependencies.
+        """
+        members_by_name = {canonicalize_name(member.name): member for member in members}
+        reached = set()
+        pending = list(self.declared_dependencies & members_by_name.keys())
+        while pending:
+            name = pending.pop()
+            if name in reached:
+                continue
+            reached.add(name)
+            pending.extend(
+                members_by_name[name].declared_dependencies & members_by_name.keys()
+            )
+        return reached
+
 
 def workspace_members() -> list[WorkspaceMember]:
     """Read the members from ``[tool.uv.workspace]`` of the root ``pyproject.toml``."""
@@ -99,3 +117,19 @@ def test_dependencies_are_declared_statically(member: WorkspaceMember) -> None:
 def test_imported_workspace_members_are_declared(member: WorkspaceMember) -> None:
     undeclared_members = member.imported_members(MEMBERS) - member.declared_dependencies
     assert undeclared_members == set()
+
+
+# %% layering
+
+
+def test_semantic_digital_twin_depends_on_no_package_that_depends_on_it() -> None:
+    """
+    No workspace member that :mod:`semantic_digital_twin` depends on, directly or
+    through other members, depends on :mod:`semantic_digital_twin` in turn.
+    """
+    semantic_digital_twin = next(
+        member for member in MEMBERS if member.name == "semantic_digital_twin"
+    )
+    assert canonicalize_name(
+        semantic_digital_twin.name
+    ) not in semantic_digital_twin.members_depended_on(MEMBERS)

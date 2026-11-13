@@ -40,13 +40,13 @@ executor = StatechartExecutor(
 statechart = Statechart(context=executor.context)
 
 # 3. Add a monitor that counts for 1 second
-statechart.add_node(counter := CountSeconds(seconds=1.0))
+statechart.add_node(node=(counter := CountSeconds(seconds=1.0)))
 
 # 4. Transition to EndMotion when the counter is finished
-statechart.add_node(EndMotion.when_true(counter))
+statechart.add_node(node=EndMotion.when_true(node=counter))
 
 # 5. Compile and run the statechart
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.tick_until_end(timeout=1000)
 
 print(f"Control cycles executed: {executor.tick_count}")

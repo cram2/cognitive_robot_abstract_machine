@@ -91,7 +91,9 @@ class ActionServerTask(
         Creates the action client and the message to send.
         """
         super().set_up()
-        ros_context_extension = self.context.require_extension(RosContextExtension)
+        ros_context_extension = self.context.require_extension(
+            extension_type=RosContextExtension
+        )
         self._action_client = ros_context_extension.get_or_create_action_client(
             self.message_type, self.action_topic
         )

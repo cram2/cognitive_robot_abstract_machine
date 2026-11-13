@@ -190,7 +190,10 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
 
     pr2 = PR2.from_world(world)
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(pr2)]), ros_node=ros_node
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=pr2)]
+        ),
+        ros_node=ros_node,
     )
 
     with world.modify_world():
@@ -221,7 +224,7 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
     :return: The fully executed plan, ready for EQL queries.
     """
     world = executor.context.world
-    pr2 = executor.context.require_extension(RobotAccess).robot
+    pr2 = executor.context.require_extension(extension_type=RobotAccess).robot
 
     def _failing_step():
         raise PlanFailure()
@@ -259,8 +262,8 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
     )
 
     statechart = Statechart(context=executor.context)
-    statechart.add_node(root)
-    executor.compile(statechart)
+    statechart.add_node(node=root)
+    executor.compile(statechart=statechart)
     executor.execute()
 
     return root

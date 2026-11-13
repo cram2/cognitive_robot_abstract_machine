@@ -72,7 +72,7 @@ executor_pcc = StatechartExecutor(
 )
 msc_pcc = Statechart(context=executor_pcc.context)
 msc_pcc.add_node(
-    goal_pcc := Sequence(
+    node=(goal_pcc := Sequence(
         nodes=[
             CartesianPosition(
                 root_link=world_pcc.root,
@@ -90,12 +90,12 @@ msc_pcc.add_node(
                 goal_point=Point3(x=0.0, y=0.0, z=0.9, reference_frame=world_pcc.root),
             )
         ]
-    )
+    ))
 )
-msc_pcc.add_node(EndMotion.when_true(goal_pcc))
+msc_pcc.add_node(node=EndMotion.when_true(node=goal_pcc))
 
 # Execute the motion statechart
-executor_pcc.compile(msc_pcc)
+executor_pcc.compile(statechart=msc_pcc)
 executor_pcc.tick_until_end()
 ```
 
@@ -129,7 +129,7 @@ executor_cos = StatechartExecutor(
 )
 msc_cos = Statechart(context=executor_cos.context)
 msc_cos.add_node(
-    goal_cos := Sequence(
+    node=(goal_cos := Sequence(
         nodes=[
             CartesianPosition(
                 root_link=world_cosserat.root,
@@ -148,11 +148,11 @@ msc_cos.add_node(
                 goal_point=Point3(x=0.4, y=0.5, z=1.2, reference_frame=world_cosserat.root),
             )
         ]
-    )
+    ))
 )
-msc_cos.add_node(EndMotion.when_true(goal_cos))
+msc_cos.add_node(node=EndMotion.when_true(node=goal_cos))
 
-executor_cos.compile(msc_cos)
+executor_cos.compile(statechart=msc_cos)
 executor_cos.tick_until_end()
 ```
 

@@ -33,7 +33,7 @@ def create_context_with_motion_control(
         if qp_controller_config is None
         else MotionControl(qp_controller_config=qp_controller_config)
     )
-    motion_control.extend_context(context)
+    motion_control.extend_context(context=context)
     return context
 
 
@@ -55,7 +55,7 @@ def add_to_statechart_with_motion_control(
     statechart = Statechart(
         context=create_context_with_motion_control(world, qp_controller_config)
     )
-    statechart.add_node(node)
+    statechart.add_node(node=node)
     return statechart
 
 

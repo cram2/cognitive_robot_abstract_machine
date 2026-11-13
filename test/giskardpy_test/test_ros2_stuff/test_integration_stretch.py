@@ -142,14 +142,16 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
 
     motion_statechart = Statechart(context=giskard.api.context)
     motion_statechart.add_node(
-        lift_goal := JointPositionList(
-            goal_state=JointState.from_str_dict(
-                {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
+        node=(
+            lift_goal := JointPositionList(
+                goal_state=JointState.from_str_dict(
+                    {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
+                )
             )
         )
     )
-    motion_statechart.add_node(EndMotion.when_true(lift_goal))
-    giskard.api.compile(motion_statechart)
+    motion_statechart.add_node(node=EndMotion.when_true(node=lift_goal))
+    giskard.api.compile(statechart=motion_statechart)
     giskard.api.execute()
 
     height_after = tool_frame_height(giskard)
@@ -168,18 +170,18 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
 
     motion_statechart = Statechart(context=giskard.api.context)
     motion_statechart.add_node(
-        JointPositionList(
+        node=JointPositionList(
             goal_state=JointState.from_str_dict(
                 {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
             )
         )
     )
     motion_statechart.add_node(
-        local_minimum := LocalMinimumReached(joint_convergence_threshold=0.025)
+        node=(local_minimum := LocalMinimumReached(joint_convergence_threshold=0.025))
     )
-    motion_statechart.add_node(EndMotion.when_true(local_minimum))
+    motion_statechart.add_node(node=EndMotion.when_true(node=local_minimum))
 
-    giskard.api.compile(motion_statechart)
+    giskard.api.compile(statechart=motion_statechart)
     giskard.api.execute()
 
     height_after = tool_frame_height(giskard)

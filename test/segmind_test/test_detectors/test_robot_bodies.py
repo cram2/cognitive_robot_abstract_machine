@@ -115,12 +115,12 @@ def _supporters_detected_for(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [SupportDetector(tracked_object=box, exclude_robot=exclude_robot)]
         ).build(executor.context)
     )
     executor.tick()
-    segmind_context = executor.context.require_extension(SegmindContext)
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
     return [
         event.with_object
         for event in segmind_context.logger.get_events()
@@ -166,12 +166,12 @@ def _contacts_detected_for(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [ContactDetector(tracked_object=box, exclude_robot=exclude_robot)]
         ).build(executor.context)
     )
     executor.tick()
-    segmind_context = executor.context.require_extension(SegmindContext)
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
     return [
         event.with_object
         for event in segmind_context.logger.get_events()
@@ -251,7 +251,7 @@ def _containers_detected_for(
         context=StatechartContext(world=world), extensions=[EpisodeSegmentation()]
     )
     executor.compile(
-        DetectorStatechartBuilder(
+        statechart=DetectorStatechartBuilder(
             [
                 SupportDetector(tracked_object=box, exclude_robot=exclude_robot),
                 ContainmentDetector(tracked_object=box, exclude_robot=exclude_robot),
@@ -259,7 +259,7 @@ def _containers_detected_for(
         ).build(executor.context)
     )
     executor.tick()
-    segmind_context = executor.context.require_extension(SegmindContext)
+    segmind_context = executor.context.require_extension(extension_type=SegmindContext)
     return [
         event.with_object
         for event in segmind_context.logger.get_events()

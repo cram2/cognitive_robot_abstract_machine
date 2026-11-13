@@ -560,7 +560,7 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
     plan = Sequence(nodes=[ParkArmsAction(arms=view.all_arms), pick_up])
     executor = simulated_executor(extensions, plan_adaptations=[FailTheFirstLift()])
 
-    executor.compile(statechart_of(executor, plan))
+    executor.compile(statechart=statechart_of(executor, plan))
     executor.execute()
 
     first, second = pick_up.grounded_nodes
