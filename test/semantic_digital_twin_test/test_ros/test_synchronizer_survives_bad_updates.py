@@ -1,6 +1,7 @@
 """
-Tests that a synchronizer keeps receiving after an update it cannot apply, ignores its
-own echo without reading it, and buffers updates that build on each other.
+Tests that a synchronizer keeps receiving after an update it cannot apply and tells the
+owner of the world, ignores its own echo without reading it, and buffers updates that
+build on each other.
 """
 
 from __future__ import annotations
@@ -8,6 +9,7 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
+import pytest
 import std_msgs.msg
 
 from krrood.adapters.json_serializer import to_json
@@ -17,7 +19,11 @@ from semantic_digital_twin.adapters.ros.messages import (
     WorldStateUpdate,
     WorldUpdate,
 )
+from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.exceptions import (
+    StateUpdateContainsUnknownDegreesOfFreedomError,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -113,9 +119,46 @@ def test_receiver_does_not_report_caught_up_with_a_publisher_it_diverged_from(
     publishing_world.notify_state_change()
 
     assert wait_for_condition(lambda: receiving_world.state._data[0, 0] == 4.2)
+    with pytest.raises(SynchronizerDivergedError):
+        receiver.has_applied(publisher.latest_published_position)
     assert not receiver.has_applied(publisher.latest_published_position)
     publisher.close()
     receiver.close()
+
+
+# %% telling the owner of the world
+
+
+def test_owner_is_told_why_an_update_could_not_be_applied(rclpy_node):
+    synchronizer = WorldSynchronizer(
+        node=rclpy_node,
+        _world=create_dummy_world(),
+        topic_name=unique_topic("owner_told"),
+    )
+    synchronizer.subscription_callback(state_update_of_unknown_degree_of_freedom())
+
+    with pytest.raises(SynchronizerDivergedError) as raised:
+        synchronizer.apply_missed_messages()
+
+    assert isinstance(
+        raised.value.raised_from, StateUpdateContainsUnknownDegreesOfFreedomError
+    )
+    synchronizer.close()
+
+
+def test_owner_is_told_once_about_an_update_that_could_not_be_applied(rclpy_node):
+    synchronizer = WorldSynchronizer(
+        node=rclpy_node,
+        _world=create_dummy_world(),
+        topic_name=unique_topic("owner_told_once"),
+    )
+    synchronizer.subscription_callback(state_update_of_unknown_degree_of_freedom())
+    with pytest.raises(SynchronizerDivergedError):
+        synchronizer.apply_missed_messages()
+
+    synchronizer.apply_missed_messages()
+
+    synchronizer.close()
 
 
 # %% own echo

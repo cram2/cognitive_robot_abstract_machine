@@ -38,6 +38,7 @@ from semantic_digital_twin.callbacks.callback import (
     StateChangeCallback,
     ModelChangeCallback,
 )
+from semantic_digital_twin.adapters.ros.exceptions import SynchronizerDivergedError
 from semantic_digital_twin.exceptions import (
     SynchronizerNotConnectedError,
     MissingPublishChangesKWARG,
@@ -167,6 +168,14 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
     from their worlds for good.
     """
 
+    _unreported_divergence: SynchronizerDivergedError | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    The first failure to apply a received message that was not raised on the thread that
+    owns the world yet.
+    """
+
     _sequence_number_lock: threading.Lock = field(
         default_factory=threading.Lock, init=False, repr=False
     )
@@ -261,21 +270,43 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         error_throttle_period: float = 1.0,
     ) -> None:
         """
-        Log that a message could not be applied, and stop counting its publisher as
-        caught up with, instead of ending the spinning of the node.
+        Log that a message could not be applied, stop counting its publisher as caught
+        up with, and keep the failure for :meth:`raise_unreported_divergence`, instead
+        of ending the spinning of the node.
 
         :param received: The message that could not be applied.
         :param error: Why it could not be applied.
         :param error_throttle_period: The fewest seconds between two logged errors.
         """
+        divergence = SynchronizerDivergedError(
+            publisher=received.publisher,
+            sequence_number=received.sequence_number,
+            raised_from=error,
+        )
         with self._sequence_number_lock:
             self._diverged_publishers.add(received.publisher)
+            if self._unreported_divergence is None:
+                self._unreported_divergence = divergence
         self.node.get_logger().error(
             f"Update #{received.sequence_number} of '{received.publisher.node_name}' "
             f"could not be applied, so this world may differ from the one of the "
             f"publisher from now on: {error}",
             throttle_duration_sec=error_throttle_period,
         )
+
+    def raise_unreported_divergence(self) -> None:
+        """
+        Raise, on the calling thread, the first failure to apply a received message that
+        was not raised yet; each failure is raised once.
+
+        :raises SynchronizerDivergedError: If a message could not be applied since the
+            last call.
+        """
+        with self._sequence_number_lock:
+            divergence = self._unreported_divergence
+            self._unreported_divergence = None
+        if divergence is not None:
+            raise divergence
 
     def _notice_lost_messages(
         self, message: ReceivedMessage, warning_throttle_period: float = 1.0
@@ -321,7 +352,11 @@ class Synchronizer(WorldEntityWithClassBasedID, PublicationProgress):
         A publisher this world never heard from is treated as being at the start of its
         stream, so its first message is still awaited. A publisher a message of which
         could not be applied is never caught up with.
+
+        :raises SynchronizerDivergedError: If a message could not be applied since the
+            last time this was reported, see :meth:`raise_unreported_divergence`.
         """
+        self.raise_unreported_divergence()
         with self._sequence_number_lock:
             if position.origin in self._diverged_publishers:
                 return False
@@ -774,9 +809,12 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
 
         :raises ApplyMissedMessagesWhileWorldIsBeingModifiedError: If called while a
             ``modify_world`` context is active on this synchronizer's world.
+        :raises SynchronizerDivergedError: If a message could not be applied since the
+            last time this was reported, see :meth:`raise_unreported_divergence`.
         """
         if self._world.world_is_being_modified:
             raise ApplyMissedMessagesWhileWorldIsBeingModifiedError()
+        self.raise_unreported_divergence()
         with self._missed_message_lock:
             pending_messages = self.missed_messages[:count]
             if not pending_messages:
