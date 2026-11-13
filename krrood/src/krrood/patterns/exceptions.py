@@ -1,3 +1,7 @@
+"""
+The exceptions the patterns raise.
+"""
+
 from __future__ import annotations
 
 import inspect
