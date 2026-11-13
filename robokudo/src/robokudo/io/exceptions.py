@@ -11,6 +11,14 @@ from robokudo.types.image import ImageRotation
 from semantic_digital_twin.datastructures.camera_model import CameraDistortionModel
 
 
+# %% Stereo configuration
+@dataclass(kw_only=True)
+class InvalidStereoCameraConfiguration(RoboKudoError, ValueError):
+    """
+    Base for stereo settings that contradict the camera input contract.
+    """
+
+
 # %% Image rotation
 @dataclass
 class UnsupportedImageRotation(RoboKudoError, ValueError):
