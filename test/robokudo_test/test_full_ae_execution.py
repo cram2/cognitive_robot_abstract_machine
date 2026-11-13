@@ -7,7 +7,6 @@ import numpy as np
 import py_trees
 
 from robokudo.types.cv import ColorToDepthRatio
-from robokudo.perceived_objects import PerceivedObjects
 import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
@@ -36,7 +35,10 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from semantic_digital_twin.robots.robot_parts import Camera
+from rclpy.node import Node
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
+
+from ._perception_process import EngineRunningABehaviour, robokudo_of_its_own
 
 
 class TestFullAEExecution(object):
@@ -115,7 +117,11 @@ class TestFullAEExecution(object):
             ]
         )
 
-        perceived_objects = PerceivedObjects(world=seq.world)
+        perceiving_node = Node("perceiving_into_the_semantic_digital_twin")
+        perceiving_robokudo = robokudo_of_its_own(
+            perceiving_node, EngineRunningABehaviour()
+        )
+        seq.world = perceiving_robokudo.world
         body_ids_after_each_successful_cas = []
 
         def assert_current_cas_keeps_a_single_object(cas):
@@ -126,16 +132,11 @@ class TestFullAEExecution(object):
                 "Each successful CAS should already contain the object hypothesis to be synchronized."
             )
 
-            [body_id] = perceived_objects.apply(cas)
-            perceivable_objects = seq.world.get_semantic_annotations_by_type(
+            perceiving_robokudo.update_world_with_perception_beliefs(pipeline=seq)
+            [perceivable_object] = seq.world.get_semantic_annotations_by_type(
                 IsPerceivable
             )
-            assert [annotation.root.id for annotation in perceivable_objects] == [
-                body_id
-            ], (
-                "After each successful pass, the current object should be the one perceivable object of the world."
-            )
-            body_ids_after_each_successful_cas.append(body_id)
+            body_ids_after_each_successful_cas.append(perceivable_object.root.id)
 
         successful_cas_instances = (
             robokudo.utils.tree_execution.run_tree_until_successful_cas_count(
@@ -205,16 +206,8 @@ class TestFullAEExecution(object):
                 robokudo.types.annotation.BoundingBox3DAnnotation,
                 object_hypothesis.annotations,
             )
-            stamped_pose_annotations = cas.filter_by_type(
-                robokudo.types.annotation.StampedPoseAnnotation,
-                object_hypothesis.annotations,
-            )
-
             assert len(pose_annotations) == 1
             assert len(bbox_annotations) == 1
-            assert len(stamped_pose_annotations) == 1
-            assert stamped_pose_annotations[0].source == PerceivedObjects.__name__
-            assert stamped_pose_annotations[0].frame == "map"
 
         [perceived_object] = seq.world.get_semantic_annotations_by_type(IsPerceivable)
         assert perceived_object.root.parent_connection is not None, (
@@ -223,6 +216,8 @@ class TestFullAEExecution(object):
         assert len(perceived_object.root.visual.shapes) == 1, (
             "The body of the perceived object should contain one visual shape derived from its bounding box."
         )
+        perceiving_robokudo.close()
+        perceiving_node.destroy_node()
 
     def test_run_semdt_raytracer_ae_successfully(self, node) -> None:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(

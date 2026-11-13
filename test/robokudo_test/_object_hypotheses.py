@@ -22,6 +22,7 @@ def make_object_hypothesis(
     source: str = "test_source",
     class_label: str | None = None,
     class_confidence: float = 1.0,
+    hypothesis_type: type[ObjectHypothesis] = ObjectHypothesis,
 ) -> ObjectHypothesis:
     """
     An object hypothesis with an image region, a pose, a 3D bounding box and, if given,
@@ -34,9 +35,10 @@ def make_object_hypothesis(
     :param class_label: The class the object is classified as, or None to leave it
         unclassified.
     :param class_confidence: How confident the classification is.
+    :param hypothesis_type: The kind of hypothesis, such as one about a human.
     :return: The hypothesis.
     """
-    hypothesis = ObjectHypothesis()
+    hypothesis = hypothesis_type()
 
     x, y, width, height = roi
     hypothesis.roi.roi.pos.x = x

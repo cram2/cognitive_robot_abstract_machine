@@ -575,6 +575,32 @@ class UnknownWorldFrameError(RoboKudoError, LookupError):
 
 
 @dataclass
+class CameraPoseOutsideWorldError(RoboKudoError, LookupError):
+    """
+    Raised when the camera pose of a finished pass is measured against a body that is
+    not part of the world RoboKudo perceives into.
+    """
+
+    reference_frame_name: str
+    """
+    The name of the body the camera pose is measured against.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The camera pose of the pass is measured against '{self.reference_frame_name}', "
+            f"which is not a body of the world RoboKudo perceives into, so the objects "
+            f"of the pass cannot be placed in it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "let the pipeline perceive into the world of its RoboKudo, which "
+            "RoboKudo.start gives every pipeline of the analysis engine."
+        )
+
+
+@dataclass
 class WorldDescriptorError(RoboKudoError, ABC):
     """
     Base class for world descriptor related errors.

@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import timedelta
 from threading import Thread, Timer
+from uuid import UUID
 
 import numpy as np
 import pytest
@@ -15,6 +16,10 @@ from py_trees.common import Status
 from rclpy.context import Context
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -29,7 +34,6 @@ from std_srvs.srv import Trigger
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.cas import CAS
 from robokudo.exceptions import (
     EngineRootIsNotAPipelineError,
     RoboKudoAlreadyRunningError,
@@ -38,9 +42,13 @@ from robokudo.identifier import BBIdentifier
 from robokudo.pipeline import Pipeline
 from robokudo.process import RoboKudo
 from robokudo.types.annotation import BoundingBox3DAnnotation
-from robokudo.types.scene import ObjectHypothesis
 
 from ._object_hypotheses import make_object_hypothesis
+from ._perception_process import (
+    EngineRunningABehaviour,
+    put_pass_into_world,
+    robokudo_of_its_own,
+)
 from ._perception_world import (
     FrameName,
     SharedWorld,
@@ -49,26 +57,6 @@ from ._perception_world import (
     place_camera_of,
     wait_until,
 )
-
-
-@dataclass
-class EngineRunningABehaviour:
-    """
-    An analysis engine whose pipeline runs a single behaviour.
-    """
-
-    behaviour: Behaviour = field(default_factory=lambda: Success(name="Perceive"))
-    """
-    The behaviour the pipeline runs.
-    """
-
-    def name(self) -> str:
-        return type(self).__name__
-
-    def implementation(self) -> Pipeline:
-        pipeline = Pipeline("RunningABehaviour")
-        pipeline.add_child(self.behaviour)
-        return pipeline
 
 
 @dataclass
@@ -125,29 +113,6 @@ class EngineFindingAnObject:
         return pipeline
 
 
-def cas_holding_hypothesis(world: World, hypothesis: ObjectHypothesis) -> CAS:
-    """
-    :return: A CAS seen from :func:`camera_pose` in ``world`` that found ``hypothesis``.
-    """
-    cas = cas_seen_from(world, camera_pose())
-    cas.annotations.append(hypothesis)
-    return cas
-
-
-def robokudo_of_its_own(
-    node: Node, analysis_engine: AnalysisEngineInterface
-) -> RoboKudo:
-    """
-    :return: A RoboKudo that looks for a shared world only once, finds none, and
-        perceives into a world of its own.
-    """
-    return RoboKudo(
-        node=node,
-        analysis_engine=analysis_engine,
-        world_discovery_timeout=timedelta(0),
-    )
-
-
 def robokudo_joining_a_shared_world(
     node: Node, analysis_engine: AnalysisEngineInterface
 ) -> RoboKudo:
@@ -160,6 +125,14 @@ def robokudo_joining_a_shared_world(
         analysis_engine=analysis_engine,
         world_discovery_timeout=timedelta(seconds=10),
     )
+
+
+def perceived_body_id(world: World) -> UUID:
+    """
+    :return: The id of the body of the one perceivable object of ``world``.
+    """
+    [annotation] = world.get_semantic_annotations_by_type(IsPerceivable)
+    return annotation.root.id
 
 
 @pytest.fixture
@@ -288,10 +261,13 @@ class TestJoiningSharedWorld:
     def test_perceived_object_reaches_the_shared_world_at_its_pose(
         self, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        cas = cas_seen_from(joined_robokudo.world, camera_pose(x=1.0))
-        cas.annotations.append(make_object_hypothesis(translation=(0.0, 0.5, 2.0)))
+        put_pass_into_world(
+            joined_robokudo,
+            cas_seen_from(joined_robokudo.world, camera_pose(x=1.0)),
+            make_object_hypothesis(translation=(0.0, 0.5, 2.0)),
+        )
 
-        [body_id] = joined_robokudo.perceived_objects.apply(cas)
+        body_id = perceived_body_id(joined_robokudo.world)
 
         perceived_body = joined_robokudo.world.get_kinematic_structure_entity_by_id(
             body_id
@@ -317,10 +293,13 @@ class TestJoiningSharedWorld:
         self, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         class_label = "fork"
-        cas = cas_seen_from(joined_robokudo.world, camera_pose())
-        cas.annotations.append(make_object_hypothesis(class_label=class_label))
+        put_pass_into_world(
+            joined_robokudo,
+            cas_seen_from(joined_robokudo.world, camera_pose()),
+            make_object_hypothesis(class_label=class_label),
+        )
 
-        [body_id] = joined_robokudo.perceived_objects.apply(cas)
+        body_id = perceived_body_id(joined_robokudo.world)
 
         assert wait_until(
             lambda: (
@@ -338,14 +317,17 @@ class TestJoiningSharedWorld:
     def test_classified_object_reaches_the_shared_world_as_its_semantic_annotation(
         self, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        [body_id] = joined_robokudo.perceived_objects.apply(
-            cas_holding_hypothesis(joined_robokudo.world, make_object_hypothesis())
+        put_pass_into_world(
+            joined_robokudo,
+            cas_seen_from(joined_robokudo.world, camera_pose()),
+            make_object_hypothesis(),
         )
+        body_id = perceived_body_id(joined_robokudo.world)
 
-        joined_robokudo.perceived_objects.apply(
-            cas_holding_hypothesis(
-                joined_robokudo.world, make_object_hypothesis(class_label="cup")
-            )
+        put_pass_into_world(
+            joined_robokudo,
+            cas_seen_from(joined_robokudo.world, camera_pose()),
+            make_object_hypothesis(class_label="cup"),
         )
 
         assert wait_until(
@@ -364,9 +346,12 @@ class TestJoiningSharedWorld:
     def test_perceiving_adds_no_camera_to_the_shared_world(
         self, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        [body_id] = joined_robokudo.perceived_objects.apply(
-            cas_holding_hypothesis(joined_robokudo.world, make_object_hypothesis())
+        put_pass_into_world(
+            joined_robokudo,
+            cas_seen_from(joined_robokudo.world, camera_pose()),
+            make_object_hypothesis(),
         )
+        body_id = perceived_body_id(joined_robokudo.world)
 
         assert wait_until(
             lambda: body_id in [body.id for body in shared_world.world.bodies]
@@ -432,9 +417,12 @@ class TestJoiningAWorldWithARobot:
             ).to_np()
         )
 
-        [body_id] = robokudo_joined_to_a_robot.perceived_objects.apply(
-            cas_holding_hypothesis(robokudo_joined_to_a_robot.world, hypothesis)
+        put_pass_into_world(
+            robokudo_joined_to_a_robot,
+            cas_seen_from(robokudo_joined_to_a_robot.world, camera_pose()),
+            hypothesis,
         )
+        body_id = perceived_body_id(robokudo_joined_to_a_robot.world)
 
         assert wait_until(
             lambda: (
@@ -584,7 +572,7 @@ class TestObjectsOfAFinishedPass:
         robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
         robokudo.start(include_gui=False)
 
-        robokudo.tick()
+        robokudo.tick_tree()
 
         [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
             PerceivedObject
@@ -598,7 +586,109 @@ class TestObjectsOfAFinishedPass:
         )
         robokudo.start(include_gui=False)
 
-        robokudo.tick()
+        robokudo.tick_tree()
 
         assert robokudo.world.get_semantic_annotations_by_type(PerceivedObject) == []
         robokudo.close()
+
+
+# %% publishing its own world
+
+
+def robokudo_publishing_its_own_world(node: Node) -> RoboKudo:
+    """
+    :return: A RoboKudo that perceives into a world of its own, finds one object per
+        pass and publishes its world.
+    """
+    return RoboKudo(
+        node=node,
+        analysis_engine=EngineFindingAnObject(),
+        world_discovery_timeout=timedelta(0),
+        publishes_own_world=True,
+    )
+
+
+class TestPublishingItsOwnWorld:
+    """
+    A RoboKudo with a world of its own publishes that world to RViz.
+    """
+
+    def test_publishes_its_objects_without_claiming_the_frames_of_the_camera_pose(
+        self, *, node: Node
+    ) -> None:
+        robokudo = robokudo_publishing_its_own_world(node)
+        robokudo.start(include_gui=False)
+
+        robokudo.tick_tree()
+
+        [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
+            PerceivedObject
+        )
+        tf_publisher = robokudo.world_publisher.tf_publisher
+        published = tf_publisher.tf_model_callback
+        transforms = (
+            published.tf_message.transforms + published.static_tf_message.transforms
+        )
+        published_frames = {
+            frame
+            for transform in transforms
+            for frame in (transform.header.frame_id, transform.child_frame_id)
+        }
+        assert (
+            tf_publisher.frame_names.assign(perceived_object.root) in published_frames
+        )
+        assert published_frames & {FrameName.WORLD, FrameName.CAMERA} == set()
+        robokudo.close()
+
+    def test_publishes_markers_of_its_objects(self, *, node: Node) -> None:
+        robokudo = robokudo_publishing_its_own_world(node)
+        robokudo.start(include_gui=False)
+
+        robokudo.tick_tree()
+
+        [perceived_object] = robokudo.world.get_semantic_annotations_by_type(
+            PerceivedObject
+        )
+        world_publisher = robokudo.world_publisher
+        assert {
+            marker.header.frame_id for marker in world_publisher.markers.markers
+        } == {world_publisher.tf_publisher.frame_names.assign(perceived_object.root)}
+        robokudo.close()
+
+    def test_publishes_nothing_unless_asked_to(self, *, node: Node) -> None:
+        robokudo = robokudo_of_its_own(node, EngineFindingAnObject())
+        robokudo.start(include_gui=False)
+
+        robokudo.tick_tree()
+
+        assert robokudo.world_publisher is None
+        robokudo.close()
+
+    def test_leaves_publishing_a_shared_world_to_the_process_serving_it(
+        self, *, node: Node, shared_world: SharedWorld
+    ) -> None:
+        robokudo = RoboKudo(
+            node=node,
+            analysis_engine=EngineFindingAnObject(),
+            world_discovery_timeout=timedelta(seconds=10),
+            publishes_own_world=True,
+        )
+        robokudo.start(include_gui=False)
+
+        robokudo.tick_tree()
+
+        assert robokudo.world_publisher is None
+        robokudo.close()
+
+    def test_closed_robokudo_no_longer_publishes_its_world(self, *, node: Node) -> None:
+        robokudo = robokudo_publishing_its_own_world(node)
+        robokudo.start(include_gui=False)
+        robokudo.tick_tree()
+
+        robokudo.close()
+
+        assert (
+            VizMarkerPublisher.all_callbacks_of_this_type_from_world(robokudo.world)
+            == []
+        )
+        assert TFPublisher.all_callbacks_of_this_type_from_world(robokudo.world) == []

@@ -26,6 +26,10 @@ from semantic_digital_twin.adapters.ros.world_fetcher import (
     fetch_world_from_service,
     find_world_fetcher_service,
 )
+from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames
+from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
+    VizMarkerPublisher,
+)
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.world import World
 from typing_extensions import TYPE_CHECKING, List, Optional, Type
@@ -34,15 +38,17 @@ from typing_extensions import TYPE_CHECKING, List, Optional, Type
 # trips the circular import between robokudo.pipeline and robokudo.annotators.core.
 import robokudo.pipeline
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE
+from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
 from robokudo.exceptions import (
+    CameraPoseOutsideWorldError,
     EngineRootIsNotAPipelineError,
     RoboKudoAlreadyRunningError,
 )
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.perceived_objects import PerceivedObjects
+from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.pipeline import Pipeline
+from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.tree import find_parent_of_type, setup_with_descendants_rk
 
 if TYPE_CHECKING:
@@ -79,15 +85,24 @@ class RoboKudo:
     of its own.
     """
 
+    publishes_own_world: bool = False
+    """
+    Whether to publish a world of its own to RViz, as markers and as the tf frames of
+    the objects in it.
+
+    A shared world is published by the process serving it.
+    """
+
     world: World = field(init=False)
     """
     The world perception perceives into: the shared world, or an empty world of its own
     if no process serves one.
     """
 
-    perceived_objects: PerceivedObjects = field(init=False)
+    world_publisher: VizMarkerPublisher | None = field(init=False, default=None)
     """
-    The objects perception believes in, kept as bodies in :attr:`world`.
+    Publishes a world of its own, from the first pass on that gave it a world frame, if
+    :attr:`publishes_own_world`; None until then.
     """
 
     synchronizer: Optional[WorldSynchronizer] = field(init=False, default=None)
@@ -136,7 +151,6 @@ class RoboKudo:
         else:
             self.world = fetch_world_from_service(self.node)
             self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
-        self.perceived_objects = PerceivedObjects(world=self.world)
 
     @classmethod
     def from_blackboard(cls) -> RoboKudo:
@@ -224,7 +238,7 @@ class RoboKudo:
             try:
                 logger.debug(f"--------- Tick {tick_count} ---------")
                 start = timer()
-                self.tick()
+                self.tick_tree()
                 logger.debug(f"Tick took {timer() - start:.4f} seconds")
                 if (
                     self.tree.root.children
@@ -236,22 +250,110 @@ class RoboKudo:
                 logger.error(f"Exception: {exception}")
                 logger.error("Traceback:\n" + traceback.format_exc())
 
-    def tick(self) -> None:
+    def tick_tree(self) -> None:
         """
         Tick the behaviour tree once, and put the objects found by a pass of
         :attr:`pipeline` that finished successfully in this tick into the world.
+
+        Publishing a world of its own starts once it has a world frame, as
+        :attr:`publishes_own_world` asks.
         """
         self.tree.tick()
         pipeline = self.pipeline
         if pipeline.status != Status.SUCCESS:
             return
-        self.perceived_objects.apply(pipeline.cas)
+        self.update_world_with_perception_beliefs(pipeline=pipeline)
+        if (
+            self.publishes_own_world
+            and self.synchronizer is None
+            and self.world_publisher is None
+            and self.world.root is not None
+        ):
+            self.start_publishing_own_world()
+
+    def start_publishing_own_world(self) -> None:
+        """
+        Publish :attr:`world` as markers and as tf frames named under the package name,
+        joined to the unprefixed world frame.
+
+        Its frames thus never claim those of the tf tree perception reads the camera
+        poses from, which also holds its cameras.
+        """
+        self.world_publisher = VizMarkerPublisher(
+            _world=self.world,
+            node=self.node,
+            tf_publisher=TFPublisher(
+                _world=self.world,
+                node=self.node,
+                frame_names=TfFrameNames(prefix=f"{PACKAGE_NAME}/"),
+            ),
+        )
+
+    def update_world_with_perception_beliefs(self, *, pipeline: Pipeline) -> None:
+        """
+        Form a belief about each object the last pass of ``pipeline`` found and match
+        the beliefs to the perceivable objects of :attr:`world`. A matched object is
+        updated as :meth:`PerceptionBelief.update_known_object` describes; any other
+        belief is added to :attr:`world`. No other thread changes :attr:`world`
+        meanwhile.
+
+        A pass without a camera pose in the world is left out, with a warning logged.
+
+        :param pipeline: A pipeline whose last pass finished successfully.
+        :raises CameraPoseOutsideWorldError: If the camera pose of the pass is measured
+            against a body that is not part of :attr:`world`.
+        """
+        matcher = ObjectMatcher()
+        minimum_class_confidence = 0.5
+        cas = pipeline.cas
+        observation = cas.camera_observation
+        if (
+            observation is None
+            or observation.world_T_camera is None
+            or observation.world_T_camera.reference_frame is None
+        ):
+            logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE).warning(
+                "Leaving out a pass without a camera pose in the world."
+            )
+            return
+        world_T_camera = observation.world_T_camera
+        with self.world._world_lock:
+            if (
+                world_T_camera.reference_frame
+                not in self.world.kinematic_structure_entities
+            ):
+                raise CameraPoseOutsideWorldError(
+                    reference_frame_name=str(world_T_camera.reference_frame.name)
+                )
+            beliefs = [
+                belief
+                for hypothesis in cas.filter_annotations_by_type(ObjectHypothesis)
+                if (
+                    belief := PerceptionBelief.from_hypothesis(
+                        hypothesis=hypothesis,
+                        world_T_camera=world_T_camera,
+                        minimum_class_confidence=minimum_class_confidence,
+                    )
+                )
+                is not None
+            ]
+            matches = matcher.match(beliefs=beliefs, world=self.world)
+            for belief in beliefs:
+                known_object = matches.get(belief)
+                if known_object is None:
+                    belief.add_to_world(world=self.world)
+                    continue
+                belief.update_known_object(known_object=known_object, world=self.world)
 
     def close(self) -> None:
         """
-        Stop sharing the world and serving :attr:`node`, and make room for another
-        RoboKudo in this process.
+        Stop sharing and publishing the world and serving :attr:`node`, and make room
+        for another RoboKudo in this process.
         """
+        if self.world_publisher is not None:
+            self.world_publisher.stop()
+            self.world_publisher.tf_publisher.stop()
+            self.world_publisher = None
         if self.synchronizer is not None:
             self.synchronizer.close()
             self.synchronizer = None

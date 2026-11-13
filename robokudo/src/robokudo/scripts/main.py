@@ -174,6 +174,7 @@ def main() -> None:
         node=node1,
         analysis_engine=loaded_ae,
         world_discovery_timeout=timedelta(seconds=args.world_discovery_timeout),
+        publishes_own_world=True,
     )
 
     # 9. Build the Behavior Tree of the loaded AE
