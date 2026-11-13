@@ -300,21 +300,28 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         )
 
     def to_namespace(
-        self, namespace: ModuleType, device: Any = None, dtype: Any = None
+        self,
+        namespace: ModuleType,
+        device: Any = None,
+        floating_point_type: Any = None,
     ) -> Self:
         """
         :param namespace: The Array API namespace to store the parameters in.
         :param device: The device of that namespace to store them on, its default if
             ``None``.
-        :param dtype: The floating point type to store them in, which the numeric
-            queries then compute in; float64 if ``None``.
+        :param floating_point_type: The floating point type to store them in, which
+            the numeric queries then compute in; float64 if ``None``.
         :return: A copy of this circuit whose parameters are arrays of that namespace.
         """
         return self.copy_with_parameters(
             [
                 namespace.asarray(
                     HasParameterArrays.host_copy(parameter),
-                    dtype=namespace.float64 if dtype is None else dtype,
+                    dtype=(
+                        namespace.float64
+                        if floating_point_type is None
+                        else floating_point_type
+                    ),
                     device=device,
                 )
                 for parameter in self.parameters

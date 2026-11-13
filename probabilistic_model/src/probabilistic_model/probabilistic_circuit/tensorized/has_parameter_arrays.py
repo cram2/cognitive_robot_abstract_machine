@@ -14,28 +14,43 @@ import numpy as np
 import array_api_compat
 from array_api_compat import array_namespace, is_cupy_array, is_torch_array
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
-from typing_extensions import Any, Self
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Any, Generic, Self, TypeVar
 
-from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
-    BackendArray,
-)
+ArrayType = TypeVar("ArrayType")
+"""
+The array type of the backend the parameters belong to, such as :class:`numpy.ndarray`
+or :class:`jax.Array`.
+"""
+
+FloatingPointType = TypeVar("FloatingPointType", default=Any)
+"""
+The type of the floating point types of that backend, such as :class:`numpy.dtype` or
+:class:`torch.dtype`.
+"""
 
 # %% parameter arrays of one backend
 
 
 @dataclass(eq=False, kw_only=True)
-class HasParameterArrays(DataclassDeepcopyMixin, ABC):
+class HasParameterArrays(
+    Generic[ArrayType, FloatingPointType],
+    SubClassSafeGeneric,
+    DataclassDeepcopyMixin,
+    ABC,
+):
     """
     Base class for the parts of a layered circuit whose numeric queries compute with the
     array backend of their parameters.
 
     Everything else it stores is structure, numpy on the host. A deep copy copies only
-    the constructor fields, so it looks up the backend anew.
+    the constructor fields, so it looks up the backend anew. Annotate a part of one
+    backend as, for instance, ``HasParameterArrays[jax.Array]``.
     """
 
     @property
     @abstractmethod
-    def parameters(self) -> list[BackendArray]:
+    def parameters(self) -> list[ArrayType]:
         """
         :return: The parameter arrays, the only arrays an array backend may replace. All
             of them belong to one backend.
@@ -43,7 +58,7 @@ class HasParameterArrays(DataclassDeepcopyMixin, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, parameters: list[ArrayType]) -> Self:
         """
         :param parameters: Arrays of one backend in the order and with the shapes of
             :attr:`parameters`.
@@ -52,7 +67,7 @@ class HasParameterArrays(DataclassDeepcopyMixin, ABC):
         raise NotImplementedError
 
     @functools.cached_property
-    def dtype(self) -> Any:
+    def floating_point_type(self) -> FloatingPointType:
         """
         :return: The floating point type of the parameters, which the numeric queries
             compute in.
@@ -68,7 +83,7 @@ class HasParameterArrays(DataclassDeepcopyMixin, ABC):
         return array_api_compat.device(self.parameters[0])
 
     @staticmethod
-    def host_copy(array: BackendArray) -> np.ndarray:
+    def host_copy(array: ArrayType) -> np.ndarray:
         """
         :param array: An array of any backend, on any device.
         :return: The values of the array as a numpy array.

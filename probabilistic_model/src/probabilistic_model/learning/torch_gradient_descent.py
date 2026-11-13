@@ -10,23 +10,21 @@ from dataclasses import dataclass, field
 
 import torch
 import tqdm
-from typing_extensions import TYPE_CHECKING, Any
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic
 
 from probabilistic_model.learning.gradient_descent import (
     ClassConditionalLikelihoodLoss,
+    LayerType,
     LikelihoodLoss,
 )
 
-if TYPE_CHECKING:
-    from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
-        Layer,
-    )
 
 # %% gradient descent
 
 
 @dataclass
-class TorchGradientDescent(ABC):
+class TorchGradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
     """
     Minimizes a loss of the circuit rooted at a tensorized layer whose parameters are
     torch tensors, one optimizer step per epoch.
@@ -35,7 +33,7 @@ class TorchGradientDescent(ABC):
     ``projected_circuit_parameters``.
     """
 
-    layer: Layer
+    layer: LayerType
     """
     The root of the circuit to train, which is left unchanged.
     """
@@ -62,14 +60,14 @@ class TorchGradientDescent(ABC):
         ]
 
     @abstractmethod
-    def loss(self, layer: Any, *arguments: torch.Tensor) -> torch.Tensor:
+    def loss(self, layer: LayerType, *arguments: torch.Tensor) -> torch.Tensor:
         """
         :param layer: The root of the circuit to evaluate.
         :param arguments: The tensors passed to :meth:`minimize`.
         :return: The scalar loss of the circuit on the arguments.
         """
 
-    def minimize(self, epochs: int, *arguments: torch.Tensor) -> Layer:
+    def minimize(self, epochs: int, *arguments: torch.Tensor) -> LayerType:
         """
         :param epochs: The number of epochs.
         :param arguments: The tensors :meth:`loss` takes after the circuit.
@@ -98,7 +96,9 @@ class TorchGradientDescent(ABC):
 
 
 @dataclass
-class TorchLikelihoodMaximization(LikelihoodLoss, TorchGradientDescent):
+class TorchLikelihoodMaximization(
+    LikelihoodLoss[LayerType], TorchGradientDescent[LayerType]
+):
     """
     Maximizes the average log-likelihood of the data under the nodes of the root with
     torch.
@@ -107,7 +107,7 @@ class TorchLikelihoodMaximization(LikelihoodLoss, TorchGradientDescent):
 
 @dataclass
 class TorchClassConditionalLikelihoodMaximization(
-    ClassConditionalLikelihoodLoss, TorchGradientDescent
+    ClassConditionalLikelihoodLoss[LayerType], TorchGradientDescent[LayerType]
 ):
     """
     Maximizes the average log-likelihood of each row under the node of its class with

@@ -31,7 +31,7 @@ The representation a probability table stores its log-probabilities in.
 """
 
 
-class ProbabilityTable(HasParameterArrays, ABC, Generic[StoredLogProbabilities]):
+class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC):
     """
     The probability of every state for every node of a discrete layer, a table of shape
     (#nodes, #states).

@@ -132,7 +132,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         self, values: SampleColumn
     ) -> SampleNodeValues:
         reached = self.float_column(values=values) >= self.location - self.tolerance
-        return self.namespace.astype(reached, self.dtype)
+        return self.namespace.astype(reached, self.floating_point_type)
 
     def moment_of_nodes_own(
         self, order: int, center: float, variable: Variable
@@ -208,7 +208,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         :attr:`tolerance` and zero otherwise.
         """
         return self.namespace.astype(
-            self.contains(event[variables[self.variable]]), self.dtype
+            self.contains(event[variables[self.variable]]), self.floating_point_type
         )
 
     def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:

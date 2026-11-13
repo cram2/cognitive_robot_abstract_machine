@@ -88,7 +88,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             shape (#events, 1).
         """
         return self.namespace.reshape(
-            self.namespace.asarray(values, dtype=self.dtype, device=self.device),
+            self.namespace.asarray(
+                values, dtype=self.floating_point_type, device=self.device
+            ),
             (-1, 1),
         )
 
@@ -175,7 +177,7 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         if not query.requested[self.variable]:
             return self.namespace.zeros(
                 (self.number_of_nodes, query.number_of_variables),
-                dtype=self.dtype,
+                dtype=self.floating_point_type,
                 device=self.device,
             )
         own_moments = self.moment_of_nodes_own(
@@ -212,7 +214,9 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
             ],
             dtype=float,
         )
-        return self.namespace.asarray(moments, dtype=self.dtype, device=self.device)
+        return self.namespace.asarray(
+            moments, dtype=self.floating_point_type, device=self.device
+        )
 
     def sample_forward(
         self,
@@ -420,13 +424,13 @@ class AbstractContinuousLayer(UnivariateInputLayer, ABC):
     ) -> NodeValues:
         interval: Interval = event[variables[self.variable]]
         result = self.namespace.zeros(
-            self.number_of_nodes, dtype=self.dtype, device=self.device
+            self.number_of_nodes, dtype=self.floating_point_type, device=self.device
         )
         for simple_interval in interval.simple_sets:
             values = self.cumulative_distribution_of_nodes_from_column(
                 self.namespace.asarray(
                     [simple_interval.lower, simple_interval.upper],
-                    dtype=self.dtype,
+                    dtype=self.floating_point_type,
                     device=self.device,
                 )
             )

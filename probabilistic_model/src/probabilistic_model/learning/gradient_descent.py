@@ -16,15 +16,18 @@ import optax
 import tqdm
 import array_api_compat
 from array_api_compat import array_namespace
-from typing_extensions import TYPE_CHECKING, Any
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from typing_extensions import Generic, TypeVar
 
-if TYPE_CHECKING:
-    from probabilistic_model.probabilistic_circuit.jax.inner_layer import (
-        DifferentiableLayer,
-    )
-    from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
-        Layer,
-    )
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
+)
+
+LayerType = TypeVar("LayerType")
+"""
+The type of the root layer that gradient descent trains, such as
+:class:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base.Layer`.
+"""
 
 # %% gradient descent
 
@@ -51,7 +54,7 @@ class TrainingState(eqx.Module):
 
 
 @dataclass
-class GradientDescent(ABC):
+class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
     """
     Minimizes a loss of the circuit rooted at a layer by gradient descent, one compiled
     step per epoch.
@@ -62,7 +65,7 @@ class GradientDescent(ABC):
     list.
     """
 
-    layer: Layer | DifferentiableLayer
+    layer: LayerType
     """
     The root of the circuit to train, which is left unchanged.
     """
@@ -85,7 +88,7 @@ class GradientDescent(ABC):
         self.initial_parameters = list(self.layer.circuit_parameters)
 
     @abstractmethod
-    def loss(self, layer: Any, *arguments: jax.Array) -> jax.Array:
+    def loss(self, layer: LayerType, *arguments: jax.Array) -> jax.Array:
         """
         :param layer: The root of the circuit to evaluate.
         :param arguments: The arrays passed to :meth:`minimize`.
@@ -121,7 +124,7 @@ class GradientDescent(ABC):
         )
         return TrainingState(parameters, optimizer_state, loss)
 
-    def minimize(self, epochs: int, *arguments: jax.Array) -> Any:
+    def minimize(self, epochs: int, *arguments: jax.Array) -> LayerType:
         """
         :param epochs: The number of epochs.
         :param arguments: The arrays :meth:`loss` takes after the circuit.
@@ -143,24 +146,26 @@ class GradientDescent(ABC):
 # %% losses
 
 
-class LikelihoodLoss(ABC):
+class LikelihoodLoss(Generic[LayerType], ABC):
     """
     The negative average log-likelihood of the data under the nodes of the root, on any
     array backend.
     """
 
-    def loss(self, layer: Any, data: Any) -> Any:
+    def loss(self, layer: LayerType, data: BackendArray) -> BackendArray:
         log_likelihoods = layer.log_likelihood_of_nodes(data)
         return -array_namespace(log_likelihoods).mean(log_likelihoods)
 
 
-class ClassConditionalLikelihoodLoss(ABC):
+class ClassConditionalLikelihoodLoss(Generic[LayerType], ABC):
     """
     The negative average log-likelihood of each row under the node of its class, on any
     array backend.
     """
 
-    def loss(self, layer: Any, data: Any, labels: Any) -> Any:
+    def loss(
+        self, layer: LayerType, data: BackendArray, labels: BackendArray
+    ) -> BackendArray:
         log_likelihoods = layer.log_likelihood_of_nodes(data)
         namespace = array_namespace(log_likelihoods)
         rows = namespace.arange(
@@ -170,7 +175,7 @@ class ClassConditionalLikelihoodLoss(ABC):
 
 
 @dataclass
-class LikelihoodMaximization(LikelihoodLoss, GradientDescent):
+class LikelihoodMaximization(LikelihoodLoss[LayerType], GradientDescent[LayerType]):
     """
     Maximizes the average log-likelihood of the data under the nodes of the root with
     jax.
@@ -179,7 +184,7 @@ class LikelihoodMaximization(LikelihoodLoss, GradientDescent):
 
 @dataclass
 class ClassConditionalLikelihoodMaximization(
-    ClassConditionalLikelihoodLoss, GradientDescent
+    ClassConditionalLikelihoodLoss[LayerType], GradientDescent[LayerType]
 ):
     """
     Maximizes the average log-likelihood of each row under the node of its class with
